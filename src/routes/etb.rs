@@ -1,10 +1,14 @@
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{
+    EinsatzErfassungsfreigabe, EinsatzErfassungszugriff, EinsatzLesezugriff, EinsatzSchreibzugriff,
+};
 use crate::einsatz::modul::{Auftraege, Etb, Meldungen};
 use crate::error::AppError;
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
 use crate::etb::zaehler::EtbZaehlerAnzeige;
-use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
+use crate::etb::{
+    fordere_etb_typ_fuer_rolle, normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg,
+};
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
@@ -61,12 +65,12 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 }
 
 /// POST /api/einsaetze/{id}/etb — neuen ETB-Eintrag erfassen.
-/// Nur Schreibberechtigte (Einsatzleitung/Führungspersonal), nur bei aktivem
-/// Einsatz. Der Server vergibt `lfd_nr` und `received_at` und broadcastet den
-/// fertigen Eintrag an alle SSE-Abonnenten.
+/// Nur Erfassungsberechtigte (Einsatzleitung/Führungspersonal; die Mitarbeit nur Meldung, Lage
+/// und eigene Berichtigungen, LLH-1817), nur bei aktivem Einsatz. Der Server vergibt `lfd_nr`
+/// und `received_at` und broadcastet den fertigen Eintrag an alle SSE-Abonnenten.
 pub async fn erfassen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibfreigabe<Etb>,
+    ctx: EinsatzErfassungsfreigabe<Etb>,
     headers: HeaderMap,
     JsonBody(req): JsonBody<NeuerEintrag>,
 ) -> Result<(StatusCode, Json<EtbEintragAnzeige>), AppError> {
@@ -139,6 +143,19 @@ pub async fn erfassen(
         ));
     }
 
+    // Mitarbeit (LLH-1817, design.md D3/D4): Typ-Positivliste und Eigentum an den Anhängen, vor
+    // jedem Schreiben. Sie gelten auch für den Weg in den Meldungseingang: eine Lage legt dort
+    // eine Lagemeldung an, die der Mitarbeit auf der Meldungsroute verwehrt ist.
+    let ist_mitarbeit = ctx.rolle.is_some_and(|r| r.ist_mitarbeit());
+    fordere_etb_typ_fuer_rolle(ctx.rolle, typ)?;
+    if ist_mitarbeit {
+        if in_meldungseingang && typ == EtbTyp::Lage {
+            return Err(AppError::Forbidden);
+        }
+        crate::etb::fordere_eigene_anhaenge(&state.pool, einsatz_id, &anhang_ids, ctx.benutzer.id)
+            .await?;
+    }
+
     // Grenzen nach dem Replay-Check (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
     let inhalt = pflicht_max(&req.inhalt, "Inhalt", crate::etb::INHALT_MAX)?;
     // Von und An sind Pflicht (LFH-894, Spec `etb-absender-empfaenger`): fehlend oder leer ist
@@ -164,6 +181,11 @@ pub async fn erfassen(
         let ziel = req.berichtigt_eintrag_id.ok_or_else(|| {
             AppError::Validation("Berichtigung erfordert berichtigt_eintrag_id".into())
         })?;
+        if ist_mitarbeit {
+            crate::etb::fordere_eigenen_eintrag(&state.pool, einsatz_id, ziel, ctx.benutzer.id)
+                .await?;
+            crate::etb::fordere_eintrag_ausserhalb_der_lage(&state.pool, einsatz_id, ziel).await?;
+        }
         if !repo::gehoert_zu_einsatz(&state.pool, ziel, einsatz_id).await? {
             return Err(AppError::Validation(
                 "Berichtigter Eintrag gehört nicht zu diesem Einsatz".into(),
@@ -291,7 +313,7 @@ async fn meldung_publizieren(
 
 /// POST /api/einsaetze/{id}/etb/anhaenge — Datei für einen ETB-Eintrag hochladen (LFH-117).
 ///
-/// Dieselben Gates wie [`erfassen`]: Schreibrecht, Modul „etb", aktiver Einsatz. Die Datei
+/// Dieselben Gates wie [`erfassen`]: Erfassungsrecht, Modul „etb", aktiver Einsatz. Die Datei
 /// ist danach ungebunden, bis ein Erfassen sie mit `anhang_ids` nennt; bleibt das aus, nimmt
 /// sie der Aufräumlauf nach der Karenz. Allowlist ist die der Dokumentenablage (HEIC/HEIF für
 /// iPhone-Fotos, TIFF für Scans) — der generische Upload bleibt bei der Chat-Liste. Schleife,
@@ -299,7 +321,7 @@ async fn meldung_publizieren(
 /// schickt eine Datei je Anfrage; das Body-Limit (26 MiB) sitzt in `app.rs` an der Route.
 pub async fn anhang_hochladen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Etb>,
+    ctx: EinsatzErfassungszugriff<Etb>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<crate::anhang::AnhangAnzeige>>), AppError> {
     let einsatz_id = ctx.einsatz.id;

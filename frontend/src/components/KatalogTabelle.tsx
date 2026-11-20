@@ -545,14 +545,22 @@ export const KOPF_FREIRAUM = '--lfh-tabellenkopf-hoehe';
  * gerechnet, weil die Kopfzeile umbrechen kann; ohne stehende Kopfzeile ist er 0.
  */
 export function setzeKopfFreiraum(wurzel: HTMLElement): void {
+  // Erst alle drei messen, dann schreiben (LLH-1974): jede Messung nach einem Schreiben an der
+  // Wurzel erzwingt eine volle Style-Neuberechnung der Tabelle. Geschrieben wird nur, was sich
+  // geändert hat, damit ein Lauf des Beobachters ohne Änderung nichts invalidiert.
   const kopf = wurzel.querySelector<HTMLElement>('.ant-table-sticky-holder');
-  wurzel.style.setProperty(KOPF_FREIRAUM, `${kopf?.offsetHeight ?? 0}px`);
   // Dieselbe Messung für die fixierte Kennung, siehe `SPALTEN_FREIRAUM`.
   const kennung = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
-  wurzel.style.setProperty(SPALTEN_FREIRAUM, `${kennung?.offsetWidth ?? 0}px`);
   // Und für die rechts fixierte Aktionsspalte (LLH-1789), siehe `AKTION_FREIRAUM`.
   const aktion = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-end');
-  wurzel.style.setProperty(AKTION_FREIRAUM, `${aktion?.offsetWidth ?? 0}px`);
+  const werte: [string, string][] = [
+    [KOPF_FREIRAUM, `${kopf?.offsetHeight ?? 0}px`],
+    [SPALTEN_FREIRAUM, `${kennung?.offsetWidth ?? 0}px`],
+    [AKTION_FREIRAUM, `${aktion?.offsetWidth ?? 0}px`],
+  ];
+  for (const [name, wert] of werte) {
+    if (wurzel.style.getPropertyValue(name) !== wert) wurzel.style.setProperty(name, wert);
+  }
 }
 
 /**

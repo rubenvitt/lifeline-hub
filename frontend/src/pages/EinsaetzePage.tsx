@@ -66,8 +66,12 @@ import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
 import WillkommenKarte, { useWillkommenEntschieden } from '../hilfe/WillkommenKarte';
+import { useEinstellungMerken } from '../hilfe/useEinstellungMerken';
+import { useRundgangOrt } from '../hilfe/rundgang/RundgangProvider';
+import { sollListeSelbstStarten } from '../hilfe/rundgang/rundgangSchluessel';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import MitgliederKlappteil, { type AnlageMitglied } from './MitgliederKlappteil';
 import { useAdressSuche } from '../routing/useAdressWert';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
@@ -78,6 +82,8 @@ interface AnlegeWerte {
   begonnen_at: Dayjs;
   /** Einsatzort aus dem Ortsfeld (LFH-1175); die Koordinate nur nach Wahl eines Treffers. */
   einsatzort?: OrtsfeldWert;
+  /** Personen, die gleich mit aufgenommen werden (LLH-1820); fehlt, solange niemand gewählt ist. */
+  mitglieder?: AnlageMitglied[];
 }
 
 /** Einsatzart, mit der der Anlegedialog öffnet; auch die Vorbelegung ohne Vorlage. */
@@ -199,6 +205,8 @@ function EinsaetzeInhalt() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
+  // Teil „Mitglieder“ im Anlegedialog (LLH-1820): zu beim Öffnen, auf bei einem Prüffehler darin.
+  const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const [form] = Form.useForm<AnlegeWerte>();
   // Vorlage und Handänderung der Einsatzart (LLH-1375) leben neben den Formularwerten: die Vorlage
   // steht zwar als oberstes Feld im Dialog (LLH-1816), ihre Wahl folgt aber den Vorrangregeln aus
@@ -266,6 +274,10 @@ function EinsaetzeInhalt() {
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
+  // Rundgang für Erstnutzer, Teil „Liste“ (LLH-1990): erst nach dem ersten Abruf, sonst stünden
+  // noch Skelette statt Kacheln und der Schritt „Einsätze“ fiele für immer weg.
+  const { stand: einstellungen } = useEinstellungMerken();
+  useRundgangOrt('liste', !isPending && sollListeSelbstStarten(einstellungen));
 
   const { data: stichwortVorschlaege = [] } = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
@@ -327,6 +339,7 @@ function EinsaetzeInhalt() {
 
   function dialogSchliessen() {
     setDialogOffen(false);
+    setMitgliederOffen(false);
     setVorlageWahl(OHNE_VORLAGE);
     setStichwortText('');
     einsatzartVonHand.current = false;
@@ -344,6 +357,15 @@ function EinsaetzeInhalt() {
         ...einsatzortFelder(werte.einsatzort),
         // Ohne Vorlage fehlt das Feld: das Anlegen schreibt dann keine Modulwerte.
         ...(vorlageId != null ? { vorlage_id: vorlageId } : {}),
+        // Ohne Wahl fehlt das Feld: nur die anlegende Person wird Mitglied (LLH-1820).
+        ...(werte.mitglieder?.length
+          ? {
+              mitglieder: werte.mitglieder.map(({ benutzer_id, rolle }) => ({
+                benutzer_id,
+                rolle,
+              })),
+            }
+          : {}),
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
@@ -694,6 +716,10 @@ function EinsaetzeInhalt() {
         onErfassen={async (w) => {
           await anlegen.mutateAsync({ werte: w, vorlageId: vorlageWahl.vorlageId });
         }}
+        onPruefungGescheitert={(felder) => {
+          // Ein Fehler im eingeklappten Teil bliebe sonst unsichtbar (LFH-974).
+          if (felder.some((f) => f.startsWith('mitglieder'))) setMitgliederOffen(true);
+        }}
         onFertig={dialogSchliessen}
         onAbbrechen={() => {
           // Der nächste Dialog öffnet ohne den Grund des vorigen Versuchs.
@@ -765,6 +791,8 @@ function EinsaetzeInhalt() {
             <span data-lfh="anlage-schichtmodell">{`Schichtmodell: ${schichtmodellText}`}</span>
           </div>
         )}
+        {/* Eingeklappt, zählt nicht zum Feldbudget; der Kopf nennt die Wahl (LLH-1820). */}
+        <MitgliederKlappteil offen={mitgliederOffen} onOffenChange={setMitgliederOffen} />
         <SpeicherFehler
           fehler={anlegen.error}
           titel="Einsatz nicht angelegt"

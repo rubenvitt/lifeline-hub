@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { sichtbareFormfelder } from '../test/feldbudget';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
@@ -18,6 +19,13 @@ import { tippeZeit } from '../test/zeitEingabe';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 const admin = adminFixture();
+
+// Rundgang (LLH-1990): nur die Anmeldung des Orts zählt hier; Start und Tour prüft der Provider.
+const rundgang = vi.hoisted(() => ({ ort: vi.fn() }));
+vi.mock('../hilfe/rundgang/RundgangProvider', async (original) => ({
+  ...(await original<typeof import('../hilfe/rundgang/RundgangProvider')>()),
+  useRundgangOrt: rundgang.ort,
+}));
 
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
 vi.mock('../anzeige/Kartenausschnitt', () => ({
@@ -188,7 +196,7 @@ describe('EinsaetzePage', () => {
     for (const feld of ['Bezeichnung', 'Stichwort', 'Einsatzart', 'Alarmzeit', 'Einsatzort']) {
       expect(screen.getByLabelText(feld)).toBeInTheDocument();
     }
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(sichtbareFormfelder(dialog).length).toBe(5);
     // Der Ausschnitt erscheint erst nach der Wahl eines Treffers.
     expect(screen.queryByTestId('kartenausschnitt')).toBeNull();
   });
@@ -219,7 +227,7 @@ describe('EinsaetzePage', () => {
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
     ).toBeInTheDocument();
     // Feldbudget (LFH-1175): weiter fünf Felder.
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(sichtbareFormfelder(dialog).length).toBe(5);
   });
 
   it('ohne Vorgabe der Organisation keine Schichtmodell-Zeile (LLH-1122)', async () => {
@@ -1494,5 +1502,45 @@ describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
     act(() => feld.blur());
     await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
     expect(titel()).toEqual(['Einsatz 3', 'Einsatz 2', 'Einsatz 1']);
+  });
+});
+
+describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
+  beforeEach(() => {
+    rundgang.ort.mockClear();
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+  });
+
+  it('ein Erstnutzer bekommt Teil „Liste“ von selbst', async () => {
+    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('liste', true));
+  });
+
+  it('solange die Liste lädt, startet nichts (sonst fehlte der Schritt „Einsätze“)', async () => {
+    server.use(
+      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+      http.get('/api/einsaetze', () => new Promise<never>(() => {})),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('liste', true);
+  });
+
+  it('wer die Willkommenskarte geschlossen hat, nicht', async () => {
+    server.use(
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
+      ),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenCalledWith('liste', false));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('liste', true);
   });
 });

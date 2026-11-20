@@ -236,6 +236,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     }
     // Live-Kanäle ohne Empfänger nach der Replay-Karenz abräumen (LFH-918).
     live.starte_kanal_sweep();
+    live.starte_praesenz_sweep();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Instanzkopplung (LLH-1490): Identität beim ersten Start erzeugen, Name und Melde-Abstand

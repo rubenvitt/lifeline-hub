@@ -404,6 +404,20 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
   (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
 
+## Frontend — Verwaltung: Einstieg (LLH-1820)
+
+Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`,
+Zeichenflächen `docs/design/2026-11-19-verwaltung-uebersicht/`.
+
+- **`/admin` führt immer auf die Übersicht** (`admin/BereitschaftUebersicht.tsx`,
+  `defaultAdminPfad()`), den ersten Menüpunkt vor den Gruppen. Wer auf „die Verwaltung“ umleitet,
+  nimmt `defaultAdminPfad()`, nie eine Stammdaten-Seite.
+- **Was „fehlt“, bestimmt allein `admin/bereitschaft.ts`** (`bewerteBereitschaft`); der Server
+  zählt nur (`GET /api/verwaltung/bereitschaft`). Pflicht: ein weiterer Benutzer und Fahrzeuge
+  oder Personal; Vorlagen sind Empfehlung.
+- **Die Übersicht zeigt Zahlen, keine Namen; Demo-Daten zählen nicht mit.** Auch die
+  Führungskraft sieht sie; der Sprung zur Benutzerseite steht nur für System-Admins.
+
 ## Frontend — Bausteinwahl (wann nehme ich was)
 
 Die erste Frage beim Bauen und beim Entwerfen: Welcher Baustein trägt den Bedarf? Eine Zeile je
@@ -824,6 +838,13 @@ anwendbar), „nicht geprüft" ist keins.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer (seit LFH-1078 P7); neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Ausnahme Rundgang** (LLH-1990, Entscheidung 20.11.2026): Der Rundgang für Erstnutzer darf
+  die Bedienung erklären. Seine Texte stehen nur in `hilfe/rundgang/rundgangTexte.ts`, die der
+  Wächter als einzige Datei ausnimmt (`AUSNAHMEN`); die Anrede-Regel gilt dort weiter. Er startet
+  von selbst nur für Erstnutzer und im Einsatz nur in einer Übung, nie am Handschirm oder auf einem
+  gekoppelten Gerät oder unter Browser-Automatisierung (`navigator.webdriver`), und öffnet weder
+  Paneel noch Schublade. Herleitung:
+  `docs/superpowers/specs/2026-11-20-kgsx7ta3-einfuehrung-erstnutzer-design.md`.
 - **Anrede: niemand wird angesprochen** (LLH-1830, Entscheidung 19.11.2026). Kein Du, kein Sie,
   auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene
   Rolle“, „Code aus der Authenticator-App“) oder den Handgriff im Infinitiv („Nur bestätigen,
@@ -1158,6 +1179,17 @@ anwendbar), „nicht geprüft" ist keins.
   in `halten`). Karten und Ansichten bearbeiten im Fluss;
   `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
   ohne Sprung“).
+- **Overlays in Zeilen erst bei Bedarf** (LLH-1974, Entwurf
+  `docs/superpowers/specs/2026-11-19-nuokxhqs-renderkosten-tabellen-design.md`): Ein Baustein, der je
+  Zeile einer Liste steht, hängt `Popover`, `Dropdown` oder `Tooltip` erst beim ersten Öffnen ein
+  (`components/useErstBeiBedarf.ts`; Träger `InlineAngabe`, `StatusWahl`, `EinsatzfunktionZelle`).
+  Ein geschlossener Trigger je Zeile setzt beim Einhängen Zustand im Commit und kostet beim Öffnen
+  der Seite einen zweiten, synchronen Render aller Zeilen. Das Overlay richtet sich an einer
+  deckungsgleichen, durchlässigen Fläche im Auslöser aus, damit Knopf und Fokus beim ersten Öffnen
+  ihren Knoten behalten; wo das nicht geht (`StatusWahl`), gibt der Baustein den Fokus beim
+  Schließen selbst zurück. Die `Datensicht` rendert beim ersten Anzeigen stückweise
+  (`components/stueckweise.ts`, `STUECK_ZEILEN`), nicht im Druck, nicht virtualisiert und nicht bei
+  hervorgehobener Zeile; in der Vitest-Suite ist das aus (`src/test/setup.ts`).
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec
   `personal-einsatzangaben`): steht in einer Listenzelle schon ein anderer Wert (die Qualifikation
   neben der leeren Einsatzfunktion), sagt ein Stift-Knopf mit zugänglichem Namen (Etikett und
@@ -1581,7 +1613,9 @@ und `pages/personen/`.
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.** Einzige Ausnahme ist die Alarmzone (LLH-1735, Entscheidung Ruben 15.11.2026):
   ein Alarm schiebt den Inhalt um seine Zeile, statt ihn zu verdecken; CLS-Messungen laufen ohne
-  anstehenden Alarm.
+  anstehenden Alarm. Zweite Ausnahme ist der Präsenzhinweis (LLH-1946, Entscheidung Ruben
+  19.11.2026): er ersetzt die Vermerkzeile, und nur an einer Angabe ohne Vermerk kommt eine Zeile
+  dazu.
 - **Ein Eingang ist Information, kein Alarm** (LLH-1062, LLH-1143, Spec `benachrichtigungen`,
   „Eingangshinweis“): alle Eingänge eines Einsatzes (Stufe `hinweis`) stehen gebündelt im
   Eingangsband **unten** (`alarm/Eingangsband.tsx`, `alarm/useEingangshinweis.tsx`), nie in der
@@ -1681,7 +1715,10 @@ Spec `bedien-arbeitsplatz`).
   „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026; LLH-1816, Entscheidung
   19.11.2026): sechs Felder. Zuerst die Einsatz-Vorlage, weil sie das Menü des ganzen Einsatzes
   bestimmt und das Stichwort sie einstellt (Modulzahl darunter, Vorgabe „Alle Module“); das letzte
-  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Ausnahme
+  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Darunter der eingeklappte
+  Teil „Mitglieder“ (LLH-1820, `pages/MitgliederKlappteil.tsx`): zählt nicht zu den sechs, sein
+  Kopf nennt die Wahl („nur Einsatzleitung“, „Einsatzleitung + 2 Personen“), die Auswahl lädt erst beim
+  Aufklappen; eine Ablehnung des Servers nennt die Person in der Fehlerzeile des Dialogs. Ausnahme
   „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.
@@ -1815,6 +1852,9 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   öffnet die Betriebszeile `/api/live` (`live/useOrgLiveStream.ts`), der ruht, solange ein
   Einsatz-Strom offen ist (`live/einsatzStromStore.ts`). Verbindungsbau nur über
   `live/liveVerbindung.ts`, keine zweite `EventSource`.
+- **Präsenz ist kein Cache** (LLH-1946, ADR-0074): das Ereignis `praesenz` füllt den Store in
+  `live/praesenz.ts` (kein Query-Key, nicht über den Sammler), gelesen über `usePraesenzAnderer`.
+  Gemeldet wird nur über die Prop `praesenz` an `InlineAngabe`, nie aus einer Seite selbst.
 - **Live-Ereignisse invalidieren nur über den Sammler** `live/liveInvalidierung.ts` (LFH-922,
   Spec `live-abgleich`): je Key ein Abgleich je 300-ms-Fenster, `cancelRefetch: false`, verdeckte
   Tabs markieren nur. `modulZaehler` läuft über einen zweiten Sammler mit 1-s-Fenster

@@ -39,6 +39,7 @@ export default function HilfeKnopf({ beschriftet = false, onVorOeffnen }: HilfeK
   const knopf = (
     <Button
       type="text"
+      data-lfh="hilfe-knopf"
       aria-label="Hilfe zu dieser Seite"
       aria-keyshortcuts="? F1"
       icon={<IconHilfe size={20} />}

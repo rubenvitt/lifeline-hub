@@ -1091,6 +1091,46 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
     expect(wurzel.style.getPropertyValue(AKTION_FREIRAUM)).toBe('124px');
   });
 
+  it('liest alle drei Maße, bevor es schreibt (LLH-1974)', () => {
+    const protokoll: string[] = [];
+    const wurzel = document.createElement('div');
+    const element = (tag: string, klasse: string, mass: 'offsetHeight' | 'offsetWidth') => {
+      const el = document.createElement(tag);
+      el.className = klasse;
+      Object.defineProperty(el, mass, {
+        get: () => {
+          protokoll.push(`lies:${klasse}`);
+          return 40;
+        },
+      });
+      wurzel.appendChild(el);
+    };
+    element('div', 'ant-table-sticky-holder', 'offsetHeight');
+    element('th', 'ant-table-cell-fix-start', 'offsetWidth');
+    element('th', 'ant-table-cell-fix-end', 'offsetWidth');
+    const schreiben = wurzel.style.setProperty.bind(wurzel.style);
+    vi.spyOn(wurzel.style, 'setProperty').mockImplementation((name, wert) => {
+      protokoll.push(`schreib:${name}`);
+      schreiben(name, wert);
+    });
+    setzeKopfFreiraum(wurzel);
+    const erstesSchreiben = protokoll.findIndex((e) => e.startsWith('schreib:'));
+    expect(protokoll.slice(0, erstesSchreiben)).toHaveLength(3);
+    expect(protokoll.slice(erstesSchreiben).some((e) => e.startsWith('lies:'))).toBe(false);
+  });
+
+  it('schreibt nichts, wenn sich kein Maß geändert hat (LLH-1974)', () => {
+    const wurzel = document.createElement('div');
+    const kopf = document.createElement('div');
+    kopf.className = 'ant-table-header ant-table-sticky-holder';
+    Object.defineProperty(kopf, 'offsetHeight', { value: 39 });
+    wurzel.appendChild(kopf);
+    setzeKopfFreiraum(wurzel);
+    const schreiben = vi.spyOn(wurzel.style, 'setProperty');
+    setzeKopfFreiraum(wurzel);
+    expect(schreiben).not.toHaveBeenCalled();
+  });
+
   it('ohne stehende Kopfzeile ist der Freiraum 0, nicht ein alter Wert', () => {
     const wurzel = document.createElement('div');
     wurzel.style.setProperty(KOPF_FREIRAUM, '39px');

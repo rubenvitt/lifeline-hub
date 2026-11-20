@@ -42,6 +42,11 @@ interface NeuerEinsatz {
   einsatzort_lon?: number;
   /** Einsatz-Vorlage (LLH-1375): ihre ausgeblendeten Module werden eigene Einsatzwerte. */
   vorlage_id?: number;
+  /**
+   * Personen, die mit dem Einsatz gleich aufgenommen werden (LLH-1820). Wer anlegt, wird
+   * immer Einsatzleitung und steht nicht in der Liste.
+   */
+  mitglieder?: { benutzer_id: number; rolle: EinsatzRolle }[];
 }
 
 export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
@@ -71,6 +76,14 @@ export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
 /** Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): nur Kennung und Anzeigename. */
 export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
   return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/mitglieder/auswahl`);
+}
+
+/**
+ * Personen, die sich schon beim Anlegen aufnehmen lassen (LLH-1820): dieselbe Grundmenge wie
+ * unter „Zugriff“, ohne die anlegende Person. Nur Kennung und Anzeigename.
+ */
+export function loadMitgliedAuswahlAnlage(): Promise<MitgliedAuswahl[]> {
+  return apiGet<MitgliedAuswahl[]>('/api/einsaetze/mitglied-auswahl');
 }
 
 /**

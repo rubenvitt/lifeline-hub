@@ -120,6 +120,12 @@ export const adminGruppen: AdminGruppe[] = [
   },
 ];
 
+/**
+ * Übersicht (LLH-1820): Einstieg der Verwaltung, erster Menüpunkt vor den Gruppen. Sieht jede
+ * Person mit Zugang zur Verwaltung; die Seite zeigt nur Zahlen.
+ */
+export const adminUebersicht = { key: 'uebersicht', label: 'Übersicht' } as const;
+
 /** Benutzer-Verwaltung: Sonder-Eintrag (eigene Route, strengeres system_rolle=admin-Gate). */
 export const adminBenutzer = { key: 'benutzer', label: 'Benutzer' } as const;
 
@@ -149,6 +155,11 @@ export const adminZugangsprotokoll = {
 /** `/admin/<gruppe>/<sektion>`. */
 export function adminSektionPfad(gruppe: string, sektion: string): string {
   return `/admin/${gruppe}/${sektion}`;
+}
+
+/** `/admin/uebersicht`. */
+export function adminUebersichtPfad(): string {
+  return `/admin/${adminUebersicht.key}`;
 }
 
 /** `/admin/benutzer`. */
@@ -182,8 +193,7 @@ export function ersteSektionPfad(gruppe: string): string {
   return g ? adminSektionPfad(g.key, g.sektionen[0].key) : defaultAdminPfad();
 }
 
-/** Default-Ziel für `/admin` (erste Gruppe, erste Sektion). */
+/** Default-Ziel für `/admin`: immer die Übersicht (LLH-1820). */
 export function defaultAdminPfad(): string {
-  const g = adminGruppen[0];
-  return adminSektionPfad(g.key, g.sektionen[0].key);
+  return adminUebersichtPfad();
 }

@@ -1,0 +1,25 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-19T10:00:00Z" },
+  "title": "Verwaltung – Übersicht (LLH-1820)",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "title": "Pflicht fehlt · Admin · Desktop · kompakt" },
+    "Bereit.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "Bereit, Empfehlungen offen · Führungskraft · Demo eingespielt" },
+    "Handy.dc.html": { "x": 2720, "y": 0, "w": 390, "h": 844, "title": "Handy 390 × 844 · komfortabel" }
+  },
+  "order": ["Main.dc.html", "Bereit.dc.html", "Handy.dc.html"],
+  "notes": {
+    "titel": { "x": 0, "y": -300, "text": "Verwaltung: Übersicht als Einstieg", "kind": "title1", "maxW": 3110 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": "1795043884-83af",
+      "copiedAt": "2026-11-19T10:00:00Z"
+    }
+  ]
+}

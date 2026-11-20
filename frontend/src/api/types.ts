@@ -14,6 +14,8 @@ export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
 /** Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) mit `geraet`. */
 export type MeAntwort = S['MeAntwort'];
+// Bestand der Bereitschaft (LLH-1820, `GET /api/verwaltung/bereitschaft`).
+export type Bereitschaft = S['Bereitschaft'];
 
 // ============================== Gerätekopplung (LFH-892) ==============================
 export type Funktionsansicht = S['Funktionsansicht'];
@@ -467,6 +469,10 @@ export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type Einheit = S['EinheitAnzeige'];
 /** Wer eine Angabe zuletzt geändert hat und wann (LLH-1834, Spec `aenderungsvermerk`). */
 export type FeldVermerk = S['FeldVermerk'];
+/** Wer gerade welche Angabe bearbeitet (LLH-1946); Daten des Live-Ereignisses `praesenz`. */
+export type PraesenzStand = S['PraesenzStand'];
+export type PraesenzEintrag = S['PraesenzEintrag'];
+export type PraesenzObjekt = S['PraesenzObjekt'];
 /** Beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266), nur an aufgelösten. */
 export type LetzteBesetzung = S['LetzteBesetzung'];
 export type LetztePerson = S['LetztePerson'];

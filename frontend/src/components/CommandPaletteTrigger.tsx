@@ -92,6 +92,7 @@ export default function CommandPaletteTrigger() {
     return (
       <Button
         type="text"
+        data-lfh="suche-ausloeser"
         aria-label="Suchen"
         aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
         icon={<IconLupe size={20} />}
@@ -111,6 +112,7 @@ export default function CommandPaletteTrigger() {
   return (
     <Button
       type="text"
+      data-lfh="suche-ausloeser"
       aria-label="Suchen"
       aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
       onClick={toggle}

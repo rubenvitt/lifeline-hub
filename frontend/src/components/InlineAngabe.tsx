@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { useErstBeiBedarf } from './useErstBeiBedarf';
 import { Button, Popover, Space } from 'antd';
 import { useAngabeForm, type OffeneAngabe } from './angabeForm';
 import { FeldFehler, Stapel } from './instrument';
@@ -21,6 +22,16 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { FeldVermerk } from '../api/types';
 import { vermerkKurz } from './feldVermerk';
+import { PraesenzZeile } from './FeldVermerkAnzeige';
+import { useOhneVerbindung } from '../offline/verbindung';
+import {
+  beendePraesenz,
+  meldePraesenz,
+  PRAESENZ_TAKT_MS,
+  praesenzSatz,
+  usePraesenzAnderer,
+  type PraesenzSchluessel,
+} from '../live/praesenz';
 
 /**
  * Inline bearbeitbare Angabe mit BELIEBIGER Eingabe (LFH-472) — Text, Textfeld, Zahl, Auswahl,
@@ -209,6 +220,12 @@ export interface InlineAngabeProps<T> {
   /** Wer den gespeicherten Wert zuletzt gesetzt hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
   /**
+   * Präsenz (LLH-1946): Die offene Eingabe meldet sich beim Öffnen und alle 15 s und endet beim
+   * Schließen; bearbeitet jemand anderes dieselben Angaben, steht „Wird gerade bearbeitet von …“
+   * unter dem Wert. Ohne Netz wird nichts gesendet.
+   */
+  praesenz?: PraesenzSchluessel;
+  /**
    * Kein Hinweis „Inzwischen geändert“: für Angaben, die ihren Vergleichsstand selbst fortschreiben
    * und den Live-Wert schon mit eigenen Teilschritten ändern (Sprechgruppen-Einzelwege).
    */
@@ -290,10 +307,12 @@ export function InlineAngabe<T>({
   onOeffnen,
   onSchliessen,
   vermerk,
+  praesenz,
   ohneFremdHinweis = false,
   bearbeitenDaneben = false,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
+  const popoverBereit = useErstBeiBedarf(bearbeitet);
   // Der Serverstand beim Öffnen (LLH-1831): Altwert des Feld-CAS und Maß für „unverändert“.
   const [beimOeffnen, setBeimOeffnenZustand] = useState<T>(wert);
   // Hat die Person seit dem Öffnen eingegeben? Unberührt sendet „Speichern“ nichts (LLH-1831).
@@ -498,6 +517,39 @@ export function InlineAngabe<T>({
     [],
   );
 
+  // Präsenz (LLH-1946, Entwurf D5): Lebenszeichen solange offen, Ende beim Schließen, Aushängen und
+  // Verlassen der Seite (`keepalive`). Der Schlüssel als Text, damit ein neues Objekt gleichen
+  // Inhalts den Takt nicht neu startet.
+  const ohneNetz = useOhneVerbindung();
+  const praesenzText = praesenz ? JSON.stringify(praesenz) : null;
+  useEffect(() => {
+    if (!bearbeitet || praesenzText === null || ohneNetz) return;
+    const s = JSON.parse(praesenzText) as PraesenzSchluessel;
+    // Lehnt der Server die Meldung ab (412, 403, 404), hört der Takt auf (Entwurf D5).
+    const melden = () =>
+      void meldePraesenz(s).then((weiter) => {
+        if (!weiter) window.clearInterval(takt);
+      });
+    const takt = window.setInterval(melden, PRAESENZ_TAKT_MS);
+    melden();
+    let beendet = false;
+    const verlassen = () => {
+      beendet = true;
+      beendePraesenz(s, true);
+    };
+    window.addEventListener('pagehide', verlassen);
+    return () => {
+      window.clearInterval(takt);
+      window.removeEventListener('pagehide', verlassen);
+      if (!beendet) beendePraesenz(s);
+    };
+  }, [bearbeitet, praesenzText, ohneNetz]);
+  const praesenzId = useId();
+  const praesenzZeile = <PraesenzZeile id={praesenzId} praesenz={praesenz} />;
+  const { andere: praesenzAndere, eigenesKonto: praesenzEigenesKonto } =
+    usePraesenzAnderer(praesenz);
+  const praesenzAktiv = praesenzSatz(praesenzAndere, praesenzEigenesKonto) !== null;
+
   // Ein Ziel im Wertknopf ist verschachteltes Markup; der Aufrufer braucht `bearbeitenDaneben`.
   // Gelesen am DOM, weil die Anzeige ein beliebiger Knoten ist; je Instanz nur einmal.
   const zielGewarntRef = useRef(false);
@@ -511,7 +563,13 @@ export function InlineAngabe<T>({
     );
   });
 
-  if (!darfSchreiben && !bearbeitet) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
+  if (!darfSchreiben && !bearbeitet)
+    return ausloeser ? null : (
+      <>
+        {leer(wert) ? '—' : anzeige}
+        {praesenzZeile}
+      </>
+    );
 
   function oeffnen() {
     if (isGesperrt) return;
@@ -720,6 +778,7 @@ export function InlineAngabe<T>({
         },
       })}
       <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
+      {praesenzZeile}
       {fremdGeaendert ? (
         <div role="status" style={{ color: rollen.achtungText }}>
           {`Inzwischen geändert${vermerk ? ` von ${vermerkKurz(vermerk, zeitKurz)}` : ''}: `}
@@ -775,33 +834,43 @@ export function InlineAngabe<T>({
    * Popovers. Kein Auslöser am Popover selbst und kein Schließen beim Klick daneben: wie im Fluss
    * schließen nur „Abbrechen“, Escape und das Speichern (Regel „kein Speichern beim Verlassen“).
    */
+  /*
+   * Das Popover erst ab dem ersten Öffnen (LLH-1974, `useErstBeiBedarf`): geschlossen setzt sein
+   * Trigger beim Einhängen Zustand im Commit, und jede Zeile einer Liste renderte beim Öffnen der
+   * Seite ein zweites Mal synchron. Es richtet sich an einer deckungsgleichen, durchlässigen Fläche
+   * IM Anker aus, nicht am Anker selbst: so bleibt der Inhalt beim ersten Öffnen eingehängt, und
+   * Knopf und Fokus behalten ihren Knoten.
+   */
   const mitPopover = (inhalt: ReactNode): ReactNode =>
     !schwebend ? (
       inhalt
     ) : (
-      <Popover
-        open={bearbeitet}
-        trigger={[]}
-        placement="bottomLeft"
-        arrow={false}
-        destroyOnHidden
-        content={
-          <div
-            ref={popoverInhaltRef}
-            style={{ minWidth: 220, maxWidth: 'min(360px, calc(100vw - 32px))' }}
-          >
-            {formular}
-          </div>
-        }
+      <span
+        ref={anchorRef}
+        data-lfh="angabe-anker"
+        style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0, position: 'relative' }}
       >
-        <span
-          ref={anchorRef}
-          data-lfh="angabe-anker"
-          style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0 }}
-        >
-          {inhalt}
-        </span>
-      </Popover>
+        {inhalt}
+        {popoverBereit && (
+          <Popover
+            open={bearbeitet}
+            trigger={[]}
+            placement="bottomLeft"
+            arrow={false}
+            destroyOnHidden
+            content={
+              <div
+                ref={popoverInhaltRef}
+                style={{ minWidth: 220, maxWidth: 'min(360px, calc(100vw - 32px))' }}
+              >
+                {formular}
+              </div>
+            }
+          >
+            <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+          </Popover>
+        )}
+      </span>
     );
 
   const hinweis = pflichtHinweis ? (
@@ -816,6 +885,7 @@ export function InlineAngabe<T>({
         {ausloeser({ ref: knopfRef, onClick: oeffnen, disabled: isGesperrt })}
         {sperrHinweis}
         {hinweis}
+        {bearbeitet ? null : praesenzZeile}
       </>,
     );
   }
@@ -836,11 +906,18 @@ export function InlineAngabe<T>({
         </Button>
         {sperrHinweis}
         {hinweis}
+        {bearbeitet ? null : praesenzZeile}
       </>,
     );
   }
 
-  const wertBeschreibung = isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId;
+  const wertBeschreibung = [
+    wertId,
+    isGesperrt ? sperrBeschreibung : null,
+    praesenzAktiv ? praesenzId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   if (bearbeitenDaneben) {
     return mitPopover(
@@ -862,6 +939,7 @@ export function InlineAngabe<T>({
         </Stapel>
         {sperrHinweis}
         {hinweis}
+        {bearbeitet ? null : praesenzZeile}
       </>,
     );
   }
@@ -885,6 +963,7 @@ export function InlineAngabe<T>({
       </Button>
       {sperrHinweis}
       {hinweis}
+      {bearbeitet ? null : praesenzZeile}
     </>,
   );
 }

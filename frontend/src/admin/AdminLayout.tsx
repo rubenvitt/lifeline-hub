@@ -12,6 +12,7 @@ import {
   adminBenutzer,
   adminDemoDaten,
   adminGruppen,
+  adminUebersicht,
   adminZugangsprotokoll,
 } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
@@ -172,7 +173,9 @@ export default function AdminLayout() {
   // '/admin/stammdaten/fahrzeuge' → 'stammdaten/fahrzeuge'; '/admin/benutzer' → 'benutzer'.
   const aktiv = pathname.replace(/^\/admin\/?/, '');
 
+  // Die Übersicht steht vor den Gruppen (LLH-1820): Einstieg der Verwaltung für alle mit Zugang.
   const items: MenuProps['items'] = [
+    { key: adminUebersicht.key, label: adminUebersicht.label },
     ...adminGruppen.map((g) => ({
       key: g.key,
       type: 'group' as const,
@@ -183,6 +186,7 @@ export default function AdminLayout() {
     ...sonderEintraege.map((e) => ({ key: e.key, label: e.label })),
   ];
   const menuKeys = [
+    adminUebersicht.key,
     ...adminGruppen.flatMap((g) => g.sektionen.map((s) => sektionsKey(g.key, s.key))),
     ...sonderEintraege.map((e) => e.key),
   ];
@@ -243,6 +247,7 @@ export default function AdminLayout() {
      * aktuellen Bereich; nach der Wahl klappt die Liste zu, sonst schöbe sie jede Sektion nach unten.
      */
     const aktuell = [
+      { key: adminUebersicht.key, label: adminUebersicht.label },
       ...adminGruppen.flatMap((g) =>
         g.sektionen.map((sek) => ({ key: sektionsKey(g.key, sek.key), label: sek.label })),
       ),

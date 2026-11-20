@@ -43,14 +43,18 @@ function schreibKoepfe(): Record<string, string> {
 
 /**
  * Schickt einen Bericht, der das Ende der Seite überleben soll (Absturzbericht, LLH-1822,
- * `api/clientFehler.ts`): POST mit `keepalive`, Sitzungscookie und den Schreibköpfen. Anders als
+ * `api/clientFehler.ts`; Ende der Präsenz beim Verlassen, LLH-1946, mit `DELETE`): mit `keepalive`, Sitzungscookie und den Schreibköpfen. Anders als
  * `apiSend` ohne Zeitlimit, Fehleranzeige, Benutzerprüfung oder Warteschlange; die Antwort wird
  * nicht gelesen. Ein Netzfehler wirft wie bei `fetch`, der Aufrufer verschluckt ihn. Liegt hier,
  * weil jeder Schreibweg über diese Datei läuft (`api/schreibwege.guard.test.ts`).
  */
-export async function apiSendKeepalive(pfad: string, body: unknown): Promise<void> {
+export async function apiSendKeepalive(
+  pfad: string,
+  body: unknown,
+  methode: 'POST' | 'DELETE' = 'POST',
+): Promise<void> {
   await fetch(pfad, {
-    method: 'POST',
+    method: methode,
     credentials: 'same-origin',
     keepalive: true,
     headers: { ...schreibKoepfe(), 'Content-Type': 'application/json' },

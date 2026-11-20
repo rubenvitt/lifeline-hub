@@ -7,6 +7,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
+import { praesenzStand } from './praesenz';
 import { LIVE_SAMMELFENSTER_MS, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { WIEDERAUFBAU_SCHONFRIST_MS } from './liveVerbindung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
@@ -93,6 +94,54 @@ function Probe({ id }: { id: number }) {
 }
 
 describe('useEinsatzLiveStream', () => {
+  it('übernimmt die Präsenz des Einsatzes und leert sie beim Abbau (LLH-1946)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const stand = {
+      einsatz_id: 1,
+      eintraege: [
+        { objekt: 'einsatz', felder: ['stichwort'], benutzer_id: 2, von: 'Anna', fenster: 'f' },
+      ],
+    };
+    FakeEventSource.letzte?.emit('praesenz', JSON.stringify(stand));
+    await waitFor(() => expect(praesenzStand(1)?.eintraege).toHaveLength(1));
+    expect(spy).not.toHaveBeenCalled();
+    unmount();
+    expect(praesenzStand(1)).toBeUndefined();
+  });
+
+  it('leert die Präsenz bei jedem Öffnen der Verbindung: der Server schickt danach den Stand (LLH-1946)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    quelle.emit(
+      'praesenz',
+      JSON.stringify({
+        einsatz_id: 1,
+        eintraege: [
+          { objekt: 'einsatz', felder: ['stichwort'], benutzer_id: 2, von: 'Anna', fenster: 'f' },
+        ],
+      }),
+    );
+    expect(praesenzStand(1)?.eintraege).toHaveLength(1);
+    // Neuaufbau derselben Quelle: ein leerer Stand kommt nicht, also leert das Öffnen.
+    quelle.emitError(FakeEventSource.CONNECTING);
+    quelle.emit('open');
+    expect(praesenzStand(1)).toBeUndefined();
+  });
+
   it('invalidiert einsatz-personal, einsatz-fahrzeuge & einsatz-material bei einheit-Event', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

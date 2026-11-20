@@ -696,6 +696,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Ausnahme Rundgang** (Entscheidung 20.11.2026): Der Rundgang für Erstnutzer darf
+  die Bedienung erklären. Seine Texte stehen nur in `hilfe/rundgang/rundgangTexte.ts`, die der
+  Wächter als einzige Datei ausnimmt (`AUSNAHMEN`); die Anrede-Regel gilt dort weiter. Er startet
+  von selbst nur für Erstnutzer und im Einsatz nur in einer Übung, nie am Handschirm oder auf einem
+  gekoppelten Gerät oder unter Browser-Automatisierung (`navigator.webdriver`), und öffnet weder
+  Paneel noch Schublade.
 - **Anrede: niemand wird angesprochen** (Entscheidung 19.11.2026). Kein Du, kein Sie,
   auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene
   Rolle“, „Code aus der Authenticator-App“) oder den Handgriff im Infinitiv („Nur bestätigen,

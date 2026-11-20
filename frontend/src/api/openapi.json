@@ -3933,6 +3933,58 @@
           }
         }
       },
+      "Bereitschaft": {
+        "type": "object",
+        "description": "Bestand der Bereitschaft. Demo-Zeilen (`demo_herkunft`, LFH-733) zählen nicht zum Bestand.\nSie stehen getrennt in den `*_demo`-Feldern.",
+        "required": [
+          "benutzer",
+          "fahrzeuge",
+          "fahrzeuge_demo",
+          "personal",
+          "personal_demo",
+          "einheit_vorlagen",
+          "einheit_vorlagen_demo",
+          "einsatz_vorlagen"
+        ],
+        "properties": {
+          "benutzer": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Aktive Personenkonten der Org, ohne Geräte-, Stellvertreter- und Archivkonten."
+          },
+          "einheit_vorlagen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Aktive Einheiten-Vorlagen."
+          },
+          "einheit_vorlagen_demo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatz_vorlagen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeuge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Fahrzeuge im Dienst."
+          },
+          "fahrzeuge_demo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personal im Dienst."
+          },
+          "personal_demo": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "BerichtigungVerweis": {
         "type": "object",
         "description": "Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`\nfür den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines\nETB-Eintrags nie leer.",
@@ -7365,6 +7417,7 @@
         "enum": [
           "einsatzleitung",
           "fuehrungspersonal",
+          "mitarbeit",
           "beobachter"
         ]
       },
@@ -13955,6 +14008,7 @@
           "einsatz",
           "mitglieder",
           "benachrichtigung",
+          "praesenz",
           "lagged"
         ]
       },
@@ -18261,6 +18315,76 @@
           "uhs",
           "pause"
         ]
+      },
+      "PraesenzEintrag": {
+        "type": "object",
+        "description": "Ein Fenster, das gerade Angaben eines Objekts bearbeitet.",
+        "required": [
+          "objekt",
+          "felder",
+          "benutzer_id",
+          "von",
+          "fenster"
+        ],
+        "properties": {
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "felder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fenster": {
+            "type": "string",
+            "description": "Zufällige Kennung des Tabs."
+          },
+          "objekt": {
+            "$ref": "#/components/schemas/PraesenzObjekt"
+          },
+          "von": {
+            "type": "string",
+            "description": "Anzeigename, wie `FeldVermerk.von`."
+          }
+        }
+      },
+      "PraesenzObjekt": {
+        "type": "string",
+        "description": "Wessen Angabe bearbeitet wird; dieselben Werte wie `objekt_art` des Änderungsvermerks.",
+        "enum": [
+          "einsatz",
+          "einheit",
+          "fuehrungsstelle"
+        ]
+      },
+      "PraesenzStand": {
+        "type": "object",
+        "description": "Der ganze Präsenzstand eines Einsatzes; Daten des Ereignisses `praesenz`.",
+        "required": [
+          "einsatz_id",
+          "eintraege"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PraesenzEintrag"
+            }
+          }
+        }
       },
       "Prioritaet": {
         "type": "string",

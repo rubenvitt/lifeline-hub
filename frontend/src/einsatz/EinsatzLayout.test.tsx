@@ -27,6 +27,12 @@ vi.mock('./useModulZaehler', () => ({
 }));
 // Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
 vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
+// Rundgang (LLH-1990): nur die Anmeldung des Orts zählt hier; Start und Tour prüft der Provider.
+const rundgang = vi.hoisted(() => ({ ort: vi.fn() }));
+vi.mock('../hilfe/rundgang/RundgangProvider', async (original) => ({
+  ...(await original<typeof import('../hilfe/rundgang/RundgangProvider')>()),
+  useRundgangOrt: rundgang.ort,
+}));
 
 /**
  * Der gemerkte Rahmen-Zustand wird gegen ein HANDGESCHRIEBENES Literal geprüft, sonst prüfte
@@ -1651,5 +1657,42 @@ describe('EinsatzLayout · Übung (LLH-1725)', () => {
     await waitFor(() =>
       expect(document.title).toBe('ÜBUNG · ETB · Hochwasser Nord · lifeline-hub'),
     );
+  });
+});
+
+describe('EinsatzLayout · Rundgang (LLH-1990)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setzeViewportBreite(XL);
+    rundgang.ort.mockClear();
+  });
+
+  it('ein echter Einsatz startet den Rundgang nie von selbst', async () => {
+    setup();
+    await screen.findByText('ETB-Inhalt');
+    await waitFor(() => expect(rundgang.ort).toHaveBeenCalledWith('einsatz', false));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('einsatz', true);
+  });
+
+  it('eine Übung startet ihn für Erstnutzer von selbst', async () => {
+    setup();
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+    );
+    await screen.findByText('ETB-Inhalt');
+    await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('einsatz', true));
+  });
+
+  it('wer die Karte geschlossen und keinen Rundgang gesehen hat, bleibt unbehelligt', async () => {
+    setup();
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
+      ),
+    );
+    await screen.findByText('ETB-Inhalt');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('einsatz', true);
   });
 });

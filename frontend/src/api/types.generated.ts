@@ -1568,6 +1568,40 @@ export interface components {
             geaendert_at?: string | null;
         };
         /**
+         * @description Bestand der Bereitschaft. Demo-Zeilen (`demo_herkunft`, LFH-733) zählen nicht zum Bestand.
+         *     Sie stehen getrennt in den `*_demo`-Feldern.
+         */
+        Bereitschaft: {
+            /**
+             * Format: int64
+             * @description Aktive Personenkonten der Org, ohne Geräte-, Stellvertreter- und Archivkonten.
+             */
+            benutzer: number;
+            /**
+             * Format: int64
+             * @description Aktive Einheiten-Vorlagen.
+             */
+            einheit_vorlagen: number;
+            /** Format: int64 */
+            einheit_vorlagen_demo: number;
+            /** Format: int64 */
+            einsatz_vorlagen: number;
+            /**
+             * Format: int64
+             * @description Fahrzeuge im Dienst.
+             */
+            fahrzeuge: number;
+            /** Format: int64 */
+            fahrzeuge_demo: number;
+            /**
+             * Format: int64
+             * @description Personal im Dienst.
+             */
+            personal: number;
+            /** Format: int64 */
+            personal_demo: number;
+        };
+        /**
          * @description Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`
          *     für den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines
          *     ETB-Eintrags nie leer.
@@ -2971,7 +3005,7 @@ export interface components {
          *     Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
          * @enum {string}
          */
-        EinsatzRolle: "einsatzleitung" | "fuehrungspersonal" | "beobachter";
+        EinsatzRolle: "einsatzleitung" | "fuehrungspersonal" | "mitarbeit" | "beobachter";
         /** @description Die Kopie eines Schichtmodells am Einsatz. */
         EinsatzSchichtmodell: {
             bezeichnung: string;
@@ -5607,7 +5641,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -7361,6 +7395,30 @@ export interface components {
          * @enum {string}
          */
         PostenArt: "einheit" | "uhs" | "pause";
+        /** @description Ein Fenster, das gerade Angaben eines Objekts bearbeitet. */
+        PraesenzEintrag: {
+            /** Format: int64 */
+            benutzer_id: number;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            felder: string[];
+            /** @description Zufällige Kennung des Tabs. */
+            fenster: string;
+            objekt: components["schemas"]["PraesenzObjekt"];
+            /** @description Anzeigename, wie `FeldVermerk.von`. */
+            von: string;
+        };
+        /**
+         * @description Wessen Angabe bearbeitet wird; dieselben Werte wie `objekt_art` des Änderungsvermerks.
+         * @enum {string}
+         */
+        PraesenzObjekt: "einsatz" | "einheit" | "fuehrungsstelle";
+        /** @description Der ganze Präsenzstand eines Einsatzes; Daten des Ereignisses `praesenz`. */
+        PraesenzStand: {
+            /** Format: int64 */
+            einsatz_id: number;
+            eintraege: components["schemas"]["PraesenzEintrag"][];
+        };
         /**
          * @description Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
          *     LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.

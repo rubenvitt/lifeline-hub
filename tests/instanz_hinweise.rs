@@ -228,6 +228,32 @@ async fn meldeantwort_nennt_hinweise_und_web_push_des_hubs() {
     assert_eq!(faehigkeiten(&elw.i).await, (true, true));
 }
 
+/// LLH-1817 (design.md D7): Beide Seiten nennen die Einsatzrolle „Mitarbeit“, die meldende in
+/// ihrer Anfrage, die erreichte in ihrer Antwort; jede hält fest, was das Gegenüber kann.
+#[tokio::test]
+async fn meldende_und_erreichte_seite_speichern_die_faehigkeit() {
+    let hub = seite(false).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    for i in [&hub.i, &elw.i] {
+        exec(
+            &i.pool,
+            "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 0",
+        )
+        .await;
+    }
+    melden(&elw.i).await;
+    for (name, i) in [("Hub", &hub.i), ("ELW", &elw.i)] {
+        let mitarbeit: bool = eine(
+            &i.pool,
+            "SELECT gegenueber_rolle_mitarbeit FROM instanz_kopplung LIMIT 1",
+        )
+        .await;
+        assert!(mitarbeit, "{name} kennt die Fähigkeit des Gegenübers");
+    }
+}
+
 #[tokio::test]
 async fn hub_ohne_push_meldet_keinen_push() {
     let hub = seite(false).await;

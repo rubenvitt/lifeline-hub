@@ -1,6 +1,7 @@
 import { Dropdown, theme } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useErstBeiBedarf } from './useErstBeiBedarf';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { Status } from './instrument/Status';
 import { StatusBlock, StatusKnopf, type StatusVariante } from './instrument/StatusKnopf';
@@ -177,6 +178,7 @@ export default function StatusWahl<W extends string | number>({
 
   // Kontrolliert geöffnet, damit die Palette das Menü öffnen kann (Muster: „Spalten“, LFH-391).
   const [offen, setOffen] = useState(false);
+  const menueBereit = useErstBeiBedarf(offen);
   const bedienbar = darfSchreiben && !gesperrt && !laeuft;
 
   /*
@@ -240,6 +242,25 @@ export default function StatusWahl<W extends string | number>({
     }, 0);
     return () => window.clearTimeout(t);
   }, [offen, titel]);
+  /*
+   * Schließt das Menü, während der Fokus darin oder nirgends steht (Escape, Wahl eines Eintrags),
+   * gehört er zurück an den Knopf. Seit der Knopf sich beim ersten Öffnen unter dem `Dropdown` neu
+   * einhängt (LLH-1974), tut rc-dropdown das nicht mehr verlässlich; ein Klick daneben behält
+   * seinen Fokus.
+   */
+  const warOffen = useRef(false);
+  useEffect(() => {
+    if (offen) {
+      warOffen.current = true;
+      return;
+    }
+    if (!warOffen.current) return;
+    warOffen.current = false;
+    const aktiv = document.activeElement;
+    const imMenue = aktiv instanceof HTMLElement && aktiv.closest('.ant-dropdown') != null;
+    if (aktiv == null || aktiv === document.body || imMenue) knopf.current?.focus();
+  }, [offen]);
+
   // Öffnet die Palette das Menü, misst es dieselbe Lage.
   useEffect(() => {
     if (offen)
@@ -281,6 +302,27 @@ export default function StatusWahl<W extends string | number>({
       </span>
     ),
   }));
+
+  /*
+   * Das Menü erst ab dem ersten Öffnen (LLH-1974, `useErstBeiBedarf`): geschlossen setzt der
+   * Trigger des `Dropdown` beim Einhängen Zustand im Commit, und jede Zeile einer Liste renderte
+   * beim Öffnen der Seite ein zweites Mal synchron. Bis dahin öffnet der Knopf selbst.
+   */
+  const knopfElement = (
+    <StatusKnopf
+      ref={verbindeKnopf}
+      onClick={menueBereit ? undefined : () => setzeOffen(true)}
+      darstellung={darstellung}
+      farbe={farbe}
+      code={code}
+      variante={variante}
+      aria-label={`Status von ${kennung} ändern`}
+      aria-keyshortcuts={tastenkuerzel || undefined}
+      loading={laeuft}
+      disabled={laeuft || gesperrt}
+    />
+  );
+  if (!menueBereit) return knopfElement;
 
   return (
     <Dropdown
@@ -333,17 +375,7 @@ export default function StatusWahl<W extends string | number>({
       }}
       autoFocus
     >
-      <StatusKnopf
-        ref={verbindeKnopf}
-        darstellung={darstellung}
-        farbe={farbe}
-        code={code}
-        variante={variante}
-        aria-label={`Status von ${kennung} ändern`}
-        aria-keyshortcuts={tastenkuerzel || undefined}
-        loading={laeuft}
-        disabled={laeuft || gesperrt}
-      />
+      {knopfElement}
     </Dropdown>
   );
 }

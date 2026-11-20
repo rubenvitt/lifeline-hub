@@ -13,6 +13,7 @@ import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import { useHilfeSeitenleiste } from '../hilfe/HilfeSeitenleisteProvider';
+import { useRundgang } from '../hilfe/rundgang/RundgangProvider';
 import { useViewport } from '../components/useViewport';
 import type { BefehlsGedaechtnis } from './useZuletztBefehle';
 import type { SchnellaktionZaehlung } from './useSchnellaktionZaehler';
@@ -55,6 +56,7 @@ export function useBefehle(
   const { setHelligkeit } = useHelligkeit();
   const { pathname } = useLocation();
   const { oeffneHilfe } = useHilfeSeitenleiste();
+  const { starte: starteRundgang } = useRundgang();
   const { istBeruehrung } = useViewport();
   const einsatzId = einsatzIdAusPfad(pathname);
   /**
@@ -135,6 +137,7 @@ export function useBefehle(
         tastaturAktionen,
         userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
         oeffneHilfe,
+        starteRundgang,
         istBeruehrung,
       }),
     // `setDichte` ist identitätsstabil, das Objekt aus `useDichte()` NICHT (je Aufruf frisch).
@@ -158,6 +161,7 @@ export function useBefehle(
       gedaechtnisOderLeer,
       zaehlungOderLeer,
       oeffneHilfe,
+      starteRundgang,
       istBeruehrung,
     ],
   );

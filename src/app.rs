@@ -234,6 +234,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/sitzungen/{kennung}",
             delete(routes::sitzung::eigene_beenden),
         )
+        .route(
+            "/api/verwaltung/bereitschaft",
+            get(routes::verwaltung::bereitschaft),
+        )
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))
@@ -324,6 +328,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
+        .route(
+            "/api/einsaetze/mitglied-auswahl",
+            get(routes::einsatz::mitglied_auswahl_anlage),
+        )
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
         .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
@@ -344,6 +352,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fuehrungsstelle",
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
+        )
+        // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
+        .route(
+            "/api/einsaetze/{id}/praesenz",
+            put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/praesenz",
+            put(routes::praesenz::einheit_melden).delete(routes::praesenz::einheit_beenden),
         )
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.

@@ -207,6 +207,17 @@ pub fn fordere_schreibrecht(rolle: Option<EinsatzRolle>) -> Result<(), AppError>
     }
 }
 
+/// Stellt sicher, dass der Benutzer im Einsatz erfassen darf: Einsatzleitung, Führungspersonal
+/// oder Mitarbeit (`EinsatzRolle::darf_erfassen`). `Forbidden` bei Beobachter oder fehlender
+/// Mitgliedschaft. Nur für Handler der Positivliste, siehe `src/AGENTS.md`,
+/// „Erfassungs-Gate (LLH-1817)“; Ändern bleibt hinter [`fordere_schreibrecht`].
+pub fn fordere_erfassungsrecht(rolle: Option<EinsatzRolle>) -> Result<(), AppError> {
+    match rolle {
+        Some(r) if r.darf_erfassen() => Ok(()),
+        _ => Err(AppError::Forbidden),
+    }
+}
+
 /// Gate der Verwaltungsrouten (Kopfdaten, Einstellungen, Führungsstelle; hinter
 /// `EinsatzVerwaltungszugriff`): Einsatz-Schreibrecht (Einsatzleitung oder Führungspersonal)
 /// ODER System-Admin der Einsatz-Org (`src/AGENTS.md`, „Admin-Schreibwege am Einsatz“, LFH-1066).
@@ -1073,6 +1084,21 @@ mod tests {
         ));
         assert!(matches!(
             fordere_einsatzleitung(None).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn fordere_erfassungsrecht_laesst_mitarbeit_durch_und_sperrt_beobachter() {
+        assert!(fordere_erfassungsrecht(Some(EinsatzRolle::Mitarbeit)).is_ok());
+        assert!(fordere_erfassungsrecht(Some(EinsatzRolle::Fuehrungspersonal)).is_ok());
+        assert!(fordere_erfassungsrecht(Some(EinsatzRolle::Einsatzleitung)).is_ok());
+        assert!(matches!(
+            fordere_erfassungsrecht(Some(EinsatzRolle::Beobachter)).unwrap_err(),
+            AppError::Forbidden
+        ));
+        assert!(matches!(
+            fordere_erfassungsrecht(None).unwrap_err(),
             AppError::Forbidden
         ));
     }

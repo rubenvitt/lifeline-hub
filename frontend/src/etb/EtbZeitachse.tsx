@@ -163,6 +163,11 @@ interface Props {
    * bleibt sichtbar und nennt den Grund — ein fehlender Punkt sagte nicht, warum.
    */
   berichtigenGesperrt?: string;
+  /**
+   * „Berichtigen" nur an Einträgen von `eigeneBenutzerId` (Mitarbeit, LLH-1817: berichtigt nur
+   * Eigenes). Ohne bekannte Benutzer-id an keinem.
+   */
+  berichtigenNurEigene?: boolean;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, bietet jeder Eintrag „Auftrag erteilen" an (ETB→Auftrag, LFH-112). */
@@ -331,6 +336,7 @@ export default function EtbZeitachse({
   lesemarke,
   onBerichtigen,
   berichtigenGesperrt,
+  berichtigenNurEigene = false,
   onWiedervorlage,
   onAuftragErteilen,
   auftragGesperrt = false,
@@ -569,10 +575,12 @@ export default function EtbZeitachse({
   const kannWiedervorlage = onWiedervorlage != null;
   const kannAuftrag = onAuftragErteilen != null;
   const nurProtokollierenAngeboten = onNurProtokollieren != null;
+  const berichtigenNurErfasserId = berichtigenNurEigene ? (eigeneBenutzerId ?? -1) : undefined;
   const rechte = useMemo<ZeilenRechte>(
     () => ({
       kannBerichtigen,
       ...(berichtigenGesperrt ? { berichtigenGesperrt } : {}),
+      ...(berichtigenNurErfasserId !== undefined ? { berichtigenNurErfasserId } : {}),
       kannWiedervorlage,
       kannAuftrag,
       auftragGesperrt,
@@ -581,6 +589,7 @@ export default function EtbZeitachse({
     [
       kannBerichtigen,
       berichtigenGesperrt,
+      berichtigenNurErfasserId,
       kannWiedervorlage,
       kannAuftrag,
       auftragGesperrt,

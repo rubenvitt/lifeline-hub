@@ -7,7 +7,7 @@ import type { BenoetigteRolle, EinsatzRolle, OrgRolle, SystemRolle } from '../ap
  * (`rollenVokabular.guard.test.ts`) verbietet Rollennamen als Literal anderswo.
  *
  * Die `Record`s über die Wire-Typen brechen den Build, sobald der Typ-Codegen eine Rolle ergänzt
- * (etwa „Mitarbeit“, LLH-1817), statt still den Rohwert zu zeigen.
+ * (so kam „Mitarbeit“ hinzu, LLH-1817), statt still den Rohwert zu zeigen.
  *
  * Darf-Zeilen nennen den Umfang in wenigen Wörtern, nie die Bedienung (benannte Ausnahme in
  * „Texte: zeigen statt erklären“); höchstens 80 Zeichen.
@@ -28,6 +28,10 @@ export const EINSATZ_ROLLE: Record<EinsatzRolle, RollenBegriff> = {
   fuehrungspersonal: {
     name: 'Führungspersonal',
     darf: 'schreibt in Modulen, Kopfdaten und Einstellungen',
+  },
+  mitarbeit: {
+    name: 'Mitarbeit',
+    darf: 'erfasst Meldungen, Chat und ETB-Einträge, ändert sonst nichts',
   },
   beobachter: { name: 'Beobachter', darf: 'liest nur' },
 };

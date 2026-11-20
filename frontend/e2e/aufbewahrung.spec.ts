@@ -161,7 +161,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
       await expect(fk.getByRole('menuitem', { name: 'Aufbewahrung' })).toHaveCount(0);
       // Direkt angesteuert leitet die Seite zurück in die Verwaltung.
       await fk.goto('/admin/aufbewahrung');
-      await expect(fk).toHaveURL(/\/admin\/stammdaten\//);
+      await expect(fk).toHaveURL(/\/admin\/uebersicht$/);
     } finally {
       await fk.close();
     }

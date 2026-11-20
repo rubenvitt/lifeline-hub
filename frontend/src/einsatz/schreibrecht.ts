@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige, Meldung } from '../api/types';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 /**
@@ -56,6 +56,12 @@ export function isEinsatzGesperrt(einsatz?: EinsatzSchreibkontext): boolean {
 /** Beobachter-Rolle im Einsatz (rein lesend). */
 export function istBeobachter(einsatz?: EinsatzSchreibkontext): boolean {
   return einsatz?.meine_rolle === 'beobachter';
+}
+
+/** Mitarbeit im Einsatz (LLH-1817): erfasst, ändert sonst nichts. Nur für die Auswahl innerhalb der
+    Erfassung (ETB-Typen, Meldungsart); ob erfasst werden darf, sagt {@link darfImEinsatzErfassen}. */
+export function istMitarbeit(einsatz?: Pick<EinsatzAnzeige, 'meine_rolle'> | null): boolean {
+  return einsatz?.meine_rolle === 'mitarbeit';
 }
 
 /** Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): führt diese Instanz den Einsatz? Ohne
@@ -192,6 +198,25 @@ export function darfImEinsatzSchreiben(einsatz?: EinsatzSchreibkontext): boolean
   return !istSpiegel(einsatz) && hasSchreibrolleImAktivenEinsatz(einsatz);
 }
 
+/**
+ * Erfassen im Einsatz (LLH-1817, design.md D9): aktiver Einsatz, kein Spiegel UND (Einsatzleitung
+ * ODER Führungspersonal ODER Mitarbeit). Nur an den Erfassungsorten (Chat-Eingabe und eigene
+ * Nachricht, Meldung, ETB-Eintrag, Erfassungs-Anhänge); Ändern, Kanal, Bezug, Heraufstufen und alle
+ * anderen Module bleiben bei {@link darfImEinsatzSchreiben}. Der Server prüft dieselbe Menge
+ * (Erfassungs-Gate), und was Mitarbeit je Eintrag darf, bleibt Sache des Aufrufers (nur Eigenes).
+ */
+export function darfImEinsatzErfassen(einsatz?: EinsatzSchreibkontext): boolean {
+  return !istSpiegel(einsatz) && hasErfassungsrolleImAktivenEinsatz(einsatz);
+}
+
+/** Aktiver Einsatz UND Erfassungsrolle (Schreibrolle oder Mitarbeit). */
+function hasErfassungsrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boolean {
+  return (
+    hasSchreibrolleImAktivenEinsatz(einsatz) ||
+    (einsatz?.status === 'aktiv' && istMitarbeit(einsatz))
+  );
+}
+
 /** Aktiver Einsatz UND Schreibrolle — der gemeinsame Kern von Schreiben und Beantragen. */
 function hasSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boolean {
   return (
@@ -212,6 +237,38 @@ function hasSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boole
 export function darfBeantragen(einsatz?: EinsatzSchreibkontext): boolean {
   if (einsatz?.spiegel?.beendet) return false;
   return hasSchreibrolleImAktivenEinsatz(einsatz);
+}
+
+/**
+ * Eine Meldung korrigieren (LLH-1817): Wer schreiben darf, an jeder; Mitarbeit nur an einer eigenen
+ * (`erfasst_von_id`) und nur, solange sie weder in der Lage steht noch eine Lagemeldung ist — wie
+ * der Server (`meldung_korrektur`), der sonst mit 404 bzw. 403 ablehnt. Die übrigen Objekt-Gates
+ * (Status, Modul) bleiben am Aufrufort.
+ */
+export function darfMeldungKorrigieren(
+  einsatz: EinsatzSchreibkontext,
+  meldung: Pick<Meldung, 'erfasst_von_id' | 'lagerelevant' | 'meldungsart'>,
+  benutzerId: number | null | undefined,
+): boolean {
+  if (darfImEinsatzSchreiben(einsatz)) return true;
+  return (
+    darfImEinsatzErfassen(einsatz) &&
+    istMitarbeit(einsatz) &&
+    benutzerId != null &&
+    meldung.erfasst_von_id === benutzerId &&
+    !meldung.lagerelevant &&
+    meldung.meldungsart !== 'lagemeldung'
+  );
+}
+
+/**
+ * ETB-Eintrag oder Meldung erfassen bzw. am Spiegel beantragen (LLH-1817, design.md D9): wie
+ * {@link darfBeantragen}, aber mit Mitarbeit. Nur an der ETB- und Meldungserfassung; alle anderen
+ * beantragbaren Erfassungen (Personen, Sichtung, Verpflegung …) bleiben bei {@link darfBeantragen}.
+ */
+export function darfErfassungBeantragen(einsatz?: EinsatzSchreibkontext): boolean {
+  if (einsatz?.spiegel?.beendet) return false;
+  return hasErfassungsrolleImAktivenEinsatz(einsatz);
 }
 
 /** Nicht übernommene Erfassungen nach einer Notübernahme ablegen (LLH-1646, N6): Schreibrolle,

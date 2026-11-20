@@ -161,6 +161,11 @@ export interface BefehlKontext {
    * „Tastenkürzel“. Der Reiter steht als Literal hier, damit `typen.ts` nichts aus `hilfe/` lädt.
    */
   oeffneHilfe?: (reiter?: 'seite' | 'kuerzel') => void;
+  /**
+   * Startet den Rundgang zur aktuellen Seite (LLH-1990, `hilfe/rundgang/RundgangProvider.tsx`).
+   * Fehlt er (kein Ort, Handschirm, Gerät), fehlt „Rundgang“.
+   */
+  starteRundgang?: () => void;
   /** Grober Zeiger (`useViewport().istBeruehrung`): ohne Tastatur keine Kürzelübersicht. */
   istBeruehrung?: boolean;
   benutzer: BenutzerAnzeige | null;

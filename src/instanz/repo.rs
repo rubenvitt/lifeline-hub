@@ -43,6 +43,9 @@ pub struct KopplungZeile {
     pub gegenueber_hinweise: bool,
     /// Meldende Seite: das Gegenüber bietet Web Push an.
     pub gegenueber_web_push: bool,
+    /// Beide Seiten: das Gegenüber kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7).
+    /// Ohne sie geht `mitarbeit` als `beobachter` hinaus.
+    pub gegenueber_rolle_mitarbeit: bool,
 }
 
 impl KopplungZeile {
@@ -68,7 +71,7 @@ const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, g
      gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
      naechste_meldung_at, angebahnt_at, erstellt_at, gegenueber_age_empfaenger, \
      gegenueber_datentraeger_verschluesselt, art, tls_zertifikat, tls_zertifikat_gemeldet, \
-     gegenueber_hinweise, gegenueber_web_push";
+     gegenueber_hinweise, gegenueber_web_push, gegenueber_rolle_mitarbeit";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -623,12 +626,14 @@ pub async fn mark_gesehen(
     Ok(())
 }
 
-/// Meldende Seite: die Fähigkeiten des Gegenübers aus seiner Meldeantwort (LLH-1495, D4).
+/// Meldende Seite: die Fähigkeiten des Gegenübers aus seiner Meldeantwort (LLH-1495, D4;
+/// `rolle_mitarbeit` LLH-1817, design.md D7).
 pub async fn save_faehigkeiten(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     hinweise: bool,
     web_push: bool,
+    rolle_mitarbeit: bool,
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ? WHERE id = ?",
@@ -638,6 +643,50 @@ pub async fn save_faehigkeiten(
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
+    save_rolle_mitarbeit(conn, kopplung_id, rolle_mitarbeit).await
+}
+
+/// Die Fähigkeit `rolle_mitarbeit` des Gegenübers, frisch aus der DB (LLH-1817, design.md D7).
+/// Liefern und Übernehmen lesen sie hier statt aus einer geladenen [`KopplungZeile`]: Ein
+/// Austausch, der die Zeile vor dem Wechsel geladen hat, verbrauchte sonst die einmalige
+/// Nachlieferung mit dem alten Wert.
+pub async fn load_gegenueber_rolle_mitarbeit(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT gegenueber_rolle_mitarbeit FROM instanz_kopplung WHERE id = ?")
+            .bind(kopplung_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .unwrap_or(false),
+    )
+}
+
+/// Ob das Gegenüber die Einsatzrolle `mitarbeit` kennt (LLH-1817, design.md D7); die erreichte
+/// Seite ruft das mit der Anfrage, die meldende über [`save_faehigkeiten`] mit der Antwort. Lernt
+/// die Kopplung die Fähigkeit neu (0 → 1), gehen die Mitarbeiten, die das Gegenüber bisher als
+/// `beobachter` bekam, einmal neu hinaus (`spiegel::liefern::resend_mitarbeit`). Der
+/// Wechsel steht in der Bedingung des UPDATE: eine weitere Meldung mit 1 ändert keine Zeile und
+/// liefert nichts nach.
+pub async fn save_rolle_mitarbeit(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    rolle_mitarbeit: bool,
+) -> Result<(), AppError> {
+    let geaendert = sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = ? \
+         WHERE id = ? AND gegenueber_rolle_mitarbeit IS NOT ?",
+    )
+    .bind(rolle_mitarbeit)
+    .bind(kopplung_id)
+    .bind(rolle_mitarbeit)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if rolle_mitarbeit && geaendert > 0 {
+        super::spiegel::liefern::resend_mitarbeit(conn, kopplung_id).await?;
+    }
     Ok(())
 }
 
