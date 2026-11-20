@@ -43,6 +43,7 @@ import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
 import BerichtigtMarke from '../meldungen/BerichtigtMarke';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import { useStandardRufname } from '../etb/useStandardRufname';
 import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
@@ -230,6 +231,8 @@ export default function LagemeldungenPage() {
   });
   const funktionsVorschlaege = useFunktionsVorschlaege(formOffen ? einsatzId : undefined);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  // Die eigene Stelle aus dem ETB belegt die Meldung nach Art vor (LLH-1759).
+  const eigeneStelle = useStandardRufname().standard;
   const vorschlagsquellen = useFunkrufnamenQuellen({
     einsatzId,
     funktionen: funktionsVorschlaege,
@@ -572,6 +575,7 @@ export default function LagemeldungenPage() {
           abschnitte={abschnitteQuery.data}
           funktionsVorschlaege={funktionsVorschlaege}
           vorschlagsquellen={vorschlagsquellen}
+          eigeneStelle={eigeneStelle}
         />
       )}
       {angezeigteNeue.length > 0 && darfSchreiben && (

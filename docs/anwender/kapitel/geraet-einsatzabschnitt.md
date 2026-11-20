@@ -43,7 +43,7 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 ### Vollzug melden
 
 1. Beim Auftrag „Vollzug melden“ wählen.
-2. Im Dialog „Vollzug melden“ die Rückmeldung zur Erledigung eintragen.
+2. Im Dialog „Vollzug melden“ die „Vollzugsmeldung“ eintragen.
 
    ![Dialog „Vollzug melden“ mit der Rückmeldung „Gemeindehaus eingerichtet, vier Behandlungsplätze bereit“](../bilder/geraet-einsatzabschnitt/vollzug.png)
 

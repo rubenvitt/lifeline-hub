@@ -118,7 +118,7 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
 
   it.each<[AufnahmeModus, number]>([
     ['erfassen', 4],
-    ['vermisst', 3],
+    ['vermisst', 4],
   ])(
     '%s: sichtbares Budget unverändert (%i), die neuen Felder erst nach dem Aufklappen',
     async (modus, sichtbar) => {
@@ -284,4 +284,114 @@ describe('AufnahmeFelder — Grenzen der Freitexte (LLH-1329)', () => {
       await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
     },
   );
+});
+
+/**
+ * LLH-1765: „Vermisst melden“ ohne jede Angabe legte einen Geisterdatensatz an, und der Name lag
+ * eingeklappt. Bei Vermissten ist der Name das Erste, wonach gesucht wird.
+ */
+describe('AufnahmeFelder — Vermisst melden (LLH-1765)', () => {
+  function mitAbsenden(modus: AufnahmeModus) {
+    const onFinish = vi.fn();
+    renderMitProviders(
+      <Form onFinish={onFinish}>
+        <AufnahmeFelder modus={modus} />
+        <Button htmlType="submit">Absenden</Button>
+      </Form>,
+    );
+    return { onFinish };
+  }
+
+  const HINWEIS = 'Mindestens eine Angabe zur vermissten Person';
+
+  it('zeigt Name, Vorname, Geschlecht und Fundort oben; das Alter liegt unter „Weitere Angaben“', async () => {
+    const { container } = zeige('vermisst');
+    const beschriftungen = [...container.querySelectorAll('.ant-form-item label')].map(
+      (l) => l.textContent,
+    );
+    expect(beschriftungen).toEqual(['Name', 'Vorname', 'Geschlecht', 'Fundort']);
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await screen.findByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
+    // Name und Vorname stehen nur einmal, nicht zusätzlich eingeklappt.
+    expect(screen.getAllByLabelText('Name')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Vorname')).toHaveLength(1);
+  });
+
+  it('die allgemeine Maske behält Alter oben und Name eingeklappt', () => {
+    const { container } = zeige('erfassen');
+    const beschriftungen = [...container.querySelectorAll('.ant-form-item label')].map(
+      (l) => l.textContent,
+    );
+    expect(beschriftungen).toEqual([
+      'Sichtungskategorie',
+      'Geschlecht',
+      'Geschätztes Alter (Jahre)',
+      'Fundort',
+    ]);
+  });
+
+  it('ohne jede Angabe hält die Maske an und nennt den Grund', async () => {
+    const { onFinish } = mitAbsenden('vermisst');
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    expect(await screen.findByText(HINWEIS)).toBeInTheDocument();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('nur Leerzeichen im Namen zählen nicht als Angabe', async () => {
+    const { onFinish } = mitAbsenden('vermisst');
+    await userEvent.type(screen.getByLabelText('Name'), '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    expect(await screen.findByText(HINWEIS)).toBeInTheDocument();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('„unbekannt“ als Geschlecht zählt nicht als Angabe', async () => {
+    const { onFinish } = mitAbsenden('vermisst');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Geschlecht' }));
+    const option = (await screen.findAllByText('unbekannt')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await userEvent.click(option!);
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    expect(await screen.findByText(HINWEIS)).toBeInTheDocument();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Name', 'Müller'],
+    ['Vorname', 'Anna'],
+    ['Fundort', 'Bahnhof'],
+  ])('eine Angabe im Feld „%s“ genügt', async (label, wert) => {
+    const { onFinish } = mitAbsenden('vermisst');
+    await userEvent.type(screen.getByLabelText(label), wert);
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(HINWEIS)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Melder / Kontakt', 'Tochter, 0170 1234567'],
+    ['Notiz', 'rote Jacke'],
+    ['Geschätztes Alter (Jahre)', '80'],
+  ])('auch eine eingeklappte Angabe („%s“) genügt', async (label, wert) => {
+    const { onFinish } = mitAbsenden('vermisst');
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(await screen.findByLabelText(label), wert);
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
+  });
+
+  it('der Grund verschwindet, sobald eine Angabe dasteht', async () => {
+    mitAbsenden('vermisst');
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    expect(await screen.findByText(HINWEIS)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Vorname'), 'Anna');
+    await waitFor(() => expect(screen.queryByText(HINWEIS)).not.toBeInTheDocument());
+  });
+
+  it('die allgemeine Maske verlangt keine Angabe: eine unbekannte Person darf leer entstehen', async () => {
+    const { onFinish } = mitAbsenden('erfassen');
+    await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
+  });
 });

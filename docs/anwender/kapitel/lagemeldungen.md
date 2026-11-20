@@ -25,7 +25,7 @@ Für Einsatzleitung und Führungspersonal:
    Steht noch keine Lagemeldung da, steht der Knopf auch in der leeren Ansicht. Der Dialog
    „Lagemeldung erfassen“ öffnet sich.
 2. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ eingeben. Die Meldungsart ist
-   „Lagemeldung“.
+   „Lagemeldung“. Ist im ETB ein Standard-Rufname gesetzt, steht er schon als Absender da.
 
    ![Dialog „Lagemeldung erfassen“ mit Wortlaut und Absender](../bilder/lagemeldungen/lagemeldung-erfassen.png)
 

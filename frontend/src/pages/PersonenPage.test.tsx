@@ -972,7 +972,7 @@ describe('PersonenPage', () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
     // Redirect → Detailseite rendert die Überschrift:
-    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
   });
 
   it('zeigt die Sichtung als BBK-Etikett und zählt das Sichtungsbild der Seitenleiste', async () => {
@@ -1282,7 +1282,7 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, [person]);
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     // Die Detailseite zeigt den Personen-Titel als Überschrift:
-    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
   });
 
   it('rendert genau einen Datensatz-Link pro Personenzeile', async () => {

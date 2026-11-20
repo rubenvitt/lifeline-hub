@@ -59,6 +59,7 @@ import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import { useStandardRufname } from '../etb/useStandardRufname';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { meldungsFunktionsOptionen } from '../fuehrung/funktionsOptionenKern';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
@@ -212,6 +213,8 @@ export default function MeldungenPage() {
     neuAuftrag.raeume('neu');
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfMeldenRoh]);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  // Die eigene Stelle aus dem ETB belegt die Meldung nach Art vor (LLH-1759).
+  const eigeneStelle = useStandardRufname().standard;
   const vorschlagsquellen = useFunkrufnamenQuellen({
     einsatzId,
     funktionen: funktionsVorschlaege,
@@ -985,6 +988,7 @@ export default function MeldungenPage() {
             funktionsVorschlaege={funktionsVorschlaege}
             vorschlagsquellen={vorschlagsquellen}
             ohneLagemeldungsart={ohneLagemeldungsart}
+            eigeneStelle={eigeneStelle}
           />
         </Paneel>
       )}

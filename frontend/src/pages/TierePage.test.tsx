@@ -86,6 +86,16 @@ function regFolge(): string[] {
  * kennt `WebkitAnimation`, nicht `animation` — hier heißt das Ereignis „webkitAnimationEnd". Beide
  * Namen zu schicken hält den Helfer über einen jsdom-Wechsel heil.
  */
+/** Wählt im Erfassungsdialog eine Spezies; eine Vorgabe gibt es nicht (LLH-1765). */
+async function waehleSpezies(dialog: HTMLElement, wort: string) {
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Spezies' }));
+  const option = (await screen.findAllByText(wort)).find((el) =>
+    el.closest('.ant-select-item-option'),
+  );
+  expect(option).toBeTruthy();
+  await userEvent.click(option!);
+}
+
 async function warteBisDialogWeg(timeout?: number) {
   await waitFor(
     () => {
@@ -542,9 +552,32 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waehleSpezies(dialog, 'Katze');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.status).toBe('aktiv'));
-    expect(body.spezies).toBe('hund'); // initialValues
+    expect(body.spezies).toBe('katze');
+  });
+
+  /**
+   * LLH-1765: ein leerer Klick legte einen Hund an (Vorgabe „Hund“). Die Spezies hat keine Vorgabe
+   * mehr; ohne Wahl hält die Pflichtregel an, und kein Datensatz entsteht.
+   */
+  it('ohne gewählte Spezies entsteht kein Tier — keine Vorgabe „Hund“ (LLH-1765)', async () => {
+    let posts = 0;
+    server.use(
+      http.post('/api/einsaetze/1/tiere', () => {
+        posts += 1;
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByTitle('Hund')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(await within(dialog).findByText('Spezies fehlt')).toBeInTheDocument();
+    expect(posts).toBe(0);
   });
 
   it('Vermisst-Meldung schickt status=vermisst', async () => {
@@ -557,6 +590,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Katze');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.status).toBe('vermisst'));
   });
@@ -583,6 +617,7 @@ describe('TierePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('T-009')).toBeInTheDocument();
@@ -647,6 +682,7 @@ describe('TierePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
@@ -685,6 +721,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await screen.findByRole('dialog');
 
     // Kein Klick auf „Erfassen": nur die Enter-Taste im Feld belegt, dass der Absende-Knopf im
@@ -718,14 +755,9 @@ describe('TierePage', () => {
 
     // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
-    // Spezies weg vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen auch ohne
-    // Übernahme wieder da.
-    await userEvent.click(within(dialog).getByRole('combobox'));
-    const katze = (await screen.findAllByText('Katze')).find((el) =>
-      el.closest('.ant-select-item-option'),
-    );
-    expect(katze).toBeTruthy();
-    await userEvent.click(katze!);
+    // Ohne Vorgabe (LLH-1765) stünde die Spezies nach dem Zurücksetzen leer; nur die Übernahme
+    // hält sie.
+    await waehleSpezies(dialog, 'Katze');
     await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Nord');
     await userEvent.type(screen.getByRole('textbox', { name: 'Rufname' }), 'Rex');
 
@@ -775,6 +807,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.type(screen.getByRole('textbox', { name: 'Fundort' }), '51.50000, 8.25000');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(rumpfe).toHaveLength(1));
@@ -798,12 +831,14 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.type(screen.getByLabelText('Fundort'), 'Tier-Sammelstelle');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tier-Sammelstelle'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
@@ -818,6 +853,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.type(screen.getByLabelText('Fundort'), 'Fehlerort Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
@@ -853,6 +889,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await userEvent.type(screen.getByLabelText('Fundort'), 'Wartort Tier');
     await userEvent.type(screen.getByRole('textbox', { name: 'Rufname' }), 'Warte-Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -885,6 +922,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
 
     await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tierlager Nord'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
@@ -922,6 +960,7 @@ describe('TierePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tierlager A'));
     const dialogA = screen.getByRole('dialog');
     await userEvent.click(within(dialogA).getByRole('combobox'));
@@ -935,6 +974,7 @@ describe('TierePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     await warteBisDialogWeg();
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
 
     const dialogB = await screen.findByRole('dialog');
     await waitFor(() =>
@@ -1176,6 +1216,7 @@ describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
       }),
     );
     const dialog = await oeffne('Tier erfassen');
+    await waehleSpezies(dialog, 'Hund');
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(within(dialog).getByLabelText('Rasse / Beschreibung'), 'Haflinger');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
@@ -1259,6 +1300,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
 
   async function erfasse(rufname: string) {
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Rufname'), rufname);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
@@ -1305,6 +1347,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     const wieder = await screen.findByRole('dialog');
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
@@ -1351,6 +1394,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
     await screen.findByText('Einsatz 2');
 
     await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
+    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
     const dialogB = await screen.findByRole('dialog');
     expect(within(dialogB).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
 
