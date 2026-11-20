@@ -22,22 +22,30 @@ export default function RundgangTour({
       current={aktuell}
       onChange={setAktuell}
       onClose={onClose}
-      onFinish={onClose}
       indicatorsRender={(c, gesamt) => `${c + 1}/${gesamt}`}
-      actionsRender={(knoepfe) => (
+      // Eigene Knöpfe statt der kleinen aus antd: sie folgen der Bediendichte (Dichte-Staffel,
+      // `frontend/AGENTS.md`), auch mit Handschuh.
+      actionsRender={(_, { current }) => (
         <>
-          <Button size="small" type="text" onClick={onClose}>
+          <Button type="text" onClick={onClose}>
             Rundgang beenden
           </Button>
-          {knoepfe}
+          {current > 0 && <Button onClick={() => setAktuell(current - 1)}>Zurück</Button>}
+          {current < letzter ? (
+            <Button type="primary" onClick={() => setAktuell(current + 1)}>
+              Weiter
+            </Button>
+          ) : (
+            <Button type="primary" onClick={onClose}>
+              Fertig
+            </Button>
+          )}
         </>
       )}
-      steps={schritte.map(({ schritt, ziel, text }, i) => ({
+      steps={schritte.map(({ schritt, ziel, text }) => ({
         title: schritt.titel,
         description: <div data-lfh="rundgang">{text}</div>,
         target: () => ziel,
-        prevButtonProps: { children: 'Zurück' },
-        nextButtonProps: { children: i === letzter ? 'Fertig' : 'Weiter' },
       }))}
     />
   );

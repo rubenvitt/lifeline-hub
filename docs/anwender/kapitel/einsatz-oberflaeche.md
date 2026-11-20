@@ -165,7 +165,7 @@ Hilfe).
 
 1. Auf der Willkommenskarte „Rundgang starten“ wählen oder in der Sprungpalette „Rundgang“. Es
    startet der Teil zur Seite, die gerade offen ist.
-2. „Weiter“ und „Zurück“ blättern, oben steht der Schritt („2/5“). „Fertig“, „Rundgang beenden“
+2. „Weiter“ und „Zurück“ blättern, unten in der Sprechblase steht der Schritt („2/5“). „Fertig“, „Rundgang beenden“
    oder **Esc** beenden ihn.
 
 Von selbst erscheint der Teil zur Einsatzliste einmal beim ersten Besuch, solange die

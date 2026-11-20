@@ -199,9 +199,6 @@ export default function EinsaetzePage() {
 
 function EinsaetzeInhalt() {
   const navigate = useNavigate();
-  // Rundgang für Erstnutzer, Teil „Liste“ (LLH-1990).
-  const { stand: einstellungen } = useEinstellungMerken();
-  useRundgangOrt('liste', sollListeSelbstStarten(einstellungen));
   const { zeitKurz } = useAnzeigeKonventionen();
   const { token } = theme.useToken();
   const { rollen } = useRollen();
@@ -273,6 +270,10 @@ function EinsaetzeInhalt() {
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
+  // Rundgang für Erstnutzer, Teil „Liste“ (LLH-1990): erst nach dem ersten Abruf, sonst stünden
+  // noch Skelette statt Kacheln und der Schritt „Einsätze“ fiele für immer weg.
+  const { stand: einstellungen } = useEinstellungMerken();
+  useRundgangOrt('liste', !isPending && sollListeSelbstStarten(einstellungen));
 
   const { data: stichwortVorschlaege = [] } = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),

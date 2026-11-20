@@ -1,4 +1,5 @@
 import {
+  Component,
   createContext,
   lazy,
   Suspense,
@@ -37,6 +38,26 @@ const STILL: RundgangWert = {
 };
 
 const RundgangKontext = createContext<RundgangWert>(STILL);
+
+/**
+ * Scheitert die Tour (Chunk nicht ladbar offline oder nach einem Deploy), geht nur der Rundgang zu;
+ * sonst ersetzte die Wurzel-Fehlergrenze die ganze App. Muster: `LeistenFehlergrenze` der Hilfe.
+ */
+class TourFehlergrenze extends Component<
+  { children: ReactNode; onFehler: () => void },
+  { fehler: boolean }
+> {
+  state = { fehler: false };
+  static getDerivedStateFromError() {
+    return { fehler: true };
+  }
+  componentDidCatch() {
+    this.props.onFehler();
+  }
+  render() {
+    return this.state.fehler ? null : this.props.children;
+  }
+}
 
 /**
  * Rundgang für Erstnutzer (LLH-1990, `frontend/AGENTS.md`, „Ausnahme Rundgang“): hält den Ort
@@ -87,9 +108,11 @@ export function RundgangProvider({ children }: { children: ReactNode }) {
     <RundgangKontext.Provider value={wert}>
       {children}
       {lauf && (
-        <Suspense fallback={null}>
-          <RundgangTour key={lauf.teil} schritte={lauf.schritte} onClose={() => setLauf(null)} />
-        </Suspense>
+        <TourFehlergrenze onFehler={() => setLauf(null)}>
+          <Suspense fallback={null}>
+            <RundgangTour key={lauf.teil} schritte={lauf.schritte} onClose={() => setLauf(null)} />
+          </Suspense>
+        </TourFehlergrenze>
       )}
     </RundgangKontext.Provider>
   );

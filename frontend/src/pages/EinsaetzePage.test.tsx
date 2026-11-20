@@ -1472,6 +1472,17 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
     await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('liste', true));
   });
 
+  it('solange die Liste lädt, startet nichts (sonst fehlte der Schritt „Einsätze“)', async () => {
+    server.use(
+      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+      http.get('/api/einsaetze', () => new Promise<never>(() => {})),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('liste', true);
+  });
+
   it('wer die Willkommenskarte geschlossen hat, nicht', async () => {
     server.use(
       http.get('/api/benutzer-einstellungen', () =>
