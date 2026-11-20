@@ -390,7 +390,7 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
     expect(seitenFehler).toEqual([]);
   });
 
-  test('eine auf dem Server beendete Sitzung führt nach der Rückkehr zur Anmeldung, die Queue bleibt', async ({
+  test('eine auf dem Server beendete Sitzung zeigt nach der Rückkehr „Sitzung beendet“, die Queue bleibt', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -415,9 +415,13 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
     await offlineErfassen(app, 'Kaltstart-Probe für die Beweissicherung');
 
     // Server zurück: jetzt antwortet er mit 401 — das ist eine Antwort über die Sitzung, kein
-    // Leitungsfehler, also Anmeldung. Die Erfassung bleibt in der Queue (Beweissicherung).
+    // Leitungsfehler, also Anmeldung: als Dialog über der Seite, die offline gestartete Sitzung
+    // zählt als Betrieb (LLH-1770). Die Erfassung bleibt in der Queue (Beweissicherung).
     await app.context().setOffline(false);
-    await expect(app).toHaveURL(/\/login/, { timeout: 60_000 });
+    await expect(app.getByRole('dialog', { name: 'Sitzung beendet' })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(app).not.toHaveURL(/\/login/);
     expect(await queueEintraege(app)).toBe(1);
   });
 });
