@@ -417,6 +417,8 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
       if (weg === 'kreuz')
         await nutzer.click(within(dialog).getByRole('button', { name: 'Close' }));
       if (weg === 'escape') await nutzer.keyboard('{Escape}');
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await nutzer.click(await screen.findByRole('button', { name: 'Verwerfen' }));
 
       dialog = await oeffneDialog(nutzer);
       expect(within(dialog).getByLabelText('Titel')).toHaveValue('');
@@ -547,6 +549,8 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     await within(dialog).findByRole('alert');
 
     await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await nutzer.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     const wieder = await oeffneDialog(nutzer);
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });

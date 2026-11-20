@@ -17,6 +17,7 @@ import { FakeEventSource } from '../test/eventSource';
 import * as dateiSpeichern from '../components/dateiSpeichern';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { AdresseSteht } from '../test/adresseSteht';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -1346,9 +1347,11 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
-    await waehleSpezies(await screen.findByRole('dialog'), 'Hund');
-    const wieder = await screen.findByRole('dialog');
+    await waehleSpezies(await findeDialogOhneRueckfrage(), 'Hund');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 

@@ -32,6 +32,7 @@ import { type AnzeigeKonventionen, DEFAULT_KONVENTIONEN } from '../../anzeige/fo
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../../test/prozessZone';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { bestaetigeVerwerfen } from '../../test/verwerfen';
 
 type Snap = Record<string, unknown>;
 function snapshot(over: Snap = {}): Snap {
@@ -163,6 +164,8 @@ describe('SnapshotLeiste', () => {
     expect(await within(dialog).findByText('Stand zu groß')).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await waitFor(() => expect(dialog.closest('.ant-modal')).toHaveClass('ant-zoom-leave'));
     await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
     // Wieder offen (nicht mehr im Verlassen-Zustand), und ohne den alten Grund.

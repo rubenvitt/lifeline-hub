@@ -7,6 +7,7 @@ import { NetzFehler } from '../api/client';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /** Die Offline-Download-Maske auf `ErfassungsModal`; sie kennt nur den Anlegen-Fall. */
 
@@ -134,6 +135,8 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
@@ -194,8 +197,10 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
     await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
     expect(within(wieder).queryByRole('alert')).toBeNull();
   });

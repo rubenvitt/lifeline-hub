@@ -13,6 +13,7 @@ import { alsSchadenAuswahl } from '../api/einsatzSchaden';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag } from '../test/menue';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Dialoge nennen
@@ -278,6 +279,8 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
     await within(bereich).findByRole('alert');
 
     await userEvent.click(within(bereich).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull();
     await userEvent.click(
       within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' }),
@@ -359,6 +362,8 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
     keinToast();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     expect(within(await offenerDialog()).queryByRole('alert')).toBeNull();
   });

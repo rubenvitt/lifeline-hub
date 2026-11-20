@@ -17,6 +17,7 @@ import { dichten } from '../theme/tokens';
 import { adminFixture } from '../test/fixtures';
 import { tippeZeit } from '../test/zeitEingabe';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 const admin = adminFixture();
 
@@ -1186,6 +1187,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     expect(await within(dialog).findByText('Bezeichnung bereits vergeben')).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Neuer Einsatz' }));
     await screen.findByLabelText('Bezeichnung');
     expect(screen.queryByText('Bezeichnung bereits vergeben')).toBeNull();

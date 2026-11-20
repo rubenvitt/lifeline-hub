@@ -1700,8 +1700,15 @@ Spec `bedien-arbeitsplatz`).
   nächste“ stehen nicht klebend am Formularende (`data-lfh="erfassung-serie"`). Auf der Seite
   (`fussKlebt="seite"`) ebenso, nur bleibt „Abbrechen“ im klebenden Fuß (LLH-1761). Ein Abschluss mit
   Wirkung im Einsatz („RTW nötig“) ist Nebenaktion, nie Serienteil.
-- **Zurückgesetzt wird auf JEDEM Weg hinaus** (Erfassen, Abbrechen, Kreuz, Escape, Maske); der
+- **Zurückgesetzt wird auf JEDEM Weg hinaus** (Erfassen, Abbrechen, Kreuz, Escape); der
   Aufrufer ruft kein `resetFields()`; Vorbelegen zum Bearbeiten (`setFieldsValue`) ist kein Reset. **`destroyOnHidden` setzt rc-field-form nicht zurück.**
+- **Geänderte Eingaben gehen nie ohne Rückfrage verloren** (LLH-1755, Design-Doc
+  `docs/superpowers/specs/2026-11-20-t103cygu-dialoge-schuetzen-eingaben-design.md`): die Maske
+  schließt nie; mit geänderten Feldern fragt jeder Weg hinaus erst „Eingaben verwerfen?“
+  (`VerwerfenDialog`, „Weiter bearbeiten“ hat den Fokus). „Geändert“ heißt: angefasst
+  (`onValuesChange`, nie `setFieldsValue`) und anders als `initialValues`. Ein Dialog um ein
+  eigenes `ErfassungsFormular` (Aufträge) leitet Kreuz und Escape über `steuerungRef` und
+  `keyboard={false}`; ohne eigenen Abbrechen-Knopf über `ohneAbbrechenKnopf`.
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.
 - **Serienmodus** (`serie`): „Speichern und nächste" hält offen, leert, zählt, fokussiert, ruft
   `form.submit()` von Hand; die Serien-Marke wird in `onFinish` verbraucht **und in

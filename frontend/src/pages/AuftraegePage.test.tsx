@@ -21,6 +21,7 @@ import { ApiError } from '../api/client';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
 import { warteAufMenueFokus } from '../test/menue';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({
@@ -217,7 +218,8 @@ const oeffneErteilen = async (user: Bediener = userEvent) => {
     .filter((k) => !k.closest('[role="dialog"]'));
   expect(kopf).toHaveLength(1);
   await user.click(kopf[0]);
-  return screen.findByRole('dialog');
+  // Die beantwortete Rückfrage „Eingaben verwerfen?“ bleibt in jsdom im Baum (LLH-1755).
+  return findeDialogOhneRueckfrage();
 };
 const fuelleErteilen = async (dialog: HTMLElement, user: Bediener = userEvent) => {
   await user.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
@@ -1137,6 +1139,8 @@ describe('AuftraegePage', () => {
       await within(dialog).findByRole('alert');
 
       await userEvent.click(within(dialog).getByRole('button', { name: /close|schließen/i }));
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await bestaetigeVerwerfen();
       await waitFor(() => expect(istZu(dialog)).toBe(true));
       // jsdom beendet die Ausblendung nie, `destroyOnHidden` hängt das Formular hier also nicht
       // neu ein: gerade dann muss das Öffnen selbst den alten Grund räumen.
@@ -1190,6 +1194,8 @@ describe('AuftraegePage', () => {
         fireEvent.transitionEnd(liste);
       }
       fireEvent.keyDown(within(dialog).getByLabelText('Auftrag / Was'), { key: 'Escape' });
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await bestaetigeVerwerfen();
       await waitFor(() => expect(istZu(dialog)).toBe(true));
       const neu = await oeffneErteilen();
       await waitFor(() => expect(istZu(neu)).toBe(false));

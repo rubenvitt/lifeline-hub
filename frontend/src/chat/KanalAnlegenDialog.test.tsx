@@ -3,6 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { renderMitProviders } from '../test/utils';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 import KanalAnlegenDialog from './KanalAnlegenDialog';
 
 /** Hält den Offen-Zustand wie die Aufrufer (`KanalListe`, schmale Leiste in `ChatPage`). */
@@ -96,7 +97,11 @@ describe('KanalAnlegenDialog', () => {
 
     await user.type(await screen.findByLabelText('Name'), 'Verworfen');
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(user);
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Neuer Kanal' })).toHaveClass('ant-zoom-leave'),
+    );
     expect(onKanalAnlegen).not.toHaveBeenCalled();
   });
 });

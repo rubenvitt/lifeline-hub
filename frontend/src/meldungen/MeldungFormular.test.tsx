@@ -796,6 +796,8 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     render(<DialogHarness onAnlegen={anlegenMock()} />);
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Verworfen');
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     await waitFor(() => expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue(''));
   });

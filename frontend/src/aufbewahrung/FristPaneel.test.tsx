@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { alsBackendZeit, alsOrtszeit } from '../anzeige/zeitEingabe';
 import { tippeZeit } from '../test/zeitEingabe';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 import FristPaneel from './FristPaneel';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
@@ -174,6 +175,8 @@ describe('FristPaneel', () => {
     let dialog = await dialogOeffnen();
     await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     dialog = await dialogOeffnen();
     await waitFor(() =>
       expect(
