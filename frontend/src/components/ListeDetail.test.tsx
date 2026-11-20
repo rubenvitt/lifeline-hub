@@ -179,6 +179,83 @@ describe('ListeDetail — Handschirm', () => {
   });
 });
 
+describe('ListeDetail — Handschirm: Detail in den Blick (LLH-1761)', () => {
+  /** Lässt das Detail bei `unten` px enden; `innerHeight` ist 844 wie am Handy. */
+  function detailEndetBei(unten: number) {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    const original = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      if (this.getAttribute('data-lfh') === 'liste-detail-detail') {
+        return {
+          top: unten - 300,
+          bottom: unten,
+          left: 0,
+          right: 390,
+          height: 300,
+          width: 390,
+          x: 0,
+          y: unten - 300,
+          toJSON: () => ({}),
+        };
+      }
+      return original.call(this);
+    });
+  }
+
+  it('eine Wahl von Hand rollt das aufgeklappte Detail in den Blick, wenn es unter den Rand fällt', () => {
+    setzeViewportBreite(390);
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    detailEndetBei(1200);
+    const { container } = rendere(<Harness eintraege={[A, B, C]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 2: Bravo' }));
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll.mock.calls[0][0]).toMatchObject({ block: 'start' });
+    expect(scroll.mock.contexts[0]).toBe(
+      container.querySelector('[data-liste-detail-eintrag="2"]'),
+    );
+    vi.restoreAllMocks();
+  });
+
+  it('passt das Detail ins Fenster, rollt nichts', () => {
+    setzeViewportBreite(390);
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    detailEndetBei(600);
+    rendere(<Harness eintraege={[A, B, C]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 2: Bravo' }));
+    expect(scroll).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('Zuklappen und ein späteres Rendern rollen nicht erneut', () => {
+    setzeViewportBreite(390);
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    detailEndetBei(1200);
+    const { rerender } = rendere(<Harness eintraege={[A, B, C]} />);
+    const ziel = screen.getByRole('button', { name: 'Objekt 2: Bravo' });
+    fireEvent.click(ziel);
+    rerender(<Harness eintraege={[A, B, C]} />);
+    fireEvent.click(ziel);
+    expect(scroll).toHaveBeenCalledOnce();
+    vi.restoreAllMocks();
+  });
+
+  it('ab lg rollt die Wahl nicht', () => {
+    setzeViewportBreite(1440);
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    detailEndetBei(1200);
+    rendere(<Harness eintraege={[A, B, C]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 2: Bravo' }));
+    expect(scroll).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+});
+
 describe('ListeDetail — Zustände', () => {
   it('bei der ersten Lieferung steht ein Skelett, kein Leerzustand', () => {
     rendere(<Harness eintraege={[]} ladend leer={<SeitenLeer titel="Keine Objekte" />} />);

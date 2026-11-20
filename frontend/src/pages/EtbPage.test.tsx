@@ -398,8 +398,9 @@ describe('EtbPage', () => {
     // Ohne Rufname hält die Pflicht den Eintrag zurück; der Text bleibt stehen.
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Pegel steigt{Enter}');
-    expect(await screen.findByText('Absender fehlt')).toBeInTheDocument();
-    expect(screen.getByText('Empfänger fehlt')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Absender und Empfänger fehlen – Rufname oben eintragen'),
+    ).toBeInTheDocument();
     expect(body).toBeNull();
     expect(feld).toHaveValue('Pegel steigt');
 

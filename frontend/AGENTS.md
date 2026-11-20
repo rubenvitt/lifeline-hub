@@ -216,14 +216,20 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
-    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (Stufe `kartentitel`) seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
     nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
     Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die
     gebündelte Alarmzentrale nennt die vorrangige Störung). Einziger Breitenhalter: der Platz von „Ton blockiert“ am
     Glockenknopf ab `md`, weil der Browser den Ton vor der ersten Geste ohne Zutun sperrt (am Handy
     nicht, dort hätte die eine Zeile keinen Platz dafür, LLH-1728). Tastenhinweise
-    nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`.
+    nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`. Der Knopf „?“ (Hilfe zur
+    Seite, LLH-1824) steht im Einsatz-Kopf erst ab `xl`, im App-Rahmen ab `md`; wo er die eine Zeile
+    bräche, steht „Hilfe zu dieser Seite“ im Benutzermenü (`hilfeZurSeite`), am Handy im Einsatz im
+    Fuß der Navigation. Unter `md` ersetzt dieser Eintrag „Hilfe“ (die Seitenleiste verlinkt die
+    volle Hilfe), und der Menükopf trägt keine Versionszeile, wie im Handschuh-Betrieb; sonst
+    ragte „Abmelden“ in `komfortabel` unter den Fensterrand (e2e `benutzermenue`, Entscheidung
+    20.11.2026).
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
     `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
@@ -505,8 +511,9 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
   `openspec/changes/archive/2026-10-12-oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn
   Objekte je Stück gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
   Ab `lg` Liste links, Detail rechts (klebt), darunter klappt es unter der gewählten Karte auf; kein
-  Drawer. Die Karte trägt nur das Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen
-  im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
+  Drawer; unter `lg` holt die Wahl von Hand das aufgeklappte Detail in den Blick, wenn es unter den
+  Fensterrand fällt (LLH-1761, nie bei Vorauswahl, Deeplink oder Zuklappen). Die Karte trägt nur das
+  Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
   weiter auf der Vollseite geschrieben. Vorbild Aufträge/Befehle; Einsatzabschnitte und Gefahren
   sind ältere Einzelbauten.
 
@@ -1419,7 +1426,9 @@ anwendbar), „nicht geprüft" ist keins.
 - **Knopfreihen über `Knopfreihe`** (LLH-1973, ADR-0070): zwei oder mehr Knöpfe nebeneinander
   stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
   bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
-  rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
+  rechtsbündig, darunter untereinander in voller Breite). Im `ErfassungsModal` unter `md` klebt nur der Abschluss
+  (Primärknopf, Nebenaktionen, Zusammenfassung); „Abbrechen“ steht dort als Text im Schließknopf des
+  Kopfs, Einstellungszeile und „Speichern und nächste“ am Formularende (LLH-1763). Primär steht im Kopf, im Paneel und in
   der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
   Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
   Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
@@ -1673,6 +1682,19 @@ Spec `bedien-arbeitsplatz`).
   prüfen: kein `.ant-modal-footer` **und** `knopf.closest('form')` ≠ `null`
   (`components/Erfassung.test.tsx`).
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern (`requestAnimationFrame`).
+- **Der Fuß klebt am unteren Rand**, solange die Maske höher ist als der Schirm: im Dialog
+  (`fussKlebt="dialog"`, setzt `ErfassungsModal`, LLH-1274) und auf einer Seite mit langer Maske
+  (`fussKlebt="seite"`: Aufnahme, Meldung erfassen; LLH-1761). Steht der Fokus im Formular, rückt
+  er über die Bildschirmtastatur (`components/tastaturVersatz.ts`, VisualViewport; kein
+  `interactive-widget` im Viewport-Meta). Kurze Formulare in Paneelen kleben nicht. Entwurf:
+  `docs/superpowers/specs/2026-11-20-j45fvu8l-handy-hauptaktion-kleben-design.md`.
+- **Am Handy klebt im Dialog nur der Abschluss** (LLH-1763, Entwurf
+  `docs/superpowers/specs/2026-11-20-zpnrt6qz-handy-dialog-fuss-design.md`): unter `md` trägt das
+  `ErfassungsModal` „Abbrechen“ statt des Kreuzes im Kopf (derselbe Schließweg, dieselbe Sperre),
+  klebend nur Primärknopf, Nebenaktionen und Zusammenfassung; „Werte behalten“ und „Speichern und
+  nächste“ stehen nicht klebend am Formularende (`data-lfh="erfassung-serie"`). Auf der Seite
+  (`fussKlebt="seite"`) ebenso, nur bleibt „Abbrechen“ im klebenden Fuß (LLH-1761). Ein Abschluss mit
+  Wirkung im Einsatz („RTW nötig“) ist Nebenaktion, nie Serienteil.
 - **Zurückgesetzt wird auf JEDEM Weg hinaus** (Erfassen, Abbrechen, Kreuz, Escape, Maske); der
   Aufrufer ruft kein `resetFields()`; Vorbelegen zum Bearbeiten (`setFieldsValue`) ist kein Reset. **`destroyOnHidden` setzt rc-field-form nicht zurück.**
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.
@@ -1808,7 +1830,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   ein nackter `Link`, im Einsatz wie in der Verwaltung. Kam man per PUSH von genau diesem Pfad
   (Query zählt nicht), geht der einfache Klick per `navigate(-1)` zurück, damit Ansicht, Filter und
   Rollposition wieder stehen; das `href` trägt die vorige Adresse für Strg- und Mittelklick. Sonst
-  ist es ein Link auf das Ziel. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
+  ist es ein Link auf das Ziel. Ein Ziel mit Zeilenmarke, die die Liste wählt und hervorhebt (Befehl,
+  `?befehl=`), bekommt `zeilenmarke` und bleibt immer ein Link. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
   `BetriebsLayout` (`routing/verlaufGedaechtnis.ts`, `sessionStorage lfh:verlauf`, räumt bei jedem
   Ausgang). Andere Rückwege (nach Storno oder Löschen, „Zur Liste“ in `SeitenNichtGefunden`) bleiben
   Links: nach einer Aktion ist kein Zurück im Verlauf gemeint. Herleitung:
