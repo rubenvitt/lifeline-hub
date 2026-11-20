@@ -19,6 +19,8 @@ import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { vorText } from '../anzeige/dauer';
 import { ErfassungsFormular } from '../components/Erfassung';
+import { leerKnopfStil, wertAngabeStil } from '../components/InlineAngabe';
+import { IconStift } from '../icons';
 import {
   Datenfeld,
   Datenraster,
@@ -268,22 +270,16 @@ export default function Patientenkopf({
           {/* Anlass der Hilfeleistung (LLH-1566): wer sichten darf, legt ihn fest; am Gerät nur
               die UHS. Ein Gesundheitsdatum, nie im ETB. */}
           <Datenfeld label="Anlass">
-            <span data-lfh="anlass">
-              {person.anlass ? (
-                ANLASS_WORT[person.anlass]
-              ) : (
-                <Typography.Text type="secondary">kein Anlass</Typography.Text>
-              )}
-            </span>
-            {erfassbar && darfSichten && angetroffen && (
-              <PaneelKnopf
-                offen={offen === 'anlass'}
-                gesperrt={isSpeichernd}
-                onClick={() => toggle('anlass')}
-              >
-                Anlass festlegen
-              </PaneelKnopf>
-            )}
+            <StandAngabe
+              etikett="Anlass"
+              lfh="anlass"
+              bedienbar={erfassbar && darfSichten && angetroffen}
+              offen={offen === 'anlass'}
+              gesperrt={isSpeichernd}
+              onClick={() => toggle('anlass')}
+              wert={person.anlass ? ANLASS_WORT[person.anlass] : null}
+              leer="kein Anlass"
+            />
           </Datenfeld>
 
           <Datenfeld label="Zustand / Verdacht">
@@ -361,32 +357,30 @@ export default function Patientenkopf({
           </Datenfeld>
 
           <Datenfeld label="Transport">
-            <span data-lfh="transport">
-              {transport ? (
-                <>
-                  {transport}
-                  {person.transport_at && (
-                    <Typography.Text type="secondary">
-                      {' '}
-                      · <ZeitAnzeige wert={person.transport_at} rolle="kurz" />
-                      {letzterTransport?.bestaetigt_name &&
-                        ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
-                    </Typography.Text>
-                  )}
-                </>
-              ) : (
-                <Typography.Text type="secondary">kein Transport</Typography.Text>
-              )}
-            </span>
-            {behandelbar && (
-              <PaneelKnopf
-                offen={offen === 'transport'}
-                gesperrt={isSpeichernd}
-                onClick={() => toggle('transport')}
-              >
-                Transport festlegen
-              </PaneelKnopf>
-            )}
+            <StandAngabe
+              etikett="Transport"
+              lfh="transport"
+              bedienbar={behandelbar}
+              offen={offen === 'transport'}
+              gesperrt={isSpeichernd}
+              onClick={() => toggle('transport')}
+              wert={
+                transport ? (
+                  <>
+                    {transport}
+                    {person.transport_at && (
+                      <Typography.Text type="secondary">
+                        {' '}
+                        · <ZeitAnzeige wert={person.transport_at} rolle="kurz" />
+                        {letzterTransport?.bestaetigt_name &&
+                          ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
+                      </Typography.Text>
+                    )}
+                  </>
+                ) : null
+              }
+              leer="kein Transport"
+            />
           </Datenfeld>
 
           {/* Angefordertes Rettungsmittel (LLH-1573, design.md D3/D4): lesend nur mit Stand. */}
@@ -749,6 +743,71 @@ type Paneel =
   'sichtung' | 'anlass' | 'verbleib' | 'uebergabe' | 'transport' | 'massnahme' | 'verletzung';
 
 /** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
+/**
+ * Ein Stand im Kopf, der über ein Paneel gesetzt wird (Anlass, Transport). Eine Form für
+ * „Bearbeiten“ (LLH-1769, `frontend/src/personen/AGENTS.md`, „Patientenkopf“): gesetzt der Wert
+ * mit Stift (Name „{Etikett} bearbeiten“), leer die Aufforderung als Wort („{Etikett}
+ * festlegen“), ohne Recht nur der Text. Der Wert trägt keine eigenen Ziele.
+ */
+function StandAngabe({
+  etikett,
+  lfh,
+  bedienbar,
+  offen,
+  gesperrt,
+  onClick,
+  wert,
+  leer,
+}: {
+  etikett: string;
+  lfh: string;
+  bedienbar: boolean;
+  offen: boolean;
+  gesperrt: boolean;
+  onClick: () => void;
+  wert: ReactNode | null;
+  leer: string;
+}) {
+  const { token, rollen } = useRollen();
+  if (!bedienbar) {
+    return (
+      <span data-lfh={lfh}>
+        {wert ?? <Typography.Text type="secondary">{leer}</Typography.Text>}
+      </span>
+    );
+  }
+  if (wert == null) {
+    return (
+      <Button
+        type="link"
+        aria-expanded={offen}
+        disabled={gesperrt}
+        style={leerKnopfStil(token, rollen.bedienText)}
+        onClick={onClick}
+      >
+        {`${etikett} festlegen`}
+      </Button>
+    );
+  }
+  return (
+    <Button
+      type="text"
+      aria-label={`${etikett} bearbeiten`}
+      aria-expanded={offen}
+      disabled={gesperrt}
+      style={wertAngabeStil(token)}
+      onClick={onClick}
+    >
+      <span data-lfh={lfh}>{wert}</span>
+      {/* Icon ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist kein Icon"). */}
+      <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
+        <IconStift />
+      </span>
+    </Button>
+  );
+}
+
+/** Rahmenknopf für einen neuen Eintrag (Maßnahme, Verletzung): er öffnet sein Paneel. */
 function PaneelKnopf({
   offen,
   gesperrt,
