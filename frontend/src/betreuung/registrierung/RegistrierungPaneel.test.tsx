@@ -10,6 +10,7 @@ import { meHandler, server } from '../../test/server';
 import { benutzerFixture } from '../../test/fixtures';
 import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { waehleMenueEintrag } from '../../test/menue';
+import { setzeViewportBreite } from '../../test/viewport';
 import RegistrierungPaneel from './RegistrierungPaneel';
 
 /**
@@ -171,6 +172,29 @@ describe('Registrieren gesperrt', () => {
     await user.click(await screen.findByRole('button', { name: /H-1/ }));
     await screen.findByRole('list', { name: 'Personen in H-1' });
     expect(screen.queryByRole('button', { name: /abmelden/i })).toBeNull();
+  });
+});
+
+describe('Sperrgrund am Handschirm (Gate 1)', () => {
+  afterEach(() => setzeViewportBreite(1280));
+
+  it('steht unter md über dem Inhalt statt im Kopf, neben „Registrieren“ und „Weitere“ hat er keinen Platz', async () => {
+    setzeViewportBreite(390);
+    const grund = 'nur Einsatzleitung und Führungspersonal';
+    rendere({ darfSchreiben: false, rechteGrund: grund });
+    const knopf = await screen.findByRole('button', { name: 'Registrieren' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription(grund);
+    const text = screen.getByText(grund);
+    expect(text).toBeVisible();
+    expect(text.closest('[data-lfh="paneel-kopf-rechts"]')).toBeNull();
+  });
+
+  it('steht ab md im Kopf neben „Registrieren“', async () => {
+    const grund = 'nur Einsatzleitung und Führungspersonal';
+    rendere({ darfSchreiben: false, rechteGrund: grund });
+    await screen.findByRole('button', { name: 'Registrieren' });
+    expect(screen.getByText(grund).closest('[data-lfh="paneel-kopf-rechts"]')).not.toBeNull();
   });
 });
 

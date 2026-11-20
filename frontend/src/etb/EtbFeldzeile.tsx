@@ -36,6 +36,15 @@ export const FEHLT: Record<'von' | 'an', string> = {
   an: 'Empfänger fehlt',
 };
 
+/**
+ * Ein Grund für die Seiten, die ohne Standard der Rufname der Abfrage füllt (LLH-1764): EINE
+ * Meldung statt je Seite, und sie nennt den Weg, weil die Abfrage über der Zeile steht.
+ */
+export function rufnameFehltText(seiten: readonly ('von' | 'an')[]): string {
+  const was = seiten.length > 1 ? 'Absender und Empfänger fehlen' : FEHLT[seiten[0]];
+  return `${was} – Rufname oben eintragen`;
+}
+
 /** Ref eines Vorschlagsfelds (antds `AutoComplete` in `StammdatenFeld`). */
 export type ParteiRef = ComponentRef<typeof AutoComplete>;
 

@@ -24,9 +24,7 @@ for (const kontext of [
   { name: 'Handy', viewport: HANDY, dichte: 'komfortabel' },
   { name: 'Handschuh-Tablet', viewport: { width: 1180, height: 820 }, dichte: 'handschuh' },
 ] as const) {
-  test(`Aufnahme (${kontext.name}): „Erfassen“ und „Speichern und nächste“ stehen ohne Rollen im Bild`, async ({
-    page,
-  }) => {
+  test(`Aufnahme (${kontext.name}): „Erfassen“ steht ohne Rollen im Bild`, async ({ page }) => {
     await page.setViewportSize(kontext.viewport);
     await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Aufnahme ${Date.now()}`);
@@ -37,7 +35,8 @@ for (const kontext of [
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
       .toBeGreaterThan(kontext.viewport.height);
     await ganzImBild(page, 'Erfassen');
-    await ganzImBild(page, 'Speichern und nächste');
+    // Am Handy klebt nur der Abschluss; die Serie steht am Formularende (LLH-1763).
+    if (kontext.viewport.width >= 768) await ganzImBild(page, 'Speichern und nächste');
   });
 }
 
