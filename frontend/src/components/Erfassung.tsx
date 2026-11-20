@@ -67,7 +67,8 @@ import './Erfassung.css';
  *
  * **Im Dialog klebt der Fuß am unteren Rand** (LLH-1274, `klebenderFuss`), solange der Dialog
  * höher ist als der Schirm, und der Dialogkopf hält das 72-px-Schließkreuz des Handschuhs vom
- * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht.
+ * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht, außer in der
+ * Gerätehülle (LLH-1760, `klebenderSeitenfuss`).
  *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
@@ -227,10 +228,17 @@ interface ErfassungsFormularProps<T> {
    */
   zusammenfassung?: ReactNode;
   /**
-   * Nur für `ErfassungsModal`: der Fuß steht am unteren Rand des Dialogs, solange der Dialog höher
-   * ist als der Schirm (LLH-1274). Inline auf einer Seite klebt er nicht.
+   * Der Fuß klebt am unteren Rand seines Scrollports, solange das Formular darüber hinausreicht.
+   * `'dialog'` nur für `ErfassungsModal` (LLH-1274). `'seite'` nur für eine Inline-Erfassung in der
+   * Gerätehülle (LLH-1760): dort rollt allein der Inhalt, direkt darunter steht die Navigation, und
+   * ein Fuß unter dem Rand lag dort, wo die Reiter beginnen. Ohne Angabe klebt er nicht.
    */
-  fussKlebt?: boolean;
+  fussKlebt?: 'dialog' | 'seite';
+  /**
+   * Grund des klebenden Fußes bei `fussKlebt="seite"`: der Grund der Fläche, auf der das Formular
+   * steht (Seite oder Paneel), damit er die durchrollenden Felder deckt. Vorgabe `colorBgLayout`.
+   */
+  fussGrund?: string;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -274,7 +282,8 @@ export function ErfassungsFormular<T extends object>({
   speicherFehlerTitel,
   speicherFehlerFallback,
   zusammenfassung,
-  fussKlebt = false,
+  fussKlebt,
+  fussGrund,
   nebenaktionen,
   children,
 }: ErfassungsFormularProps<T>) {
@@ -483,7 +492,10 @@ export function ErfassungsFormular<T extends object>({
             marginTop: token.margin,
             paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
-            ...(fussKlebt ? klebenderFuss(token) : undefined),
+            ...(fussKlebt === 'dialog' ? klebenderFuss(token) : undefined),
+            ...(fussKlebt === 'seite'
+              ? klebenderSeitenfuss(token, fussGrund ?? token.colorBgLayout)
+              : undefined),
           }}
         >
           {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
@@ -629,6 +641,26 @@ function klebenderFuss(token: GlobalToken) {
   } as const;
 }
 
+/**
+ * Der klebende Fuß einer Inline-Erfassung in der Gerätehülle (LLH-1760). Die Hülle hat feste Höhe
+ * und rollt nur in `main`, direkt darunter steht die Navigation: auf dem UHS-Tablet (1180 × 820)
+ * stand „Erfassen“ bei y = 755 unter dem Rand von `main`, die Navigation begann bei 754, und an
+ * der Knopfmitte lag der Reiter „Grundriss“. Klebend steht die Knopfleiste über der Navigation,
+ * solange das Formular darüber hinausreicht; sonst unter dem letzten Feld.
+ *
+ * Anders als im Dialog kein negativer Rand: die Seite hat kein Dialogpolster, in das er reichen
+ * könnte. Der Grund ist der der Fläche, auf der das Formular steht.
+ */
+function klebenderSeitenfuss(token: GlobalToken, grund: string) {
+  return {
+    position: 'sticky',
+    bottom: 0,
+    zIndex: 1,
+    background: grund,
+    paddingBottom: token.paddingSM,
+  } as const;
+}
+
 /** Was {@link kopfBoden} vom Theme braucht; `theme.useToken()` erfüllt es. */
 type KopfToken = Pick<
   GlobalToken,
@@ -719,7 +751,7 @@ export function ErfassungsModal<T extends object>({
         onAbbrechen={onAbbrechen}
         {...rest}
         steuerungRef={formularSteuerung}
-        fussKlebt
+        fussKlebt="dialog"
       />
     </Modal>
   );

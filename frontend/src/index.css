@@ -202,6 +202,13 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
 }
 
+/* Dasselbe für den klebenden Fuß einer Inline-Erfassung in der Gerätehülle (LLH-1760): dort ist
+   `main` der Scrollport, die Hülle selbst hat feste Höhe. Ein Dialog darin trägt seinen Fuß im
+   `.ant-modal-wrap`, außerhalb von `main`, und trifft diese Regel nicht. */
+.geraet-huelle > main:has([data-lfh='erfassung-fuss']) {
+  scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
+}
+
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).
    `scroll-padding-block-start` am SCROLLPORT, nicht `scroll-margin` an den Zielen: rückwärts
    getabbt bleibt ein Ziel, das schon im Fenster liegt, sonst ganz hinter dem Kopf (gemessen in

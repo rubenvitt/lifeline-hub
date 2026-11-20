@@ -58,6 +58,8 @@ function Harness(props: {
   steuerungRef?: Ref<ErfassungsFormularSteuerung>;
   onErfasst?: (werte: Werte) => void | Promise<void>;
   zusammenfassung?: ReactNode;
+  fussKlebt?: 'seite';
+  fussGrund?: string;
 }) {
   const [form] = Form.useForm<Werte>();
   return (
@@ -71,6 +73,8 @@ function Harness(props: {
       steuerungRef={props.steuerungRef}
       onErfasst={props.onErfasst}
       zusammenfassung={props.zusammenfassung}
+      fussKlebt={props.fussKlebt}
+      fussGrund={props.fussGrund}
     >
       <Form.Item label="Ort" name="ort">
         <Input />
@@ -834,6 +838,32 @@ describe('ErfassungsModal', () => {
 
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
     expect(document.querySelector('[data-lfh="erfassung-fuss"]')).toBeNull();
+  });
+
+  it('der Fuß klebt auf einer Seite der Gerätehülle unten, auf dem Grund der Fläche (LLH-1760)', () => {
+    const { unmount } = renderMitProviders(
+      <Harness
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        fussKlebt="seite"
+        fussGrund="rgb(1, 2, 3)"
+      />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe('0px');
+    // Der Grund deckt die Felder, die darunter durchrollen.
+    expect(fuss!.style.background).toBe('rgb(1, 2, 3)');
+    // Auf der Seite kein negativer Rand: das Dialogpolster gibt es hier nicht.
+    expect(fuss!.style.marginBottom).toBe('');
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-fokusabstand'),
+    ).not.toBe('');
+    unmount();
+    expect(document.documentElement.style.getPropertyValue('--lfh-erfassung-fokusabstand')).toBe(
+      '',
+    );
   });
 
   it('fokussiert beim Öffnen das erste Feld und sendet per Enter', async () => {

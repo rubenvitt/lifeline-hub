@@ -392,6 +392,16 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
     await waitFor(() => expect(quittiert).toEqual(['31/1']));
   });
 
+  it('„Meldung senden“ klebt über der Navigation der Hülle (LLH-1760)', async () => {
+    stelleBereit();
+    renderApp('/geraet/7/melden');
+    const knopf = await screen.findByRole('button', { name: 'Meldung senden' });
+    const fuss = knopf.closest<HTMLElement>('[data-lfh="erfassung-fuss"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe('0px');
+  });
+
   it('meldet mit Abschnitt und Gerät als Absender', async () => {
     const { gesendet } = stelleBereit();
     renderApp('/geraet/7/melden');

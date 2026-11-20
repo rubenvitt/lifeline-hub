@@ -9,6 +9,7 @@ import type { Meldung, MeldungPrioritaet, NeueMeldung } from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { Feld, Paneel, Segmentleiste, Stapel } from '../components/instrument';
+import { useRollen } from '../components/instrument/rollenwerte';
 import MeldungKarte from '../meldungen/MeldungKarte';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
@@ -116,6 +117,7 @@ export default function GeraetMeldungen({
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { rollen } = useRollen();
   const [form] = Form.useForm<MeldungWerte>();
 
   // Erst mit eingehängtem Formular: ohne Schreibrecht (oder solange es unbekannt ist) fehlt es.
@@ -185,6 +187,10 @@ export default function GeraetMeldungen({
             onErfassen={absenden}
             // Inline: nach dem Senden bleibt das Formular stehen, leer, für die nächste Meldung.
             onFertig={() => {}}
+            // Nur in der Gerätehülle: „Meldung senden“ klebt über der Navigation (LLH-1760), auf
+            // dem Grund des Paneels.
+            fussKlebt="seite"
+            fussGrund={rollen.paneel}
             laeuft={senden.isPending}
             erfassenText="Meldung senden"
             speicherung={senden}

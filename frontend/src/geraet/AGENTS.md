@@ -135,7 +135,11 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
   geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/verpflegung`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
   einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
-  `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
+  `Math.max(56, controlHeight)`. Die Hülle rollt nur in `main`, die Navigation steht direkt
+  darunter: eine Inline-Erfassung klebt dort ihren Fuß über ihr (`ErfassungsFormular` mit
+  `fussKlebt="seite"`, auf einem Paneel mit `fussGrund`; Aufnahme und Melden), sonst lag
+  „Erfassen“ unter dem Rand, wo die Reiter beginnen (LLH-1760). Nach „Erfassen“ mit Seitenwechsel
+  nennt ein Toast die Quittung, die stehende Quittung geht mit der Seite. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü. Eine Übung zeigt das Übungsband direkt unter dem Kopf, im
   Fluss und nicht klebend, der Lagemonitor die Marke in der Statusleiste (Regel: `frontend/AGENTS.md`,
   Rahmen, „Übung“). Fehlt der Einsatzkopf, laden beide ihn alle 30 s nach und nennen nach einem
