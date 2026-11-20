@@ -10,6 +10,7 @@ import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import { sternTrefferPx } from './KoerperFigur';
 import Koerperschema, { type KoerperschemaProps } from './Koerperschema';
+import { farbenHell, koerperschemaFarben } from '../../theme/tokens';
 
 /**
  * Der Baustein „Körperschema“ (LLH-1120, Spec `koerperschema`, design.md D13): lesen, markieren
@@ -378,5 +379,48 @@ describe('Körperschema — Trefferfläche des Sternchens', () => {
     expect(sternTrefferPx({ controlHeight: 30 })).toBe(40);
     expect(sternTrefferPx({ controlHeight: 48 })).toBe(48);
     expect(sternTrefferPx({ controlHeight: 72 })).toBe(72);
+  });
+});
+
+/** Regionen sichtbar (LLH-1769): beim Markieren ist jede Region gestrichelt in der Konturfarbe. */
+describe('Körperschema — Regionen sichtbar (LLH-1769)', () => {
+  const farben = koerperschemaFarben(farbenHell);
+
+  it('umrandet beim Markieren jede Region gestrichelt in der Konturfarbe', () => {
+    zeige({ verletzungen: [] });
+    // Je Ansicht eine Gruppe Grenzen, auf den Umriss beschnitten, ohne Zeiger.
+    const gruppen = [...document.querySelectorAll('[data-lfh="zonengrenzen"]')];
+    expect(gruppen).toHaveLength(2);
+    for (const g of gruppen) {
+      const id = /^url\(#([\w-]+)\)$/.exec(g.getAttribute('clip-path') ?? '')?.[1];
+      expect(id && g.querySelector(`clipPath#${id} path`)).toBeTruthy();
+      expect(g.getAttribute('pointer-events')).toBe('none');
+      const grenzen = [...g.querySelectorAll(':scope > rect')];
+      expect(grenzen.length).toBeGreaterThan(0);
+      for (const r of grenzen) {
+        expect(r.getAttribute('stroke')).toBe(farben.kontur);
+        expect(r.getAttribute('stroke-dasharray')).toBeTruthy();
+      }
+    }
+    // Die Trefferflächen selbst bleiben ohne Strich, bis Fokus oder Wahl sie zeichnen.
+    for (const r of document.querySelectorAll('[data-lfh="koerperzone"] rect')) {
+      expect(r.getAttribute('stroke')).toBe('none');
+    }
+  });
+
+  it('zeichnet die gewählte Region durchgezogen in der Bedienfarbe', async () => {
+    zeige({ verletzungen: [] });
+    await userEvent.click(within(schema()).getByRole('button', { name: 'Kopf, vorn' }));
+    const kopf = within(schema()).getByRole('button', { name: 'Kopf, vorn' });
+    for (const r of kopf.querySelectorAll('rect')) {
+      expect(r.getAttribute('stroke')).toBe(farben.bedien);
+      expect(r.getAttribute('stroke-dasharray')).toBeNull();
+    }
+  });
+
+  it('zeigt beim Lesen keine Regionen', () => {
+    zeige({ modus: 'lesen' });
+    expect(document.querySelector('[data-lfh="koerperzone"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="zonengrenzen"]')).toBeNull();
   });
 });

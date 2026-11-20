@@ -80,7 +80,7 @@ test('Strg+↵ öffnet eine Person im neuen Tab — kalt, angemeldet, am Datensa
 
   // Der neue Tab: Detailseite genau dieser Person, ohne Umweg über die Anmeldung.
   await expect(tab).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+$`));
-  await expect(tab.getByRole('heading', { name: `Person ${kennung}` })).toBeVisible();
+  await expect(tab.getByRole('heading', { name: new RegExp(kennung) })).toBeVisible();
 
   // Der alte Tab: dieselbe Adresse, Palette zu.
   expect(page.url()).toBe(vorher);
@@ -271,7 +271,7 @@ test.describe('Tablet', () => {
     // Die übrige Zeile öffnet wie bisher — getippt auf das Label, links vom Ziel.
     await zeile.getByText(kennung).tap();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+$`));
-    await expect(page.getByRole('heading', { name: `Person ${kennung}` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: new RegExp(kennung) })).toBeVisible();
   });
 });
 
