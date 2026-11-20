@@ -62,6 +62,37 @@ describe('BetroffeneZeile — Kürzel-Hinweis', () => {
 });
 
 /**
+ * Feld in voller Breite am Handy (LLH-1762): unter `md` ließen Präfix „/person“ und Knopf (140 px)
+ * dem Feld 96 px, etwa elf Zeichen. Gestapelt steht das Feld allein in der ersten Zeile der Box,
+ * „/person“ und „Person erfassen“ darunter; ab `md` bleibt alles in einer Zeile.
+ */
+describe('BetroffeneZeile — Breite des Felds (LLH-1762)', () => {
+  const zelleVon = (el: HTMLElement) => el.closest('.lfh-schnellerfassung__feld');
+
+  it('unter md steht das Feld allein in seiner Zelle, Präfix und Knopf darunter', () => {
+    setzeViewportBreite(390);
+    const { container } = zeige();
+    const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
+    const knopf = screen.getByRole('button', { name: 'Person erfassen' });
+    expect(zelleVon(feld)).toHaveClass('lfh-schnellerfassung__feld--gestapelt');
+    expect(zelleVon(knopf)).toBeNull();
+    // DOM-Folge = Sichtfolge = Tab-Folge: Feld, Präfix, Knopf.
+    const zeile = container.querySelector('.lfh-schnellerfassung')!;
+    expect(zeile.firstElementChild).toBe(zelleVon(feld));
+    expect(zeile.lastElementChild).toContainElement(knopf);
+  });
+
+  it('ab md bleibt die Zeile einzeilig mit dem Knopf neben dem Feld', () => {
+    setzeViewportBreite(1180);
+    zeige();
+    const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
+    const knopf = screen.getByRole('button', { name: 'Person erfassen' });
+    expect(zelleVon(feld)).not.toHaveClass('lfh-schnellerfassung__feld--gestapelt');
+    expect(zelleVon(knopf)).toBe(zelleVon(feld));
+  });
+});
+
+/**
  * Grenze des Namens in der Schnellerfassung (LLH-1329): ab 80 % steht der Zähler an der Marke,
  * darüber sendet die Zeile nicht, nennt den Grund und behält den Wortlaut. Mutationsprobe: den
  * Zähler an der Namensmarke entfernt → „201 / 200 · zu lang“ fehlt und der Fall wird rot.
