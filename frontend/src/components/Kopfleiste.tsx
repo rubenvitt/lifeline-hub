@@ -320,8 +320,8 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
     // „nicht gesendet“ statt „WARTET“ (LLH-1758): ehrlich auch nach einem Serverfehler, und wer das
     // Wort liest, hält den Eintrag nicht für schon beim Server (LFH-944).
     wort: 'NICHT GESENDET',
-    satz: (q) =>
-      `${anzahl(q.ausstehend, 'Offline-Aktion', 'Offline-Aktionen')} nicht gesendet — antippen für Details`,
+    // Name = sichtbarer Wortlaut (WCAG 2.5.3); wer antippt, sieht die Liste, keine Erklärung.
+    satz: (q) => `${q.ausstehend} nicht gesendet`,
     farbe: farbenDunkel.achtung,
     getrennt: false,
   },
@@ -418,12 +418,15 @@ export function SyncZelle({
   const Icon = d.getrennt ? IconWlanGetrennt : IconWlanVerbunden;
   const satz = d.satz(queue);
   const zahl = zustand === 'ausstehend' ? queue.ausstehend : null;
-  const wort = syncZeigtWort(zustand, kompakt)
-    ? zahl != null
-      ? `${zahl} ${d.wort}`
-      : d.wort
-    : kompakt && zahl != null
-      ? String(zahl)
+  // Im Gerätekopf (`zelle`) nur die Zahl: „2 NICHT GESENDET“ brach die rechte Gruppe auf 390 px
+  // in eine zweite Zeile (Review LLH-1758, LLH-1734); die Betriebszeile darunter trägt das Wort.
+  const nurZahl = zahl != null && (kompakt || zelle != null);
+  const wort = nurZahl
+    ? String(zahl)
+    : syncZeigtWort(zustand, kompakt)
+      ? zahl != null
+        ? `${zahl} ${d.wort}`
+        : d.wort
       : null;
   const stil = kopfZelleStil(zelle ?? (kompakt ? { padding: token.paddingXS } : token));
   const inhalt = (
@@ -439,6 +442,7 @@ export function SyncZelle({
             fontFamily: schrift.zahl,
             fontSize: schriftskala.meta.groesse,
             color: d.farbe,
+            whiteSpace: 'nowrap',
           }}
         >
           {wort}
@@ -450,6 +454,7 @@ export function SyncZelle({
     return (
       <button
         type="button"
+        className="lfh-kopf-sync"
         data-lfh="kopf-sync"
         data-zustand={zustand}
         aria-label={satz}

@@ -32,6 +32,7 @@ import {
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import RettungsmittelFeld from './RettungsmittelFeld';
 import { Feld } from '../components/instrument';
+import type { VormerkGrund } from '../offline/fehler';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
@@ -43,7 +44,8 @@ interface VerbleibErfassungProps {
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
   /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand; die Zeile quittiert. */
-  onVorgemerkt?: () => void;
+  /** Nur vorgemerkt, mit Grund (LLH-1758): der Aufrufer bildet daraus den Wortlaut. */
+  onVorgemerkt?: (grund: VormerkGrund) => void;
   onSchliessen: () => void;
   /** Titel; Vorgabe „Verbleib erfassen“ (der Grundriss nennt die Person). */
   titel?: string;
@@ -254,7 +256,11 @@ export default function VerbleibErfassung({
     // Merkt ohne Netz vor (LLH-1138, design.md D8; `frontend/src/offline/AGENTS.md`).
     networkMode: 'always',
     mutationFn: (eingabe: VerbleibEingabe) => save(einsatzId, person, 'verbleib', eingabe),
-    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
+    // Vorgemerkt mit Grund (LLH-1758); beantragt (Spiegel) bleibt beim bisherigen Wortlaut.
+    onSuccess: (ergebnis) =>
+      ergebnis.zustand === 'gesendet'
+        ? onErfasst()
+        : onVorgemerkt?.(ergebnis.zustand === 'vorgemerkt' ? ergebnis.grund : 'offline'),
   });
 
   return (

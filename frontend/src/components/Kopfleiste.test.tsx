@@ -91,12 +91,8 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
 
   it('meldet ausstehende Offline-Aktionen als „nicht gesendet“, mit Zähler und Einzahl (LLH-1758)', () => {
     expect(SYNC_DARSTELLUNG.ausstehend.wort).toBe('NICHT GESENDET');
-    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 1 })).toBe(
-      '1 Offline-Aktion nicht gesendet — antippen für Details',
-    );
-    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 3 })).toBe(
-      '3 Offline-Aktionen nicht gesendet — antippen für Details',
-    );
+    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 1 })).toBe('1 nicht gesendet');
+    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 3 })).toBe('3 nicht gesendet');
     expect(SYNC_DARSTELLUNG.abgelehnt.wort).toBe('PRÜFEN');
   });
 });
@@ -195,7 +191,8 @@ describe('SyncZelle — Knopf zum Wiederherstellungsbereich (LLH-1758)', () => {
     const hoerer = vi.fn();
     const abbestellen = subscribeWiederherstellung(hoerer);
     render(<SyncZelle zustand="ausstehend" queue={queue} kompakt={false} />);
-    const knopf = screen.getByRole('button', { name: /2 Offline-Aktionen nicht gesendet/ });
+    // Name = sichtbarer Wortlaut (WCAG 2.5.3), keine Bedienerklärung im Text.
+    const knopf = screen.getByRole('button', { name: '2 nicht gesendet' });
     expect(knopf).toHaveTextContent('2 NICHT GESENDET');
     await userEvent.click(knopf);
     expect(hoerer).toHaveBeenCalledTimes(1);
@@ -212,6 +209,18 @@ describe('SyncZelle — Knopf zum Wiederherstellungsbereich (LLH-1758)', () => {
     const knopf = screen.getByRole('button', { name: /nicht gesendet/ });
     expect(knopf).toHaveTextContent('2');
     expect(knopf).not.toHaveTextContent('NICHT GESENDET');
+  });
+
+  it('im Gerätekopf nur die Zahl: die Betriebszeile darunter trägt das Wort (LLH-1758)', () => {
+    render(<SyncZelle zustand="ausstehend" queue={queue} kompakt={false} zelle={{ padding: 8 }} />);
+    const knopf = screen.getByRole('button', { name: '2 nicht gesendet' });
+    expect(knopf).toHaveTextContent('2');
+    expect(knopf).not.toHaveTextContent('NICHT GESENDET');
+  });
+
+  it('der Knopf trägt den Fokusring in `bedien`', () => {
+    render(<SyncZelle zustand="ausstehend" queue={queue} kompakt={false} />);
+    expect(screen.getByRole('button')).toHaveClass('lfh-kopf-sync');
   });
 
   it('die stehende Verbindung bleibt eine Anzeige, kein Knopf', () => {

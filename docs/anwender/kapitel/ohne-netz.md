@@ -62,11 +62,12 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 
 ### Server-Fehler ist nicht offline
 
-Ist Netz da, aber der Server kann einen Eintrag gerade nicht speichern (Server-Fehler, Überlast,
-Zeitüberschreitung), merkt die App ihn ebenfalls vor und meldet „Server-Fehler – … vorgemerkt, wird
+Ist Netz da, aber der Server antwortet, dass er einen Eintrag gerade nicht speichern kann
+(Server-Fehler, Überlast), merkt die App ihn ebenfalls vor und meldet „Server-Fehler – … vorgemerkt, wird
 erneut gesendet“, etwa „Server-Fehler – Meldung von RTW 2 vorgemerkt, wird erneut gesendet“. Sie
 versucht es nach wenigen Sekunden von selbst wieder. Bis dahin steht der Eintrag unter „nicht
-gesendet“ wie ohne Netz.
+gesendet“ wie ohne Netz. Antwortet der Server gar nicht (etwa nach 15 Sekunden ohne Antwort),
+heißt es weiter „Offline vorgemerkt“.
 
 ### Was ohne Netz lesbar bleibt
 
