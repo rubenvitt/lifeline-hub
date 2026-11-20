@@ -64,6 +64,8 @@ const ERLAUBT: readonly string[] = [
   'Aufnehmen',
   'Zählen',
   'Weiter',
+  // Baustein einsetzen (LLH-2010): füllt den ETB-Text, speichert noch nichts.
+  'Einsetzen',
   // Aktionen an bestehenden Datensätzen, keine Erfassungen.
   'Abschließen',
   'Abziehen',
