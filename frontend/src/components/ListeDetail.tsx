@@ -293,8 +293,9 @@ export default function ListeDetail<T>({
     const flaeche = eintrag?.querySelector('[data-lfh="liste-detail-detail"]');
     if (!eintrag || !flaeche) return;
     if (flaeche.getBoundingClientRect().bottom <= window.innerHeight) return;
-    const ruhig = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    eintrag.scrollIntoView?.({ block: 'start', behavior: ruhig ? 'auto' : 'smooth' });
+    // Sofort, nicht geglättet, wie der Deeplink-Sprung oben: keine Bewegung, die bei
+    // „reduzierter Bewegung“ abzuschalten wäre, und keine Medienabfrage außerhalb von `useViewport`.
+    eintrag.scrollIntoView?.({ block: 'start' });
   });
 
   // Stabile Wahl für die gemerkten Auswahlziele: der Ref trägt die jüngsten Werte.

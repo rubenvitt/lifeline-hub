@@ -80,7 +80,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/j45fvu8l47a0snwv5gxrrsje
 - Test: `frontend/src/components/ListeDetail.test.tsx` (Block „Handschirm“)
 
 **Interfaces:**
-- Produces: nach Wahl von Hand unter `lg`: liegt `[data-lfh="liste-detail-detail"]` mit `getBoundingClientRect().bottom > window.innerHeight`, dann `eintrag.scrollIntoView({ block: 'start', behavior })` mit `behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'`; `handWahl` wird danach geräumt (einmal je Wahl).
+- Produces: nach Wahl von Hand unter `lg`: liegt `[data-lfh="liste-detail-detail"]` mit `getBoundingClientRect().bottom > window.innerHeight`, dann `eintrag.scrollIntoView({ block: 'start' })` (sofort); `handWahl` wird danach geräumt (einmal je Wahl).
 
 - [x] **Step 1: Failing tests** (Handschirm, `scrollIntoView` als `vi.fn()`, `getBoundingClientRect` des Details gestubbt):
   - `eine Wahl von Hand rollt das aufgeklappte Detail in den Blick, wenn es unter den Rand fällt` — bottom 1200 bei innerHeight 844 → `scrollIntoView` einmal mit `{ block: 'start', … }` am `li[data-liste-detail-eintrag]`.
@@ -116,3 +116,6 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/j45fvu8l47a0snwv5gxrrsje
 - Der Seitenfuß nimmt den Grund des ersten deckenden Vorfahren (nicht `colorBgContainer`: auf der
   Aufnahme stand er als hellerer Balken) und `zIndex: 3`, weil antds `Space.Compact` seine Glieder
   auf 2 hebt (Fundort lag über „Speichern und nächste“). Am Bild gefunden.
+- Gerollt wird sofort statt geglättet: `matchMedia` für „reduzierte Bewegung“ verbietet der
+  Viewport-Wächter außerhalb von `useViewport`, und der Deeplink-Sprung rollt ebenso sofort. Die
+  Vorgabe „unter `prefers-reduced-motion` kein `smooth`“ ist damit erfüllt.
