@@ -1,5 +1,6 @@
 import { AutoComplete, Button, Tooltip, Typography, theme } from 'antd';
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type Ref } from 'react';
+import { useErstBeiBedarf } from '../components/useErstBeiBedarf';
 import { useAngabeForm } from '../components/angabeForm';
 import { IconStift } from '../icons';
 import { InlineAngabe } from '../components/InlineAngabe';
@@ -52,6 +53,50 @@ export function stiftStil(token: { controlHeightSM: number }): CSSProperties {
  * Zeilen doppelt hoch. Ohne Qualifikation bleibt die Aufforderung als Wort: dann steht kein Wert
  * daneben, der den Stift erklärt (`frontend/AGENTS.md`, „Ein leeres Feld muss sagen …“).
  */
+/**
+ * Der Stift neben der Qualifikation mit dem Tooltip „Funktion eintragen“. Der Tooltip hängt sich
+ * erst beim ersten Überfahren ein (LLH-1974, `useErstBeiBedarf`): geschlossen setzte sein Trigger
+ * in jeder Zeile beim Öffnen der Seite Zustand im Commit. Er richtet sich an einer
+ * deckungsgleichen, durchlässigen Fläche aus, damit der Knopf beim Einhängen seinen Knoten (und
+ * den Fokus) behält.
+ */
+function StiftMitHinweis({
+  knopfRef,
+  name,
+  disabled,
+  onClick,
+  stil,
+}: {
+  knopfRef: Ref<HTMLButtonElement>;
+  name: string;
+  disabled: boolean;
+  onClick: () => void;
+  stil: CSSProperties;
+}) {
+  const [isUeber, setUeber] = useState(false);
+  const isBereit = useErstBeiBedarf(isUeber);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <Button
+        ref={knopfRef}
+        type="text"
+        aria-label={`Funktion zu ${name} eintragen`}
+        disabled={disabled}
+        onClick={onClick}
+        onPointerEnter={() => setUeber(true)}
+        onPointerLeave={() => setUeber(false)}
+        style={stil}
+        icon={<IconStift />}
+      />
+      {isBereit && (
+        <Tooltip title="Funktion eintragen" open={isUeber}>
+          <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
 export default function EinsatzfunktionZelle({
   name,
   einsatzfunktion,
@@ -105,17 +150,13 @@ export default function EinsatzfunktionZelle({
                   }}
                 >
                   <span style={{ minWidth: 0, overflowWrap: 'break-word' }}>{funktion}</span>
-                  <Tooltip title="Funktion eintragen">
-                    <Button
-                      ref={ref}
-                      type="text"
-                      aria-label={`Funktion zu ${name} eintragen`}
-                      disabled={disabled}
-                      onClick={onClick}
-                      style={stiftStil(token)}
-                      icon={<IconStift />}
-                    />
-                  </Tooltip>
+                  <StiftMitHinweis
+                    knopfRef={ref}
+                    name={name}
+                    disabled={disabled}
+                    onClick={onClick}
+                    stil={stiftStil(token)}
+                  />
                 </span>
               )
             : undefined
