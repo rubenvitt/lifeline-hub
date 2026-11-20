@@ -22,7 +22,9 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Statusfilter (die Seitenleiste rutscht unter die Liste).
 - **Personen-Detail** (LLH-1094, Spec `personen-detail`): eine Spalte in fester Folge —
   Patientenkopf, Verlauf, Personendaten, eingeklappt Bezüge, Fotos und Dateien,
-  Zugriffsprotokoll; ein Baum. Den Aufenthalt (UHS- und Platzname, seit) liefert der Detail-GET
+  Zugriffsprotokoll; ein Baum. Der Seitentitel nennt „Name, Vorname“ und klein die Kennung
+  (`data-lfh="titel-kennung"`), ohne Namen „Person R-…“; Breadcrumb und Tab-Titel bleiben ohne
+  Namen (LLH-1769). Den Aufenthalt (UHS- und Platzname, seit) liefert der Detail-GET
   (`aufenthalt`), ebenso Transporte, Maßnahmen und Verletzungen: kein zweiter Abruf beim Öffnen.
   Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“ (mit
   Schreibrecht als Knöpfe „+ Etikett“, Name „Etikett eintragen“, siehe nächster Punkt), kein
@@ -53,7 +55,11 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   ohne Bildlauf (Nachweis `e2e/personen-detail.spec.ts`). Sichten, Verbleib, Transport, Maßnahme
   und Verletzung haben je ein Paneel, die Notiz eine Zeile; kein Dialog, Grund am Ort. Alle
   Mutationen liegen im Kopf: immer nur ein Paneel offen, der Wechsel ist gesperrt, solange eines
-  speichert; ein Paneel räumt beim Öffnen die Gründe seiner Mutationen (LFH-1077). Das Aufheben
+  speichert; ein Paneel räumt beim Öffnen die Gründe seiner Mutationen (LFH-1077). **Eine Form
+  für „Bearbeiten“** (LLH-1769): ein gesetzter Stand (Anlass, Transport, wie die Personendaten)
+  wird am Wert mit Stift geändert („… bearbeiten“, `StandAngabe`), eine leere Angabe fordert als
+  Wort auf („… festlegen“, „… eintragen“), ein neuer Eintrag entsteht über einen Rahmenknopf
+  („Maßnahme erfassen“, „Verletzung markieren“, „Verbleib erfassen“). Das Aufheben
   einer Maßnahme fragt nach („Maßnahme aufheben“, LFH-363), am Sternchen ist der zweite Tipp die
   Rückfrage. Die Sperren ohne Netz fragen `useOhneVerbindung`, nie `navigator.onLine` allein. Transport, Maßnahme und Verletzung nur mit `darfBehandeln` (am Gerät
   `geraetDarf('person-behandlung')`, nur UHS). Die Lesefassung (`modus="lesen"`) dient den
@@ -111,7 +117,8 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Geschlecht, Name, Nummer und Layout in `koerperschemaKern.ts`. Markieren in zwei Tipps (Region,
   dann Art; Schwere vorher optional, je Region neu, sichtbar beschriftet), Aufheben am Sternchen;
   vorn und hinten nebeneinander nur, wenn die Spalte daneben mitpasst (`schemaLayout`, gemessen),
-  sonst Umschaltung; die Wahl klebt neben der Figur unter dem Rahmen und steht nach dem Tipp ohne
+  sonst Umschaltung; das Paneel im Kopf rollt beim Öffnen ins Bild, beim Markieren ist jede Region
+  gestrichelt in `kontur` umrandet, Fokus und Wahl durchgezogen in `bedien` (LLH-1769); die Wahl klebt neben der Figur unter dem Rahmen und steht nach dem Tipp ohne
   Bildlauf im Bild (Nachweis `e2e/personen-detail.spec.ts`); beim Markieren schrumpft die Figur
   nie, sie rollt. Der Fokus kehrt nach Speichern, Aufheben und Abbrechen an Region bzw. Sternchen
   zurück; ohne Netz merkt das Markieren vor, das

@@ -42,7 +42,8 @@ Spezies oder Status verbergen würde, nimmt diesen Filter zurück.
 
 1. „Tier erfassen“ wählen.
 2. Die „Spezies“ wählen („Hund“, „Katze“, „Großtier“, „Nutzgeflügel“, „Kleintier“, „Wildtier“,
-   „Sonstige“), dazu „Rufname“ und „Fundort“, soweit bekannt. Den Fundort mit Enter oder „Ort
+   „Sonstige“); sie ist Pflicht und hat keine Vorgabe. Dazu „Rufname“ und „Fundort“, soweit
+   bekannt. Den Fundort mit Enter oder „Ort
    suchen“ suchen und einen Treffer wählen, dann ist das Tier gleich verortet.
 3. Unter „Weitere Angaben“ bei Bedarf „Rasse / Beschreibung“ und „Notiz“ ergänzen.
 

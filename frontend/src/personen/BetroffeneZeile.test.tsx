@@ -22,8 +22,8 @@ function zeige(onErfassen = vi.fn()) {
     <BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />,
   );
   return {
-    onErfassen,
     container,
+    onErfassen,
     feld: screen.getByRole('textbox', { name: 'Kurzeingabe Person' }),
   };
 }
@@ -132,13 +132,13 @@ describe('BetroffeneZeile — Breite des Felds (LLH-1762)', () => {
 
   it('unter md steht das Feld allein in seiner Zelle, Präfix und Knopf darunter', () => {
     setzeViewportBreite(390);
-    const { container } = zeige();
+    zeige();
     const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
     const knopf = screen.getByRole('button', { name: 'Person erfassen' });
     expect(zelleVon(feld)).toHaveClass('lfh-schnellerfassung__feld--gestapelt');
     expect(zelleVon(knopf)).toBeNull();
     // DOM-Folge = Sichtfolge = Tab-Folge: Feld, Präfix, Knopf.
-    const zeile = container.querySelector('.lfh-schnellerfassung')!;
+    const zeile = document.querySelector('.lfh-schnellerfassung')!;
     expect(zeile.firstElementChild).toBe(zelleVon(feld));
     expect(zeile.lastElementChild).toContainElement(knopf);
   });

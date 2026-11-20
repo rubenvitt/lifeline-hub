@@ -529,8 +529,10 @@ export default function TierePage() {
 
           `uebernahme` trägt die zwei Felder, die sich an einer Sammelstelle nicht ändern: der
           Fundort ist die Sammelstelle selbst, und die Spezies müsste sonst je Tier neu
-          gewählt werden (das Zurücksetzen fiele auf `initialValues` = 'hund'). Die übrigen
-          Felder beschreiben das einzelne Tier.
+          gewählt werden. Die übrigen Felder beschreiben das einzelne Tier.
+
+          Die Spezies hat KEINE Vorgabe (LLH-1765): mit „Hund“ als Startwert legte ein leerer Klick
+          einen Hund an. Sie ist Pflicht, die erste Wahl ist also immer bewusst.
 
           Der sitzungsweite Fundort ist ein eigener Vertrag: nach erfolgreicher Mutation
           einsatz- und maskenbezogen gemerkt und beim Öffnen einmal eingesetzt. Er gehört nicht
@@ -546,7 +548,6 @@ export default function TierePage() {
         speicherung={anlegenSpeicherung}
         speicherFehlerTitel="Nicht erfasst"
         speicherFehlerFallback="Erfassen fehlgeschlagen"
-        initialValues={{ spezies: 'hund' }}
         serie
         uebernahme={['spezies', 'antreff_ort']}
         onErfassen={async ({ antreff_ort, ...daten }) => {
@@ -592,7 +593,10 @@ export default function TierePage() {
           name="spezies"
           rules={[{ required: true, message: 'Bitte Spezies wählen' }]}
         >
-          <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
+          <Select
+            placeholder="Bitte wählen"
+            options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))}
+          />
         </Feld>
         <Feld label="Rufname" name="rufname">
           <Input />

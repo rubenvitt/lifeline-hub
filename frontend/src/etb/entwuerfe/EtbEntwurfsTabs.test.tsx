@@ -921,6 +921,20 @@ describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
   // 72-px-Inhalt streckte ihn in handschuh von 90 auf rund 141 px und risse den Deckel der
   // ETB-Erfassungsleiste (`e2e/leisten-flaeche.spec.ts`). Der negative Rand nimmt die Fläche
   // aus dem Layout — Margin-Box-Höhe 0 —, die Trefffläche bleibt.
+  // Die Fläche trägt der KNOPF selbst, nicht ein Kind darin (LLH-1771): Messung und Hilfstechnik
+  // sahen sonst einen Knopf von 84 × 14 px.
+  it('legt die Maße auf den Knopf „Entwurf verwerfen“ selbst', async () => {
+    const p = props();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    await userEvent.click(await screen.findByRole('button', { name: '+ weiterer Entwurf' }));
+    const kreuze = await screen.findAllByRole('button', { name: 'Entwurf verwerfen' });
+    for (const kreuz of kreuze) {
+      expect(kreuz.style.minHeight).not.toBe('');
+      expect(kreuz.style.minWidth).toBe(kreuz.style.minHeight);
+      expect(kreuz.style.marginBlock).not.toBe('');
+    }
+  });
+
   it('ist für das Layout höhenneutral: der senkrechte Rand hebt die Höhe genau auf', () => {
     for (const controlHeightSM of [24, 48, 72]) {
       const stil = entfernenStil({ controlHeightSM });

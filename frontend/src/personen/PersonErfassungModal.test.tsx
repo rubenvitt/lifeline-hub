@@ -326,6 +326,8 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     zeige({ modus: 'vermisst', onErfassen });
     const nutzer = userEvent.setup();
+    // Eine leere Vermisstmeldung hält an (LLH-1765); „vermisst seit“ allein ist keine Angabe.
+    await nutzer.type(screen.getByLabelText('Name'), 'Müller');
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     const feld = await screen.findByRole('textbox', { name: 'vermisst seit' });
     // Enter übernimmt den getippten Zeitpunkt UND sendet ab — das Feld liegt im `<form>`.
@@ -334,7 +336,7 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     // Ortszeit 08:00 → UTC; gegen den absoluten Zeitpunkt geprüft, nicht gegen sich selbst.
     const erwartet = new Date(2026, 8, 22, 8, 0, 0).toISOString().slice(0, 19).replace('T', ' ');
-    expect(onErfassen.mock.calls[0][0]).toMatchObject({ vermisst_seit: erwartet });
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ name: 'Müller', vermisst_seit: erwartet });
   });
 });
 
