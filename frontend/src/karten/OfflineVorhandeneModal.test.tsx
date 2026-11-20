@@ -132,3 +132,44 @@ describe('OfflineVorhandeneModal', () => {
     ).toHaveAttribute('data-fehler');
   });
 });
+
+/**
+ * LLH-2010: ein geänderter Name geht nicht still verloren (`frontend/AGENTS.md`,
+ * „Erfassungs-Norm“). Die Maske schließt nie; das Kreuz fragt nur nach einer Namensänderung.
+ */
+describe('OfflineVorhandeneModal — Rückfrage vor dem Verwerfen (LLH-2010)', () => {
+  const kreuz = () => screen.getByRole('button', { name: /Close|Schließen/i });
+
+  it('die Maske schließt nicht', async () => {
+    mock();
+    renderMitProviders(<Harness />);
+    await screen.findByDisplayValue('hamburg');
+    await userEvent.click(document.querySelector<HTMLElement>('.ant-modal-wrap')!);
+    expect(screen.getByRole('dialog', { name: 'Gebaute Region übernehmen' })).not.toHaveClass(
+      'ant-zoom-leave',
+    );
+  });
+
+  it('unverändert schließt das Kreuz still', async () => {
+    mock();
+    renderMitProviders(<Harness />);
+    await screen.findByDisplayValue('hamburg');
+    await userEvent.click(kreuz());
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Gebaute Region übernehmen' })).toHaveClass(
+        'ant-zoom-leave',
+      ),
+    );
+    expect(screen.queryByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeNull();
+  });
+
+  it('ein geänderter Name: das Kreuz fragt nach', async () => {
+    mock();
+    renderMitProviders(<Harness />);
+    await userEvent.type(await screen.findByDisplayValue('hamburg'), '-nord');
+    await userEvent.click(kreuz());
+    expect(
+      await screen.findByText('Die Eingaben in „Gebaute Region übernehmen“ gehen verloren.'),
+    ).toBeInTheDocument();
+  });
+});

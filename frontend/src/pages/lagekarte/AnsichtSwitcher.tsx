@@ -11,6 +11,7 @@ import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { useVerwerfenSchutz } from '../../components/VerlassenRueckfrage';
 import type { KartenAnsicht } from '../../api/types';
 
 interface AnsichtSwitcherProps {
@@ -56,6 +57,20 @@ export default function AnsichtSwitcher({
   // Laufende Antwort und Grund der letzten Ablehnung; beide Dialoge teilen sie, offen ist einer.
   const [laeuft, setLaeuft] = useState(false);
   const [dialogFehler, setDialogFehler] = useState<unknown>(null);
+
+  // Ein getippter Name geht nicht still verloren (LLH-2010): geändert ist, was vom Stand beim
+  // Öffnen abweicht (neu: leer, umbenennen: der bisherige Name).
+  const nameSchutz = useVerwerfenSchutz({
+    geaendert:
+      nameDialog != null &&
+      nameWert.trim() !== (nameDialog.modus === 'umbenennen' ? nameDialog.start : ''),
+    gesperrt: laeuft,
+    titel: nameDialog?.modus === 'umbenennen' ? 'Ansicht umbenennen' : 'Neue Ansicht',
+    onSchliessen: () => {
+      setNameDialog(null);
+      setDialogFehler(null);
+    },
+  });
 
   // Ladezustand (noch keine Ansicht geladen): kein Switcher — der Lazy-Seed liefert stets ≥1.
   if (ansichten.length === 0) return null;
@@ -108,11 +123,6 @@ export default function AnsichtSwitcher({
     );
   }
   // Abbrechen ist während des Laufs gesperrt, sonst hätte die Ablehnung keinen Ort mehr.
-  function schliesseName() {
-    if (laeuft) return;
-    setNameDialog(null);
-    setDialogFehler(null);
-  }
   function schliesseLoeschen() {
     if (laeuft) return;
     setLoeschDialog(false);
@@ -198,10 +208,9 @@ export default function AnsichtSwitcher({
         confirmLoading={laeuft}
         cancelButtonProps={{ disabled: laeuft }}
         closable={!laeuft}
-        mask={{ closable: !laeuft }}
-        keyboard={!laeuft}
+        // Maske, Kreuz, Escape und Abbrechen über den Schutz (LLH-2010).
+        {...nameSchutz.modalProps}
         onOk={bestaetigeName}
-        onCancel={schliesseName}
         destroyOnHidden
       >
         <Stapel abstand="sm">
@@ -226,6 +235,7 @@ export default function AnsichtSwitcher({
             ))}
         </Stapel>
       </Modal>
+      {nameSchutz.rueckfrage}
 
       <Modal
         open={loeschDialog}

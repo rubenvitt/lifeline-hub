@@ -1,5 +1,12 @@
-import { Button, Modal } from 'antd';
-import { useEffect, type KeyboardEvent, type ReactNode } from 'react';
+import { Button, Modal, type ModalProps } from 'antd';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useBlocker } from 'react-router';
 import { istSitzungGesperrt } from '../auth/sitzungsSperre';
 import { SpeicherFehler } from './SpeicherHinweis';
@@ -175,4 +182,93 @@ export function VerwerfenDialog({
         : 'Die Eingaben gehen verloren.'}
     </Modal>
   );
+}
+
+const EINGABE =
+  'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])';
+
+/**
+ * Wohin der Fokus nach „Weiter bearbeiten“ zurückkehrt: das Feld, in dem er stand, sonst (Kreuz,
+ * Abbrechen-Knopf) das erste Feld des Dialogs.
+ */
+function eingabeFokus(aktiv: Element | null): HTMLElement | null {
+  if (!(aktiv instanceof HTMLElement)) return null;
+  if (aktiv.matches(EINGABE)) return aktiv;
+  return aktiv.closest('.ant-modal')?.querySelector<HTMLElement>(EINGABE) ?? aktiv;
+}
+
+/**
+ * Schutz eines handgebauten Dialogs mit gesteuerten Feldern (LLH-2010, `frontend/AGENTS.md`,
+ * „Erfassungs-Norm“): dieselbe Pforte wie in `ErfassungsFormular`, für Dialoge, die kein
+ * Formular sind (Bestätigung mit Grund, Einfelddialog, Postenliste). Die Maske schließt nie;
+ * Kreuz, Escape und ein eigener Abbrechen-Knopf (`abbrechen`) schließen ohne Änderung sofort und
+ * fragen mit Änderung über {@link VerwerfenDialog} nach.
+ *
+ * `rueckfrage` steht neben dem `<Modal>` (ein eigener Dialog darüber), nicht in seinem Inhalt.
+ */
+export function useVerwerfenSchutz({
+  geaendert,
+  gesperrt = false,
+  titel,
+  onSchliessen,
+}: {
+  /** Hat die Person etwas eingegeben, das beim Schließen verloren ginge? */
+  geaendert: boolean;
+  /** Läuft gerade gespeichert? Dann ist jeder Weg hinaus gesperrt. */
+  gesperrt?: boolean;
+  /** Titel des Dialogs; die Rückfrage nennt ihn. */
+  titel?: ReactNode;
+  /** Der Abbruch des Dialogs: Zustand räumen, Dialog schließen. */
+  onSchliessen: () => void;
+}): {
+  modalProps: Pick<ModalProps, 'mask' | 'wrapProps' | 'onCancel' | 'keyboard'>;
+  abbrechen: () => void;
+  rueckfrage: ReactNode;
+} {
+  const [rueckfrageOffen, setRueckfrageOffen] = useState(false);
+  // Fokus vor der Rückfrage; „Weiter bearbeiten“ bringt ihn zurück, sonst stünde er auf <body>
+  // und der Dialog hörte kein Escape mehr.
+  const fokusVorher = useRef<HTMLElement | null>(null);
+
+  const abbrechen = useCallback(() => {
+    if (gesperrt) return;
+    if (!geaendert) {
+      onSchliessen();
+      return;
+    }
+    fokusVorher.current = eingabeFokus(document.activeElement);
+    setRueckfrageOffen(true);
+  }, [gesperrt, geaendert, onSchliessen]);
+
+  const weiter = useCallback(() => {
+    setRueckfrageOffen(false);
+    const ziel = fokusVorher.current;
+    fokusVorher.current = null;
+    if (ziel) setTimeout(() => ziel.focus(), 0);
+  }, []);
+
+  const verwerfen = useCallback(() => {
+    setRueckfrageOffen(false);
+    fokusVorher.current = null;
+    onSchliessen();
+  }, [onSchliessen]);
+
+  return {
+    modalProps: {
+      mask: { closable: false },
+      wrapProps: MASKE_HAELT_FOKUS,
+      onCancel: abbrechen,
+      // Escape erreicht nur den obersten offenen Dialog (rc-dialog): steht die Rückfrage, gilt es ihr.
+      keyboard: !gesperrt,
+    },
+    abbrechen,
+    rueckfrage: (
+      <VerwerfenDialog
+        offen={rueckfrageOffen}
+        titel={titel}
+        onWeiter={weiter}
+        onVerwerfen={verwerfen}
+      />
+    ),
+  };
 }

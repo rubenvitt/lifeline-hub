@@ -3,6 +3,7 @@ import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useVerwerfenSchutz } from '../components/VerlassenRueckfrage';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   listeVorhandeneKarten,
@@ -70,72 +71,92 @@ export default function OfflineVorhandeneModal({
     },
   });
 
+  // Ein geänderter Name geht nicht still verloren (LLH-2010, `frontend/AGENTS.md`,
+  // „Erfassungs-Norm“): geändert ist ein Name, der vom abgeleiteten abweicht.
+  const geaendert = (vorhandeneQuery.data ?? []).some((v) => {
+    const name = namen[v.dateiname];
+    return name !== undefined && name.trim() !== nameAusDatei(v.dateiname);
+  });
+  const schutz = useVerwerfenSchutz({
+    geaendert,
+    titel: 'Gebaute Region übernehmen',
+    onSchliessen: () => {
+      setNamen({});
+      onClose();
+    },
+  });
+
   return (
-    <Modal
-      open={offen}
-      title="Gebaute Region übernehmen"
-      footer={null}
-      onCancel={onClose}
-      destroyOnHidden
-    >
-      {vorhandeneQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: 'var(--lfh-luft-5)' }}>
-          <Spin />
-        </div>
-      ) : (
-        <Liste
-          // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): der
-          // Titel ist ein Eingabefeld, und ein Bedienelement gehört nicht in eine Überschrift.
-          dataSource={vorhandeneQuery.data ?? []}
-          emptyText="Keine neuen Dateien im Karten-Verzeichnis"
-          renderItem={(v) => {
-            const grund = zeilen.grund(v.dateiname);
-            return (
-              <ListenEintrag
-                actions={[
-                  <Button
-                    key="imp"
-                    type="link"
-                    disabled={importMutation.isPending}
-                    onClick={() => importMutation.mutate(v)}
-                  >
-                    Übernehmen
-                  </Button>,
-                ]}
-              >
-                <ListenEintragMeta
-                  title={
-                    /*
-                     * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
-                     * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
-                     * Handschuh-Betrieb.
-                     */
-                    <div style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
-                      <Input
-                        value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
-                        onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
-                        aria-label={`Name für ${v.dateiname}`}
-                      />
-                    </div>
-                  }
-                  description={
-                    <>
-                      <Textstufe stufe="textKlein" ton="gedaempft">
-                        {v.dateiname} <Marke>{formatGroesse(v.groesse)}</Marke>
-                      </Textstufe>
-                      {grund && (
-                        <div>
-                          <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
-                        </div>
-                      )}
-                    </>
-                  }
-                />
-              </ListenEintrag>
-            );
-          }}
-        />
-      )}
-    </Modal>
+    <>
+      <Modal
+        open={offen}
+        title="Gebaute Region übernehmen"
+        footer={null}
+        {...schutz.modalProps}
+        destroyOnHidden
+      >
+        {vorhandeneQuery.isLoading ? (
+          <div style={{ textAlign: 'center', padding: 'var(--lfh-luft-5)' }}>
+            <Spin />
+          </div>
+        ) : (
+          <Liste
+            // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): der
+            // Titel ist ein Eingabefeld, und ein Bedienelement gehört nicht in eine Überschrift.
+            dataSource={vorhandeneQuery.data ?? []}
+            emptyText="Keine neuen Dateien im Karten-Verzeichnis"
+            renderItem={(v) => {
+              const grund = zeilen.grund(v.dateiname);
+              return (
+                <ListenEintrag
+                  actions={[
+                    <Button
+                      key="imp"
+                      type="link"
+                      disabled={importMutation.isPending}
+                      onClick={() => importMutation.mutate(v)}
+                    >
+                      Übernehmen
+                    </Button>,
+                  ]}
+                >
+                  <ListenEintragMeta
+                    title={
+                      /*
+                       * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
+                       * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
+                       * Handschuh-Betrieb.
+                       */
+                      <div style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
+                        <Input
+                          value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
+                          onChange={(e) =>
+                            setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))
+                          }
+                          aria-label={`Name für ${v.dateiname}`}
+                        />
+                      </div>
+                    }
+                    description={
+                      <>
+                        <Textstufe stufe="textKlein" ton="gedaempft">
+                          {v.dateiname} <Marke>{formatGroesse(v.groesse)}</Marke>
+                        </Textstufe>
+                        {grund && (
+                          <div>
+                            <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                          </div>
+                        )}
+                      </>
+                    }
+                  />
+                </ListenEintrag>
+              );
+            }}
+          />
+        )}
+      </Modal>
+      {schutz.rueckfrage}
+    </>
   );
 }

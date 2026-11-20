@@ -1742,6 +1742,13 @@ Spec `bedien-arbeitsplatz`).
   (`onValuesChange`, nie `setFieldsValue`) und anders als `initialValues`. Ein Dialog um ein
   eigenes `ErfassungsFormular` (Aufträge) leitet Kreuz und Escape über `steuerungRef` und
   `keyboard={false}`; ohne eigenen Abbrechen-Knopf über `ohneAbbrechenKnopf`.
+- **Handgebaute Dialoge mit Eingabe** (LLH-2010, Design-Doc
+  `docs/superpowers/specs/2026-11-20-e127jfu7-formulardialoge-schuetzen-design.md`): ein eigenes
+  `<Modal>` mit gesteuerten Feldern, das kein Formular ist (Bestätigung mit Grund, Einfelddialog,
+  Postenliste), nimmt `useVerwerfenSchutz` (`components/VerlassenRueckfrage.tsx`): `modalProps`
+  ins `<Modal>`, `rueckfrage` daneben, „geändert“ heißt anders als beim Öffnen. Ein reiner
+  Auswahldialog sperrt nur die Maske (`mask={{ closable: false }}`,
+  `wrapProps={MASKE_HAELT_FOKUS}`). Wächter: `components/dialogEingabe.guard.test.ts`.
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.
 - **Serienmodus** (`serie`): „Speichern und nächste" hält offen, leert, zählt, fokussiert, ruft
   `form.submit()` von Hand; die Serien-Marke wird in `onFinish` verbraucht **und in

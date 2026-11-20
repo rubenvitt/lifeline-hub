@@ -243,3 +243,52 @@ describe.each([
     }
   });
 });
+
+/**
+ * LLH-2010: ein getippter Name geht nicht still verloren (`frontend/AGENTS.md`, „Erfassungs-Norm“).
+ * Die Maske schließt nie; Kreuz und Abbrechen fragen nur, wenn der Name vom Stand beim Öffnen
+ * abweicht.
+ */
+describe('AnsichtSwitcher · Rückfrage vor dem Verwerfen (LLH-2010)', () => {
+  const namensDialog = (titel: string) => screen.findByRole('dialog', { name: titel });
+  const rueckfrageText = (titel: string) => `Die Eingaben in „${titel}“ gehen verloren.`;
+
+  async function oeffne(user: ReturnType<typeof userEvent.setup>, eintrag: RegExp) {
+    await user.click(screen.getByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: eintrag }));
+  }
+
+  it('Neue Ansicht: die Maske schließt nicht, das Kreuz mit Name fragt nach', async () => {
+    const user = userEvent.setup();
+    baue();
+    await oeffne(user, /Neue Ansicht/);
+    const dialog = await namensDialog('Neue Ansicht');
+    await user.click(dialog.closest<HTMLElement>('.ant-modal-wrap')!);
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    await user.type(within(dialog).getByLabelText('Ansichts-Name'), 'Süd');
+    await user.click(within(dialog).getByRole('button', { name: /Close|Schließen/i }));
+    expect(await screen.findByText(rueckfrageText('Neue Ansicht'))).toBeInTheDocument();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+  });
+
+  it('Umbenennen: unveränderter Name schließt still', async () => {
+    const user = userEvent.setup();
+    baue();
+    await oeffne(user, /Umbenennen/);
+    const dialog = await namensDialog('Ansicht umbenennen');
+    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(screen.queryByText(rueckfrageText('Ansicht umbenennen'))).toBeNull();
+  });
+
+  it('Umbenennen: geänderter Name fragt nach', async () => {
+    const user = userEvent.setup();
+    baue();
+    await oeffne(user, /Umbenennen/);
+    const dialog = await namensDialog('Ansicht umbenennen');
+    await user.type(within(dialog).getByLabelText('Ansichts-Name'), ' 2');
+    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    expect(await screen.findByText(rueckfrageText('Ansicht umbenennen'))).toBeInTheDocument();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+  });
+});

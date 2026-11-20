@@ -104,3 +104,13 @@ describe('ZeichenHierDialog (LFH-776)', () => {
     expect(within(dialog()).getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
   });
 });
+
+/** LLH-2010: ein Tipp neben den Dialog verwirft die Auswahl nicht (`frontend/AGENTS.md`, „Erfassungs-Norm“). */
+describe('ZeichenHierDialog — Maske (LLH-2010)', () => {
+  it('die Maske schließt den Dialog nicht', async () => {
+    const { onAbbrechen } = aufbau();
+    // userEvent statt fireEvent: rc-dialog schließt nur nach mousedown UND click auf der Maske.
+    await userEvent.click(dialog().closest('.ant-modal-wrap') as HTMLElement);
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+});
