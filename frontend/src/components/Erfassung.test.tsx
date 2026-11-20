@@ -856,13 +856,39 @@ describe('ErfassungsModal', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
   });
 
-  it('leert die Felder auch über Escape und das Schliesskreuz, nicht nur über den Knopf', async () => {
+  it('ohne Änderung schließen Escape und Kreuz sofort und still', async () => {
+    for (const weg of ['escape', 'kreuz'] as const) {
+      const onAbbrechen = vi.fn();
+      const { unmount } = renderMitProviders(
+        <ModalHarness
+          offen
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+          onAbbrechen={onAbbrechen}
+        />,
+      );
+      const nutzer = userEvent.setup();
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+      if (weg === 'escape') await nutzer.keyboard('{Escape}');
+      else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+
+      await waitFor(() => expect(onAbbrechen).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('Escape und Kreuz mit Änderung fragen nach, nennen den Dialog und leeren erst nach „Verwerfen“', async () => {
     // `onCancel` roh durchgereicht deckte nur den Abbrechen-KNOPF. `destroyOnHidden` rettet das
     // nicht: der Speicher von rc-field-form überlebt und gewinnt beim nächsten Öffnen gegen
     // `initialValues`. Beide Wege einzeln, weil sie im Modal an verschiedenen Stellen hängen.
     for (const weg of ['escape', 'kreuz'] as const) {
+      const onAbbrechen = vi.fn();
       const { unmount } = renderMitProviders(
-        <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+        <ModalHarness
+          offen
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+          onAbbrechen={onAbbrechen}
+        />,
       );
       const nutzer = userEvent.setup();
       await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
@@ -870,9 +896,34 @@ describe('ErfassungsModal', () => {
       if (weg === 'escape') await nutzer.keyboard('{Escape}');
       else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
 
+      expect(
+        await screen.findByText('Die Eingaben in „Person erfassen“ gehen verloren.'),
+      ).toBeInTheDocument();
+      expect(onAbbrechen).not.toHaveBeenCalled();
+      await verwerfenBestaetigen();
       await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+      expect(onAbbrechen).toHaveBeenCalledTimes(1);
       unmount();
     }
+  });
+
+  it('ein Klick auf die Maske schließt nie, auch ohne Änderung (LLH-1755)', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    await userEvent.click(maske!);
+
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Person erfassen' })).not.toHaveClass(
+      'ant-zoom-leave',
+    );
   });
 
   it('Escape läuft genau einmal über die Registry und verwirft die Eingabe', async () => {
@@ -896,12 +947,14 @@ describe('ErfassungsModal', () => {
     fireEvent(ort, ereignis);
 
     expect(ereignis.defaultPrevented).toBe(true);
+    await verwerfenBestaetigen();
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
   });
 
-  it('verwirft einen laufenden Abschluss über Kreuz und Maskenklick', async () => {
-    for (const weg of ['kreuz', 'maske'] as const) {
+  it('verwirft einen laufenden Abschluss über das Kreuz', async () => {
+    // Die Maske schließt seit LLH-1755 nie; der Abbruch läuft über Kreuz und Rückfrage.
+    {
       let antwortFreigeben!: () => void;
       const antwort = new Promise<void>((resolve) => {
         antwortFreigeben = resolve;
@@ -923,13 +976,8 @@ describe('ErfassungsModal', () => {
       await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
       await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-      if (weg === 'kreuz') {
-        await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-      } else {
-        const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
-        expect(maske).not.toBeNull();
-        await userEvent.click(maske!);
-      }
+      await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+      await verwerfenBestaetigen();
       await act(async () => {
         antwortFreigeben();
         await antwort;
