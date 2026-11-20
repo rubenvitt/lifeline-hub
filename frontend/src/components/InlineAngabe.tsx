@@ -13,7 +13,7 @@ import {
 import { useErstBeiBedarf } from './useErstBeiBedarf';
 import { Button, Popover, Space } from 'antd';
 import { useAngabeForm, type OffeneAngabe } from './angabeForm';
-import { FeldFehler, Stapel } from './instrument';
+import { FeldFehler, SperrStelle, Stapel, useSperrSammler } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
 import { useSelbstanmeldung } from './offeneBearbeitung';
@@ -345,6 +345,9 @@ export function InlineAngabe<T>({
   // Riegel in der Absende-Funktion, nicht am Knopf: Enter und ein zweiter Klick liefen sonst an
   // `loading` vorbei, bevor React neu gerendert hat.
   const sendetRef = useRef(false);
+  // Der Grund einer Eingabe, die getippten Text stehen lässt (LLH-1768), steht unter dem Feld.
+  const [sperrGrund, setSperrGrund] = useState<string | null>(null);
+  const eingabeSperre = useSperrSammler(setSperrGrund);
   // Offen-Zustand des Eingabe-Popups. Gelesen in der CAPTURE-Phase: ein Popup schließt sich
   // beim Escape im eigenen keydown (vor dem Bubbling ans `<form>`) und meldet `onOpenChange(false)`
   // dabei schon — in der Bubble-Phase stünde hier bereits „zu".
@@ -618,6 +621,13 @@ export function InlineAngabe<T>({
 
   async function abschicken() {
     if (sendetRef.current || isGesperrt || !darfSchreiben) return;
+    // Eine Eingabe, die getippten Text nicht lesen konnte und ihn stehen lässt (LLH-1768), sperrt:
+    // weder speichern noch „unverändert“ schließen, sonst ginge der Text still verloren. Den Grund
+    // nennt die Eingabe selbst.
+    if (eingabeSperre.grund() !== null) {
+      document.getElementById(feldId)?.focus();
+      return;
+    }
     const entwurf = entwurfRef.current;
     if (pflicht && leer(entwurf)) {
       setPflichtHinweis(true);
@@ -757,27 +767,31 @@ export function InlineAngabe<T>({
           : {}),
       }}
     >
-      {eingabe({
-        feld: {
-          id: feldId,
-          'aria-label': name,
-          autoFocus: true,
-          ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
-          ...(schreibschutz ? { readOnly: true } : {}),
-        },
-        value: entwurf,
-        onChange: (neu) => {
-          if (schreibschutz) return;
-          setAngefasst(true);
-          setEntwurf(neu);
-        },
-        popup: {
-          onOpenChange: (offen) => {
-            popupOffenRef.current = offen;
+      <SperrStelle melden={eingabeSperre.melden}>
+        {eingabe({
+          feld: {
+            id: feldId,
+            'aria-label': name,
+            autoFocus: true,
+            ...(pruefGrund || sperrGrund
+              ? { 'aria-invalid': true, 'aria-describedby': pruefId }
+              : {}),
+            ...(schreibschutz ? { readOnly: true } : {}),
           },
-        },
-      })}
-      <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
+          value: entwurf,
+          onChange: (neu) => {
+            if (schreibschutz) return;
+            setAngefasst(true);
+            setEntwurf(neu);
+          },
+          popup: {
+            onOpenChange: (offen) => {
+              popupOffenRef.current = offen;
+            },
+          },
+        })}
+      </SperrStelle>
+      <FeldFehler id={pruefId}>{pruefGrund ?? sperrGrund}</FeldFehler>
       {praesenzZeile}
       {fremdGeaendert ? (
         <div role="status" style={{ color: rollen.achtungText }}>
