@@ -251,7 +251,9 @@ export default function BetroffeneZeile({
       : 'vorleser';
   const raster = {
     display: 'grid',
-    gridTemplateColumns: 'max-content minmax(0, 1fr)',
+    // Am Handschirm Zeichen über Bedeutung: neben „rot · gelb · grün · blau“ bliebe der Bedeutung
+    // kaum ein Drittel der Breite.
+    gridTemplateColumns: istSchmal ? 'minmax(0, 1fr)' : 'max-content minmax(0, 1fr)',
     columnGap: token.padding,
     rowGap: token.marginXXS,
     margin: 0,
@@ -269,7 +271,9 @@ export default function BetroffeneZeile({
             position: 'absolute',
             top: '100%',
             insetInlineStart: 0,
-            zIndex: 2,
+            // Über Tabellenkopf und Zeilen der Liste, unter dem Eingangsband (`zIndexPopupBase - 1`)
+            // und allen Klappflächen.
+            zIndex: token.zIndexPopupBase - 2,
             width: 'max-content',
             maxWidth: 'min(720px, calc(100vw - 32px))',
             marginBlockStart: token.marginXXS,
@@ -300,11 +304,18 @@ export default function BetroffeneZeile({
             visibility: leer ? 'visible' : 'hidden',
           }}
         >
+          {/* In der Ebene des leeren Felds, ÜBER der Legenden-Schicht (die sonst den Hinweis
+              verdeckte). Immer im Baum, damit Vorlesende die Meldung beim Erscheinen hören. */}
+          <span role="status" style={leerVersuch ? undefined : NUR_VORLESER}>
+            {leerVersuch ? 'Noch nichts eingegeben' : ''}
+          </span>
           <dl id={kuerzelId} data-lfh="kuerzel" aria-label="Kürzel" style={legendeStil}>
             {LEGENDE.map((z) => (
               <div key={z.zeichen} style={{ display: 'contents' }}>
                 <dt style={{ ...monoStil('mono'), color: rollen.bedien }}>{z.zeichen}</dt>{' '}
-                <dd style={{ margin: 0 }}>{z.bedeutung}</dd>
+                <dd style={{ margin: 0, marginBlockEnd: istSchmal ? token.marginXS : 0 }}>
+                  {z.bedeutung}
+                </dd>
               </div>
             ))}
           </dl>
@@ -347,10 +358,6 @@ export default function BetroffeneZeile({
           {zuletzt}
         </span>
       )}
-      {/* Immer im Baum, damit Vorlesende die Meldung beim Erscheinen hören. */}
-      <span role="status" style={leerVersuch ? { flexBasis: '100%' } : NUR_VORLESER}>
-        {leerVersuch ? 'Noch nichts eingegeben' : ''}
-      </span>
       {versuchFehler && versuchFehler.length > 0 && (
         <span role="alert" style={{ flexBasis: '100%', color: rollen.alarmText }}>
           Nicht erfasst: {versuchFehler.join(' · ')}
