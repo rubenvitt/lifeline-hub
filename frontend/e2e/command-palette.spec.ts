@@ -470,8 +470,29 @@ test('die Fußzeile bleibt bei 1440 px in jeder Dichte einzeilig (LFH-1055)', as
 
     await oeffnePalette(page);
     const fuss = page.locator('[data-lfh="palette-fuss"]');
-    // Eine Zeile Tastenmarken (16 px) plus 2 × 6 px Polsterung und Rand; zwei Zeilen lägen über 50.
-    expect((await fuss.boundingBox())!.height, stufe).toBeLessThanOrEqual(36);
+    // Einzeilig: jeder Hinweis steht oben auf derselben Zeile, und die Fußzeile ist nicht höher als
+    // ihr höchster Hinweis plus Polsterung und Rand. Die Polsterung wächst mit der Dichte (Raster,
+    // ADR-0067), deshalb gemessen statt als feste Zahl; eine zweite Zeile brächte ≥ 18 px mehr.
+    const mass = await fuss.evaluate((el) => {
+      const stil = getComputedStyle(el);
+      const kinder = [...el.children].map((k) => k.getBoundingClientRect());
+      return {
+        hoehe: el.getBoundingClientRect().height,
+        rahmen:
+          parseFloat(stil.paddingTop) +
+          parseFloat(stil.paddingBottom) +
+          parseFloat(stil.borderTopWidth) +
+          parseFloat(stil.borderBottomWidth),
+        oben: kinder.map((k) => k.top),
+        zeile: Math.max(...kinder.map((k) => k.height)),
+      };
+    });
+    expect(mass.oben.length, `${stufe}: Hinweise`).toBeGreaterThanOrEqual(3);
+    for (const oben of mass.oben)
+      expect(oben, `${stufe}: in einer Zeile`).toBeCloseTo(mass.oben[0]!, 0);
+    expect(mass.hoehe, `${stufe}: eine Zeile hoch`).toBeLessThanOrEqual(
+      mass.zeile + mass.rahmen + 1,
+    );
     await page.keyboard.press('Escape');
     await expect(paletteInput(page)).toBeHidden();
   }

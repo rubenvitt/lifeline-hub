@@ -13,10 +13,14 @@ import { parseKoordinate } from './koordinate';
  *                  kein Name.
  *  · Geschlecht    `m` / `w` / `d` als eigenes Wort, gefolgt vom Alter (`w 34`, `m ~50`)
  *                  oder zusammengeschrieben (`w34`).
- *  · Alter         `34` oder `~50`, 0–120. Das Modell kennt nur `alter_geschaetzt`; die Tilde
- *                  ist Schreibhilfe, beide Formen landen im selben Feld.
+ *  · Alter         `34`, `~50` oder `ca 50` (auch `ca. 50`, `circa 50`, `ca50`), 0–120. Das Modell
+ *                  kennt nur `alter_geschaetzt`; Tilde und „ca“ sind Schreibhilfe, alle Formen
+ *                  landen im selben Feld (LLH-1767).
  *  · Sichtung      `sk1`–`sk4`, `skt` (tot), `sku` (unverletzt), römisch `SKIII` oder
- *                  getrennt `SK III` / `SK 3`. Groß-/Kleinschreibung egal.
+ *                  getrennt `SK III` / `SK 3`. Groß-/Kleinschreibung egal. Dazu die Farbe
+ *                  (LLH-1767, {@link SICHTUNG_FARBEN}): `rot`, `gelb`, `grün`/`gruen`, `blau` für
+ *                  SK I–IV, außer direkt am Komma des Namens („Grün, Anna“). „schwarz“ und „weiß“
+ *                  bewusst nicht: häufige Nachnamen, die sonst als tot bzw. unverletzt anlegten.
  *  · Unfallhilfsstelle  `@` + Bezeichnung (`@Weserstadion`, `@UHS Weserstadion`); `uhs_id`
  *                  geht im SELBEN Anlege-POST mit. Das `@` nimmt die folgenden Wörter bis zur
  *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`/`!`; Zahlen
@@ -33,11 +37,16 @@ import { parseKoordinate } from './koordinate';
  *                  im SELBEN POST als `antreff_lat`/`antreff_lon`, gelesen über
  *                  `personen/koordinate.ts`. Ein `#`-Wort wird nie als Namensteil geschluckt.
  *
+ * ── DER NAME IST EIN BLOCK ──────────────────────────────────────────────────────────────
+ * Freie Wörter (kein Kürzel) bilden den Namen, aber nur der ERSTE zusammenhängende Block.
+ * Jeder weitere Block freier Wörter (etwa „verwirrt“ in „Mann ca 40 rot verwirrt“) ist ein
+ * unerkannter Teil und ein Problem (LLH-1767): früher landete er still im Namen.
+ *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
  * Doppelte Angaben, ein unbekannter Anlass, eine unbekannte Maßnahme, `>` ohne `entl`, `>entl`
  * ohne Anlass, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
  * (LLH-1329), ein unbrauchbares `#`, ein `@` ohne Bezeichnung und eine nicht eindeutige UHS
- * erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
+ * sowie ein nicht verstandener Wortblock erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
  * verstandener Befehl legte eine Person mit falscher Sichtung oder in der falschen UHS an.
  */
 
@@ -107,6 +116,22 @@ const ROEMISCH: Record<string, Sichtungskategorie> = {
   t: 'tot',
   u: 'unverletzt',
 };
+
+/**
+ * Die Farben der Sichtung (BBK) als eigenes Wort (LLH-1767). Die Legende der Schnellerfassung
+ * liest sie von hier. „schwarz“ (tot) und „weiß“ fehlen absichtlich, siehe Kopf.
+ */
+export const SICHTUNG_FARBEN: readonly { farbe: string; kategorie: Sichtungskategorie }[] = [
+  { farbe: 'rot', kategorie: 'sk1' },
+  { farbe: 'gelb', kategorie: 'sk2' },
+  { farbe: 'grün', kategorie: 'sk3' },
+  { farbe: 'blau', kategorie: 'sk4' },
+];
+
+const FARBE_NACH_WORT: ReadonlyMap<string, Sichtungskategorie> = new Map([
+  ...SICHTUNG_FARBEN.map((f) => [f.farbe, f.kategorie] as const),
+  ['gruen', 'sk3'],
+]);
 
 /**
  * Die Sichtungen mit Buchstabe statt Ziffer. Die Hinweiszeile der Schnellerfassung liest ihre
@@ -180,7 +205,9 @@ export function anlassAus(wort: string): PersonAnlass | null {
   return ANLASS_NACH_KUERZEL.get(kuerzel) ?? null;
 }
 
-const ALTER_MUSTER = /^~?(\d{1,3})$/;
+const ALTER_MUSTER = /^(?:~|ca\.?|circa)?(\d{1,3})$/i;
+/** „ca“ als eigenes Wort vor der Zahl („ca 40“). */
+const CA_MUSTER = /^(?:ca\.?|circa)$/i;
 const GESCHLECHT_ALTER_MUSTER = /^([mwd])(~?\d{1,3})$/i;
 const SK_EIN_WORT = /^sk(i{1,3}|iv|[1-4tu])$/i;
 
@@ -192,6 +219,40 @@ function alterAus(wort: string): number | null {
   return n >= 0 && n <= 120 ? n : Number.NaN;
 }
 
+/**
+ * Alter ab Wort `i`: ein Wort (`34`, `~50`, `ca40`) oder das Paar „ca 40“. `null`, wenn dort
+ * keines steht; `wert` ist `NaN` außerhalb 0–120.
+ */
+function alterAb(
+  woerter: readonly string[],
+  i: number,
+): { wert: number; text: string; woerter: number } | null {
+  const wort = woerter[i];
+  if (wort == null) return null;
+  const ein = alterAus(wort);
+  if (ein != null) return { wert: ein, text: wort, woerter: 1 };
+  const zahl = woerter[i + 1];
+  if (CA_MUSTER.test(wort) && zahl != null && /^\d{1,3}$/.test(zahl)) {
+    return { wert: alterAus(zahl) as number, text: `${wort} ${zahl}`, woerter: 2 };
+  }
+  return null;
+}
+
+/**
+ * Farbe als Sichtung (`rot` …) — sonst `null`. Am Komma gehört das Wort zum Namen: direkt
+ * davor („Grün, Anna“) oder direkt dahinter („Meier, Rot“).
+ */
+function farbeAus(
+  wort: string,
+  vorher: string | undefined,
+  naechstes: string | undefined,
+): Sichtungskategorie | null {
+  const wert = FARBE_NACH_WORT.get(wort.toLowerCase());
+  if (wert == null) return null;
+  if (vorher?.endsWith(',') || naechstes?.startsWith(',')) return null;
+  return wert;
+}
+
 /** Sichtung aus einem Wort (`sk3`, `SKIII`) — sonst `null`. */
 function sichtungAus(wort: string): Sichtungskategorie | null {
   const m = SK_EIN_WORT.exec(wort);
@@ -199,8 +260,8 @@ function sichtungAus(wort: string): Sichtungskategorie | null {
 }
 
 /**
- * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`, `!`, `+`,
- * `>`. Eine
+ * Beendet dieses Wort einen `@`-Suchtext? Sichtung (auch als Farbe), Geschlecht (auch `w34`),
+ * `@`, `#`, `!`, `+`, `>`. Eine
  * NACKTE Zahl nicht: „UHS 2" ist üblich, und ein Alter steht hinter dem Geschlecht.
  */
 function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
@@ -209,6 +270,7 @@ function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
   if (klein === 'sk' && naechstes != null && ROEMISCH[naechstes.toLowerCase()] != null) return true;
   if (GESCHLECHT[klein] != null) return true;
   if (GESCHLECHT_ALTER_MUSTER.test(wort)) return true;
+  if (FARBE_NACH_WORT.has(klein)) return true;
   return ['@', '#', '!', '+', '>'].some((z) => wort.startsWith(z));
 }
 
@@ -230,8 +292,8 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
     .filter((w) => w !== '');
   const teile: BefehlTeil[] = [];
   const probleme: string[] = [];
-  const namensWoerter: string[] = [];
-  let namensIndex = -1;
+  /** Blöcke freier Wörter: der erste ist der Name, jeder weitere unerkannt. */
+  const bloecke: { teilIndex: number; woerter: string[]; letztesWort: number }[] = [];
   let sichtung: Sichtungskategorie | undefined;
   let anlass: PersonAnlass | undefined;
   let geschlecht: GeschlechtWert | undefined;
@@ -267,6 +329,7 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
     const wort = woerter[i];
     const klein = wort.toLowerCase();
     const naechstes = woerter[i + 1];
+    const vorher = woerter[i - 1];
 
     if (wort.startsWith('#')) {
       const k = parseKoordinate(wort);
@@ -358,14 +421,20 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       continue;
     }
 
+    const farbe = farbeAus(wort, vorher, naechstes);
+    if (farbe != null) {
+      setzeSichtung(farbe, wort);
+      continue;
+    }
+
     const zusammen = GESCHLECHT_ALTER_MUSTER.exec(wort);
     const geschlechtWort = zusammen ? zusammen[1].toLowerCase() : klein;
     if (GESCHLECHT[geschlechtWort] != null) {
-      // Zusammengeschrieben (`w34`) oder als Paar (`w 34`); das Alter hängt dann am Teil.
-      const alterWort = zusammen ? zusammen[2] : naechstes;
-      const alterWert = alterWort != null ? alterAus(alterWort) : null;
-      const text = zusammen ? wort : alterWert != null ? `${wort} ${alterWort}` : wort;
-      if (!zusammen && alterWert != null) i++;
+      // Zusammengeschrieben (`w34`) oder als Paar (`w 34`, `m ca 40`); das Alter hängt am Teil.
+      const folgend = zusammen ? null : alterAb(woerter, i + 1);
+      const alterWert = zusammen ? alterAus(zusammen[2]) : (folgend?.wert ?? null);
+      const text = zusammen ? wort : folgend != null ? `${wort} ${folgend.text}` : wort;
+      if (folgend != null) i += folgend.woerter;
       if (geschlecht != null) {
         teile.push({ art: 'unerkannt', text, grund: 'Geschlecht doppelt' });
         probleme.push(`Geschlecht doppelt angegeben („${text}")`);
@@ -382,18 +451,33 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       continue;
     }
 
-    const alterWert = alterAus(wort);
-    if (alterWert != null) {
-      if (setzeAlter(alterWert, wort)) teile.push({ art: 'alter', text: wort, wert: alterWert });
-      else teile.push({ art: 'unerkannt', text: wort, grund: 'Alter ungültig' });
+    const alterTeil = alterAb(woerter, i);
+    if (alterTeil != null) {
+      const { wert, text } = alterTeil;
+      i += alterTeil.woerter - 1;
+      if (setzeAlter(wert, text)) teile.push({ art: 'alter', text, wert });
+      else teile.push({ art: 'unerkannt', text, grund: 'Alter ungültig' });
       continue;
     }
 
-    if (namensIndex < 0) namensIndex = teile.length;
-    namensWoerter.push(wort);
+    const block = bloecke[bloecke.length - 1];
+    if (block != null && block.letztesWort === i - 1) {
+      block.woerter.push(wort);
+      block.letztesWort = i;
+    } else {
+      // Platzhalter an der Stelle des Blocks; Name oder Unerkanntes wird er unten.
+      bloecke.push({ teilIndex: teile.length, woerter: [wort], letztesWort: i });
+      teile.push({ art: 'unerkannt', text: wort, grund: '' });
+    }
   }
 
-  const namensText = namensWoerter.join(' ');
+  for (const weiterer of bloecke.slice(1)) {
+    const text = weiterer.woerter.join(' ');
+    teile[weiterer.teilIndex] = { art: 'unerkannt', text, grund: 'Nicht verstanden' };
+    probleme.push(`„${text}" nicht verstanden`);
+  }
+  const namensBlock = bloecke[0];
+  const namensText = namensBlock?.woerter.join(' ') ?? '';
   const { name, vorname } = nameAus(namensText);
   // Grenze des Servers (LLH-1329) vor Senden und Warteschlange; gekürzt wird nie.
   if (istZuLang(name, PERSON_NAME_MAX)) {
@@ -402,8 +486,8 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
   if (istZuLang(vorname, PERSON_NAME_MAX)) {
     probleme.push(`Vorname darf höchstens ${PERSON_NAME_MAX} Zeichen lang sein`);
   }
-  if (namensWoerter.length > 0) {
-    teile.splice(namensIndex, 0, { art: 'name', text: namensText, name, vorname });
+  if (namensBlock != null) {
+    teile[namensBlock.teilIndex] = { art: 'name', text: namensText, name, vorname };
   }
   // Ohne Anlass zählt der leichte Fall weder im Lagebild noch im Bericht (design.md D3).
   if (entlassen && anlass == null) probleme.push('Entlassung ohne Anlass („!…“ fehlt)');

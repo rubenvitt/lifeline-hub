@@ -29,8 +29,9 @@ async function vorbereiten(page: Page) {
   const api = `/api/einsaetze/${einsatzId}/befehle/${befehlId}`;
   const liste = `/einsaetze/${einsatzId}/auftraege`;
   const detail = `${liste}/befehle/${befehlId}`;
-  // Der Rückweg aus einem Befehl führt auf den Reiter Befehle (LFH-972).
-  const befehle = `${liste}?reiter=befehle`;
+  // Der Rückweg aus einem Befehl führt auf den Reiter Befehle (LFH-972). Wählt `?befehl=` einen
+  // Entwurf, schreibt die Liste ihre Sicht dazu in die Adresse (LLH-1826, `befehle_sicht`).
+  const befehle = new RegExp(`${liste}\\?reiter=befehle(&befehle_sicht=(entwurf|freigegeben))?$`);
   return { einsatzId, api, liste, befehle, detail };
 }
 
