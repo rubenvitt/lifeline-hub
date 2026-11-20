@@ -145,7 +145,7 @@ describe('EmpfaengerWahl (kz5udbog D7)', () => {
       await userEvent.type(feld, 'Logistikt');
       const folge = listenFolge();
       expect(folge[0]).toBe('Logistiktrupp');
-      expect(folge.at(-1)).toBe('„Logistikt“ als Freitext übernehmen');
+      expect(folge[folge.length - 1]).toBe('„Logistikt“ als Freitext übernehmen');
       await userEvent.click(within(liste()).getByTitle('„Logistikt“ als Freitext übernehmen'));
       expect(onChange).toHaveBeenLastCalledWith(['Logistikt']);
       expect(feld).toHaveAttribute('aria-expanded', 'false');

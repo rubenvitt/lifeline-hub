@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
 import type { RefSelectProps } from 'antd';
+import type { DefaultOptionType } from 'antd/es/select';
 import { Select } from '../components/Select';
 
 /** Ein Eintrag der Liste: Wert und sichtbare Beschriftung. */
@@ -118,17 +119,21 @@ export function VorschlagsSelect({
 
   for (const o of [...treffer, ...zusatzOptionen]) beschriftungRef.current.set(o.value, o.label);
 
-  const alsOption = (o: VorschlagsOption) => ({ value: o.value, label: o.label, title: o.label });
-  const freitextOption = freitext && {
+  const alsOption = (o: VorschlagsOption): DefaultOptionType => ({
+    value: o.value,
+    label: o.label,
+    title: o.label,
+  });
+  const freitextOption: DefaultOptionType | null = freitext && {
     ...alsOption(freitext),
     'data-lfh': 'freitext-eintrag',
   };
-  const gruppenOptionen = gefiltert.flatMap((g) =>
+  const gruppenOptionen = gefiltert.flatMap((g): DefaultOptionType[] =>
     g.label
       ? [{ label: g.label, title: g.label, options: g.options.map(alsOption) }]
       : g.options.map(alsOption),
   );
-  const optionen =
+  const optionen: DefaultOptionType[] =
     treffer.length > 0
       ? [
           ...gruppenOptionen,
@@ -143,7 +148,7 @@ export function VorschlagsSelect({
     ...(treffer.length > 0 ? [] : zusatzOptionen),
   ].map((o) => o.value);
   // Gewählte Werte, die gerade in keiner Liste stehen, behalten ihre Beschriftung.
-  const gewaehlteOhneListe = werte
+  const gewaehlteOhneListe: DefaultOptionType[] = werte
     .filter((w) => !folge.includes(w) && beschriftungRef.current.has(w))
     .map((w) => ({
       value: w,
