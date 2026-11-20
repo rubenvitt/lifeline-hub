@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
+import SitzungBeendetDialog from './auth/SitzungBeendetDialog';
 import AppLayout from './components/AppLayout';
 import RollWiederherstellung from './components/RollWiederherstellung';
 import SprungZumInhalt from './components/SprungZumInhalt';
@@ -303,6 +304,8 @@ function SitzungsLayout() {
       <Outlet />
       {/* Benutzerwechsel in einem anderen Tab (LFH-387) — neben der Wache, über jeder Route. */}
       <BenutzerKonfliktDialog />
+      {/* Sitzung im Betrieb beendet (LLH-1770): Anmeldung über der montierten, verdeckten Seite. */}
+      <SitzungBeendetDialog />
     </>
   );
 }

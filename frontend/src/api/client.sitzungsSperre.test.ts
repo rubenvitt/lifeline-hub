@@ -119,4 +119,10 @@ describe('apiGet bei unterbrochener Sitzung (LLH-1770)', () => {
     sitzungSperren();
     await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 401 });
   });
+
+  it('Anmeldewege unter /api/auth/ warten nie — der Dialog braucht die Anbieterliste', async () => {
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+    sitzungSperren();
+    await expect(apiGet('/api/auth/providers')).resolves.toEqual([]);
+  });
 });

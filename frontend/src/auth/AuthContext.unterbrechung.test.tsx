@@ -83,7 +83,9 @@ function Sonde() {
   return (
     <div>
       <span data-testid="name">{benutzer ? benutzer.anzeigename : 'anonym'}</span>
-      <span data-testid="unterbrechung">{unterbrechung ? unterbrechung.bisher.benutzername : '—'}</span>
+      <span data-testid="unterbrechung">
+        {unterbrechung ? unterbrechung.bisher.benutzername : '—'}
+      </span>
       <span data-testid="konflikt">{konflikt ? konflikt.jetzt.anzeigename : '—'}</span>
       <button onClick={() => void login(loginAls.benutzername, 'pw')}>login</button>
     </div>

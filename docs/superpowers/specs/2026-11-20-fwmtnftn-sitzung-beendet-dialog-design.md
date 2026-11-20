@@ -35,8 +35,9 @@ was er getippt hat.
 
 1. Eine 401 im laufenden Betrieb (Person, nicht gekoppeltes Gerät) baut die Seite **nicht** ab.
    Darüber legt sich eine Anmeldung als Dialog; die Seite dahinter ist vollständig verdeckt.
-2. Der Dialog nennt den Grund: Kopf **„Sitzung beendet“**, darunter „Melde dich erneut an.
-   Deine Eingaben auf dieser Seite bleiben erhalten.“
+2. Der Dialog nennt den Grund: Kopf **„Sitzung beendet“**, darunter „Erneut anmelden.
+   Eingaben auf dieser Seite bleiben erhalten.“ (Umsetzung: ohne Anrede nach
+   `frontend/AGENTS.md`, „Anrede“, LLH-1830; zuerst abgestimmt war „Melde dich erneut an …“.)
 3. Meldet sich **dieselbe Person** wieder an, schließt der Dialog, die Daten der Seite laden neu,
    offene Formulare und Dialoge stehen unverändert da (Werte, Fokus darf neu gesetzt werden).
 4. Meldet sich eine **andere Person** an, lädt die Seite neu (Regel LFH-387: ein Benutzerwechsel
@@ -140,8 +141,8 @@ nach der Auflösung mit derselben Person wieder an; die vorgemerkten Einträge g
   Nicht schließbar (kein Kreuz, kein Escape, kein Maskenklick), Fokus gefangen.
 - **Undurchsichtige Abdeckung** in der Flächenfarbe der Gestaltungssprache, über allem, auch
   über offenen antd-Dialogen, Schubladen und Popovern der Seite (z-index über deren Stapel).
-- Inhalt: Kopf „Sitzung beendet“, Satz „Melde dich erneut an. Deine Eingaben auf dieser Seite
-  bleiben erhalten.“, Benutzername mit dem bisherigen vorbelegt (änderbar), Passwort,
+- Inhalt: Kopf „Sitzung beendet“, Satz „Erneut anmelden. Eingaben auf dieser Seite bleiben
+  erhalten.“, Benutzername mit dem bisherigen vorbelegt (änderbar), Passwort,
   „Anmelden“. Zweitfaktor-Stufe im Dialog. Passkey, wenn er auf der Anmeldeseite angeboten würde,
   und in der macOS-Hülle „Im Browser anmelden“ (LFH-818, verlässt die Seite nicht) — kurz: jeder
   Weg der Anmeldeseite, der die Seite nicht verlässt.

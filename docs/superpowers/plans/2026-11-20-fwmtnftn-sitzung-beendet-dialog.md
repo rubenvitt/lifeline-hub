@@ -20,7 +20,7 @@ gleiche Person → auflösen, andere Person → Seite neu laden.
 
 - Frist: `UNTERBRECHUNG_FRIST_MS = 15 * 60_000` ab Eintritt.
 - Dialogkopf wörtlich: „Sitzung beendet“.
-- Dialogtext wörtlich: „Melde dich erneut an. Deine Eingaben auf dieser Seite bleiben erhalten.“
+- Dialogtext wörtlich: „Erneut anmelden. Eingaben auf dieser Seite bleiben erhalten.“
 - SSO-Hinweis wörtlich: „Verlässt die Seite, Eingaben auf dieser Seite gehen verloren“.
 - Restlaufzeit wörtlich: „Ohne Anmeldung wird diese Seite in {n} min geschlossen“ (`n` aufgerundet,
   mindestens 1).

@@ -121,12 +121,13 @@ describe('App-Routing', () => {
     expect(pruefungen).toBe(1);
   });
 
-  it('die Sitzungswache kennt nach Navigation die aktuelle URL einschließlich Query und Hash', async () => {
+  it('Sitzungsende im Betrieb: Dialog über der Seite, „Abmelden“ kennt die aktuelle URL samt Query und Hash (LLH-1770)', async () => {
     server.use(
       meHandler(admin),
       http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/auth/providers', () => HttpResponse.json([])),
     );
     const { router } = renderApp('/einsaetze');
     await screen.findByRole('button', { name: 'Neuer Einsatz' });
@@ -136,8 +137,13 @@ describe('App-Routing', () => {
     });
     await waitFor(() => expect(platzhalterTitel()).toHaveTextContent('WIP-Probe'));
     act(() => window.dispatchEvent(new Event(SITZUNG_ABGELAUFEN)));
+    // Die Seite bleibt, darüber der Dialog.
+    expect(await screen.findByRole('dialog', { name: 'Sitzung beendet' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/einsaetze/7/wip-probe');
+    expect(platzhalterTitel()).toHaveTextContent('WIP-Probe');
+    await userEvent.click(screen.getByRole('button', { name: 'Abmelden' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
-    expect(router.state.location.state).toMatchObject({ von: ziel });
+    expect(router.state.location.state).toMatchObject({ von: ziel, grund: 'sitzung-beendet' });
   });
 
   it('lädt das per React.lazy eingebundene Meldebild (Kräfteübersicht) im Data Router', async () => {
