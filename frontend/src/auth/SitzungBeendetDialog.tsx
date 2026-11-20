@@ -1,6 +1,7 @@
 import { Button, Flex, Modal } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { dauer } from '../anzeige/dauer';
 import { Stapel } from '../components/instrument';
 import AnmeldeFormular from './AnmeldeFormular';
 import { VERDECKT } from './BenutzerKonfliktDialog';
@@ -81,7 +82,7 @@ export default function SitzungBeendetDialog() {
     >
       <Stapel abstand="sm">
         <span>Erneut anmelden. Eingaben auf dieser Seite bleiben erhalten.</span>
-        <span>{`Ohne Anmeldung wird diese Seite in ${restMinuten(restMs)} min geschlossen`}</span>
+        <span>{`Ohne Anmeldung wird diese Seite in ${dauer(restMinuten(restMs))} geschlossen`}</span>
         <AnmeldeFormular
           zielPfad={von}
           onAngemeldet={() => {}}

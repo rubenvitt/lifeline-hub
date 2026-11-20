@@ -3,24 +3,16 @@
  * Sonst hielte sie den Weg zur Anmeldeseite (Frist, „Abmelden“) unsichtbar unter der Abdeckung
  * fest, und die Anmeldeseite verlöre den Grund.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route, Routes } from 'react-router';
 import VerlassenRueckfrage from './VerlassenRueckfrage';
 import { renderMitProviders } from '../test/utils';
+import { sitzungEntsperren, sitzungSperren } from '../auth/sitzungsSperre';
 
-let unterbrochen = true;
-vi.mock('../auth/AuthContext', async (echt) => {
-  const modul = await echt<typeof import('../auth/AuthContext')>();
-  return {
-    ...modul,
-    useAuthOptional: () => {
-      const wert = modul.useAuthOptional();
-      return wert && { ...wert, unterbrechung: unterbrochen ? { bisher: {}, seit: 0 } : null };
-    },
-  };
-});
+// Die Sperre steht genau so lange wie die Unterbrechung im AuthProvider.
+afterEach(() => sitzungEntsperren('beendet'));
 
 function Seite() {
   return (
@@ -41,7 +33,7 @@ function Seite() {
 
 describe('VerlassenRueckfrage bei unterbrochener Sitzung (LLH-1770)', () => {
   it('lässt den Wechsel ohne Rückfrage durch', async () => {
-    unterbrochen = true;
+    sitzungSperren();
     renderMitProviders(<Seite />, { route: '/formular', datenRouter: true });
     await userEvent.click(screen.getByRole('link', { name: 'Zur Anmeldung' }));
     expect(await screen.findByText('ANMELDUNG')).toBeInTheDocument();
@@ -49,7 +41,6 @@ describe('VerlassenRueckfrage bei unterbrochener Sitzung (LLH-1770)', () => {
   });
 
   it('ohne Unterbrechung fragt sie wie bisher', async () => {
-    unterbrochen = false;
     renderMitProviders(<Seite />, { route: '/formular', datenRouter: true });
     await userEvent.click(screen.getByRole('link', { name: 'Zur Anmeldung' }));
     expect(
