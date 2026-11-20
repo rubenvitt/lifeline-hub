@@ -13,6 +13,10 @@ const auth = vi.hoisted(() => ({
   wert: { benutzer: { id: 1 }, geraet: null } as { benutzer: unknown; geraet: unknown } | null,
 }));
 vi.mock('../auth/AuthContext', () => ({ useAuthOptional: () => auth.wert }));
+const rundgang = vi.hoisted(() => ({ starte: undefined as undefined | (() => void) }));
+vi.mock('./rundgang/RundgangProvider', () => ({
+  useRundgang: () => ({ ort: 'liste', starte: rundgang.starte }),
+}));
 
 const TITEL = 'Willkommen bei Lifeline Hub';
 
@@ -145,5 +149,26 @@ describe('WillkommenKarte', () => {
     zeige();
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText(TITEL)).toBeNull();
+  });
+});
+
+describe('WillkommenKarte · Rundgang (LLH-1990)', () => {
+  it('„Rundgang starten“ startet ihn und lässt die Karte stehen', async () => {
+    stand({});
+    const starte = vi.fn();
+    rundgang.starte = starte;
+    zeige();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rundgang starten' }));
+    expect(starte).toHaveBeenCalledOnce();
+    expect(screen.getByText(TITEL)).toBeInTheDocument();
+    rundgang.starte = undefined;
+  });
+
+  it('ohne Starter (Handschirm) kein Knopf', async () => {
+    stand({});
+    rundgang.starte = undefined;
+    zeige();
+    await screen.findByText(TITEL);
+    expect(screen.queryByRole('button', { name: 'Rundgang starten' })).toBeNull();
   });
 });

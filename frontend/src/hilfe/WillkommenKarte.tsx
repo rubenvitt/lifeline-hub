@@ -7,16 +7,19 @@ import { istApplePlattform } from '../command-palette/befehle';
 import { hilfePfad } from '../routing/deeplinks';
 import { SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, istWillkommenOffen } from './willkommen';
 import { useEinstellungMerken } from './useEinstellungMerken';
+import { useRundgang } from './rundgang/RundgangProvider';
 
 /**
  * Willkommenskarte auf der Einsatzliste (LLH-1824): führt Erstnutzer an den Aufbau, die Hilfe zur
  * Seite und die Sprungpalette heran. Sie steht, bis man sie schließt; das merkt sich der Server je
- * Benutzer. Die anschauliche Einführung folgt als eigene Aufgabe (LLH-1990).
+ * Benutzer. „Rundgang starten“ zeigt die Oberfläche in Sprechblasen (LLH-1990).
  */
 export default function WillkommenKarte() {
   // Ein gekoppeltes Gerät hat keine Einsatzliste mit Hilfe (LFH-892): dann ohne Benutzer.
   const { stand: data, benutzerId, merke } = useEinstellungMerken();
   const [geschlossen, setGeschlossen] = useState(false);
+  // Rundgang (LLH-1990): fehlt am Handschirm, dann auch der Knopf.
+  const { starte: starteRundgang } = useRundgang();
   const { token } = theme.useToken();
   const { istBeruehrung } = useViewport();
   const einweisung = hilfePfad({ gruppe: 'alle' });
@@ -61,6 +64,7 @@ export default function WillkommenKarte() {
               </li>
             </ul>
             <div style={{ display: 'flex', gap: token.marginSM, marginBlockStart: token.marginSM }}>
+              {starteRundgang && <Button onClick={starteRundgang}>Rundgang starten</Button>}
               <Button href={einweisung} onClick={zurEinweisung}>
                 Einweisung lesen
               </Button>

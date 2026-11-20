@@ -20,6 +20,13 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 const admin = adminFixture();
 
+// Rundgang (LLH-1990): nur die Anmeldung des Orts zählt hier; Start und Tour prüft der Provider.
+const rundgang = vi.hoisted(() => ({ ort: vi.fn() }));
+vi.mock('../hilfe/rundgang/RundgangProvider', async (original) => ({
+  ...(await original<typeof import('../hilfe/rundgang/RundgangProvider')>()),
+  useRundgangOrt: rundgang.ort,
+}));
+
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
 vi.mock('../anzeige/Kartenausschnitt', () => ({
   Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
@@ -1446,5 +1453,34 @@ describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
     act(() => feld.blur());
     await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
     expect(titel()).toEqual(['Einsatz 3', 'Einsatz 2', 'Einsatz 1']);
+  });
+});
+
+describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
+  beforeEach(() => {
+    rundgang.ort.mockClear();
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+  });
+
+  it('ein Erstnutzer bekommt Teil „Liste“ von selbst', async () => {
+    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('liste', true));
+  });
+
+  it('wer die Willkommenskarte geschlossen hat, nicht', async () => {
+    server.use(
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
+      ),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await waitFor(() => expect(rundgang.ort).toHaveBeenCalledWith('liste', false));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(rundgang.ort).not.toHaveBeenCalledWith('liste', true);
   });
 });

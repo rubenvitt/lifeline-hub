@@ -66,6 +66,9 @@ import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
 import WillkommenKarte from '../hilfe/WillkommenKarte';
+import { useEinstellungMerken } from '../hilfe/useEinstellungMerken';
+import { useRundgangOrt } from '../hilfe/rundgang/RundgangProvider';
+import { sollListeSelbstStarten } from '../hilfe/rundgang/rundgangSchluessel';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import MitgliederKlappteil, { type AnlageMitglied } from './MitgliederKlappteil';
@@ -196,6 +199,9 @@ export default function EinsaetzePage() {
 
 function EinsaetzeInhalt() {
   const navigate = useNavigate();
+  // Rundgang für Erstnutzer, Teil „Liste“ (LLH-1990).
+  const { stand: einstellungen } = useEinstellungMerken();
+  useRundgangOrt('liste', sollListeSelbstStarten(einstellungen));
   const { zeitKurz } = useAnzeigeKonventionen();
   const { token } = theme.useToken();
   const { rollen } = useRollen();
