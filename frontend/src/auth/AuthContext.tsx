@@ -124,6 +124,9 @@ interface AuthWert {
   /** Voller Ausgang aus der Unterbrechung (Frist, „Abmelden“ im Dialog): lokal abmelden wie
    *  beim Sitzungsende, wartende Leseanfragen scheitern. Wirft nie. */
   unterbrechungBeenden: () => Promise<void>;
+  /** Die letzte Sitzung endete über „Sitzung beendet“ (Frist oder „Abmelden“ im Dialog); die
+   *  Anmeldeseite nennt dann den Grund. Fällt mit der nächsten Anmeldung (LLH-1770). */
+  sitzungBeendet: boolean;
   /**
    * Lädt `/api/auth/me` neu und übernimmt den Benutzer — für Login-Wege, die die Session
    * serverseitig ohne `authApi.login` setzen (Passkey, `totpFinish`).
@@ -163,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [unterbrechung, setUnterbrechung] = useState<SitzungsUnterbrechung | null>(null);
   /** Synchron lesbar für Prüfung und Anmeldewege, die nicht an einen Render gebunden sind. */
   const unterbrechungRef = useRef<SitzungsUnterbrechung | null>(null);
+  const [sitzungBeendet, setSitzungBeendet] = useState(false);
   const queryClient = useQueryClient();
   const benutzerId = benutzer?.id ?? null;
   const istGeraet = benutzer?.geraet != null;
@@ -204,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setzeErwartetenBenutzer(b?.id ?? null);
     erfassungsSitzungBinden(b?.id ?? null);
     listenGedaechtnisBinden(b?.id ?? null);
+    if (b) setSitzungBeendet(false);
     setBenutzer(b);
   }, []);
 
@@ -262,6 +267,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient, setzeUnterbrechung]);
 
   const unterbrechungBeenden = useCallback(async () => {
+    // Der Grund steht im Provider, nicht im Navigationszustand: wer zuerst zur Anmeldeseite
+    // umleitet (Dialog oder `RequireAuth`), ist dann gleich.
+    if (unterbrechungRef.current) setSitzungBeendet(true);
     // `abmeldenLokal` beendet die Unterbrechung mit „beendet“: wartende Leseanfragen scheitern.
     await abmeldenLokal('sitzungsende');
   }, [abmeldenLokal]);
@@ -638,6 +646,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unterbrechung,
       unterbrechen,
       unterbrechungBeenden,
+      sitzungBeendet,
     }),
     [
       benutzer,
@@ -652,6 +661,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unterbrechung,
       unterbrechen,
       unterbrechungBeenden,
+      sitzungBeendet,
     ],
   );
 

@@ -86,6 +86,7 @@ export function authWertFixture(benutzer: MeAntwort | null): ReturnType<typeof u
     unterbrechung: null,
     unterbrechen: vi.fn(() => false),
     unterbrechungBeenden: vi.fn(),
+    sitzungBeendet: false,
   };
 }
 

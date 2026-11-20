@@ -331,4 +331,16 @@ describe('Befunde des Reviews (LLH-1770)', () => {
     await waitFor(() => expect(screen.getByTestId('unterbrechung')).toHaveTextContent('—'));
     expect(screen.getByTestId('konflikt')).toHaveTextContent('—');
   });
+
+  it('„Sitzung beendet“ bleibt als Grund stehen, bis wieder jemand angemeldet ist', async () => {
+    await starte();
+    expect(auth.sitzungBeendet).toBe(false);
+    await unterbreche();
+    await act(() => auth.unterbrechungBeenden());
+    expect(auth.sitzungBeendet).toBe(true);
+    sitzung = anna;
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    expect(auth.sitzungBeendet).toBe(false);
+  });
 });

@@ -10,13 +10,13 @@ import './LoginPage.css';
 
 export default function LoginPage() {
   useDokumentTitel(['Anmelden']);
-  const { benutzer, laedt: authLaedt } = useAuth();
+  const { benutzer, laedt: authLaedt, sitzungBeendet: beendetImProvider } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const zustand = location.state as { von?: string; grund?: string } | null;
   const zielPfad = zustand?.von ?? '/einsaetze';
   // Über das Sitzungsende hierher gekommen (Frist oder „Abmelden“ im Dialog, LLH-1770).
-  const sitzungBeendet = zustand?.grund === 'sitzung-beendet';
+  const sitzungBeendet = zustand?.grund === 'sitzung-beendet' || beendetImProvider;
   const anfangsFehler =
     new URLSearchParams(location.search).get('fehler') === 'oidc'
       ? 'Die Anmeldung über Single Sign-On ist fehlgeschlagen'
