@@ -99,11 +99,11 @@ for (const modus of ['light', 'dark'] as const) {
     await page.mouse.move(1, 1);
     await pruefe(verdacht, TEXT[modus], `${modus}: Abgleich „Verdacht“`);
 
-    // Rolle im Benutzermenü: „Admin“ war `gold`.
+    // Rolle im Benutzermenü: „Admin“ war `gold`; seit LLH-1818 heißt sie „System-Admin“.
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     const admin = page
       .locator('.ant-dropdown :is([data-lfh="status"],[data-marke])')
-      .filter({ hasText: /^Admin$/ });
+      .filter({ hasText: /^System-Admin$/ });
     await expect(admin).toHaveCount(1);
     await pruefe(admin, TEXT[modus], `${modus}: Admin im Benutzermenü`);
     await page.keyboard.press('Escape');
