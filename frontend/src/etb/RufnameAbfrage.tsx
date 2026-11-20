@@ -1,8 +1,9 @@
 import { Alert, Button, Checkbox, Space } from 'antd';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
-import { useId, useState } from 'react';
+import { useId, useState, type Ref } from 'react';
 import { useRollen } from '../components/instrument';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
+import type { ParteiRef } from './EtbFeldzeile';
 import { KONTEXT_FUNKRUFNAME, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import {
   anWieVon as leiteAnWieVonAb,
@@ -24,6 +25,10 @@ interface Props {
   onUebernehmen: (wert: string) => Promise<void>;
   /** Nur beim Ändern: zurück, ohne zu speichern. Die erste Abfrage hat keinen Ausweg ohne Wert. */
   onAbbrechen?: () => void;
+  /** Das erste Feld, für den Fokus aus der Erfassung (Startfokus, Pflichtgrund; LLH-1764). */
+  feldRef?: Ref<ParteiRef>;
+  /** Kennung des Pflichtgrunds in der Fußzeile, solange er auf die Abfrage verweist (LLH-1764). */
+  pflichtGrundId?: string;
 }
 
 /**
@@ -43,6 +48,8 @@ export default function RufnameAbfrage({
   vorschlag,
   onUebernehmen,
   onAbbrechen,
+  feldRef,
+  pflichtGrundId,
 }: Props) {
   const { token, rollen } = useRollen();
   const vonId = useId();
@@ -80,11 +87,21 @@ export default function RufnameAbfrage({
    * offener Liste schließt nur die Liste (Spec `stammdaten-feld`, „Tastatur“,
    * `components/StammdatenFeld.tsx`).
    */
-  const feld = (id: string, wert: string, setze: (v: string) => void, name: string) => (
+  const feld = (
+    id: string,
+    wert: string,
+    setze: (v: string) => void,
+    name: string,
+    ref?: Ref<ParteiRef>,
+  ) => (
     <StammdatenFeld
       nurText
       id={id}
+      ref={ref}
       aria-label={name}
+      // Der Pflichtgrund der Erfassung steht in der Fußzeile; das Feld, das ihn behebt, trägt ihn.
+      aria-invalid={pflichtGrundId != null || undefined}
+      aria-describedby={pflichtGrundId}
       value={wert}
       onChange={(v) => {
         setze(v);
@@ -121,7 +138,7 @@ export default function RufnameAbfrage({
         {standard ? 'Eigener Rufname für Von und An' : 'Mit welchem Rufnamen ins ETB schreiben?'}
       </label>
       <Space wrap align="center">
-        {feld(vonId, von, setVon, gleich ? 'Rufname für Von und An' : 'Rufname für Von')}
+        {feld(vonId, von, setVon, gleich ? 'Rufname für Von und An' : 'Rufname für Von', feldRef)}
         <Checkbox checked={gleich} disabled={laeuft} onChange={(e) => setGleich(e.target.checked)}>
           Empfänger wie Absender
         </Checkbox>
