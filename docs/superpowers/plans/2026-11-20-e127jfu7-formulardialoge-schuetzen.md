@@ -53,7 +53,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
   };
   ```
 
-- [ ] **Step 1: Failing tests** in `useVerwerfenSchutz.test.tsx` mit einer Testkomponente (`<Modal title="Probe" open {...schutz.modalProps}><Input aria-label="Text" value onChange /></Modal>{schutz.rueckfrage}`, `geaendert = text.trim() !== ''`):
+- [x] **Step 1: Failing tests** in `useVerwerfenSchutz.test.tsx` mit einer Testkomponente (`<Modal title="Probe" open {...schutz.modalProps}><Input aria-label="Text" value onChange /></Modal>{schutz.rueckfrage}`, `geaendert = text.trim() !== ''`):
   - „ohne Eingabe schließt das Kreuz sofort“ → `onSchliessen` 1×, `queryByText(/gehen verloren\./)` null.
   - „die Maske schließt nicht“ → Klick auf `.ant-modal-wrap` mit Eingabe und ohne: `onSchliessen` 0×.
   - „mit Eingabe fragt das Kreuz nach; Weiter bearbeiten behält den Text und den Fokus“ → Text `"abc"`, Kreuz, Text „Die Eingaben in „Probe“ gehen verloren.“, „Weiter bearbeiten“ → `onSchliessen` 0×, Feld hat `"abc"` und `toHaveFocus()`.
@@ -61,10 +61,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
   - „Escape bei offener Rückfrage schließt nur die Rückfrage“ → Escape im Feld öffnet Rückfrage, zweites Escape: Rückfrage weg, `onSchliessen` 0×.
   - „gesperrt tut nichts“ → `gesperrt: true`, Kreuz: `onSchliessen` 0×, keine Rückfrage.
   - „abbrechen() fragt wie das Kreuz“ → eigener Knopf „Abbrechen“ ruft `schutz.abbrechen`.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend vitest run src/components/useVerwerfenSchutz.test.tsx` → FAIL (Export fehlt).
-- [ ] **Step 3: Implement.** Zustand `rueckfrageOffen`; beim Öffnen der Rückfrage `document.activeElement` merken und nach „Weiter bearbeiten“ per `requestAnimationFrame`/`setTimeout(0)` fokussieren. `keyboard: !gesperrt && !rueckfrageOffen`. `rueckfrage` = `<VerwerfenDialog offen={rueckfrageOffen} titel={titel} onWeiter=… onVerwerfen=… />`. JSDoc nennt `frontend/AGENTS.md`, „Erfassungs-Norm“, und dass `rueckfrage` neben, nicht in das `<Modal>` gehört.
-- [ ] **Step 4:** Test-Befehl aus Step 2 → PASS.
-- [ ] **Step 5: Commit** `feat: Hook useVerwerfenSchutz für handgebaute Dialoge (LLH-2010)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend vitest run src/components/useVerwerfenSchutz.test.tsx` → FAIL (Export fehlt).
+- [x] **Step 3: Implement.** Zustand `rueckfrageOffen`; beim Öffnen der Rückfrage `document.activeElement` merken und nach „Weiter bearbeiten“ per `requestAnimationFrame`/`setTimeout(0)` fokussieren. `keyboard: !gesperrt && !rueckfrageOffen`. `rueckfrage` = `<VerwerfenDialog offen={rueckfrageOffen} titel={titel} onWeiter=… onVerwerfen=… />`. JSDoc nennt `frontend/AGENTS.md`, „Erfassungs-Norm“, und dass `rueckfrage` neben, nicht in das `<Modal>` gehört.
+- [x] **Step 4:** Test-Befehl aus Step 2 → PASS.
+- [x] **Step 5: Commit** `feat: Hook useVerwerfenSchutz für handgebaute Dialoge (LLH-2010)`.
 
 ### Task 2: Vollzug melden, Nachforderung ablehnen und zurückziehen
 
@@ -74,13 +74,13 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 **Interfaces:** Consumes `useVerwerfenSchutz` (Task 1).
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - Vollzug: „Maske schließt nicht“, „Kreuz mit Text fragt nach“, „Kreuz ohne Text schließt“, „nach Verwerfen und erneutem Öffnen ist das Feld leer und das Kreuz schließt still“.
   - Ablehnen: „Kreuz mit Grund fragt nach, ohne Grund schließt“, „Maske schließt nicht“. Zurückziehen: dasselbe.
-- [ ] **Step 2:** Tests laufen lassen → FAIL.
-- [ ] **Step 3: Implement.** Je Modal `useVerwerfenSchutz({ geaendert: text.trim() !== '', gesperrt: meldet|lehntAb|zieht, titel, onSchliessen: <bisheriger onCancel-Körper> })`; `{...schutz.modalProps}` ersetzt `mask`, `keyboard`, `onCancel`; `closable`, `confirmLoading`, `cancelButtonProps` bleiben. `schutz.rueckfrage` als Geschwister rendern (in der Page in ein Fragment neben dem Modal).
-- [ ] **Step 4:** Tests → PASS; bestehende Tests der Dateien grün.
-- [ ] **Step 5: Commit** `feat: Vollzug und Nachforderungsgründe fragen vor dem Verwerfen (LLH-2010)`.
+- [x] **Step 2:** Tests laufen lassen → FAIL.
+- [x] **Step 3: Implement.** Je Modal `useVerwerfenSchutz({ geaendert: text.trim() !== '', gesperrt: meldet|lehntAb|zieht, titel, onSchliessen: <bisheriger onCancel-Körper> })`; `{...schutz.modalProps}` ersetzt `mask`, `keyboard`, `onCancel`; `closable`, `confirmLoading`, `cancelButtonProps` bleiben. `schutz.rueckfrage` als Geschwister rendern (in der Page in ein Fragment neben dem Modal).
+- [x] **Step 4:** Tests → PASS; bestehende Tests der Dateien grün.
+- [x] **Step 5: Commit** `feat: Vollzug und Nachforderungsgründe fragen vor dem Verwerfen (LLH-2010)`.
 
 ### Task 3: Ansicht anlegen/umbenennen, Postenliste der Unterkunft
 
@@ -90,14 +90,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 **Interfaces:** Consumes `useVerwerfenSchutz`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - Neue Ansicht: „Kreuz mit Name fragt nach“, „Maske schließt nicht“.
   - Umbenennen: „unveränderter Name schließt still“, „geänderter Name fragt nach“.
   - Postenliste: „unverändert schließt ‚Schließen‘ still“, „nach Haken an einer Zeile fragt ‚Schließen‘ nach“, „Maske schließt nicht“.
-- [ ] **Step 2:** → FAIL.
-- [ ] **Step 3: Implement.** Ansicht: `geaendert = nameDialog?.modus === 'umbenennen' ? nameWert.trim() !== (aktive?.name ?? '') : nameWert.trim() !== ''` (Ausgangsname aus dem Zustand beim Öffnen nehmen, falls `aktive` dort nicht der umbenannte ist). Postenliste: Startzeilen beim Einhängen per `useState(() => zeilen)` merken; `geaendert`, wenn `an` oder Menge einer Zeile abweicht. `cancelText="Schließen"` bleibt; `onCancel` aus dem Hook, `gesperrt: laeuft`.
-- [ ] **Step 4:** → PASS.
-- [ ] **Step 5: Commit** `feat: Ansichtsname und Postenliste fragen vor dem Verwerfen (LLH-2010)`.
+- [x] **Step 2:** → FAIL.
+- [x] **Step 3: Implement.** Ansicht: `geaendert = nameDialog?.modus === 'umbenennen' ? nameWert.trim() !== (aktive?.name ?? '') : nameWert.trim() !== ''` (Ausgangsname aus dem Zustand beim Öffnen nehmen, falls `aktive` dort nicht der umbenannte ist). Postenliste: Startzeilen beim Einhängen per `useState(() => zeilen)` merken; `geaendert`, wenn `an` oder Menge einer Zeile abweicht. `cancelText="Schließen"` bleibt; `onCancel` aus dem Hook, `gesperrt: laeuft`.
+- [x] **Step 4:** → PASS.
+- [x] **Step 5: Commit** `feat: Ansichtsname und Postenliste fragen vor dem Verwerfen (LLH-2010)`.
 
 ### Task 4: „Baustein einsetzen“ auf `ErfassungsModal`
 
@@ -107,11 +107,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 **Interfaces:** Consumes `ErfassungsModal` (`components/Erfassung.tsx`); Props `offen`, `titel`, `form`, `onErfassen`, `onFertig`, `onAbbrechen`, `erfassenText`. Public Props von `BausteinPlatzhalterModal` bleiben unverändert.
 
-- [ ] **Step 1: Failing tests:** „Maske schließt nicht“, „Kreuz mit Platzhalterwert fragt nach“, „Einsetzen liefert die substituierten Felder“ (Baustein mit Platzhalter `{ort}`, Eingabe „Nord“ → `onEinsetzen` mit „Nord“ im Text), „Baustein ohne Platzhalter setzt sofort ein, ohne Dialog“.
-- [ ] **Step 2:** → FAIL (die ersten beiden).
-- [ ] **Step 3: Implement.** `ErfassungsModal` mit `titel="Baustein einsetzen"`, `erfassenText="Einsetzen"`, `onErfassen={async (w) => onEinsetzen(setzeBausteinEin(...))}`, `onFertig` = nichts weiter (Aufrufer schließt über `baustein=null` nach `onEinsetzen`; prüfen, ob `onFertig` dafür `onAbbrechenAll` braucht — nein, wenn `onEinsetzen` den Baustein zurücksetzt; Test belegt es), `onAbbrechen={onAbbrechenAll}`. Eigener Knopf und `form.resetFields()` beim Öffnen entfallen, soweit die Hülle zurücksetzt; `autoFocus` am ersten Feld bleibt.
-- [ ] **Step 4:** → PASS, `etb`-Tests grün.
-- [ ] **Step 5: Commit** `refactor: Baustein einsetzen läuft über die Erfassungshülle (LLH-2010)`.
+- [x] **Step 1: Failing tests:** „Maske schließt nicht“, „Kreuz mit Platzhalterwert fragt nach“, „Einsetzen liefert die substituierten Felder“ (Baustein mit Platzhalter `{ort}`, Eingabe „Nord“ → `onEinsetzen` mit „Nord“ im Text), „Baustein ohne Platzhalter setzt sofort ein, ohne Dialog“.
+- [x] **Step 2:** → FAIL (die ersten beiden).
+- [x] **Step 3: Implement.** `ErfassungsModal` mit `titel="Baustein einsetzen"`, `erfassenText="Einsetzen"`, `onErfassen={async (w) => onEinsetzen(setzeBausteinEin(...))}`, `onFertig` = nichts weiter (Aufrufer schließt über `baustein=null` nach `onEinsetzen`; prüfen, ob `onFertig` dafür `onAbbrechenAll` braucht — nein, wenn `onEinsetzen` den Baustein zurücksetzt; Test belegt es), `onAbbrechen={onAbbrechenAll}`. Eigener Knopf und `form.resetFields()` beim Öffnen entfallen, soweit die Hülle zurücksetzt; `autoFocus` am ersten Feld bleibt.
+- [x] **Step 4:** → PASS, `etb`-Tests grün.
+- [x] **Step 5: Commit** `refactor: Baustein einsetzen läuft über die Erfassungshülle (LLH-2010)`.
 
 ### Task 5: „In die Lage übernehmen“ auf `ErfassungsModal`
 
@@ -121,11 +121,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 **Interfaces:** Public Props unverändert (`offen`, `meldung`, `senden`, `einsatzId`, `onAbbrechen`, `onUebergeben`, `speicherung`).
 
-- [ ] **Step 1: Failing tests:** „vorbelegter Lage-Text allein: Kreuz schließt still“, „geänderter Lage-Text: Kreuz fragt nach“, „Maske schließt nicht“, „Übernehmen ruft onUebergeben mit getrimmtem Text“, „Speicherfehler steht unter ‚Nicht übernommen‘“.
-- [ ] **Step 2:** → FAIL.
-- [ ] **Step 3: Implement.** `ErfassungsModal` mit Titel „In die Lage übernehmen“, `erfassenText` = heutiger Primärknopftext, `speicherung`, `speicherFehlerTitel="Nicht übernommen"`, `laeuft={senden}`, `breite={460}`. `onErfassen` ruft `onUebergeben` (bleibt synchron → `async`-Hülle; die Mutation selbst liegt beim Aufrufer, `speicherung` zeigt ihren Fehler). Vorbelegung per `setFieldsValue` beim Öffnen bleibt. Eigener Fehlerblock und Knöpfe entfallen.
-- [ ] **Step 4:** → PASS, `meldungen`-Tests grün.
-- [ ] **Step 5: Commit** `refactor: In die Lage übernehmen läuft über die Erfassungshülle (LLH-2010)`.
+- [x] **Step 1: Failing tests:** „vorbelegter Lage-Text allein: Kreuz schließt still“, „geänderter Lage-Text: Kreuz fragt nach“, „Maske schließt nicht“, „Übernehmen ruft onUebergeben mit getrimmtem Text“, „Speicherfehler steht unter ‚Nicht übernommen‘“.
+- [x] **Step 2:** → FAIL.
+- [x] **Step 3: Implement.** `ErfassungsModal` mit Titel „In die Lage übernehmen“, `erfassenText` = heutiger Primärknopftext, `speicherung`, `speicherFehlerTitel="Nicht übernommen"`, `laeuft={senden}`, `breite={460}`. `onErfassen` ruft `onUebergeben` (bleibt synchron → `async`-Hülle; die Mutation selbst liegt beim Aufrufer, `speicherung` zeigt ihren Fehler). Vorbelegung per `setFieldsValue` beim Öffnen bleibt. Eigener Fehlerblock und Knöpfe entfallen.
+- [x] **Step 4:** → PASS, `meldungen`-Tests grün.
+- [x] **Step 5: Commit** `refactor: In die Lage übernehmen läuft über die Erfassungshülle (LLH-2010)`.
 
 ### Task 6: Maskensperre für Eintreffen und Auswahldialoge
 
@@ -133,11 +133,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 - Modify: `frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx` (≈:815), `frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx`, `frontend/src/pages/lagekarte/ZeichenHierDialog.tsx`, `frontend/src/planung/PlanungUebernahmeDialog.tsx`
 - Test: je Datei ein Test „die Maske schließt nicht“ in der vorhandenen Testdatei (oder neu)
 
-- [ ] **Step 1: Failing tests** „die Maske schließt nicht“ (Klick auf `.ant-modal-wrap`, Schließ-Callback 0×) für alle vier; für Eintreffen zusätzlich „im Schritt Suche schließt Escape weiter sofort“.
-- [ ] **Step 2:** → FAIL.
-- [ ] **Step 3: Implement.** Je Modal `mask={{ closable: false }}` und `wrapProps={MASKE_HAELT_FOKUS}`; sonst nichts. Bei Eintreffen am Gerät bleibt der Vollbild-Spread unberührt (prüfen, dass er kein eigenes `wrapProps` setzt; sonst zusammenführen).
-- [ ] **Step 4:** → PASS.
-- [ ] **Step 5: Commit** `feat: Eintreffen und Auswahldialoge schließen nicht über die Maske (LLH-2010)`.
+- [x] **Step 1: Failing tests** „die Maske schließt nicht“ (Klick auf `.ant-modal-wrap`, Schließ-Callback 0×) für alle vier; für Eintreffen zusätzlich „im Schritt Suche schließt Escape weiter sofort“.
+- [x] **Step 2:** → FAIL.
+- [x] **Step 3: Implement.** Je Modal `mask={{ closable: false }}` und `wrapProps={MASKE_HAELT_FOKUS}`; sonst nichts. Bei Eintreffen am Gerät bleibt der Vollbild-Spread unberührt (prüfen, dass er kein eigenes `wrapProps` setzt; sonst zusammenführen).
+- [x] **Step 4:** → PASS.
+- [x] **Step 5: Commit** `feat: Eintreffen und Auswahldialoge schließen nicht über die Maske (LLH-2010)`.
 
 ### Task 7: Wächter `dialogEingabe.guard.test.ts`
 
@@ -146,10 +146,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 **Interfaces:** eigenständig; Dateikopf im Stil von `rueckfrage.guard.test.ts` (Warum, Was geprüft wird, Was er nicht sieht).
 
-- [ ] **Step 1: Test schreiben.** `lieseQuellen` wie im Rückfrage-Wächter; je `<Modal` den Block bis zum passenden `</Modal>` (oder `/>`) mit Tiefenzähler über `<Modal`/`</Modal>` ausschneiden. Block gilt als Eingabedialog, wenn er `/<Form[\s>]|<Input[\s.>]|<TextArea|<InputNumber|<Select[\s>]|<Checkbox[\s>]|<Feld[\s>]/` enthält, außer in einem verschachtelten `<Modal`. Er besteht, wenn der Kopf `mask={{ closable: false }}` oder `{...<bezeichner>.modalProps}` trägt. `AUSNAHMEN: Record<string, string>` (Pfad `datei:Titel-Ausschnitt` → Grund). Zweiter Test: jede Ausnahme trifft noch einen Block (keine toten Einträge).
-- [ ] **Step 2:** Lauf `mise exec -- pnpm -C frontend vitest run src/components/dialogEingabe.guard.test.ts`; jeden roten Treffer einordnen: Bestand aus Task 2–6 muss grün sein; Schlüsselanzeigen mit `readOnly`-Feld, Personensuche, Verbindungsdialog der Skizze u. Ä. als Ausnahme mit Grund aus dem Design-Doc („Außerhalb des Umfangs“). Ein unerwarteter echter Eingabedialog wird nicht in die Ausnahmen gelegt, sondern mit `useVerwerfenSchutz` versorgt (wie Task 2) und gemeldet.
-- [ ] **Step 3: Mutationsprobe.** `mask={{ closable: false }}` in `ZeichenHierDialog.tsx` vorübergehend entfernen → Wächter rot mit Dateinamen; zurücksetzen → grün. Ergebnis im Commit-Body nennen.
-- [ ] **Step 4: Commit** `test: Wächter gegen Eingabedialoge mit schließender Maske (LLH-2010)`.
+- [x] **Step 1: Test schreiben.** `lieseQuellen` wie im Rückfrage-Wächter; je `<Modal` den Block bis zum passenden `</Modal>` (oder `/>`) mit Tiefenzähler über `<Modal`/`</Modal>` ausschneiden. Block gilt als Eingabedialog, wenn er `/<Form[\s>]|<Input[\s.>]|<TextArea|<InputNumber|<Select[\s>]|<Checkbox[\s>]|<Feld[\s>]/` enthält, außer in einem verschachtelten `<Modal`. Er besteht, wenn der Kopf `mask={{ closable: false }}` oder `{...<bezeichner>.modalProps}` trägt. `AUSNAHMEN: Record<string, string>` (Pfad `datei:Titel-Ausschnitt` → Grund). Zweiter Test: jede Ausnahme trifft noch einen Block (keine toten Einträge).
+- [x] **Step 2:** Lauf `mise exec -- pnpm -C frontend vitest run src/components/dialogEingabe.guard.test.ts`; jeden roten Treffer einordnen: Bestand aus Task 2–6 muss grün sein; Schlüsselanzeigen mit `readOnly`-Feld, Personensuche, Verbindungsdialog der Skizze u. Ä. als Ausnahme mit Grund aus dem Design-Doc („Außerhalb des Umfangs“). Ein unerwarteter echter Eingabedialog wird nicht in die Ausnahmen gelegt, sondern mit `useVerwerfenSchutz` versorgt (wie Task 2) und gemeldet.
+- [x] **Step 3: Mutationsprobe.** `mask={{ closable: false }}` in `ZeichenHierDialog.tsx` vorübergehend entfernen → Wächter rot mit Dateinamen; zurücksetzen → grün. Ergebnis im Commit-Body nennen.
+- [x] **Step 4: Commit** `test: Wächter gegen Eingabedialoge mit schließender Maske (LLH-2010)`.
 
 ### Task 8: Regel, Design System, Gates
 
@@ -157,7 +157,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 - Modify: `frontend/AGENTS.md` (Abschnitt „Frontend — Erfassungs-Norm“, nach dem LLH-1755-Punkt)
 - Ggf. Modify: Design-System-Ausgabe (`pnpm -C frontend design-system`), Anwenderkapitel, die LLH-1755 angefasst hat
 
-- [ ] **Step 1: Regel** einfügen (Wortlaut aus dem Design-Doc, „Regeln, die sich ändern“): eigenes `<Modal>` mit gesteuerten Feldern → `useVerwerfenSchutz`; reiner Auswahldialog → nur Maskensperre; Wächter `components/dialogEingabe.guard.test.ts`.
-- [ ] **Step 2:** `grep -rn "Erfassungs-Norm\|Eingaben verwerfen" frontend/scripts/design-system docs/anwender | head`; trägt die README den Abschnitt, `mise exec -- pnpm -C frontend design-system` und Ergebnis mitcommitten. Anwenderdoku nur, wenn LLH-1755 dort Maske/Rückfrage beschreibt.
-- [ ] **Step 3: Gates:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün (Prettier, Lint, Typecheck, Vitest der berührten Suiten).
-- [ ] **Step 4: Commit** `docs: Erfassungs-Norm nennt den Schutz handgebauter Dialoge (LLH-2010)`.
+- [x] **Step 1: Regel** einfügen (Wortlaut aus dem Design-Doc, „Regeln, die sich ändern“): eigenes `<Modal>` mit gesteuerten Feldern → `useVerwerfenSchutz`; reiner Auswahldialog → nur Maskensperre; Wächter `components/dialogEingabe.guard.test.ts`.
+- [x] **Step 2:** `grep -rn "Erfassungs-Norm\|Eingaben verwerfen" frontend/scripts/design-system docs/anwender | head`; trägt die README den Abschnitt, `mise exec -- pnpm -C frontend design-system` und Ergebnis mitcommitten. Anwenderdoku nur, wenn LLH-1755 dort Maske/Rückfrage beschreibt.
+- [x] **Step 3: Gates:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün (Prettier, Lint, Typecheck, Vitest der berührten Suiten).
+- [x] **Step 4: Commit** `docs: Erfassungs-Norm nennt den Schutz handgebauter Dialoge (LLH-2010)`.
