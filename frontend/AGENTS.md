@@ -1769,7 +1769,12 @@ Spec `bedien-arbeitsplatz`).
   nur über einen bestehenden Katalog mit reiner Textanlage (heute „Externe Stellen“), ohne
   Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Feldzeile und
   Rufname-Abfrage), Meldung Absender/Empfänger. Ein genau getippter Vorschlag steht zuoberst; ohne
-  Tippen oder Pfeilmarkierung nehmen Enter und Tab keinen Vorschlag.
+  Tippen oder Pfeilmarkierung nehmen Enter und Tab keinen Vorschlag. **Dieselbe Tastaturregel gilt
+  für Felder mit mehreren Werten** (LLH-1753): `fuehrung/VorschlagsSelect.tsx` trägt sie für
+  Auftragsempfänger, Verteiler (`EmpfaengerWahl`), Erinnerung und Führungsstelle
+  (`EinWertAuswahl`); nie `mode="tags"`, das den Tipptext vor die Treffer stellt und markiert. Nach
+  der Wahl schließt die Liste; Verlassen nimmt nichts, ein Ein-Wert-Feld den Tipptext nur, wenn
+  kein Treffer passt.
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
@@ -1784,7 +1789,7 @@ Spec `bedien-arbeitsplatz`).
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
-  bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
+  bleiben sichtbar (Auftrag: Empfänger als `fuehrung/EmpfaengerWahl.tsx`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht
   (`onPruefungGescheitert` der Hülle) und dessen Kopf jede Abweichung von der Vorgabe nennt
   (LFH-974, `meldungen/MeldungFormular.tsx`).

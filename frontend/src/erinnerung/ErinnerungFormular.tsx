@@ -21,7 +21,7 @@ interface FormWerte {
   intervall: number | null;
   /**
    * Höchstens EIN Wert: `funktion:<code>[:<Bezeichnung>]` aus dem Katalog (LFH-549) oder Freitext
-   * (`mode="tags"`, die jüngste Wahl ersetzt die alte). Kein Rückschluss von „S2“ auf den Code.
+   * (`EinWertAuswahl`, die jüngste Wahl ersetzt die alte). Kein Rückschluss von „S2“ auf den Code.
    */
   empfaenger: string[];
 }

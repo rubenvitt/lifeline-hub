@@ -67,8 +67,8 @@ test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ p
   await dialog.getByLabel('Auftrag / Was').fill('Lage an der Brücke erkunden');
   const empfaenger = dialog.getByRole('combobox', { name: 'Empfänger', exact: true });
   await waehleIn(empfaenger, 'S3 – Einsatz (Müller)');
-  // Mehrere Empfänger sind erlaubt, die Liste bleibt offen: Escape schließt sie.
-  await empfaenger.press('Escape');
+  // Nach der Wahl schließt die Liste (LLH-1753); ein Escape schlösse jetzt den Dialog.
+  await expect(empfaenger).toHaveAttribute('aria-expanded', 'false');
   // Senden über den Knopf im <form> (der Select schluckt Enter).
   await dialog.getByRole('button', { name: 'Auftrag erteilen', exact: true }).click();
   await expect(dialog).toHaveCount(0);
