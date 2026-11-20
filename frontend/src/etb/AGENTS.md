@@ -89,8 +89,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): die Zeile des Inhalts trägt
     ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
     (`Schnellerfassungszeile rahmenFarbe`); `/typ ` und danach
-    `/zeit <Angabe> ` setzen Typ und Ereigniszeit in der Feldzeile (`erkenneTypBefehl`,
-    `erkenneZeitBefehl`, gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`),
+    `/zeit <Angabe> ` setzen Typ und Ereigniszeit in der Feldzeile (`parseTypBefehl`,
+    `parseZeitBefehl`, gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`),
     der Rest bleibt Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Eine
     Ereigniszeit über 60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und
     Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ebenso wenig sendet eine

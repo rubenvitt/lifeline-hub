@@ -77,7 +77,7 @@ const INAKTIV: SlashTrigger = { aktiv: false, filter: '', start: -1 };
  * (Whitespace zwischen Zeichen und Cursor schließt das Menü). Ein Zeichen mitten im Wort
  * (z.B. "2/9", Datums-/Pfadangaben, eine Mailadresse) triggert nicht.
  */
-function erkenneTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashTrigger {
+function parseTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashTrigger {
   for (let i = caret - 1; i >= 0; i--) {
     const c = text[i];
     if (c === zeichen) {
@@ -90,13 +90,13 @@ function erkenneTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashT
 }
 
 /** `/` am Wortanfang: Felder, Bausteine — und am Zeilenanfang zusätzlich der Typ. */
-export function erkenneSlashTrigger(text: string, caret: number): SlashTrigger {
-  return erkenneTrigger(text, caret, '/');
+export function parseSlashTrigger(text: string, caret: number): SlashTrigger {
+  return parseTrigger(text, caret, '/');
 }
 
 /** `@` am Wortanfang: Funkrufname für Von bzw. An. */
-export function erkenneAtTrigger(text: string, caret: number): SlashTrigger {
-  return erkenneTrigger(text, caret, '@');
+export function parseAtTrigger(text: string, caret: number): SlashTrigger {
+  return parseTrigger(text, caret, '@');
 }
 
 /**
@@ -252,7 +252,7 @@ export function zukunftsVerstoss(metadaten: MetadatenWerte, jetzt: dayjs.Dayjs):
  * den Text ohne den Befehl, sonst `null`. Nur exakte Typwörter: `/lagebericht` ist kein
  * Befehl und bleibt Text.
  */
-export function erkenneTypBefehl(
+export function parseTypBefehl(
   text: string,
   erlaubteTypen: readonly EtbTyp[] = TYP_BEFEHLE,
 ): { typ: EtbTyp; rest: string } | null {
@@ -270,7 +270,7 @@ export function erkenneTypBefehl(
  * erst mit dem Leerzeichen dahinter — vorher tippt jemand noch. Unlesbar: `ok: false` mit Grund,
  * der Text bleibt stehen. Ein vorangestellter Typbefehl ist zuvor schon abgezogen.
  */
-export function erkenneZeitBefehl(
+export function parseZeitBefehl(
   text: string,
   optionen: { zone: string | null | undefined; jetzt: dayjs.Dayjs },
 ):

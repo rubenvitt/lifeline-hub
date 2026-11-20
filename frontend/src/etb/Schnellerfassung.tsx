@@ -45,9 +45,9 @@ import {
   amZeilenanfang,
   baueEintrag,
   einheitAusSchluessel,
-  erkenneAtTrigger,
-  erkenneSlashTrigger,
-  erkenneTypBefehl,
+  parseAtTrigger,
+  parseSlashTrigger,
+  parseTypBefehl,
   TYP_BEFEHLE,
   TYP_BEFEHLE_MITARBEIT,
   fehlendeSeiten,
@@ -61,7 +61,7 @@ import {
   type SlashEintrag,
   type TextRange,
   laengenVerstoss,
-  erkenneZeitBefehl,
+  parseZeitBefehl,
   zukunftsVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
@@ -422,7 +422,7 @@ export default function Schnellerfassung({
    * Unlesbare Angabe hinter `/zeit` (LLH-1088): abgeleitet aus dem Text, nicht gespeichert, damit
    * auch ein neu eingehängter Entwurf sie kennt (Nach-Review 1 zu LLH-1866).
    */
-  const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
+  const zeitImInhalt = parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
   const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
   function handleZeitDiscard(grund: string | null) {
     zeitDiscardedRef.current = grund;
@@ -602,10 +602,10 @@ export default function Schnellerfassung({
   }
 
   function aktualisiereTrigger(text: string, caret: number) {
-    const slash = erkenneSlashTrigger(text, caret);
+    const slash = parseSlashTrigger(text, caret);
     // `@` gibt es im Berichtigungsmodus nicht: dort bleiben Von/An über `/von`, `/an`
     // erreichbar, aber die Zeile soll nichts still umschreiben, was das Original trug.
-    const at = slash.aktiv || berichtigungZu ? null : erkenneAtTrigger(text, caret);
+    const at = slash.aktiv || berichtigungZu ? null : parseAtTrigger(text, caret);
     const t = at?.aktiv ? at : slash;
     setMenuModus(at?.aktiv ? 'at' : 'slash');
     setTypenAnbieten(slash.aktiv && !berichtigungZu && amZeilenanfang(text, slash.start));
@@ -616,7 +616,7 @@ export default function Schnellerfassung({
 
   function onInhaltChange(neu: string) {
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
-    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
+    const befehl = berichtigungZu ? null : parseTypBefehl(neu, erlaubteTypen);
     let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
@@ -628,7 +628,7 @@ export default function Schnellerfassung({
     // wer in „/zeit 2590 Pumpe“ eine Ziffer löscht, meint nicht 02:59.
     const caretRoh = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
     const caretImRest = caretRoh - (neu.length - text.length);
-    const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    const zeit = parseZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
     const ausloesen =
       zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
     if (zeit?.ok && ausloesen) {
