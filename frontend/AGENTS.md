@@ -226,7 +226,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`. Der Knopf „?“ (Hilfe zur
     Seite, LLH-1824) steht im Einsatz-Kopf erst ab `xl`, im App-Rahmen ab `md`; wo er die eine Zeile
     bräche, steht „Hilfe zu dieser Seite“ im Benutzermenü (`hilfeZurSeite`), am Handy im Einsatz im
-    Fuß der Navigation.
+    Fuß der Navigation. Unter `md` ersetzt dieser Eintrag „Hilfe“ (die Seitenleiste verlinkt die
+    volle Hilfe), und der Menükopf trägt keine Versionszeile, wie im Handschuh-Betrieb; sonst
+    ragte „Abmelden“ in `komfortabel` unter den Fensterrand (e2e `benutzermenue`, Entscheidung
+    20.11.2026).
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
     `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,

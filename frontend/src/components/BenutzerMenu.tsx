@@ -125,7 +125,10 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  *
  * `hilfeZurSeite` (LLH-1824): wo der Kopf für den Knopf „?“ keinen Platz hat (App-Rahmen unter
  * `md`, Einsatz-Kopf von `md` bis unter `xl`), steht „Hilfe zu dieser Seite“ als Eintrag vor „Hilfe“
- * und öffnet die Seitenleiste. Ohne Leiste (Gerät, Hilfeseite) fehlt der Eintrag.
+ * und öffnet die Seitenleiste. Am Handy (unter `md`) ersetzt er „Hilfe“, die Seitenleiste verlinkt
+ * die volle Hilfe (Entscheidung 20.11.2026). Ohne Leiste (Gerät, Hilfeseite) fehlt der Eintrag.
+ *
+ * Unter `md` und im Handschuh-Betrieb fehlt im Kopf die Versionszeile; sie steht in der Hilfe.
  */
 /**
  * Aus der Navigation darf das Menü seitlich ins Fenster rücken (`shiftX`, LLH-1728). antds Typ
@@ -167,8 +170,16 @@ export default function BenutzerMenu({
   // Tablet hochkant, mit grobem Zeiger das Führungs-Tablet quer (1024–1280 px). Dort verdeckte ein
   // zweiter Tab den Einsatz nur. Die Zeigerart, nicht die Breite, erkennt das Tablet (`useViewport`).
   const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg') && !istBeruehrung;
+  const isHandy = !abBreite('md');
+  // Ohne Versionszeile im Kopf: im Handschuh-Betrieb (LLH-1818) und am Handy in jeder Dichte
+  // (Entscheidung 20.11.2026) — mit den Rollenmarken ragte „Abmelden“ in `komfortabel` sonst
+  // unter den Fensterrand. Die Version steht in der Hilfe.
+  const isOhneVersion = isKnapp || isHandy;
+  // Am Handy ersetzt „Hilfe zu dieser Seite“ den Eintrag „Hilfe“ (Entscheidung 20.11.2026): beide
+  // zusammen kosteten „Abmelden“ den Platz im Fenster; die Seitenleiste verlinkt die volle Hilfe.
+  const isHilfeZurSeite = hilfeZurSeite && Boolean(oeffneHilfe);
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
-  const menueBreite = !abBreite('md')
+  const menueBreite = isHandy
     ? 'calc(100vw - 16px)'
     : isKnapp
       ? MENUE_BREITE_HANDSCHUH
@@ -270,7 +281,7 @@ export default function BenutzerMenu({
                 </Space>
               </div>
             )}
-            {!isKnapp && (
+            {!isOhneVersion && (
               <Typography.Text
                 type="secondary"
                 style={{
@@ -330,11 +341,14 @@ export default function BenutzerMenu({
     // Hilfe (LFH-1096). Rückmeldung (LLH-1549) und Lizenzhinweis (LFH-1000) stehen seit LLH-1642
     // auf der Hilfe-Seite; die Hilfe bekommt den Pfad mit, aus dem sie geöffnet wurde, damit die
     // Rückmeldung dort den Bereich der App vorbefüllt (design.md D5).
-    // Hilfe zur Seite, wo der Kopf für „?“ keinen Platz hat (LLH-1824, `hilfeZurSeite`).
-    ...(hilfeZurSeite && oeffneHilfe
+    // Hilfe zur Seite, wo der Kopf für „?“ keinen Platz hat (LLH-1824, `hilfeZurSeite`); am Handy
+    // statt „Hilfe“ (`isHilfeZurSeite`, oben).
+    ...(isHilfeZurSeite
       ? [{ key: 'hilfe-seite', icon: <IconHilfe />, label: 'Hilfe zu dieser Seite' }]
       : []),
-    { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
+    ...(isHilfeZurSeite && isHandy
+      ? []
+      : [{ key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' }]),
     // ZULETZT, DURCH EINEN TRENNER ABGESETZT (LLH-1730, Spec `benutzermenue`): direkt unter
     // „Profil“ (LFH-952) lag es im Griff, und ein Klick beendete die Sitzung sofort. Jetzt steht es
     // am Ende, wo man es sucht, und fragt zurück. Seit LLH-1642 passt das Menü am Handy in
