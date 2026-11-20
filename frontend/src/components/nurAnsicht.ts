@@ -1,6 +1,6 @@
 import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
 import { istMitarbeit } from '../einsatz/schreibrecht';
-import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG, SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
+import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG } from '../einsatz/rollenVokabular';
 
 const LEITUNG = EINSATZ_ROLLE.einsatzleitung.name;
 const FUEHRUNG = EINSATZ_ROLLE.fuehrungspersonal.name;
@@ -17,7 +17,10 @@ const MITARBEIT = EINSATZ_ROLLE.mitarbeit.name;
  * nicht „Führung“): wer etwa Führungskraft der Organisation und im Einsatz Beobachter ist, darf
  * sich nicht gemeint fühlen.
  */
-export const NUR_ADMIN = `nur ${SYSTEM_ROLLE.admin.name}`;
+// `NUR_ADMIN` steht beim Rollen-Vokabular, weil `stammdaten/rechteText.ts` ihn braucht und die
+// e2e-Specs jenes Modul in Node laden: über dieses hier (`einsatz/schreibrecht`) kämen dayjs-Plugins
+// ohne `.js` mit, die Node nicht auflöst (alpha rot am 20.11.2026, die e2e-Suite lud keine Spec).
+export { NUR_ADMIN } from '../einsatz/rollenVokabular';
 /** Aktionen, die nur die Einsatzleitung ausführt. */
 export const NUR_LEITUNG = `nur ${LEITUNG}`;
 export const NUR_LEITUNG_FUEHRUNG = `nur ${LEITUNG} und ${FUEHRUNG}`;

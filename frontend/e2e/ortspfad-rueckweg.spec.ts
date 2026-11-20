@@ -51,7 +51,6 @@ test.describe('Ortspfad der Detailseite', () => {
 
     await page.getByText('Deichweg 2').click();
     await expect(page).toHaveURL(/\/schaeden\/\d+$/);
-    await expect(ortspfadZurListe(page)).toHaveAttribute('href', /f\.ausmass=gross/);
 
     await ortspfadZurListe(page).click();
     await expect(page).toHaveURL(/\/schaeden\?.*f\.ausmass=gross/);
@@ -89,12 +88,15 @@ test.describe('Ortspfad der Detailseite', () => {
       expect(a.ok(), `POST schaeden: ${a.status()}`).toBe(true);
     }
     await page.goto(`/einsaetze/${einsatzId}/schaeden?f.ausmass=gross`);
-    await expect(page.getByText('Uferweg 49')).toBeVisible();
+    // Die Liste rendert beim ersten Anzeigen stückweise (LLH-1974): erst rollen, wenn alle 41
+    // Zeilen (40 Uferwege und der Deichweg) stehen.
+    const zeilen = page.locator('.ant-table-tbody tr[data-row-key]');
+    await expect(zeilen).toHaveCount(41);
     await page.mouse.wheel(0, 900);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(400);
     const gerollt = await page.evaluate(() => window.scrollY);
 
-    const zeile = page.locator('.ant-table-tbody tr[data-row-key]').nth(25);
+    const zeile = zeilen.nth(25);
     await zeile.click();
     await expect(page).toHaveURL(/\/schaeden\/\d+$/);
     await ortspfadZurListe(page).click();
