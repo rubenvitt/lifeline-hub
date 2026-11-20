@@ -221,7 +221,7 @@ function PlanEinstellungen({
       <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
         {/* `key` am Serverwert und am PATCH-Zähler: ein Live-Ereignis, Einpassen, ein Fehlschlag
             oder ein eingerastet gleicher Wert setzen das Feld neu auf. */}
-        <ZahlFeld
+        <PlanMassFeld
           key={`x-${plan.x}-${stand}`}
           label="Links"
           wert={plan.x}
@@ -230,7 +230,7 @@ function PlanEinstellungen({
           gesperrt={gesperrt}
           onFertig={(x) => onAendern({ x })}
         />
-        <ZahlFeld
+        <PlanMassFeld
           key={`y-${plan.y}-${stand}`}
           label="Oben"
           wert={plan.y}
@@ -239,7 +239,7 @@ function PlanEinstellungen({
           gesperrt={gesperrt}
           onFertig={(y) => onAendern({ y })}
         />
-        <ZahlFeld
+        <PlanMassFeld
           key={`b-${plan.breite}-${stand}`}
           label="Breite"
           wert={plan.breite}
@@ -299,7 +299,7 @@ function PlanEinstellungen({
 }
 
 /** Zahl in Pixeln der Fläche, Schritt 10; gesendet beim Verlassen oder mit Enter. */
-function ZahlFeld(props: {
+function PlanMassFeld(props: {
   label: string;
   wert: number;
   min: number;
