@@ -82,7 +82,7 @@ describe('BausteinPlatzhalterModal', () => {
     await waitFor(() => expect(onEinsetzen).toHaveBeenCalledTimes(1));
   });
 
-  it('Abbrechen leert eingegebene Platzhalterwerte', async () => {
+  it('Abbrechen leert eingegebene Platzhalterwerte, mit Rückfrage (LLH-2010)', async () => {
     const onAbbrechenAll = vi.fn();
     renderMitProviders(
       <BausteinPlatzhalterModal
@@ -95,8 +95,44 @@ describe('BausteinPlatzhalterModal', () => {
     const feld = screen.getByLabelText('melder');
     await userEvent.type(feld, 'Florian');
     await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(
+      await screen.findByText('Die Eingaben in „Baustein einsetzen“ gehen verloren.'),
+    ).toBeInTheDocument();
+    expect(onAbbrechenAll).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
     expect(onAbbrechenAll).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByLabelText('melder')).toHaveValue(''));
+  });
+
+  it('ohne Eingabe schließt das Kreuz still (LLH-2010)', async () => {
+    const onAbbrechenAll = vi.fn();
+    renderMitProviders(
+      <BausteinPlatzhalterModal
+        baustein={baustein()}
+        einsatz={einsatz}
+        onEinsetzen={vi.fn()}
+        onAbbrechenAll={onAbbrechenAll}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onAbbrechenAll).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/gehen verloren\./)).toBeNull();
+  });
+
+  it('die Maske schließt nicht (LLH-2010)', async () => {
+    const onAbbrechenAll = vi.fn();
+    renderMitProviders(
+      <BausteinPlatzhalterModal
+        baustein={baustein()}
+        einsatz={einsatz}
+        onEinsetzen={vi.fn()}
+        onAbbrechenAll={onAbbrechenAll}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText('melder'), 'Florian');
+    await userEvent.click(document.querySelector<HTMLElement>('.ant-modal-wrap')!);
+    expect(onAbbrechenAll).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('melder')).toHaveValue('Florian');
   });
 
   it('setzt Baustein ohne Platzhalter sofort ein (kein Modal)', async () => {
