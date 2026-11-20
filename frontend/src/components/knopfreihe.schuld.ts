@@ -19,7 +19,6 @@ export const KNOPFREIHE_SCHULD: Readonly<Record<string, number>> = {
   'kraefte/MaterialAmOrt.tsx': 1,
   'lagebesprechung/LagebesprechungModal.tsx': 1,
   'meldungen/LageAngabenBearbeiten.tsx': 1,
-  'meldungen/LagerelevantModal.tsx': 1,
   'meldungen/MeldungFormular.tsx': 1,
   'meldungen/MeldungKarte.tsx': 1,
   'meldungen/MeldungKorrektur.tsx': 1,

@@ -58,6 +58,8 @@ const ERLAUBT: readonly string[] = [
   'Nachtragen',
   'Schichten erzeugen',
   'Übernehmen',
+  // Baustein im ETB: füllt die Erfassungszeile, speichert selbst nichts (LLH-2010).
+  'Einsetzen',
   'Weiteren Posten übernehmen',
   'Eintreffen buchen',
   'Unangemeldet buchen',
