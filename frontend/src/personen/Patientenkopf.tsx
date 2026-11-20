@@ -1,6 +1,6 @@
 import { Button, Flex, Form, Input, Typography } from 'antd';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   revokeMassnahme,
   revokeVerletzung,
@@ -222,6 +222,12 @@ export default function Patientenkopf({
     (v) => v.aktion.person_id === person.id,
   );
   const vorgemerkteNotizen = vorgemerkt.filter((v) => v.aktion.art === 'notiz');
+  // Das Körperschema öffnet unter dem Kopf: ins Bild damit, sonst stünde es außer Sicht (LLH-1769).
+  // `scrollIntoView` fehlt in jsdom.
+  const verletzungPaneel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (offen === 'verletzung') verletzungPaneel.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [offen]);
 
   return (
     <section
@@ -516,7 +522,11 @@ export default function Patientenkopf({
         />
       )}
       {offen === 'verletzung' && (
-        <section aria-label="Verletzung markieren" data-lfh="verletzung-paneel">
+        <section
+          ref={verletzungPaneel}
+          aria-label="Verletzung markieren"
+          data-lfh="verletzung-paneel"
+        >
           <Stapel abstand="sm">
             <Koerperschema
               einsatzId={einsatzId}

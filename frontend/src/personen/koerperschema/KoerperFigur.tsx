@@ -29,7 +29,8 @@ import { regionName, type NummerierteVerletzung } from './koerperschemaKern';
  * in `bedien`.
  *
  * TREFFERZONEN: je Region ein `<g role="button">` aus durchsichtigen Rechtecken
- * (`fill-opacity: 0`, nimmt aber Zeiger an). Roving-Tabindex in der festen Folge aus `ZONEN`,
+ * (`fill-opacity: 0`, nimmt aber Zeiger an), gestrichelt in der Kontur umrandet (LLH-1769).
+ * Roving-Tabindex in der festen Folge aus `ZONEN`,
  * Pfeiltasten wandern, Pos1/Ende springen, Enter und Leertaste wählen. Fokus und Wahl zeichnen
  * den Umriss der Zone in `bedien`.
  */
@@ -232,8 +233,11 @@ export default function KoerperFigur({
                   fill="currentColor"
                   fillOpacity={0}
                   pointerEvents="all"
-                  stroke={aktiv ? farben.bedien : 'none'}
-                  strokeWidth={2 * einheit}
+                  // Jede Region gestrichelt in der Kontur (LLH-1769): man sieht, wohin ein Tipp
+                  // trifft; Fokus und Wahl durchgezogen in `bedien`.
+                  stroke={aktiv ? farben.bedien : farben.kontur}
+                  strokeWidth={(aktiv ? 2 : 1) * einheit}
+                  strokeDasharray={aktiv ? undefined : `${3 * einheit} ${3 * einheit}`}
                 />
               ))}
             </g>

@@ -912,6 +912,24 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
     ).toEqual(['1', '3', '5', '4']);
   });
 
+  it('rollt das Paneel „Verletzung markieren“ beim Öffnen ins Bild (LLH-1769)', async () => {
+    const gerollt: { el: Element; arg: unknown }[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      gerollt.push({ el: this, arg });
+    };
+    try {
+      const { kopf } = zeige();
+      await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+      const paneel = screen.getByRole('region', { name: 'Verletzung markieren' });
+      expect(gerollt.filter((g) => g.el === paneel)).toEqual([
+        { el: paneel, arg: { block: 'nearest' } },
+      ]);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
   it('lässt die Figur unter md weg', () => {
     setzeViewportBreite(600);
     const { kopf } = zeige(vollerKern, { darfSchreiben: false });
