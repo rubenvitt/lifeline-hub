@@ -1173,6 +1173,17 @@ anwendbar), „nicht geprüft" ist keins.
   in `halten`). Karten und Ansichten bearbeiten im Fluss;
   `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
   ohne Sprung“).
+- **Overlays in Zeilen erst bei Bedarf** (LLH-1974, Entwurf
+  `docs/superpowers/specs/2026-11-19-nuokxhqs-renderkosten-tabellen-design.md`): Ein Baustein, der je
+  Zeile einer Liste steht, hängt `Popover`, `Dropdown` oder `Tooltip` erst beim ersten Öffnen ein
+  (`components/useErstBeiBedarf.ts`; Träger `InlineAngabe`, `StatusWahl`, `EinsatzfunktionZelle`).
+  Ein geschlossener Trigger je Zeile setzt beim Einhängen Zustand im Commit und kostet beim Öffnen
+  der Seite einen zweiten, synchronen Render aller Zeilen. Das Overlay richtet sich an einer
+  deckungsgleichen, durchlässigen Fläche im Auslöser aus, damit Knopf und Fokus beim ersten Öffnen
+  ihren Knoten behalten; wo das nicht geht (`StatusWahl`), gibt der Baustein den Fokus beim
+  Schließen selbst zurück. Die `Datensicht` rendert beim ersten Anzeigen stückweise
+  (`components/stueckweise.ts`, `STUECK_ZEILEN`), nicht im Druck, nicht virtualisiert und nicht bei
+  hervorgehobener Zeile; in der Vitest-Suite ist das aus (`src/test/setup.ts`).
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec
   `personal-einsatzangaben`): steht in einer Listenzelle schon ein anderer Wert (die Qualifikation
   neben der leeren Einsatzfunktion), sagt ein Stift-Knopf mit zugänglichem Namen (Etikett und

@@ -10,6 +10,7 @@ import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtig
 import { zoneZuruecksetzenFuerTests } from '../alarm/alarmZoneSpeicher';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
+import { setzeStueckweise } from '../components/stueckweise';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import { installiereAnfragenGrenze, trenneOffeneAnfragen } from './offeneAnfragen';
 import dayjs from 'dayjs';
@@ -174,6 +175,12 @@ const echterSetTimeout = globalThis.setTimeout;
 afterAll(
   () => new Promise<void>((fertig) => echterSetTimeout(fertig, uploadListeGemountet ? 350 : 25)),
 );
+
+// Stückweises Rendern der Listen (LLH-1974) ist in der Suite aus: Tests sehen weiter synchron alle
+// Zeilen. `Datensicht.stueckweise.test.tsx` und `stueckweise.test.tsx` schalten es selbst ein.
+beforeEach(() => {
+  setzeStueckweise(false);
+});
 
 // jsdom kennt keine EventSource — No-op-Stub für Seiten, die useEinsatzLiveStream mounten.
 // beforeEach stellt ihn nach `vi.unstubAllGlobals()` wieder her.

@@ -60,6 +60,7 @@ import {
   useZuflussSchleuse,
   useZuflussSteuerung,
 } from './useZuflussSchleuse';
+import { useStueckweise } from './stueckweise';
 import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
 import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleuse';
 import { aktiveFilter, FilterChips, filterMerkmale, kopfGefiltertStil } from './tabellenFilter';
@@ -1687,6 +1688,22 @@ export default function Datensicht<T extends object, const K extends string>(
    */
   const virtuell = !druckt && sichtbareZeilen.length > DATENSICHT_SCHWELLE;
   const kartenGruppiert = !alsTabelle && gruppen != null && !baum;
+  /*
+   * Beim ersten Anzeigen stückweise (LLH-1974, `stueckweise.ts`): der erste Commit trägt nur
+   * `STUECK_ZEILEN` Zeilen, die übrigen folgen in eigenen Aufgaben. Nicht virtualisiert, nicht im
+   * Druck und nicht, wenn ein Deeplink eine Zeile hervorhebt (`scrolleZurZeile` sucht sie gleich).
+   * Geschnitten wird nur, was gerendert wird, nie die Folge; Zähler und Banner sehen alles.
+   */
+  const hatHervorgehobene = useMemo(
+    () =>
+      zeilenKlasse != null &&
+      sichtbareZeilen.some((z) => (zeilenKlasse(z) ?? '').split(/\s+/).includes(HERVORGEHOBEN)),
+    [zeilenKlasse, sichtbareZeilen],
+  );
+  const stueckBis = useStueckweise(
+    sichtbareZeilen.length,
+    !virtuell && !druckt && !hatHervorgehobene,
+  );
   const folge = useMemo(
     () => (kartenGruppiert ? gruppenKarten.flatMap((g) => g.zeilen) : sichtbareZeilen),
     [kartenGruppiert, gruppenKarten, sichtbareZeilen],
@@ -2382,8 +2399,11 @@ export default function Datensicht<T extends object, const K extends string>(
 
   const { von: fensterVon, bis: fensterBis } = ausschnitt;
   const tabellenZeilen = useMemo(
-    () => (virtuell ? sichtbareZeilen.slice(fensterVon, fensterBis) : [...sichtbareZeilen]),
-    [virtuell, sichtbareZeilen, fensterVon, fensterBis],
+    () =>
+      virtuell
+        ? sichtbareZeilen.slice(fensterVon, fensterBis)
+        : sichtbareZeilen.slice(0, stueckBis),
+    [virtuell, sichtbareZeilen, fensterVon, fensterBis, stueckBis],
   );
   // Zeilennummern nur in der flachen Tabelle: Baumkinder und Aufklappbereiche sind eigene `tr`.
   const zeilenNummern = virtuell && !baum && !aufklappen;
@@ -2830,7 +2850,7 @@ export default function Datensicht<T extends object, const K extends string>(
     ) : virtuell ? (
       kartenListe(folge.slice(fensterVon, fensterBis), undefined, fensterVon)
     ) : (
-      kartenListe(sichtbareZeilen)
+      kartenListe(sichtbareZeilen.slice(0, stueckBis))
     );
   const kartenZweig = virtuell ? (
     <>

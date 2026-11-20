@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { useErstBeiBedarf } from './useErstBeiBedarf';
 import { Button, Popover, Space } from 'antd';
 import { useAngabeForm, type OffeneAngabe } from './angabeForm';
 import { FeldFehler, Stapel } from './instrument';
@@ -311,6 +312,7 @@ export function InlineAngabe<T>({
   bearbeitenDaneben = false,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
+  const popoverBereit = useErstBeiBedarf(bearbeitet);
   // Der Serverstand beim Öffnen (LLH-1831): Altwert des Feld-CAS und Maß für „unverändert“.
   const [beimOeffnen, setBeimOeffnenZustand] = useState<T>(wert);
   // Hat die Person seit dem Öffnen eingegeben? Unberührt sendet „Speichern“ nichts (LLH-1831).
@@ -829,33 +831,43 @@ export function InlineAngabe<T>({
    * Popovers. Kein Auslöser am Popover selbst und kein Schließen beim Klick daneben: wie im Fluss
    * schließen nur „Abbrechen“, Escape und das Speichern (Regel „kein Speichern beim Verlassen“).
    */
+  /*
+   * Das Popover erst ab dem ersten Öffnen (LLH-1974, `useErstBeiBedarf`): geschlossen setzt sein
+   * Trigger beim Einhängen Zustand im Commit, und jede Zeile einer Liste renderte beim Öffnen der
+   * Seite ein zweites Mal synchron. Es richtet sich an einer deckungsgleichen, durchlässigen Fläche
+   * IM Anker aus, nicht am Anker selbst: so bleibt der Inhalt beim ersten Öffnen eingehängt, und
+   * Knopf und Fokus behalten ihren Knoten.
+   */
   const mitPopover = (inhalt: ReactNode): ReactNode =>
     !schwebend ? (
       inhalt
     ) : (
-      <Popover
-        open={bearbeitet}
-        trigger={[]}
-        placement="bottomLeft"
-        arrow={false}
-        destroyOnHidden
-        content={
-          <div
-            ref={popoverInhaltRef}
-            style={{ minWidth: 220, maxWidth: 'min(360px, calc(100vw - 32px))' }}
-          >
-            {formular}
-          </div>
-        }
+      <span
+        ref={anchorRef}
+        data-lfh="angabe-anker"
+        style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0, position: 'relative' }}
       >
-        <span
-          ref={anchorRef}
-          data-lfh="angabe-anker"
-          style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0 }}
-        >
-          {inhalt}
-        </span>
-      </Popover>
+        {inhalt}
+        {popoverBereit && (
+          <Popover
+            open={bearbeitet}
+            trigger={[]}
+            placement="bottomLeft"
+            arrow={false}
+            destroyOnHidden
+            content={
+              <div
+                ref={popoverInhaltRef}
+                style={{ minWidth: 220, maxWidth: 'min(360px, calc(100vw - 32px))' }}
+              >
+                {formular}
+              </div>
+            }
+          >
+            <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+          </Popover>
+        )}
+      </span>
     );
 
   const hinweis = pflichtHinweis ? (
