@@ -21,6 +21,7 @@ import {
   meldungsFunktionsOptionen,
   type FunktionsVorschlaege,
 } from '../fuehrung/funktionsOptionenKern';
+import type { StandardRufname } from '../etb/standardRufname';
 import type {
   Einheit,
   Einsatzabschnitt,
@@ -164,6 +165,7 @@ export default function MeldungFormular({
   vorschlagsquellen = KEINE_QUELLEN,
   dialog,
   ohneLagemeldungsart = false,
+  eigeneStelle = null,
 }: {
   senden: boolean;
   /**
@@ -210,6 +212,12 @@ export default function MeldungFormular({
    * Führungspersonal, der Server lehnt sie sonst mit 403 ab. Auch der Fast-Path dafür entfällt.
    */
   ohneLagemeldungsart?: boolean;
+  /**
+   * Die eigene Stelle, der Standard-Rufname der Person aus dem ETB (LLH-1759). Belegt nach Art vor
+   * wie das ETB: eine Meldung kommt von außen, also Empfänger = eigene Stelle; eine Lagemeldung
+   * geht von ihr aus, also Absender. `null`: keine Vorgabe.
+   */
+  eigeneStelle?: StandardRufname | null;
 }) {
   const { token } = theme.useToken();
   const vorgaben = useMemo<MeldungFormWerte>(
@@ -226,6 +234,8 @@ export default function MeldungFormular({
   const ereigniszeit = Form.useWatch('ereigniszeit', form);
   const fristMin = Form.useWatch('frist_min', form);
   const koord = Form.useWatch('koord', form);
+  const absenderWert = Form.useWatch('absender', form);
+  const empfaengerWert = Form.useWatch('empfaenger', form);
   const istLagemeldung = meldungsart === 'lagemeldung';
   const { zeitKurz } = useAnzeigeKonventionen();
   const wortlautRef = useRef<TextAreaRef>(null);
@@ -236,6 +246,31 @@ export default function MeldungFormular({
   useEffect(() => {
     if (istSofort) form.setFieldValue('bestaetigung_pflicht', true);
   }, [istSofort, form]);
+
+  // Eigene Stelle nach Art vorbelegen (LLH-1759, wie `VORGABE_JE_TYP` im ETB). Ein Feld gehört der
+  // Vorgabe, solange es unangefasst ist oder noch genau den Wert trägt, den sie zuletzt schrieb
+  // (`StammdatenFeld` meldet auch einen von außen gesetzten Wert als Änderung, `isFieldTouched`
+  // allein trüge also nicht). Nur so ein Feld wird gefüllt oder beim Wechsel der Art geleert; die
+  // Watches lösen den Effekt nach jedem Zurücksetzen erneut aus.
+  const vorgabeGeschriebenRef = useRef<Partial<Record<'absender' | 'empfaenger', string>>>({});
+  useEffect(() => {
+    if (!eigeneStelle || !meldungsart) return;
+    const lage = meldungsart === 'lagemeldung';
+    const ziel = lage ? 'absender' : 'empfaenger';
+    const gegen = lage ? 'empfaenger' : 'absender';
+    const gehoertVorgabe = (feld: 'absender' | 'empfaenger') =>
+      !form.isFieldTouched(feld) ||
+      (form.getFieldValue(feld) ?? '') === vorgabeGeschriebenRef.current[feld];
+    const schreibe = (feld: 'absender' | 'empfaenger', wert: string) => {
+      vorgabeGeschriebenRef.current[feld] = wert;
+      form.setFieldValue(feld, wert);
+    };
+    const gegenWert = lage ? eigeneStelle.an : eigeneStelle.von;
+    if (form.getFieldValue(gegen) === gegenWert && gehoertVorgabe(gegen)) schreibe(gegen, '');
+    if (!form.getFieldValue(ziel)?.trim() && gehoertVorgabe(ziel)) {
+      schreibe(ziel, lage ? eigeneStelle.von : eigeneStelle.an);
+    }
+  }, [eigeneStelle, meldungsart, absenderWert, empfaengerWert, form]);
 
   /** Fast-Path: Sofortmeldung vorbelegen (Art + Priorität sofort), Fokus auf den Wortlaut. */
   const sofortVorbelegen = () => {
@@ -319,10 +354,15 @@ export default function MeldungFormular({
     form.setFieldValue('empfaenger_funktion', 's2');
   }, [meldungsart, s2Verfuegbar, form]);
 
-  /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
+  /**
+   * Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8) oder
+   * noch unverändert die vorbelegte eigene Stelle trägt (LLH-1759): die Funktion ist genauer.
+   */
   const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
     const eintrag = funktionsVorschlaege.katalog.find((e) => e.funktion === funktion);
-    if (!eintrag || form.getFieldValue('empfaenger')?.trim()) return;
+    const empfaenger = form.getFieldValue('empfaenger')?.trim();
+    const nurVorgabe = !!empfaenger && empfaenger === vorgabeGeschriebenRef.current.empfaenger;
+    if (!eintrag || (empfaenger && !nurVorgabe)) return;
     form.setFieldValue('empfaenger', eintrag.kuerzel ?? eintrag.label);
   };
 

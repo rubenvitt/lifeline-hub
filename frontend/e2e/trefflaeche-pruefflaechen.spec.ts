@@ -275,8 +275,8 @@ function etbFlaeche(einsatzId: string): Flaeche {
       { sorte: 'ETB Werte behalten', ziele: kaestchen('Werte behalten'), mindestens: 1 },
       {
         sorte: 'ETB Entwurfstab schließen',
-        // Gemessen wird die Trefffläche selbst, das Kind des Knopfs (`entfernenStil`).
-        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove > span'),
+        // Gemessen wird der Knopf selbst; er trägt die Fläche (`entfernenStil`, LLH-1771).
+        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove'),
         mindestens: 1,
         kurz: true,
       },

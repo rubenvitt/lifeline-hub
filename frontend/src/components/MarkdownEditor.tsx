@@ -41,6 +41,8 @@ interface Props {
    * `extra`/Prüffehler gesetzt) — ans Textfeld durchgereicht, sonst ginge sie hier verloren.
    */
   'aria-describedby'?: string;
+  /** Prüffehler am Feld (ETB „Inhalt fehlt“, LLH-1771): färbt den Rahmen und meldet ihn der Hilfstechnik. */
+  'aria-invalid'?: boolean;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Beschriftung der Eingabetaste auf der Bildschirmtastatur (LFH-955: ETB „enter“). */
   enterKeyHint?: TextareaHTMLAttributes<HTMLTextAreaElement>['enterKeyHint'];
@@ -105,6 +107,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     'aria-describedby': beschreibung,
+    'aria-invalid': ungueltig,
     onKeyDown,
     enterKeyHint,
     readOnly,
@@ -125,6 +128,8 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       ref={ref}
       id={id}
       aria-describedby={beschreibung}
+      aria-invalid={ungueltig || undefined}
+      status={ungueltig ? 'error' : undefined}
       value={value}
       placeholder={placeholder}
       autoSize={autoSize}

@@ -300,6 +300,16 @@ export function ErfassungsFormular<T extends object>({
   const fussRefDialog = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const fussRefSeite = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG_SEITE);
   const zusammenfassungId = useId();
+  const pruefungId = useId();
+  /**
+   * Die Fehlertexte der letzten gescheiterten Prüfung, am Knopf genannt (LLH-1759): am Handy
+   * stehen die Felder oft über dem Bildrand, ohne die Zeile wirkte der Knopf tot. Leer = keine
+   * Zeile. Sie folgt den Feldern (`onFieldsChange`) und geht auf jedem Weg hinaus.
+   */
+  const [pruefFehler, setPruefFehler] = useState<string[]>([]);
+  /** Das erste fehlerhafte Feld und ein Zähler, der das Rollen nach dem Commit auslöst. */
+  const rollZielRef = useRef<(string | number)[] | null>(null);
+  const [rollTick, setRollTick] = useState(0);
   const { istSchmal } = useViewport();
   // Unter `md` klebt nur der Abschluss (LLH-1763), im Dialog wie auf der Seite (LLH-1761):
   // Einstellung und Serienknopf stehen am Formularende. „Abbrechen“ wandert nur im Dialog in den
@@ -371,12 +381,22 @@ export function ErfassungsFormular<T extends object>({
     if (fokusTick > 0) fokussiereErstesFeld(wurzel.current);
   }, [fokusTick]);
 
+  // Gerollt wird NACH dem Commit, aus demselben Grund wie beim Fokus oben: ein Klappteil, den
+  // `onPruefungGescheitert` im selben Zug öffnet, steht erst dann im Fluss (LLH-1759).
+  useEffect(() => {
+    const ziel = rollZielRef.current;
+    if (rollTick === 0 || !ziel) return;
+    rollZielRef.current = null;
+    form.scrollToField(ziel, { block: 'center', focus: true });
+  }, [rollTick, form]);
+
   const abschicken = useCallback(
     async (werte: T) => {
       // Der Riegel liegt HIER und nicht am Knopf: eine gehaltene Taste erreicht den Knopf nie, und
       // `loading` blockiert nur Klicks.
       if (sendetRef.current) return;
       sendetRef.current = true;
+      setPruefFehler([]);
       const abbruchGeneration = abbruchGenerationRef.current;
       const serienlauf = serienlaufRef.current;
       serienlaufRef.current = false;
@@ -466,6 +486,7 @@ export function ErfassungsFormular<T extends object>({
     abbruchGenerationRef.current += 1;
     serienlaufRef.current = false;
     form.resetFields();
+    setPruefFehler([]);
     raeumeSpeicherFehler();
     onAbbrechen?.();
   }, [form, onAbbrechen, raeumeSpeicherFehler]);
@@ -539,6 +560,16 @@ export function ErfassungsFormular<T extends object>({
           serienlaufRef.current = false;
           nebenaktionRef.current = undefined;
           onPruefungGescheitert?.(errorFields.map((f) => f.name.join('.')));
+          setPruefFehler(errorFields.flatMap((f) => f.errors));
+          if (errorFields.length > 0) {
+            rollZielRef.current = errorFields[0].name;
+            setRollTick((n) => n + 1);
+          }
+        }}
+        onFieldsChange={() => {
+          // Nur eine stehende Zeile folgt den Feldern; vor der ersten Prüfung bleibt sie aus.
+          if (pruefFehler.length === 0) return;
+          setPruefFehler(form.getFieldsError().flatMap((f) => f.errors));
         }}
       >
         {children}
@@ -584,6 +615,20 @@ export function ErfassungsFormular<T extends object>({
           }}
         >
           {!serieAmEnde && einstellung}
+          {/* PRÜFUNG — was fehlt, in Worten über den Knöpfen (LLH-1759). Steht in einem stets
+              vorhandenen `aria-live`-Halter, sonst bliebe die erste Meldung unangesagt. */}
+          <div aria-live="polite">
+            {pruefFehler.length > 0 && (
+              <Typography.Text
+                type="danger"
+                id={pruefungId}
+                data-lfh="erfassung-pruefung"
+                style={{ display: 'block', marginBottom: token.marginSM }}
+              >
+                {pruefFehler.join(' · ')}
+              </Typography.Text>
+            )}
+          </div>
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
               `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
           <div
@@ -641,7 +686,14 @@ export function ErfassungsFormular<T extends object>({
                   loading={laeuft}
                   danger={unumkehrbar}
                   disabled={gesperrt}
-                  aria-describedby={zusammenfassung != null ? zusammenfassungId : undefined}
+                  aria-describedby={
+                    [
+                      zusammenfassung != null ? zusammenfassungId : undefined,
+                      pruefFehler.length > 0 ? pruefungId : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                 >
                   {erfassenText}
                 </Button>

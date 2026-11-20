@@ -164,7 +164,7 @@ async function pruefeDetail(page: Page, einsatzId: string, personId: number, sch
   for (const viewport of [HANDSCHIRM, TABLET_HOCH]) {
     await page.setViewportSize(viewport);
     await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
-    await expect(page.getByRole('heading', { name: /Person R-\d{3}/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /R-\d{3}/ })).toBeVisible();
     const pk = patientenkopf(page);
     // Anker: der Kopf trägt die Daten des Detail-GETs.
     await expect(pk).toContainText(ZUSTAND);

@@ -627,7 +627,7 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
       ),
     );
     renderApp('/geraet/7/patienten/10');
-    expect(await screen.findByRole('heading', { level: 1, name: /Person R-001/ })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: /R-001/ })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
     expect(screen.queryByText(/Bezüge/)).toBeNull();
