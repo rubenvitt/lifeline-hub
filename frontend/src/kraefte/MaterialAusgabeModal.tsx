@@ -5,6 +5,7 @@ import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import { restText } from './materialPosten';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Werte {
   menge?: number;
@@ -106,7 +107,7 @@ export default function MaterialAusgabeModal({
         label={wort.feld}
         name="menge"
         rules={[
-          { required: true, message: 'Menge eintragen' },
+          pflicht('Menge'),
           {
             validator: (_, v: number | undefined) =>
               v == null || isValidMenge(v, hoechste)

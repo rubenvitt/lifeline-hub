@@ -228,7 +228,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       /Alarmierung .* bei Anna wird endgültig gestrichen und bleibt durchgestrichen sichtbar\./,
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Streichen' }));
-    expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Grund fehlt')).toBeInTheDocument();
     expect(rumpf).toBeNull();
     await userEvent.type(within(dialog).getByLabelText('Grund'), 'Zeit verwechselt');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Streichen' }));
@@ -317,7 +317,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       expect(
         await within(dialog).findByText('Bitte Alarmierung oder Eintreffen angeben'),
       ).toBeInTheDocument();
-      expect(within(dialog).getByText('Bitte einen Zeitpunkt angeben')).toBeInTheDocument();
+      expect(within(dialog).getByText('Entlassung fehlt')).toBeInTheDocument();
       expect(rumpf).toBeNull();
 
       await tippeZeit(
@@ -395,7 +395,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       const vorbelegt = (feld as HTMLInputElement).value;
 
       await user.click(within(dialog).getByRole('button', { name: 'Berichtigen' }));
-      expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Grund fehlt')).toBeInTheDocument();
       expect(rumpf).toBeNull();
       expect(feld).toHaveValue(vorbelegt);
 

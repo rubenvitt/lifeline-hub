@@ -377,7 +377,7 @@ describe('OnlineQuellenVerwaltung', () => {
     // Attribution bewusst leer lassen.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
-    expect(await screen.findByText('Attribution ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Attribution fehlt')).toBeInTheDocument();
     // antd überspringt onFinish bei Validierungsfehler → Mutation feuert nie.
     expect(postAufgerufen).toBe(false);
   });

@@ -9,6 +9,7 @@ import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { SPRECHGRUPPE_BEDINGUNG_MAX } from '../api/eingabegrenzen';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   bezeichnung: string;
@@ -81,15 +82,11 @@ export default function SprechgruppeFormModal({
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. 412_F_DRK" />
       </Feld>
-      <Feld
-        label="Betriebsart"
-        name="betriebsart"
-        rules={[{ required: true, message: 'Betriebsart ist erforderlich' }]}
-      >
+      <Feld label="Betriebsart" name="betriebsart" rules={[pflicht('Betriebsart')]}>
         <Select
           options={[
             { value: 'TMO', label: 'TMO – Trunked Mode' },

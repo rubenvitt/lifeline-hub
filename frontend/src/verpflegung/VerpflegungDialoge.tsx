@@ -51,6 +51,7 @@ import {
   uhrzeit,
   zitat,
 } from './verpflegungText';
+import { pflicht } from '../components/pflichtRegel';
 
 dayjs.extend(utc);
 
@@ -318,10 +319,7 @@ export const ZEITRAUM_REGEL: FormRule = {
 };
 
 /** Pflicht eines Bedarfsfelds (Kräfte, Betreute); 0 ist eine Angabe. */
-export const BEDARF_REGEL: FormRule = {
-  required: true,
-  message: 'Bitte eine Anzahl angeben — 0, wenn niemand',
-};
+export const BEDARF_REGEL: FormRule = pflicht('Anzahl', { zusatz: '0, wenn niemand' });
 
 interface ZeitfensterDialogProps extends DialogBasis {
   onErfassen: (body: ZeitfensterEingabe) => Promise<unknown>;
@@ -431,7 +429,7 @@ export function ZeitfensterDialog({
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
-          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX, 'Bezeichnung'),
         ]}
       >
@@ -637,7 +635,7 @@ export function AusgabeDialog({
         name="menge"
         label="Menge (EP)"
         rules={[
-          { required: true, message: 'Bitte eine Menge angeben' },
+          pflicht('Menge'),
           // Regel statt `max` am Feld: das kappte still auf die Grenze und buchte trotzdem.
           {
             type: 'number',

@@ -13,6 +13,7 @@ import type { Einsatzart, EinsatzVorlage, EinsatzVorlageEingabe } from '../api/t
 import { EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istModulAusblendbar, kategorien, moduleNachKategorie } from '../einsatz/modulRegistry';
 import { ausgeblendetAus, sichtbarAus } from './einsatzVorlageModule';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   bezeichnung: string;
@@ -164,7 +165,7 @@ export default function EinsatzVorlageFormModal({
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. Großbrand" maxLength={EINSATZ_VORLAGE_BEZEICHNUNG_MAX} />
       </Feld>

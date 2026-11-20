@@ -332,7 +332,7 @@ function TagAusVorlageInhalt({
 
 type Bedarfsfeld = 'bedarf_kraefte' | 'bedarf_betreute';
 
-const ANZAHL_PFLICHT = 'Bitte eine Anzahl angeben — 0, wenn niemand';
+const ANZAHL_PFLICHT = 'Anzahl fehlt — 0, wenn niemand';
 
 /**
  * Ein Fenster der Vorschau: Kopf mit Bezeichnung, rechts die Wahl; im Körper Zeitraum und Art,

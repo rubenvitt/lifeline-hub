@@ -4,6 +4,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { starteOfflineDownload } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   name: string;
@@ -80,18 +81,14 @@ export default function OfflineDownloadUrlModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input placeholder="z. B. Deutschland (eigener Extrakt)" />
       </Feld>
       <Feld
         label="URL (.mbtiles)"
         name="url"
         rules={[
-          { required: true, whitespace: true, message: 'URL darf nicht leer sein' },
+          pflicht('URL', { whitespace: true }),
           {
             validator: (_, wert?: string) => {
               const fehler = wert?.trim() ? downloadUrlFehler(wert) : null;
@@ -105,7 +102,7 @@ export default function OfflineDownloadUrlModal({
       <Feld
         label="Attribution / Lizenz"
         name="lizenz"
-        rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
+        rules={[pflicht('Attribution', { whitespace: true })]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap contributors (ODbL)" />
       </Feld>

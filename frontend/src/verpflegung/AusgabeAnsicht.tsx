@@ -99,6 +99,7 @@ import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
 import { flaeche as flaechenMass } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
@@ -1164,7 +1165,7 @@ export default function AusgabeAnsicht() {
             name="menge"
             label="Menge (EP)"
             rules={[
-              { required: true, message: 'Bitte eine Menge angeben' },
+              pflicht('Menge'),
               {
                 type: 'number',
                 max: sammlung.platz,

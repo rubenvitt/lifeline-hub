@@ -16,6 +16,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { VERPFLEGUNGSART_LABEL } from '../verpflegung/verpflegungText';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Mahlzeit des Verpflegungsplans anlegen oder bearbeiten (LLH-1058, Spec `kraefte-verpflegung`,
@@ -148,7 +149,7 @@ export default function MahlzeitDialog({
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
-          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX, 'Bezeichnung'),
         ]}
       >
@@ -162,10 +163,7 @@ export default function MahlzeitDialog({
           <Feld<FormWerte>
             name="beginn"
             label="Beginn"
-            rules={[
-              { required: true, whitespace: true, message: 'Bitte Beginn angeben' },
-              uhrzeitRegel,
-            ]}
+            rules={[pflicht('Beginn', { whitespace: true }), uhrzeitRegel]}
           >
             <UhrzeitFeld />
           </Feld>
@@ -177,7 +175,7 @@ export default function MahlzeitDialog({
             dependencies={['beginn']}
             extra={isFolgetag(beginn, ende) ? 'Ende am Folgetag' : undefined}
             rules={[
-              { required: true, whitespace: true, message: 'Bitte Ende angeben' },
+              pflicht('Ende', { whitespace: true }),
               uhrzeitRegel,
               ({ getFieldValue }) => ({
                 validator: (_, wert: unknown) => {

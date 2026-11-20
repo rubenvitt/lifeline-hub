@@ -10,6 +10,7 @@ import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular (LFH-346, Befund H36).
@@ -111,7 +112,7 @@ export default function FahrzeugFormModal({
       <Feld
         label="Funkrufname"
         name="funkrufname"
-        rules={[{ required: true, whitespace: true, message: 'Funkrufname darf nicht leer sein' }]}
+        rules={[pflicht('Funkrufname', { whitespace: true })]}
       >
         <Input />
       </Feld>

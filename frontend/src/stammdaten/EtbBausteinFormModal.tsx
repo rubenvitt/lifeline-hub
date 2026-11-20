@@ -12,6 +12,7 @@ import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -92,10 +93,10 @@ export default function EtbBausteinFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
         <Input placeholder="z. B. Lage unverändert" />
       </Feld>
-      <Feld label="Typ" name="typ" rules={[{ required: true }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
       </Feld>
       {/* Die automatischen Platzhalter als sichtbare Legende, kein Satz (LFH-1078); die Form
@@ -105,7 +106,7 @@ export default function EtbBausteinFormModal({
       <Feld
         label="Inhalt"
         name="inhalt"
-        rules={[{ required: true, whitespace: true }]}
+        rules={[pflicht('Inhalt', { whitespace: true })]}
         extra={
           <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
             <Textstufe stufe="textKlein" ton="gedaempft">

@@ -19,6 +19,7 @@ import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { STELLE_ART_LABEL } from './verpflegungText';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Maske der Verpflegungsstelle, Anlegen und Bearbeiten (LLH-1040, design.md D13 Punkt 3).
@@ -158,7 +159,7 @@ export function StelleDialog({
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
-          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX, 'Bezeichnung'),
         ]}
       >
@@ -167,11 +168,7 @@ export function StelleDialog({
           count={zeichenGrenze(VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX)}
         />
       </Feld>
-      <Feld<StelleWerte>
-        name="art"
-        label="Art"
-        rules={[{ required: true, message: 'Bitte eine Art wählen' }]}
-      >
+      <Feld<StelleWerte> name="art" label="Art" rules={[pflicht('Art')]}>
         <Select options={ART_OPTIONEN} />
       </Feld>
       <Feld<StelleWerte> name="standort" label="Standort" rules={[standortRegel]}>

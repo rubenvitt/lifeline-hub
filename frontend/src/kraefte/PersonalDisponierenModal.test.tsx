@@ -223,7 +223,7 @@ describe('PersonalDisponierenModal', () => {
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('combobox', { name: 'Personen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
-    expect(await within(dialog).findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Person fehlt')).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
   });
 

@@ -12,6 +12,7 @@ import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { personalDetailPfad } from './stammdatenDetail';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular (LFH-346) — dieselbe Entscheidung wie bei
@@ -120,11 +121,7 @@ export default function PersonalFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input />
       </Feld>
       <Feld label="Personalnummer" name="personalnummer">

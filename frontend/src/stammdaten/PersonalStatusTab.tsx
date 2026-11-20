@@ -15,6 +15,7 @@ import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 import { Status } from '../components/instrument/Status';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -109,10 +110,10 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 
 const felder = (
   <>
-    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
       <Input />
     </Feld>
-    <Feld label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+    <Feld label="Kategorie" name="kategorie" rules={[pflicht('Kategorie')]}>
       <Select options={kategorien.map((k) => ({ value: k, label: statusKategorie[k].label }))} />
     </Feld>
     <Feld label="Farbe (Hex, optional)" name="farbe">

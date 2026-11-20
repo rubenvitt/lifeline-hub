@@ -171,7 +171,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await screen.findByRole('dialog');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), '   ');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Bezeichnung darf nicht leer sein')).toBeInTheDocument();
+    expect(await screen.findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(anfragen).toHaveLength(0);
   });
 

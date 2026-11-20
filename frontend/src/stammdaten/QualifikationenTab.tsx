@@ -13,6 +13,7 @@ import type { Qualifikation } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { einschlussKandidaten, einschluesseAus } from '../kraefte/qualiDeckung';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -67,7 +68,7 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 /** Die Auswahl „Schließt ein“ lässt den Eintrag selbst und jeden Kreis weg. */
 const felder = (bearbeite: Qualifikation | null, katalog: readonly Qualifikation[]) => (
   <>
-    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
       <Input />
     </Feld>
     <Feld label="Sortierung" name="sortier" breite="kurz">
