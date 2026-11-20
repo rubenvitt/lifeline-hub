@@ -96,7 +96,7 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
    ([Betroffene und Sichtung](betroffene.md)): beim Transport Priorität, Art und Fachrichtung,
    bei der Maßnahme die Fläche der Maßnahme, bei der Verletzung erst die Stelle am Körperschema.
 3. Unter „Bestätigt von“ die Person wählen, die den Eintrag verantwortet.
-4. Speichern: „Transport festlegen“ bzw. „Maßnahme erfassen“ wählen; bei der Verletzung
+4. Speichern: „Transport festlegen“ bzw. „Erfassen“ wählen; bei der Verletzung
    speichert der Tipp auf die Fläche der Art. Der Verlauf nennt danach „bestätigt: …“.
 
 Im Handschuh-Betrieb wächst das Körperschema mit, sodass auch Hand, Fuß und Hals groß genug zum
@@ -124,7 +124,7 @@ Für den UHS-Laptop:
    ![Bereich „UHS“ am Laptop mit dem Reiter „Kräfte“, der Stärke und den Kräften der UHS](../bilder/geraet-uhs/laptop-uhs.png)
 
 4. Unter „Meldungen“ den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die
-   „Priorität“ (normal, dringend, sofort) wählen und „Meldung senden“ wählen. Eine Lagemeldung steht
+   „Priorität“ (normal, dringend, sofort) wählen und „Erfassen“ wählen. Eine Lagemeldung steht
    bei der Führung gleich in den Lagemeldungen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 

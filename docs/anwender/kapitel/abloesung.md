@@ -220,8 +220,8 @@ Für Einsatzleitung und Führungspersonal:
    Personen. Überschneidet sich auch nur eine erzeugte Schicht mit einem Block, entsteht keine,
    und der Dialog nennt jeden Block, mit dem sich eine erzeugte Schicht überschneidet, einmal,
    etwa „überschneidet sich mit 1000–1400“.
-10. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer. Ein Block im Raster ist ein Knopf und
-    öffnet mit der Eingabetaste seinen Dialog.
+10. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer; „Anlegen“ legt den Block an. Ein
+    Block im Raster ist ein Knopf und öffnet mit der Eingabetaste seinen Dialog.
 
 Ein neuer Block ohne eigenes Soll übernimmt das des Postens: die Soll-Stärke der Einheit oder ihres
 Typs bzw. die Soll-Anzahl der UHS, ebenso das Qualifikationssoll. Im Dialog steht dieser Wert mit
@@ -330,7 +330,7 @@ Stammdatensatz, die nur in diesem Plan stehen, etwa von einer anderen Organisati
    ![Helferliste des Schichtplans mit Mia Beispiel (DRK OV Nord) und Jonas Keller (DLRG Musterstadt)](../bilder/abloesung/helfer.png)
 
 2. „Helfer anlegen“ wählen, „Name“ eintragen, optional „Organisation“, „Telefon“ und
-   „Qualifikationen“, und „Helfer anlegen“ wählen.
+   „Qualifikationen“, und „Anlegen“ wählen.
 3. „Bearbeiten“ und „Löschen“ stehen in der Zeile des Helfers. Ein gelöschter Helfer verschwindet
    aus allen Blöcken; die Rückfrage nennt, aus wie vielen.
 4. Erneut „Helfer“ wählen, um zum Raster zurückzukehren. Ein neuer Helfer steht sofort in der

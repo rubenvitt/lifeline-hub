@@ -63,7 +63,7 @@ Für Einsatzleitung und Führungspersonal:
 4. Unter „Weitere Angaben“ bei Bedarf „Von Einheit / Abschnitt“ (belegt den Absender vor),
    „Meldeweg“, „Meldungsart“, „Priorität“, „Richtung“, „Zeitpunkt des Ereignisses“ und die Frist
    der Bestätigung setzen.
-5. „Meldung erfassen“ wählen.
+5. „Erfassen“ wählen.
 
 Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, auch nach außen; bei
 dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel

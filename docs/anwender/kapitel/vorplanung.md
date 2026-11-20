@@ -24,7 +24,7 @@ Planen dürfen der System-Admin und die Führungskräfte der Organisation. Für 
 2. „Planung anlegen“ wählen und „Bezeichnung“, „Einsatzart“, „Ort“ sowie „Beginn“ und „Ende“
    eintragen. Ohne Einsatzart wird es ein Sanitätsdienst. Eine Planung umfasst höchstens 14 Tage,
    und keine zwei Planungen der Organisation tragen dieselbe Bezeichnung.
-3. „Planung anlegen“ übernimmt und öffnet die neue Planung.
+3. „Anlegen“ übernimmt und öffnet die neue Planung.
 
 ### Den Kopf einer Planung ändern
 
@@ -44,13 +44,13 @@ Planen dürfen der System-Admin und die Führungskräfte der Organisation. Für 
 3. Optional „Abschnitt“, „Schichtlänge“ (etwa „4 h“), „Soll“ und „Qualifikationssoll“ eintragen.
    Leer übernimmt der Posten das Soll der Vorlage bzw. die Stärke des Fahrzeugs; das Feld nennt es
    mit „(Vorgabe)“.
-4. „Posten anlegen“ übernimmt. Über das Menü ⋮ einer Zeile lässt sich ein Posten bearbeiten, „Nach
+4. „Anlegen“ übernimmt. Über das Menü ⋮ einer Zeile lässt sich ein Posten bearbeiten, „Nach
    oben“ und „Nach unten“ verschieben oder löschen. In dieser Reihenfolge stehen die Zeilen im Plan.
 
 ### Helfer erfassen
 
 1. Den Reiter „Helfer“ öffnen und „Helfer anlegen“ wählen.
-2. „Name“ eintragen, optional „Organisation“, „Telefon“ und „Qualifikationen“, und „Helfer anlegen“
+2. „Name“ eintragen, optional „Organisation“, „Telefon“ und „Qualifikationen“, und „Anlegen“
    wählen.
 3. Helfer stehen danach im Plan in der Leiste „Personen“ unter „Helfer“. „Bearbeiten“ und
    „Löschen“ stehen in ihrer Zeile.
@@ -80,7 +80,7 @@ Uhrzeit. Ein Eintrag öffnet den Dialog des Blocks.
 
 1. Den Reiter „Ablauf“ öffnen. Der Reiter nennt die Zahl der Programmpunkte.
 2. „Programmpunkt“ wählen, „Zeitpunkt“ und „Bezeichnung“ eintragen, etwa „Feuerwerk“ um 22:30,
-   und „Anlegen“ wählen.
+   und „Erfassen“ wählen.
 3. Ändern und Löschen gehen wie im Paneel „Ablauf“ der Einsatzdaten (Kapitel
    [Einsatzdaten](einsatzdaten.md)).
 
