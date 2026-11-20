@@ -1,18 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Button, theme } from 'antd';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLinkClickHandler } from 'react-router';
-import dayjs from 'dayjs';
-import { useAuthOptional } from '../auth/AuthContext';
-import { ladeBenutzerEinstellungen, setzeBenutzerEinstellung } from '../api/benutzerEinstellungen';
-import { globalKeys } from '../api/queryKeys';
-import type { BenutzerEinstellungen } from '../api/types';
-import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { istApplePlattform } from '../command-palette/befehle';
 import { hilfePfad } from '../routing/deeplinks';
 import { SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, istWillkommenOffen } from './willkommen';
+import { useEinstellungMerken } from './useEinstellungMerken';
 
 /**
  * Willkommenskarte auf der Einsatzliste (LLH-1824): führt Erstnutzer an den Aufbau, die Hilfe zur
@@ -20,17 +14,8 @@ import { SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, istWillkommenOffen } from './willkom
  * Benutzer. Die anschauliche Einführung folgt als eigene Aufgabe (LLH-1990).
  */
 export default function WillkommenKarte() {
-  const auth = useAuthOptional();
-  // Ein gekoppeltes Gerät hat keine Einsatzliste mit Hilfe (LFH-892).
-  const benutzerId = auth?.geraet ? null : ((auth?.benutzer as { id?: number } | null)?.id ?? null);
-  const client = useQueryClient();
-  const key = useMemo(() => globalKeys.benutzerEinstellungenVon(benutzerId), [benutzerId]);
-  const { data } = useQuery({
-    queryKey: key,
-    queryFn: ladeBenutzerEinstellungen,
-    enabled: benutzerId != null,
-    staleTime: Infinity,
-  });
+  // Ein gekoppeltes Gerät hat keine Einsatzliste mit Hilfe (LFH-892): dann ohne Benutzer.
+  const { stand: data, benutzerId, merke } = useEinstellungMerken();
   const [geschlossen, setGeschlossen] = useState(false);
   const { token } = theme.useToken();
   const { istBeruehrung } = useViewport();
@@ -40,18 +25,8 @@ export default function WillkommenKarte() {
   if (benutzerId == null || geschlossen || !istWillkommenOffen(data)) return null;
 
   function schliesse() {
-    // Sofort weg und nur den eigenen Schlüssel im geteilten Fach ergänzen, nie den ganzen Stand
-    // ersetzen: sonst überschriebe die späte Antwort, was `useZuletztBefehle` inzwischen gemerkt
-    // hat (dort wird die Antwort aus demselben Grund verworfen). Ein Fehler kostet höchstens ein
-    // erneutes Erscheinen in einer späteren Sitzung.
-    const wert = alsBackendZeit(dayjs());
     setGeschlossen(true);
-    client.setQueryData<BenutzerEinstellungen>(key, (alt) =>
-      alt
-        ? { ...alt, eintraege: { ...alt.eintraege, [SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN]: wert } }
-        : alt,
-    );
-    setzeBenutzerEinstellung(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, wert).catch(() => {});
+    merke(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN);
   }
 
   const palette = istApplePlattform(navigator.userAgent) ? '⌘ K' : 'Strg + K';
