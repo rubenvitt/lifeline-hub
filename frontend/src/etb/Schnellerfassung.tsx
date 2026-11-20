@@ -1360,7 +1360,8 @@ export default function Schnellerfassung({
           // Feld behält so beim Aufklappen seinen Platz im Baum.
           feldFuellt
           praefix={praefix}
-          rahmenFarbe={typFarbe.kante}
+          // „Inhalt fehlt“ färbt den Rahmen der Zeile, die das rahmenlose Feld trägt (LLH-1771).
+          rahmenFarbe={inhaltFehltSichtbar ? rollen.alarm : typFarbe.kante}
           hinweis={
             istSchmal ? undefined : (
               <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>

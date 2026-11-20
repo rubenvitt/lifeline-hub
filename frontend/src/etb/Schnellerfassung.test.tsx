@@ -1058,6 +1058,10 @@ describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    const typRahmen = feld
+      .closest<HTMLElement>('[data-rahmen-farbe]')!
+      .style.getPropertyValue('--lfh-schnellerfassung-rahmen');
+    expect(typRahmen).not.toBe('');
     await userEvent.type(feld, '  ');
     await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
     expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
@@ -1065,11 +1069,15 @@ describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
     expect(feld).toHaveAttribute('aria-invalid', 'true');
     expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
     expect(p.erfassen).not.toHaveBeenCalled();
+    // Die Zeile trägt den Rahmen des Felds: er wechselt von der Typfarbe in die Alarmfarbe.
+    const zeile = feld.closest<HTMLElement>('[data-rahmen-farbe]')!;
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).not.toBe(typRahmen);
 
     // Beim Tippen geht der Grund.
     await userEvent.type(feld, 'Pegel steigt');
     expect(screen.queryByText('Inhalt fehlt')).toBeNull();
     expect(feld).not.toHaveAttribute('aria-invalid');
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe(typRahmen);
   });
 
   it('Strg+Enter im leeren Feld nennt den Grund; blankes Enter bleibt still', async () => {
