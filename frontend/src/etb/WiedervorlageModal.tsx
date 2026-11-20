@@ -10,7 +10,11 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { Feld } from '../components/instrument';
 import { serverJetzt } from '../offline/serveruhr';
-import { SCHNELLWAHL_TERMIN, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
+import {
+  SCHNELLWAHL_TERMIN,
+  VORGABE_FRIST_MINUTEN,
+  schnellwahlZeit,
+} from '../anzeige/zeitSchnellwahl';
 import type { EtbEintragAnzeige } from '../api/types';
 
 const { TextArea } = Input;
@@ -28,12 +32,6 @@ interface FormWerte {
   faellig: dayjs.Dayjs;
   beschreibung?: string;
 }
-
-/**
- * Vorgabe der Fälligkeit: „jetzt" meint niemand, eine Wiedervorlage darauf ist beim Anlegen
- * schon fällig. Die Schnellwahl darüber deckt den Rest des üblichen Bandes ab.
- */
-const VORGABE_MINUTEN = 30;
 
 /**
  * Schnellwahl der Fälligkeit. Echte antd-`Button` ohne `size`: so erben sie `controlHeight`
@@ -130,7 +128,7 @@ export default function WiedervorlageModal({
         eintrag
           ? {
               titel: titelAusEintrag(eintrag.inhalt),
-              faellig: serverJetzt().add(VORGABE_MINUTEN, 'minute'),
+              faellig: serverJetzt().add(VORGABE_FRIST_MINUTEN, 'minute'),
             }
           : undefined
       }
