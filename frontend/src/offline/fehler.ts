@@ -18,3 +18,23 @@ export function istOfflineTransient(e: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * Warum eine Erfassung vorgemerkt wurde (LLH-1758, `offline/AGENTS.md`, „Vorgemerkt heißt nicht
+ * offline“). `serverfehler`: der eigene Anwendungsserver hat geantwortet (`{error}`-Umschlag),
+ * aber nicht gespeichert (408, 429, 5xx). Alles andere Vormerkbare ist `offline`: Netzfehler,
+ * Gateway-502/503/504 ohne Umschlag, Sitzungsfälle (401/412). Dieselbe Grenze zieht
+ * `useOhneVerbindung` für „· offline“.
+ */
+export type VormerkGrund = 'offline' | 'serverfehler';
+
+export function vormerkGrund(e: unknown): VormerkGrund {
+  if (
+    e instanceof ApiError &&
+    e.vomAnwendungsserver &&
+    (e.status === 408 || e.status === 429 || e.status >= 500)
+  ) {
+    return 'serverfehler';
+  }
+  return 'offline';
+}

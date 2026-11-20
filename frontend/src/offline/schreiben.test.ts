@@ -84,7 +84,7 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
       status: 'vermisst',
       client_id: 'person-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'person-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'person-1', grund: 'offline' });
     expect(legePersonAn).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(11, 7)).toEqual([
       expect.objectContaining({
@@ -106,6 +106,7 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
     await expect(erfassePersonOfflineFaehig(11, 7, { client_id: 'person-2' })).resolves.toEqual({
       zustand: 'vorgemerkt',
       client_id: 'person-2',
+      grund: 'offline',
     });
 
     vi.mocked(legePersonAn).mockRejectedValueOnce(new ApiError(422, 'Ungültig'));
@@ -147,6 +148,55 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
   });
 });
 
+describe('Grund des Vormerkens (LLH-1758)', () => {
+  const meldung = {
+    absender: 'ELW',
+    meldeweg: 'funk' as const,
+    inhalt: 'Lage',
+    ereigniszeit: '2026-08-06 12:00:00',
+  };
+
+  it('ohne Netz heißt der Grund offline', async () => {
+    online(false);
+    await expect(
+      erfasseMeldungOfflineFaehig(11, 7, { ...meldung, client_id: 'm-1' }),
+    ).resolves.toEqual({ zustand: 'vorgemerkt', client_id: 'm-1', grund: 'offline' });
+  });
+
+  it('eine 500 des eigenen Servers heißt Serverfehler, nicht offline', async () => {
+    vi.mocked(legeMeldungAn).mockRejectedValueOnce(
+      new ApiError(500, 'Interner Fehler', { vomAnwendungsserver: true }),
+    );
+    await expect(
+      erfasseMeldungOfflineFaehig(11, 7, { ...meldung, client_id: 'm-2' }),
+    ).resolves.toEqual({ zustand: 'vorgemerkt', client_id: 'm-2', grund: 'serverfehler' });
+  });
+
+  it('ein Gateway-502 ohne Umschlag bleibt offline', async () => {
+    vi.mocked(meldeStand).mockRejectedValueOnce(new ApiError(502, 'Bad Gateway'));
+    const ergebnis = await erfasseStandOfflineFaehig(
+      11,
+      7,
+      { id: 3, bezeichnung: 'Nord' },
+      { client_id: 's-1' } as Parameters<typeof erfasseStandOfflineFaehig>[3],
+    );
+    expect(ergebnis).toMatchObject({ zustand: 'vorgemerkt', grund: 'offline' });
+  });
+
+  it('die Stand-Meldung nach einer 503 des eigenen Servers heißt Serverfehler', async () => {
+    vi.mocked(meldeStand).mockRejectedValueOnce(
+      new ApiError(503, 'Überlast', { vomAnwendungsserver: true }),
+    );
+    const ergebnis = await erfasseStandOfflineFaehig(
+      11,
+      7,
+      { id: 3, bezeichnung: 'Nord' },
+      { client_id: 's-2' } as Parameters<typeof erfasseStandOfflineFaehig>[3],
+    );
+    expect(ergebnis).toMatchObject({ zustand: 'vorgemerkt', grund: 'serverfehler' });
+  });
+});
+
 describe('offlinefähige Stand- und Belegungsmeldungen (LFH-675)', () => {
   const bezirk = { id: 3, bezeichnung: 'Uferstraße 12–40' };
   const stelle = { id: 4, bezeichnung: 'Turnhalle Ost' };
@@ -167,7 +217,7 @@ describe('offlinefähige Stand- und Belegungsmeldungen (LFH-675)', () => {
       erhebung: 'gezaehlt',
       client_id: 'stand-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'stand-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'stand-1', grund: 'offline' });
     expect(meldeStand).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(11, 7)).toEqual([
       expect.objectContaining({
@@ -231,7 +281,7 @@ describe('offlinefähige Stand- und Belegungsmeldungen (LFH-675)', () => {
     expect(gesendet).not.toHaveProperty('zeitpunkt_at');
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-09-24 08:00:00' });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id, grund: 'offline' });
 
     vi.mocked(meldeStand).mockRejectedValueOnce(new ApiError(409, 'storniert'));
     await expect(
@@ -260,7 +310,7 @@ describe('offlinefähige Verpflegungsausgaben (LFH-688)', () => {
       sonderkost: { vegan: 3 },
       client_id: 'ausgabe-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ausgabe-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ausgabe-1', grund: 'offline' });
     expect(erfasseAusgabe).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(11, 7)).toEqual([
       expect.objectContaining({
@@ -317,7 +367,7 @@ describe('offlinefähige Verpflegungsausgaben (LFH-688)', () => {
     expect(gesendet).not.toHaveProperty('zeitpunkt_at');
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-09-24 09:40:00' });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id, grund: 'offline' });
 
     vi.mocked(erfasseAusgabe).mockRejectedValueOnce(new ApiError(404, 'Nicht gefunden'));
     await expect(
@@ -347,7 +397,7 @@ describe('Aufnahme einer Person ohne Netz mit Erfassungszeit (LLH-1330)', () => 
       uhs_id: 4,
       client_id: 'aufnahme-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'aufnahme-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'aufnahme-1', grund: 'offline' });
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion).toEqual({
       art: 'person',
@@ -500,6 +550,7 @@ describe('Sammlung direkt vormerken (LLH-1032, design.md D5)', () => {
       expect(ergebnis).toEqual({
         zustand: 'vorgemerkt',
         client_id: (zeile.aktion.daten as { client_id: string }).client_id,
+        grund: 'offline',
       });
       expect(ereignisse.length).toBeGreaterThan(0);
     } finally {
@@ -544,7 +595,7 @@ describe('offlinefähiges Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)'
       ...unangemeldet,
       client_id: 'e-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'e-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'e-1', grund: 'offline' });
     expect(bucheEintreffen).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(11, 7)).toEqual([
       expect.objectContaining({
@@ -577,7 +628,7 @@ describe('offlinefähiges Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)'
     const ergebnis = await erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'FL', unangemeldet);
     const gesendet = vi.mocked(bucheEintreffen).mock.calls[0][2];
     expect(gesendet.client_id).toEqual(expect.any(String));
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id, grund: 'offline' });
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-10-16 12:12:00' });
   });
@@ -655,7 +706,7 @@ describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () =>
         ...eingabe,
         client_id: `${art}-1`,
       } as never);
-      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: `${art}-1` });
+      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: `${art}-1`, grund: 'offline' });
       expect(api).not.toHaveBeenCalled();
       expect(await schreibaktionenLaden(11, 7)).toEqual([
         expect.objectContaining({
@@ -692,7 +743,7 @@ describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () =>
       const ergebnis = await savePersonEintragOfflineCapable(11, 7, r012, art, eingabe as never);
       const gesendet = vi.mocked(api).mock.calls[0][2] as { client_id: string };
       expect(gesendet.client_id).toEqual(expect.any(String));
-      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id, grund: 'offline' });
       const [zeile] = await schreibaktionenLaden(11, 7);
       expect(zeile.aktion).toMatchObject({ art, person_id: 10 });
       expect((zeile.aktion as { daten: unknown }).daten).toEqual({
@@ -809,7 +860,7 @@ describe('Registrieren und Abmelden ohne Netz (LLH-1612, design.md D8)', () => {
       ...haushalt,
       client_id: 'reg-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'reg-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'reg-1', grund: 'offline' });
     expect(sendRegistrierung).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(11, 7)).toEqual([
       expect.objectContaining({
@@ -830,7 +881,7 @@ describe('Registrieren und Abmelden ohne Netz (LLH-1612, design.md D8)', () => {
     expect([einsatz, stelle, optionen]).toEqual([7, 8, { offlineQueueBenutzerId: 11 }]);
     expect(gesendet.client_id).toEqual(expect.any(String));
     expect(gesendet).not.toHaveProperty('zeitpunkt_at');
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id, grund: 'offline' });
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-11-09 09:15:00' });
   });
@@ -850,7 +901,7 @@ describe('Registrieren und Abmelden ohne Netz (LLH-1612, design.md D8)', () => {
       ziel: 'zu Verwandten',
       client_id: 'ab-1',
     });
-    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ab-1' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ab-1', grund: 'offline' });
     expect(sendAbmeldung).not.toHaveBeenCalled();
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion).toEqual({
