@@ -19,6 +19,12 @@ describe('pflicht()', () => {
     });
   });
 
+  it('hängt einen Zusatz nach einem Gedankenstrich an', () => {
+    expect(pflicht('Anzahl', { zusatz: '0, wenn niemand' }).message).toBe(
+      'Anzahl fehlt — 0, wenn niemand',
+    );
+  });
+
   it('lehnt mit whitespace eine Eingabe aus Leerzeichen ab', async () => {
     render(
       <Form>

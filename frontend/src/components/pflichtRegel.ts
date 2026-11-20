@@ -6,13 +6,16 @@ import type { RuleObject } from 'antd/es/form';
  * Jede Pflichtregel im Frontend nimmt diesen Helfer mit ausdrücklichem Feldnamen: antd setzt
  * `${label}` nur bei einem Text-Label, bei einem JSX-Label stünde sonst der technische Feldname im
  * Fehler. Der Name ist das kurze Hauptwort des sichtbaren Labels, ohne Artikel, ohne „Bitte“.
- * Wächter: `pflichtRegel.guard.test.ts`.
+ * Ein `zusatz` sagt, was einzutragen ist („Anzahl fehlt — 0, wenn niemand“). Wächter: `pflichtRegel.guard.test.ts`.
  */
-export function pflicht(feld: string, optionen: { whitespace?: boolean } = {}): RuleObject {
+export function pflicht(
+  feld: string,
+  optionen: { whitespace?: boolean; zusatz?: string } = {},
+): RuleObject {
   return {
     required: true,
     ...(optionen.whitespace ? { whitespace: true } : {}),
-    message: `${feld} fehlt`,
+    message: optionen.zusatz ? `${feld} fehlt — ${optionen.zusatz}` : `${feld} fehlt`,
   };
 }
 
