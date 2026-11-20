@@ -114,11 +114,12 @@ test.describe('Werkzeuganteil am Tablet quer, Handschuh', () => {
       const kopf = page.locator('[data-lfh="seitenkopf"]');
       await expect(kopf.getByRole('button', { name: 'Betroffene erfassen' })).toBeVisible();
       await expect(kopf.getByRole('button', { name: 'Vermisst melden' })).toBeVisible();
-      await expect(kopf.getByRole('link', { name: 'Drucken / als PDF' })).toHaveCount(0);
+      // Die Betroffenenliste druckt über ihre Druckseite: „Druckansicht“ (LLH-1836).
+      await expect(kopf.getByRole('link', { name: 'Druckansicht' })).toHaveCount(0);
       await expect(kopf.getByRole('button', { name: 'CSV exportieren' })).toHaveCount(0);
       await kopf.getByRole('button', { name: 'Weitere Aktionen zu den Betroffenen' }).click();
       await expect(page.getByRole('menuitem', { name: 'CSV exportieren' })).toBeVisible();
-      await expect(page.getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeVisible();
+      await expect(page.getByRole('menuitem', { name: 'Druckansicht' })).toBeVisible();
     });
   }
 });

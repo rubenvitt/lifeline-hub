@@ -79,17 +79,23 @@ for (const nutzer of NUTZER) {
     await pruefeKopf(menue, nutzer, benutzername);
     const gerollt = await menue.evaluate((m) => m.scrollTop);
     expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    for (const name of ['Profil', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe', 'Abmelden']) {
-      await expect(menue.getByRole('menuitem', { name: new RegExp(`^${name}`) })).toBeInViewport({
-        ratio: 1,
-      });
+    // „Hilfe zu dieser Seite“ steht am Handy im Menü, weil der Kopf für „?“ keinen Platz hat
+    // (LLH-1824), und ersetzt dort „Hilfe“ (Entscheidung 20.11.2026): beide zusammen schoben
+    // „Abmelden“ unter den Rand.
+    for (const name of ['Profil', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe zu dieser Seite']) {
+      await expect(menue.getByRole('menuitem', { name })).toBeInViewport({ ratio: 1 });
     }
+    await expect(menue.getByRole('menuitem', { name: 'Hilfe', exact: true })).toHaveCount(0);
+    await expect(menue.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport({ ratio: 1 });
     for (const leiste of ['Darstellung', 'Bediendichte', 'Helligkeit in %']) {
       await expect(menue.getByRole('radiogroup', { name: leiste })).toBeInViewport({ ratio: 1 });
     }
-    // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): „Hilfe“ führt auf die Hilfe.
-    await menue.getByRole('menuitem', { name: 'Hilfe' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
+    // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): „Hilfe zu dieser Seite“ öffnet die
+    // Hilfe-Seitenleiste (ein Drawer, `hilfe/HilfeSeitenleiste.tsx`).
+    await menue.getByRole('menuitem', { name: 'Hilfe zu dieser Seite' }).click();
+    await expect(
+      page.getByRole('dialog').filter({ has: page.locator('.hilfe-seitenleiste') }),
+    ).toBeVisible();
   });
 
   test(`Handy, Handschuh, ${nutzer}: Profil und alle drei Leisten im Fenster`, async ({ page }) => {
@@ -215,7 +221,7 @@ test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter im abge
 /**
  * D12: fünf Helligkeitsstufen im Handschuh-Betrieb in einer Zeile, nicht überlappend, nicht über
  * die Leiste hinaus, Zielabstand ≥ 16 px (LFH-865), Höhe 72 px. Am Handy schmaler als die Staffel,
- * ab `md` (Menü 480 px) in voller Breite.
+ * ab `md` (Menü 504 px) in voller Breite.
  */
 for (const fenster of [HANDY, { width: 1024, height: 768 }]) {
   test(`Handschuh ${fenster.width} px: Helligkeit in einer Zeile mit Zielabstand`, async ({

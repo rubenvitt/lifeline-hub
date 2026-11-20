@@ -464,3 +464,103 @@ describe('Name und Vorname an der Grenze (LLH-1329)', () => {
     expect(loeseBefehl(vorname, []).ok).toBe(false);
   });
 });
+
+describe('Farbe als Sichtung (LLH-1767)', () => {
+  it.each([
+    ['rot', 'sk1'],
+    ['gelb', 'sk2'],
+    ['grün', 'sk3'],
+    ['gruen', 'sk3'],
+    ['blau', 'sk4'],
+    ['Rot', 'sk1'],
+    ['GRÜN', 'sk3'],
+  ])('„%s" → %s', (text, kategorie) => {
+    const b = parsePersonBefehl(text);
+    expect(b.eingabe).toEqual({ sichtung: kategorie });
+    expect(b.teile).toEqual([{ art: 'sichtung', text, wert: kategorie }]);
+  });
+
+  it('führt „schwarz" und „weiß" NICHT als Sichtung (häufige Nachnamen)', () => {
+    expect(parsePersonBefehl('schwarz').eingabe).toEqual({ name: 'schwarz' });
+    expect(parsePersonBefehl('weiß').eingabe).toEqual({ name: 'weiß' });
+  });
+
+  it('lässt ein Farbwort am Komma im Namen („Grün, Anna", „Meier, Rot")', () => {
+    expect(parsePersonBefehl('Grün, Anna w 34 rot').eingabe).toEqual({
+      name: 'Grün',
+      vorname: 'Anna',
+      geschlecht: 'weiblich',
+      alter_geschaetzt: 34,
+      sichtung: 'sk1',
+    });
+    expect(parsePersonBefehl('Meier, Rot').eingabe).toEqual({ name: 'Meier', vorname: 'Rot' });
+  });
+
+  it('meldet Farbe und Kürzel zusammen als doppelte Sichtung', () => {
+    expect(parsePersonBefehl('rot sk3').probleme).toEqual(['Sichtung doppelt angegeben („sk3")']);
+  });
+});
+
+describe('„ca" vor dem Alter (LLH-1767)', () => {
+  it.each(['ca 40', 'ca. 40', 'Ca 40', 'circa 40', 'ca40', 'ca.40'])('„%s" → 40 Jahre', (text) => {
+    const b = parsePersonBefehl(text);
+    expect(b.eingabe).toEqual({ alter_geschaetzt: 40 });
+    expect(b.probleme).toEqual([]);
+    expect(b.teile).toEqual([{ art: 'alter', text, wert: 40 }]);
+  });
+
+  it('nimmt „ca" auch hinter dem Geschlecht („m ca 40")', () => {
+    const b = parsePersonBefehl('m ca 40');
+    expect(b.eingabe).toEqual({ geschlecht: 'maennlich', alter_geschaetzt: 40 });
+    expect(b.teile).toEqual([{ art: 'geschlecht', text: 'm ca 40', wert: 'maennlich', alter: 40 }]);
+  });
+
+  it('versteht „Mann ca 40 rot" als Name, Alter und Sichtung (der Fall aus der Analyse)', () => {
+    const b = parsePersonBefehl('Mann ca 40 rot');
+    expect(b.probleme).toEqual([]);
+    expect(b.eingabe).toEqual({ name: 'Mann', alter_geschaetzt: 40, sichtung: 'sk1' });
+  });
+
+  it('führt ein „ca" ohne folgende Zahl nicht als Alter', () => {
+    // Gegenhälfte: „Ca" allein ist ein Name (und kein stilles Verschlucken).
+    expect(parsePersonBefehl('Ca').eingabe).toEqual({ name: 'Ca' });
+  });
+
+  it('meldet „ca 200" als Alter außerhalb 0–120', () => {
+    expect(parsePersonBefehl('ca 200').probleme).toEqual(['Alter außerhalb 0–120 („ca 200")']);
+  });
+});
+
+describe('Unerkannte Wörter (LLH-1767)', () => {
+  it('nimmt nur den ersten zusammenhängenden Block freier Wörter als Namen', () => {
+    const b = parsePersonBefehl('Mann ca 40 rot verwirrt');
+    expect(b.eingabe.name).toBe('Mann');
+    expect(b.teile).toContainEqual({
+      art: 'unerkannt',
+      text: 'verwirrt',
+      grund: 'Nicht verstanden',
+    });
+    expect(b.probleme).toEqual(['„verwirrt" nicht verstanden']);
+  });
+
+  it('fasst einen späteren Block zu EINEM unerkannten Teil zusammen', () => {
+    const b = parsePersonBefehl('Kowalski w 34 Anna Maria sk3');
+    expect(b.eingabe.name).toBe('Kowalski');
+    expect(b.teile.map((t) => t.art)).toEqual(['name', 'geschlecht', 'unerkannt', 'sichtung']);
+    expect(b.probleme).toEqual(['„Anna Maria" nicht verstanden']);
+  });
+
+  it('lässt einen Namen hinter den Kürzeln gelten, wenn er der einzige Block ist', () => {
+    // Gegenhälfte: die Reihenfolge bleibt frei (siehe „ist reihenfolgeunabhängig").
+    const b = parsePersonBefehl('sk3 w 34 Kowalski, Anna');
+    expect(b.probleme).toEqual([]);
+    expect(b.eingabe.name).toBe('Kowalski');
+  });
+
+  it('sperrt das Senden, solange ein Wort nicht verstanden ist', () => {
+    expect(loeseBefehl(parsePersonBefehl('Mann rot verwirrt'), [])).toEqual({
+      ok: false,
+      probleme: ['„verwirrt" nicht verstanden'],
+    });
+  });
+});

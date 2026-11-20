@@ -775,12 +775,15 @@ mark.lfh-fundstelle {
   bottom: 0;
   z-index: 20;
   margin: 0 calc(-1 * var(--lfh-seiten-polsterung)) calc(-1 * var(--lfh-seiten-polsterung));
-  padding: var(--lfh-luft-3) var(--lfh-seiten-polsterung) var(--lfh-luft-4);
+  padding: var(--lfh-luft-2) var(--lfh-seiten-polsterung);
   background: var(--lfh-kopf);
   border-top: 1px solid var(--lfh-linie-stark);
 }
+[data-dichte='handschuh'] .etb-erfassung-sticky {
+  padding-block: var(--lfh-luft-1);
+}
 .etb-erfassung-sticky .ant-tabs-nav {
-  margin-bottom: var(--lfh-luft-2);
+  margin-bottom: var(--lfh-luft-1);
 }
 .etb-erfassung-sticky .markdown-editor__vorschau {
   max-height: 28vh;
@@ -839,6 +842,9 @@ main:has([data-lfh='zaehltasten']) {
 }
 :root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
+}
+:root:has([data-lfh='erfassung-fuss-seite']) {
+  scroll-padding-block-end: var(--lfh-erfassung-seite-fokusabstand, 0px);
 }
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
