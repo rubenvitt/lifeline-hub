@@ -65,15 +65,15 @@ gleiche Person → auflösen, andere Person → Seite neu laden.
   - in `sitzungsEvent.ts`: `SITZUNG_WIEDERHERGESTELLT = 'lfh:sitzung-wiederhergestellt'`,
     `meldeSitzungWiederhergestellt(): void` (Fensterereignis, ohne Sperre).
 
-- [ ] **Step 1: Failing tests** — `sitzungsSperre.test.ts`: ohne Sperre `warteAufSitzung()` ist
+- [x] **Step 1: Failing tests** — `sitzungsSperre.test.ts`: ohne Sperre `warteAufSitzung()` ist
   `null`; nach `sitzungSperren()` zweimal liefert `warteAufSitzung()` dasselbe Versprechen;
   `sitzungEntsperren('wiederhergestellt')` → `true`, `'beendet'` → `false`; danach
   `istSitzungGesperrt()` `false`; `meldeSitzungWiederhergestellt()` feuert
   `SITZUNG_WIEDERHERGESTELLT` genau einmal je Aufruf.
-- [ ] **Step 2:** `cd frontend && mise exec -- pnpm exec vitest run src/auth/sitzungsSperre.test.ts` → FAIL.
-- [ ] **Step 3:** Implementieren (Modulzustand, kein React).
-- [ ] **Step 4:** Test → PASS.
-- [ ] **Step 5:** Commit `feat(auth): Sitzungssperre und Signal „Sitzung wiederhergestellt“`.
+- [x] **Step 2:** `cd frontend && mise exec -- pnpm exec vitest run src/auth/sitzungsSperre.test.ts` → FAIL.
+- [x] **Step 3:** Implementieren (Modulzustand, kein React).
+- [x] **Step 4:** Test → PASS.
+- [x] **Step 5:** Commit `feat(auth): Sitzungssperre und Signal „Sitzung wiederhergestellt“`.
 
 ### Task 2: Leseanfragen warten an der Sperre
 
@@ -92,7 +92,7 @@ synchron rufen (die Wache setzt darüber synchron die Sperre), dann `warteAufSit
 genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholversuch wirft eine
 401 wie heute.
 
-- [ ] **Step 1: Failing tests** (MSW, Sperre im Test per `window`-Listener auf
+- [x] **Step 1: Failing tests** (MSW, Sperre im Test per `window`-Listener auf
   `SITZUNG_ABGELAUFEN` gesetzt, `sitzungsMeldungZuruecksetzen()` im `afterEach`):
   - `wartet bei 401 auf die Anmeldung und wiederholt einmal` — erste Antwort 401, nach
     `sitzungEntsperren('wiederhergestellt')` 200 → Promise löst mit den Daten.
@@ -103,10 +103,10 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
   - `401 nach der Wiederherstellung wird nicht erneut abgewartet` — zweite Antwort auch 401 →
     wirft, Server sah genau 2 Anfragen.
   - `/api/auth/me wartet nie`.
-- [ ] **Step 2:** vitest → FAIL.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** vitest für `src/api/` → PASS (bestehende `client`-Tests unverändert grün).
-- [ ] **Step 5:** Commit `feat(api): Leseanfragen warten bei Sitzungsende auf die Neuanmeldung`.
+- [x] **Step 2:** vitest → FAIL.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** vitest für `src/api/` → PASS (bestehende `client`-Tests unverändert grün).
+- [x] **Step 5:** Commit `feat(api): Leseanfragen warten bei Sitzungsende auf die Neuanmeldung`.
 
 ### Task 3: Platte räumen, Tab-Speicher behalten
 
@@ -125,7 +125,7 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
   - `lagebildUnterbrechen(qc: QueryClient): Promise<void>` — in der `reihe`: Persister beenden
     (`beenden`), `lagebildLoeschenPlatte()`, **ohne** `qc.clear()`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `geraetPlatteRaeumen lässt sessionStorage und verlaufInhalt stehen` — vorher
     `lfh:erfassung:1:m:f`, `lfh:alarm:ausgeblendet`, `lfh:liste:x:1`, `verlaufInhalt` und
     `localStorage lfh:queue-zaehler` setzen; danach nur der `localStorage`-Schlüssel weg.
@@ -134,10 +134,10 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
     `lagebildAnmelden` + gesetzter Query: `lagebildLesen()` `undefined`, `qc.getQueryData` noch da;
     eine spätere Cache-Änderung schreibt nichts auf die Platte.
   - `lagebildAnmelden derselben Person nach der Unterbrechung legt neu an und speichert wieder`.
-- [ ] **Step 2:** vitest → FAIL.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** vitest `src/offline/` → PASS, inkl. `geraetRaeumung.guard.test.ts`.
-- [ ] **Step 5:** Commit `feat(offline): Platte räumen ohne den Speicher des Tabs`.
+- [x] **Step 2:** vitest → FAIL.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** vitest `src/offline/` → PASS, inkl. `geraetRaeumung.guard.test.ts`.
+- [x] **Step 5:** Commit `feat(offline): Platte räumen ohne den Speicher des Tabs`.
 
 ### Task 4: Unterbrechung im `AuthProvider`
 
@@ -173,7 +173,7 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
   `setKonflikt(...)`.
 - `abmeldenLokal` setzt eine stehende Unterbrechung auf `null` und entsperrt mit `beendet`.
 
-- [ ] **Step 1: Failing tests** (je ein `it`, deutsch als Satz):
+- [x] **Step 1: Failing tests** (je ein `it`, deutsch als Satz):
   - `401 im Betrieb unterbricht: Benutzer bleibt, Platte leer, Query-Cache bleibt`.
   - `Gerät wird nicht unterbrochen` (`unterbrechen()` → `false`).
   - `Anmeldung derselben Person löst auf ohne Neuladen` — `login('anna', …)` → `unterbrechung`
@@ -187,11 +187,11 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
   - `angekündigtes Abmelden in einem anderen Tab räumt wie bisher`.
   - `unterbrechungBeenden meldet lokal ab und entsperrt mit beendet`.
   - `Push wird nach der Auflösung abgeglichen` (`pushAbgleichen` gemockt).
-- [ ] **Step 2:** vitest → FAIL.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** vitest `src/auth/` → PASS; bestehende `AuthContext*.test.tsx` angepasst, wo sie
+- [x] **Step 2:** vitest → FAIL.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** vitest `src/auth/` → PASS; bestehende `AuthContext*.test.tsx` angepasst, wo sie
   das alte 401-Verhalten im Betrieb festhalten (nur diese Erwartungen ändern, nicht die übrigen).
-- [ ] **Step 5:** Commit `feat(auth): Sitzungsende im Betrieb unterbricht statt abzumelden`.
+- [x] **Step 5:** Commit `feat(auth): Sitzungsende im Betrieb unterbricht statt abzumelden`.
 
 ### Task 5: Sitzungswache, Offline-Abgleich
 
@@ -208,11 +208,11 @@ genau ein Wiederholversuch, `null`/`false` → wie heute werfen. Der Wiederholve
 `beiAblauf`: Gerät → wie heute; sonst `if (unterbrechen()) return;`; sonst wie heute
 (`abmeldenLokal('sitzungsende')`, `/login` mit `von`).
 
-- [ ] **Step 1: Failing tests:** `Ablauf mit Benutzer unterbricht und navigiert nicht`;
+- [x] **Step 1: Failing tests:** `Ablauf mit Benutzer unterbricht und navigiert nicht`;
   `Ablauf ohne Benutzer führt wie bisher zur Anmeldung`; `Gerät führt wie bisher zu Kopplung
   beendet`; `abgleichFuer ruht während der Unterbrechung`.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** implementieren. **Step 4:** PASS.
-- [ ] **Step 5:** Commit `feat(auth): Sitzungswache unterbricht statt umzuleiten`.
+- [x] **Step 2:** vitest → FAIL. **Step 3:** implementieren. **Step 4:** PASS.
+- [x] **Step 5:** Commit `feat(auth): Sitzungswache unterbricht statt umzuleiten`.
 
 ### Task 6: Live-Ströme nach der Wiederherstellung
 
@@ -227,10 +227,10 @@ Nach `meldeSitzungAbgelaufen()` im Zweig `!sessionGueltig`: einmalig auf
 `SITZUNG_WIEDERHERGESTELLT` hören; dann (sofern nicht `abgebrochen`) `verbinde()` mit
 `backoffStufe = 0`. Das Abräumen der Verbindung entfernt den Listener.
 
-- [ ] **Step 1: Failing tests:** `nach 401 und Wiederherstellung baut die Verbindung neu auf und
+- [x] **Step 1: Failing tests:** `nach 401 und Wiederherstellung baut die Verbindung neu auf und
   gleicht ab` (`beiWiederaufbau` gerufen); `abgeräumte Verbindung reagiert nicht mehr`.
-- [ ] **Step 2–4:** FAIL → implementieren → PASS.
-- [ ] **Step 5:** Commit `feat(live): Ströme nach wiederhergestellter Sitzung neu aufbauen`.
+- [x] **Step 2–4:** FAIL → implementieren → PASS.
+- [x] **Step 5:** Commit `feat(live): Ströme nach wiederhergestellter Sitzung neu aufbauen`.
 
 ### Task 7: Anmeldekomponente ziehen, Dialog bauen, Anmeldeseite nennt den Grund
 
@@ -268,11 +268,11 @@ Text und Restlaufzeit wörtlich (Global Constraints). Restzeit je Sekunde aus
 'sitzung-beendet' } })`. Benutzername vorbelegt mit `bisher.benutzername`. Bei gekoppeltem Gerät
 nie sichtbar (die Wache unterbricht es nicht).
 
-- [ ] **Step 1:** `LoginPage`-Tests laufen lassen (Ausgangslage grün).
-- [ ] **Step 2:** `AnmeldeFormular` ziehen, `LoginPage` darauf umstellen; `LoginPage`-Tests →
+- [x] **Step 1:** `LoginPage`-Tests laufen lassen (Ausgangslage grün).
+- [x] **Step 2:** `AnmeldeFormular` ziehen, `LoginPage` darauf umstellen; `LoginPage`-Tests →
   PASS ohne Änderung ihrer Erwartungen. Commit `refactor(auth): Anmeldeformular aus der
   Anmeldeseite ziehen`.
-- [ ] **Step 3: Failing tests** `SitzungBeendetDialog.test.tsx`:
+- [x] **Step 3: Failing tests** `SitzungBeendetDialog.test.tsx`:
   - `zeigt Kopf, Text und vorbelegten Benutzernamen bei Unterbrechung`.
   - `lässt sich weder mit Escape noch per Maske schließen`.
   - `liegt über einem offenen Dialog der Seite und behält dessen Eingabe` — Seite rendert ein
@@ -283,9 +283,9 @@ nie sichtbar (die Wache unterbricht es nicht).
   - `„Abmelden“ führt zur Anmeldeseite mit Grund`.
   - `SSO-Knopf zeigt den Hinweis`.
   - `LoginPage.test.tsx`: `nennt den Grund nach Sitzungsende`.
-- [ ] **Step 4:** FAIL → Dialog bauen, in `SitzungsLayout` einhängen, Hinweis auf der
+- [x] **Step 4:** FAIL → Dialog bauen, in `SitzungsLayout` einhängen, Hinweis auf der
   Anmeldeseite → PASS.
-- [ ] **Step 5:** Commit `feat(auth): Anmeldung als Dialog über der Seite nach Sitzungsende`.
+- [x] **Step 5:** Commit `feat(auth): Anmeldung als Dialog über der Seite nach Sitzungsende`.
 
 ### Task 8: Regeln und e2e
 
@@ -298,17 +298,17 @@ nie sichtbar (die Wache unterbricht es nicht).
 - Prüfen: `docs/anwender/` nach Beschreibungen des Sitzungsendes (`grep -ri "sitzung"`); wo eine
   steht, nachziehen (Mitänderungsregel `docs/anwender/AGENTS.md`).
 
-- [ ] **Step 1:** `auth/AGENTS.md`: neuer Abschnitt „Sitzung beendet im Betrieb (LLH-1770)“ mit
+- [x] **Step 1:** `auth/AGENTS.md`: neuer Abschnitt „Sitzung beendet im Betrieb (LLH-1770)“ mit
   Unterbrechung, Auflösungstabelle (Kurzform), Frist 15 min, undurchsichtige Abdeckung,
   Lesesperre; den Satz zur Sitzungswache anpassen. `offline/AGENTS.md`: 401 im Betrieb → Platte
   sofort, Speicher und `sessionStorage` mit der Frist. Verweis auf das Design-Doc.
-- [ ] **Step 2:** e2e `Meldung bleibt nach erneuter Anmeldung erhalten`: anmelden, Meldungen
+- [x] **Step 2:** e2e `Meldung bleibt nach erneuter Anmeldung erhalten`: anmelden, Meldungen
   öffnen, Formular ausfüllen, Sitzung über `context.clearCookies()` beenden, eine Leseanfrage
   auslösen (Seite fokussieren/Abfrage invalidieren), Dialog „Sitzung beendet“ sichtbar, mit
   demselben Benutzer anmelden, Text im Formular unverändert, Senden legt die Meldung an.
-- [ ] **Step 3:** betroffene e2e-Specs anpassen; Lauf soweit in der Umgebung möglich
+- [x] **Step 3:** betroffene e2e-Specs anpassen; Lauf soweit in der Umgebung möglich
   (`mise exec -- pnpm exec playwright test e2e/sitzung-*.spec.ts --trace off`), sonst im PR
   benennen.
-- [ ] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 5:** Commit `docs: Regeln zum Sitzungsende im Betrieb` und
+- [x] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] **Step 5:** Commit `docs: Regeln zum Sitzungsende im Betrieb` und
   `test(e2e): Sitzung beendet als Dialog`.
