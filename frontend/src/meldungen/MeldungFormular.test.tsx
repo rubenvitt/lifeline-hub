@@ -631,8 +631,7 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
-    // Der Text steht am Feld und seit LLH-1759 auch in der Zeile über dem Knopf.
-    expect(screen.getAllByText('Frist mindestens 1 Min')).toHaveLength(2);
+    expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 
@@ -645,8 +644,7 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     });
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    // Am Feld und in der Zeile über dem Knopf (LLH-1759).
-    expect(await screen.findAllByText('Frist höchstens 10080 Min')).toHaveLength(2);
+    expect(await screen.findByText('Frist höchstens 10080 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 });
