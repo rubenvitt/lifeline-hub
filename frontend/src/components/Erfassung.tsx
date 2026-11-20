@@ -282,6 +282,8 @@ export function ErfassungsFormular<T extends object>({
   const fussRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const zusammenfassungId = useId();
   const { istSchmal } = useViewport();
+  // Im Dialog unter `md` steht „Abbrechen“ im Kopf, klebend nur der Abschluss (LLH-1763).
+  const abbruchImKopf = fussKlebt && istSchmal;
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
@@ -536,7 +538,7 @@ export function ErfassungsFormular<T extends object>({
             )}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
               <Knopfreihe fuss>
-                {onAbbrechen && (
+                {onAbbrechen && !abbruchImKopf && (
                   <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                     Abbrechen
                   </Button>
@@ -629,6 +631,37 @@ function klebenderFuss(token: GlobalToken) {
   } as const;
 }
 
+/**
+ * Unter `md` trägt der Kopf „Abbrechen“ statt des Schließkreuzes (LLH-1763): es ist antds
+ * Schließknopf selbst, nur mit Text. So bleibt es derselbe Ausweg wie Kreuz, Maske und Escape
+ * (`onCancel` → `schliessen`), dieselbe Sperre beim Speichern und dieselbe Lage im Kopf, deren
+ * Höhe {@link kopfBoden} rechnet; die Höhe des Knopfs bleibt antds Kreuzgröße (= Steuerhöhe).
+ * Der Rahmen macht ihn als Knopf erkennbar, ein nacktes Wort im Kopf läse sich als Titelteil.
+ */
+function abbrechenImKopf(token: GlobalToken) {
+  return {
+    width: 'auto',
+    paddingInline: token.paddingSM,
+    fontSize: token.fontSize,
+    fontWeight: 'normal',
+    color: token.colorText,
+    border: `${token.lineWidth}px solid ${token.colorBorder}`,
+  } as const;
+}
+
+/**
+ * Der Kopfknopf liegt wie das Kreuz absolut über dem Kopf; der Titel muss vor ihm umbrechen.
+ * `10ch` in der Schrift des Kopfs deckt „Abbrechen“ (9 Zeichen proportional, schmaler als 9
+ * Ziffern) samt Rahmen, dazu beide Polster des Knopfs und der Abstand des Knopfs zum Rand
+ * (`padding`, großzügig gegen antds `(Kopfhöhe − Kreuz) / 2`) und ein Zielabstand `marginXS`.
+ * Nachweis: `e2e/dialoge-handy.spec.ts`, Titel und Knopf schneiden sich nicht.
+ */
+function kopfMitAbbrechen(token: GlobalToken) {
+  return {
+    paddingInlineEnd: `calc(10ch + ${2 * token.paddingSM + token.padding + token.marginXS}px)`,
+  } as const;
+}
+
 /** Was {@link kopfBoden} vom Theme braucht; `theme.useToken()` erfüllt es. */
 type KopfToken = Pick<
   GlobalToken,
@@ -692,6 +725,7 @@ export function ErfassungsModal<T extends object>({
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   const sperrtAbbruch = rest.speicherung?.isPending === true;
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
   const schliessen = useCallback(() => {
@@ -707,13 +741,26 @@ export function ErfassungsModal<T extends object>({
       open={offen}
       title={titel}
       onCancel={schliessen}
-      closable={sperrtAbbruch ? { disabled: true } : true}
+      closable={
+        istSchmal
+          ? { closeIcon: 'Abbrechen', 'aria-label': 'Abbrechen', disabled: sperrtAbbruch }
+          : sperrtAbbruch
+            ? { disabled: true }
+            : true
+      }
       mask={{ closable: !sperrtAbbruch }}
       footer={null}
       destroyOnHidden
       keyboard={false}
       width={breite}
-      styles={{ header: { minHeight: kopfBoden(token) } }}
+      styles={
+        istSchmal
+          ? {
+              header: { minHeight: kopfBoden(token), ...kopfMitAbbrechen(token) },
+              close: abbrechenImKopf(token),
+            }
+          : { header: { minHeight: kopfBoden(token) } }
+      }
     >
       <ErfassungsFormular<T>
         onAbbrechen={onAbbrechen}

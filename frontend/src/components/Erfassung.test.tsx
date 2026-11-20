@@ -13,6 +13,8 @@ import {
   serienKuerzel,
   titelzeilenHoehe,
   type ErfassungsFormularSteuerung,
+  type Nebenaktion,
+  type Speicherung,
 } from './Erfassung';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
@@ -795,6 +797,11 @@ describe('ErfassungsModal', () => {
     onErfasst?: (w: Werte) => void;
     onFertig?: () => void;
     onAbbrechen?: () => void;
+    speicherung?: Speicherung;
+    serie?: boolean;
+    uebernahme?: (keyof Werte)[];
+    nebenaktionen?: Nebenaktion[];
+    zusammenfassung?: ReactNode;
   }) {
     const [form] = Form.useForm<Werte>();
     return (
@@ -806,6 +813,11 @@ describe('ErfassungsModal', () => {
         onFertig={props.onFertig ?? (() => {})}
         onAbbrechen={props.onAbbrechen ?? (() => {})}
         onErfasst={props.onErfasst}
+        speicherung={props.speicherung}
+        serie={props.serie}
+        uebernahme={props.uebernahme}
+        nebenaktionen={props.nebenaktionen}
+        zusammenfassung={props.zusammenfassung}
       >
         <Form.Item label="Ort" name="ort">
           <Input />
@@ -931,6 +943,53 @@ describe('ErfassungsModal', () => {
       expect(onFertig).not.toHaveBeenCalled();
       unmount();
     }
+  });
+
+  it('zeigt am Handy statt des Kreuzes „Abbrechen“ im Kopf (LLH-1763)', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const knoepfe = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(knoepfe).toHaveLength(1);
+    const [abbrechen] = knoepfe;
+    expect(abbrechen).toHaveClass('ant-modal-close');
+    expect(abbrechen.closest('form')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeNull();
+  });
+
+  it('behält ab md das Schließkreuz, ohne „Abbrechen“ im Kopf', () => {
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const kreuz = screen.getByRole('button', { name: /Close|Schliessen|Schließen/i });
+    expect(kreuz).toHaveClass('ant-modal-close');
+    expect(kreuz).not.toHaveTextContent('Abbrechen');
+  });
+
+  it('„Abbrechen“ im Kopf leert die Felder und ruft onAbbrechen einmal (LLH-1763)', async () => {
+    setzeViewportBreite(390);
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('„Abbrechen“ im Kopf ist gesperrt, solange gespeichert wird (LLH-1763)', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        speicherung={{ isPending: true, error: null, reset: vi.fn() }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
   });
 
   it('trägt keine eigene antd-Fusszeile — der Absende-Knopf liegt im Formular', () => {
