@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
+import { sitzungEntsperren } from '../auth/sitzungsSperre';
 import { onlineManager } from '@tanstack/react-query';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
@@ -127,6 +128,8 @@ afterEach(() => {
   // Nach dem Unmount: Ein späterer Abbruch (Frist aus `api/client.ts`) einer noch offenen Anfrage
   // ließe msw im nächsten Test dessen Anfragen ins echte Netz (`offeneAnfragen.ts`, LLH-1536).
   trenneOffeneAnfragen();
+  // Eine stehende Sitzungssperre (LLH-1770) hielte im nächsten Test jede Leseanfrage an.
+  sitzungEntsperren('beendet');
   server.resetHandlers();
   // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
   // nicht TanStack online und `navigator.onLine` offline meldet.

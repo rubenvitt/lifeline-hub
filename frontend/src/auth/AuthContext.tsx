@@ -25,8 +25,11 @@ import {
 import {
   BENUTZER_PRUEFEN,
   meldeSitzungAbgelaufen,
+  meldeSitzungWiederhergestellt,
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
+import { sitzungEntsperren, sitzungSperren } from './sitzungsSperre';
+import { seiteNeuLaden } from './seiteNeuLaden';
 import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import { listenGedaechtnisBinden } from '../components/listenGedaechtnis';
 import {
@@ -34,10 +37,12 @@ import {
   lagebildBeenden,
   lagebildLoeschen,
   lagebildStarten,
+  lagebildUnterbrechen,
 } from '../offline/lagebildSitzung';
 import type { MeErgebnis } from '../offline/lagebildStart';
 import {
   geraetFuerBenutzerRaeumen,
+  geraetPlatteRaeumen,
   geraetRaeumen,
   type AusgangsAnlass,
 } from '../offline/geraetRaeumung';
@@ -69,6 +74,18 @@ export interface BenutzerKonflikt {
   jetzt: MeAntwort;
 }
 
+/** Wie lange die Seite hinter dem Dialog „Sitzung beendet“ höchstens montiert bleibt
+ *  (LLH-1770); danach folgt der volle Ausgang. */
+export const UNTERBRECHUNG_FRIST_MS = 15 * 60_000;
+
+/** Die Sitzung endete im laufenden Betrieb (LLH-1770): die Seite bleibt montiert und verdeckt,
+ *  bis `bisher` sich wieder anmeldet, jemand anderes übernimmt oder die Frist abläuft. */
+export interface SitzungsUnterbrechung {
+  bisher: MeAntwort;
+  /** Eintritt, ms seit Epoche; die Frist zählt ab hier. */
+  seit: number;
+}
+
 interface AuthWert {
   benutzer: MeAntwort | null;
   /** Die Kopplung, wenn dieser Tab als gekoppeltes Gerät läuft (LFH-892); sonst `null`. Kommt
@@ -90,6 +107,19 @@ interface AuthWert {
   /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). Aufgelöst per Neuladen
    *  (`BenutzerKonfliktDialog`), nie im laufenden Baum. */
   konflikt: BenutzerKonflikt | null;
+  /** Steht, solange die Sitzung im Betrieb unterbrochen ist (LLH-1770, `SitzungBeendetDialog`). */
+  unterbrechung: SitzungsUnterbrechung | null;
+  /**
+   * Unterbricht nach einer 401 im Betrieb, statt abzumelden (LLH-1770): der Benutzer bleibt
+   * (die Seite bleibt montiert), Leseanfragen warten an der Sitzungssperre, Lagebild-Platte und
+   * Gerätedaten auf der Platte gehen sofort. `true`, wenn die Unterbrechung danach steht (neu
+   * oder schon vorher); `false` ohne Benutzer und bei einem gekoppelten Gerät — dann gilt der
+   * bisherige Ausgang.
+   */
+  unterbrechen: () => boolean;
+  /** Voller Ausgang aus der Unterbrechung (Frist, „Abmelden“ im Dialog): lokal abmelden wie
+   *  beim Sitzungsende, wartende Leseanfragen scheitern. Wirft nie. */
+  unterbrechungBeenden: () => Promise<void>;
   /**
    * Lädt `/api/auth/me` neu und übernimmt den Benutzer — für Login-Wege, die die Session
    * serverseitig ohne `authApi.login` setzen (Passkey, `totpFinish`).
@@ -126,6 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [benutzer, setBenutzer] = useState<MeAntwort | null>(null);
   const [laedt, setLaedt] = useState(true);
   const [konflikt, setKonflikt] = useState<BenutzerKonflikt | null>(null);
+  const [unterbrechung, setUnterbrechung] = useState<SitzungsUnterbrechung | null>(null);
+  /** Synchron lesbar für Prüfung und Anmeldewege, die nicht an einen Render gebunden sind. */
+  const unterbrechungRef = useRef<SitzungsUnterbrechung | null>(null);
   const queryClient = useQueryClient();
   const benutzerId = benutzer?.id ?? null;
   const istGeraet = benutzer?.geraet != null;
@@ -170,6 +203,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBenutzer(b);
   }, []);
 
+  /** Setzt die Unterbrechung (LLH-1770) synchron mit ihrem Ref. Endet sie, entscheidet
+   *  `ergebnis`, ob wartende Leseanfragen wiederholen oder scheitern. */
+  const setzeUnterbrechung = useCallback(
+    (u: SitzungsUnterbrechung | null, ergebnis: 'wiederhergestellt' | 'beendet' = 'beendet') => {
+      const vorher = unterbrechungRef.current;
+      unterbrechungRef.current = u;
+      setUnterbrechung(u);
+      if (u) sitzungSperren();
+      else if (vorher) sitzungEntsperren(ergebnis);
+    },
+    [],
+  );
+
   /** Der Benutzer zuerst, das Lagebild (LFH-723, Speicher UND Platte) und die übrigen
    *  Gerätedaten (LFH-767) danach: ein Fehler beim Löschen darf die Abmeldung nicht aufhalten —
    *  sonst ließe `RequireAuth` geschützte Routen passieren und die Sitzungswache meldete wegen
@@ -179,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const warAngemeldet = benutzerRef.current !== null;
       uebernimm(null);
       setKonflikt(null);
+      setzeUnterbrechung(null);
       // Nur ein echter Wechsel wird gemeldet — sonst schaukelten sich die Tabs mit
       // „abgemeldet“ gegenseitig auf.
       if (warAngemeldet) meldeAuthWechsel({ art: 'abgemeldet', anlass });
@@ -193,8 +240,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Auftragsreihenfolge aus, ein späteres Anmelden räumt erst danach.
       void geraetRaeumen(anlass);
     },
-    [queryClient, uebernimm],
+    [queryClient, uebernimm, setzeUnterbrechung],
   );
+
+  const unterbrechen = useCallback((): boolean => {
+    if (unterbrechungRef.current) return true;
+    const bisher = benutzerRef.current;
+    if (!bisher || bisher.geraet != null) return false;
+    setzeUnterbrechung({ bisher, seit: Date.now() });
+    // Platte sofort, Speicher des Tabs erst mit der Frist (Design LLH-1770). Beides wirft nie
+    // und wird nicht abgewartet, wie in `abmeldenLokal`.
+    lagebildUnterbrechen(queryClient).catch((e: unknown) =>
+      console.error('Lagebild konnte bei der Unterbrechung nicht geräumt werden', e),
+    );
+    void geraetPlatteRaeumen();
+    return true;
+  }, [queryClient, setzeUnterbrechung]);
+
+  const unterbrechungBeenden = useCallback(async () => {
+    // `abmeldenLokal` beendet die Unterbrechung mit „beendet“: wartende Leseanfragen scheitern.
+    await abmeldenLokal('sitzungsende');
+  }, [abmeldenLokal]);
 
   /** Nach jeder geklärten Anmeldung (LFH-767, design.md D4): Entwürfe und Quittungen anderer
    *  Personen gehen von der Platte. Das Räumen wird nicht abgewartet (s. `abmeldenLokal`) — die
@@ -205,6 +271,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void geraetFuerBenutzerRaeumen(b.id);
     },
     [queryClient],
+  );
+
+  /**
+   * Eine bestätigte Sitzung trifft auf eine stehende Unterbrechung (LLH-1770). Dieselbe Person:
+   * auflösen — Lagebild wieder vorhalten, Leseanfragen wiederholen lassen, Live-Ströme und
+   * Web Push neu, alle Abfragen frisch; die Seite bleibt, wie sie war. Eine andere Person: die
+   * Seite neu laden, nie im laufenden Baum übernehmen (LFH-387) — sonst schriebe ein noch
+   * offenes Formular von `bisher` mit der Kennung der neuen Person. `false` ohne Unterbrechung.
+   */
+  const unterbrechungAufloesen = useCallback(
+    async (b: MeAntwort): Promise<boolean> => {
+      const u = unterbrechungRef.current;
+      if (!u) return false;
+      if (b.id !== u.bisher.id) {
+        meldeAuthWechsel({ art: 'angemeldet' });
+        const { pathname, search, hash } = window.location;
+        seiteNeuLaden(`${pathname}${search}${hash}`);
+        return true;
+      }
+      await vorhaltungAnmelden(b);
+      if (unterbrechungRef.current !== u) return true;
+      vergissOffeneAbmeldung();
+      uebernimm(b);
+      setzeUnterbrechung(null, 'wiederhergestellt');
+      sitzungsMeldungZuruecksetzen();
+      meldeSitzungWiederhergestellt();
+      void queryClient.invalidateQueries();
+      void pushAbgleichen(b.id, { nurBeiBedarf: true });
+      meldeAuthWechsel({ art: 'angemeldet' });
+      return true;
+    },
+    [queryClient, setzeUnterbrechung, uebernimm, vorhaltungAnmelden],
   );
 
   /** Prüft, wem die Sitzung gehört (LFH-387). Die Wahrheit ist `GET /api/auth/me`; Anstöße
@@ -239,7 +337,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (e instanceof ApiError && e.status === 401) {
             vergissOffeneAbmeldungSeit(merkerVorher);
             if (benutzerRef.current) {
-              void abmeldenLokal(abmeldenAngekuendigt.current ? 'abmelden' : 'sitzungsende');
+              // Freiwillig abgemeldet (anderer Tab): räumen wie ein Abmelden. Sonst im Betrieb
+              // unterbrechen (LLH-1770); ein Gerät meldet ab wie bisher. Die Sitzungswache
+              // folgt auf die Meldung (sie unterbricht nicht doppelt).
+              if (abmeldenAngekuendigt.current) void abmeldenLokal('abmelden');
+              else if (!unterbrechen()) void abmeldenLokal('sitzungsende');
               abmeldenAngekuendigt.current = false;
               meldeSitzungAbgelaufen();
             }
@@ -270,6 +372,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           sitzungsMeldungZuruecksetzen();
           return;
         }
+        if (unterbrechungRef.current) {
+          // In einem anderen Tab angemeldet (LLH-1770): dieselbe Person heilt auch diesen Tab.
+          // Eine andere endet die Unterbrechung OHNE Räumen — der Konflikt lädt neu, und die
+          // Frist löschte sonst das Lagebild der neuen, gültigen Sitzung auf der Platte.
+          if (lokal.id === aufServer.id) {
+            await unterbrechungAufloesen(aufServer);
+            return;
+          }
+          setzeUnterbrechung(null);
+        }
         setKonflikt(lokal.id === aufServer.id ? null : { bisher: lokal, jetzt: aufServer });
       })().finally(() => {
         laufendePruefung.current = null;
@@ -281,7 +393,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       laufendePruefung.current = lauf;
       return lauf;
     },
-    [abmeldenLokal, uebernimm, vorhaltungAnmelden],
+    [
+      abmeldenLokal,
+      setzeUnterbrechung,
+      uebernimm,
+      unterbrechen,
+      unterbrechungAufloesen,
+      vorhaltungAnmelden,
+    ],
   );
 
   /**
@@ -398,6 +517,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Übernimmt die Antwort einer frisch angelegten Sitzung (Login, Festlegen nach Einmalpasswort). */
   const angemeldet = useCallback(
     async (antwort: BenutzerAnzeige) => {
+      if (await unterbrechungAufloesen(antwort)) return;
       // Eine andere Person als die vorherige räumt deren Lagebild und Gerätedaten (LFH-767),
       // bevor der Benutzer wechselt.
       await vorhaltungAnmelden(antwort);
@@ -408,7 +528,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sitzungsMeldungZuruecksetzen();
       meldeAuthWechsel({ art: 'angemeldet' });
     },
-    [uebernimm, vorhaltungAnmelden],
+    [uebernimm, unterbrechungAufloesen, vorhaltungAnmelden],
   );
 
   const login = useCallback(
@@ -470,6 +590,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const aktualisiere = useCallback(async () => {
     const merkerVorher = offenerVorgang();
     const b = await authApi.me();
+    if (await unterbrechungAufloesen(b)) {
+      vergissOffeneAbmeldungSeit(merkerVorher);
+      return;
+    }
     await vorhaltungAnmelden(b);
     vergissOffeneAbmeldungSeit(merkerVorher);
     uebernimm(b);
@@ -477,7 +601,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.
     sitzungsMeldungZuruecksetzen();
     meldeAuthWechsel({ art: 'angemeldet' });
-  }, [uebernimm, vorhaltungAnmelden]);
+  }, [uebernimm, unterbrechungAufloesen, vorhaltungAnmelden]);
 
   const geraet = benutzer?.geraet ?? null;
   const wert = useMemo<AuthWert>(
@@ -491,6 +615,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       aktualisiere,
       abmeldenLokal,
       konflikt,
+      unterbrechung,
+      unterbrechen,
+      unterbrechungBeenden,
     }),
     [
       benutzer,
@@ -502,6 +629,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       aktualisiere,
       abmeldenLokal,
       konflikt,
+      unterbrechung,
+      unterbrechen,
+      unterbrechungBeenden,
     ],
   );
 
