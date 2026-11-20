@@ -74,6 +74,8 @@ import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
 import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
+import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
+import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 
 const ORT_OPTIONEN: { value: Ortsfilter; label: string }[] = [
   { value: 'alle', label: 'Alle Orte' },
@@ -183,6 +185,10 @@ export default function LagemeldungenPage() {
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
+  // Auf diesem Gerät vorgemerkte Lagemeldungen (LLH-1758): über der Zeitachse, nicht in ihr.
+  const nichtGesendet = useVorgemerkteSchreibaktionen(benutzer?.id, einsatzId, 'meldung').filter(
+    (v) => v.antrag == null && v.aktion.daten.meldungsart === 'lagemeldung',
+  );
   const { message } = App.useApp();
   const meldungenGesperrt = useSprungSperre(einsatzId)('meldungen');
 
@@ -689,6 +695,14 @@ export default function LagemeldungenPage() {
           </Button>
         </div>
       )}
+      <BeantragtListe
+        titel="Nicht gesendet"
+        eintraege={nichtGesendet.map((v) => ({
+          schluessel: `vorgemerkt-${v.id}`,
+          text: `${v.aktion.daten.absender} · ${v.aktion.daten.inhalt}`,
+          zeit: v.erstellt_at,
+        }))}
+      />
       <div
         role="region"
         aria-label="Lagemeldungen"

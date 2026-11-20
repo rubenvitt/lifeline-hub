@@ -11,7 +11,12 @@ import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
-import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionEntfernen,
+  schreibaktionenLaden,
+} from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
@@ -233,6 +238,33 @@ describe('MeldungenPage', () => {
     // Ereigniszeit wird immer mitgesendet (Pflicht, leer ⇒ jetzt).
     expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(
       /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    );
+  });
+
+  // LLH-1758: was vorgemerkt ist, steht als „Nicht gesendet“ über der Liste, nicht in ihr.
+  it('zeigt eine vorgemerkte Meldung als „Nicht gesendet“ über der Liste, bis sie gesendet ist', async () => {
+    await schreibaktionEinreihen(1, 1, {
+      art: 'meldung',
+      daten: {
+        absender: 'RTW 9',
+        meldeweg: 'funk',
+        inhalt: 'Vorgemerkte Lage',
+        ereigniszeit: '2026-11-20 12:00:00',
+        client_id: 'm-vorgemerkt',
+      },
+    });
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const abschnitt = await screen.findByRole('region', { name: 'Nicht gesendet' });
+    expect(within(abschnitt).getByText(/RTW 9 · Vorgemerkte Lage/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Beantragte Meldungen' })).not.toBeInTheDocument();
+
+    const [zeile] = await schreibaktionenLaden(1, 1);
+    await act(async () => {
+      await schreibaktionEntfernen(1, zeile.id!);
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Nicht gesendet' })).not.toBeInTheDocument(),
     );
   });
 

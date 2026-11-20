@@ -139,12 +139,11 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
-  // Beantragte Meldungen am Spiegel (LLH-1492, D13); vorgemerkte zeigt der Wiederherstellungsbereich.
-  const beantragteMeldungen = useVorgemerkteSchreibaktionen(
-    benutzer?.id,
-    einsatzId,
-    'meldung',
-  ).filter((v) => v.antrag != null);
+  // Beantragte Meldungen am Spiegel (LLH-1492, D13) und auf diesem Gerät vorgemerkte, noch nicht
+  // gesendete (LLH-1758): beide über der Liste, getrennt von ihren Daten und Kennzahlen.
+  const meldungenAmGeraet = useVorgemerkteSchreibaktionen(benutzer?.id, einsatzId, 'meldung');
+  const beantragteMeldungen = meldungenAmGeraet.filter((v) => v.antrag != null);
+  const nichtGesendeteMeldungen = meldungenAmGeraet.filter((v) => v.antrag == null);
   // Unter `md` Zeile statt Band und Filterknopf statt Auswahlfeld (LFH-974): der Wortlaut der
   // ersten Karte gehört in den ersten Schirm.
   const { istSchmal } = useViewport();
@@ -956,6 +955,15 @@ export default function MeldungenPage() {
         </Kennzahlenband>
       )}
 
+      {/* Vorgemerkte Meldungen (LLH-1758): über der Liste, nicht in den Kennzahlen. */}
+      <BeantragtListe
+        titel="Nicht gesendet"
+        eintraege={nichtGesendeteMeldungen.map((v) => ({
+          schluessel: `vorgemerkt-${v.id}`,
+          text: `${v.aktion.daten.absender} · ${v.aktion.daten.inhalt}`,
+          zeit: v.erstellt_at,
+        }))}
+      />
       {/* Beantragte Meldungen am Spiegel (LLH-1492): über der Liste, nicht in den Kennzahlen. */}
       <BeantragtListe
         titel="Beantragte Meldungen"
