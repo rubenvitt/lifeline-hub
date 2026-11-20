@@ -22,6 +22,7 @@ import {
   verbindungsartWort,
 } from '../skizzenZeichen';
 import { verbindenZiele, type VerbindenZiel } from './bedienung';
+import { pflicht } from '../../components/pflichtRegel';
 
 // ── Anlegen ──────────────────────────────────────────────────────────────────────────────────
 
@@ -91,14 +92,14 @@ export function AnlegenDialog({
       onAbbrechen={onSchliessen}
     >
       {art === 'extern' ? (
-        <Feld label="Art" name="stellenart" rules={[{ required: true }]}>
+        <Feld label="Art" name="stellenart" rules={[pflicht('Art')]}>
           <Select
             options={EXTERNE_STELLENARTEN.map((a) => ({ value: a, label: STELLENART_LABEL[a] }))}
           />
         </Feld>
       ) : null}
       {art === 'komponente' ? (
-        <Feld label="Art" name="komponentenart" rules={[{ required: true }]}>
+        <Feld label="Art" name="komponentenart" rules={[pflicht('Art')]}>
           <Select
             options={KOMPONENTENARTEN.map((a) => ({ value: a, label: komponentenartWort(a) }))}
           />
@@ -108,9 +109,7 @@ export function AnlegenDialog({
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
-          ...(art === 'extern'
-            ? [{ required: true, whitespace: true, message: 'Bezeichnung fehlt' }]
-            : []),
+          ...(art === 'extern' ? [pflicht('Bezeichnung', { whitespace: true })] : []),
           { max: 100, message: 'Höchstens 100 Zeichen' },
         ]}
       >

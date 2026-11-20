@@ -26,6 +26,7 @@ import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../kraefte/q
 import { uhsTyp } from '../theme/statusFarben';
 import { schichtlaengeRegeln } from './planungRegeln';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Woher ein neuer Posten kommt; danach bleibt sie (der Server ändert sie nicht). */
 export type PostenHerkunft = 'frei' | 'vorlage' | 'fahrzeug' | 'uhs';
@@ -190,7 +191,7 @@ export default function PlanungPostenDialog({
       titel={posten ? `Posten ${posten.bezeichnung}` : 'Posten anlegen'}
       form={form}
       initialValues={anfang}
-      erfassenText={posten ? 'Speichern' : 'Posten anlegen'}
+      erfassenText={posten ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={posten ? 'Posten nicht gespeichert' : 'Posten nicht angelegt'}
@@ -209,7 +210,7 @@ export default function PlanungPostenDialog({
             <Feld<PostenWerte>
               label="Einheitenvorlage"
               name="vorlage_id"
-              rules={[{ required: true, message: 'Bitte eine Vorlage wählen' }]}
+              rules={[pflicht('Einheitenvorlage')]}
             >
               <Select<number>
                 aria-label="Einheitenvorlage"
@@ -224,7 +225,7 @@ export default function PlanungPostenDialog({
             <Feld<PostenWerte>
               label="Stamm-Fahrzeug"
               name="fahrzeug_id"
-              rules={[{ required: true, message: 'Bitte ein Fahrzeug wählen' }]}
+              rules={[pflicht('Stamm-Fahrzeug')]}
             >
               <Select<number>
                 aria-label="Stamm-Fahrzeug"
@@ -241,11 +242,7 @@ export default function PlanungPostenDialog({
             </Feld>
           )}
           {herkunft === 'uhs' && (
-            <Feld<PostenWerte>
-              label="Typ"
-              name="uhs_typ"
-              rules={[{ required: true, message: 'Bitte einen Typ wählen' }]}
-            >
+            <Feld<PostenWerte> label="Typ" name="uhs_typ" rules={[pflicht('Typ')]}>
               <Select<UhsTyp>
                 aria-label="Typ"
                 options={UHS_TYPEN.map((t) => ({ value: t, label: uhsTyp[t].label }))}
@@ -257,7 +254,7 @@ export default function PlanungPostenDialog({
       <Feld<PostenWerte>
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. RTW 1" maxLength={PLANUNG_BEZEICHNUNG_MAX} />
       </Feld>

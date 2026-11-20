@@ -172,7 +172,7 @@ describe('VerbleibErfassung — Rettungsmittel (LLH-1332)', () => {
     zeige();
     await waehle(user, 'Art', 'Transport');
     await user.click(screen.getByRole('button', { name: 'Erfassen' }));
-    expect(await screen.findByText('Rettungsmittel angeben')).toBeInTheDocument();
+    expect(await screen.findByText('Rettungsmittel fehlt')).toBeInTheDocument();
     expect(gesendet).toHaveLength(0);
   });
 });

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AdhocPersonModal from './AdhocPersonModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 describe('AdhocPersonModal', () => {
   it('meldet die angelegte Disposition zurück und schliesst', async () => {
@@ -147,8 +148,10 @@ describe('AdhocPersonModal', () => {
       // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
       // ein, und jsdom beendet die Animation nie.
       await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await bestaetigeVerwerfen(nutzer);
       await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-      const wieder = await screen.findByRole('dialog');
+      const wieder = await findeDialogOhneRueckfrage();
       await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
     });
   });

@@ -61,11 +61,12 @@ test('das Tableau läuft auf 390, 1024 und 1366 px nicht waagerecht über', asyn
 
   for (const breite of [390, 1024, 1366]) {
     await page.setViewportSize({ width: breite, height: 900 });
-    // Über die Sprungmarken-Adresse — der Auftrag wird übernommen und geräumt.
+    // Über die Sprungmarken-Adresse — die Ansicht ist Zustand der Adresse und bleibt stehen
+    // (LLH-1826, `frontend/AGENTS.md`, „Ansicht und Filter gehören in die Adresse“).
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=tableau`);
     await expect(tableau(page).getByRole('heading', { name: ABSCHNITT })).toBeVisible();
     await expect(tableau(page).getByText(FAHRZEUG_FREI)).toBeVisible();
-    await expect(page).not.toHaveURL(/ansicht=/);
+    await expect(page).toHaveURL(/[?&]ansicht=tableau(&|$)/);
     await expect
       .poll(
         () =>

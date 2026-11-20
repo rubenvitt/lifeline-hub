@@ -150,7 +150,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     await userEvent.type(await screen.findByLabelText('Dauer Anhänge (Tage)'), '30');
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Rechtsgrundlage angeben')).toBeInTheDocument();
+    expect(await screen.findByText('Rechtsgrundlage fehlt')).toBeInTheDocument();
     expect(speichereOrgEinstellungen).not.toHaveBeenCalled();
   });
 

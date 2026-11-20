@@ -28,6 +28,7 @@ import {
   type ZeitfensterWerte,
 } from './VerpflegungDialoge';
 import { KOSTFORM_LABEL, KOSTFORMEN } from './verpflegungText';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * „Bedarf bearbeiten“ an der Zeitfensterkarte (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der
@@ -143,7 +144,7 @@ export default function ZeitfensterBearbeiten({
       anzeige: vorher.bezeichnung,
       eingabe: <Input count={zeichenGrenze(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX)} />,
       regeln: [
-        { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+        pflicht('Bezeichnung', { whitespace: true }),
         zeichenRegel(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX, 'Bezeichnung'),
       ],
     },

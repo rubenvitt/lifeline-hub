@@ -12,6 +12,7 @@ import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { kopfFilterWaehlen, openKopfFilter } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
 import { setzeViewportBreite } from '../test/viewport';
+import { bestaetigeVerwerfen, dialogOhneRueckfrage } from '../test/verwerfen';
 
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
@@ -25,7 +26,8 @@ function stellenFeld(): HTMLElement {
 
 /** Der gewählte Wert im offenen Dialog. */
 function stellenWert(): string | null | undefined {
-  return within(screen.getByRole('dialog')).queryByText(
+  // Die beantwortete Rückfrage „Eingaben verwerfen?“ bleibt in jsdom im Baum (LLH-1755).
+  return within(dialogOhneRueckfrage()).queryByText(
     (_, el) => el?.classList.contains('ant-select-selection-item') ?? false,
   )?.textContent;
 }
@@ -64,6 +66,8 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.tab();
     expect(stellenWert()).toBe('Verworfene Eingabe');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(ausloeser);
     expect(stellenWert()).toBe('Gespeicherte Stelle');
     await waitFor(() => expect(stellenFeld()).toHaveFocus());

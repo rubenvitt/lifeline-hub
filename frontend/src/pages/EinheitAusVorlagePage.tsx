@@ -79,6 +79,7 @@ import {
 } from '../routing/deeplinks';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Einheit aus Vorlage bilden (LLH-1049, Spec `einheit-vorlagen`, „Seite zum Bilden aus der
@@ -378,7 +379,7 @@ function KopfFelder({
       <Feld
         label="Name"
         name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
+        rules={[pflicht('Name', { whitespace: true })]}
         // Warnung, keine Sperre (D15): zwei Züge derselben Vorlage sind legitim.
         validateStatus={vergeben ? 'warning' : undefined}
         help={vergeben ? 'Name schon vergeben' : undefined}

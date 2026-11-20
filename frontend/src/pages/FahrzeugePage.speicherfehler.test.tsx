@@ -9,6 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import FahrzeugePage from './FahrzeugePage';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { waehleMenueEintrag } from '../test/menue';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /**
  * Abgelehnte Speichervorgänge der Fahrzeugseite stehen am Ort der Handlung (LFH-1077,
@@ -152,8 +153,10 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' }));
-    expect(within(await screen.findByRole('dialog')).queryByRole('alert')).toBeNull();
+    expect(within(await findeDialogOhneRueckfrage()).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
   });
 

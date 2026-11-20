@@ -32,6 +32,7 @@ import LeichterFallModal, {
   type LeichterFallStelle,
 } from '../personen/LeichterFallModal';
 import { ANLASS_WORT } from '../personen/personMeta';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /** Ausgang eines Kontakts als Marke (LLH-1580, Entwurf K5/K8). */
 export interface KontaktMarke {
@@ -181,7 +182,10 @@ export default function GeraetKontaktePage() {
     },
     onSuccess: (ergebnis, daten) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        void message.warning('Offline vorgemerkt · R-…');
+        void message.warning(
+          vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.

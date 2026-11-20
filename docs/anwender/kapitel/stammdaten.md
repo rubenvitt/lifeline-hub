@@ -41,7 +41,7 @@ mit der „Übersicht“: Sie zählt den Bestand und sagt, was für einen Einsat
 
    ![Dialog „Fahrzeug anlegen“ mit Funkrufname, Fahrzeugtyp und Trägerorganisation](../bilder/stammdaten/fahrzeug-anlegen.png)
 
-4. „Speichern“ wählen, oder „Speichern und nächste“ (Strg+Enter), um gleich das nächste
+4. „Anlegen“ wählen, oder „Speichern und nächste“ (Strg+Enter), um gleich das nächste
    Fahrzeug zu erfassen. Ist „Werte behalten“ angehakt, bleibt dabei die Trägerorganisation
    stehen.
 
@@ -86,7 +86,7 @@ Am Beispiel der Qualifikationen; Fahrzeug-Status, Personal-Status und Einheitsty
 gleich:
 
 1. Unter „Stammdaten“ „Qualifikationen“ öffnen.
-2. Unter „Neue Qualifikation“ die Bezeichnung eintippen und „Qualifikation anlegen“ wählen.
+2. Unter „Neue Qualifikation“ die Bezeichnung eintippen und „Anlegen“ wählen.
 3. Zum Ändern in der Zeile „Bearbeiten“ wählen.
 4. Zum Entfernen „Deaktivieren“ wählen und die Rückfrage „Qualifikation deaktivieren?“ mit
    „Qualifikation deaktivieren“ bestätigen.
@@ -140,7 +140,7 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
    Hilfsorganisation oder Sonstige.
 4. Bei der eigenen Leitstelle „Zuständige Leitstelle“ anhaken.
 5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
-6. „Speichern“ wählen.
+6. „Anlegen“ wählen.
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
 deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
@@ -162,7 +162,7 @@ Sanitätsdienst. Wer einen Einsatz anlegt, wählt sie im Dialog „Neuen Einsatz
 
    ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“, daneben Schichtmodell „keins“, und den sichtbaren Modulen nach Kategorien, „Informationstelefon“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
 
-5. „Speichern“ wählen.
+5. „Anlegen“ wählen.
 
 Zum Ändern in der Zeile „Bearbeiten“ wählen. „Löschen“ fragt mit „… löschen?“ nach und wird mit
 „Vorlage löschen“ bestätigt.

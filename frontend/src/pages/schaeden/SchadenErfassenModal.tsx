@@ -21,6 +21,7 @@ import {
 import GeschaedigtPicker, { type GeschaedigtWert } from './GeschaedigtPicker';
 import { GefahrAuswahlImFormular, SchadensgradAuswahl } from './GefahrAuswahl';
 import { AUSMASS_META, TYP_LABEL, geschaedigtFelder } from './schadenHelfer';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface Props {
   open: boolean;
@@ -168,12 +169,12 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       speicherung={anlegenSpeicherung}
       speicherFehlerTitel="Nicht angelegt"
       speicherFehlerFallback="Anlegen fehlgeschlagen"
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       serie
       uebernahme={['ort']}
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select
           options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
             value: t,
@@ -181,11 +182,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
           }))}
         />
       </Feld>
-      <Feld
-        label="Ausmaß"
-        name="ausmass"
-        rules={[{ required: true, message: 'Ausmaß ist Pflicht' }]}
-      >
+      <Feld label="Ausmaß" name="ausmass" rules={[pflicht('Ausmaß')]}>
         <Select
           options={(Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
             value: a,
@@ -198,7 +195,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
         label="Ort"
         name="ort"
         required
-        rules={ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' })}
+        rules={ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort fehlt' })}
       >
         <EinsatzOrtsfeld
           einsatzId={einsatzId}

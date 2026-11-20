@@ -2,12 +2,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
+import { setzeZeigerGrob } from '../test/viewport';
 import NachrichtEingabe, { sendeFehlerKopf } from './NachrichtEingabe';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import { ERWAEHNUNGEN_MAX } from '../api/eingabegrenzen';
 import type { ErwaehnungVorschlag } from './erwaehnung';
 
 describe('NachrichtEingabe', () => {
+  // Enter-Vertrag „mehrzeilig in der Zeile“ (LLH-1766, `frontend/AGENTS.md`, „Erfassungs-Norm“).
+  it('bricht mit grobem Zeiger bei Enter um und sendet nur über den Knopf', async () => {
+    setzeZeigerGrob(true);
+    const onSenden = vi.fn();
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    expect(feld).toHaveAttribute('enterkeyhint', 'enter');
+    await userEvent.type(feld, 'Lage{Enter}ruhig');
+    expect(onSenden).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Lage\nruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(onSenden).toHaveBeenCalledWith('Lage\nruhig', [], []);
+  });
+
+  it('sendet nicht, solange eine Eingabemethode noch komponiert', async () => {
+    const onSenden = vi.fn();
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Lage');
+    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, isComposing: true });
+    expect(onSenden).not.toHaveBeenCalled();
+  });
+
+  it('sendet mit feinem Zeiger bei Enter, Umschalt+Enter bricht um', async () => {
+    const onSenden = vi.fn();
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    expect(feld).toHaveAttribute('enterkeyhint', 'send');
+    await userEvent.type(feld, 'Lage{Shift>}{Enter}{/Shift}');
+    expect(onSenden).not.toHaveBeenCalled();
+    await userEvent.type(feld, 'ruhig{Enter}');
+    expect(onSenden).toHaveBeenCalledWith('Lage\nruhig', [], []);
+  });
+
   it('sendet getrimmten Text und leert das Feld', async () => {
     const onSenden = vi.fn();
     renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);

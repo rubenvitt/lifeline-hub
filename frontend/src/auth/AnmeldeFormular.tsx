@@ -22,6 +22,7 @@ import {
 } from '../huelle/faehigkeiten';
 import { Marke } from '../components/instrument/Marke';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 import '../pages/LoginPage.css';
 
 interface FormWerte {
@@ -380,7 +381,7 @@ export default function AnmeldeFormular({
             <Feld
               label="Wiederherstellungscode"
               name="code"
-              rules={[{ required: true, message: 'Bitte Wiederherstellungscode eingeben' }]}
+              rules={[pflicht('Wiederherstellungscode')]}
             >
               <Input
                 size="large"
@@ -391,11 +392,7 @@ export default function AnmeldeFormular({
               />
             </Feld>
           ) : (
-            <Feld
-              label="Code aus der Authenticator-App"
-              name="code"
-              rules={[{ required: true, message: 'Bitte Code eingeben' }]}
-            >
+            <Feld label="Code aus der Authenticator-App" name="code" rules={[pflicht('Code')]}>
               {/* Das geteilte OTP-Primitiv (auch auf der Profilseite). Sechs Ziffern senden
                   ab, der Knopf darunter bleibt der Rückfallweg. */}
               <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
@@ -486,9 +483,7 @@ export default function AnmeldeFormular({
                 <Feld
                   label="Benutzername"
                   name="benutzername"
-                  rules={[
-                    { required: true, whitespace: true, message: 'Bitte Benutzername eingeben' },
-                  ]}
+                  rules={[pflicht('Benutzername', { whitespace: true })]}
                 >
                   {/* Bildschirmtastaturen schreiben sonst den ersten Buchstaben groß und
                       hängen bei Wortvorschlägen ein Leerzeichen an (LFH-981). */}
@@ -503,11 +498,7 @@ export default function AnmeldeFormular({
                 </Feld>
               )}
               {passwortAktiv && (
-                <Feld
-                  label="Passwort"
-                  name="passwort"
-                  rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
-                >
+                <Feld label="Passwort" name="passwort" rules={[pflicht('Passwort')]}>
                   <Input.Password
                     size="large"
                     autoFocus={Boolean(benutzernameVorgabe)}

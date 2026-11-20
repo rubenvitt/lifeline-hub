@@ -56,6 +56,7 @@ import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -359,7 +360,7 @@ export default function SchaedenDetailPage() {
                     count={zeichenGrenze(SCHADEN_ORT_MAX)}
                   />,
                 ),
-                rules: ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' }),
+                rules: ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort fehlt' }),
               },
               // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
               // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
@@ -545,11 +546,7 @@ export default function SchaedenDetailPage() {
         onFertig={() => setUebergebenOffen(false)}
         onAbbrechen={() => setUebergebenOffen(false)}
       >
-        <Feld
-          label="Übergeben an"
-          name="uebergeben_an"
-          rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
-        >
+        <Feld label="Übergeben an" name="uebergeben_an" rules={[pflicht('Adressat')]}>
           <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
         </Feld>
       </ErfassungsModal>
@@ -567,11 +564,7 @@ export default function SchaedenDetailPage() {
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Feld
-          label="Abschlussgrund"
-          name="abschluss_grund"
-          rules={[{ required: true, message: 'Grund ist Pflicht' }]}
-        >
+        <Feld label="Abschlussgrund" name="abschluss_grund" rules={[pflicht('Abschlussgrund')]}>
           <Select options={ABSCHLUSS_GRUENDE} />
         </Feld>
         <Feld label="Notiz (optional)" name="notiz">

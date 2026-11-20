@@ -547,7 +547,7 @@ describe('EintreffenDialog — Schritt 2: unangemeldet', () => {
       'MTW',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Unangemeldet buchen' }));
-    expect(await within(dialog()).findByText('Funkrufname angeben')).toBeInTheDocument();
+    expect(await within(dialog()).findByText('Funkrufname fehlt')).toBeInTheDocument();
     expect(koerper).toEqual([]);
   });
 
@@ -698,5 +698,17 @@ describe('EintreffenDialog — ohne Netz (LLH-1075 Teil III)', () => {
     await zuSchrittZwei('HLF 20 FF Musterstadt');
     expect(screen.queryByText(/^Schon /)).toBeNull();
     expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeEnabled();
+  });
+});
+
+describe('EintreffenDialog — Maske (LLH-1755)', () => {
+  it('ein Klick neben den Dialog schließt ihn nicht und lässt den Fokus stehen', async () => {
+    const { onClose } = zeige();
+    await screen.findByRole('searchbox', { name: 'Suche' });
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    expect(fireEvent.mouseDown(maske!)).toBe(false);
+    await userEvent.click(maske!);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

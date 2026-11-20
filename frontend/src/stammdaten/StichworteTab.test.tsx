@@ -37,7 +37,7 @@ describe('StichworteTab', () => {
   it('Admin sieht Hinzufügen und Löschen', async () => {
     renderTab(admin);
     await screen.findByText('H1');
-    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
 
@@ -50,7 +50,7 @@ describe('StichworteTab', () => {
   it('Nicht-Admin: Hinzufügen GESPERRT (samt Feld), Löschen weg', async () => {
     renderTab(nichtAdmin);
     await screen.findByText('H1');
-    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
     // Das Feld gehört mit dazu: ein gesperrter Knopf über einem beschreibbaren Feld
     // lädt zum Tippen ein, das nirgends ankommt.
     expect(screen.getByLabelText('Neues Stichwort')).toBeDisabled();
@@ -358,6 +358,6 @@ describe('StichworteTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
     expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
     expect(within(lokal).getByRole('button', { name: 'Löschen' })).toBeEnabled();
     expect(within(lokal).getByRole('combobox', { name: 'Vorlage zu H2' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeEnabled();
   });
 });

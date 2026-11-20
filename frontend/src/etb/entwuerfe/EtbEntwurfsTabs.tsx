@@ -65,10 +65,13 @@ const REITER_TEXTE = {
  * Ein unbeschriftetes Ziel hält den Boden auf BEIDEN Achsen (A1 Gate 3); antds Vorgabe maß
  * 15 × 24 px in jeder Stufe (LFH-724).
  *
+ * Er liegt am KNOPF selbst (`styles.remove`, LLH-1771), nicht an einem Kind darin: sonst maß der
+ * Knopf für Prüfung und Hilfstechnik 84 × 14 px im Handschuh-Betrieb.
+ *
  * HÖHENNEUTRAL: der Kartentab rechnet sein senkrechtes Polster fest aus `cardHeight`, jeder
  * höhere Inhalt streckte ihn (handschuh 90 → rund 141 px) und risse den Deckel der
  * angepinnten Erfassungsleiste. Der negative Rand nimmt die Fläche aus dem Layout; sie ragt
- * zentriert über den Knopf hinaus und bleibt sein Kind, ein Klick darauf ist ein Klick auf ihn.
+ * zentriert über die Zeile des Reiters hinaus.
  */
 export function entfernenStil(token: { controlHeightSM: number }) {
   return {
@@ -309,11 +312,10 @@ export default function EtbEntwurfsTabs({
       <Tabs
         type="editable-card"
         locale={REITER_TEXTE}
-        removeIcon={
-          <span style={entfernenStil(token)}>
-            <IconKreuz />
-          </span>
-        }
+        removeIcon={<IconKreuz />}
+        // Die Fläche trägt der Knopf selbst (LLH-1771): an einem Kind darin maßen Prüfung und
+        // Hilfstechnik den Knopf mit 84 × 14 px, obwohl die Trefffläche reichte.
+        styles={{ remove: entfernenStil(token) }}
         activeKey={aktiverId ?? undefined}
         onChange={aktivenSetzen}
         onEdit={onEdit}

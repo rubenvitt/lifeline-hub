@@ -14,8 +14,7 @@ const was = () => screen.getByRole('combobox', { name: 'Was' });
 const wohin = () => screen.getByRole('combobox', { name: 'Wohin' });
 const anzahl = () => screen.getByLabelText('Anzahl');
 const details = () => screen.getByLabelText('Details / Zweck');
-const absetzen = () =>
-  userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+const absetzen = () => userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
 /** Katalog „Externe Stellen“ ohne zuständige Leitstelle, wenn ein Test nichts anderes setzt. */
 function katalog(stellen: ExterneStelle[] = []) {
@@ -56,7 +55,7 @@ describe('NachforderungFormular — Serienerfassung', () => {
 
     await userEvent.type(was(), 'RTW');
     await userEvent.type(details(), 'Zwei RTW');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onAnlegen).toHaveBeenCalled());
     expect(was()).toHaveValue('RTW');
@@ -83,7 +82,7 @@ describe('NachforderungFormular — Eingabegrenzen (LFH-937)', () => {
     await userEvent.type(details(), 'Zwei RTW');
     fireEvent.change(begruendung, { target: { value: 'g'.repeat(501) } });
     expect(begruendung).toHaveValue('g'.repeat(501));
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(
       await screen.findByText('Begründung darf höchstens 500 Zeichen lang sein'),
     ).toBeInTheDocument();
@@ -129,7 +128,7 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
 
     await userEvent.type(was(), 'RTW');
     await userEvent.type(details(), 'Zwei RTW');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -213,7 +212,7 @@ describe('NachforderungFormular — Stellenbezug (LLH-1082)', () => {
 
     await userEvent.type(was(), 'Feldbetten');
     await userEvent.type(details(), 'Feldbetten für die Nacht');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -257,7 +256,7 @@ describe('NachforderungFormular — Stellenbezug (LLH-1082)', () => {
     expect(screen.queryByText(/Betreuungsstelle/)).toBeNull();
     await userEvent.type(was(), 'RTW');
     await userEvent.type(details(), 'Zwei RTW');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalled());
     expect(onAnlegen.mock.calls[0][0].betreuungsstelle_id).toBeUndefined();
   });
@@ -412,7 +411,7 @@ describe('NachforderungFormular — Schnellwahl, Vorschläge, Ziel und Bedarfsze
     fireEvent.change(details(), { target: { value: 'Transport aus UHS' } });
     expect(await screen.findByText('Weitere Angaben · Details')).toBeInTheDocument();
     await absetzen();
-    expect(await screen.findByText('Was ist erforderlich')).toBeInTheDocument();
+    expect(await screen.findByText('Bedarf fehlt')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 
@@ -454,7 +453,7 @@ describe('NachforderungFormular — Personenbezug (LLH-1573)', () => {
     );
     expect(was()).toHaveValue('RTW');
     expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue('Für R-012');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({

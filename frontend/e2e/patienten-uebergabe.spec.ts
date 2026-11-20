@@ -61,7 +61,7 @@ test('Eigentransport ist unterwegs, die quittierte Übergabe schließt ab', asyn
   await page.getByTitle('1/83-1').click();
   await expect(paneel).toContainText('Eigentransport');
   await paneel.getByLabel('Ziel').fill('KH Mitte');
-  await paneel.getByRole('button', { name: 'Verbleib erfassen' }).click();
+  await paneel.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(kopf).toContainText('Eigentransport → KH Mitte (1/83-1)');
 
   // Unterwegs: die Person bleibt in der Liste.
@@ -85,7 +85,12 @@ test('Eigentransport ist unterwegs, die quittierte Übergabe schließt ab', asyn
   await page.getByRole('radio', { name: 'Sichtungsraster' }).click();
   await expect(page.getByTestId('sichtungsboard')).toBeVisible();
   await expect(page.getByText('Übergabetest')).toHaveCount(0);
-  await schalter.check();
+  // Der Schalter ist Zustand der Adresse (`abgeschlossen=1`, LLH-1826): der Router schreibt sie
+  // in einer Transition, das Häkchen steht erst danach. `check()` liest den Zustand direkt nach
+  // dem Klick und sähe noch den alten; deshalb klicken und auf das Häkchen warten.
+  await schalter.click();
+  await expect(schalter).toBeChecked();
+  await expect(page).toHaveURL(/[?&]abgeschlossen=1(&|$)/);
   await expect(page.getByTestId('board-karte').filter({ hasText: 'Übergabetest' })).toBeVisible();
 });
 

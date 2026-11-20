@@ -336,7 +336,12 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit gesperrten
       rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
       'Vorbedingung: Führungspersonal darf die Einstellungen ändern — kein Hinweis',
     ).toHaveCount(0);
-    await expect(speichern(p), 'Vorbedingung: Speichern ist frei').toBeEnabled();
+    // Ohne Änderung ist „Speichern“ gesperrt (LLH-1829); mit Schreibrecht nennt der Stand
+    // daneben den Grund „Keine Änderungen“. Ohne Schreibrecht entfällt der Stand.
+    await expect(
+      speichern(p),
+      'Vorbedingung: Speichern sperrt nur der Änderungsstand',
+    ).toHaveAccessibleDescription('Keine Änderungen');
   });
   await keinQuerlauf(page, `${basis}/verhalten`, /Präfix ETB/);
   await keinQuerlauf(page, `${basis}/aufbewahrung`, /Aufbewahrungs-Dauer/, async (p) => {
@@ -379,6 +384,11 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinw
       speichern(p),
       'Vorbedingung: Speichern ist gesperrt, nicht versteckt',
     ).toBeDisabled();
+    // Gesperrt wegen des Rechts, nicht wegen des Änderungsstands (LLH-1829): kein Stand daneben.
+    await expect(
+      speichern(p),
+      'Vorbedingung: der Grund ist das Recht, nicht „Keine Änderungen“',
+    ).toHaveAccessibleDescription('');
   };
 
   await keinQuerlauf(page, `${basis}/allgemein`, 'Einstiegsmodul', formularGesperrt);

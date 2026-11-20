@@ -16,6 +16,7 @@ vi.mock('../api/dokumente', async (importOriginal) => {
 import { legeDokumentAb } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
 import * as queue from '../offline/queue';
+import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 
 const legeAb = vi.mocked(legeDokumentAb);
 
@@ -138,7 +139,8 @@ const neuGezeichnet = () => act(() => new Promise((r) => setTimeout(r, 20)));
  * Tasten an den Fokuswechsel (LFH-672, Gegenprobe „Anfangsfokus hängt an keinem Frame“).
  */
 async function dialog() {
-  const d = (await screen.findAllByRole('dialog'))[0];
+  // Die beantwortete Rückfrage „Eingaben verwerfen?“ bleibt in jsdom im Baum (LLH-1755).
+  const d = ohneVerwerfenRueckfrage(await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
   await waitFor(() => expect(document.activeElement).toBe(knopf));
   return d;
@@ -741,6 +743,8 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
     await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
@@ -770,6 +774,8 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
     await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));

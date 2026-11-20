@@ -60,7 +60,11 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (LLH-1842, LLH-1865). Enter im Feld übernimmt und springt in den Inhalt. Fokus beim Laden und
   nach dem Erfassen im ersten leeren Pflichtfeld (`fokusStart`), sonst im Inhalt; ein Pflicht- oder
   Zeitgrund steht in der Fußzeile, das Feld ist `aria-invalid`, beschreibt sich per
-  `aria-describedby` und bekommt den Fokus. Eine Ereigniszeit ab einer Minute vor „jetzt“ ist ein
+  `aria-describedby` und bekommt den Fokus. **Ohne Standard-Rufname** (Abfrage offen, LLH-1764)
+  haben die fehlenden Seiten, die beim Typ die eigene Stelle tragen (`hatVorgabe`), EINEN Grund
+  („Absender und Empfänger fehlen – Rufname oben eintragen“, `rufnameFehltText`), auf den Feld und
+  Abfrage verweisen; Start- und Pflichtfokus gehen in die Abfrage (`data-startfeld="rufname"`),
+  nach dem Übernehmen ins nächste leere Pflichtfeld. Das Von einer Meldung bleibt ein Feld von Hand. Eine Ereigniszeit ab einer Minute vor „jetzt“ ist ein
   Nachtrag: Feld `status="warning"`, Fußzeile „Nachtrag · Ereignis vor n min“, Knopf „Erfassen als
   HHMM“. Fußzeile (`fusszeileStil`): links Gründe, „Auch in den Meldungseingang“, „Werte behalten“,
   rechts „+ Veranlassung“, „Anhang“, „+ weiterer Entwurf“, „Eigene Stelle ändern“ und bei Lage der
@@ -72,8 +76,12 @@ Ableitungen in `etb/zeitachseModell.ts`)
   - **Enter weicht nach der Zeigerart, nicht nach der Breite** (`useViewport().istBeruehrung`):
     mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
     Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
-    sendet einen Einzeiler). Den Vertrag zeigt die Tastenkappe ↵ an „Erfassen“ (nur feiner
-    Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“.
+    sendet einen Einzeiler); blankes Enter im leeren Feld tut nichts, führende Leerzeilen machen
+    keinen Mehrzeiler (LLH-1756). Den Vertrag zeigt die Tastenkappe an „Erfassen“, ↵ beim
+    Einzeiler, „Strg + ↵“/„⌘ ↵“ beim Mehrzeiler (nur feiner
+    Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“. Das ist der
+    Enter-Vertrag „mehrzeilig in der Zeile“ (`frontend/AGENTS.md`, „Erfassungs-Norm“, LLH-1766),
+    verschärft: nach einem Umbruch sendet auch mit feinem Zeiger nur noch Strg/⌘+Enter.
   - **Feldbreite per Opt-in:** `Schnellerfassungszeile feldFuellt` streckt das Kind der Feldzelle
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.
@@ -86,12 +94,16 @@ Ableitungen in `etb/zeitachseModell.ts`)
     Fokus nicht in ihr liegt und genau ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
-  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): die Zeile des Inhalts trägt
-    ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
-    (`Schnellerfassungszeile rahmenFarbe`); `/typ ` und danach
-    `/zeit <Angabe> ` setzen Typ und Ereigniszeit in der Feldzeile (`erkenneTypBefehl`,
-    `erkenneZeitBefehl`, gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`),
-    der Rest bleibt Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Eine
+  - **Typ am Textanfang, Ereigniszeit überall** (LLH-1112/LLH-1088/LLH-1754): die Zeile des
+    Inhalts trägt ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
+    (`Schnellerfassungszeile rahmenFarbe`); `/typ ` am Textanfang setzt den Typ
+    (`parseTypBefehl`), `/zeit <Angabe>` an jedem Wortanfang die Ereigniszeit (`parseZeitBefehl`,
+    gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
+    Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Beim Tippen löst `/zeit`
+    erst mit dem Leerzeichen hinter der Angabe aus, am Textende ohne Leerzeichen übernimmt
+    `absenden` die Zeit und sendet nicht. **Ein Befehl geht nie als Text ins Tagebuch:** ein Text
+    nur aus `/wort` (`parseNurBefehl`) setzt Typ oder springt ins Feld wie die Menüwahl, ein
+    unbekanntes Wort bleibt stehen („„/xyz“ ist kein Befehl“). Eine
     Ereigniszeit über 60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und
     Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ebenso wenig sendet eine
     unlesbare Zeit (LLH-1866): ein unlesbares `/zeit` oder eine im Feld Zeit verworfene Eingabe

@@ -1,7 +1,11 @@
 import { Modal } from 'antd';
 import { useEffect, useRef } from 'react';
 import type { Auftrag, AuftragPatch, NeuerAuftrag } from '../api/types';
-import type { Speicherung } from '../components/Erfassung';
+import {
+  MASKE_HAELT_FOKUS,
+  type ErfassungsFormularSteuerung,
+  type Speicherung,
+} from '../components/Erfassung';
 import AuftragFormular, { type ZielOption } from './AuftragFormular';
 
 interface Props {
@@ -30,8 +34,9 @@ interface Props {
  * (`meldungen/AuftragErteilenModal.tsx`), aber mit Serie: an derselben Lage entstehen mehrere
  * Aufträge hintereinander.
  *
- * `destroyOnHidden` hängt das Formular je Öffnen neu ein: so setzt jeder Weg hinaus (Kreuz, Escape,
- * Maske) zurück, ohne dass der Aufrufer `resetFields()` ruft.
+ * `destroyOnHidden` hängt das Formular je Öffnen neu ein: so setzt jeder Weg hinaus (Kreuz, Escape)
+ * zurück, ohne dass der Aufrufer `resetFields()` ruft. Kreuz und Escape laufen über die Pforte der
+ * Erfassungshülle, die bei Änderung erst nachfragt; die Maske schließt nie (LLH-1755).
  */
 export default function AuftragErteilenDialog({
   offen,
@@ -58,27 +63,31 @@ export default function AuftragErteilenDialog({
     const s = speicherungRef.current;
     if (s && !s.isPending && s.error != null) s.reset();
   }, [offen]);
+  const steuerung = useRef<ErfassungsFormularSteuerung>(null);
+  const titel = berichtigen
+    ? berichtigen.auftrag.lfd_nr != null
+      ? `Auftrag #${berichtigen.auftrag.lfd_nr} berichtigen`
+      : 'Auftrag berichtigen'
+    : 'Auftrag erteilen';
   return (
     <Modal
       open={offen}
-      title={
-        berichtigen
-          ? berichtigen.auftrag.lfd_nr != null
-            ? `Auftrag #${berichtigen.auftrag.lfd_nr} berichtigen`
-            : 'Auftrag berichtigen'
-          : 'Auftrag erteilen'
-      }
+      title={titel}
       footer={null}
-      onCancel={() => {
-        if (!sperrt) onSchliessen();
-      }}
+      // Kreuz über die Pforte der Erfassungshülle: bei Änderung erst die Rückfrage (LLH-1755).
+      onCancel={() => steuerung.current?.abbrechen()}
       closable={sperrt ? { disabled: true } : true}
-      mask={{ closable: !sperrt }}
-      keyboard={!sperrt}
+      // Die Maske schließt nie; Escape läuft über die Tastatur-Ebene des Formulars.
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
+      keyboard={false}
       destroyOnHidden
       width={640}
     >
       <AuftragFormular
+        steuerungRef={steuerung}
+        onAbbrechen={onSchliessen}
+        rueckfrageTitel={titel}
         // Je Auftrag ein frisches Formular: die Vorbelegung gilt ab dem Öffnen.
         key={berichtigen?.auftrag.id ?? 'neu'}
         card={false}

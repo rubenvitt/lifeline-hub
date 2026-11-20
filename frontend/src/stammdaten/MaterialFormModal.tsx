@@ -11,6 +11,7 @@ import { teilwortSuche } from '../components/teilwortSuche';
 import { ART_OPTIONEN } from '../kraefte/materialPosten';
 import { MATERIAL_STAMM_BEMERKUNG_MAX, MATERIAL_STAMM_TEXT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   bezeichnung: string;
@@ -105,7 +106,7 @@ export default function MaterialFormModal({
       offen={offen}
       titel={material ? 'Material bearbeiten' : 'Material anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={material ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
@@ -134,10 +135,7 @@ export default function MaterialFormModal({
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[
-          { required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' },
-          kurzRegel('Bezeichnung'),
-        ]}
+        rules={[pflicht('Bezeichnung', { whitespace: true }), kurzRegel('Bezeichnung')]}
       >
         <Input
           placeholder="z. B. Wolldecke, Stromerzeuger 5 kVA"

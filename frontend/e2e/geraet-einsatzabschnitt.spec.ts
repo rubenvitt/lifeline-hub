@@ -90,7 +90,7 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
     await nav.getByRole('link', { name: 'Melden' }).click();
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/melden$`));
     await tablet.getByLabel('Inhalt').fill('Deich hält');
-    await tablet.getByRole('button', { name: 'Meldung senden' }).click();
+    await tablet.getByRole('button', { name: 'Erfassen', exact: true }).click();
     await expect(tablet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
     // Leer heißt angenommen: vorher stünde der Text noch im Eingabefeld.
     await expect(tablet.getByLabel('Inhalt')).toHaveValue('');

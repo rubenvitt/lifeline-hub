@@ -96,12 +96,17 @@ Für Einsatzleitung und Führungspersonal:
    einer Anordnung als „An“, sonst als „Von“.
 4. Den Inhalt in das Feld „Inhalt …“ schreiben und „Erfassen“ wählen oder Enter drücken. Auf einem
    Touch-Gerät erfasst erst Strg+Enter (⌘+Enter am Mac); Enter allein beginnt dort eine neue Zeile.
+   Hat der Inhalt mehrere Zeilen (Umschalt+Enter), erfasst ebenfalls erst Strg+Enter; die Taste
+   steht dann am Knopf „Erfassen“. Enter im leeren Feld tut nichts.
 
 Beim Öffnen steht der Cursor im ersten leeren Pflichtfeld, bei einer Meldung also in „Von“, sonst
 im Inhalt; nach dem Erfassen ebenso. Inhalt, „Von“ und „An“ sind Pflicht: fehlt eine Seite, nennt
-die Fußzeile „Absender fehlt“ oder „Empfänger fehlt“, das Feld ist rot markiert und hat den Cursor;
-Text und Felder bleiben stehen. Ist noch kein Standard-Rufname gesetzt, fragt die Erfassungsleiste
-zuerst danach; „Eigene Stelle ändern“ in der Fußzeile ändert ihn. „Vorschau“ erscheint, sobald der
+die Fußzeile „Absender fehlt“ oder „Empfänger fehlt“, bei leerem Inhalt „Inhalt fehlt“; das Feld
+ist rot markiert und hat den Cursor, Text und Felder bleiben stehen. Ist noch kein Standard-Rufname
+gesetzt, fragt die Erfassungsleiste zuerst danach, und der Cursor steht beim Öffnen in dieser
+Abfrage. Fehlt dann eine Seite, die der Rufname füllen würde, steht dort eine einzige Meldung, etwa
+„Absender und Empfänger fehlen – Rufname oben eintragen“, und der Cursor springt in die Abfrage.
+„Eigene Stelle ändern“ in der Fußzeile ändert den Rufnamen. „Vorschau“ erscheint, sobald der
 Text Formatierung trägt (etwa **fett**, eine Liste oder einen Verweis), und zeigt ihn so, wie er in
 der Zeitachse erscheinen wird.
 
@@ -119,8 +124,12 @@ der Zeitachse erscheinen wird.
    bis die Zeit stimmt. Dann steht in der Fußzeile „Zeit nicht übernommen“, und das Feld hat den
    Cursor. Eine lesbare Zeit eintippen oder das Feld leeren (dann gilt „jetzt“); Enter oder Escape im
    Feld behalten die gezeigte Zeit, bei einem leeren Feld also „jetzt“.
-3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
-   „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
+3. Schneller geht ein Nachtrag mit „/zeit“ an beliebiger Stelle im Text: „/zeit 1420 Pumpe läuft“
+   oder „Pumpe läuft /zeit 1420“ trägt 1420 in „Zeit“ ein, der Rest der Zeile bleibt der Inhalt.
+   Steht der Befehl am Ende, übernimmt Enter bzw. „Erfassen“ erst die Zeit ins Feld und sendet
+   noch nicht; das nächste Enter sendet. Ein Text, der nur aus einem Befehl besteht, geht nie ins
+   Tagebuch: „/lage“ setzt den Typ, „/zeit“ oder „/von“ springt ins Feld, und ein unbekanntes Wort
+   wie „/xyz“ bleibt stehen, die Fußzeile nennt „„/xyz“ ist kein Befehl“. Eine unlesbare Angabe bleibt als Text stehen,
    die Fußzeile nennt den Grund, und die Erfassung sendet nicht, bis die Angabe lesbar oder der
    Befehl aus dem Text gelöscht ist: „Erfassen“ markiert dann die Angabe im Text, Tippen
    überschreibt sie. Wer eine Angabe mitten im Text berichtigt, sieht die Zeit nach „Erfassen“ erst
@@ -265,7 +274,7 @@ Für Einsatzleitung und Führungspersonal:
 2. Den vorbelegten „Titel“ prüfen.
 3. „Fällig am“ setzen; die „Schnellwahl“ bietet +15 min, +30 min, +1 h und +2 h und, wenn
    geplant, die nächste Lagebesprechung.
-4. Bei Bedarf eine „Beschreibung (optional)“ schreiben und „Anlegen“ wählen.
+4. Bei Bedarf eine „Beschreibung (optional)“ schreiben und „Erfassen“ wählen.
 
 Die Wiedervorlage erscheint als Erinnerung (Kapitel [Erinnerungen](erinnerungen.md)) mit einem
 Verweis zurück auf den Eintrag.

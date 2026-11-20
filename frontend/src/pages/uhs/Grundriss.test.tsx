@@ -30,6 +30,7 @@ import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../../test/menue';
+import { bestaetigeVerwerfen, dialogOhneRueckfrage } from '../../test/verwerfen';
 
 /**
  * Der Abwurf eines Zugs, abgegriffen am `DndContext` (sonst unverändert): jsdom misst keine
@@ -447,12 +448,14 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     await userEvent.click(await screen.findByText('Entlassung vor Ort'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
 
     await userEvent.click(oeffnen);
     expect(await screen.findByRole('textbox', { name: /Ziel/ })).toHaveValue('');
     // antd v6 trägt den gewählten Eintrag als `title` am Select-Inhalt — das Eingabefeld der
     // Combobox ist immer leer.
-    const dialog = screen.getByRole('dialog');
+    const dialog = dialogOhneRueckfrage();
     expect(within(dialog).getByTitle('Transport')).toBeInTheDocument();
     expect(within(dialog).queryByTitle('Entlassung vor Ort')).not.toBeInTheDocument();
   });

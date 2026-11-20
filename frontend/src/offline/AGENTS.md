@@ -247,6 +247,19 @@ draußen gelassen werden.
   Verlauf neu. Die Org-Zentrale (ohne Einsatz) quittiert nur online: scheitert es,
   zeigt das Nachreichen die Benachrichtigung wieder. Beide Routen prüfen den Kopf des erwarteten
   Benutzers.
+- **Vorgemerkt heißt nicht offline** (LLH-1758): Ein Vormerken trägt seinen Grund
+  (`OfflineSchreibErgebnis` 'vorgemerkt' mit `grund`, `vormerkGrund` in `offline/fehler.ts`).
+  `serverfehler` gilt genau bei einer Antwort des eigenen Servers (`vomAnwendungsserver`) mit
+  408, 429 oder 5xx, alles andere Vormerkbare ist `offline` (dieselbe Grenze wie „· offline“).
+  Jede Rückmeldung nimmt ihren Wortlaut aus `vorgemerktText` (`offline/vorgemerktText.ts`):
+  „Offline vorgemerkt: …“ bzw. „Server-Fehler – … vorgemerkt, wird erneut gesendet“, der zweite
+  länger (`vorgemerktDauer`). „Erfasst: n“ der Erfassungshülle zählt nur Angenommenes,
+  Vorgemerktes steht daneben als „nicht gesendet: m“. Der Kopf zeigt ausstehende Aktionen als
+  Knopf „n NICHT GESENDET“, die Betriebszeile als „n nicht gesendet“; beide öffnen den
+  Wiederherstellungsbereich (`openWiederherstellung`), der oben `NichtGesendetListe` zeigt
+  (alle Einsätze, „Jetzt erneut senden“, kein Verwerfen). Vorgemerkte Meldungen und
+  Lagemeldungen stehen als „Nicht gesendet“ über ihrer Liste. Herleitung:
+  `docs/superpowers/specs/2026-11-20-vr2k8af0-sendestatus-ehrlich-design.md`.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
   `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
   nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt

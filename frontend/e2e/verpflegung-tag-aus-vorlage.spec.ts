@@ -100,7 +100,7 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
       await f.getByLabel(`Einsatzkräfte (EP) zu ${name}`).fill('12');
       await f.getByLabel(`Betreute (EP) zu ${name}`).fill('0');
     }
-    await page.getByRole('button', { name: 'Zeitfenster anlegen' }).click();
+    await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
     await expect(page.getByText('2 Zeitfenster für den 29mrz26 angelegt')).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/verpflegung$`));
 
@@ -174,7 +174,7 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
     await page.keyboard.press('Escape');
     await page.goto(`/einsaetze/${e}/verpflegung/aus-vorlage?tag=2026-10-11`);
     await expect(page.getByText('Nur Ansicht')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Zeitfenster anlegen' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Anlegen', exact: true })).toBeDisabled();
     expect(await ueberlauf()).toBeLessThanOrEqual(0);
   } finally {
     await wechsleZuAdmin(page);

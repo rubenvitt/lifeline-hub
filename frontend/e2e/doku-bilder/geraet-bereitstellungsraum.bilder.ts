@@ -199,7 +199,7 @@ test.describe(KAPITEL, () => {
       await geraet.getByLabel('Inhalt').blur();
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'melden');
-      await geraet.getByRole('button', { name: 'Meldung senden' }).click();
+      await geraet.getByRole('button', { name: 'Erfassen', exact: true }).click();
       await expect(geraet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
       await expect(geraet.getByText('Zufahrt Tor 3 blockiert', { exact: false })).toBeVisible();
     } finally {

@@ -26,6 +26,7 @@ import {
   fahrzeugSuchtext,
   gruendeJeKraft,
 } from './sammelDisposition';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FahrzeugeDisponierenModalProps {
   offen: boolean;
@@ -142,7 +143,7 @@ export default function FahrzeugeDisponierenModal({
         label="Fahrzeuge"
         name="fahrzeug_ids"
         rules={[
-          { required: true, message: 'Mindestens ein Fahrzeug wählen' },
+          pflicht('Fahrzeug'),
           {
             type: 'array',
             max: SAMMEL_MAX,

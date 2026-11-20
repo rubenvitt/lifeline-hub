@@ -47,6 +47,7 @@ import type {
   WebhookVersuch,
 } from '../../api/types';
 import { ANBINDUNGEN_ABRUF_MS, webhookZustandAnzeige } from './anbindungAnzeige';
+import { pflicht } from '../../components/pflichtRegel';
 
 // Webhook einer Anbindung (LLH-1656, Spec `webhook-zustellung`, design.md D9): einrichten im
 // `ErfassungsModal`, bearbeiten im `BearbeitbaresPaneel`, dazu Zustand der Zustellung und der
@@ -117,14 +118,14 @@ function ArtenAuswahl({
 }
 
 const URL_REGELN = [
-  { required: true, whitespace: true, message: 'Ziel-URL angeben' },
+  pflicht('Ziel-URL', { whitespace: true }),
   { max: WEBHOOK_URL_MAX, message: `Höchstens ${WEBHOOK_URL_MAX} Zeichen` },
   { pattern: /^\s*https:\/\//i, message: 'Die Ziel-URL muss mit https:// beginnen' },
 ];
 
-const ARTEN_REGELN = [
-  { required: true, type: 'array' as const, min: 1, message: 'Mindestens eine Art wählen' },
-];
+// `pflicht` lehnt auch eine leere Auswahl (`[]`) ab; eine zweite Regel `min: 1` zeigte nur
+// denselben Fehler ein zweites Mal (LLH-1766).
+const ARTEN_REGELN = [pflicht('Ereignisarten')];
 
 function ArtenText({ arten }: { arten: readonly EventType[] }) {
   return <>{arten.map((a) => ART_TEXT[a] ?? a).join(', ')}</>;

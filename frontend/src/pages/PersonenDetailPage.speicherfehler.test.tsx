@@ -13,6 +13,7 @@ import { alsSchadenAuswahl } from '../api/einsatzSchaden';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag } from '../test/menue';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Dialoge nennen
@@ -177,7 +178,7 @@ function render(
   );
 }
 
-const kopfueberschrift = () => screen.findByRole('heading', { name: /Person R-001/ });
+const kopfueberschrift = () => screen.findByRole('heading', { name: /R-001/ });
 const keinToast = () => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 const seitenHinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
 
@@ -267,7 +268,7 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
     expect(within(bereich).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
     // Ein laufendes Speichern sperrt nur das eigene Paneel: die Notizzeile bleibt bedienbar.
     expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toBeEnabled();
-    expect(within(kopf()).getByRole('button', { name: 'Notiz anlegen' })).toBeEnabled();
+    expect(within(kopf()).getByRole('button', { name: 'Erfassen' })).toBeEnabled();
   });
 
   it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
@@ -278,6 +279,8 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
     await within(bereich).findByRole('alert');
 
     await userEvent.click(within(bereich).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull();
     await userEvent.click(
       within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' }),
@@ -302,7 +305,7 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
       within(bereich).getByRole('combobox', { name: /Rettungsmittel/ }),
       'RTW 3/83-2',
     );
-    await userEvent.click(within(bereich).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Erfassen' }));
     return bereich;
   }
 
@@ -336,7 +339,7 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
     const bereich = await erfasseVerbleib();
     await within(bereich).findByRole('alert');
 
-    await userEvent.click(within(bereich).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(within(bereich).queryByRole('alert')).toBeNull());
     expect(within(bereich).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
   });
@@ -359,6 +362,8 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
     keinToast();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     expect(within(await offenerDialog()).queryByRole('alert')).toBeNull();
   });
@@ -376,7 +381,7 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
     await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
     const dialog = await offenerDialog();
     await waehle(dialog, 'Tier oder Schaden', /Minka/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
 
     const grund = await within(dialog).findByRole('alert');
     expect(grund).toHaveTextContent('Bezug nicht hinzugefügt');
@@ -400,7 +405,7 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
     await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
     const dialog = await offenerDialog();
     await waehle(dialog, 'Tier oder Schaden', /S-011/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden abgeschlossen');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
@@ -658,7 +663,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
     await kopfueberschrift();
     const feld = screen.getByRole('textbox', { name: /Verlaufsnotiz/ });
     await userEvent.type(feld, 'trinkt Wasser');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     const grund = await screen.findByRole('alert');
     expect(grund).toHaveTextContent('Notiz nicht angelegt');
@@ -666,7 +671,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
     expect(feld).toHaveValue('trinkt Wasser');
     keinToast();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(screen.queryByText('Person storniert')).toBeNull());
   });
 });
@@ -854,7 +859,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
   }
   const zurZweiten = async () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Person' }));
-    await screen.findByRole('heading', { name: /Person R-011/ });
+    await screen.findByRole('heading', { name: /R-011/ });
   };
 
   it('räumt Notiz-, Personendaten- und Austrags-Grund und den getippten Notiztext', async () => {
@@ -865,7 +870,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     ]);
     await kopfueberschrift();
     await userEvent.type(screen.getByRole('textbox', { name: /Verlaufsnotiz/ }), 'trinkt Wasser');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await screen.findByText('Person storniert');
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await screen.findByText('Bereits entlassen');
@@ -875,7 +880,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     // Der abgelehnte Name ist ein offener Entwurf: der Wechsel fragt nach (LLH-1103).
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Person' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
-    await screen.findByRole('heading', { name: /Person R-011/ });
+    await screen.findByRole('heading', { name: /R-011/ });
     expect(screen.queryByText('Person storniert')).toBeNull();
     expect(screen.queryByText('Bereits entlassen')).toBeNull();
     expect(screen.queryByText('Name zu lang')).toBeNull();
@@ -887,7 +892,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
 
   it('hängt den Patientenkopf neu ein, auch wenn die zweite Person schon im Cache liegt', async () => {
     // Liegt die zweite Person im Cache, gibt es keinen Ladezustand dazwischen: ohne `key` blieben
-    // getippte Notiz und offenes Paneel stehen, und „Notiz anlegen“ träfe die zweite Person.
+    // getippte Notiz und offenes Paneel stehen, und „Erfassen“ der Notiz träfe die zweite Person.
     const client = erzeugeQueryClient({
       queries: { retry: false, gcTime: 60_000, staleTime: 60_000 },
       mutations: { retry: false },

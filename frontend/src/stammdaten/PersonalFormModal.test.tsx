@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Die Stammdaten-Personalmaske auf `ErfassungsModal` (LFH-332).
@@ -113,7 +114,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     renderMitProviders(<Harness />);
     await screen.findByLabelText('Name');
     expect(screen.getByRole('button', { name: /Speichern und nächste/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
   });
 
   it('Bearbeiten: KEIN Serienweg — „Speichern und nächste" wäre ein toter Knopf', async () => {
@@ -133,6 +134,8 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Erika Mustermann');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
@@ -155,7 +158,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
 
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Name'), 'Erika Mustermann');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Personalnummer bereits vergeben',

@@ -43,6 +43,7 @@ import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
 import BerichtigtMarke from '../meldungen/BerichtigtMarke';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import { useStandardRufname } from '../etb/useStandardRufname';
 import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
@@ -73,6 +74,9 @@ import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
+import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
+import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 
 const ORT_OPTIONEN: { value: Ortsfilter; label: string }[] = [
   { value: 'alle', label: 'Alle Orte' },
@@ -182,6 +186,10 @@ export default function LagemeldungenPage() {
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
+  // Auf diesem Gerät vorgemerkte Lagemeldungen (LLH-1758): über der Zeitachse, nicht in ihr.
+  const nichtGesendet = useVorgemerkteSchreibaktionen(benutzer?.id, einsatzId, 'meldung').filter(
+    (v) => v.antrag == null && v.aktion.daten.meldungsart === 'lagemeldung',
+  );
   const { message } = App.useApp();
   const meldungenGesperrt = useSprungSperre(einsatzId)('meldungen');
 
@@ -230,6 +238,8 @@ export default function LagemeldungenPage() {
   });
   const funktionsVorschlaege = useFunktionsVorschlaege(formOffen ? einsatzId : undefined);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  // Die eigene Stelle aus dem ETB belegt die Meldung nach Art vor (LLH-1759).
+  const eigeneStelle = useStandardRufname().standard;
   const vorschlagsquellen = useFunkrufnamenQuellen({
     einsatzId,
     funktionen: funktionsVorschlaege,
@@ -262,7 +272,10 @@ export default function LagemeldungenPage() {
     },
     onSuccess: (ergebnis, { einsatzId: eid, daten }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Lagemeldung von ${daten.absender}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Lagemeldung von ${daten.absender}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
@@ -572,6 +585,7 @@ export default function LagemeldungenPage() {
           abschnitte={abschnitteQuery.data}
           funktionsVorschlaege={funktionsVorschlaege}
           vorschlagsquellen={vorschlagsquellen}
+          eigeneStelle={eigeneStelle}
         />
       )}
       {angezeigteNeue.length > 0 && darfSchreiben && (
@@ -685,6 +699,14 @@ export default function LagemeldungenPage() {
           </Button>
         </div>
       )}
+      <BeantragtListe
+        titel="Nicht gesendet"
+        eintraege={nichtGesendet.map((v) => ({
+          schluessel: `vorgemerkt-${v.id}`,
+          text: `${v.aktion.daten.absender} · ${v.aktion.daten.inhalt}`,
+          zeit: v.erstellt_at,
+        }))}
+      />
       <div
         role="region"
         aria-label="Lagemeldungen"

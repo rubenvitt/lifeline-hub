@@ -15,6 +15,7 @@ import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { EXTERNE_STELLE_BEZEICHNUNG_MAX, EXTERNE_STELLE_KURZ_MAX } from '../api/eingabegrenzen';
 import { EXTERNE_STELLE_ARTEN, EXTERNE_STELLE_ART_LABEL } from './externeStellenVorschlaege';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   bezeichnung: string;
@@ -115,7 +116,7 @@ export default function ExterneStelleFormModal({
       offen={offen}
       titel={stelle ? 'Externe Stelle bearbeiten' : 'Externe Stelle anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={stelle ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       speicherung={mutation}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
@@ -126,11 +127,11 @@ export default function ExterneStelleFormModal({
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. ILS Musterkreis" maxLength={EXTERNE_STELLE_BEZEICHNUNG_MAX} />
       </Feld>
-      <Feld label="Art" name="art" rules={[{ required: true, message: 'Art ist erforderlich' }]}>
+      <Feld label="Art" name="art" rules={[pflicht('Art')]}>
         <Select<ExterneStelleArt> aria-label="Art" options={ART_OPTIONEN} />
       </Feld>
       {art === 'leitstelle' && (

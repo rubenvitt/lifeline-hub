@@ -46,6 +46,8 @@ import {
   type OfflineSchreibaktion,
 } from './queue';
 import { discardFruehereKopplung, useFruehereKopplungCount } from './fruehereKopplung';
+import NichtGesendetListe from './NichtGesendetListe';
+import { useOfflineQueueZaehler } from './useOfflineQueueZaehler';
 import { PERSON_EINTRAG_ABGELEHNT } from './personEintrag';
 import { useAbgelehnteAntraegeAusCache } from '../einsatz/spiegel/abgelehnteAntraege';
 import {
@@ -305,6 +307,8 @@ export default function OfflineRecoveryDrawer({
   const sichtbareAntraege =
     einsatzId == null ? alleAntraege : alleAntraege.filter((a) => a.einsatz_id === einsatzId);
   const kopierenMoeglich = typeof navigator.clipboard?.writeText === 'function';
+  // Ausstehendes zeigt `NichtGesendetListe`; der Leerzustand gilt erst ohne es (LLH-1758).
+  const { ausstehend } = useOfflineQueueZaehler(benutzerId, einsatzId);
 
   // Öffnen und ein Wechsel von Benutzer oder Einsatz räumen alte Gründe.
   useEffect(() => {
@@ -500,6 +504,8 @@ export default function OfflineRecoveryDrawer({
           titel="Nicht geladen"
           fallback="Offline-Daten konnten nicht geladen werden"
         />
+        {/* Was noch nicht beim Server ist, vor dem Abgelehnten (LLH-1758). */}
+        <NichtGesendetListe benutzerId={benutzerId} einsatzId={einsatzId} />
         {ohneKarte.map((s) => {
           const grund = zeilen.grund(s);
           return (
@@ -698,7 +704,9 @@ export default function OfflineRecoveryDrawer({
           );
         })}
 
-        {leer && <Empty description="Keine wiederherzustellenden Offline-Aktionen" />}
+        {leer && ausstehend === 0 && (
+          <Empty description="Keine wiederherzustellenden Offline-Aktionen" />
+        )}
       </Stapel>
     </Drawer>
   );

@@ -61,6 +61,7 @@ import { Feld, Paneel, monoStil, Knopfreihe } from '../components/instrument';
 import './lageberichtPrint.css';
 import { flaeche } from '../theme/tokens';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
@@ -520,7 +521,7 @@ function LageberichtDetail() {
                   // Feldern gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
                   // (`entwurf/dokumentEntwurf.css`).
                   <>
-                    <Feld label="Titel" name="titel" rules={[{ required: true }]}>
+                    <Feld label="Titel" name="titel" rules={[pflicht('Titel')]}>
                       <Input />
                     </Feld>
                     {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe

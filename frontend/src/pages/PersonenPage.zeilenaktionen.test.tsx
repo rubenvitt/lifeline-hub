@@ -177,9 +177,7 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
     await user.click(await screen.findByRole('button', { name: /^Sichtung R-007 ändern/ }));
     const flaeche = await screen.findByRole('region', { name: 'Sichtung R-007' });
     await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
-    expect(
-      await within(flaeche).findByText('Bitte eine Sichtungskategorie wählen'),
-    ).toBeInTheDocument();
+    expect(await within(flaeche).findByText('Sichtungskategorie fehlt')).toBeInTheDocument();
     await act(async () => {});
     expect(gesendet).toEqual([]);
   });

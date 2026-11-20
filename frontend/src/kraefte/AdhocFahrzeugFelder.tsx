@@ -4,6 +4,7 @@ import { FAHRZEUG_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import type { AdhocEingabe } from '../api/einsatzFahrzeuge';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import type { AdhocFeld } from './fahrzeugAngaben';
+import { pflicht } from '../components/pflichtRegel';
 
 const ETIKETT: Record<AdhocFeld, string> = {
   funkrufname: 'Funkrufname',
@@ -63,7 +64,7 @@ export default function AdhocFahrzeugFelder({
       label={ETIKETT[f]}
       name={f}
       rules={[
-        ...(f === 'funkrufname' ? [{ required: true, whitespace: true }] : []),
+        ...(f === 'funkrufname' ? [pflicht('Funkrufname', { whitespace: true })] : []),
         zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, ETIKETT[f]),
       ]}
     >

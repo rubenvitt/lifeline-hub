@@ -136,7 +136,7 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Benutzername'), '   ');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-      expect(await screen.findByText('Bitte Benutzername eingeben')).toBeInTheDocument();
+      expect(await screen.findByText('Benutzername fehlt')).toBeInTheDocument();
       expect(gesendet).toBe(false);
     });
   });

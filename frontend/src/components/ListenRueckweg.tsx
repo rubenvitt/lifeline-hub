@@ -13,11 +13,22 @@ import { useVorigeAdresse } from '../routing/VerlaufMerken';
  * Rückkehr im Verlauf her. Das `href` trägt die vorige Adresse samt Query, damit Strg- und
  * Mittelklick die gefilterte Liste in einem neuen Tab öffnen. Sonst (direkt geöffnet, von einer
  * anderen Seite) ein gewöhnlicher Link auf `to`.
+ *
+ * `zeilenmarke`: `to` trägt eine Zeilenmarke, die die Liste wählt und hervorhebt (Befehl,
+ * `?befehl=`, abgestimmt 19.11.2026). Ein Zurück verlöre sie, deshalb dann immer der Link.
  */
-export function ListenRueckweg({ to, children }: { to: string; children: ReactNode }) {
+export function ListenRueckweg({
+  to,
+  zeilenmarke = false,
+  children,
+}: {
+  to: string;
+  zeilenmarke?: boolean;
+  children: ReactNode;
+}) {
   const vorige = useVorigeAdresse();
   const navigate = useNavigate();
-  const passt = vorige !== null && pfadVon(to) === vorige.pathname;
+  const passt = !zeilenmarke && vorige !== null && pfadVon(to) === vorige.pathname;
   if (!passt) return <Link to={to}>{children}</Link>;
   return (
     <Link

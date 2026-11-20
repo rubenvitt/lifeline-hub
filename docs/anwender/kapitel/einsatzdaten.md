@@ -84,7 +84,7 @@ einer Vorplanung, steht ihr Ablauf schon hier (Kapitel [Vorplanung](vorplanung.m
 1. Im Paneel „Ablauf“ oben rechts „Programmpunkt“ wählen.
 2. Im Dialog „Programmpunkt anlegen“ den „Zeitpunkt“ und die „Bezeichnung“ eintragen, etwa
    „Feuerwerk“.
-3. „Anlegen“ wählen oder Enter drücken. Der Punkt steht in der Liste nach Zeit.
+3. „Erfassen“ wählen oder Enter drücken. Der Punkt steht in der Liste nach Zeit.
 4. Zeitpunkt oder Bezeichnung eines Punkts ändern wie jede andere Angabe: den Wert wählen, ändern,
    mit Enter oder „Speichern“ übernehmen.
 5. Zum Löschen das Mülleimer-Zeichen der Zeile wählen und „Löschen“ bestätigen.
