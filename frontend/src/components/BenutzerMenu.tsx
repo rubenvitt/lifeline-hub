@@ -349,6 +349,7 @@ export default function BenutzerMenu({
       >
         <Button
           type="text"
+          data-lfh="benutzermenue"
           aria-label="Benutzermenü"
           block={inNavigation}
           style={{

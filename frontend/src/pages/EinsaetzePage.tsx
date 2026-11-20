@@ -66,6 +66,9 @@ import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
 import WillkommenKarte from '../hilfe/WillkommenKarte';
+import { useEinstellungMerken } from '../hilfe/useEinstellungMerken';
+import { useRundgangOrt } from '../hilfe/rundgang/RundgangProvider';
+import { sollListeSelbstStarten } from '../hilfe/rundgang/rundgangSchluessel';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import MitgliederKlappteil, { type AnlageMitglied } from './MitgliederKlappteil';
@@ -267,6 +270,10 @@ function EinsaetzeInhalt() {
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
+  // Rundgang für Erstnutzer, Teil „Liste“ (LLH-1990): erst nach dem ersten Abruf, sonst stünden
+  // noch Skelette statt Kacheln und der Schritt „Einsätze“ fiele für immer weg.
+  const { stand: einstellungen } = useEinstellungMerken();
+  useRundgangOrt('liste', !isPending && sollListeSelbstStarten(einstellungen));
 
   const { data: stichwortVorschlaege = [] } = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),

@@ -696,6 +696,18 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         ausfuehren: () => oeffneHilfe('kuerzel'),
       });
   }
+  // Rundgang für Erstnutzer (LLH-1990): startet den Teil der aktuellen Seite.
+  if (k.starteRundgang) {
+    const starteRundgang = k.starteRundgang;
+    befehle.push({
+      id: 'hilfe:rundgang',
+      gruppe: 'navigation',
+      label: 'Rundgang',
+      icon: IconHilfe,
+      schlagworte: ['Einführung', 'Tour', 'Erste Schritte'],
+      ausfuehren: () => starteRundgang(),
+    });
+  }
   // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
   // Route.
   if (darfVerwaltung(k.benutzer)) {

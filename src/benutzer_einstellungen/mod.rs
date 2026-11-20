@@ -46,6 +46,14 @@ pub const SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER: &str = "schnellaktionen_zaehler";
 /// (`frontend/src/hilfe/willkommen.ts`), dort zählt allein, ob er da ist.
 pub const SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN: &str = "willkommen_geschlossen";
 
+/// Zeitpunkt, zu dem der Rundgang auf der Einsatzliste zum ersten Mal stand (LLH-1990); opak wie
+/// [`SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN`]. Spiegel in `frontend/src/hilfe/rundgang/rundgangSchluessel.ts`.
+pub const SCHLUESSEL_RUNDGANG_LISTE_GESEHEN: &str = "rundgang_liste_gesehen";
+
+/// Zeitpunkt, zu dem der Rundgang im Einsatz zum ersten Mal stand (LLH-1990); opak wie
+/// [`SCHLUESSEL_RUNDGANG_LISTE_GESEHEN`].
+pub const SCHLUESSEL_RUNDGANG_EINSATZ_GESEHEN: &str = "rundgang_einsatz_gesehen";
+
 /// Der gesamte gültige Schlüsselraum. Eine neue Präferenz wird hier eingetragen —
 /// die Tabelle bleibt unangetastet.
 pub const BEKANNTE_SCHLUESSEL: &[&str] = &[
@@ -54,6 +62,8 @@ pub const BEKANNTE_SCHLUESSEL: &[&str] = &[
     SCHLUESSEL_BENACHRICHTIGUNGEN_AUS,
     SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER,
     SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN,
+    SCHLUESSEL_RUNDGANG_LISTE_GESEHEN,
+    SCHLUESSEL_RUNDGANG_EINSATZ_GESEHEN,
 ];
 
 /// Obergrenze für einen Wert in **Zeichen** (nicht Bytes, sonst hinge sie an der Kodierung).
@@ -159,6 +169,28 @@ mod tests {
             pruefe_wert(SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER, "{\"aktion:etb\":3}").unwrap(),
             "{\"aktion:etb\":3}"
         );
+    }
+
+    #[test]
+    fn rundgang_schluessel_sind_gueltige_opake_schluessel() {
+        assert!(ist_gueltiger_schluessel(SCHLUESSEL_RUNDGANG_LISTE_GESEHEN));
+        assert!(ist_gueltiger_schluessel(
+            SCHLUESSEL_RUNDGANG_EINSATZ_GESEHEN
+        ));
+        assert_eq!(SCHLUESSEL_RUNDGANG_LISTE_GESEHEN, "rundgang_liste_gesehen");
+        assert_eq!(
+            SCHLUESSEL_RUNDGANG_EINSATZ_GESEHEN,
+            "rundgang_einsatz_gesehen"
+        );
+        for schluessel in [
+            SCHLUESSEL_RUNDGANG_LISTE_GESEHEN,
+            SCHLUESSEL_RUNDGANG_EINSATZ_GESEHEN,
+        ] {
+            assert_eq!(
+                pruefe_wert(schluessel, "2026-11-20 10:00:00").unwrap(),
+                "2026-11-20 10:00:00"
+            );
+        }
     }
 
     #[test]

@@ -7,7 +7,9 @@ Schirm nie über den Rand. `InputNumber`, `DatePicker` und `TimePicker`, die ant
 aus 100 % breit setzt, füllt die Klasse `FELD_KLASSE` in `index.css`.
 
 Bewusst ohne `style`: eine Pixelbreite lässt sich nicht ausdrücken. Ein Sonderfall wird eine
-neue Stufe, keine Ausnahme. Regel: `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine;
+neue Stufe, keine Ausnahme. Für Felder nebeneinander in einer Zeile und für das letzte Feld
+eines Dialogs gibt es zwei benannte Optionen: `abstand="ohne"` lässt den Feldabstand
+darunter weg, `zeile` gibt den Flex-Anteil als Stufe aus `FELDBREITE`. Regel: `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine;
 Wächter `components/feld.guard.test.ts`.
 
 Aus `frontend/src/components/instrument/FeldFehler.tsx`:

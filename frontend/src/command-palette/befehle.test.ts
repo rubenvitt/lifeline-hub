@@ -1287,3 +1287,17 @@ describe('baueBefehle — Hilfe zur Seite (LLH-1824)', () => {
     expect(ids.slice(0, 2)).toEqual(['nav:hilfe', 'hilfe:seite']);
   });
 });
+
+describe('baueBefehle — Rundgang (LLH-1990)', () => {
+  it('mit Starter steht „Rundgang“ in der Palette und startet ihn', () => {
+    const starteRundgang = vi.fn();
+    const b = baueBefehle(kontext({ starteRundgang })).find((x) => x.id === 'hilfe:rundgang');
+    expect(b?.label).toBe('Rundgang');
+    b!.ausfuehren!();
+    expect(starteRundgang).toHaveBeenCalledOnce();
+  });
+
+  it('ohne Starter kein Befehl', () => {
+    expect(baueBefehle(kontext()).some((x) => x.id === 'hilfe:rundgang')).toBe(false);
+  });
+});

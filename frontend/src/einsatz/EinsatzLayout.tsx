@@ -49,6 +49,9 @@ import { isUebung } from './einsatzart';
 import { NichtGefundenProvider, type NichtGefundenMarke } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import HilfeKnopf from '../hilfe/HilfeKnopf';
+import { useEinstellungMerken } from '../hilfe/useEinstellungMerken';
+import { useRundgangOrt } from '../hilfe/rundgang/RundgangProvider';
+import { sollEinsatzSelbstStarten } from '../hilfe/rundgang/rundgangSchluessel';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import AlarmZone from '../alarm/AlarmZone';
@@ -338,6 +341,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const einsatz = einsatzQuery.data;
+  // Rundgang für Erstnutzer, Teil „Einsatz“ (LLH-1990): von selbst nur in einer Übung. Am Rahmen,
+  // nicht an einer Modulseite: auch ein Deeplink in ein Modul zählt als erstes Öffnen.
+  const { stand: einstellungen } = useEinstellungMerken();
+  useRundgangOrt(
+    'einsatz',
+    einsatz != null && sollEinsatzSelbstStarten(einstellungen, isUebung(einsatz)),
+  );
   // Die Suche wartet auf den Namen, höchstens eine Sekunde (LLH-1726, Suchzelle unten): lädt der
   // Einsatz länger (Wiederholungen), steht sie trotzdem, denn unter `xxl` führt sonst nichts im Kopf
   // aus dem Einsatz.
@@ -567,6 +577,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 <Button
                   type="text"
                   ref={navGriff}
+                  data-lfh="navigation-oeffnen"
                   aria-label="Navigation öffnen"
                   // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
                   // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
