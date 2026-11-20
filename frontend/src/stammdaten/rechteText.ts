@@ -1,5 +1,5 @@
-import { NUR_ADMIN } from '../components/nurAnsicht';
-import { SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
+// Nicht aus `components/nurAnsicht`: die e2e-Specs laden dieses Modul in Node (s. dort).
+import { NUR_ADMIN, SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
 
 /**
  * EIN Grund für alle Verwaltungssektionen (LFH-346, Befund M45): wer ohne Admin-Rolle eine
