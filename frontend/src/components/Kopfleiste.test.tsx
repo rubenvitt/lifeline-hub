@@ -19,8 +19,12 @@ import {
   railBreite,
   syncZustand,
   wortmarkeStil,
+  SyncZelle,
   Uhr,
 } from './Kopfleiste';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { subscribeWiederherstellung } from '../offline/wiederherstellungOeffnen';
 import { MemoryRouter } from 'react-router';
 import { ConfigProvider } from 'antd';
 
@@ -85,15 +89,14 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
     expect(SYNC_DARSTELLUNG.getrennt.satz(LEER)).toBe('Live-Verbindung unterbrochen');
   });
 
-  it('meldet ausstehende Offline-Aktionen auf Deutsch, mit Zähler und richtiger Einzahl (LFH-944)', () => {
-    expect(SYNC_DARSTELLUNG.ausstehend.wort).toBe('WARTET');
+  it('meldet ausstehende Offline-Aktionen als „nicht gesendet“, mit Zähler und Einzahl (LLH-1758)', () => {
+    expect(SYNC_DARSTELLUNG.ausstehend.wort).toBe('NICHT GESENDET');
     expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 1 })).toBe(
-      '1 Offline-Aktion ausstehend',
+      '1 Offline-Aktion nicht gesendet — antippen für Details',
     );
     expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 3 })).toBe(
-      '3 Offline-Aktionen ausstehend',
+      '3 Offline-Aktionen nicht gesendet — antippen für Details',
     );
-    // SYNC und PRÜFEN bleiben (Entscheidung „Anzeige, kein Bedienziel“).
     expect(SYNC_DARSTELLUNG.abgelehnt.wort).toBe('PRÜFEN');
   });
 });
@@ -182,6 +185,39 @@ describe('syncZeigtWort — Wort genau bei Störung', () => {
     for (const z of ['ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
       expect(syncZeigtWort(z, false), z).toBe(true);
     }
+  });
+});
+
+describe('SyncZelle — Knopf zum Wiederherstellungsbereich (LLH-1758)', () => {
+  const queue = { ...LEER, ausstehend: 2 };
+
+  it('„n NICHT GESENDET“ ist ein Knopf und öffnet den Wiederherstellungsbereich', async () => {
+    const hoerer = vi.fn();
+    const abbestellen = subscribeWiederherstellung(hoerer);
+    render(<SyncZelle zustand="ausstehend" queue={queue} kompakt={false} />);
+    const knopf = screen.getByRole('button', { name: /2 Offline-Aktionen nicht gesendet/ });
+    expect(knopf).toHaveTextContent('2 NICHT GESENDET');
+    await userEvent.click(knopf);
+    expect(hoerer).toHaveBeenCalledTimes(1);
+    abbestellen();
+  });
+
+  it('abgelehnte Aktionen sind ebenfalls ein Knopf', () => {
+    render(<SyncZelle zustand="abgelehnt" queue={{ ...LEER, abgelehnt: 1 }} kompakt={false} />);
+    expect(screen.getByRole('button', { name: /abgelehnt/ })).toHaveTextContent('PRÜFEN');
+  });
+
+  it('unter md steht die Zahl neben dem Symbol, ohne Wort', () => {
+    render(<SyncZelle zustand="ausstehend" queue={queue} kompakt />);
+    const knopf = screen.getByRole('button', { name: /nicht gesendet/ });
+    expect(knopf).toHaveTextContent('2');
+    expect(knopf).not.toHaveTextContent('NICHT GESENDET');
+  });
+
+  it('die stehende Verbindung bleibt eine Anzeige, kein Knopf', () => {
+    render(<SyncZelle zustand="verbunden" queue={LEER} kompakt={false} />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Live-Verbindung steht' })).toBeInTheDocument();
   });
 });
 

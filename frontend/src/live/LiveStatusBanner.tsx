@@ -9,6 +9,7 @@ import {
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
+import { subscribeWiederherstellung } from '../offline/wiederherstellungOeffnen';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import { Stapel } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -58,6 +59,8 @@ export default function LiveStatusBanner({
   const [aktualisierungLaeuft, setAktualisierungLaeuft] = useState(false);
   const [aktualisierungFehlgeschlagen, setAktualisierungFehlgeschlagen] = useState(false);
   const [recoveryOffen, setRecoveryOffen] = useState(false);
+  // Der Kopf-Zähler „n NICHT GESENDET“ öffnet denselben Bereich (LLH-1758).
+  useEffect(() => subscribeWiederherstellung(() => setRecoveryOffen(true)), []);
   const { abBreite } = useViewport();
   const mittel = abBreite('md');
   const aktualisierungVerfuegbar = useSyncExternalStore(
@@ -137,20 +140,18 @@ export default function LiveStatusBanner({
   const queueBadges = (
     <Stapel als="span" richtung="zeile" umbruch abstand="md" ausrichten="mitte">
       {queue.ausstehend > 0 && (
-        <Stapel
-          als="span"
-          richtung="zeile"
-          abstand="xs"
-          ausrichten="mitte"
-          aria-label={anzahl(
-            queue.ausstehend,
-            'ausstehende Offline-Aktion',
-            'ausstehende Offline-Aktionen',
-          )}
+        // Ein Knopf wie „abgelehnt – prüfen“ (LLH-1758): der Wiederherstellungsbereich zeigt, was
+        // nicht gesendet ist. Name = sichtbarer Wortlaut (WCAG 2.5.3).
+        <Button
+          type="text"
+          aria-label={`${queue.ausstehend} nicht gesendet`}
+          onClick={() => setRecoveryOffen(true)}
         >
-          <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
-          <span>ausstehend</span>
-        </Stapel>
+          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
+            <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
+            <span>nicht gesendet</span>
+          </Stapel>
+        </Button>
       )}
       {queue.abgelehnt > 0 && (
         <Button
