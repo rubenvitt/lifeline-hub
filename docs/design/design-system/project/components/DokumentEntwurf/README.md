@@ -20,7 +20,7 @@ Baustein, damit dasselbe Dokument nicht zwei Bedienformen hat.
 
 TIPPLATENZ: der Baustein beobachtet das Formular nur über die Leer-Kette (`Form.useWatch` mit
 Selektor) und rendert nur, wenn ein Abschnitt kippt; jeder Abschnitt ist `memo`. Tippen rendert
-damit nur das eigene `Form.Item` (Messung `e2e/lagebericht-tippen.spec.ts`).
+damit nur das eigene `Feld` (Messung `e2e/lagebericht-tippen.spec.ts`).
 
 Quelle: `frontend/src/entwurf/DokumentEntwurf.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
