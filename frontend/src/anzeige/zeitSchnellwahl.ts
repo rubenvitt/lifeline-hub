@@ -35,6 +35,12 @@ export const SCHNELLWAHL: Readonly<Record<ZeitArt, readonly SchnellwahlEintrag[]
 export const SCHNELLWAHL_TERMIN = SCHNELLWAHL.frist;
 
 /**
+ * Vorgabe einer Frist beim Anlegen (Erinnerung, Wiedervorlage): „jetzt“ meint niemand, eine
+ * Erinnerung darauf wäre beim Anlegen schon fällig (LLH-1768).
+ */
+export const VORGABE_FRIST_MINUTEN = 30;
+
+/**
  * Die Frist-Einträge zu den genannten Minuten, in Tabellenreihenfolge.
  *
  * Eine unbekannte Minutenzahl ist ein Programmierfehler und wirft: still weggelassen fehlte ein

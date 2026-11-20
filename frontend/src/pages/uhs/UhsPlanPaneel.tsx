@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { App, Button, InputNumber, Popconfirm, Slider, Switch, Upload } from 'antd';
+import { App, Button, Popconfirm, Slider, Switch, Upload } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   aenderePlan,
@@ -21,6 +21,7 @@ import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { FELD_KLASSE, Paneel, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /** Formate, die der Server als Plan annimmt (`src/uhs/plan.rs`, D3). HEIC bleibt draußen. */
 export const PLAN_ACCEPT = '.png,.jpg,.jpeg,.webp';
@@ -220,7 +221,7 @@ function PlanEinstellungen({
       <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
         {/* `key` am Serverwert und am PATCH-Zähler: ein Live-Ereignis, Einpassen, ein Fehlschlag
             oder ein eingerastet gleicher Wert setzen das Feld neu auf. */}
-        <ZahlFeld
+        <PlanMassFeld
           key={`x-${plan.x}-${stand}`}
           label="Links"
           wert={plan.x}
@@ -229,7 +230,7 @@ function PlanEinstellungen({
           gesperrt={gesperrt}
           onFertig={(x) => onAendern({ x })}
         />
-        <ZahlFeld
+        <PlanMassFeld
           key={`y-${plan.y}-${stand}`}
           label="Oben"
           wert={plan.y}
@@ -238,7 +239,7 @@ function PlanEinstellungen({
           gesperrt={gesperrt}
           onFertig={(y) => onAendern({ y })}
         />
-        <ZahlFeld
+        <PlanMassFeld
           key={`b-${plan.breite}-${stand}`}
           label="Breite"
           wert={plan.breite}
@@ -298,7 +299,7 @@ function PlanEinstellungen({
 }
 
 /** Zahl in Pixeln der Fläche, Schritt 10; gesendet beim Verlassen oder mit Enter. */
-function ZahlFeld(props: {
+function PlanMassFeld(props: {
   label: string;
   wert: number;
   min: number;
@@ -324,13 +325,15 @@ function ZahlFeld(props: {
         {props.label}
       </Textstufe>
       <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-kurz)', maxWidth: '100%' }}>
-        <InputNumber<number>
+        <ZahlFeld
           id={id}
           value={entwurf}
           min={props.min}
           max={props.max}
+          ganz
+          // Ohne Formular: ein Wert außerhalb bleibt stehen und geht nicht hinaus (LLH-1768).
+          nurGueltig
           step={10}
-          precision={0}
           disabled={props.gesperrt}
           onChange={setEntwurf}
           onBlur={fertig}

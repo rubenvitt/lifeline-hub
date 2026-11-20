@@ -2,6 +2,7 @@ import { InputNumber, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import type { Staerke } from '../api/types';
 import { Stapel, Textstufe } from '../components/instrument';
+import { useZahlSperre } from '../components/zahlRegel';
 
 type Feld = number | null;
 
@@ -29,6 +30,14 @@ function gleich(a: Staerke | null, b: Staerke | null): boolean {
   );
 }
 
+/** Ist dieser Teil ungültig (negativ oder kein Ganzes)? */
+function pruefeTeil(wert: Feld): boolean {
+  return wert != null && (wert < 0 || !Number.isInteger(wert));
+}
+
+/** Grenzen eines Teils der Stärke. */
+const GRENZEN = { min: 0, ganz: true };
+
 const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'column' };
 
 /**
@@ -45,11 +54,20 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
   const [uf, setUf] = useState<Feld>(value?.unterfuehrer ?? null);
   const [m, setM] = useState<Feld>(value?.mannschaft ?? null);
 
+  // Geprüft statt gekappt (LLH-1768): ein negativer Teil bleibt stehen, sperrt und geht nicht hinaus.
+  const { grund, pruefe } = useZahlSperre();
+
   useEffect(() => {
     if (gleich(koerziere(f, uf, m), value ?? null)) return; // eigenes Echo → ignorieren
     setF(value?.fuehrer ?? null);
     setUf(value?.unterfuehrer ?? null);
     setM(value?.mannschaft ?? null);
+    // Ein Wert von außen ersetzt die Eingabe: ein alter Grund bleibt nicht hängen (LLH-1768).
+    if (grund) {
+      pruefe(value?.fuehrer, GRENZEN, 'f');
+      pruefe(value?.unterfuehrer, GRENZEN, 'uf');
+      pruefe(value?.mannschaft, GRENZEN, 'm');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -57,7 +75,12 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
     setF(nf);
     setUf(nuf);
     setM(nm);
-    onChange?.(koerziere(nf, nuf, nm));
+    const fehler = [
+      pruefe(nf, GRENZEN, 'f'),
+      pruefe(nuf, GRENZEN, 'uf'),
+      pruefe(nm, GRENZEN, 'm'),
+    ].some(Boolean);
+    if (!fehler) onChange?.(koerziere(nf, nuf, nm));
   }
 
   const begonnen = f != null || uf != null || m != null;
@@ -70,8 +93,8 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
           Führer
         </Textstufe>
         <InputNumber
-          min={0}
           value={f}
+          status={grund && pruefeTeil(f) ? 'error' : undefined}
           disabled={disabled}
           aria-label="Führer"
           autoFocus={autoFocus}
@@ -85,8 +108,8 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
           Unterführer
         </Textstufe>
         <InputNumber
-          min={0}
           value={uf}
+          status={grund && pruefeTeil(uf) ? 'error' : undefined}
           disabled={disabled}
           aria-label="Unterführer"
           placeholder="UF"
@@ -99,8 +122,8 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
           Mannschaft
         </Textstufe>
         <InputNumber
-          min={0}
           value={m}
+          status={grund && pruefeTeil(m) ? 'error' : undefined}
           disabled={disabled}
           aria-label="Mannschaft"
           placeholder="M"

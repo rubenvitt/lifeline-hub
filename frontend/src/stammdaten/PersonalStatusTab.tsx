@@ -1,4 +1,4 @@
-import { Collapse, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
+import { Collapse, Input, Switch, type TableColumnsType } from 'antd';
 import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
@@ -15,6 +15,7 @@ import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 import { Status } from '../components/instrument/Status';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
@@ -120,7 +121,7 @@ const felder = (
       <Input placeholder="#22aa55" />
     </Feld>
     <Feld label="Sortierung" name="sortier" breite="kurz">
-      <InputNumber min={0} />
+      <ZahlFeld min={0} />
     </Feld>
     {/* Die Marke (LFH-552) und der Schalter „Pause“ (LLH-1555) liegen eingeklappt: vier Felder
         stehen schon offen, ein fünftes sprengte das Feldbudget. Ohne `forceRender` — die

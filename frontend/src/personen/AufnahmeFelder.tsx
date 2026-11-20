@@ -1,4 +1,4 @@
-import { Collapse, Input, InputNumber, Typography, type FormRule } from 'antd';
+import { Collapse, Input, Typography, type FormRule } from 'antd';
 import { Select } from '../components/Select';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
@@ -20,6 +20,7 @@ import AnlassWahl from './AnlassWahl';
 import SichtungsWahl from './SichtungsWahl';
 import { VersorgendeEinheitFeld } from './VersorgtVon';
 import { Feld } from '../components/instrument';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
@@ -226,7 +227,7 @@ export default function AufnahmeFelder({
   );
   const alterFeld = (
     <Feld label="Geschätztes Alter (Jahre)" name="alter_geschaetzt" breite="kurz">
-      <InputNumber min={0} max={120} />
+      <ZahlFeld min={0} max={120} ganz einheit="Jahre" />
     </Feld>
   );
   const weitereAngaben = (

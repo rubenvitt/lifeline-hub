@@ -1,4 +1,4 @@
-import { Form, Input, InputNumber, theme } from 'antd';
+import { Form, Input, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { loadEinheitVorlagen } from '../api/einheitVorlagen';
@@ -26,6 +26,7 @@ import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../kraefte/q
 import { uhsTyp } from '../theme/statusFarben';
 import { schichtlaengeRegeln } from './planungRegeln';
 import { Feld } from '../components/instrument';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 /** Woher ein neuer Posten kommt; danach bleibt sie (der Server ändert sie nicht). */
@@ -266,12 +267,7 @@ export default function PlanungPostenDialog({
           <Input placeholder="z. B. 4 h" autoComplete="off" />
         </Feld>
         <Feld<PostenWerte> label="Soll" name="soll">
-          <InputNumber
-            min={0}
-            max={SCHICHTPLAN_SOLL_ANZAHL_MAX}
-            precision={0}
-            placeholder={sollPlatzhalter}
-          />
+          <ZahlFeld min={0} max={SCHICHTPLAN_SOLL_ANZAHL_MAX} ganz placeholder={sollPlatzhalter} />
         </Feld>
       </div>
       <Feld<PostenWerte>

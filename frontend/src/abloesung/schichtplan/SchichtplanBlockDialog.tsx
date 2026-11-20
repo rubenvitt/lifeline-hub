@@ -1,14 +1,4 @@
-import {
-  Button,
-  Collapse,
-  ConfigProvider,
-  Form,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Typography,
-  theme,
-} from 'antd';
+import { Button, Collapse, ConfigProvider, Form, Input, Popconfirm, Typography, theme } from 'antd';
 import { Select } from '../../components/Select';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -43,6 +33,7 @@ import {
   postenSchluessel,
   type PersonOption,
 } from './schichtplanZeilen';
+import { ZahlFeld } from '../../components/ZahlFeld';
 import { pflicht } from '../../components/pflichtRegel';
 
 /**
@@ -391,12 +382,7 @@ export default function SchichtplanBlockDialog({
         </Feld>
         {!istPause && (
           <Feld<BlockWerte> name="soll" label="Soll" breite="kurz">
-            <InputNumber
-              min={0}
-              max={SCHICHTPLAN_PERSONEN_MAX}
-              precision={0}
-              placeholder={sollPlatzhalter}
-            />
+            <ZahlFeld min={0} max={SCHICHTPLAN_PERSONEN_MAX} ganz placeholder={sollPlatzhalter} />
           </Feld>
         )}
         <Collapse
