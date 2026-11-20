@@ -1,7 +1,7 @@
 import type { FormRule } from 'antd';
 import type { NamePath } from 'antd/es/form/interface';
-import { useCallback, useRef, useState } from 'react';
-import { useEingabeSperre } from './instrument/eingabeSperre';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEingabeSperre, useHatSperrStelle } from './instrument/eingabeSperre';
 
 /**
  * Grenzen eines Zahlenfelds als Prüfregel (LLH-1768): Zahlenfelder kappen und runden nie
@@ -89,4 +89,56 @@ export function useZahlSperre(): {
     [meldeSperre],
   );
   return { grund, pruefe };
+}
+
+/**
+ * Die Eingabe eines Zahl-Bausteins mit {@link useZahlSperre}: prüft, was die Person tippt, und
+ * reicht es weiter. Ohne Sperrstelle darüber (kein `Feld`, keine `InlineAngabe`) oder mit
+ * `nurGueltig` geht ein abgelehnter Wert nicht hinaus, bleibt aber sichtbar im Feld stehen. Ein
+ * von außen gesetzter Wert wird neu geprüft, damit ein alter Grund nicht hängen bleibt.
+ */
+export function useZahlEingabe({
+  value,
+  grenzen,
+  onChange,
+  nurGueltig,
+  onGrund,
+}: {
+  value: number | null | undefined;
+  grenzen: ZahlGrenzen;
+  onChange?: (wert: number | null) => void;
+  nurGueltig?: boolean;
+  onGrund?: (grund: string | null) => void;
+}): {
+  wert: number | null | undefined;
+  grund: string | null;
+  aendere: (wert: number | null) => void;
+} {
+  const { grund, pruefe } = useZahlSperre();
+  const hatStelle = useHatSperrStelle();
+  const nur = nurGueltig ?? !hatStelle;
+  const [abgelehnt, setAbgelehnt] = useState<number | null>(null);
+  const grundRef = useRef(grund);
+  grundRef.current = grund;
+  useEffect(() => {
+    if (grundRef.current === null) return;
+    // Nur ein gültiger Wert von außen räumt ab; der eigene, weitergereichte bleibt geprüft.
+    // Erst prüfen, dann melden: `onGrund?.(pruefe(…))` überspränge ohne `onGrund` das Prüfen.
+    const neu = pruefe(value, grenzen);
+    onGrund?.(neu);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur ein neuer Wert von außen zählt
+  }, [value]);
+  return {
+    wert: nur && grund ? abgelehnt : value,
+    grund,
+    aendere: (wert) => {
+      const neu = pruefe(wert, grenzen);
+      onGrund?.(neu);
+      if (neu && nur) {
+        setAbgelehnt(wert);
+        return;
+      }
+      onChange?.(wert);
+    },
+  };
 }

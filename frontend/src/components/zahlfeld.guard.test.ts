@@ -41,8 +41,9 @@ function oeffnungstag(text: string, start: number): string {
 export function findeKappendeZahlfelder(eintraege: [string, string][]): string[] {
   const funde: string[] = [];
   for (const [pfad, text] of eintraege) {
-    for (const treffer of text.matchAll(/<InputNumber\b/g)) {
-      const tag = oeffnungstag(text, treffer.index);
+    // Ein Typparameter (`<InputNumber<number>`) gehört zum Namen, nicht ans Tagende.
+    for (const treffer of text.matchAll(/<InputNumber(<[^>]*>)?/g)) {
+      const tag = oeffnungstag(text, treffer.index + treffer[0].length);
       if (/\s(min|max|precision)=/.test(tag)) {
         const zeile = text.slice(0, treffer.index).split('\n').length;
         funde.push(`${pfad}:${zeile}`);
@@ -61,5 +62,8 @@ describe('Zahlenfeld-Wächter (LLH-1768)', () => {
     const probe = `<InputNumber\n  value={x > 1 ? 2 : 3}\n  max={5}\n/>`;
     expect(findeKappendeZahlfelder([['/src/probe.tsx', probe]])).toEqual(['/src/probe.tsx:1']);
     expect(findeKappendeZahlfelder([['/src/ok.tsx', '<InputNumber value={1} />']])).toEqual([]);
+    // Typparameter: das `>` von `<number>` beendet den Tag nicht (Review LLH-1768).
+    const generisch = `<InputNumber<number>\n  min={0}\n/>`;
+    expect(findeKappendeZahlfelder([['/src/gen.tsx', generisch]])).toEqual(['/src/gen.tsx:1']);
   });
 });

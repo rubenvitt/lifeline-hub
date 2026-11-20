@@ -122,3 +122,35 @@ describe('ZahlFeld (Ersatz für InputNumber mit Grenzen, LLH-1768)', () => {
     expect(feld).toHaveValue('80');
   });
 });
+
+describe('Review LLH-1768', () => {
+  it('MengenFeld ohne Formular reicht einen Wert außerhalb nicht weiter und lässt ihn stehen', () => {
+    const onChange = vi.fn();
+    renderMitProviders(<MengenFeld beschriftung="Anzahl" max={10} value={2} onChange={onChange} />);
+    const feld = tippe('Anzahl', '0');
+    expect(onChange).not.toHaveBeenCalledWith(0);
+    expect(feld).toHaveValue('0');
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('ein von außen gesetzter gültiger Wert räumt den Grund ab', async () => {
+    const onFinish = vi.fn();
+    function Mit() {
+      const [form] = Form.useForm();
+      return (
+        <Form form={form} onFinish={onFinish}>
+          <Feld name="x" label="X">
+            <ZahlFeld aria-label="Zahl" min={1} />
+          </Feld>
+          <Button onClick={() => form.setFieldsValue({ x: 5 })}>Setzen</Button>
+          <Button htmlType="submit">Senden</Button>
+        </Form>
+      );
+    }
+    renderMitProviders(<Mit />);
+    tippe('Zahl', '0');
+    fireEvent.click(screen.getByRole('button', { name: 'Setzen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith({ x: 5 }));
+  });
+});

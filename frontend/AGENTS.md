@@ -1691,9 +1691,10 @@ Spec `bedien-arbeitsplatz`).
   `precision` (antd setzt den getippten Wert beim Verlassen still um: Alter 250 → 120, 2,5 → 3;
   Wächter `components/zahlfeld.guard.test.ts`). Grenzen nimmt `components/ZahlFeld.tsx`
   (`min`, `max`, `ganz`, `einheit`), Mengen `MengenFeld`, Dezimalzahlen `DezimalFeld` (`stellen`
-  prüft, rundet nicht); sie melden den Grund über `useZahlSperre` an die Eingabesperre, das
-  Formular sendet dann nicht. Ohne Formular darüber `nurGueltig` (ein abgelehnter Wert bleibt im
-  Feld, geht nicht hinaus). Eine Regel am `Feld` ist `zahlRegel` (`components/zahlRegel.ts`).
+  prüft, rundet nicht); sie melden den Grund über `useZahlEingabe` an die Eingabesperre, das
+  Formular sendet dann nicht. Ohne Sperrstelle darüber (kein `Feld`, keine `InlineAngabe`) geht
+  ein abgelehnter Wert nicht hinaus und bleibt im Feld stehen; ein Dialog ohne Formular, der
+  sendet, stellt selbst eine `SperrStelle` und sperrt seinen Knopf (`useSperrSammler`). Eine Regel am `Feld` ist `zahlRegel` (`components/zahlRegel.ts`).
   Geprüft wird nur, was die Person ändert: ein gespeicherter Altwert sperrt nicht.
 - **Eine Frist ist beim Anlegen mit „jetzt + 30 min“ vorbelegt** (`VORGABE_FRIST_MINUTEN`,
   `anzeige/zeitSchnellwahl.ts`; Erinnerung, Wiedervorlage), nie mit „jetzt“.

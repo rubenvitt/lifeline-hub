@@ -1,6 +1,6 @@
 import { InputNumber } from 'antd';
 import type { InputNumberProps } from 'antd';
-import { useZahlSperre } from './zahlRegel';
+import { useZahlEingabe } from './zahlRegel';
 
 /**
  * Zahlfeld für Dezimalzahlen (LLH-1146), Gegenstück zu `MengenFeld`: zeigt das Dezimalkomma und
@@ -71,16 +71,18 @@ export function DezimalFeld({
   status,
   ...rest
 }: DezimalFeldProps) {
-  const { grund, pruefe } = useZahlSperre();
+  const { wert, grund, aendere } = useZahlEingabe({
+    value: rest.value,
+    grenzen: { min, max, stellen },
+    onChange: onChange as ((wert: number | null) => void) | undefined,
+  });
   return (
     <InputNumber<number>
       {...rest}
       status={grund ? 'error' : status}
       aria-invalid={grund ? true : rest['aria-invalid']}
-      onChange={(wert) => {
-        pruefe(wert, { min, max, stellen });
-        onChange?.(wert);
-      }}
+      value={wert}
+      onChange={aendere}
       formatter={(wert, { userTyping, input }) =>
         userTyping || wert === undefined || wert === null || String(wert) === ''
           ? input

@@ -32,6 +32,11 @@ export function useEingabeSperre(): (grund: string | null) => void {
   return useCallback((grund: string | null) => melden?.(quelle, grund), [melden, quelle]);
 }
 
+/** Steht eine Sperrstelle darüber? Ohne sie reichen Zahl-Bausteine nur gültige Werte weiter. */
+export function useHatSperrStelle(): boolean {
+  return useContext(SperrKontext) !== null;
+}
+
 /**
  * Nennt die Stelle darüber einen gemeldeten Grund selbst? Dann nennt das Steuerelement ihn nicht
  * noch einmal.

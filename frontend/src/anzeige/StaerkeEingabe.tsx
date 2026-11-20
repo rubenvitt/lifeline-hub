@@ -35,6 +35,9 @@ function pruefeTeil(wert: Feld): boolean {
   return wert != null && (wert < 0 || !Number.isInteger(wert));
 }
 
+/** Grenzen eines Teils der Stärke. */
+const GRENZEN = { min: 0, ganz: true };
+
 const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'column' };
 
 /**
@@ -51,17 +54,22 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
   const [uf, setUf] = useState<Feld>(value?.unterfuehrer ?? null);
   const [m, setM] = useState<Feld>(value?.mannschaft ?? null);
 
+  // Geprüft statt gekappt (LLH-1768): ein negativer Teil bleibt stehen, sperrt und geht nicht hinaus.
+  const { grund, pruefe } = useZahlSperre();
+
   useEffect(() => {
     if (gleich(koerziere(f, uf, m), value ?? null)) return; // eigenes Echo → ignorieren
     setF(value?.fuehrer ?? null);
     setUf(value?.unterfuehrer ?? null);
     setM(value?.mannschaft ?? null);
+    // Ein Wert von außen ersetzt die Eingabe: ein alter Grund bleibt nicht hängen (LLH-1768).
+    if (grund) {
+      pruefe(value?.fuehrer, GRENZEN, 'f');
+      pruefe(value?.unterfuehrer, GRENZEN, 'uf');
+      pruefe(value?.mannschaft, GRENZEN, 'm');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
-
-  // Geprüft statt gekappt (LLH-1768): ein negativer Teil bleibt stehen, sperrt und geht nicht hinaus.
-  const { grund, pruefe } = useZahlSperre();
-  const GRENZEN = { min: 0, ganz: true };
 
   function melde(nf: Feld, nuf: Feld, nm: Feld) {
     setF(nf);

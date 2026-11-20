@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Button, InputNumber } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { QUALI_SOLL_ANZAHL_MAX, QUALI_SOLL_MAX } from '../api/eingabegrenzen';
@@ -26,6 +26,9 @@ export function vollstaendig(zeilen: readonly QualiSollZeile[] | undefined): Qua
 }
 
 const KEINE: QualiSollZeile[] = [];
+
+/** Grenzen der Anzahl je Zeile, geprüft statt gekappt (LLH-1768). */
+const ANZAHL = { min: 1, max: QUALI_SOLL_ANZAHL_MAX, ganz: true };
 
 /** Hüllen der Eingaben einer Zeile: Breiten als Feldstufe (Spec `feldbreiten`). */
 const AUSWAHL_HUELLE: CSSProperties = { display: 'grid', minWidth: 'var(--lfh-feld-schmal)' };
@@ -69,10 +72,17 @@ export default function QualiSollFeld({
   ];
 
   // Geprüft statt gekappt (LLH-1768): eine Anzahl außerhalb bleibt stehen und sperrt.
+  // Geprüft wird die ganze Liste, sobald die Person sie ändert (ein gespeicherter Altwert sperrt
+  // nicht); eine entfernte Zeile nimmt ihren Grund mit.
   const { pruefe } = useZahlSperre();
-  const ANZAHL = { min: 1, max: QUALI_SOLL_ANZAHL_MAX, ganz: true };
+  const [geaendert, setGeaendert] = useState(false);
+  const melde = (zeilen: QualiSollZeile[]) => {
+    setGeaendert(true);
+    pruefe(zeilen.map((z) => z.anzahl).find((a) => pruefeZahl(a, ANZAHL) !== null) ?? null, ANZAHL);
+    onChange?.(zeilen);
+  };
   const aendere = (index: number, aenderung: Partial<QualiSollZeile>) =>
-    onChange?.(value.map((z, i) => (i === index ? { ...z, ...aenderung } : z)));
+    melde(value.map((z, i) => (i === index ? { ...z, ...aenderung } : z)));
 
   return (
     <Stapel
@@ -104,11 +114,9 @@ export default function QualiSollFeld({
               <InputNumber
                 aria-label={`Anzahl ${nummer}`}
                 value={zeile.anzahl}
-                status={pruefeZahl(zeile.anzahl, ANZAHL) ? 'error' : undefined}
-                onChange={(anzahl) => {
-                  pruefe(anzahl, ANZAHL, String(index));
-                  aendere(index, { anzahl });
-                }}
+                status={geaendert && pruefeZahl(zeile.anzahl, ANZAHL) ? 'error' : undefined}
+                aria-invalid={geaendert && pruefeZahl(zeile.anzahl, ANZAHL) ? true : undefined}
+                onChange={(anzahl) => aendere(index, { anzahl })}
                 disabled={disabled}
               />
             </div>
@@ -117,7 +125,7 @@ export default function QualiSollFeld({
               danger
               aria-label={`Qualifikation ${nummer} entfernen`}
               icon={<IconMuelleimer />}
-              onClick={() => onChange?.(value.filter((_, i) => i !== index))}
+              onClick={() => melde(value.filter((_, i) => i !== index))}
               disabled={disabled}
             />
           </Stapel>
@@ -125,7 +133,7 @@ export default function QualiSollFeld({
       })}
       <Button
         icon={<IconPlus />}
-        onClick={() => onChange?.([...value, { anzahl: 1 }])}
+        onClick={() => melde([...value, { anzahl: 1 }])}
         disabled={disabled || value.length >= QUALI_SOLL_MAX}
       >
         Qualifikation fordern

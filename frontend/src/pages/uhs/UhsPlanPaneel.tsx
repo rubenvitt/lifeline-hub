@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { App, Button, InputNumber, Popconfirm, Slider, Switch, Upload } from 'antd';
+import { App, Button, Popconfirm, Slider, Switch, Upload } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   aenderePlan,
@@ -21,6 +21,7 @@ import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { FELD_KLASSE, Paneel, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /** Formate, die der Server als Plan annimmt (`src/uhs/plan.rs`, D3). HEIC bleibt draußen. */
 export const PLAN_ACCEPT = '.png,.jpg,.jpeg,.webp';
@@ -324,13 +325,15 @@ function ZahlFeld(props: {
         {props.label}
       </Textstufe>
       <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-kurz)', maxWidth: '100%' }}>
-        <InputNumber<number>
+        <ZahlFeld
           id={id}
           value={entwurf}
           min={props.min}
           max={props.max}
+          ganz
+          // Ohne Formular: ein Wert außerhalb bleibt stehen und geht nicht hinaus (LLH-1768).
+          nurGueltig
           step={10}
-          precision={0}
           disabled={props.gesperrt}
           onChange={setEntwurf}
           onBlur={fertig}

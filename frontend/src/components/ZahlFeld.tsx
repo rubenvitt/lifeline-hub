@@ -1,13 +1,12 @@
 import { InputNumber } from 'antd';
 import type { InputNumberProps } from 'antd';
-import { useState } from 'react';
-import { useZahlSperre, type ZahlGrenzen } from './zahlRegel';
+import { useZahlEingabe, type ZahlGrenzen } from './zahlRegel';
 
 export type ZahlFeldProps = Omit<InputNumberProps<number>, 'min' | 'max' | 'precision'> &
   Omit<ZahlGrenzen, 'stellen'> & {
     /**
-     * Nur gültige Werte gehen über `onChange` hinaus; ein abgelehnter bleibt im Feld stehen. Für
-     * Felder ohne Formular darüber (keine Eingabesperre), deren Wert sonst still mitliefe.
+     * Nur gültige Werte gehen über `onChange` hinaus; ein abgelehnter bleibt im Feld stehen.
+     * Vorgabe: an, wenn keine Sperrstelle darüber steht (kein `Feld`, keine `InlineAngabe`).
      */
     nurGueltig?: boolean;
     /** Meldet den Grund (`null` = gültig), etwa um einen Knopf daneben zu sperren. */
@@ -33,23 +32,20 @@ export function ZahlFeld({
   value,
   ...rest
 }: ZahlFeldProps) {
-  const { grund, pruefe } = useZahlSperre();
-  const [abgelehnt, setAbgelehnt] = useState<number | null>(null);
+  const { wert, grund, aendere } = useZahlEingabe({
+    value,
+    grenzen: { min, max, ganz, einheit },
+    onChange,
+    nurGueltig,
+    onGrund,
+  });
   return (
     <InputNumber<number>
       {...rest}
-      value={nurGueltig && grund ? abgelehnt : value}
+      value={wert}
       status={grund ? 'error' : status}
       aria-invalid={grund ? true : rest['aria-invalid']}
-      onChange={(wert) => {
-        const neu = pruefe(wert, { min, max, ganz, einheit });
-        onGrund?.(neu);
-        if (neu && nurGueltig) {
-          setAbgelehnt(wert);
-          return;
-        }
-        onChange?.(wert);
-      }}
+      onChange={aendere}
     />
   );
 }

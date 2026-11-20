@@ -1,6 +1,6 @@
 import { InputNumber } from 'antd';
 import type { InputNumberProps } from 'antd';
-import { useZahlSperre } from './zahlRegel';
+import { useZahlEingabe } from './zahlRegel';
 
 /**
  * Zahlfeld für Mengen (LFH-983). Der zugängliche Name ist Pflicht (`beschriftung`), auch im
@@ -33,16 +33,18 @@ export function MengenFeld({
   status,
   ...rest
 }: MengenFeldProps) {
-  const { grund, pruefe } = useZahlSperre();
+  const { wert, grund, aendere } = useZahlEingabe({
+    value: rest.value,
+    grenzen: { min, max, ganz: true },
+    onChange: onChange as ((wert: number | null) => void) | undefined,
+  });
   return (
     <InputNumber<number>
       {...rest}
       status={grund ? 'error' : status}
       aria-invalid={grund ? true : rest['aria-invalid']}
-      onChange={(wert) => {
-        pruefe(wert, { min, max, ganz: true });
-        onChange?.(wert);
-      }}
+      value={wert}
+      onChange={aendere}
       controls={false}
       inputMode="numeric"
       aria-label={beschriftung}

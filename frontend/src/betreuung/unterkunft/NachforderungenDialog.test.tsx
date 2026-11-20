@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, AUSGANG_UNBEKANNT_TEXT, AusgangUnbekannt, NetzFehler } from '../../api/client';
@@ -142,5 +142,26 @@ describe('NachforderungenDialog', () => {
     await waitFor(() => expect(onSchliessen).toHaveBeenCalledTimes(1));
     expect(angekommen[angekommen.length - 1]?.art).toBe('Decken');
     expect(onFertig).toHaveBeenLastCalledWith({ angelegt: ['Decken'], gescheitert: [] }, false);
+  });
+});
+
+describe('NachforderungenDialog prüft die Anzahl (LLH-1768)', () => {
+  it('eine Anzahl außerhalb sperrt das Anlegen, statt still eine andere zu senden', async () => {
+    renderMitProviders(
+      <NachforderungenDialog
+        einsatzId={1}
+        stelleId={8}
+        stelleName="Turnhalle Ost"
+        posten={POSTEN}
+        onFertig={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    const anzahl = within(dialog).getByRole('spinbutton', { name: 'Anzahl Feldbetten' });
+    fireEvent.change(anzahl, { target: { value: '2000000' } });
+    fireEvent.blur(anzahl);
+    expect(anzahl).toHaveValue('2000000');
+    expect(within(dialog).getByRole('button', { name: /Nachforderungen? anlegen/ })).toBeDisabled();
   });
 });

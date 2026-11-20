@@ -96,6 +96,7 @@ export { default as Feld, FELD_KLASSE, type FeldProps } from './Feld';
 export {
   SperrStelle,
   useEingabeSperre,
+  useHatSperrStelle,
   useSperrSammler,
   useSperrStelle,
   useSperrStelleZeigtGrund,
