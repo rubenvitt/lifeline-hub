@@ -1,4 +1,5 @@
-import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+import { BENUTZER_PRUEFEN, meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { warteAufSitzung } from '../auth/sitzungsSperre';
 import { merkeServerzeit } from '../offline/serveruhr';
 import type { ZeilenArt, ZeilenGrund } from './types';
 import { dispatchAntragIfAngenommen } from './antragEreignis';
@@ -288,7 +289,33 @@ function netzFehlerWerfen(e: unknown): never {
   throw e;
 }
 
+/** Wirft die 401 einer Leseanfrage, die an der Sitzungssperre nicht weiterkam. */
+function sitzungBeendetWerfen(): never {
+  throw new ApiError(401, 'Sitzung beendet');
+}
+
+/**
+ * Leseanfrage. Bei unterbrochener Sitzung (LLH-1770, `auth/sitzungsSperre.ts`) wartet sie auf
+ * die Neuanmeldung, statt mit 401 zu scheitern: vor dem Abruf, wenn schon gesperrt ist, und nach
+ * einer ersten 401, die über `meldeSitzungAbgelaufen` synchron die Sperre setzt (die
+ * Sitzungswache unterbricht im selben Takt). Wiederholt wird höchstens einmal; `/api/auth/me`
+ * wartet nie, sonst hinge die Prüfung des `AuthProvider` an sich selbst.
+ */
 export async function apiGet<T>(pfad: string): Promise<T> {
+  const wartend = pfad === ME_PFAD ? null : warteAufSitzung();
+  if (wartend && !(await wartend)) sitzungBeendetWerfen();
+  try {
+    return await apiGetEinmal<T>(pfad);
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 401 || pfad === ME_PFAD) throw e;
+    meldeSitzungAbgelaufen();
+    const sperre = warteAufSitzung();
+    if (!sperre || !(await sperre)) throw e;
+    return apiGetEinmal<T>(pfad);
+  }
+}
+
+async function apiGetEinmal<T>(pfad: string): Promise<T> {
   try {
     // Bewusst ohne `cache`-Option: bedingte Abrufe (ETag → `If-None-Match` → 304, LFH-594)
     // erledigt der HTTP-Cache des Browsers und reicht die gespeicherte Antwort als 200 durch.
