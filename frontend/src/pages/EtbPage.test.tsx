@@ -18,6 +18,7 @@ import { adminFixture, freigabenFixture } from '../test/fixtures';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
 import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import { AdresseSteht } from '../test/adresseSteht';
+import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 
 /**
  * Sperre vor dem Laden der Entwürfe: offen, bis ein Test sie schließt. Damit montiert die
@@ -317,7 +318,7 @@ describe('EtbPage', () => {
       if (termin) {
         await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
         await user.click(
-          within(screen.getByRole('dialog')).getByRole('button', { name: 'Anlegen' }),
+          within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
         );
         await waitFor(() => expect(gesendet?.faellig_at).toBe(termin));
       } else {
@@ -356,7 +357,7 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Wiedervorlage');
     await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
     const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2099-09-09 13:17:43'));
   });
 
@@ -672,7 +673,7 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Wiedervorlage');
     // Titel ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue(/Wiedervorlage: Erste Meldung/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.bezug_typ).toBe('etb');
@@ -1898,8 +1899,10 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
 
       // rc-dialog friert den schließenden Dialog in jsdom ein: am neuen Dialog prüfen.
       await user.click(dialog.querySelector<HTMLElement>('.ant-modal-close')!);
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await bestaetigeVerwerfen(user);
       await waehleZeilenaktion(user, 'Auftrag erteilen');
-      const wieder = (await screen.findAllByRole('dialog')).slice(-1)[0];
+      const wieder = ohneVerwerfenRueckfrage(await screen.findAllByRole('dialog')).slice(-1)[0];
       await within(wieder).findByDisplayValue('Erste Meldung');
       expect(within(wieder).queryByRole('alert')).toBeNull();
     });

@@ -62,7 +62,7 @@ import {
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
-import { Stapel } from '../components/instrument';
+import { Stapel, monoStil } from '../components/instrument';
 import Knopfreihe from '../components/instrument/Knopfreihe';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 
@@ -439,6 +439,10 @@ export default function PersonenDetailPage() {
       : detailQuery.data;
   // Eine unbekannte Sichtung aus einem veralteten Stand gilt als ungesichtet (LLH-1998).
   const sk = personSichtung(p.aktuelle_sichtung);
+
+  // Wer die Person ist, steht im Titel (LLH-1769): „Name, Vorname“, die Kennung klein dahinter.
+  // Breadcrumb und Tab-Titel bleiben ohne Namen, damit er nicht in Verlauf und Lesezeichen landet.
+  const kopfName = [p.name, p.vorname].filter(Boolean).join(', ') || null;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
@@ -852,7 +856,20 @@ export default function PersonenDetailPage() {
       }
       titel={
         <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
-          Person {registrierAnzeige(p.registrier_nr)}
+          {kopfName ? (
+            <>
+              {kopfName}
+              <Typography.Text
+                type="secondary"
+                data-lfh="titel-kennung"
+                style={{ ...monoStil('mono'), fontWeight: 400 }}
+              >
+                {registrierAnzeige(p.registrier_nr)}
+              </Typography.Text>
+            </>
+          ) : (
+            <>Person {registrierAnzeige(p.registrier_nr)}</>
+          )}
           <Status darstellung={personStatusDarstellung(p.status)} />
           {sk && <SichtungsTag kategorie={sk} />}
           {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}

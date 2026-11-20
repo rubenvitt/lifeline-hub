@@ -6,6 +6,7 @@ import { MATERIAL_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Werte {
   bezeichnung: string;
@@ -120,7 +121,7 @@ export default function MaterialAngabenModal({
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
-          { required: true, whitespace: true, message: 'Bezeichnung eintragen' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(MATERIAL_ADHOC_TEXT_MAX, 'Bezeichnung'),
         ]}
       >

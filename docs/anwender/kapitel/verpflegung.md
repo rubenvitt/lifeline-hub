@@ -137,7 +137,7 @@ Für Einsatzleitung und Führungspersonal, wenn die Organisation einen Verpflegu
 4. Ein Fenster, das an diesem Tag nicht gebraucht wird, mit „anlegen“ abwählen. Steht an einem
    Fenster „schon angelegt“, gibt es am Tag schon ein Zeitfenster dieses Namens; es wird nicht
    noch einmal angelegt.
-5. „Zeitfenster anlegen“ wählen. Die App kehrt zur Verpflegung zurück und meldet, wie viele
+5. „Anlegen“ wählen. Die App kehrt zur Verpflegung zurück und meldet, wie viele
    Zeitfenster für den Tag angelegt sind, und nennt jedes, das am Tag schon bestand.
 6. Weitere Personen, Sonderkost und Stellen auf der Karte über „Bedarf bearbeiten“ eintragen.
 

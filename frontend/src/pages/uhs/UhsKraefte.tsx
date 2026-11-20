@@ -34,6 +34,7 @@ import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
 import { Marke } from '../../components/instrument/Marke';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface Props {
   einsatzId: number;
@@ -385,11 +386,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         onFertig={() => setOffen(null)}
         onAbbrechen={() => setOffen(null)}
       >
-        <Feld<KraftWerte>
-          name="kraft_id"
-          label="Kraft"
-          rules={[{ required: true, message: 'Bitte eine Kraft auswählen' }]}
-        >
+        <Feld<KraftWerte> name="kraft_id" label="Kraft" rules={[pflicht('Kraft')]}>
           <Select
             showSearch={teilwortSuche}
             placeholder="Kraft auswählen…"
@@ -411,11 +408,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           onFertig={() => setOffen(null)}
           onAbbrechen={() => setOffen(null)}
         >
-          <Feld<EinheitWerte>
-            name="einheit_id"
-            label="Einheit"
-            rules={[{ required: true, message: 'Bitte eine Einheit auswählen' }]}
-          >
+          <Feld<EinheitWerte> name="einheit_id" label="Einheit" rules={[pflicht('Einheit')]}>
             <Select
               placeholder="Einheit auswählen…"
               options={einheiten.map((e) => ({
@@ -445,11 +438,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         onFertig={() => setOffen(null)}
         onAbbrechen={() => setOffen(null)}
       >
-        <Feld<AdhocWerte>
-          name="name"
-          label="Name"
-          rules={[{ required: true, whitespace: true, message: 'Bitte einen Namen angeben' }]}
-        >
+        <Feld<AdhocWerte> name="name" label="Name" rules={[pflicht('Name', { whitespace: true })]}>
           <Input maxLength={PERSONAL_ADHOC_TEXT_MAX} />
         </Feld>
         {/* Freitext ist die Qualifikation (`funktion`); die Einsatzfunktion setzt die Personalliste. */}

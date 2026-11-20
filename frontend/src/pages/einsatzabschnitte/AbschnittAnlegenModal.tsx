@@ -8,6 +8,7 @@ import type { Einsatzabschnitt } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { Feld } from '../../components/instrument';
 import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface AnlegenValues {
   name: string;
@@ -77,7 +78,7 @@ export default function AbschnittAnlegenModal({
       }}
       onAbbrechen={onClose}
     >
-      <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input />
       </Feld>
       {/* Eindeutig je Einsatz wie der Index (NOCASE): als Prüfung am Feld (LFH-1078). */}

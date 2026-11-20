@@ -10,6 +10,7 @@ import { renderMitProviders } from '../test/utils';
 import { gewaehlteOptionen, oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, Personal } from '../api/types';
 import PersonalDisponierenModal from './PersonalDisponierenModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 const person = (id: number, name: string, felder: Partial<Personal> = {}): Personal =>
   ({
@@ -223,7 +224,7 @@ describe('PersonalDisponierenModal', () => {
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('combobox', { name: 'Personen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
-    expect(await within(dialog).findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Person fehlt')).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
   });
 
@@ -294,8 +295,10 @@ describe('PersonalDisponierenModal', () => {
       await within(dialog).findByRole('list', { name: 'Nicht disponiert' });
 
       await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+      await bestaetigeVerwerfen();
       await userEvent.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-      const wieder = await screen.findByRole('dialog');
+      const wieder = await findeDialogOhneRueckfrage();
       await waitFor(() => {
         expect(within(wieder).queryByRole('alert')).toBeNull();
         expect(within(wieder).queryByRole('list', { name: 'Nicht disponiert' })).toBeNull();

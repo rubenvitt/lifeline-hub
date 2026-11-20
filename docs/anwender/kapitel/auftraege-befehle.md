@@ -100,8 +100,8 @@ hat den alten Wortlaut bestätigt. Dann den Auftrag aufheben und neu erteilen. �
 Für Einsatzleitung und Führungspersonal:
 
 1. Den Auftrag wählen und „Vollzug melden“ wählen.
-2. Im Dialog „Vollzug melden“ die „Rückmeldung zur Erledigung“ eintragen und „Vollzug melden“
-   wählen. Der Auftrag wechselt in die Ansicht „Abgeschlossen“; solange er gewählt bleibt, steht
+2. Im Dialog „Vollzug melden“ die „Vollzugsmeldung“ eintragen und „Vollzug melden“ wählen. Ohne
+   Text nennt der Dialog „Vollzugsmeldung fehlt“. Der Auftrag wechselt in die Ansicht „Abgeschlossen“; solange er gewählt bleibt, steht
    er mit dem Hinweis „Nicht mehr in dieser Ansicht“ weiter da.
 3. Zur Kontrolle in „Abgeschlossen“ den Auftrag wählen, „Abnehmen“ wählen und die Rückfrage
    „Auftrag abnehmen?“ mit „Auftrag abnehmen“ bestätigen.

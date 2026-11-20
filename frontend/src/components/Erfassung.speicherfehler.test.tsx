@@ -110,8 +110,10 @@ describe('ErfassungsModal — Speicherfehler im Dialog (LFH-1077)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein,
     // und jsdom beendet die Animation nie.
     await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     await user.click(screen.getByRole('button', { name: 'Öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await screen.findByRole('dialog', { name: 'Fahrzeug bearbeiten' });
     expect(within(wieder).getByLabelText('Name')).toHaveValue('');
     expect(within(wieder).queryByRole('alert')).toBeNull();
   });

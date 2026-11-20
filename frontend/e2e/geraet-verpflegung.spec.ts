@@ -126,7 +126,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     await expect(inhalt).toHaveValue(
       /^Fehlmenge Verpflegung ‚Mittag Deich‘ .+: 30 EP \(Bedarf 80, ausgegeben 50\)\.$/,
     );
-    await tablet.getByRole('button', { name: 'Meldung senden' }).click();
+    await tablet.getByRole('button', { name: 'Erfassen', exact: true }).click();
     // Auf die Quittung warten, nicht auf den Text: der stünde auch im Feld (e2e-Falle textarea).
     await expect(tablet.getByLabel('Inhalt')).toHaveValue('');
     await expect(tablet.getByText(/^Fehlmenge Verpflegung ‚Mittag Deich‘/)).toBeVisible();

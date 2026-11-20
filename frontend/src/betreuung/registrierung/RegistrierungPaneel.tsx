@@ -54,6 +54,7 @@ import {
   kostformBand,
   personName,
 } from './registrierKern';
+import { vorgemerktDauer, vorgemerktText } from '../../offline/vorgemerktText';
 
 /**
  * Abschnitt „Registrierung“ einer Betreuungsstelle (LLH-1612, Spec `betreuung-registrierung`,
@@ -157,7 +158,10 @@ export default function RegistrierungPaneel({
     onSuccess: (ergebnis, body) => {
       const n = personenWort(body.personen.length);
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Registrierung ${n}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Registrierung ${n}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch kein Haushalt.
@@ -177,7 +181,10 @@ export default function RegistrierungPaneel({
     },
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Abmeldung`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, 'Abmeldung'),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {

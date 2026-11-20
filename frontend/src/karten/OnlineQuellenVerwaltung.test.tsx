@@ -375,9 +375,9 @@ describe('OnlineQuellenVerwaltung', () => {
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Test-Quelle');
     await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.org/style.json');
     // Attribution bewusst leer lassen.
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
-    expect(await screen.findByText('Attribution ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Attribution fehlt')).toBeInTheDocument();
     // antd überspringt onFinish bei Validierungsfehler → Mutation feuert nie.
     expect(postAufgerufen).toBe(false);
   });
@@ -410,7 +410,7 @@ describe('OnlineQuellenVerwaltung', () => {
     );
     await userEvent.click(option);
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toMatchObject({
@@ -451,7 +451,7 @@ describe('OnlineQuellenVerwaltung', () => {
     );
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toMatchObject({ name: 'MapTiler', proxy: false });

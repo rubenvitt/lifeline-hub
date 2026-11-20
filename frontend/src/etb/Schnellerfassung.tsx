@@ -14,6 +14,7 @@ import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import { Zeichenzaehler } from '../components/zeichenGrenze';
 import Tastenkuerzel from '../components/Tastenkuerzel';
+import { serienKuerzel } from '../components/Erfassung';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
@@ -50,9 +51,9 @@ import {
   amZeilenanfang,
   baueEintrag,
   einheitAusSchluessel,
-  erkenneAtTrigger,
-  erkenneSlashTrigger,
-  erkenneTypBefehl,
+  parseAtTrigger,
+  parseSlashTrigger,
+  parseTypBefehl,
   TYP_BEFEHLE,
   TYP_BEFEHLE_MITARBEIT,
   fehlendeSeiten,
@@ -66,7 +67,8 @@ import {
   type SlashEintrag,
   type TextRange,
   laengenVerstoss,
-  erkenneZeitBefehl,
+  parseZeitBefehl,
+  parseNurBefehl,
   zukunftsVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
@@ -240,6 +242,20 @@ const KUERZEL_FEIN = 'Enter Control+Enter Meta+Enter';
 const KUERZEL_GROB = 'Control+Enter Meta+Enter';
 
 /**
+ * Kappe im Mehrzeilenmodus (LLH-1756): dort sendet nur Strg/⌘+Enter, die Kappe ↵ versprach
+ * sonst einen Weg, den es nicht gibt. Einmal je Sitzung bestimmt — die Plattform wechselt nicht.
+ */
+const KAPPE_MEHRZEILIG = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+/**
+ * Ob der Inhalt als mehrzeilig gilt (LLH-1756): führende Leerzeilen zählen nicht, sonst schaltete
+ * ein Umschalt+Enter vor dem ersten Zeichen den Sendeweg für den ganzen Eintrag um.
+ */
+function istMehrzeilig(inhalt: string): boolean {
+  return inhalt.trimStart().includes('\n');
+}
+
+/**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
  * (Von/An/Meldeweg sind das Gerüst einer Funkmeldung). Den Eintragstyp behält der Schalter
  * ebenfalls (LLH-1112); er ist kein Metadatum und geht eigens mit (`entwurfSchliessen`).
@@ -355,6 +371,7 @@ export default function Schnellerfassung({
   const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
+  const mehrzeilig = istMehrzeilig(inhalt);
   // Mitarbeit erfasst nur Meldung und Lage (LLH-1817); der Server lehnt anderes mit 403 ab.
   const erlaubteTypen = istMitarbeit(einsatz) ? TYP_BEFEHLE_MITARBEIT : TYP_BEFEHLE;
   const [typ, setTyp] = useState<EtbTyp>(
@@ -395,6 +412,14 @@ export default function Schnellerfassung({
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
   const [pflicht, setPflicht] = useState<('von' | 'an')[]>([]);
+  /**
+   * „Erfassen“ (Knopf oder Strg+Enter) bei leerem Inhalt: der Grund steht am Feld, statt dass der
+   * Knopf stumm bleibt (LLH-1771). Blankes Enter im leeren Feld sendet nie und meldet nichts.
+   * Geht, sobald Text getippt wird, und kehrt erst mit dem nächsten Versuch zurück. Text von außen
+   * (Baustein, Berichtigung) prüft die Bedingung mit.
+   */
+  const [inhaltFehlt, setInhaltFehlt] = useState(false);
+  const inhaltFehltSichtbar = inhaltFehlt && inhalt.trim() === '';
   // Ein Pflichtgrund steht nur, solange die Seite wirklich fehlt: eine Vorgabe nach Typwechsel oder
   // ein `@` füllen sie ohne `setzeFeld` (Review E5).
   const fehltJetzt = fehlendeSeiten(wirksam);
@@ -409,6 +434,7 @@ export default function Schnellerfassung({
   const rufnameSichtbar = pflichtSichtbar.filter(ausRufname);
   /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
   const pflichtGrundId = useId();
+  const inhaltGrundId = useId();
   const zeitGrundId = useId();
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
@@ -416,6 +442,8 @@ export default function Schnellerfassung({
   const protokollGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
+  /** Ein Text nur aus einem unbekannten `/wort` wurde nicht gesendet (LLH-1754); geht beim Tippen. */
+  const [befehlHinweis, setBefehlHinweis] = useState<string | null>(null);
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   /**
@@ -437,8 +465,13 @@ export default function Schnellerfassung({
    * Unlesbare Angabe hinter `/zeit` (LLH-1088): abgeleitet aus dem Text, nicht gespeichert, damit
    * auch ein neu eingehängter Entwurf sie kennt (Nach-Review 1 zu LLH-1866).
    */
-  const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
-  const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
+  const zeitImInhalt = parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
+  // Am Textende ohne Leerzeichen tippt womöglich noch jemand: dort meldet sich der Grund erst mit
+  // dem angehaltenen Senden (LLH-1754), nicht bei jeder Ziffer.
+  const zeitBefehlGrund =
+    zeitImInhalt && !zeitImInhalt.ok && (zeitImInhalt.abgeschlossen || isUnlesbarHalted)
+      ? zeitImInhalt.grund
+      : null;
   function handleZeitDiscard(grund: string | null) {
     zeitDiscardedRef.current = grund;
     setZeitDiscardedState(grund);
@@ -644,10 +677,10 @@ export default function Schnellerfassung({
   }, [rufname.standard]);
 
   function aktualisiereTrigger(text: string, caret: number) {
-    const slash = erkenneSlashTrigger(text, caret);
+    const slash = parseSlashTrigger(text, caret);
     // `@` gibt es im Berichtigungsmodus nicht: dort bleiben Von/An über `/von`, `/an`
     // erreichbar, aber die Zeile soll nichts still umschreiben, was das Original trug.
-    const at = slash.aktiv || berichtigungZu ? null : erkenneAtTrigger(text, caret);
+    const at = slash.aktiv || berichtigungZu ? null : parseAtTrigger(text, caret);
     const t = at?.aktiv ? at : slash;
     setMenuModus(at?.aktiv ? 'at' : 'slash');
     setTypenAnbieten(slash.aktiv && !berichtigungZu && amZeilenanfang(text, slash.start));
@@ -657,8 +690,10 @@ export default function Schnellerfassung({
   }
 
   function onInhaltChange(neu: string) {
+    setBefehlHinweis(null);
+    if (neu.trim() !== '') setInhaltFehlt(false);
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
-    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
+    const befehl = berichtigungZu ? null : parseTypBefehl(neu, erlaubteTypen);
     let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
@@ -670,9 +705,15 @@ export default function Schnellerfassung({
     // wer in „/zeit 2590 Pumpe“ eine Ziffer löscht, meint nicht 02:59.
     const caretRoh = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
     const caretImRest = caretRoh - (neu.length - text.length);
-    const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    const zeit = parseZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    // Beim Tippen nur ein abgeschlossener Befehl (Leerzeichen hinter der Angabe); ein offener am
+    // Textende geht erst mit Enter bzw. „Erfassen“ ins Feld (LLH-1754).
     const ausloesen =
-      zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
+      zeit != null &&
+      zeit.abgeschlossen &&
+      (befehl != null ||
+        caretImRest === zeit.ende ||
+        parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() }) == null);
     if (zeit?.ok && ausloesen) {
       applyZeitFromText(zeit.zeitpunkt);
       text = zeit.rest;
@@ -761,8 +802,23 @@ export default function Schnellerfassung({
       e.preventDefault();
       return;
     }
+    const leer = inhalt.trim() === '';
+    // Blankes Enter im leeren Feld tut nichts (LLH-1756): die Leerzeile, die der Browser sonst
+    // einfügt, schaltete den Inhalt auf mehrzeilig, und Enter sendete danach nie mehr.
+    if (
+      !istBeruehrung &&
+      leer &&
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey
+    ) {
+      e.preventDefault();
+      return;
+    }
     // Grober Zeiger: nur Strg/⌘+Enter sendet, Return bricht um (LFH-955, design.md D1).
-    const einzeilerSendet = !istBeruehrung && inhalt.trim() !== '' && !inhalt.includes('\n');
+    const einzeilerSendet = !istBeruehrung && !leer && !mehrzeilig;
     const istSendeTaste =
       e.key === 'Enter' &&
       !e.repeat &&
@@ -833,7 +889,13 @@ export default function Schnellerfassung({
   }
 
   async function absenden() {
-    if (sendet || inhalt.trim() === '') return;
+    if (sendet) return;
+    if (inhalt.trim() === '') {
+      setInhaltFehlt(true);
+      fokusInsFeld();
+      return;
+    }
+    setInhaltFehlt(false);
     // Ein lesbares `/zeit`, das beim Tippen nicht übernommen wurde (berichtigt mitten in der
     // Angabe, dort löst LLH-1088 bewusst nicht aus): dieser Klick übernimmt die Zeit sichtbar ins
     // Feld und sendet noch nicht. Erst der nächste sendet, mit Nachtrag am Knopf (Review B1,
@@ -842,6 +904,24 @@ export default function Schnellerfassung({
       applyZeitFromText(zeitImInhalt.zeitpunkt);
       setInhalt(zeitImInhalt.rest);
       fokusInsFeld();
+      return;
+    }
+    // Ein Text nur aus einem Befehl geht nie ins Tagebuch (LLH-1754): der Befehl wirkt wie die Wahl
+    // im `/`-Menü, ein unbekannter bleibt stehen und heißt „kein Befehl“.
+    const nurBefehl = parseNurBefehl(inhalt, berichtigungZu ? [] : erlaubteTypen);
+    if (nurBefehl) {
+      if (nurBefehl.art === 'unbekannt') {
+        setBefehlHinweis(`„${nurBefehl.befehl}“ ist kein Befehl`);
+        fokusInsFeld();
+        return;
+      }
+      setInhalt('');
+      if (nurBefehl.art === 'typ') {
+        setTyp(nurBefehl.typ);
+        fokusInsFeld();
+      } else {
+        fokusFeld(nurBefehl.feld);
+      }
       return;
     }
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
@@ -1076,6 +1156,17 @@ export default function Schnellerfassung({
   });
   const gruende = (
     <>
+      {inhaltFehltSichtbar && (
+        <span
+          id={inhaltGrundId}
+          role="alert"
+          data-lfh="etb-inhalt-hinweis"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Inhalt fehlt</span>
+        </span>
+      )}
       {rufnameSichtbar.length > 0 && (
         <span
           id={`${pflichtGrundId}-rufname`}
@@ -1143,6 +1234,12 @@ export default function Schnellerfassung({
       {nachtragMin != null && (
         <span data-lfh="etb-nachtrag-hinweis" style={grundStil(rollen.achtungText)}>
           {nachtragHinweis(nachtragMin)}
+        </span>
+      )}
+      {befehlHinweis && (
+        <span role="alert" data-lfh="etb-befehl-hinweis" style={grundStil(rollen.alarmText)}>
+          <IconWarndreieck />
+          <span>{befehlHinweis}</span>
         </span>
       )}
       {laengenHinweis && (
@@ -1216,6 +1313,8 @@ export default function Schnellerfassung({
     </span>
   );
 
+  // Mehrzeilig sendet blankes Enter nicht mehr; Kappe und Kürzel sagen das (LLH-1756).
+  const enterSendet = !istBeruehrung && !mehrzeilig;
   const erfassenKnopf = (
     // Die Sendetaste als Kappe statt als Satz (LFH-1078), nur mit feinem Zeiger: mit grobem sendet
     // Return nicht (LFH-955, D1). Erst ab `lg`: darunter kostete die Kappe dem Textfeld seinen
@@ -1224,14 +1323,14 @@ export default function Schnellerfassung({
     <Button
       type="primary"
       loading={sendet}
-      aria-keyshortcuts={istBeruehrung ? KUERZEL_GROB : KUERZEL_FEIN}
+      aria-keyshortcuts={enterSendet ? KUERZEL_FEIN : KUERZEL_GROB}
       onClick={() => void absenden()}
       style={{ flexShrink: 0 }}
     >
       {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : knopfText}
       {!istBeruehrung && !fortschritt && abBreite('lg') && (
         <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
-          ↵
+          {mehrzeilig ? KAPPE_MEHRZEILIG : '↵'}
         </Tastenkuerzel>
       )}
     </Button>
@@ -1407,7 +1506,8 @@ export default function Schnellerfassung({
           // Feld behält so beim Aufklappen seinen Platz im Baum.
           feldFuellt
           praefix={praefix}
-          rahmenFarbe={typFarbe.kante}
+          // „Inhalt fehlt“ färbt den Rahmen der Zeile, die das rahmenlose Feld trägt (LLH-1771).
+          rahmenFarbe={inhaltFehltSichtbar ? rollen.alarm : typFarbe.kante}
           hinweis={
             istSchmal ? undefined : (
               <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
@@ -1429,6 +1529,8 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            aria-invalid={inhaltFehltSichtbar}
+            aria-describedby={inhaltFehltSichtbar ? inhaltGrundId : undefined}
             // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
             enterKeyHint="enter"
             readOnly={sendet}

@@ -29,6 +29,7 @@ import {
   type RegistrierWerte,
   type RegistrierZeile,
 } from './registrierKern';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Maske „Registrieren“ der Registrierstelle (LLH-1612, Spec `betreuung-registrierung`,
@@ -252,7 +253,7 @@ export default function RegistrierMaske({
                       <Feld
                         name={[f.name, 'name']}
                         rules={[
-                          { required: true, whitespace: true, message: 'Nachname fehlt' },
+                          pflicht('Nachname', { whitespace: true }),
                           zeichenRegel(PERSON_NAME_MAX, 'Nachname'),
                         ]}
                       >

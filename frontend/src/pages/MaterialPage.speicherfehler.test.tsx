@@ -10,6 +10,7 @@ import MaterialPage from './MaterialPage';
 import { waehle } from '../test/auswahlListe';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /**
  * Abgelehnte Speichervorgänge der Materialseite stehen am Ort der Handlung (LFH-1077,
@@ -121,8 +122,10 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Material nicht im Dienst');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Material disponieren' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     expect(within(wieder).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
   });

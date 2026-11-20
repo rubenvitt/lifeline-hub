@@ -9,6 +9,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZIEL_ART } from './archivText';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Rückfrage vor einem Löschersuchen nach Art. 17 (LFH-751, Spec `aufbewahrung-loeschersuchen`,
@@ -143,7 +144,7 @@ export default function SchwaerzungsantragDialog({
         name="aktenzeichen"
         extra="Ohne Namen; bleibt im Einsatztagebuch stehen"
         rules={[
-          { required: true, whitespace: true, message: 'Aktenzeichen angeben' },
+          pflicht('Aktenzeichen', { whitespace: true }),
           { max: 64, message: 'Höchstens 64 Zeichen' },
         ]}
       >

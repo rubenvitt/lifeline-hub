@@ -73,19 +73,19 @@ function handler(benutzer: typeof admin) {
 /**
  * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sieben Sektionen der
  * Knopf im `aktionen`-Slot, bei fünf der Anlegen-Knopf ihrer `SchnellAnlegen`-Zeile, bei
- * `Organisation` der Speichern-Knopf ihres Formulars. Dass „Status anlegen" zweimal
+ * `Organisation` der Speichern-Knopf ihres Formulars. Dass „Anlegen" mehrfach
  * vorkommt, ist unschädlich: je Durchlauf steht genau eine Sektion im Baum.
  */
 const SEKTIONEN = [
-  { name: 'Einsatz-Stichworte', Komp: StichworteTab, aktion: 'Hinzufügen' },
+  { name: 'Einsatz-Stichworte', Komp: StichworteTab, aktion: 'Anlegen' },
   { name: 'Fahrzeuge', Komp: FahrzeugeTab, aktion: 'Fahrzeug anlegen' },
   { name: 'Material', Komp: MaterialTab, aktion: 'Material anlegen' },
-  { name: 'Fahrzeug-Status', Komp: StatusKatalogTab, aktion: 'Status anlegen' },
+  { name: 'Fahrzeug-Status', Komp: StatusKatalogTab, aktion: 'Anlegen' },
   { name: 'Personal', Komp: PersonalTab, aktion: 'Person anlegen' },
-  { name: 'Qualifikationen', Komp: QualifikationenTab, aktion: 'Qualifikation anlegen' },
-  { name: 'Personal-Status', Komp: PersonalStatusTab, aktion: 'Status anlegen' },
+  { name: 'Qualifikationen', Komp: QualifikationenTab, aktion: 'Anlegen' },
+  { name: 'Personal-Status', Komp: PersonalStatusTab, aktion: 'Anlegen' },
   { name: 'ETB-Schnellbausteine', Komp: EtbBausteineTab, aktion: 'Baustein anlegen' },
-  { name: 'Einheitstypen', Komp: EinheitTypenTab, aktion: 'Typ anlegen' },
+  { name: 'Einheitstypen', Komp: EinheitTypenTab, aktion: 'Anlegen' },
   { name: 'Einheiten-Vorlagen', Komp: EinheitVorlagenTab, aktion: 'Vorlage anlegen' },
   { name: 'Organisation', Komp: OrganisationTab, aktion: 'Speichern' },
   { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },

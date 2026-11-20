@@ -669,13 +669,14 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
       name: 'Zusage zu 2× RTW — 2 RTW zur Verstärkung',
     });
     expect(within(formular).getByRole('spinbutton', { name: 'Zugesagt' })).toHaveValue('2');
-    // Der Öffner ist weg: genau ein Knopf dieses Namens, der Absendeknopf.
-    expect(screen.getAllByRole('button', { name: 'Zusage erfassen' })).toHaveLength(1);
+    // Der Öffner ist weg; das Formular sendet mit „Erfassen“.
+    expect(screen.queryByRole('button', { name: 'Zusage erfassen' })).toBeNull();
+    expect(within(formular).getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
     const menge = within(formular).getByRole('spinbutton', { name: 'Zugesagt' });
     await userEvent.clear(menge);
     await userEvent.type(menge, '1');
     await userEvent.type(within(formular).getByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onZusage).toHaveBeenCalledWith(1, { anzahl: 1, rufnamen: ['83-1'] });
     expect(onStatus).not.toHaveBeenCalled();
     // Nach dem Erfassen schließt das Formular.
@@ -712,7 +713,7 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     const menge = screen.getByRole('spinbutton', { name: 'Zugesagt' });
     await userEvent.clear(menge);
     await userEvent.type(menge, '3');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Höchstens 2 angefordert')).toBeInTheDocument();
     expect(onZusage).not.toHaveBeenCalled();
   });

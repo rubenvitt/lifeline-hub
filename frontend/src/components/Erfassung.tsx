@@ -21,10 +21,16 @@ import {
   FOKUSABSTAND_ERFASSUNG_SEITE,
   useFokusabstandUnten,
 } from './fokusabstandUnten';
+import { gleichFuerStand } from './aenderungsstand';
 import { SpeicherFehler } from './SpeicherHinweis';
+import { MASKE_HAELT_FOKUS } from './maskeHaeltFokus';
+import { VerwerfenDialog } from './VerlassenRueckfrage';
 import { useTastaturVersatz } from './tastaturVersatz';
 import { useViewport } from './useViewport';
+import { useRollen } from './instrument/rollenwerte';
 import './Erfassung.css';
+
+export { MASKE_HAELT_FOKUS };
 
 /**
  * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus, Wertübernahme.
@@ -37,15 +43,19 @@ import './Erfassung.css';
  * 2. **Der Fokus steht beim Öffnen im ersten Feld** und kehrt nach jedem Serien-Speichern
  *    dorthin zurück.
  * 3. **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über Abbrechen,
- *    Schliesskreuz, Escape und Maskenklick. Warum `destroyOnHidden` das NICHT erledigt, steht
- *    am `ErfassungsModal`.
+ *    Schliesskreuz und Escape; die Maske schließt nie. Warum `destroyOnHidden` das NICHT
+ *    erledigt, steht am `ErfassungsModal`. **Geänderte Eingaben gehen nie ohne Rückfrage
+ *    verloren** (LLH-1755): weicht ein angefasstes Feld (`onValuesChange`, nie `setFieldsValue`)
+ *    von `initialValues` ab, fragt jeder Weg hinaus erst „Eingaben verwerfen?“.
  *
  * Die Fusszeile rendert die Hülle **selbst und innerhalb** des Formulars (`footer={null}`):
  * der sichtbare Knopf ist damit schon der Übermittlungsknopf, ein versteckter Zwilling wäre
  * überflüssig.
  *
  * Der Zähler heisst **„Erfasst: n"**, nicht „heute erfasst": er zählt seit dem Öffnen dieses
- * Dialogs, eine Tagesangabe behauptete Daten, die die Hülle nicht kennt.
+ * Dialogs, eine Tagesangabe behauptete Daten, die die Hülle nicht kennt. Er zählt nur, was der
+ * Server angenommen hat; nur Vorgemerktes steht daneben als **„nicht gesendet: m"** in der
+ * Achtung-Farbe (LLH-1758, `offline/AGENTS.md`, „Vorgemerkt heißt nicht offline“).
  *
  * ── EINE FALLE ─────────────────────────────────────────────────────
  *
@@ -249,6 +259,17 @@ interface ErfassungsFormularProps<T> {
    * Formular im Seitenfluss (LLH-1761). Ohne Angabe klebt nichts (kurze Formulare in Paneelen).
    */
   fussKlebt?: 'dialog' | 'seite';
+  /**
+   * Titel des umgebenden Dialogs; die Rückfrage vor dem Verwerfen nennt ihn („Die Eingaben in
+   * „Vermisst melden“ gehen verloren.“, LLH-1755). `ErfassungsModal` reicht seinen Titel.
+   */
+  rueckfrageTitel?: ReactNode;
+  /**
+   * Kein Knopf „Abbrechen“ im Fuß, obwohl `onAbbrechen` steht: der Dialog bricht nur über Kreuz
+   * und Escape ab (Auftragsdialoge, LLH-1755). `onAbbrechen` ruft dann der Abbruch über
+   * `steuerungRef` nach „Verwerfen“ bzw. ohne Änderung.
+   */
+  ohneAbbrechenKnopf?: boolean;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -294,12 +315,25 @@ export function ErfassungsFormular<T extends object>({
   zusammenfassung,
   fussKlebt,
   nebenaktionen,
+  rueckfrageTitel,
+  ohneAbbrechenKnopf = false,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const fussRefDialog = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const fussRefSeite = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG_SEITE);
   const zusammenfassungId = useId();
+  const pruefungId = useId();
+  /**
+   * Die Fehlertexte der letzten gescheiterten Prüfung, am Knopf genannt (LLH-1759): am Handy
+   * stehen die Felder oft über dem Bildrand, ohne die Zeile wirkte der Knopf tot. Leer = keine
+   * Zeile. Sie folgt den Feldern (`onFieldsChange`) und geht auf jedem Weg hinaus.
+   */
+  const [pruefFehler, setPruefFehler] = useState<string[]>([]);
+  /** Das erste fehlerhafte Feld und ein Zähler, der das Rollen nach dem Commit auslöst. */
+  const rollZielRef = useRef<(string | number)[] | null>(null);
+  const [rollTick, setRollTick] = useState(0);
   const { istSchmal } = useViewport();
   // Unter `md` klebt nur der Abschluss (LLH-1763), im Dialog wie auf der Seite (LLH-1761):
   // Einstellung und Serienknopf stehen am Formularende. „Abbrechen“ wandert nur im Dialog in den
@@ -316,6 +350,8 @@ export function ErfassungsFormular<T extends object>({
     setSeitenGrund(deckenderGrund(wurzel.current?.parentElement ?? null));
   }, [fussKlebt, token.colorBgLayout, token.colorBgContainer]);
   const [zaehler, setZaehler] = useState(0);
+  // Nur vorgemerkt, nicht angenommen (LLH-1758): eigener Zähler, nie in „Erfasst: n“.
+  const [nichtGesendet, setNichtGesendet] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
   const [behalten, setBehalten] = useState(false);
   // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug gelesen.
@@ -328,6 +364,17 @@ export function ErfassungsFormular<T extends object>({
   // Jeder Abbruch macht einen bereits laufenden Abschluss ungültig. Die Mutation
   // darf serverseitig zu Ende laufen, aber danach weder schließen noch navigieren.
   const abbruchGenerationRef = useRef(0);
+  /*
+   * Änderungsstand für die Rückfrage vor dem Verwerfen (LLH-1755): oberste Feldnamen, die die
+   * Person angefasst hat. `onValuesChange` ruft antd nur bei Bedienung, nie bei `setFieldsValue`;
+   * Vorbelegen allein fragt deshalb nicht. Jedes Zurücksetzen leert die Menge.
+   */
+  const touchedFieldsRef = useRef(new Set<string>());
+  const [rueckfrageOffen, setRueckfrageOffen] = useState(false);
+  const rueckfrageOffenRef = useRef(false);
+  const fokusVorRueckfrageRef = useRef<HTMLElement | null>(null);
+  const initialValuesRef = useRef(initialValues);
+  initialValuesRef.current = initialValues;
 
   /**
    * Der Fokus läuft über **Effekte, nicht über eine Zeitangabe**. Ein direkter `focus()` im
@@ -371,12 +418,22 @@ export function ErfassungsFormular<T extends object>({
     if (fokusTick > 0) fokussiereErstesFeld(wurzel.current);
   }, [fokusTick]);
 
+  // Gerollt wird NACH dem Commit, aus demselben Grund wie beim Fokus oben: ein Klappteil, den
+  // `onPruefungGescheitert` im selben Zug öffnet, steht erst dann im Fluss (LLH-1759).
+  useEffect(() => {
+    const ziel = rollZielRef.current;
+    if (rollTick === 0 || !ziel) return;
+    rollZielRef.current = null;
+    form.scrollToField(ziel, { block: 'center', focus: true });
+  }, [rollTick, form]);
+
   const abschicken = useCallback(
     async (werte: T) => {
       // Der Riegel liegt HIER und nicht am Knopf: eine gehaltene Taste erreicht den Knopf nie, und
       // `loading` blockiert nur Klicks.
       if (sendetRef.current) return;
       sendetRef.current = true;
+      setPruefFehler([]);
       const abbruchGeneration = abbruchGenerationRef.current;
       const serienlauf = serienlaufRef.current;
       serienlaufRef.current = false;
@@ -387,15 +444,17 @@ export function ErfassungsFormular<T extends object>({
         (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
       ) as Partial<T>;
       let serverErfolg = false;
+      let vorgemerkt = false;
       try {
         try {
           const ergebnis = await (aktion === undefined
             ? onErfassen(werte)
             : onErfassen(werte, aktion));
           serverErfolg = true;
+          vorgemerkt = istVorgemerkt(ergebnis);
           // Haptik der Hülle (Spec `huellen-vertrag`): angenommen `success`, ohne Netz nur
           // vorgemerkt `tap` — kein „gespeichert“-Gefühl für etwas, das der Server nicht kennt.
-          huelleHaptics(istVorgemerkt(ergebnis) ? 'tap' : 'success');
+          huelleHaptics(vorgemerkt ? 'tap' : 'success');
         } catch {
           // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
           // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
@@ -413,7 +472,12 @@ export function ErfassungsFormular<T extends object>({
         // hat Reset/Callback bereits selbst ausgeführt.
         if (abbruchGenerationRef.current !== abbruchGeneration) return;
 
-        setZaehler((n) => n + 1);
+        if (vorgemerkt) setNichtGesendet((n) => n + 1);
+        else setZaehler((n) => n + 1);
+        touchedFieldsRef.current.clear();
+        // Gespeichert ist nichts mehr zu verwerfen: eine offene Rückfrage geht mit (LLH-1755).
+        rueckfrageOffenRef.current = false;
+        setRueckfrageOffen(false);
         if (!serienlauf) {
           form.resetFields();
           onFertig();
@@ -461,14 +525,59 @@ export function ErfassungsFormular<T extends object>({
     serienSpeichern();
   }
 
-  const abbrechen = useCallback(() => {
+  const verwerfen = useCallback(() => {
     if (sperrtAbbruchRef.current) return;
+    rueckfrageOffenRef.current = false;
+    setRueckfrageOffen(false);
     abbruchGenerationRef.current += 1;
     serienlaufRef.current = false;
+    touchedFieldsRef.current.clear();
     form.resetFields();
+    setPruefFehler([]);
     raeumeSpeicherFehler();
     onAbbrechen?.();
   }, [form, onAbbrechen, raeumeSpeicherFehler]);
+
+  /** Weicht ein angefasstes Feld vom Startwert ab? (leer ≙ `null` ≙ nie gesetzt) */
+  const hasAenderungen = useCallback(() => {
+    const start = (initialValuesRef.current ?? {}) as Record<string, unknown>;
+    const jetzt = form.getFieldsValue(true) as Record<string, unknown>;
+    for (const name of touchedFieldsRef.current) {
+      if (!gleichFuerStand(jetzt[name], start[name])) return true;
+    }
+    return false;
+  }, [form]);
+
+  /**
+   * Der eine Abbruch aller Wege hinaus (Knopf, Escape, Kreuz über `steuerungRef`). Mit Änderung
+   * fragt er erst nach (LLH-1755); gesperrt während des Speicherns wie bisher.
+   */
+  const abbrechen = useCallback(() => {
+    if (sperrtAbbruchRef.current || rueckfrageOffenRef.current) return;
+    if (!hasAenderungen()) {
+      verwerfen();
+      return;
+    }
+    fokusVorRueckfrageRef.current =
+      document.activeElement instanceof HTMLElement &&
+      wurzel.current?.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+    rueckfrageOffenRef.current = true;
+    setRueckfrageOffen(true);
+  }, [hasAenderungen, verwerfen]);
+
+  const weiterBearbeiten = useCallback(() => {
+    rueckfrageOffenRef.current = false;
+    setRueckfrageOffen(false);
+    const ziel = fokusVorRueckfrageRef.current;
+    fokusVorRueckfrageRef.current = null;
+    // Nach dem Schließen der Rückfrage: antd gibt den Fokus sonst an seinen eigenen Auslöser.
+    requestAnimationFrame(() => {
+      if (ziel?.isConnected) ziel.focus();
+      else fokussiereErstesFeld(wurzel.current);
+    });
+  }, []);
 
   useImperativeHandle(steuerungRef, () => ({ abbrechen }), [abbrechen]);
 
@@ -504,7 +613,11 @@ export function ErfassungsFormular<T extends object>({
         </Checkbox>
       )}
       <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
-        {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+        {zaehler > 0 && <span>Erfasst: {zaehler}</span>}
+        {zaehler > 0 && nichtGesendet > 0 && <span aria-hidden="true"> · </span>}
+        {nichtGesendet > 0 && (
+          <span style={{ color: rollen.achtungText }}>nicht gesendet: {nichtGesendet}</span>
+        )}
       </Typography.Text>
     </div>
   );
@@ -535,10 +648,23 @@ export function ErfassungsFormular<T extends object>({
         layout="vertical"
         initialValues={initialValues}
         onFinish={abschicken}
+        onValuesChange={(geaendert: Partial<T>) => {
+          for (const name of Object.keys(geaendert)) touchedFieldsRef.current.add(name);
+        }}
         onFinishFailed={({ errorFields }) => {
           serienlaufRef.current = false;
           nebenaktionRef.current = undefined;
           onPruefungGescheitert?.(errorFields.map((f) => f.name.join('.')));
+          setPruefFehler(errorFields.flatMap((f) => f.errors));
+          if (errorFields.length > 0) {
+            rollZielRef.current = errorFields[0].name;
+            setRollTick((n) => n + 1);
+          }
+        }}
+        onFieldsChange={() => {
+          // Nur eine stehende Zeile folgt den Feldern; vor der ersten Prüfung bleibt sie aus.
+          if (pruefFehler.length === 0) return;
+          setPruefFehler(form.getFieldsError().flatMap((f) => f.errors));
         }}
       >
         {children}
@@ -584,6 +710,20 @@ export function ErfassungsFormular<T extends object>({
           }}
         >
           {!serieAmEnde && einstellung}
+          {/* PRÜFUNG — was fehlt, in Worten über den Knöpfen (LLH-1759). Steht in einem stets
+              vorhandenen `aria-live`-Halter, sonst bliebe die erste Meldung unangesagt. */}
+          <div aria-live="polite">
+            {pruefFehler.length > 0 && (
+              <Typography.Text
+                type="danger"
+                id={pruefungId}
+                data-lfh="erfassung-pruefung"
+                style={{ display: 'block', marginBottom: token.marginSM }}
+              >
+                {pruefFehler.join(' · ')}
+              </Typography.Text>
+            )}
+          </div>
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
               `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
           <div
@@ -610,7 +750,7 @@ export function ErfassungsFormular<T extends object>({
             )}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
               <Knopfreihe fuss>
-                {onAbbrechen && !abbruchImKopf && (
+                {onAbbrechen && !ohneAbbrechenKnopf && !abbruchImKopf && (
                   <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                     Abbrechen
                   </Button>
@@ -641,7 +781,14 @@ export function ErfassungsFormular<T extends object>({
                   loading={laeuft}
                   danger={unumkehrbar}
                   disabled={gesperrt}
-                  aria-describedby={zusammenfassung != null ? zusammenfassungId : undefined}
+                  aria-describedby={
+                    [
+                      zusammenfassung != null ? zusammenfassungId : undefined,
+                      pruefFehler.length > 0 ? pruefungId : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                 >
                   {erfassenText}
                 </Button>
@@ -650,6 +797,12 @@ export function ErfassungsFormular<T extends object>({
           </div>
         </div>
       </Form>
+      <VerwerfenDialog
+        offen={rueckfrageOffen}
+        titel={rueckfrageTitel}
+        onWeiter={weiterBearbeiten}
+        onVerwerfen={verwerfen}
+      />
     </div>
   );
 }
@@ -710,7 +863,7 @@ function deckenderGrund(el: Element | null): string | undefined {
 
 /**
  * Unter `md` trägt der Kopf „Abbrechen“ statt des Schließkreuzes (LLH-1763): es ist antds
- * Schließknopf selbst, nur mit Text. So bleibt es derselbe Ausweg wie Kreuz, Maske und Escape
+ * Schließknopf selbst, nur mit Text. So bleibt es derselbe Ausweg wie Kreuz und Escape
  * (`onCancel` → `schliessen`), dieselbe Sperre beim Speichern und dieselbe Lage im Kopf, deren
  * Höhe {@link kopfBoden} rechnet; die Höhe des Knopfs bleibt antds Kreuzgröße (= Steuerhöhe).
  * Der Rahmen macht ihn als Knopf erkennbar, ein nacktes Wort im Kopf läse sich als Titelteil.
@@ -782,16 +935,17 @@ export function kopfBoden(token: KopfToken): number {
  * Dieselbe Hülle als Dialog. `footer={null}`, weil die Knöpfe **im** Formular liegen;
  * `destroyOnHidden`, damit ein geschlossener Dialog keine Felder im Baum stehen lässt.
  *
- * **`onCancel` wird umschlossen, nicht durchgereicht.** Von den vier Auswegen (Abbrechen,
- * Schließkreuz, Escape, Maske) läuft nur der erste durch das Formular, und `destroyOnHidden`
- * fängt die übrigen **nicht** auf: der Speicher von rc-field-form überlebt das Abhängen
+ * **`onCancel` wird umschlossen, nicht durchgereicht.** Von den drei Auswegen (Abbrechen,
+ * Schließkreuz, Escape; die Maske schließt seit LLH-1755 nie) läuft nur der erste durch das
+ * Formular, und `destroyOnHidden` fängt die übrigen **nicht** auf: der Speicher von rc-field-form überlebt das Abhängen
  * (`preserve` per Vorgabe an) und gewinnt beim nächsten Öffnen gegen `initialValues`. Ein
  * Anlegen-Dialog trüge sonst die Werte des zuletzt bearbeiteten Datensatzes und legte ihn als
  * Dublette an.
  *
- * Deshalb besitzen alle vier Wege denselben zentralen Abbruch: Knopf und Escape gehen direkt
- * durch `ErfassungsFormular.abbrechen`, Kreuz und Maske über `ErfassungsFormularSteuerung`.
- * Während die Mutation läuft, sind Kreuz und Maske zusätzlich sichtbar gesperrt.
+ * Deshalb besitzen alle drei Wege denselben zentralen Abbruch: Knopf und Escape gehen direkt
+ * durch `ErfassungsFormular.abbrechen`, das Kreuz über `ErfassungsFormularSteuerung`. Dort fragt
+ * er bei geänderten Feldern erst nach („Eingaben verwerfen?“, LLH-1755). Während die Mutation
+ * läuft, ist das Kreuz zusätzlich sichtbar gesperrt.
  */
 export function ErfassungsModal<T extends object>({
   offen,
@@ -825,7 +979,9 @@ export function ErfassungsModal<T extends object>({
             ? { disabled: true }
             : true
       }
-      mask={{ closable: !sperrtAbbruch }}
+      // Die Maske schließt nie (LLH-1755): ein Tap neben den Dialog ist kein Abbruch.
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       footer={null}
       destroyOnHidden
       keyboard={false}
@@ -843,6 +999,7 @@ export function ErfassungsModal<T extends object>({
         onAbbrechen={onAbbrechen}
         {...rest}
         steuerungRef={formularSteuerung}
+        rueckfrageTitel={titel}
         fussKlebt="dialog"
       />
     </Modal>

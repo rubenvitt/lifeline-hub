@@ -47,7 +47,7 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
     .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
     .fill('Pegel Mühlbach steigt, Deich hält');
   await dialog.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
-  await dialog.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+  await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(dialog).toBeHidden();
 
   const sicht = page.getByRole('region', { name: 'Lagemeldungen' });

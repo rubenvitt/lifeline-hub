@@ -1,10 +1,10 @@
-import { Form, Input, theme } from 'antd';
+import { Form, Input, theme, type FormInstance } from 'antd';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
+import { createRef, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   ErfassungsFormular,
   ErfassungsModal,
@@ -45,6 +45,11 @@ interface Werte {
   ort: string;
   melder: string;
   notiz: string;
+}
+
+/** Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755): „Verwerfen“ bestätigen. */
+async function verwerfenBestaetigen() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
 }
 
 /**
@@ -261,6 +266,44 @@ describe('ErfassungsFormular — Serienmodus', () => {
   it('ohne Serienmodus gibt es „Speichern und nächste" gar nicht', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
     expect(screen.queryByRole('button', { name: 'Speichern und nächste' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ErfassungsFormular — Zähler nur für Angenommenes (LLH-1758)', () => {
+  const vorgemerkt = { zustand: 'vorgemerkt', client_id: 'c-1', grund: 'serverfehler' };
+  const gesendet = { zustand: 'gesendet', daten: { id: 1 } };
+
+  async function speichere(nutzer: ReturnType<typeof userEvent.setup>, ort: string) {
+    await nutzer.type(screen.getByLabelText('Ort'), ort);
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  }
+
+  it('zählt Vorgemerktes als „nicht gesendet“, nie als erfasst', async () => {
+    const onErfassen = vi
+      .fn()
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(gesendet);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const nutzer = userEvent.setup();
+
+    await speichere(nutzer, 'A');
+    expect(screen.getByText('nicht gesendet: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Erfasst:/)).not.toBeInTheDocument();
+
+    await speichere(nutzer, 'B');
+    await speichere(nutzer, 'C');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.getByText('nicht gesendet: 2')).toBeInTheDocument();
+  });
+
+  it('eine Antwort ohne Vormerk-Zustand zählt als erfasst', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    await speichere(userEvent.setup(), 'A');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/nicht gesendet/)).not.toBeInTheDocument();
   });
 });
 
@@ -731,6 +774,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await act(async () => {
       steuerung.current?.abbrechen();
     });
+    await verwerfenBestaetigen();
     await act(async () => {
       hookFreigeben();
       await hookAntwort;
@@ -766,6 +810,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
     await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await verwerfenBestaetigen();
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
@@ -786,6 +831,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await act(async () => {
       steuerung.current?.abbrechen();
     });
+    await verwerfenBestaetigen();
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
@@ -979,13 +1025,39 @@ describe('ErfassungsModal', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
   });
 
-  it('leert die Felder auch über Escape und das Schliesskreuz, nicht nur über den Knopf', async () => {
+  it('ohne Änderung schließen Escape und Kreuz sofort und still', async () => {
+    for (const weg of ['escape', 'kreuz'] as const) {
+      const onAbbrechen = vi.fn();
+      const { unmount } = renderMitProviders(
+        <ModalHarness
+          offen
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+          onAbbrechen={onAbbrechen}
+        />,
+      );
+      const nutzer = userEvent.setup();
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+      if (weg === 'escape') await nutzer.keyboard('{Escape}');
+      else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+
+      await waitFor(() => expect(onAbbrechen).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('Escape und Kreuz mit Änderung fragen nach, nennen den Dialog und leeren erst nach „Verwerfen“', async () => {
     // `onCancel` roh durchgereicht deckte nur den Abbrechen-KNOPF. `destroyOnHidden` rettet das
     // nicht: der Speicher von rc-field-form überlebt und gewinnt beim nächsten Öffnen gegen
     // `initialValues`. Beide Wege einzeln, weil sie im Modal an verschiedenen Stellen hängen.
     for (const weg of ['escape', 'kreuz'] as const) {
+      const onAbbrechen = vi.fn();
       const { unmount } = renderMitProviders(
-        <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+        <ModalHarness
+          offen
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+          onAbbrechen={onAbbrechen}
+        />,
       );
       const nutzer = userEvent.setup();
       await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
@@ -993,9 +1065,43 @@ describe('ErfassungsModal', () => {
       if (weg === 'escape') await nutzer.keyboard('{Escape}');
       else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
 
+      expect(
+        await screen.findByText('Die Eingaben in „Person erfassen“ gehen verloren.'),
+      ).toBeInTheDocument();
+      expect(onAbbrechen).not.toHaveBeenCalled();
+      await verwerfenBestaetigen();
       await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+      expect(onAbbrechen).toHaveBeenCalledTimes(1);
       unmount();
     }
+  });
+
+  it('ein Klick auf die Maske nimmt dem Feld den Fokus nicht, Escape bleibt wirksam (LLH-1755)', async () => {
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    // `fireEvent` liefert `false`, wenn der Standard verhindert wurde: der Browser verschiebt den
+    // Fokus dann nicht auf `<body>`, wo keine Tastatur-Ebene Escape hörte.
+    expect(fireEvent.mouseDown(maske!)).toBe(false);
+  });
+
+  it('ein Klick auf die Maske schließt nie, auch ohne Änderung (LLH-1755)', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    await userEvent.click(maske!);
+
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Person erfassen' })).not.toHaveClass(
+      'ant-zoom-leave',
+    );
   });
 
   it('Escape läuft genau einmal über die Registry und verwirft die Eingabe', async () => {
@@ -1019,12 +1125,14 @@ describe('ErfassungsModal', () => {
     fireEvent(ort, ereignis);
 
     expect(ereignis.defaultPrevented).toBe(true);
+    await verwerfenBestaetigen();
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
   });
 
-  it('verwirft einen laufenden Abschluss über Kreuz und Maskenklick', async () => {
-    for (const weg of ['kreuz', 'maske'] as const) {
+  it('verwirft einen laufenden Abschluss über das Kreuz', async () => {
+    // Die Maske schließt seit LLH-1755 nie; der Abbruch läuft über Kreuz und Rückfrage.
+    {
       let antwortFreigeben!: () => void;
       const antwort = new Promise<void>((resolve) => {
         antwortFreigeben = resolve;
@@ -1046,13 +1154,8 @@ describe('ErfassungsModal', () => {
       await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
       await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-      if (weg === 'kreuz') {
-        await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-      } else {
-        const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
-        expect(maske).not.toBeNull();
-        await userEvent.click(maske!);
-      }
+      await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+      await verwerfenBestaetigen();
       await act(async () => {
         antwortFreigeben();
         await antwort;
@@ -1083,7 +1186,7 @@ describe('ErfassungsModal', () => {
     expect(kreuz).not.toHaveTextContent('Abbrechen');
   });
 
-  it('„Abbrechen“ im Kopf leert die Felder und ruft onAbbrechen einmal (LLH-1763)', async () => {
+  it('„Abbrechen“ im Kopf fragt nach, leert nach „Verwerfen“ und ruft onAbbrechen einmal (LLH-1763, LLH-1755)', async () => {
     setzeViewportBreite(390);
     const onAbbrechen = vi.fn();
     renderMitProviders(
@@ -1096,6 +1199,8 @@ describe('ErfassungsModal', () => {
     const nutzer = userEvent.setup();
     await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    await verwerfenBestaetigen();
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
   });
@@ -1393,5 +1498,365 @@ describe('ErfassungsFormular — Haptik in der Hülle', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue({})} onFertig={onFertig} />);
     await userEvent.setup().type(screen.getByLabelText('Melder'), 'Löschzug 1{Enter}');
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('ErfassungsFormular — Rückfrage vor dem Verwerfen (LLH-1755)', () => {
+  function RueckfrageHarness(props: {
+    onErfassen?: (w: Werte) => Promise<unknown>;
+    onAbbrechen?: () => void;
+    serie?: boolean;
+    uebernahme?: (keyof Werte)[];
+    steuerungRef?: Ref<ErfassungsFormularSteuerung>;
+    formRef?: { current: FormInstance<Werte> | null };
+    speicherung?: Speicherung;
+    rueckfrageTitel?: ReactNode;
+  }) {
+    const [form] = Form.useForm<Werte>();
+    if (props.formRef) props.formRef.current = form;
+    return (
+      <ErfassungsFormular<Werte>
+        form={form}
+        onErfassen={props.onErfassen ?? vi.fn().mockResolvedValue(undefined)}
+        onFertig={() => {}}
+        onAbbrechen={props.onAbbrechen ?? (() => {})}
+        serie={props.serie}
+        uebernahme={props.uebernahme}
+        steuerungRef={props.steuerungRef}
+        speicherung={props.speicherung}
+        rueckfrageTitel={props.rueckfrageTitel}
+      >
+        <Form.Item label="Ort" name="ort">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Melder" name="melder">
+          <Input />
+        </Form.Item>
+      </ErfassungsFormular>
+    );
+  }
+
+  /** Offene Rückfrage; antd schließt im jsdom animiert und hängt dann `ant-zoom-leave` an. */
+  const rueckfrage = () => {
+    const d = screen.queryByRole('dialog', { name: 'Eingaben verwerfen?' });
+    return d && !d.classList.contains('ant-zoom-leave') ? d : null;
+  };
+
+  it('ohne Änderung schließt Abbrechen sofort und still', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('mit Änderung fragt Abbrechen nach; „Weiter bearbeiten“ behält die Werte', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+
+    await nutzer.click(screen.getByRole('button', { name: 'Weiter bearbeiten' }));
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('„Verwerfen“ leert und meldet den Abbruch', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
+  it('nennt den Titel des Dialogs im Text der Rückfrage', async () => {
+    renderMitProviders(<RueckfrageHarness rueckfrageTitel="Vermisst melden" />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(
+      await screen.findByText('Die Eingaben in „Vermisst melden“ gehen verloren.'),
+    ).toBeInTheDocument();
+  });
+
+  it('der Fokus steht in der Rückfrage auf „Weiter bearbeiten“ und kehrt danach ins Feld zurück', async () => {
+    renderMitProviders(<RueckfrageHarness />);
+    const nutzer = userEvent.setup();
+    const melder = screen.getByLabelText('Melder');
+    await nutzer.type(melder, 'Florian');
+    await act(async () => {
+      fireEvent.keyDown(melder, { key: 'Escape' });
+    });
+
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+    await nutzer.click(weiter);
+    await waitFor(() => expect(document.activeElement).toBe(melder));
+  });
+
+  it('getippt und wieder gelöscht gilt als unverändert', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'x{Backspace}');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('setFieldsValue allein fragt nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const formRef: { current: FormInstance<Werte> | null } = { current: null };
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} formRef={formRef} />);
+    act(() => {
+      formRef.current!.setFieldsValue({ ort: 'Vorbelegt' });
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('nach einem Serien-Speichern mit „Werte behalten“ fragt Abbrechen nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <RueckfrageHarness
+        serie
+        uebernahme={['ort']}
+        onErfassen={onErfassen}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: /Speichern und nächste/ }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue('Brücke'));
+
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('Escape in der Rückfrage schließt nur die Rückfrage', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+
+    await nutzer.keyboard('{Escape}');
+
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    // Keine zweite Rückfrage hinterher.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(rueckfrage()).toBeNull();
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('Strg+Enter bei offener Rückfrage speichert nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<RueckfrageHarness serie onErfassen={onErfassen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(rueckfrage()).not.toBeNull();
+  });
+
+  it('Escape schließt die Rückfrage auch mit dem Fokus auf ihrem Rahmen', async () => {
+    renderMitProviders(<RueckfrageHarness />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const offen = await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' });
+    const rahmen = offen.closest<HTMLElement>('.ant-modal-wrap');
+    expect(rahmen).not.toBeNull();
+    fireEvent.keyDown(rahmen!, { key: 'Escape' });
+
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+  });
+
+  it('ein Speichern, das während der offenen Rückfrage gelingt, schließt sie mit', async () => {
+    let freigeben!: () => void;
+    const antwort = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <RueckfrageHarness serie onErfassen={vi.fn(() => antwort)} onAbbrechen={onAbbrechen} />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: /Speichern und nächste/ }));
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+
+    await act(async () => {
+      freigeben();
+      await antwort;
+    });
+
+    // Gespeichert ist nichts mehr zu verwerfen: die Rückfrage geht, der Abbruch bleibt aus.
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('der äußere Abbruch über steuerungRef fragt bei Änderung ebenso nach', async () => {
+    const onAbbrechen = vi.fn();
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} steuerungRef={steuerung} />);
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('während des Speicherns fragt und schließt der Abbruch nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    const speicherung: Speicherung = { isPending: true, error: null, reset: vi.fn() };
+    renderMitProviders(
+      <RueckfrageHarness
+        onAbbrechen={onAbbrechen}
+        steuerungRef={steuerung}
+        speicherung={speicherung}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+});
+
+/** Zwei Pflichtfelder, dazu ein Abbrechen-Weg und ein Mitschnitt des Rollens (LLH-1759). */
+function ZweiPflichtHarness(props: {
+  onErfassen?: (w: Werte) => Promise<unknown>;
+  onAbbrechen?: () => void;
+  zusammenfassung?: ReactNode;
+  onPruefungGescheitert?: (felder: string[]) => void;
+  onRollen?: (...args: unknown[]) => void;
+}) {
+  const [form] = Form.useForm<Werte>();
+  // antd rollt über `scroll-into-view-if-needed`, das jsdom nicht abbildet; gemessen wird deshalb
+  // der Aufruf am Formular, das echte Rollen samt Fokus läuft weiter.
+  const echt = useRef(form.scrollToField);
+  form.scrollToField = (...args: Parameters<typeof form.scrollToField>) => {
+    props.onRollen?.(...args);
+    echt.current(...args);
+  };
+  return (
+    <ErfassungsFormular<Werte>
+      form={form}
+      onErfassen={props.onErfassen ?? vi.fn().mockResolvedValue(undefined)}
+      onFertig={() => {}}
+      onAbbrechen={props.onAbbrechen ?? (() => {})}
+      zusammenfassung={props.zusammenfassung}
+      onPruefungGescheitert={props.onPruefungGescheitert}
+    >
+      <Form.Item
+        label="Ort"
+        name="ort"
+        rules={[{ required: true, message: 'Ort ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+      <Form.Item
+        label="Melder"
+        name="melder"
+        rules={[{ required: true, message: 'Melder ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+    </ErfassungsFormular>
+  );
+}
+
+describe('ErfassungsFormular — Prüfung gescheitert (LLH-1759)', () => {
+  const pruefzeile = () => document.querySelector('[data-lfh="erfassung-pruefung"]');
+
+  it('rollt zum ersten fehlerhaften Feld und fokussiert es', async () => {
+    const rollen = vi.fn();
+    renderMitProviders(<ZweiPflichtHarness onRollen={rollen} />);
+    // Der Klick nimmt den Fokus vom Startfeld: geprüft wird, dass die Prüfung ihn zurücksetzt.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(rollen).toHaveBeenCalled());
+    expect(rollen).toHaveBeenCalledWith(
+      ['ort'],
+      expect.objectContaining({ block: 'center', focus: true }),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+  });
+
+  it('nennt die Fehler am Knopf', async () => {
+    renderMitProviders(<ZweiPflichtHarness zusammenfassung="1 Meldung" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    expect(pruefzeile()).toHaveTextContent('Ort ist erforderlich');
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    expect(pruefzeile()!.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
+    const beschreibung = screen
+      .getByRole('button', { name: 'Erfassen' })
+      .getAttribute('aria-describedby');
+    expect(beschreibung?.split(' ')).toContain(pruefzeile()!.id);
+    // Die Zusammenfassung bleibt Teil der Beschreibung.
+    expect(beschreibung?.split(' ')).toHaveLength(2);
+  });
+
+  it('die Zeile verschwindet, sobald die Felder stimmen', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.type(screen.getByLabelText('Ort'), 'Halle 3');
+    await waitFor(() => expect(pruefzeile()).not.toHaveTextContent('Ort ist erforderlich'));
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    await userEvent.type(screen.getByLabelText('Melder'), 'RTW 2');
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('Abbrechen räumt die Zeile', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('ruft onPruefungGescheitert vor dem Rollen', async () => {
+    const reihenfolge: string[] = [];
+    renderMitProviders(
+      <ZweiPflichtHarness
+        onPruefungGescheitert={() => reihenfolge.push('gescheitert')}
+        onRollen={() => reihenfolge.push('rollen')}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(reihenfolge).toContain('rollen'));
+    expect(reihenfolge[0]).toBe('gescheitert');
   });
 });

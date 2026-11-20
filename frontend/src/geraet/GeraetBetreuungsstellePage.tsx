@@ -19,6 +19,7 @@ import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import GeraetMeldungen from './GeraetMeldungen';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 const BEREICH_NAME = {
   belegung: 'Belegung',
@@ -105,7 +106,10 @@ export default function GeraetBetreuungsstellePage() {
     },
     onSuccess: (ergebnis, { ziel, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Belegungsmeldung ${ziel.bezeichnung}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Belegungsmeldung ${ziel.bezeichnung}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {

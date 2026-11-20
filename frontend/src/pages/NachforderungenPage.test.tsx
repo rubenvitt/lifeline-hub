@@ -236,7 +236,7 @@ describe('NachforderungenPage', () => {
     // Das Formular liegt hinter dem Kopf-Toggle → erst aufklappen.
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
     await fuelleErfassung('SEG', 'Eine SEG');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
         1,
@@ -333,7 +333,11 @@ describe('NachforderungenPage', () => {
     await userEvent.clear(menge);
     await userEvent.type(menge, '1');
     await userEvent.type(screen.getByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('region', { name: /^Zusage zu / })).getByRole('button', {
+        name: 'Erfassen',
+      }),
+    );
     await waitFor(() =>
       expect(erfasseZusage).toHaveBeenCalledWith(1, 1, { anzahl: 1, rufnamen: ['83-1'] }),
     );
@@ -348,7 +352,11 @@ describe('NachforderungenPage', () => {
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
     await userEvent.type(await screen.findByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('region', { name: /^Zusage zu / })).getByRole('button', {
+        name: 'Erfassen',
+      }),
+    );
     const formular = screen.getByRole('region', { name: /^Zusage zu / });
     expect(await within(formular).findByText('Mehr Rufnamen als zugesagt')).toBeInTheDocument();
     expect(within(formular).getByText('83-1')).toBeInTheDocument();
@@ -698,7 +706,7 @@ describe('NachforderungenPage', () => {
       legeNachforderungAn.mockResolvedValue(nf());
       renderPage(deeplink);
       await erwarteVorbelegt();
-      await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await waitFor(() =>
         expect(legeNachforderungAn).toHaveBeenCalledWith(
           1,
@@ -814,7 +822,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     });
 
   async function setzeAb() {
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
   }
 
   it('Anlegen: der Grund steht am Formular, die Eingabe bleibt, kein Toast', async () => {
@@ -1721,7 +1729,7 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
     );
 
     await fuelleErfassung('Decken', '100 Wolldecken');
-    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
         1,

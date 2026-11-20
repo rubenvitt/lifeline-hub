@@ -130,6 +130,23 @@ describe('AufnahmePage', () => {
     );
   });
 
+  // Befund LLH-1771: der Startfokus lag auf „SK I akut“, ein verirrtes Enter wählte „akut“.
+  it('legt den Startfokus auf die Sichtungsgruppe; ein verirrtes Enter wählt nichts und sendet nicht', async () => {
+    let gesendet = 0;
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => {
+        gesendet += 1;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ]);
+    const gruppe = await screen.findByRole('radiogroup');
+    await waitFor(() => expect(gruppe).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    for (const radio of within(gruppe).getAllByRole('radio')) expect(radio).not.toBeChecked();
+    expect(gruppe).toHaveFocus();
+    expect(gesendet).toBe(0);
+  });
+
   it('erfasst in Serie, ohne die Seite zu verlassen', async () => {
     let gesendet: { sichtung?: string } = {};
     render(einsatzAktiv, [

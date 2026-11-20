@@ -15,6 +15,7 @@ vi.mock('../api/dokumente', async (importOriginal) => {
   return { ...echt, aendereDokument: vi.fn() };
 });
 import { aendereDokument } from '../api/dokumente';
+import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 
 const aendere = vi.mocked(aendereDokument);
 
@@ -115,7 +116,8 @@ function rendere(dokument: Dokument = lageplan) {
 
 /** Der Dialog, NACHDEM sein Anfangsfokus sitzt (Muster `DokumentAblegenModal.test.tsx`). */
 async function dialog() {
-  const d = (await screen.findAllByRole('dialog'))[0];
+  // Die beantwortete Rückfrage „Eingaben verwerfen?“ bleibt in jsdom im Baum (LLH-1755).
+  const d = ohneVerwerfenRueckfrage(await screen.findAllByRole('dialog'))[0];
   const erstes = within(d).getByRole('combobox', { name: 'Kategorie' });
   await waitFor(() => expect(document.activeElement).toBe(erstes));
   return d;
@@ -263,6 +265,8 @@ describe('DokumentBearbeitenModal', () => {
     await userEvent.clear(titel);
     await userEvent.type(titel, 'Verworfen');
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));

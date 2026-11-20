@@ -13,6 +13,7 @@ import { nichtGefundenInhalt } from '../components/SeitenZustand';
 import { zeichenRegel } from '../components/zeichenGrenze';
 import { besatzungZeile, mitkommendeBesatzung, typVorgabe } from './eigeneEinheit';
 import { gruendeJeKraft } from './sammelDisposition';
+import { pflicht } from '../components/pflichtRegel';
 
 type Werte = { name: string; typ_id?: number; abschnitt_id?: number };
 
@@ -125,7 +126,7 @@ export default function EigeneEinheitDialog({
       <Feld
         label="Name"
         name="name"
-        rules={[{ required: true, whitespace: true }, zeichenRegel(EINHEIT_NAME_MAX, 'Name')]}
+        rules={[pflicht('Name', { whitespace: true }), zeichenRegel(EINHEIT_NAME_MAX, 'Name')]}
       >
         <Input maxLength={EINHEIT_NAME_MAX} />
       </Feld>

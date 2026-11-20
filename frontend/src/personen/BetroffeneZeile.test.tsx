@@ -18,8 +18,14 @@ import BetroffeneZeile from './BetroffeneZeile';
 afterEach(() => setzeViewportZurueck());
 
 function zeige(onErfassen = vi.fn()) {
-  renderMitProviders(<BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />);
-  return { onErfassen, feld: screen.getByRole('textbox', { name: 'Kurzeingabe Person' }) };
+  const { container } = renderMitProviders(
+    <BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />,
+  );
+  return {
+    container,
+    onErfassen,
+    feld: screen.getByRole('textbox', { name: 'Kurzeingabe Person' }),
+  };
 }
 
 const legende = () => document.querySelector<HTMLElement>('[data-lfh="kuerzel"]')!;
@@ -119,20 +125,20 @@ describe('BetroffeneZeile — stille Fehlwege (LLH-1767)', () => {
 /**
  * Feld in voller Breite am Handy (LLH-1762): unter `md` ließen Präfix „/person“ und Knopf (140 px)
  * dem Feld 96 px, etwa elf Zeichen. Gestapelt steht das Feld allein in der ersten Zeile der Box,
- * „/person“ und „Person erfassen“ darunter; ab `md` bleibt alles in einer Zeile.
+ * „/person“ und „Erfassen“ darunter; ab `md` bleibt alles in einer Zeile.
  */
 describe('BetroffeneZeile — Breite des Felds (LLH-1762)', () => {
   const zelleVon = (el: HTMLElement) => el.closest('.lfh-schnellerfassung__feld');
 
   it('unter md steht das Feld allein in seiner Zelle, Präfix und Knopf darunter', () => {
     setzeViewportBreite(390);
-    const { container } = zeige();
+    zeige();
     const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
-    const knopf = screen.getByRole('button', { name: 'Person erfassen' });
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
     expect(zelleVon(feld)).toHaveClass('lfh-schnellerfassung__feld--gestapelt');
     expect(zelleVon(knopf)).toBeNull();
     // DOM-Folge = Sichtfolge = Tab-Folge: Feld, Präfix, Knopf.
-    const zeile = container.querySelector('.lfh-schnellerfassung')!;
+    const zeile = document.querySelector('.lfh-schnellerfassung')!;
     expect(zeile.firstElementChild).toBe(zelleVon(feld));
     expect(zeile.lastElementChild).toContainElement(knopf);
   });
@@ -141,7 +147,7 @@ describe('BetroffeneZeile — Breite des Felds (LLH-1762)', () => {
     setzeViewportBreite(1180);
     zeige();
     const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
-    const knopf = screen.getByRole('button', { name: 'Person erfassen' });
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
     expect(zelleVon(feld)).not.toHaveClass('lfh-schnellerfassung__feld--gestapelt');
     expect(zelleVon(knopf)).toBe(zelleVon(feld));
   });
@@ -164,7 +170,7 @@ describe('BetroffeneZeile — Grenze des Namens (LLH-1329)', () => {
     const lang = 'x'.repeat(PERSON_NAME_MAX + 1);
     fireEvent.change(feld, { target: { value: `${lang} sk2` } });
     expect(screen.getByText('201 / 200 · zu lang')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Nicht erfasst: Name darf höchstens 200 Zeichen lang sein',
     );

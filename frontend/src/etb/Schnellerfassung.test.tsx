@@ -212,20 +212,54 @@ describe('Schnellerfassung', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
+  /**
+   * LLH-1756: Enter im leeren Feld fügte eine unsichtbare Leerzeile ein; danach galt der Inhalt
+   * als mehrzeilig und Enter sendete nie mehr, obwohl die Kappe weiter ↵ zeigte.
+   */
   it.each([
     ['leer', ''],
     ['nur Whitespace', '  \t'],
-  ])('Plain Enter unterdrückt bei %s keinen nativen Zeilenumbruch', async (_fall, inhalt) => {
+  ])('Plain Enter tut bei %s nichts — keine Leerzeile, kein Senden', async (_fall, inhalt) => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     if (inhalt) await userEvent.type(feld, inhalt);
-    let nichtVerhindert = false;
+    let nichtVerhindert = true;
     await act(async () => {
       nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' });
     });
-    expect(nichtVerhindert).toBe(true);
+    expect(nichtVerhindert).toBe(false);
+    expect(feld).toHaveValue(inhalt);
     expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nach Enter im leeren Feld sendet Enter den Einzeiler weiter', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Enter}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('führende Leerzeilen (Umschalt+Enter) zählen nicht: Enter sendet den Einzeiler', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Shift>}{Enter}{Enter}{/Shift}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('die Kappe wechselt mit dem Modus: mehrzeilig Strg + ↵, Einzeiler ↵', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    await userEvent.type(feld, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2');
+    expect(knopf.querySelector('kbd')).toHaveTextContent('Strg + ↵');
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '{Shift>}{Enter}{/Shift}Einzeiler');
+    expect(knopf.querySelector('kbd')).toHaveTextContent(/^↵$/);
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter Control+Enter Meta+Enter');
   });
 
   it('Plain Enter ergänzt bei mehrzeiligem Inhalt eine weitere Zeile', async () => {
@@ -1049,6 +1083,48 @@ describe('Schnellerfassung — Fußzeile (Spec „Einstellungen in der Fußzeile
     expect(screen.queryByRole('button', { name: 'Vorschau' })).toBeNull();
     await userEvent.type(feld, ' **jetzt**');
     expect(screen.getByRole('button', { name: 'Vorschau' })).toBeInTheDocument();
+  });
+});
+
+describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
+  it('„Erfassen“ bei leerem Feld nennt „Inhalt fehlt“ am Feld und setzt den Fokus hinein', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    const typRahmen = feld
+      .closest<HTMLElement>('[data-rahmen-farbe]')!
+      .style.getPropertyValue('--lfh-schnellerfassung-rahmen');
+    expect(typRahmen).not.toBe('');
+    await userEvent.type(feld, '  ');
+    await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(feld).toHaveFocus();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    // Die Zeile trägt den Rahmen des Felds: er wechselt von der Typfarbe in die Alarmfarbe.
+    const zeile = feld.closest<HTMLElement>('[data-rahmen-farbe]')!;
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).not.toBe(typRahmen);
+
+    // Beim Tippen geht der Grund.
+    await userEvent.type(feld, 'Pegel steigt');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    expect(feld).not.toHaveAttribute('aria-invalid');
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe(typRahmen);
+  });
+
+  it('Strg+Enter im leeren Feld nennt den Grund; blankes Enter bleibt still', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.click(feld);
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    await userEvent.clear(feld);
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(p.erfassen).not.toHaveBeenCalled();
   });
 });
 
@@ -2333,5 +2409,105 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await userEvent.type(inhaltFeld(), 'Lage ruhig');
     await userEvent.click(erfassenKnopf());
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+});
+
+// LLH-1754: ein Kurzbefehl geht nie als Text ins Tagebuch.
+describe('Kurzbefehl wird nie als Text gesendet (LLH-1754)', () => {
+  mitProzessZone('Europe/Berlin');
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  const gesendet = (p: ReturnType<typeof props>) =>
+    (p.erfassen as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+
+  it('„/zeit 1420“ und Enter setzt die Zeit und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('„/zeit 1420“ am Satzende: Enter übernimmt die Zeit, das nächste Enter sendet ohne Befehl', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe läuft /zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('„/zeit 1420“ mitten im Satz wirkt schon beim Tippen', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 1420 läuft');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(feldWert('Zeit')).toBe('1420');
+  });
+
+  it('ein unlesbares „/zeit“ am Textende hält das Senden an', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 2590{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
+    expect(feld).toHaveValue('Pumpe /zeit 2590');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nur ein Typbefehl: „Erfassen“ setzt den Typ und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lage');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, 'Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({ typ: 'lage', inhalt: 'Lage ruhig' });
+  });
+
+  it('nur ein Feldbefehl: „Erfassen“ springt ins Feld und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('ein unbekanntes „/xyz“ bleibt stehen und heißt „kein Befehl“', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/xyz');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('/xyz');
+    expect(await screen.findByRole('alert')).toHaveTextContent('„/xyz“ ist kein Befehl');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, ' a');
+    expect(screen.queryByText('„/xyz“ ist kein Befehl')).toBeNull();
   });
 });

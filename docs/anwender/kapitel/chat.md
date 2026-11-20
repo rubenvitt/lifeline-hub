@@ -27,7 +27,8 @@ können Einsatzleitung und Führungspersonal, solange der Einsatz läuft.
 2. Links den Kanal wählen. Beim ersten Öffnen ist „Allgemein“ gewählt.
 3. In „Nachricht…“ den Text schreiben; Umschalt+Enter beginnt eine neue Zeile, die auch im
    Verlauf erhalten bleibt. Eine Datei hängt „Anhang“ an.
-4. Mit Enter oder „Senden“ abschicken.
+4. Mit Enter oder „Senden“ abschicken. Auf Touch-Geräten beginnt Enter eine neue Zeile; dort
+   schickt nur „Senden“ ab.
 
    ![Chat mit der Kanalliste „Allgemein“ und „Abschnitt Nord“ (eine ungelesene Nachricht), dem Verlauf in „Allgemein“ und dem Eingabefeld mit „Senden“ und „Anhang“](../bilder/chat/chat.png)
 

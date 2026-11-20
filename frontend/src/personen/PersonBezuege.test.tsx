@@ -167,7 +167,7 @@ describe('PersonBezuege (LLH-1129)', () => {
     expect(screen.queryByTitle(/T-010/)).toBeNull();
     expect(screen.queryByTitle(/S-012/)).toBeNull();
     await userEvent.click(screen.getByTitle('S-011 · Sturmschaden (gering)'));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
     await waitFor(() =>
       expect(patches).toEqual([
         {

@@ -346,14 +346,14 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     await verbleib.getByLabel('Ziel').fill('KH Mitte');
     // Ein Transport nennt das Rettungsmittel (LLH-1332); freier Text heißt fremdes Rettungsmittel.
     await verbleib.getByRole('combobox', { name: /Rettungsmittel/ }).fill('RTW 3/83-2');
-    await verbleib.getByRole('button', { name: 'Verbleib erfassen' }).click();
+    await verbleib.getByRole('button', { name: 'Erfassen', exact: true }).click();
     await expect(verbleib).toHaveCount(0);
     await expect(quittung).toContainText('Verbleib Transport → KH Mitte');
 
     // Notiz über die Eingabezeile.
     const notizZeile = kopf.locator('[data-lfh="notiz-zeile"]');
     await notizZeile.getByRole('textbox', { name: 'Verlaufsnotiz' }).fill('Infusion läuft');
-    await notizZeile.getByRole('button', { name: 'Notiz anlegen' }).click();
+    await notizZeile.getByRole('button', { name: 'Erfassen', exact: true }).click();
     await expect(notizZeile.locator('[data-lfh="notiz-vorgemerkt"]')).toContainText(
       'Infusion läuft',
     );

@@ -11,13 +11,19 @@ import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
-import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionEntfernen,
+  schreibaktionenLaden,
+} from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { warteAufMenueFokus } from '../test/menue';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -217,8 +223,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
-    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → „Erfassen" ist der Submit.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
         1,
@@ -236,6 +242,51 @@ describe('MeldungenPage', () => {
     );
   });
 
+  // LLH-1758: was vorgemerkt ist, steht als „Nicht gesendet“ über der Liste, nicht in ihr.
+  it('zeigt eine vorgemerkte Meldung als „Nicht gesendet“ über der Liste, bis sie gesendet ist', async () => {
+    await schreibaktionEinreihen(1, 1, {
+      art: 'meldung',
+      daten: {
+        absender: 'RTW 9',
+        meldeweg: 'funk',
+        inhalt: 'Vorgemerkte Lage',
+        ereigniszeit: '2026-11-20 12:00:00',
+        client_id: 'm-vorgemerkt',
+      },
+    });
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const abschnitt = await screen.findByRole('region', { name: 'Nicht gesendet' });
+    expect(within(abschnitt).getByText(/RTW 9 · Vorgemerkte Lage/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Beantragte Meldungen' })).not.toBeInTheDocument();
+
+    const [zeile] = await schreibaktionenLaden(1, 1);
+    await act(async () => {
+      await schreibaktionEntfernen(1, zeile.id!);
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Nicht gesendet' })).not.toBeInTheDocument(),
+    );
+  });
+
+  // LLH-1758: Netz ist da, der Server antwortet 500 — das ist kein „offline“.
+  it('meldet einen Serverfehler beim Anlegen als Serverfehler, nicht als offline', async () => {
+    legeMeldungAn.mockRejectedValueOnce(
+      new ApiError(500, 'Interner Fehler', { vomAnwendungsserver: true }),
+    );
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+
+    expect(
+      await screen.findByText('Server-Fehler – Meldung von RTW 2 vorgemerkt, wird erneut gesendet'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Offline vorgemerkt/)).not.toBeInTheDocument();
+  });
+
   it('merkt den vollständigen Wortlaut offline sichtbar vor', async () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
@@ -244,7 +295,7 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Offline-Lage');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Offline vorgemerkt: Meldung von RTW 2')).toBeInTheDocument();
     expect(legeMeldungAn).not.toHaveBeenCalled();
@@ -861,8 +912,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
-    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → „Erfassen" ist der Submit.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
         1,
@@ -913,7 +964,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle();
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
     // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter heißt gleich,
@@ -929,7 +980,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle('Wichtiger Wortlaut');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue('Wichtiger Wortlaut');
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
@@ -1151,7 +1202,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(paneel().getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(paneel().getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
-    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
   }
 
   it('Erfassen: der Grund steht im Paneel, der Wortlaut bleibt, kein Toast', async () => {
@@ -1176,7 +1227,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await erfasse();
     await paneel().findByText('Absender unbekannt');
 
-    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(2));
     expect(paneel().queryByText('Absender unbekannt')).toBeNull();
     expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeDisabled();
@@ -1484,6 +1535,8 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
     const wieder = await offenerDialog();
     expect(within(wieder).queryByRole('alert')).toBeNull();

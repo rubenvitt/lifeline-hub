@@ -100,7 +100,7 @@ oder nachgetragen.
 
    ![Seite „Melden“ mit vorbefüllter Fehlmeldung zum Mittagessen und der Priorität normal](../bilder/geraet-verpflegung/fehlmenge.png)
 
-3. Bei Bedarf Text und „Priorität“ anpassen und „Meldung senden“ wählen.
+3. Bei Bedarf Text und „Priorität“ anpassen und „Erfassen“ wählen.
 
 ## Hintergrund
 

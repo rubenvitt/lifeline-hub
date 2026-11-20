@@ -439,7 +439,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     await userEvent.click(leitung);
     await userEvent.paste('x'.repeat(201));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Bitte eine Bezeichnung angeben')).toBeInTheDocument();
+    expect(await screen.findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(
       await screen.findByText('Leitung darf höchstens 200 Zeichen lang sein'),
     ).toBeInTheDocument();

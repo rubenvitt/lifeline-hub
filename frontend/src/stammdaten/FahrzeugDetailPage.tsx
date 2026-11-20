@@ -31,6 +31,7 @@ import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   funkrufname: string;
@@ -211,13 +212,7 @@ export default function FahrzeugDetailPage() {
                   <Feld
                     label="Funkrufname"
                     name="funkrufname"
-                    rules={[
-                      {
-                        required: true,
-                        whitespace: true,
-                        message: 'Funkrufname darf nicht leer sein',
-                      },
-                    ]}
+                    rules={[pflicht('Funkrufname', { whitespace: true })]}
                   >
                     <Input />
                   </Feld>

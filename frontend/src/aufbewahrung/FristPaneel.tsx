@@ -166,7 +166,7 @@ export function useFristAenderung(
         <Feld
           label="Neue Aufbewahrungsfrist"
           name="frist"
-          rules={[{ required: !unbegrenzt, message: 'Zeitpunkt wählen' }]}
+          rules={[{ required: !unbegrenzt, message: 'Aufbewahrungsfrist fehlt' }]}
           dependencies={['unbegrenzt']}
           extra={
             unbegrenzt

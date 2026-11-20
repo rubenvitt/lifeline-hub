@@ -5,6 +5,7 @@ import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { BEZUG_TYP_OPTIONEN, type BezugOptionen } from './bezug';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   typ?: BezugTyp;
@@ -72,7 +73,7 @@ export default function BezugDialog({
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
-      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select
           options={BEZUG_TYP_OPTIONEN}
           // Objekt-Auswahl bei Typ-Wechsel zurücksetzen (sie ist typ-spezifisch).
@@ -80,7 +81,7 @@ export default function BezugDialog({
         />
       </Feld>
       {/* Ohne Typ gesperrt: das zeigt die Reihenfolge, kein Satz (LFH-1078). */}
-      <Feld label="Objekt" name="ziel_id" rules={[{ required: true, message: 'Objekt wählen' }]}>
+      <Feld label="Objekt" name="ziel_id" rules={[pflicht('Objekt')]}>
         <Select options={objektOptionen} disabled={!typ} notFoundContent="Keine Objekte" />
       </Feld>
     </ErfassungsModal>

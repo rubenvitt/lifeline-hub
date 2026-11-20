@@ -88,6 +88,7 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useHalteQuellen } from '../components/useHalteQuellen';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { vorgemerktText } from '../offline/vorgemerktText';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -423,7 +424,7 @@ export default function PersonenPage() {
         }
         setQuittungFuer(zielEinsatzId, {
           typ: 'warning',
-          text: 'Offline vorgemerkt · R-…',
+          text: vorgemerktText(ergebnis.grund, 'R-…', ' · '),
           benutzerId: variablen.benutzerId,
         });
         return;

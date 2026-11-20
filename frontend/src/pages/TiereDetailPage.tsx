@@ -67,6 +67,7 @@ import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSc
 import { flaeche } from '../theme/tokens';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -681,11 +682,7 @@ export default function TiereDetailPage() {
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Feld
-          label="Verbleib"
-          name="abschluss_grund"
-          rules={[{ required: true, message: 'Verbleib ist Pflicht' }]}
-        >
+        <Feld label="Verbleib" name="abschluss_grund" rules={[pflicht('Verbleib')]}>
           <Select
             options={(Object.keys(TIER_VERBLEIB) as AbschlussGrund[]).map((k) => ({
               value: k,

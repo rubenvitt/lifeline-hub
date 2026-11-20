@@ -1,9 +1,12 @@
-import { Input, Modal, theme } from 'antd';
+import { Input, Modal } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { Speicherung } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
-import { useEffect, useRef, useState } from 'react';
+import { useRollen } from '../components/instrument';
+import { IconWarndreieck } from '../icons';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 
 export default function VollzugMeldenModal({
   offen,
@@ -24,13 +27,18 @@ export default function VollzugMeldenModal({
    */
   speicherung?: Speicherung;
 }) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const [text, setText] = useState('');
   // Kein antd-Formular: die Grenze des ETB-Inhalts sperrt den Knopf, der Zähler nennt die
   // Überlänge; der Text bleibt stehen (LFH-937, `components/zeichenGrenze.tsx`). Eine leere
-  // Rückmeldung sperrt ebenso: eine Prüfung ohne Server ist kein Speicherfehler (LFH-1077).
+  // Rückmeldung sperrt NICHT stumm (LLH-1771): der Knopf bleibt frei, ein Klick nennt den Grund am
+  // Feld und setzt den Fokus hinein. Eine Prüfung ohne Server ist kein Speicherfehler (LFH-1077).
   const zuLang = istZuLang(text, ETB_INHALT_MAX);
   const leer = text.trim() === '';
+  const [leerGemeldet, setLeerGemeldet] = useState(false);
+  const feldRef = useRef<TextAreaRef>(null);
+  const feldId = useId();
+  const grundId = useId();
 
   // Ref, damit Öffnen und Abbrechen die AKTUELLE Mutation räumen, ohne dass ein neues
   // Mutationsobjekt je Render den Effekt auslöst. Eine laufende bleibt unberührt: `reset()`
@@ -59,7 +67,7 @@ export default function VollzugMeldenModal({
       open={offen}
       okText="Vollzug melden"
       cancelText="Abbrechen"
-      okButtonProps={{ disabled: zuLang || leer }}
+      okButtonProps={{ disabled: zuLang }}
       confirmLoading={meldet}
       cancelButtonProps={{ disabled: meldet }}
       closable={meldet ? { disabled: true } : true}
@@ -68,11 +76,17 @@ export default function VollzugMeldenModal({
       onCancel={() => {
         abbruchGeneration.current += 1;
         setText('');
+        setLeerGemeldet(false);
         raeume();
         onAbbrechen();
       }}
       onOk={async () => {
-        if (zuLang || leer) return;
+        if (zuLang) return;
+        if (leer) {
+          setLeerGemeldet(true);
+          feldRef.current?.focus();
+          return;
+        }
         const generation = abbruchGeneration.current;
         try {
           await onBestaetigen(text.trim());
@@ -83,14 +97,42 @@ export default function VollzugMeldenModal({
         if (generation === abbruchGeneration.current) setText('');
       }}
     >
+      <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
+        Vollzugsmeldung
+      </label>
       <Input.TextArea
+        id={feldId}
+        ref={feldRef}
         rows={3}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (e.target.value.trim() !== '') setLeerGemeldet(false);
+        }}
         placeholder="Rückmeldung zur Erledigung"
+        status={leerGemeldet ? 'error' : undefined}
+        aria-invalid={leerGemeldet || undefined}
+        aria-describedby={leerGemeldet ? grundId : undefined}
         // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
         count={zeichenGrenze(ETB_INHALT_MAX)}
       />
+      {leerGemeldet && (
+        // Zeichen und Wort neben der Farbe (WCAG 1.4.1), wie die Gründe der ETB-Fußzeile.
+        <div
+          id={grundId}
+          role="alert"
+          style={{
+            color: rollen.alarmText,
+            display: 'flex',
+            alignItems: 'center',
+            gap: token.marginXXS,
+            marginTop: token.marginXXS,
+          }}
+        >
+          <IconWarndreieck />
+          <span>Vollzugsmeldung fehlt</span>
+        </div>
+      )}
       {speicherung?.error != null && (
         <div style={{ marginTop: token.marginSM }}>
           <SpeicherFehler

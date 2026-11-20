@@ -21,7 +21,11 @@ import type {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import { useAuthOptional } from '../../auth/AuthContext';
-import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
+import {
+  ErfassungsFormular,
+  MASKE_HAELT_FOKUS,
+  type ErfassungsFormularSteuerung,
+} from '../../components/Erfassung';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import DemoMarke from '../../components/DemoMarke';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -49,6 +53,7 @@ import {
   type NachgefordertZeile,
   type StammZeile,
 } from './eintreffenKern';
+import { vorgemerktDauer, vorgemerktText } from '../../offline/vorgemerktText';
 
 /** Die Felder von Schritt 2 (unangemeldete Kraft). */
 interface UnangemeldetFormular {
@@ -297,7 +302,10 @@ export default function EintreffenDialog({
     },
     onSuccess: (ergebnis, b) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Eintreffen ${b.name}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Eintreffen ${b.name}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Buchung.
@@ -632,6 +640,7 @@ export default function EintreffenDialog({
         form={form}
         initialValues={{ funkrufname: suche.trim() }}
         steuerungRef={steuerung}
+        rueckfrageTitel="Eintreffen buchen"
         erfassenText={herkunft ? 'Eintreffen buchen' : 'Unangemeldet buchen'}
         gesperrt={doppel != null}
         speicherung={buchung}
@@ -733,7 +742,7 @@ export default function EintreffenDialog({
                                   wert?.trim() ||
                                   !getFieldValue(['weitere', z.name, 'fahrzeugtyp'])?.trim()
                                     ? Promise.resolve()
-                                    : Promise.reject(new Error('Funkrufname angeben')),
+                                    : Promise.reject(new Error('Funkrufname fehlt')),
                               }),
                               zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname'),
                             ]}
@@ -817,7 +826,9 @@ export default function EintreffenDialog({
       title="Eintreffen buchen"
       onCancel={aufAbbruch}
       closable={sperrtAbbruch ? { disabled: true } : true}
-      mask={{ closable: !sperrtAbbruch }}
+      // Die Maske schließt nie (LLH-1755); ein Klick darauf lässt den Fokus im Feld.
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       footer={null}
       destroyOnHidden
       // Schritt 2 trägt Escape über die Tastaturebene der Erfassung.
