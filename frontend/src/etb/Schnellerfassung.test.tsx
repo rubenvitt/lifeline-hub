@@ -212,20 +212,54 @@ describe('Schnellerfassung', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
+  /**
+   * LLH-1756: Enter im leeren Feld fügte eine unsichtbare Leerzeile ein; danach galt der Inhalt
+   * als mehrzeilig und Enter sendete nie mehr, obwohl die Kappe weiter ↵ zeigte.
+   */
   it.each([
     ['leer', ''],
     ['nur Whitespace', '  \t'],
-  ])('Plain Enter unterdrückt bei %s keinen nativen Zeilenumbruch', async (_fall, inhalt) => {
+  ])('Plain Enter tut bei %s nichts — keine Leerzeile, kein Senden', async (_fall, inhalt) => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     if (inhalt) await userEvent.type(feld, inhalt);
-    let nichtVerhindert = false;
+    let nichtVerhindert = true;
     await act(async () => {
       nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' });
     });
-    expect(nichtVerhindert).toBe(true);
+    expect(nichtVerhindert).toBe(false);
+    expect(feld).toHaveValue(inhalt);
     expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nach Enter im leeren Feld sendet Enter den Einzeiler weiter', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Enter}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('führende Leerzeilen (Umschalt+Enter) zählen nicht: Enter sendet den Einzeiler', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Shift>}{Enter}{Enter}{/Shift}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('die Kappe wechselt mit dem Modus: mehrzeilig Strg + ↵, Einzeiler ↵', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    await userEvent.type(feld, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2');
+    expect(knopf.querySelector('kbd')).toHaveTextContent('Strg + ↵');
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '{Shift>}{Enter}{/Shift}Einzeiler');
+    expect(knopf.querySelector('kbd')).toHaveTextContent(/^↵$/);
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter Control+Enter Meta+Enter');
   });
 
   it('Plain Enter ergänzt bei mehrzeiligem Inhalt eine weitere Zeile', async () => {

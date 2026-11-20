@@ -14,6 +14,7 @@ import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import { Zeichenzaehler } from '../components/zeichenGrenze';
 import Tastenkuerzel from '../components/Tastenkuerzel';
+import { serienKuerzel } from '../components/Erfassung';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
@@ -241,6 +242,20 @@ const KUERZEL_FEIN = 'Enter Control+Enter Meta+Enter';
 const KUERZEL_GROB = 'Control+Enter Meta+Enter';
 
 /**
+ * Kappe im Mehrzeilenmodus (LLH-1756): dort sendet nur Strg/⌘+Enter, die Kappe ↵ versprach
+ * sonst einen Weg, den es nicht gibt. Einmal je Sitzung bestimmt — die Plattform wechselt nicht.
+ */
+const KAPPE_MEHRZEILIG = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+/**
+ * Ob der Inhalt als mehrzeilig gilt (LLH-1756): führende Leerzeilen zählen nicht, sonst schaltete
+ * ein Umschalt+Enter vor dem ersten Zeichen den Sendeweg für den ganzen Eintrag um.
+ */
+function istMehrzeilig(inhalt: string): boolean {
+  return inhalt.trimStart().includes('\n');
+}
+
+/**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
  * (Von/An/Meldeweg sind das Gerüst einer Funkmeldung). Den Eintragstyp behält der Schalter
  * ebenfalls (LLH-1112); er ist kein Metadatum und geht eigens mit (`entwurfSchliessen`).
@@ -356,6 +371,7 @@ export default function Schnellerfassung({
   const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
+  const mehrzeilig = istMehrzeilig(inhalt);
   // Mitarbeit erfasst nur Meldung und Lage (LLH-1817); der Server lehnt anderes mit 403 ab.
   const erlaubteTypen = istMitarbeit(einsatz) ? TYP_BEFEHLE_MITARBEIT : TYP_BEFEHLE;
   const [typ, setTyp] = useState<EtbTyp>(
@@ -786,8 +802,23 @@ export default function Schnellerfassung({
       e.preventDefault();
       return;
     }
+    const leer = inhalt.trim() === '';
+    // Blankes Enter im leeren Feld tut nichts (LLH-1756): die Leerzeile, die der Browser sonst
+    // einfügt, schaltete den Inhalt auf mehrzeilig, und Enter sendete danach nie mehr.
+    if (
+      !istBeruehrung &&
+      leer &&
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey
+    ) {
+      e.preventDefault();
+      return;
+    }
     // Grober Zeiger: nur Strg/⌘+Enter sendet, Return bricht um (LFH-955, design.md D1).
-    const einzeilerSendet = !istBeruehrung && inhalt.trim() !== '' && !inhalt.includes('\n');
+    const einzeilerSendet = !istBeruehrung && !leer && !mehrzeilig;
     const istSendeTaste =
       e.key === 'Enter' &&
       !e.repeat &&
@@ -1282,6 +1313,8 @@ export default function Schnellerfassung({
     </span>
   );
 
+  // Mehrzeilig sendet blankes Enter nicht mehr; Kappe und Kürzel sagen das (LLH-1756).
+  const enterSendet = !istBeruehrung && !mehrzeilig;
   const erfassenKnopf = (
     // Die Sendetaste als Kappe statt als Satz (LFH-1078), nur mit feinem Zeiger: mit grobem sendet
     // Return nicht (LFH-955, D1). Erst ab `lg`: darunter kostete die Kappe dem Textfeld seinen
@@ -1290,14 +1323,14 @@ export default function Schnellerfassung({
     <Button
       type="primary"
       loading={sendet}
-      aria-keyshortcuts={istBeruehrung ? KUERZEL_GROB : KUERZEL_FEIN}
+      aria-keyshortcuts={enterSendet ? KUERZEL_FEIN : KUERZEL_GROB}
       onClick={() => void absenden()}
       style={{ flexShrink: 0 }}
     >
       {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : knopfText}
       {!istBeruehrung && !fortschritt && abBreite('lg') && (
         <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
-          ↵
+          {mehrzeilig ? KAPPE_MEHRZEILIG : '↵'}
         </Tastenkuerzel>
       )}
     </Button>

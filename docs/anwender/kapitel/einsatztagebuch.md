@@ -96,6 +96,8 @@ Für Einsatzleitung und Führungspersonal:
    einer Anordnung als „An“, sonst als „Von“.
 4. Den Inhalt in das Feld „Inhalt …“ schreiben und „Erfassen“ wählen oder Enter drücken. Auf einem
    Touch-Gerät erfasst erst Strg+Enter (⌘+Enter am Mac); Enter allein beginnt dort eine neue Zeile.
+   Hat der Inhalt mehrere Zeilen (Umschalt+Enter), erfasst ebenfalls erst Strg+Enter; die Taste
+   steht dann am Knopf „Erfassen“. Enter im leeren Feld tut nichts.
 
 Beim Öffnen steht der Cursor im ersten leeren Pflichtfeld, bei einer Meldung also in „Von“, sonst
 im Inhalt; nach dem Erfassen ebenso. Inhalt, „Von“ und „An“ sind Pflicht: fehlt eine Seite, nennt
