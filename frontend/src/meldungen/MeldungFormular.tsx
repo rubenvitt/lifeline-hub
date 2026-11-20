@@ -354,10 +354,15 @@ export default function MeldungFormular({
     form.setFieldValue('empfaenger_funktion', 's2');
   }, [meldungsart, s2Verfuegbar, form]);
 
-  /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
+  /**
+   * Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8) oder
+   * noch unverändert die vorbelegte eigene Stelle trägt (LLH-1759): die Funktion ist genauer.
+   */
   const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
     const eintrag = funktionsVorschlaege.katalog.find((e) => e.funktion === funktion);
-    if (!eintrag || form.getFieldValue('empfaenger')?.trim()) return;
+    const empfaenger = form.getFieldValue('empfaenger')?.trim();
+    const nurVorgabe = !!empfaenger && empfaenger === vorgabeGeschriebenRef.current.empfaenger;
+    if (!eintrag || (empfaenger && !nurVorgabe)) return;
     form.setFieldValue('empfaenger', eintrag.kuerzel ?? eintrag.label);
   };
 

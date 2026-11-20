@@ -874,6 +874,21 @@ describe('MeldungFormular — eigene Stelle (LLH-1759)', () => {
     expect(empfaenger()).toHaveValue('');
   });
 
+  it('eine gewählte Empfängerfunktion ersetzt die unveränderte Vorgabe durch ihr Kürzel', async () => {
+    renderEigene({ funktionsVorschlaege: TEST_VORSCHLAEGE });
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Empfängerfunktion' }));
+    await userEvent.click(
+      await screen.findByText(
+        (_, el) =>
+          typeof el?.className === 'string' &&
+          el.className.includes('ant-select-item-option-content') &&
+          el.textContent === 'S3 – Einsatz',
+      ),
+    );
+    await waitFor(() => expect(empfaenger()).toHaveValue('S3'));
+  });
+
   it('überschreibt keinen eingetragenen Empfänger', async () => {
     renderEigene();
     await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
