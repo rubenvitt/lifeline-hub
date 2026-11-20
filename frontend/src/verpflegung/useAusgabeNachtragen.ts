@@ -26,6 +26,7 @@ import { useAuth } from '../auth/AuthContext';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseVerpflegungsausgabeOfflineFaehig } from '../offline/schreiben';
 import { zitat } from './verpflegungText';
+import { vorgemerktText } from '../offline/vorgemerktText';
 
 /** Fester Schlüssel des Hinweises „Offline vorgemerkt“: ein zweiter ersetzt den ersten (D6). */
 export const VORGEMERKT_SCHLUESSEL = 'lfh-verpflegung-vorgemerkt';
@@ -98,7 +99,9 @@ export function useAusgabeNachtragen(
     onSuccess: (ergebnis, { zf, body }) => {
       // Vorgemerkt gibt es noch keine Ausgabe auf dem Server — also kein „Rückgängig“.
       if (ergebnis.zustand === 'vorgemerkt') {
-        zeigeVorgemerkt(`Offline vorgemerkt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
+        zeigeVorgemerkt(
+          vorgemerktText(ergebnis.grund, `${body.menge} EP zu ${zitat(zf.bezeichnung)}`),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, ohne „Rückgängig“.

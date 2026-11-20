@@ -44,7 +44,9 @@ test.describe(KAPITEL, () => {
     const ausstehend = page.locator('.etb-ausstehend');
     await expect(ausstehend).toContainText('Pegel am Mühlbach');
     await expect(ausstehend).toContainText('vorgemerkt');
-    await expect(page.getByLabel('1 ausstehende Offline-Aktion')).toContainText('ausstehend');
+    await expect(page.getByRole('button', { name: '1 nicht gesendet' })).toContainText(
+      'nicht gesendet',
+    );
     await expect(page.locator('[data-lfh="sendestatus"]')).toHaveText('1 ausstehend');
     await expect(page.getByText('1 Eintrag offline vorgemerkt')).toBeVisible();
     // Ans Ende: dort steht der vorgemerkte Eintrag (Funkprotokoll-Ordnung, LLH-1149).

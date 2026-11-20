@@ -53,6 +53,7 @@ import {
   type NachgefordertZeile,
   type StammZeile,
 } from './eintreffenKern';
+import { vorgemerktDauer, vorgemerktText } from '../../offline/vorgemerktText';
 
 /** Die Felder von Schritt 2 (unangemeldete Kraft). */
 interface UnangemeldetFormular {
@@ -301,7 +302,10 @@ export default function EintreffenDialog({
     },
     onSuccess: (ergebnis, b) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Eintreffen ${b.name}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Eintreffen ${b.name}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Buchung.
