@@ -260,8 +260,8 @@ const EINSTELLUNGEN_ROUTEN = (
  * Einsatz-Workspace bleiben darunter Geschwister.
  */
 function BetriebsLayout() {
-  const { benutzer, konflikt } = useAuth();
-  useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  const { benutzer, konflikt, unterbrechung } = useAuth();
+  useOfflineSync(abgleichFuer(benutzer, konflikt !== null || unterbrechung !== null));
   // Org-Strom außerhalb eines Einsatzes (LFH-734); im Einsatz ruht er von selbst.
   useOrgLiveStream(benutzer != null);
   return (

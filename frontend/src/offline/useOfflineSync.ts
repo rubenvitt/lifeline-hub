@@ -43,12 +43,13 @@ type QueueElement =
 
 /** Für wen der Abgleich laufen soll. Während eines Benutzerkonflikts (LFH-387) pausiert er: die
  *  Sitzung gehört dann einem anderen Benutzer, jeder Versuch scheiterte mit 412 und bliebe
- *  liegen. Die Einträge warten, bis ihr Benutzer wieder angemeldet ist. */
+ *  liegen. Ebenso während einer unterbrochenen Sitzung (LLH-1770): jeder Versuch scheiterte mit
+ *  401. Die Einträge warten, bis ihr Benutzer wieder angemeldet ist. */
 export function abgleichFuer(
   benutzer: { id: number } | null,
-  konflikt: boolean,
+  ruht: boolean,
 ): number | undefined {
-  return konflikt || !benutzer ? undefined : benutzer.id;
+  return ruht || !benutzer ? undefined : benutzer.id;
 }
 
 /** Globaler Queue-Flush für genau die aktuell angemeldete, datenbankweit
