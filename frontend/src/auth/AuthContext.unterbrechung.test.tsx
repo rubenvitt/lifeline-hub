@@ -258,3 +258,77 @@ describe('Sitzung unterbrochen (LLH-1770)', () => {
     expect(logoutAufrufe).toBe(0);
   });
 });
+
+describe('Befunde des Reviews (LLH-1770)', () => {
+  it('ein Passkey-Weg, dessen /me erst nach einer Konfliktprüfung ankommt, übernimmt die andere Person nicht', async () => {
+    await starte();
+    await unterbreche();
+    let freigeben: () => void = () => {};
+    const gehalten = new Promise<void>((r) => (freigeben = r));
+    let aufrufe = 0;
+    server.use(
+      http.get('/api/auth/me', async () => {
+        aufrufe++;
+        if (aufrufe === 1) await gehalten;
+        return HttpResponse.json(bruno);
+      }),
+    );
+    sitzung = bruno;
+    let lauf: Promise<void> = Promise.resolve();
+    act(() => {
+      lauf = auth.aktualisiere();
+    });
+    await waitFor(() => expect(aufrufe).toBe(1));
+    act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
+    await waitFor(() => expect(screen.getByTestId('konflikt')).toHaveTextContent('Bruno Beispiel'));
+    freigeben();
+    await act(() => lauf);
+    expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
+    expect(screen.getByTestId('konflikt')).toHaveTextContent('Bruno Beispiel');
+    expect(neuLaden.seiteNeuLaden).toHaveBeenCalledTimes(1);
+  });
+
+  it('eine andere Person räumt vor dem Neuladen den Speicher des Tabs', async () => {
+    await starte();
+    sessionStorage.setItem('lfh:verlauf', '["/einsaetze/4/personen?q=Meier"]');
+    sessionStorage.setItem('lfh:alarm:ausgeblendet', '[40]');
+    await unterbreche();
+    expect(sessionStorage.getItem('lfh:verlauf')).not.toBeNull();
+    loginAls = bruno;
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(neuLaden.seiteNeuLaden).toHaveBeenCalled());
+    expect(sessionStorage.getItem('lfh:verlauf')).toBeNull();
+    expect(sessionStorage.getItem('lfh:alarm:ausgeblendet')).toBeNull();
+  });
+
+  it('ein Konflikt aus der Unterbrechung räumt den Speicher des Tabs und bleibt verdeckt', async () => {
+    await starte();
+    sessionStorage.setItem('lfh:verlauf', '["/einsaetze/4"]');
+    await unterbreche();
+    sitzung = bruno;
+    act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
+    await waitFor(() => expect(auth.konflikt?.ausUnterbrechung).toBe(true));
+    expect(sessionStorage.getItem('lfh:verlauf')).toBeNull();
+  });
+
+  it('die Auflösung lässt laufende Abrufe stehen, statt sie doppelt zu senden', async () => {
+    await starte();
+    await unterbreche();
+    const invalidieren = vi.spyOn(qc, 'invalidateQueries');
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('unterbrechung')).toHaveTextContent('—'));
+    expect(invalidieren).toHaveBeenCalledWith(undefined, { cancelRefetch: false });
+  });
+
+  it('die Auflösung räumt einen stehenden Konflikt', async () => {
+    await starte();
+    sitzung = bruno;
+    act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
+    await waitFor(() => expect(screen.getByTestId('konflikt')).toHaveTextContent('Bruno Beispiel'));
+    await unterbreche();
+    loginAls = anna;
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('unterbrechung')).toHaveTextContent('—'));
+    expect(screen.getByTestId('konflikt')).toHaveTextContent('—');
+  });
+});

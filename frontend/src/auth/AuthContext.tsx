@@ -44,6 +44,7 @@ import {
   geraetFuerBenutzerRaeumen,
   geraetPlatteRaeumen,
   geraetRaeumen,
+  geraetTabRaeumen,
   type AusgangsAnlass,
 } from '../offline/geraetRaeumung';
 import { merkeGeraet } from '../geraet/geraetMarke';
@@ -72,6 +73,9 @@ export type LoginErgebnis =
 export interface BenutzerKonflikt {
   bisher: MeAntwort;
   jetzt: MeAntwort;
+  /** Folgte auf eine unterbrochene Sitzung (LLH-1770): `bisher` hat keine gültige Sitzung mehr,
+   *  der Dialog verdeckt die Seite deshalb undurchsichtig wie „Sitzung beendet“. */
+  ausUnterbrechung?: boolean;
 }
 
 /** Wie lange die Seite hinter dem Dialog „Sitzung beendet“ höchstens montiert bleibt
@@ -281,10 +285,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * offenes Formular von `bisher` mit der Kennung der neuen Person. `false` ohne Unterbrechung.
    */
   const unterbrechungAufloesen = useCallback(
-    async (b: MeAntwort): Promise<boolean> => {
-      const u = unterbrechungRef.current;
+    async (
+      b: MeAntwort,
+      // Die Unterbrechung beim START des Anmeldewegs: eine Prüfung kann sie während des Wegs
+      // schon in einen Konflikt verwandelt haben, die andere Person darf dann trotzdem nicht in
+      // den laufenden Baum.
+      u: SitzungsUnterbrechung | null = unterbrechungRef.current,
+    ): Promise<boolean> => {
       if (!u) return false;
       if (b.id !== u.bisher.id) {
+        geraetTabRaeumen();
         meldeAuthWechsel({ art: 'angemeldet' });
         const { pathname, search, hash } = window.location;
         seiteNeuLaden(`${pathname}${search}${hash}`);
@@ -294,10 +304,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (unterbrechungRef.current !== u) return true;
       vergissOffeneAbmeldung();
       uebernimm(b);
+      setKonflikt(null);
       setzeUnterbrechung(null, 'wiederhergestellt');
       sitzungsMeldungZuruecksetzen();
       meldeSitzungWiederhergestellt();
-      void queryClient.invalidateQueries();
+      // Laufende Abrufe nicht abbrechen: die an der Sperre wartenden wiederholen gerade, ein
+      // Abbruch schickte jeden zweimal.
+      void queryClient.invalidateQueries(undefined, { cancelRefetch: false });
       void pushAbgleichen(b.id, { nurBeiBedarf: true });
       meldeAuthWechsel({ art: 'angemeldet' });
       return true;
@@ -380,7 +393,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await unterbrechungAufloesen(aufServer);
             return;
           }
+          // Der Speicher des Tabs gehört `lokal`, die Seite lädt als `aufServer` neu.
+          geraetTabRaeumen();
           setzeUnterbrechung(null);
+          setKonflikt({ bisher: lokal, jetzt: aufServer, ausUnterbrechung: true });
+          return;
         }
         setKonflikt(lokal.id === aufServer.id ? null : { bisher: lokal, jetzt: aufServer });
       })().finally(() => {
@@ -516,8 +533,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Übernimmt die Antwort einer frisch angelegten Sitzung (Login, Festlegen nach Einmalpasswort). */
   const angemeldet = useCallback(
-    async (antwort: BenutzerAnzeige) => {
-      if (await unterbrechungAufloesen(antwort)) return;
+    async (antwort: BenutzerAnzeige, u: SitzungsUnterbrechung | null) => {
+      if (await unterbrechungAufloesen(antwort, u)) return;
       // Eine andere Person als die vorherige räumt deren Lagebild und Gerätedaten (LFH-767),
       // bevor der Benutzer wechselt.
       await vorhaltungAnmelden(antwort);
@@ -533,6 +550,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
+      const u = unterbrechungRef.current;
       const antwort = await authApi.login(benutzername, passwort);
       // Untagged Union: der MFA-Zweig ist am Feld `mfa_erforderlich` erkennbar. KEIN Benutzer
       // — es gibt noch keine Session.
@@ -543,7 +561,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ('passwort_wechsel_erforderlich' in antwort) {
         return { status: 'passwort_wechsel' };
       }
-      await angemeldet(antwort);
+      await angemeldet(antwort, u);
       return { status: 'ok' };
     },
     [angemeldet],
@@ -551,7 +569,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const passwortFestlegen = useCallback(
     async (neuesPasswort: string): Promise<void> => {
-      await angemeldet(await authApi.passwortFestlegen(neuesPasswort));
+      const u = unterbrechungRef.current;
+      await angemeldet(await authApi.passwortFestlegen(neuesPasswort), u);
     },
     [angemeldet],
   );
@@ -589,8 +608,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const aktualisiere = useCallback(async () => {
     const merkerVorher = offenerVorgang();
+    const u = unterbrechungRef.current;
     const b = await authApi.me();
-    if (await unterbrechungAufloesen(b)) {
+    if (await unterbrechungAufloesen(b, u)) {
       vergissOffeneAbmeldungSeit(merkerVorher);
       return;
     }

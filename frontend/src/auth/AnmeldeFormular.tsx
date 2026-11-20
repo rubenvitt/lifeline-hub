@@ -52,6 +52,8 @@ export interface AnmeldeFormularProps {
   mitDevBenutzern?: boolean;
   /** Fehler, mit dem die Stufe startet (Anmeldeseite nach gescheitertem SSO). */
   anfangsFehler?: string | null;
+  /** Unmittelbar vor der SSO-Umleitung, die die Seite verlässt. */
+  vorUmleitung?: () => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export default function AnmeldeFormular({
   ssoHinweis,
   mitDevBenutzern = false,
   anfangsFehler = null,
+  vorUmleitung,
 }: AnmeldeFormularProps) {
   const { login, passwortFestlegen, aktualisiere } = useAuth();
   const [form] = Form.useForm<FormWerte>();
@@ -175,6 +178,7 @@ export default function AnmeldeFormular({
   // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR), daher ein echter Full-Page-Redirect. `von`
   // trägt das Redirect-Ziel weiter, damit der Callback dorthin zurückführt.
   function starteOidcAnmeldung() {
+    vorUmleitung?.();
     window.location.assign(`/api/auth/oidc/start?von=${encodeURIComponent(zielPfad)}`);
   }
 

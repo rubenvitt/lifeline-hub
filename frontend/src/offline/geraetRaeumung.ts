@@ -362,6 +362,21 @@ export async function geraetPlatteRaeumen(): Promise<void> {
 }
 
 /**
+ * Der Speicher des Tabs, wenn die unterbrochene Sitzung nicht mit derselben Person weitergeht
+ * (LLH-1770): andere Person (Neuladen), Konflikt, SSO aus dem Dialog. Die Platte ist schon leer
+ * (`geraetPlatteRaeumen`). Synchron — läuft unmittelbar vor einem Neuladen. Wirft nie.
+ */
+export function geraetTabRaeumen(): void {
+  for (const [ort, schritt] of Object.entries(TAB)) {
+    try {
+      void schritt();
+    } catch (e) {
+      console.error(`Gerät räumen: ${ort} ließ sich nicht leeren`, e);
+    }
+  }
+}
+
+/**
  * Nach Start und Anmeldung (LFH-767, design.md D4/D5): Mit bestätigter Person gehen fremde
  * Entwürfe und Quittungen; ohne Person nur, was länger als 24 h liegt. Wirft nie.
  */

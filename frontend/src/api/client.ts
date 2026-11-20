@@ -235,8 +235,10 @@ export function isVeraltet(e: unknown): e is ApiError {
 /** Die Sitzungsprüfung selbst: eine 403 darauf stößt keine neue Prüfung an, sonst liefe der
  *  Provider in eine Schleife (`AuthContext`, `pruefe` holt nach jedem Anstoß nach). */
 const ME_PFAD = '/api/auth/me';
-/** Anmeldewege ohne Sitzung; sie warten nie an der Sitzungssperre (LLH-1770). */
-const AUTH_PFAD = '/api/auth/';
+/** Lesewege ohne Sitzung; sie warten nie an der Sitzungssperre (LLH-1770): `/me` hinge sonst
+ *  an sich selbst, der Dialog „Sitzung beendet“ braucht die Anbieterliste. Angemeldete Lesewege
+ *  unter `/api/auth/` (Sitzungen, Passkeys …) warten wie jede andere Leseanfrage. */
+const OHNE_SPERRE: ReadonlySet<string> = new Set([ME_PFAD, '/api/auth/providers']);
 
 /** Ob eine 403 auf diese Anfrage die Benutzerprüfung anstößt (LLH-1360): nur bei lesenden
  *  Anfragen. Schreibende tragen den erwarteten Benutzer und bekämen nach einem Wechsel 412, ihre
@@ -300,12 +302,11 @@ function sitzungBeendetWerfen(): never {
  * Leseanfrage. Bei unterbrochener Sitzung (LLH-1770, `auth/sitzungsSperre.ts`) wartet sie auf
  * die Neuanmeldung, statt mit 401 zu scheitern: vor dem Abruf, wenn schon gesperrt ist, und nach
  * einer ersten 401, die über `meldeSitzungAbgelaufen` synchron die Sperre setzt (die
- * Sitzungswache unterbricht im selben Takt). Wiederholt wird höchstens einmal. Die Anmeldewege
- * unter `/api/auth/` warten nie: `/me` hinge sonst an sich selbst, und der Dialog „Sitzung
- * beendet“ braucht die Anbieterliste, solange die Sperre steht.
+ * Sitzungswache unterbricht im selben Takt). Wiederholt wird höchstens einmal. `/me` und die
+ * Anbieterliste warten nie (`OHNE_SPERRE`).
  */
 export async function apiGet<T>(pfad: string): Promise<T> {
-  const ohneSperre = pfad.startsWith(AUTH_PFAD);
+  const ohneSperre = OHNE_SPERRE.has(pfad);
   const wartend = ohneSperre ? null : warteAufSitzung();
   if (wartend && !(await wartend)) sitzungBeendetWerfen();
   try {

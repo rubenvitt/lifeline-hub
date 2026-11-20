@@ -206,6 +206,17 @@ describe('SitzungBeendetDialog (LLH-1770)', () => {
     );
   });
 
+  it('SSO räumt vor der Umleitung den Speicher des Tabs', async () => {
+    sessionStorage.setItem('lfh:verlauf', '["/einsaetze/4"]');
+    const zuweisen = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign: zuweisen });
+    zeige();
+    await userEvent.click(await screen.findByRole('button', { name: /Mit Firmen-SSO anmelden/ }));
+    vi.unstubAllGlobals();
+    expect(zuweisen).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem('lfh:verlauf')).toBeNull();
+  });
+
   it('der SSO-Knopf trägt den Hinweis', async () => {
     zeige();
     expect(

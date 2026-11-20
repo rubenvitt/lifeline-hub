@@ -3,11 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Stapel } from '../components/instrument';
 import AnmeldeFormular from './AnmeldeFormular';
+import { VERDECKT } from './BenutzerKonfliktDialog';
+import { geraetTabRaeumen } from '../offline/geraetRaeumung';
 import { UNTERBRECHUNG_FRIST_MS, useAuth } from './AuthContext';
-
-/** Über jedem Overlay der Seite: Dialoge (1000), Popover und Tooltips (bis 1070), die
- *  Sprungpalette (2000). */
-const Z_EBENE = 2100;
 
 /** Restliche ganze Minuten, aufgerundet, mindestens 1 — „in 0 min“ stünde nie da. */
 function restMinuten(restMs: number): number {
@@ -72,10 +70,9 @@ export default function SitzungBeendetDialog() {
       closable={false}
       keyboard={false}
       mask={{ closable: false }}
-      zIndex={Z_EBENE}
-      classNames={{ mask: 'lfh-sitzung-beendet-maske' }}
-      // Undurchsichtig: ohne gültige Sitzung bleibt nichts von der Seite sichtbar.
-      styles={{ mask: { background: 'var(--lfh-grund)', opacity: 1, backdropFilter: 'none' } }}
+      // Undurchsichtig und über jedem Overlay der Seite (Dialoge 1000, Popover bis 1070,
+      // Sprungpalette 2000): ohne gültige Sitzung bleibt nichts von der Seite sichtbar.
+      {...VERDECKT}
       footer={
         <Flex justify="end">
           <Button onClick={() => beenden.current()}>Abmelden</Button>
@@ -90,6 +87,9 @@ export default function SitzungBeendetDialog() {
           onAngemeldet={() => {}}
           benutzernameVorgabe={unterbrechung.bisher.benutzername}
           ssoHinweis="Verlässt die Seite, Eingaben auf dieser Seite gehen verloren"
+          // Wer über SSO zurückkommt, kann eine andere Person sein: der Speicher des Tabs geht
+          // vorher, die Platte ist schon leer.
+          vorUmleitung={geraetTabRaeumen}
         />
       </Stapel>
     </Modal>

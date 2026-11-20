@@ -1,6 +1,7 @@
 import { Button, Modal } from 'antd';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
+import { useAuthOptional } from '../auth/AuthContext';
 import { SpeicherFehler } from './SpeicherHinweis';
 import Stapel from './instrument/Stapel';
 
@@ -37,9 +38,12 @@ export default function VerlassenRueckfrage({
   speichert = false,
   speicherFehler,
 }: Props) {
+  // Steht der Dialog „Sitzung beendet“ (LLH-1770), fragt sie nicht: der Weg zur Anmeldeseite
+  // (Frist, „Abmelden“) bliebe sonst unsichtbar unter der Abdeckung hängen.
+  const unterbrochen = useAuthOptional()?.unterbrechung != null;
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      ungespeichert && currentLocation.pathname !== nextLocation.pathname,
+      ungespeichert && !unterbrochen && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {

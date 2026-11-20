@@ -125,4 +125,16 @@ describe('apiGet bei unterbrochener Sitzung (LLH-1770)', () => {
     sitzungSperren();
     await expect(apiGet('/api/auth/providers')).resolves.toEqual([]);
   });
+
+  it('angemeldete Lesewege unter /api/auth/ warten wie jede Leseanfrage', async () => {
+    server.use(http.get('/api/auth/sitzungen', () => HttpResponse.json([])));
+    sitzungSperren();
+    const abruf = apiGet('/api/auth/sitzungen');
+    let fertig = false;
+    void abruf.then(() => (fertig = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fertig).toBe(false);
+    sitzungEntsperren('wiederhergestellt');
+    await expect(abruf).resolves.toEqual([]);
+  });
 });
