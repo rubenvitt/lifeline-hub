@@ -10,6 +10,7 @@ import PersonErfassungModal, {
   type AusMeldung,
   type ErfassungsModus,
 } from './PersonErfassungModal';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Unit-Netz für die Erfassungsmaske der Betroffenen: was die Hülle zusichert (Fokus, Enter,
@@ -394,6 +395,8 @@ describe('PersonErfassungModal — sitzungsweiter Fundort', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ansicht.onErfassen).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await act(async () => {
       antwortFreigeben();
       await antwort;

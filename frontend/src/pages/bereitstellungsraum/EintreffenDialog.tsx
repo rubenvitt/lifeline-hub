@@ -1,5 +1,4 @@
 import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
-import { MASKE_HAELT_FOKUS } from '../../components/maskeHaeltFokus';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
@@ -22,7 +21,11 @@ import type {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import { useAuthOptional } from '../../auth/AuthContext';
-import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
+import {
+  ErfassungsFormular,
+  MASKE_HAELT_FOKUS,
+  type ErfassungsFormularSteuerung,
+} from '../../components/Erfassung';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import DemoMarke from '../../components/DemoMarke';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -633,6 +636,7 @@ export default function EintreffenDialog({
         form={form}
         initialValues={{ funkrufname: suche.trim() }}
         steuerungRef={steuerung}
+        rueckfrageTitel="Eintreffen buchen"
         erfassenText={herkunft ? 'Eintreffen buchen' : 'Unangemeldet buchen'}
         gesperrt={doppel != null}
         speicherung={buchung}
@@ -818,7 +822,7 @@ export default function EintreffenDialog({
       title="Eintreffen buchen"
       onCancel={aufAbbruch}
       closable={sperrtAbbruch ? { disabled: true } : true}
-      // Die Maske schließt in keinem Schritt (LLH-2010, „Erfassungs-Norm“).
+      // Die Maske schließt nie (LLH-1755); ein Klick darauf lässt den Fokus im Feld.
       mask={{ closable: false }}
       wrapProps={MASKE_HAELT_FOKUS}
       footer={null}

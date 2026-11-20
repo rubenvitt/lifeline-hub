@@ -701,15 +701,18 @@ describe('EintreffenDialog — ohne Netz (LLH-1075 Teil III)', () => {
   });
 });
 
-/** LLH-2010: die Maske schließt in keinem Schritt; Escape bleibt im Schritt „Suche“ der Ausweg. */
-describe('EintreffenDialog — Maske (LLH-2010)', () => {
-  it('im Schritt „Suche“ schließt die Maske nicht', async () => {
+describe('EintreffenDialog — Maske (LLH-1755)', () => {
+  it('ein Klick neben den Dialog schließt ihn nicht und lässt den Fokus stehen', async () => {
     const { onClose } = zeige();
     await screen.findByRole('searchbox', { name: 'Suche' });
-    await userEvent.click(dialog().closest('.ant-modal-wrap') as HTMLElement);
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    expect(fireEvent.mouseDown(maske!)).toBe(false);
+    await userEvent.click(maske!);
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // LLH-2010: Escape bleibt im Schritt „Suche“ der Ausweg.
   it('im Schritt „Suche“ schließt Escape weiter sofort', async () => {
     const { onClose } = zeige();
     const feld = await screen.findByRole('searchbox', { name: 'Suche' });

@@ -1350,6 +1350,61 @@ describe('ErfassungsFormular — Rückfrage vor dem Verwerfen (LLH-1755)', () =>
     expect(onAbbrechen).not.toHaveBeenCalled();
   });
 
+  it('Strg+Enter bei offener Rückfrage speichert nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<RueckfrageHarness serie onErfassen={onErfassen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(rueckfrage()).not.toBeNull();
+  });
+
+  it('Escape schließt die Rückfrage auch mit dem Fokus auf ihrem Rahmen', async () => {
+    renderMitProviders(<RueckfrageHarness />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const offen = await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' });
+    const rahmen = offen.closest<HTMLElement>('.ant-modal-wrap');
+    expect(rahmen).not.toBeNull();
+    fireEvent.keyDown(rahmen!, { key: 'Escape' });
+
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+  });
+
+  it('ein Speichern, das während der offenen Rückfrage gelingt, schließt sie mit', async () => {
+    let freigeben!: () => void;
+    const antwort = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <RueckfrageHarness serie onErfassen={vi.fn(() => antwort)} onAbbrechen={onAbbrechen} />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: /Speichern und nächste/ }));
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+
+    await act(async () => {
+      freigeben();
+      await antwort;
+    });
+
+    // Gespeichert ist nichts mehr zu verwerfen: die Rückfrage geht, der Abbruch bleibt aus.
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
   it('der äußere Abbruch über steuerungRef fragt bei Änderung ebenso nach', async () => {
     const onAbbrechen = vi.fn();
     const steuerung = createRef<ErfassungsFormularSteuerung>();

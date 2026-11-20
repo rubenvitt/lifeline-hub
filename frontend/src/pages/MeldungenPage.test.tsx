@@ -18,6 +18,7 @@ import { setzeOnline } from '../test/utils';
 import { warteAufMenueFokus } from '../test/menue';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -1484,6 +1485,8 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
     const wieder = await offenerDialog();
     expect(within(wieder).queryByRole('alert')).toBeNull();

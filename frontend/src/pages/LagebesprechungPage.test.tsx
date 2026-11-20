@@ -15,6 +15,7 @@ import LagebesprechungPage from './LagebesprechungPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Seite „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung (LFH-550), Abschluss und Verlauf — aus
@@ -436,6 +437,8 @@ describe('LagebesprechungPage · Kopfaktion „Lagebesprechung abschließen"', (
     expect(await within(erster).findByText(GRUND)).toBeInTheDocument();
 
     await u.click(within(erster).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(u);
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
 
     await u.click(knopf);

@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { Fahrzeug } from '../api/types';
 import FahrzeugFormModal from './FahrzeugFormModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /**
  * Die Fahrzeugmaske auf `ErfassungsModal` (LFH-346).
@@ -203,8 +204,10 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
     // ein, und jsdom beendet die Animation nie.
     await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).getByLabelText('Funkrufname')).toHaveValue(''));
     expect(within(wieder).queryByRole('alert')).toBeNull();
   });
@@ -236,6 +239,8 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
 
     await nutzer.type(await screen.findByLabelText('Funkrufname'), 'Florian 9');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Funkrufname')).toHaveValue(''));

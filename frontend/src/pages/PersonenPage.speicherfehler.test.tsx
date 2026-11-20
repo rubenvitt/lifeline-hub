@@ -13,6 +13,7 @@ import { offlineQuittungsKanalZuruecksetzenFuerTests } from '../offline/ereignis
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { einsatzKeys } from '../api/queryKeys';
 import { FakeEventSource } from '../test/eventSource';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die Maske nennt
@@ -177,6 +178,8 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Betroffene erfassen' }));
     expect(within(await offenerDialog()).queryByRole('alert')).toBeNull();
   });

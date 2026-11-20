@@ -11,6 +11,7 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
+import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 
@@ -930,8 +931,10 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(oeffnen);
-    const wieder = (await screen.findAllByRole('dialog'))[0];
+    const wieder = ohneVerwerfenRueckfrage(await screen.findAllByRole('dialog'))[0];
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 

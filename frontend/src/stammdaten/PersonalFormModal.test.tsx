@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Die Stammdaten-Personalmaske auf `ErfassungsModal` (LFH-332).
@@ -133,6 +134,8 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Erika Mustermann');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
