@@ -200,7 +200,7 @@ describe('ErinnerungFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     const feld = screen.getByRole('textbox', { name: 'Fällig' });
     await userEvent.clear(feld);
     await userEvent.type(feld, 'morgen');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('nicht lesbar')).toBeInTheDocument();
     expect(feld).toHaveValue('morgen');
     expect(onAnlegen).not.toHaveBeenCalled();
