@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import SchadenErfassenModal from './SchadenErfassenModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../../test/verwerfen';
 
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
 vi.mock('../../anzeige/Kartenausschnitt', () => ({
@@ -229,8 +230,10 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 });

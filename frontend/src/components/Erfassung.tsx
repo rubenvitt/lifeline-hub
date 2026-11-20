@@ -476,8 +476,9 @@ export function ErfassungsFormular<T extends object>({
   /** Weicht ein angefasstes Feld vom Startwert ab? (leer ≙ `null` ≙ nie gesetzt) */
   const hasAenderungen = useCallback(() => {
     const start = (initialValuesRef.current ?? {}) as Record<string, unknown>;
+    const jetzt = form.getFieldsValue(true) as Record<string, unknown>;
     for (const name of touchedFieldsRef.current) {
-      if (!gleichFuerStand(form.getFieldValue(name), start[name])) return true;
+      if (!gleichFuerStand(jetzt[name], start[name])) return true;
     }
     return false;
   }, [form]);

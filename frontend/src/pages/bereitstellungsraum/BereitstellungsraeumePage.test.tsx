@@ -14,6 +14,7 @@ import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { setzeViewportBreite } from '../../test/viewport';
 import { kopfFilterWaehlen } from '../../test/kopfFilter';
 import { AdresseSteht } from '../../test/adresseSteht';
+import { bestaetigeVerwerfen } from '../../test/verwerfen';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Lage', ...over });
@@ -364,6 +365,8 @@ describe('BereitstellungsraeumePage', () => {
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Wird verworfen');
 
     await userEvent.keyboard('{Escape}');
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Neu' }));
 
     expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
