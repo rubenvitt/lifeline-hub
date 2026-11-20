@@ -142,7 +142,7 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
   });
 
-  it('Sitzungsende (401): der Entwurf bleibt, der Rest geht', async () => {
+  it('Sitzungsende im Betrieb (401): die Platte geht, Tab-Speicher und Entwurf bleiben (LLH-1770)', async () => {
     server.use(meHandler(a));
     rendern();
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
@@ -152,14 +152,15 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     act(() => {
       window.dispatchEvent(new Event(BENUTZER_PRUEFEN));
     });
-    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
 
     await waitFor(async () =>
       expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]),
     );
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
-    expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
-    expect(sessionStorage.getItem(LISTENSTAND)).toBeNull();
+    // Unterbrochen, nicht abgemeldet: der Speicher des Tabs bleibt bis zur Frist.
+    expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename);
+    expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBe('Sammelstelle Süd');
+    expect(sessionStorage.getItem(LISTENSTAND)).not.toBeNull();
     expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toHaveLength(1);
   });
 
@@ -216,7 +217,6 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     const andererTab = new BroadcastChannel('lfh-auth');
     try {
       andererTab.postMessage({ art: 'abgemeldet', anlass: 'sitzungsende' });
-      await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
       await waitFor(async () =>
         expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]),
       );

@@ -1,6 +1,7 @@
 import { Button, Modal } from 'antd';
 import { useEffect, type KeyboardEvent, type ReactNode } from 'react';
 import { useBlocker } from 'react-router';
+import { istSitzungGesperrt } from '../auth/sitzungsSperre';
 import { SpeicherFehler } from './SpeicherHinweis';
 import Knopfreihe from './instrument/Knopfreihe';
 import { MASKE_HAELT_FOKUS } from './maskeHaeltFokus';
@@ -39,9 +40,13 @@ export default function VerlassenRueckfrage({
   speichert = false,
   speicherFehler,
 }: Props) {
+  // Steht der Dialog „Sitzung beendet“ (LLH-1770), fragt sie nicht: der Weg zur Anmeldeseite
+  // (Frist, „Abmelden“) bliebe sonst unsichtbar unter der Abdeckung hängen. Die Sperre steht
+  // genau so lange wie die Unterbrechung (`AuthContext`, `setzeUnterbrechung`); sie wird beim
+  // Navigieren gelesen, nicht beim Rendern, und braucht deshalb keinen Auth-Kontext.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      ungespeichert && currentLocation.pathname !== nextLocation.pathname,
+      ungespeichert && !istSitzungGesperrt() && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {

@@ -316,7 +316,7 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
   await ctx.close();
 });
 
-test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 folgt', async ({
+test('(c) Sitzungsablauf: Tab 1 zeigt „Sitzung beendet“ über der Seite, die Eingabe bleibt (LLH-1770)', async ({
   browser,
 }) => {
   const ctx = await browser.newContext();
@@ -361,7 +361,7 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   await tab2.waitForTimeout(500);
   await expect(tab2).toHaveURL(/\/profil$/);
 
-  // Tab 1 schreibt → 401 → Anmeldung mit Rückkehrziel.
+  // Tab 1 schreibt → 401 → Dialog „Sitzung beendet“ über der Seite, kein Seitenwechsel.
   await einsatzDialogOeffnen(tab1);
   await tab1.getByLabel('Bezeichnung').fill('nach Ablauf');
   const schreiben = tab1.waitForResponse(
@@ -369,20 +369,25 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   );
   await tab1.getByRole('button', { name: 'Anlegen', exact: true }).click();
   expect((await schreiben).status()).toBe(401);
-  // Die Anmeldung braucht ihre Abfragen wieder.
+  // Der Dialog braucht die Anbieterliste; sie wartet nicht an der Sitzungssperre.
   await lesendeAbfragenFreigeben(abfragen1);
-  await expect(tab1).toHaveURL(/\/login$/);
+  const sitzungBeendet = tab1.getByRole('dialog', { name: 'Sitzung beendet' });
+  await expect(sitzungBeendet).toBeVisible();
+  await expect(tab1).toHaveURL(/\/einsaetze$/);
+  await expect(sitzungBeendet.getByLabel('Benutzername')).toHaveValue(ADMIN);
 
-  // Tab 2 folgt über die Kanalmeldung ohne Neuladen. Erst danach frei: eine eigene 401 aus
-  // einer freigegebenen Abfrage bewiese das Folgen nicht.
-  await expect(tab2).toHaveURL(/\/login$/);
+  // Tab 2 räumt nichts von sich aus: eine Unterbrechung meldet den anderen Tabs nichts.
+  await tab2.waitForTimeout(500);
+  await expect(tab2).toHaveURL(/\/profil$/);
   await lesendeAbfragenFreigeben(abfragen2);
 
-  // Mit dem Rückkehrziel: nach erneuter Anmeldung steht Tab 1 wieder auf der Einsatzliste.
-  await tab1.getByLabel('Benutzername').fill(ADMIN);
-  await tab1.getByLabel('Passwort').fill(ADMIN_PW);
-  await tab1.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  // Dieselbe Person meldet sich im Dialog an: Dialog zu, die Eingabe im Einsatzdialog steht noch.
+  await sitzungBeendet.getByLabel('Passwort').fill(ADMIN_PW);
+  await sitzungBeendet.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(sitzungBeendet).toBeHidden();
   await expect(tab1).toHaveURL(/\/einsaetze$/);
+  await expect(tab1.getByLabel('Bezeichnung')).toHaveValue('nach Ablauf');
+  await expect(tab2).toHaveURL(/\/profil$/);
 
   await ctx.close();
 });

@@ -84,7 +84,10 @@ draußen gelassen werden.
 - **Ein Fehler mit Daten ist ein Stand.** Fällt der Server im Tab weg, behalten die Queries
   auf `error` ihren letzten Stand. Nur `success` zu schreiben nähme ihn von der Platte.
 - **Gelöscht wird Speicher und Platte** bei Abmelden, 401 (über `logout()`) und
-  Benutzerwechsel (`offline/lagebildSitzung.ts`). Die Offline-Queue bleibt, sie ist
+  Benutzerwechsel (`offline/lagebildSitzung.ts`). Eine **401 im Betrieb** (LLH-1770,
+  `auth/AGENTS.md`, „Sitzung beendet im Betrieb“) löscht sofort nur die Platte
+  (`lagebildUnterbrechen`, Speichern ruht); der Speicher geht erst mit dem vollen Ausgang nach
+  Frist oder „Abmelden“. Die Offline-Queue bleibt, sie ist
   Beweissicherung. Beim **Start** löscht ein Verwerfen nur die Platte: Ein `clear()` dort
   räumte die Abfragen einer schon eingehängten Seite ab (130 rote Tests).
 - **Rechteentzug im Fehler-Seam** (`api/queryClient.ts`): 403/404 auf den Einsatzkopf räumt
@@ -154,7 +157,9 @@ draußen gelassen werden.
   braucht den Beleg. Spec `geraetedaten-raeumung`, „Abgelehnte Queue-Einträge sind befristet“.
 - **Ein Weg hinaus:** `abmeldenLokal(anlass)` im `AuthProvider` ruft nach `lagebildLoeschen`
   `geraetRaeumen(anlass)`. `logout()` übergibt `'abmelden'`, die beiden 401-Wege
-  `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und
+  `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Eine 401 im Betrieb
+  räumt zunächst nur die Platte (`geraetPlatteRaeumen`: IndexedDB und `localStorage`), der
+  Speicher des Tabs (`sessionStorage`, Arbeitsspeicher) bleibt bis zur Frist (LLH-1770). Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und
   abgelaufene Daten. Beide werfen nie, jeder Ort wird einzeln versucht, und **keiner wird abgewartet**: Ein Tab mit altem Bundle hält eine DB im alten Schema offen, dann hinge das Upgrade und mit ihm der Login (`auth/geraetRaeumung.haengt.test.tsx`). Die Kanalmeldung `abgemeldet` trägt den Anlass, damit andere Tabs beim Abmelden auch die Entwürfe räumen.
 - **Während der Sitzung begrenzt** (LFH-941): Die Personen-Erfassungsquittung trägt nur
   `person_id` und `registrier_nr` (Bestand wird beim Öffnen und beim Lesen gekürzt); die

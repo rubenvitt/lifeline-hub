@@ -5,6 +5,11 @@ import {
   pausiereLiveStroeme,
   type LiveVerbindungsStatus,
 } from './liveVerbindung';
+import {
+  SITZUNG_ABGELAUFEN,
+  meldeSitzungWiederhergestellt,
+  sitzungsMeldungZuruecksetzen,
+} from '../auth/sitzungsEvent';
 
 /** Zeichnet Verbindungen auf; `oeffne` spielt das `open` ein. */
 class FakeEventSource {
@@ -275,5 +280,50 @@ describe('Wache gegen eine stumme Leitung (LLH-1935)', () => {
     vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 2);
     expect(FakeEventSource.instanzen).toHaveLength(2);
     expect(gemeldet).not.toContain('connecting');
+  });
+});
+
+describe('Neuaufbau nach wiederhergestellter Sitzung (LLH-1770)', () => {
+  /** Lässt die Quelle aufgeben und die Auth-Probe mit 401 antworten. */
+  async function gibAufMit401() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 401 }))),
+    );
+    const v = verbinde();
+    FakeEventSource.instanzen[0].oeffne();
+    FakeEventSource.instanzen[0].fehler(FakeEventSource.CLOSED);
+    await vi.waitFor(() => expect(sitzungsMeldungZaehler).toBeGreaterThan(0));
+    return v;
+  }
+
+  let sitzungsMeldungZaehler = 0;
+  const zaehle = () => sitzungsMeldungZaehler++;
+  afterEach(() => {
+    window.removeEventListener(SITZUNG_ABGELAUFEN, zaehle);
+    sitzungsMeldungZuruecksetzen();
+    sitzungsMeldungZaehler = 0;
+  });
+
+  it('baut nach 401 und Wiederherstellung neu auf und gleicht ab', async () => {
+    window.addEventListener(SITZUNG_ABGELAUFEN, zaehle);
+    const { schliessen, beiWiederaufbau } = await gibAufMit401();
+    expect(FakeEventSource.offene()).toHaveLength(0);
+    meldeSitzungWiederhergestellt();
+    expect(FakeEventSource.offene()).toHaveLength(1);
+    FakeEventSource.offene()[0].oeffne();
+    expect(beiWiederaufbau).toHaveBeenCalledTimes(1);
+    // Nur einmal: eine zweite Meldung baut nicht noch eine Leitung.
+    meldeSitzungWiederhergestellt();
+    expect(FakeEventSource.offene()).toHaveLength(1);
+    schliessen();
+  });
+
+  it('eine abgeräumte Verbindung reagiert nicht mehr', async () => {
+    window.addEventListener(SITZUNG_ABGELAUFEN, zaehle);
+    const { schliessen } = await gibAufMit401();
+    schliessen();
+    meldeSitzungWiederhergestellt();
+    expect(FakeEventSource.offene()).toHaveLength(0);
   });
 });

@@ -17,6 +17,7 @@ export const DICHTE_AUSNAHMEN: Readonly<Record<string, string>> = {
   'geraet/lagemonitor': 'Großbild: Betrachtungsabstand statt Bedienhand',
   'hilfe/Hilfe.css': 'Prosa der Hilfe: Lesetypografie, keine Bedienziele',
   'pages/LoginPage': 'Anmeldeseite: eigene Bühne vor der Dichtewahl',
+  'auth/AnmeldeFormular': 'Stufen der Anmeldeseite, auch im Dialog „Sitzung beendet“ (LLH-1770)',
   'druck/': 'Druck: Papiermaß, keine Bildschirmdichte',
 };
 
