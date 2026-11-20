@@ -46,8 +46,7 @@ export default function VerlassenRueckfrage({
   // Navigieren gelesen, nicht beim Rendern, und braucht deshalb keinen Auth-Kontext.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      ungespeichert &&
-      !istSitzungGesperrt() && currentLocation.pathname !== nextLocation.pathname,
+      ungespeichert && !istSitzungGesperrt() && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {
