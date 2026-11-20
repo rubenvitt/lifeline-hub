@@ -7,6 +7,7 @@ import type { BrListenEintrag, ObjektTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { Select } from '../../components/Select';
 import { verlegenQuittung } from './verlegenKern';
+import { pflicht } from '../../components/pflichtRegel';
 
 /** Wen der Dialog verlegt. */
 export interface VerlegenZiel {
@@ -117,11 +118,7 @@ export default function VerlegenDialog({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Ziel-Raum"
-        name="ziel_br_id"
-        rules={[{ required: true, message: 'Ziel-Raum wählen' }]}
-      >
+      <Feld label="Ziel-Raum" name="ziel_br_id" rules={[pflicht('Ziel-Raum')]}>
         <Select<number> options={raeume.map((r) => ({ value: r.id, label: r.bezeichnung }))} />
       </Feld>
     </ErfassungsModal>

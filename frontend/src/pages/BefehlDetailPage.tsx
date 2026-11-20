@@ -47,6 +47,7 @@ import './befehlPrint.css';
 import './befehlAktionsleiste.css';
 import { flaeche } from '../theme/tokens';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Formularwerte des Entwurfs: Titel und Abschnitte als Text, daneben der Verteiler (LLH-1172).
@@ -476,7 +477,7 @@ function BefehlDetail() {
                   // gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
                   // (`entwurf/dokumentEntwurf.css`).
                   <>
-                    <Feld label="Titel" name="titel" rules={[{ required: true }]}>
+                    <Feld label="Titel" name="titel" rules={[pflicht('Titel')]}>
                       <Input />
                     </Feld>
                     <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />

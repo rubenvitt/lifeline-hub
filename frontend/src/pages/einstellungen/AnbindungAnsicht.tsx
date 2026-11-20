@@ -47,6 +47,7 @@ import {
   zustandAnzeige,
 } from './anbindungAnzeige';
 import { ListenRueckweg } from '../../components/ListenRueckweg';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface ZugangWerte {
   name: string;
@@ -170,7 +171,7 @@ export default function AnbindungAnsicht() {
       anzeige: zugang.name,
       eingabe: <Input maxLength={ANBINDUNG_NAME_MAX} autoComplete="off" />,
       regeln: [
-        { required: true, whitespace: true, message: 'Name angeben' },
+        pflicht('Name', { whitespace: true }),
         { max: ANBINDUNG_NAME_MAX, message: `Höchstens ${ANBINDUNG_NAME_MAX} Zeichen` },
       ],
     },
@@ -199,7 +200,10 @@ export default function AnbindungAnsicht() {
           </Stapel>
         </Checkbox.Group>
       ),
-      regeln: [{ required: true, type: 'array', min: 1, message: 'Mindestens ein Recht wählen' }],
+      regeln: [
+        pflicht('Rechte'),
+        { type: 'array', min: 1, message: 'Mindestens ein Recht wählen' },
+      ],
     },
   ];
 

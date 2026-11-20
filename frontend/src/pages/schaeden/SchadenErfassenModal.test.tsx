@@ -410,7 +410,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     await pflichtfelder(dialog);
     await userEvent.type(within(dialog).getByLabelText('Ort'), '   ');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Ort ist Pflicht')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Ort fehlt')).toBeInTheDocument();
     expect(gesendet).toHaveLength(0);
   });
 

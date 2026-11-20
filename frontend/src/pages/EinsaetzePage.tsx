@@ -73,6 +73,7 @@ import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import MitgliederKlappteil, { type AnlageMitglied } from './MitgliederKlappteil';
 import { useAdressSuche } from '../routing/useAdressWert';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -734,11 +735,7 @@ function EinsaetzeInhalt() {
             />
           </Feld>
         )}
-        <Feld
-          label="Bezeichnung"
-          name="bezeichnung"
-          rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
-        >
+        <Feld label="Bezeichnung" name="bezeichnung" rules={[pflicht('Bezeichnung')]}>
           {/* Ausdrückliches Fokusziel: sonst fokussiert die Erfassungs-Hülle die Vorlage darüber
               (LLH-1816, Design-Doc D3). */}
           <Input data-erfassung-fokus="" />
@@ -755,7 +752,7 @@ function EinsaetzeInhalt() {
             }}
           />
         </Feld>
-        <Feld label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
+        <Feld label="Einsatzart" name="einsatzart" rules={[pflicht('Einsatzart')]}>
           <Select
             options={EINSATZART_OPTIONEN}
             onChange={() => {
@@ -763,7 +760,7 @@ function EinsaetzeInhalt() {
             }}
           />
         </Feld>
-        <Feld label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
+        <Feld label="Alarmzeit" name="begonnen_at" rules={[pflicht('Alarmzeit')]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
         </Feld>
         <Feld label="Einsatzort" name="einsatzort">

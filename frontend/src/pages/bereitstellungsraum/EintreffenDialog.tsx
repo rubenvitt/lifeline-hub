@@ -733,7 +733,7 @@ export default function EintreffenDialog({
                                   wert?.trim() ||
                                   !getFieldValue(['weitere', z.name, 'fahrzeugtyp'])?.trim()
                                     ? Promise.resolve()
-                                    : Promise.reject(new Error('Funkrufname angeben')),
+                                    : Promise.reject(new Error('Funkrufname fehlt')),
                               }),
                               zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname'),
                             ]}

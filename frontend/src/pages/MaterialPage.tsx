@@ -104,6 +104,7 @@ import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
 import { Marke } from '../components/instrument/Marke';
 import { useAdressWert } from '../routing/useAdressWert';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -1330,18 +1331,14 @@ function MaterialInhalt() {
           setDisponierenOffen(false);
         }}
       >
-        <Feld
-          label="Material"
-          name="material_id"
-          rules={[{ required: true, message: 'Material wählen' }]}
-        >
+        <Feld label="Material" name="material_id" rules={[pflicht('Material')]}>
           <Select options={poolOptionen} notFoundContent={poolInhalt} />
         </Feld>
         <Feld
           label="Menge"
           name="menge"
           breite="kurz"
-          rules={[{ required: true }]}
+          rules={[pflicht('Menge')]}
           extra={isGeraetGewaehlt ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
         >
           <MengenFeld beschriftung="Menge" disabled={isGeraetGewaehlt} />

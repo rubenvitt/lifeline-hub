@@ -9,6 +9,7 @@ import { Select } from '../components/Select';
 import { Feld, useRollen } from '../components/instrument';
 import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
 import { rollenOptionRender } from '../einsatz/rollenOption';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Eine Person, die mit dem Einsatz gleich aufgenommen wird (LLH-1820). */
 export interface AnlageMitglied {
@@ -115,7 +116,7 @@ export default function MitgliederKlappteil({ offen, onOffenChange }: Props) {
                           name={[f.name, 'rolle']}
                           label={name}
                           breite="mittel"
-                          rules={[{ required: true, message: 'Bitte eine Rolle wählen' }]}
+                          rules={[pflicht('Rolle')]}
                         >
                           <Select<EinsatzRolle>
                             aria-label={`Rolle von ${name}`}

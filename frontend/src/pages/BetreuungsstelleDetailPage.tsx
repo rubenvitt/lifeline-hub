@@ -100,6 +100,7 @@ import { betreuungsstelleStatus } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 
@@ -173,11 +174,7 @@ const BELEGUNGSART_OPTIONEN = (Object.keys(BELEGUNGSART_LABEL) as Belegungsart[]
 }));
 
 /** Pflicht, nicht nur Leerzeichen — wie im Anlegen-Dialog. */
-const bezeichnungRegel: FormRule = {
-  required: true,
-  whitespace: true,
-  message: 'Bitte eine Bezeichnung angeben',
-};
+const bezeichnungRegel: FormRule = pflicht('Bezeichnung', { whitespace: true });
 
 function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
   return {
@@ -588,14 +585,14 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         },
       )}
       {zelle('art', 'Art', <Select options={ART_OPTIONEN} />, ART_LABEL[s.art], {
-        rules: [{ required: true, message: 'Bitte eine Art wählen' }],
+        rules: [pflicht('Art')],
       })}
       {zelle(
         'belegungsart',
         'Belegungsart',
         <Select options={BELEGUNGSART_OPTIONEN} />,
         BELEGUNGSART_LABEL[s.belegungsart],
-        { rules: [{ required: true, message: 'Bitte eine Belegungsart wählen' }] },
+        { rules: [pflicht('Belegungsart')] },
       )}
       {zelle(
         'kapazitaet_personen',
