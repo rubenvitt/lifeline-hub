@@ -57,7 +57,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   // Der Seitentitel heißt „Betroffene"; die Route bleibt `personen`.
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 
-  // Person per Schnellerfassung anlegen (Modal: okText „Erfassen").
+  // Person per Schnellerfassung anlegen (Modal: Sendeknopf „Erfassen“ im Dialog, die Zeile hat einen eigenen).
   await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -67,7 +67,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
   await dialog.getByLabel('Vorname', { exact: true }).fill('Max');
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // Erste Person bekommt Registriernummer R-001 und erscheint in der Liste.
   await expect(page.getByText('Mustermann, Max')).toBeVisible();
