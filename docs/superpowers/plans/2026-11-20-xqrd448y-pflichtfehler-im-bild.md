@@ -40,16 +40,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xqrd448ygruaijmom9oz49xe
 **Interfaces:**
 - Produces: `data-lfh="erfassung-pruefung"` an der Fehlerzeile; keine neue Prop.
 
-- [ ] **Step 1: Failing tests** in `describe('Prüfung gescheitert (LLH-1759)')`:
+- [x] **Step 1: Failing tests** in `describe('Prüfung gescheitert (LLH-1759)')`:
   - `rollt zum ersten fehlerhaften Feld und fokussiert es` — `Element.prototype.scrollIntoView` per `vi.fn` stubben; leeres Pflichtfeld absenden; erwarten: `scrollIntoView` aufgerufen mit `expect.objectContaining({ block: 'center' })`, `document.activeElement` ist das erste Pflichtfeld.
   - `nennt die Fehler am Knopf` — Zeile `[data-lfh="erfassung-pruefung"]` enthält beide Fehlertexte, Primärknopf `aria-describedby` zeigt auf ihre `id`.
   - `die Zeile verschwindet, sobald die Felder stimmen` — Felder füllen → Zeile weg.
   - `Abbrechen räumt die Zeile` — Abbrechen → Zeile weg.
   - `ruft onPruefungGescheitert vor dem Rollen` — Reihenfolge über ein Array, in das beide Callbacks schreiben.
-- [ ] **Step 2:** `mise exec -- pnpm vitest run src/components/Erfassung.test.tsx` → neue Tests FAIL.
-- [ ] **Step 3: Implementieren.** State `pruefFehler: string[]`; in `onFinishFailed` aus `errorFields` die Fehlertexte setzen, `onPruefungGescheitert` rufen, dann `requestAnimationFrame(() => form.scrollToField(errorFields[0].name, { block: 'center', focus: true }))`. `onFieldsChange` am `Form`: solange `pruefFehler` nicht leer, aus `form.getFieldsError()` neu berechnen. Reset in `abschicken` und `abbrechen` leert. Zeile als `Typography.Text type="danger"` mit `aria-live="polite"`, über der Knopfreihe; `aria-describedby` am Primärknopf vereint Zusammenfassung und Fehlerzeile.
-- [ ] **Step 4:** Tests PASS, ganze Datei grün.
-- [ ] **Step 5:** Zeile in der Erfassungs-Norm ergänzen; Commit `feat(erfassung): bei gescheiterter Prüfung zum Fehler rollen und ihn am Knopf nennen`.
+- [x] **Step 2:** `mise exec -- pnpm vitest run src/components/Erfassung.test.tsx` → neue Tests FAIL.
+- [x] **Step 3: Implementieren.** State `pruefFehler: string[]`; in `onFinishFailed` aus `errorFields` die Fehlertexte setzen, `onPruefungGescheitert` rufen, dann `requestAnimationFrame(() => form.scrollToField(errorFields[0].name, { block: 'center', focus: true }))`. `onFieldsChange` am `Form`: solange `pruefFehler` nicht leer, aus `form.getFieldsError()` neu berechnen. Reset in `abschicken` und `abbrechen` leert. Zeile als `Typography.Text type="danger"` mit `aria-live="polite"`, über der Knopfreihe; `aria-describedby` am Primärknopf vereint Zusammenfassung und Fehlerzeile.
+- [x] **Step 4:** Tests PASS, ganze Datei grün.
+- [x] **Step 5:** Zeile in der Erfassungs-Norm ergänzen; Commit `feat(erfassung): bei gescheiterter Prüfung zum Fehler rollen und ihn am Knopf nennen`.
 
 ### Task 2: Meldungsformular belegt die eigene Stelle nach Art vor
 
@@ -62,7 +62,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xqrd448ygruaijmom9oz49xe
 - Consumes: `StandardRufname` aus `etb/standardRufname.ts`, `useStandardRufname()` aus `etb/useStandardRufname.ts`.
 - Produces: Prop `eigeneStelle?: StandardRufname | null` an `MeldungFormular`.
 
-- [ ] **Step 1: Failing tests** in `describe('MeldungFormular — eigene Stelle (LLH-1759)')` mit `eigeneStelle={{ von: 'ELW 1', an: 'ELW 1 EL' }}`:
+- [x] **Step 1: Failing tests** in `describe('MeldungFormular — eigene Stelle (LLH-1759)')` mit `eigeneStelle={{ von: 'ELW 1', an: 'ELW 1 EL' }}`:
   - `belegt bei einer Meldung den Empfänger vor, nicht den Absender` — Empfänger `ELW 1 EL`, Absender leer.
   - `belegt bei einer Lagemeldung den Absender vor` (`artVorgabe="lagemeldung"`) — Absender `ELW 1`.
   - `der Fast-Path Lagemeldung tauscht die unangefasste Vorgabe` — Empfänger leer, Absender `ELW 1`.
@@ -70,12 +70,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xqrd448ygruaijmom9oz49xe
   - `greift auch, wenn der Standard erst später kommt` — Rerender von `null` auf Standard.
   - `nach dem Erfassen steht die Vorgabe wieder` — erfassen ohne „Werte behalten“ → Empfänger wieder `ELW 1 EL`.
   - `ohne eigene Stelle bleibt alles leer`.
-- [ ] **Step 2:** `mise exec -- pnpm vitest run src/meldungen/MeldungFormular.test.tsx` → FAIL.
-- [ ] **Step 3: Implementieren.** Effekt auf `[meldungsart, eigeneStelle, absender, empfaenger]` (Watch): Zielfeld nach Art bestimmen; Zielfeld setzen, wenn leer und nicht angefasst; das andere Feld leeren, wenn es genau der Vorgabe entspricht und nicht angefasst ist. Seiten reichen `useStandardRufname().standard` durch.
-- [ ] **Step 4:** Tests PASS, ganze Datei grün.
-- [ ] **Step 5:** Commit `feat(meldungen): eigene Stelle nach Art vorbelegen wie im ETB`.
+- [x] **Step 2:** `mise exec -- pnpm vitest run src/meldungen/MeldungFormular.test.tsx` → FAIL.
+- [x] **Step 3: Implementieren.** Effekt auf `[meldungsart, eigeneStelle, absender, empfaenger]` (Watch): Zielfeld nach Art bestimmen; Zielfeld setzen, wenn leer und nicht angefasst; das andere Feld leeren, wenn es genau der Vorgabe entspricht und nicht angefasst ist. Seiten reichen `useStandardRufname().standard` durch.
+- [x] **Step 4:** Tests PASS, ganze Datei grün.
+- [x] **Step 5:** Commit `feat(meldungen): eigene Stelle nach Art vorbelegen wie im ETB`.
 
 ### Task 3: Prüfen
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] Bilder am schmalen Schirm (vorher/nachher) für den PR.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] Bilder am schmalen Schirm (vorher/nachher) für den PR.
