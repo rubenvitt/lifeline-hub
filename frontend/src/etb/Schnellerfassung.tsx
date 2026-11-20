@@ -388,12 +388,21 @@ export default function Schnellerfassung({
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
   const [pflicht, setPflicht] = useState<('von' | 'an')[]>([]);
+  /**
+   * „Erfassen“ (Knopf oder Strg+Enter) bei leerem Inhalt: der Grund steht am Feld, statt dass der
+   * Knopf stumm bleibt (LLH-1771). Blankes Enter im leeren Feld sendet nie und meldet nichts.
+   * Geht, sobald Text getippt wird, und kehrt erst mit dem nächsten Versuch zurück. Text von außen
+   * (Baustein, Berichtigung) prüft die Bedingung mit.
+   */
+  const [inhaltFehlt, setInhaltFehlt] = useState(false);
+  const inhaltFehltSichtbar = inhaltFehlt && inhalt.trim() === '';
   // Ein Pflichtgrund steht nur, solange die Seite wirklich fehlt: eine Vorgabe nach Typwechsel oder
   // ein `@` füllen sie ohne `setzeFeld` (Review E5).
   const fehltJetzt = fehlendeSeiten(wirksam);
   const pflichtSichtbar = pflicht.filter((seite) => fehltJetzt.includes(seite));
   /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
   const pflichtGrundId = useId();
+  const inhaltGrundId = useId();
   const zeitGrundId = useId();
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
@@ -615,6 +624,7 @@ export default function Schnellerfassung({
   }
 
   function onInhaltChange(neu: string) {
+    if (neu.trim() !== '') setInhaltFehlt(false);
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
     const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
     let text = neu;
@@ -791,7 +801,13 @@ export default function Schnellerfassung({
   }
 
   async function absenden() {
-    if (sendet || inhalt.trim() === '') return;
+    if (sendet) return;
+    if (inhalt.trim() === '') {
+      setInhaltFehlt(true);
+      fokusInsFeld();
+      return;
+    }
+    setInhaltFehlt(false);
     // Ein lesbares `/zeit`, das beim Tippen nicht übernommen wurde (berichtigt mitten in der
     // Angabe, dort löst LLH-1088 bewusst nicht aus): dieser Klick übernimmt die Zeit sichtbar ins
     // Feld und sendet noch nicht. Erst der nächste sendet, mit Nachtrag am Knopf (Review B1,
@@ -1034,6 +1050,17 @@ export default function Schnellerfassung({
   });
   const gruende = (
     <>
+      {inhaltFehltSichtbar && (
+        <span
+          id={inhaltGrundId}
+          role="alert"
+          data-lfh="etb-inhalt-hinweis"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Inhalt fehlt</span>
+        </span>
+      )}
       {pflichtSichtbar.map((seite) => (
         <span
           key={seite}
@@ -1355,6 +1382,8 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            aria-invalid={inhaltFehltSichtbar}
+            aria-describedby={inhaltFehltSichtbar ? inhaltGrundId : undefined}
             // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
             enterKeyHint="enter"
             readOnly={sendet}

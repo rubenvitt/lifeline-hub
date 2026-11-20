@@ -1052,6 +1052,40 @@ describe('Schnellerfassung — Fußzeile (Spec „Einstellungen in der Fußzeile
   });
 });
 
+describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
+  it('„Erfassen“ bei leerem Feld nennt „Inhalt fehlt“ am Feld und setzt den Fokus hinein', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    await userEvent.type(feld, '  ');
+    await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(feld).toHaveFocus();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
+    expect(p.erfassen).not.toHaveBeenCalled();
+
+    // Beim Tippen geht der Grund.
+    await userEvent.type(feld, 'Pegel steigt');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    expect(feld).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('Strg+Enter im leeren Feld nennt den Grund; blankes Enter bleibt still', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.click(feld);
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    await userEvent.clear(feld);
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+});
+
 describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', () => {
   it('ohne Standard steht die Abfrage über der Zeile, und die Pflicht hält das Absenden auf', async () => {
     const p = props({ rufname: rufnameZugriff(null) });
