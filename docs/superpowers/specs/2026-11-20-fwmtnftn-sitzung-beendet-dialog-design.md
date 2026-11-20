@@ -83,14 +83,27 @@ was er getippt hat.
 - Während der Unterbrechung **bleibt `benutzer` gesetzt** (sonst baute `RequireAuth` ab), und
   damit auch der erwartete Benutzer der Schreibanfragen (`setzeErwartetenBenutzer`). Schreiben
   scheitert ohnehin mit 401; die Offline-Schlange behält ihre Einträge wie heute.
-- **Sofort geräumt** wird beim Eintritt: das Lagebild **auf der Platte** (nicht der Query-Cache
-  im Speicher) und die Gerätedaten wie bei `geraetRaeumen('sitzungsende')` (ETB-Entwürfe
-  bleiben). Das Mitschreiben des Lagebilds auf die Platte ruht, solange die Unterbrechung steht.
+- **Sofort geräumt** wird beim Eintritt, was **auf der Platte** liegt: das Lagebild (nicht der
+  Query-Cache im Speicher) und die übrigen Gerätedaten in IndexedDB und `localStorage`, die
+  `geraetRaeumen('sitzungsende')` heute räumt (Quittungen, Ortcache, Schlangenzähler,
+  Verpflegungsstelle, Startliste, Stammdaten-zuletzt …; ETB-Entwürfe bleiben wie heute). Das
+  Mitschreiben des Lagebilds auf die Platte ruht, solange die Unterbrechung steht.
+- **Bis zur Frist bleibt**, was im Speicher des Tabs und in seinem `sessionStorage` liegt:
+  behaltene Erfassungswerte (LFH-785, samt Besitzer-Schlüssel), Listenstände (LLH-1428), Verlauf
+  und Rollpositionen, ausgeblendete Alarme, Eingangsinhalte (`verlaufInhalt`). Begründung
+  (Entscheidung des Builders, abgeleitet aus „Platte sofort, Speicher 15 min“): sonst stünde
+  dieselbe Person nach der Anmeldung nicht dort, wo sie war. `geraetRaeumen` wird dafür nach
+  Platte und Tab-Speicher getrennt; die Einordnung je Ort steht im Register `GERAETESPEICHER`
+  samt Wächtertest. Frist, „Abmelden“ und alle übrigen Ausgänge räumen beides wie heute.
 - **Frist 15 Minuten** ab Eintritt: läuft sie ab, folgt der volle bisherige Ausgang —
   `abmeldenLokal('sitzungsende')` und Umleitung nach `/login` mit `von` und Grund. Formulare
   gehen dann verloren (bewusst, Abstimmung 20.11.2026).
 - Gilt nur für eine Person. Bei einem gekoppelten Gerät, ohne angezeigten Benutzer, nach
-  angekündigtem freiwilligem Abmelden und bei einer 401 beim Start bleibt der heutige Weg.
+  angekündigtem freiwilligem Abmelden und bei einer 401 auf das **erste** `/me` beim Start bleibt
+  der heutige Weg.
+- Eine ohne Server gestartete Sitzung (LFH-780, Identität vom vorgehaltenen Stand) gilt als „im
+  Betrieb“: kommt die 401 erst, wenn der Server zurück ist, erscheint ebenfalls der Dialog —
+  gerade dort kann lange offline getippt worden sein (Entscheidung des Builders).
 
 ### Auslöser
 
@@ -106,11 +119,17 @@ was er getippt hat.
 |---|---|
 | Anmeldung im Dialog, **gleiche** Benutzer-id | Unterbrechung `null`, `sitzungsMeldungZuruecksetzen`, Kanalmeldung `angemeldet`, Lagebild-Vorhaltung wieder an, alle Abfragen invalidieren. Kein Neuladen, kein Abbau. |
 | Anmeldung im Dialog, **andere** Benutzer-id | Seite neu laden (`seiteNeuLaden` auf die aktuelle Adresse); der Start übernimmt dann die neue Person. Nicht im laufenden Baum übernehmen. |
-| In einem anderen Tab angemeldet (`pruefe` sieht `/me` ok) | Gleiche Person: auflösen wie oben (ein Tab heilt alle). Andere Person: `BenutzerKonfliktDialog` wie heute. |
+| In einem anderen Tab angemeldet (`pruefe` sieht `/me` ok) | Gleiche Person: auflösen wie oben (ein Tab heilt alle). Andere Person: `BenutzerKonfliktDialog` wie heute; die Unterbrechung endet dabei **ohne zu räumen** (Frist gestoppt), das Neuladen erledigt den Rest — sonst löschte der Ablauf der Frist das Lagebild der neuen, gültigen Sitzung auf der Platte. |
 | In einem anderen Tab freiwillig abgemeldet | voller Ausgang `abmeldenLokal('abmelden')`, Umleitung `/login`. |
 | „Abmelden“ im Dialog | voller Ausgang `abmeldenLokal('sitzungsende')` (kein Server-Logout, es gibt keine Sitzung), Umleitung `/login` mit `von` und Grund. |
 | Frist abgelaufen | wie „Abmelden“ im Dialog. |
 | Neuladen während der Unterbrechung | Start sieht 401 → heutiger Weg (Anmeldeseite); Eingaben weg. |
+
+**Bei der Auflösung mit derselben Person laufen neu an**, was heute erst der Neuaufbau der
+Seite anstieß: die Live-Ströme (Einsatz und Org; `oeffneLiveVerbindung` gibt nach einer 401
+endgültig auf), mit vollem Abgleich wie nach einem Verbindungsverlust, und das Web-Push-Abo
+(`pushAbgleichen`, das Abo fiel mit der alten Sitzung). Dafür braucht es ein Signal „Sitzung
+wiederhergestellt“, weil sich die Benutzer-id nicht ändert.
 
 Der Offline-Abgleich ruht während der Unterbrechung (wie im Konflikt, `abgleichFuer`) und läuft
 nach der Auflösung mit derselben Person wieder an; die vorgemerkten Einträge gehen dann hinaus.
@@ -123,7 +142,9 @@ nach der Auflösung mit derselben Person wieder an; die vorgemerkten Einträge g
   über offenen antd-Dialogen, Schubladen und Popovern der Seite (z-index über deren Stapel).
 - Inhalt: Kopf „Sitzung beendet“, Satz „Melde dich erneut an. Deine Eingaben auf dieser Seite
   bleiben erhalten.“, Benutzername mit dem bisherigen vorbelegt (änderbar), Passwort,
-  „Anmelden“. Zweitfaktor-Stufe im Dialog. Passkey, wenn er auf der Anmeldeseite angeboten würde.
+  „Anmelden“. Zweitfaktor-Stufe im Dialog. Passkey, wenn er auf der Anmeldeseite angeboten würde,
+  und in der macOS-Hülle „Im Browser anmelden“ (LFH-818, verlässt die Seite nicht) — kurz: jeder
+  Weg der Anmeldeseite, der die Seite nicht verlässt.
   Restlaufzeit der Frist sichtbar („Ohne Anmeldung wird diese Seite in 14 min geschlossen“ o. ä.).
 - **SSO** (OIDC) steht im Dialog mit Hinweis „Verlässt die Seite, Eingaben auf dieser Seite
   gehen verloren“; der Redirect kehrt auf die aktuelle Adresse zurück.
@@ -158,10 +179,19 @@ nach der Auflösung mit derselben Person wieder an; die vorgemerkten Einträge g
 - Schnitt der gemeinsamen Anmeldekomponente aus `pages/LoginPage.tsx`.
 - Umsetzung der Frist (Timer im Provider; ein verdeckter Tab zählt mit).
 
+## Entscheidungen des Builders (zum Gegenlesen)
+
+- Platte sofort, Tab-Speicher (Speicher und `sessionStorage`) erst mit der Frist.
+- Live-Ströme und Web-Push starten nach der Auflösung neu.
+- Ein Benutzerkonflikt beendet die Unterbrechung ohne Räumen.
+- Der Dialog trägt alle Anmeldewege der Seite ohne Seitenwechsel, SSO mit Warnung.
+- Eine offline gestartete Sitzung zählt als „im Betrieb“.
+
 ## Nachweis
 
 - Unit-Tests im `AuthProvider`/`useSitzungsWache`: 401 → Unterbrechung, Benutzer bleibt, Platte
-  geräumt, Speicher nicht; gleiche Person → aufgelöst ohne Neuladen; andere Person → Neuladen;
+  geräumt, Speicher und `sessionStorage` nicht; Live und Push nach Auflösung neu; Konflikt
+  stoppt die Frist; gleiche Person → aufgelöst ohne Neuladen; andere Person → Neuladen;
   Frist → voller Ausgang; angekündigtes Abmelden → alter Weg; Gerät → alter Weg.
 - e2e: Formular „Meldung erfassen“ ausfüllen, Sitzung serverseitig beenden, 401 auslösen,
   Dialog erscheint, gleiche Person meldet sich an, Formular steht mit dem Text da und lässt sich
