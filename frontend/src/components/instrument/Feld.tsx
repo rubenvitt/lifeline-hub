@@ -3,6 +3,7 @@ import { Form, type FormItemProps } from 'antd';
 import type { NamePath } from 'antd/es/form/interface';
 import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
 import GeaendertPunkt from './GeaendertPunkt';
+import { SperrStelle, useSperrStelle } from './eingabeSperre';
 
 /**
  * Feld — ein Formularfeld mit benannter Obergrenze (Spec `feldbreiten`, LLH-1810). Hülle um antds
@@ -67,11 +68,17 @@ export default function Feld<Values = unknown>({
   className,
   label,
   messageVariables,
+  rules,
   ...props
 }: FeldProps<Values>) {
-  return (
+  const name = props.name as NamePath | undefined;
+  // Eingabesperre (LLH-1768): ein Steuerelement, das unlesbaren Text stehen lässt, sperrt das
+  // Senden über diese Regel. Die Stelle steht AUSSEN, damit `Form.Item` sein Kind klonen kann.
+  const sperre = useSperrStelle(name);
+  const item = (
     <Form.Item<Values>
       {...props}
+      rules={name === undefined ? rules : [...(rules ?? []), sperre.regel]}
       // Das Etikett ist unten ein Fragment; antd setzte `${label}` in Prüfmeldungen sonst aus dem
       // Feldnamen. Ein Text-Etikett geht deshalb ausdrücklich mit (LLH-1829, Review).
       messageVariables={
@@ -90,4 +97,5 @@ export default function Feld<Values = unknown>({
       style={feldStil(breite, abstand, zeile)}
     />
   );
+  return name === undefined ? item : <SperrStelle melden={sperre.melden}>{item}</SperrStelle>;
 }
