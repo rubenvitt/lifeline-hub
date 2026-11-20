@@ -172,10 +172,22 @@ async function ruhigerPunktImStreifen(page: Page, g: Groesse = HANDY) {
   const punkt = await page.evaluate(
     ({ breite, hoehe }) => {
       const ziel = 'button, a, input, select, textarea, [role="button"], [role="menuitem"]';
+      // Ein Fingertipp rückt auf ein nahes Ziel (Chromium-Tippkorrektur): der Punkt braucht
+      // ringsum Abstand zu jedem Bedienziel, sonst öffnet der Tipp etwa die Navigation neben ihm.
+      const abstand = 24;
+      const kaesten = [...document.querySelectorAll(ziel)]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      const fern = (x: number, y: number) =>
+        kaesten.every((r) => {
+          const dx = Math.max(r.left - x, 0, x - r.right);
+          const dy = Math.max(r.top - y, 0, y - r.bottom);
+          return Math.hypot(dx, dy) >= abstand;
+        });
       for (let y = Math.floor(hoehe / 2); y < hoehe; y += 4) {
         for (let x = 8; x < breite - 8; x += 8) {
           const el = document.elementFromPoint(x, y);
-          if (el && !el.closest(ziel)) return { x, y };
+          if (el && !el.closest(ziel) && fern(x, y)) return { x, y };
         }
       }
       return null;
