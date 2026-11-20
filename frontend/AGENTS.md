@@ -479,8 +479,8 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Einzelwert am Ort ändern                                                                        | `InlineAngabe`, `BemerkungZelle`                                                                                                                 | `InlineAngabe`                     |
 | Zusammengehörige Werte eines Datensatzes                                                        | `BearbeitbaresPaneel` Modus `paneel`                                                                                                             | `BearbeitbaresPaneel`              |
 | Ganze Ansicht, Felder zusammen geprüft                                                          | `BearbeitbaresPaneel` Modus `ansicht`                                                                                                            | `BearbeitbaresPaneel`              |
-| Anlegen                                                                                         | `ErfassungsModal` („Erfassungs-Norm“); eigene Seite erst ab Ablauf oder > ~5 Pflichtfeldern                                                      | `Dialog`                           |
-| Serienerfassung neben einer Liste                                                               | `Schnellerfassungszeile`                                                                                                                         | —                                  |
+| Anlegen                                                                                         | Muster Dialog: `ErfassungsModal` („Erfassungs-Norm“); eigene Seite erst ab Ablauf oder > ~5 Pflichtfeldern                                       | `Dialog`                           |
+| Serienerfassung neben einer Liste                                                               | Muster Zeile: `Schnellerfassungszeile`, aufgeklappt `ErfassungsFormular`                                                                         | —                                  |
 | Kurze blockierende Aktion, Datensatz ohne eigene Ansicht                                        | Modal (Punkt 1 von „Bearbeiten in der Ansicht“)                                                                                                  | `Dialog`                           |
 | Unumkehrbares                                                                                   | rote `Popconfirm`, aus einem Zeilenmenü ein Modal („Aktionen“)                                                                                   | `Knopf`                            |
 | Nur ansehen                                                                                     | Drawer; nie zum Anlegen oder Bearbeiten                                                                                                          | —                                  |
@@ -566,7 +566,7 @@ UHS (Bereich „Angaben“) und Bereitstellungsraum („Raumdaten“) sind umges
 
 **Ort von „Bearbeiten“ und Form des Anlegens** (LLH-1722, D8): „Bearbeiten“ eines Paneels steht
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
-Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
+Kopfs). Anlegen geht über das `ErfassungsModal` (Muster Dialog, „Erfassungs-Norm“, LLH-1766); eine eigene Seite nur bei einem Ablauf oder mehr
 als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
 Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-muster`, „Einen
 Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
@@ -1665,6 +1665,39 @@ Spec `bedien-arbeitsplatz`).
 
 **Erfassungsformulare nehmen `components/Erfassung.tsx`** (`ErfassungsModal`,
 `ErfassungsFormular`); ein handgebautes `<Modal>` + `<Form>` ist ein Fehler.
+
+**Zwei Muster, ein Verb, ein Enter-Vertrag, ein Pflichtfehler** (LLH-1766, Entwurf
+`docs/superpowers/specs/2026-11-20-bn81riye-erfassung-verb-enter-design.md`; schreibt die Spec
+`bedien-muster`, „Einen Datensatz anlegen“, fort):
+
+- **Zwei Muster.** **Zeile**: Serienerfassung neben einer Liste oder Zeitachse, bleibt nach dem
+  Senden offen, leert, Fokus ins erste Feld (`Schnellerfassungszeile`, `SchnellAnlegen`; aufgeklappt
+  als `ErfassungsFormular` im Klappteil über der Liste: Meldungen, Nachforderungen, Erinnerungen,
+  Zusage). **Dialog**: jede andere Erfassung (`ErfassungsModal`, `AnlegenModal`), schließt nach
+  dem Senden, mit `serie` „Speichern und nächste“. Die eigene Seite bleibt die Ausnahme ab Ablauf
+  oder > ~5 Pflichtfeldern und folgt dem Vertrag des Dialogs. Die Felder eines aufgeklappten
+  Formulars folgen den Feldzeilen des Dialogs.
+- **Ein Sendeverb.** „Erfassen“ (ohne Objekt; Titel, Zeile oder Klappkopf nennen es) auf jeder
+  Erfassung eines Einsatz-Datensatzes; die ETB-Formen „Erfassen als HHMM“ und „Berichtigung
+  erfassen“ sind dasselbe Verb. „Anlegen“ beim Neuanlegen von Struktur und Verwaltung (Einsatz,
+  Abschnitt, UHS, Bereitstellungsraum, Kanal, Benutzer, Stammdaten, Kataloge, Planung,
+  Schichtplan, Einstellungen); ein Dialog für Anlegen und Bearbeiten heißt nach Modus „Anlegen“
+  bzw. „Speichern“. Fachhandlungen behalten ihr Verb, weil der Knopf ihre Folge nennt (Auftrag
+  erteilen, Entlassen, Disponieren, Registrieren, Senden im Chat …). Im Grenzfall „Erfassen“, wenn
+  der Datensatz zum Einsatzgeschehen gehört, „Anlegen“, wenn er Rahmen für andere ist. Wächter
+  `components/erfassungsVerb.guard.test.ts` (Liste der erlaubten Verben; ein neues braucht dort
+  einen Eintrag mit Grund).
+- **Ein Enter-Vertrag nach Feldart** (`components/enterVertrag.ts`): einzeilig sendet Enter auf
+  jeder Zeigerart (`enterKeyHint="send"` an den Feldern der Zeilen); mehrzeilig im Dialog bricht
+  Enter um; mehrzeilig in der Zeile sendet Enter nur mit feinem Zeiger, mit grobem bricht es um;
+  Strg/⌘+Enter sendet überall (ohne `serie` über die Tastaturaktion `speichern`, mit `serie`
+  „Speichern und nächste“), Umschalt+Enter nie. Enter bei offener Vorschlagsliste wählt nur aus.
+  Die ETB-Leiste verschärft die Zeile (`frontend/src/etb/AGENTS.md`).
+- **Ein Pflichtfehler „‹Feld› fehlt“**: jede Pflichtregel über `pflicht('‹Feld›')` aus
+  `components/pflichtRegel.ts` (Hauptwort des Labels, ohne Artikel, „Bitte“ und Anrede; Hinweis
+  als `zusatz`: „Anzahl fehlt — 0, wenn niemand“). Der `ConfigProvider` setzt denselben Text als
+  Rückfall (`validateMessages.required`); antd nimmt dafür nur ein Text-Label, deshalb immer der
+  ausdrückliche Name. Wächter `components/pflichtRegel.guard.test.ts`.
 
 - **Absende-Knopf im `<form>`, deshalb sendet Enter** (native Übermittlung; `Input.TextArea`
   behält den Zeilenumbruch). Fußzeile selbst gerendert (`footer={null}`), kein
