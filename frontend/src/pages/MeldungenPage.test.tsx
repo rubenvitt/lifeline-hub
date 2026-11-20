@@ -279,7 +279,7 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(
       await screen.findByText('Server-Fehler – Meldung von RTW 2 vorgemerkt, wird erneut gesendet'),
