@@ -325,9 +325,12 @@ Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeiche
 
 ### Eine vermisste Person melden und abgleichen
 
-1. „Vermisst melden“ wählen. Unter „Weitere Angaben“ stehen statt Zustand und Koordinate
-   „vermisst seit“ und „Melder / Kontakt“; ohne Angabe gilt „vermisst seit“ ab der Meldung.
-2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste.
+1. „Vermisst melden“ wählen. Oben stehen „Name“, „Vorname“, „Geschlecht“ und „Fundort“, unter
+   „Weitere Angaben“ das geschätzte Alter, „vermisst seit“ und „Melder / Kontakt“; ohne Angabe
+   gilt „vermisst seit“ ab der Meldung.
+2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste. Eine Meldung ganz
+   ohne Angabe zur Person wird nicht angelegt: der Dialog nennt am Namen „Mindestens eine Angabe
+   zur vermissten Person“.
 3. Wird jemand gefunden, der die vermisste Person sein könnte: den Statusfilter „Vermisst“
    wählen und in der Spalte „Abgleich vorschlagen“ die gefundene Person wählen.
 4. Die Einsatzleitung öffnet die vermisste Person und entscheidet unter „Vermisstenabgleich“ mit
