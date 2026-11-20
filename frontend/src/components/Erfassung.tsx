@@ -33,8 +33,10 @@ import './Erfassung.css';
  * 2. **Der Fokus steht beim Öffnen im ersten Feld** und kehrt nach jedem Serien-Speichern
  *    dorthin zurück.
  * 3. **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über Abbrechen,
- *    Schliesskreuz, Escape und Maskenklick. Warum `destroyOnHidden` das NICHT erledigt, steht
- *    am `ErfassungsModal`.
+ *    Schliesskreuz und Escape; die Maske schließt nie. Warum `destroyOnHidden` das NICHT
+ *    erledigt, steht am `ErfassungsModal`. **Geänderte Eingaben gehen nie ohne Rückfrage
+ *    verloren** (LLH-1755): weicht ein angefasstes Feld (`onValuesChange`, nie `setFieldsValue`)
+ *    von `initialValues` ab, fragt jeder Weg hinaus erst „Eingaben verwerfen?“.
  *
  * Die Fusszeile rendert die Hülle **selbst und innerhalb** des Formulars (`footer={null}`):
  * der sichtbare Knopf ist damit schon der Übermittlungsknopf, ein versteckter Zwilling wäre
