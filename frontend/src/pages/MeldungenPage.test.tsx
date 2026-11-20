@@ -236,6 +236,24 @@ describe('MeldungenPage', () => {
     );
   });
 
+  // LLH-1758: Netz ist da, der Server antwortet 500 — das ist kein „offline“.
+  it('meldet einen Serverfehler beim Anlegen als Serverfehler, nicht als offline', async () => {
+    legeMeldungAn.mockRejectedValueOnce(
+      new ApiError(500, 'Interner Fehler', { vomAnwendungsserver: true }),
+    );
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+
+    expect(
+      await screen.findByText('Server-Fehler – Meldung von RTW 2 vorgemerkt, wird erneut gesendet'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Offline vorgemerkt/)).not.toBeInTheDocument();
+  });
+
   it('merkt den vollständigen Wortlaut offline sichtbar vor', async () => {
     renderPage();
     await screen.findByText('Florian Nord 1');

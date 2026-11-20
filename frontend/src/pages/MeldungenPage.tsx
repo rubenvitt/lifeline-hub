@@ -99,6 +99,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -412,7 +413,10 @@ export default function MeldungenPage() {
     },
     onSuccess: (ergebnis, { einsatzId: eid, daten: d }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Meldung von ${d.absender}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Meldung von ${d.absender}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
@@ -549,7 +553,10 @@ export default function MeldungenPage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(eid) });
       invalidiere(eid);
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt · R-…');
+        message.warning(
+          vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {

@@ -73,6 +73,7 @@ import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 const ORT_OPTIONEN: { value: Ortsfilter; label: string }[] = [
   { value: 'alle', label: 'Alle Orte' },
@@ -262,7 +263,10 @@ export default function LagemeldungenPage() {
     },
     onSuccess: (ergebnis, { einsatzId: eid, daten }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Lagemeldung von ${daten.absender}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Lagemeldung von ${daten.absender}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.

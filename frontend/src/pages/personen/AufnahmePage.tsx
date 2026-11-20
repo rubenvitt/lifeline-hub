@@ -29,6 +29,7 @@ import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { modulName } from '../../einsatz/modulRegistry';
 import { ListenRueckweg } from '../../components/ListenRueckweg';
+import { vorgemerktText } from '../../offline/vorgemerktText';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -103,7 +104,7 @@ export default function AufnahmePage() {
     onMutate: () => setQuittung(null),
     onSuccess: (ergebnis, { einsatzId }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung({ einsatzId, text: 'Offline vorgemerkt · R-…' });
+        setQuittung({ einsatzId, text: vorgemerktText(ergebnis.grund, 'R-…', ' · ') });
       } else if (ergebnis.zustand === 'beantragt') {
         // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
         setQuittung({ einsatzId, text: 'Beantragt · R-…' });
