@@ -137,6 +137,8 @@ export default function LiveStatusBanner({
         ? 'warning'
         : 'info';
 
+  // Die Zahl kommt über `icon`: im Inhalt eines antd-Knopfs wird ein Flex-Span zu `block`, der
+  // Abstand fiel weg und die Zahl klebte am Wort (LLH-1758, Bild der Betriebszeile).
   const queueBadges = (
     <Stapel als="span" richtung="zeile" umbruch abstand="md" ausrichten="mitte">
       {queue.ausstehend > 0 && (
@@ -146,11 +148,9 @@ export default function LiveStatusBanner({
           type="text"
           aria-label={`${queue.ausstehend} nicht gesendet`}
           onClick={() => setRecoveryOffen(true)}
+          icon={<Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />}
         >
-          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
-            <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
-            <span>nicht gesendet</span>
-          </Stapel>
+          nicht gesendet
         </Button>
       )}
       {queue.abgelehnt > 0 && (
@@ -163,11 +163,9 @@ export default function LiveStatusBanner({
             'abgelehnte Offline-Aktionen',
           )}
           onClick={() => setRecoveryOffen(true)}
+          icon={<Badge count={queue.abgelehnt} overflowCount={999} color={token.colorError} />}
         >
-          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
-            <Badge count={queue.abgelehnt} overflowCount={999} color={token.colorError} />
-            <span>abgelehnt – prüfen</span>
-          </Stapel>
+          abgelehnt – prüfen
         </Button>
       )}
       {abgelehnteAntraege > 0 && (
@@ -177,11 +175,9 @@ export default function LiveStatusBanner({
           // Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3), die Zahl folgt.
           aria-label={`Anträge abgelehnt (${anzahl(abgelehnteAntraege, 'Antrag', 'Anträge')})`}
           onClick={() => setRecoveryOffen(true)}
+          icon={<Badge count={abgelehnteAntraege} overflowCount={999} color={token.colorError} />}
         >
-          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
-            <Badge count={abgelehnteAntraege} overflowCount={999} color={token.colorError} />
-            <span>Anträge abgelehnt</span>
-          </Stapel>
+          Anträge abgelehnt
         </Button>
       )}
       {fruehereKopplung > 0 && (
@@ -189,11 +185,9 @@ export default function LiveStatusBanner({
           type="text"
           aria-label={`Aus früherer Kopplung (${anzahl(fruehereKopplung, 'Eintrag', 'Einträge')})`}
           onClick={() => setRecoveryOffen(true)}
+          icon={<Badge count={fruehereKopplung} overflowCount={999} color={token.colorWarning} />}
         >
-          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
-            <Badge count={fruehereKopplung} overflowCount={999} color={token.colorWarning} />
-            <span>Aus früherer Kopplung</span>
-          </Stapel>
+          Aus früherer Kopplung
         </Button>
       )}
       {queue.nicht_zugeordnet > 0 && (
@@ -202,13 +196,13 @@ export default function LiveStatusBanner({
           // Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3), die Zahl folgt.
           aria-label={`Alte Offline-Daten ansehen (${anzahl(queue.nicht_zugeordnet, 'Aktion', 'Aktionen')} ohne Zuordnung)`}
           onClick={() => setRecoveryOffen(true)}
-        >
-          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
+          icon={
             <Badge count={queue.nicht_zugeordnet} overflowCount={999} color={token.colorWarning} />
-            {/* Der Knopf öffnet nur den Drawer; dort fragt das Verwerfen nach. „verwerfen“ las
-                sich wie die Löschung selbst und wurde gemieden (LFH-944). */}
-            <span>Alte Offline-Daten ansehen</span>
-          </Stapel>
+          }
+        >
+          {/* Der Knopf öffnet nur den Drawer; dort fragt das Verwerfen nach. „verwerfen“ las
+              sich wie die Löschung selbst und wurde gemieden (LFH-944). */}
+          Alte Offline-Daten ansehen
         </Button>
       )}
     </Stapel>

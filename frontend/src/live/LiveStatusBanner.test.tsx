@@ -117,6 +117,9 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
     await queueEinreihen(11, 7, { typ: 'meldung', inhalt: 'Offline', client_id: 'etb-1' });
     renderBanner('/einsaetze/7/etb');
     const knopf = await screen.findByRole('button', { name: '1 nicht gesendet' });
+    // Die Zahl sitzt im Icon-Platz des Knopfs, sonst fehlt der Abstand zum Wort (antd setzt einen
+    // Flex-Span im Inhalt auf `block`).
+    expect(knopf.querySelector('.ant-btn-icon .ant-badge')).not.toBeNull();
     await userEvent.click(knopf);
     expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
   });
