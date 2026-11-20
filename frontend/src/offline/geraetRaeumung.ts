@@ -316,6 +316,28 @@ async function einzeln(schritte: Record<string, () => unknown>): Promise<void> {
   );
 }
 
+/** Was auf der Platte liegt (IndexedDB, `localStorage`) und bei jedem Ausgang geht. Nicht der
+ *  Speicher des Tabs (`sessionStorage`, Arbeitsspeicher). */
+const PLATTE: Record<string, () => unknown> = {
+  personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
+  ortCache: ortCacheRaeumen,
+  verpflegungsstelle: gemerkteStellenRaeumen,
+  startlisteAusgeblendet: clearStartlisteAusgeblendet,
+  stammdatenfeldZuletzt: zuletztRaeumen,
+  queueZaehlerMerker: queueZaehlerMerkerRaeumen,
+};
+
+/** Was nur im Tab liegt (`sessionStorage`, Arbeitsspeicher) und bei jedem Ausgang geht. */
+const TAB: Record<string, () => unknown> = {
+  erfassungsSitzung: erfassungsSitzungRaeumen,
+  alarmAusgeblendet: ausgeblendetRaeumen,
+  // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
+  verlaufInhalt: () => verlaufInhalt.clear(),
+  listenGedaechtnis: listenGedaechtnisRaeumen,
+  verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
+  rollGedaechtnis: rollGedaechtnisRaeumen,
+};
+
 /**
  * Der Weg hinaus (LFH-767, design.md D2): läuft nach `lagebildLoeschen` in `abmeldenLokal`.
  * Was der Server wieder liefern kann, geht bei jedem Anlass; die ETB-Entwürfe nur beim
@@ -323,21 +345,20 @@ async function einzeln(schritte: Record<string, () => unknown>): Promise<void> {
  */
 export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
   await einzeln({
-    personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
-    ortCache: ortCacheRaeumen,
-    erfassungsSitzung: erfassungsSitzungRaeumen,
-    alarmAusgeblendet: ausgeblendetRaeumen,
-    // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
-    verlaufInhalt: () => verlaufInhalt.clear(),
-    listenGedaechtnis: listenGedaechtnisRaeumen,
-    verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
-    rollGedaechtnis: rollGedaechtnisRaeumen,
-    verpflegungsstelle: gemerkteStellenRaeumen,
-    startlisteAusgeblendet: clearStartlisteAusgeblendet,
-    stammdatenfeldZuletzt: zuletztRaeumen,
-    queueZaehlerMerker: queueZaehlerMerkerRaeumen,
+    ...PLATTE,
+    ...TAB,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });
+}
+
+/**
+ * Unterbrochene Sitzung im Betrieb (LLH-1770): nur die Platte geht sofort. Der Speicher des Tabs
+ * bleibt, bis dieselbe Person sich wieder anmeldet oder die Frist den vollen Ausgang
+ * (`geraetRaeumen('sitzungsende')`) auslöst — sonst stünde sie nach der Anmeldung nicht dort, wo
+ * sie war. Wirft nie.
+ */
+export async function geraetPlatteRaeumen(): Promise<void> {
+  await einzeln(PLATTE);
 }
 
 /**
