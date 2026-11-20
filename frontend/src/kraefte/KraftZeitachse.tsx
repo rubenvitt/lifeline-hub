@@ -515,7 +515,7 @@ export default function KraftZeitachse({
               validator: (_, wert) =>
                 wert || getFieldValue('alarmierung')
                   ? Promise.resolve()
-                  : Promise.reject(new Error('Bitte Alarmierung oder Eintreffen angeben')),
+                  : Promise.reject(new Error('Alarmierung oder Eintreffen fehlt')),
             }),
           ]}
         >

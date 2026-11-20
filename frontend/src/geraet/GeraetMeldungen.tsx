@@ -14,6 +14,7 @@ import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
 import StandortFeld from './StandortFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
   { wert: 'normal', label: 'normal' },
@@ -194,7 +195,7 @@ export default function GeraetMeldungen({
             <Feld<MeldungWerte>
               name="inhalt"
               label="Inhalt"
-              rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
+              rules={[pflicht('Inhalt', { whitespace: true })]}
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
             </Feld>

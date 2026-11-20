@@ -315,7 +315,7 @@ export const ZEITRAUM_REGEL: FormRule = {
   validator: (_, wert: Zeitraum | null | undefined) =>
     wert?.[0] && wert?.[1]
       ? Promise.resolve()
-      : Promise.reject(new Error('Bitte Beginn und Ende angeben')),
+      : Promise.reject(new Error('Beginn und Ende fehlen')),
 };
 
 /** Pflicht eines Bedarfsfelds (Kräfte, Betreute); 0 ist eine Angabe. */

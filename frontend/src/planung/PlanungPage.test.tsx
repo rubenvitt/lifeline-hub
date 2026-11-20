@@ -338,9 +338,9 @@ describe('PlanungPage (LLH-1586)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schichten erzeugen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Schichten erzeugen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schichten erzeugen' }));
-    expect(await within(dialog).findByText('Bitte eine Länge angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Länge fehlt')).toBeInTheDocument();
     await waehle('Posten', 'RTW 1');
-    await waitFor(() => expect(within(dialog).queryByText('Bitte eine Länge angeben')).toBeNull());
+    await waitFor(() => expect(within(dialog).queryByText('Länge fehlt')).toBeNull());
   });
 
   it('Handy: Liste mit allen Blöcken je Posten', async () => {

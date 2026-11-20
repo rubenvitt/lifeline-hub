@@ -412,7 +412,7 @@ describe('NachforderungFormular — Schnellwahl, Vorschläge, Ziel und Bedarfsze
     fireEvent.change(details(), { target: { value: 'Transport aus UHS' } });
     expect(await screen.findByText('Weitere Angaben · Details')).toBeInTheDocument();
     await absetzen();
-    expect(await screen.findByText('Was ist erforderlich')).toBeInTheDocument();
+    expect(await screen.findByText('Bedarf fehlt')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 

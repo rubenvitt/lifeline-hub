@@ -247,7 +247,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));
       const dialog = await screen.findByRole('dialog');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Führung zurückholen' }));
-      expect(await within(dialog).findByText('Grund angeben')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Grund fehlt')).toBeInTheDocument();
       expect(holeFuehrungZurueck).not.toHaveBeenCalled();
     });
   });

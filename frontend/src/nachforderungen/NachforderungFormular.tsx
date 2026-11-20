@@ -49,6 +49,7 @@ import {
   type ZielAbschnitt,
   type ZielRaum,
 } from './zielVorschlaege';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -431,11 +432,7 @@ export default function NachforderungFormular({
       </Space>
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={10}>
-          <Feld
-            name="art"
-            label="Was"
-            rules={[{ required: true, whitespace: true, message: 'Was ist erforderlich' }]}
-          >
+          <Feld name="art" label="Was" rules={[pflicht('Bedarf', { whitespace: true })]}>
             <AutoComplete
               aria-label="Was"
               options={artVorschlaege}

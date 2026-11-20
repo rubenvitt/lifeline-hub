@@ -80,7 +80,7 @@ describe('SchichtenErzeugenDialog (LLH-1584)', () => {
     await fuelleZeit(dialog);
     const knopf = within(dialog).getByRole('button', { name: 'Schichten erzeugen' });
     await userEvent.click(knopf);
-    expect(await within(dialog).findByText('Bitte eine Länge angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Länge fehlt')).toBeInTheDocument();
     expect(onErzeugen).not.toHaveBeenCalled();
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Länge je Schicht' }), '2:30');
     await userEvent.click(knopf);

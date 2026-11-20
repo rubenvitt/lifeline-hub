@@ -44,6 +44,7 @@ import {
   type Klappteil,
   type SchemaFeld,
 } from './auftragsschemaKern';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -90,7 +91,7 @@ function pflichtEmpfaengerRegel(
         },
         katalog,
       ).length === 0
-        ? Promise.reject(new Error('Mindestens ein Empfänger ist erforderlich'))
+        ? Promise.reject(new Error('Empfänger fehlt'))
         : Promise.resolve(),
   };
 }
@@ -496,7 +497,7 @@ export default function AuftragFormular({
         name="text"
         label="Auftrag / Was"
         rules={[
-          { required: true, message: 'Auftragstext ist erforderlich' },
+          pflicht('Auftragstext'),
           // Ein vorbelegter Text aus Meldung, Chat oder ETB über der Grenze wird nicht still
           // gekürzt: der Zähler zeigt die Überlänge, Senden scheitert hier (LFH-937, D8).
           zeichenRegel(AUFTRAG_TEXT_MAX, 'Auftragstext'),

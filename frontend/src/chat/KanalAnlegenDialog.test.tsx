@@ -54,7 +54,7 @@ describe('KanalAnlegenDialog', () => {
     renderMitProviders(<Rahmen onKanalAnlegen={onKanalAnlegen} />);
 
     await user.type(await screen.findByLabelText('Name'), '   {Enter}');
-    expect(await screen.findByText('Name erforderlich')).toBeInTheDocument();
+    expect(await screen.findByText('Name fehlt')).toBeInTheDocument();
     expect(onKanalAnlegen).not.toHaveBeenCalled();
   });
 

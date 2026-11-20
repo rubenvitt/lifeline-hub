@@ -95,7 +95,7 @@ describe('KoppelnPage (LFH-892)', () => {
     );
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
-    expect(await screen.findByText('Code eingeben')).toBeInTheDocument();
+    expect(await screen.findByText('Kopplungscode fehlt')).toBeInTheDocument();
     expect(gesendet).not.toHaveBeenCalled();
   });
 

@@ -652,7 +652,7 @@ describe('KommunikationsplanPage — Bearbeiten', () => {
     expect(s2.closest('.ant-select-item-option')).toHaveClass('ant-select-item-option-disabled');
     await userEvent.click(await screen.findByTitle('Fachberater'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Bezeichnung angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(legeKommunikationsStelleAn).not.toHaveBeenCalled();
   });
 

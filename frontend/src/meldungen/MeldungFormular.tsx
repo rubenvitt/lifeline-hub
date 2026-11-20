@@ -31,6 +31,7 @@ import type {
   NeueMeldung,
   Richtung,
 } from '../api/types';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -387,10 +388,7 @@ export default function MeldungFormular({
       <Feld
         name="inhalt"
         label="Inhalt / Wortlaut"
-        rules={[
-          { required: true, whitespace: true, message: 'Inhalt ist erforderlich' },
-          zeichenRegel(ETB_INHALT_MAX, 'Inhalt'),
-        ]}
+        rules={[pflicht('Inhalt', { whitespace: true }), zeichenRegel(ETB_INHALT_MAX, 'Inhalt')]}
       >
         {/* Ausdrückliches Fokusziel der Hülle: beim Öffnen und nach jedem Serien-Speichern. */}
         <TextArea
@@ -408,7 +406,7 @@ export default function MeldungFormular({
           <Feld
             name="absender"
             label="Absender (Funkrufname/Stelle)"
-            rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
+            rules={[pflicht('Absender', { whitespace: true })]}
           >
             <StammdatenFeld
               nurText

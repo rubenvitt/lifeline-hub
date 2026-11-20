@@ -27,6 +27,7 @@ import {
   type VerbindungsAnzeige,
 } from './kommunikationsplan';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Masken des Kommunikationsplans (LFH-848, design.md D5). Jede Maske wird nur montiert, solange
@@ -106,9 +107,10 @@ export function StelleAnlegenModal({
       disabled: !e.bezeichnung_pflicht && vergeben.has(e.funktion),
     }));
   }, [katalog.data, stellen]);
-  const pflicht = katalog.data?.find((e) => e.funktion === gewaehlt)?.bezeichnung_pflicht ?? false;
+  const isBezeichnungPflicht =
+    katalog.data?.find((e) => e.funktion === gewaehlt)?.bezeichnung_pflicht ?? false;
   const extern = art !== 'funktion';
-  const mitBezeichnung = extern || pflicht;
+  const mitBezeichnung = extern || isBezeichnungPflicht;
 
   return (
     <ErfassungsModal<StelleFormWerte>
@@ -124,7 +126,7 @@ export function StelleAnlegenModal({
           await onAnlegen({
             stellenart: 'funktion',
             funktion: w.funktion,
-            ...(pflicht && bezeichnung ? { bezeichnung } : {}),
+            ...(isBezeichnungPflicht && bezeichnung ? { bezeichnung } : {}),
           });
           return;
         }
@@ -136,15 +138,11 @@ export function StelleAnlegenModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld label="Art" name="stellenart" rules={[{ required: true }]}>
+      <Feld label="Art" name="stellenart" rules={[pflicht('Art')]}>
         <Select options={STELLENART_OPTIONEN} />
       </Feld>
       {art === 'funktion' && (
-        <Feld
-          label="Funktion"
-          name="funktion"
-          rules={[{ required: true, message: 'Funktion wählen' }]}
-        >
+        <Feld label="Funktion" name="funktion" rules={[pflicht('Funktion')]}>
           <Select options={funktionsOptionen} loading={katalog.isLoading} />
         </Feld>
       )}
@@ -152,7 +150,7 @@ export function StelleAnlegenModal({
         <Feld
           label="Bezeichnung"
           name="bezeichnung"
-          rules={[{ required: true, whitespace: true, message: 'Bezeichnung angeben' }, LAENGE]}
+          rules={[pflicht('Bezeichnung', { whitespace: true }), LAENGE]}
         >
           {extern ? (
             <AutoComplete
@@ -215,7 +213,7 @@ export function BezeichnungModal({
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung angeben' }, LAENGE]}
+        rules={[pflicht('Bezeichnung', { whitespace: true }), LAENGE]}
       >
         <Input />
       </Feld>
@@ -284,16 +282,13 @@ export function VerbindungModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld label="Mittel" name="mittel" rules={[{ required: true, message: 'Mittel wählen' }]}>
+      <Feld label="Mittel" name="mittel" rules={[pflicht('Mittel')]}>
         <Select options={VERBINDUNGSMITTEL_OPTIONEN} />
       </Feld>
       <Feld
         label="Nummer/Adresse"
         name="wert"
-        rules={[
-          { required: true, whitespace: true, message: 'Nummer oder Adresse angeben' },
-          LAENGE,
-        ]}
+        rules={[pflicht('Nummer oder Adresse', { whitespace: true }), LAENGE]}
       >
         <Input placeholder="z. B. 0421 123456" />
       </Feld>

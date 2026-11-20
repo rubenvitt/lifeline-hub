@@ -1,6 +1,7 @@
 import { Input } from 'antd';
 import { Feld } from '../components/instrument';
 import { PASSWORT_MIN_LAENGE } from '../api/auth';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * „Neues Passwort“ und „Neues Passwort wiederholen“ — die eine Eingabe für ein neues Passwort,
@@ -18,8 +19,8 @@ export default function NeuesPasswortFelder({ autoFocus = false }: { autoFocus?:
         label="Neues Passwort"
         name="neues_passwort"
         rules={[
+          pflicht('Neues Passwort'),
           {
-            required: true,
             min: PASSWORT_MIN_LAENGE,
             message: `Mindestens ${PASSWORT_MIN_LAENGE} Zeichen`,
           },
@@ -32,7 +33,7 @@ export default function NeuesPasswortFelder({ autoFocus = false }: { autoFocus?:
         name="wiederholung"
         dependencies={['neues_passwort']}
         rules={[
-          { required: true, message: 'Bitte das neue Passwort wiederholen' },
+          pflicht('Wiederholung'),
           ({ getFieldValue }) => ({
             validator: (_, wert: string | undefined) =>
               !wert || wert === getFieldValue('neues_passwort')

@@ -16,6 +16,7 @@ import { planungPfad } from '../routing/deeplinks';
 import { zeitraumRegel } from './planungRegeln';
 import { applyPlanung } from './planungCache';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Werte {
   bezeichnung: string;
@@ -82,7 +83,7 @@ export default function PlanungAnlegenDialog({
       <Feld<Werte>
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. Stadtfest 2027" maxLength={PLANUNG_BEZEICHNUNG_MAX} />
       </Feld>

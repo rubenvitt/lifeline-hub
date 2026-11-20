@@ -32,6 +32,7 @@ import FlaechenWahl, { FlaechenMehrfachWahl } from './FlaechenWahl';
 import { fundortAusText } from './AufnahmeFelder';
 import { LEICHTE_MASSNAHMEN, LEICHTE_MASSNAHMEN_MAX, MASSNAHME_WORT } from './personMeta';
 import { einheitText } from './VersorgtVon';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Titel und Primärknopf des Dialogs (LLH-1572, design.md D2). */
 export const LEICHTER_FALL_TITEL = 'Versorgt und entlassen';
@@ -349,7 +350,7 @@ export default function LeichterFallModal({
       }
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <Feld label="Anlass" name="anlass" rules={[{ required: true, message: 'Anlass fehlt' }]}>
+      <Feld label="Anlass" name="anlass" rules={[pflicht('Anlass')]}>
         <AnlassWahl />
       </Feld>
       <Feld label="Maßnahmen" name="massnahmen">

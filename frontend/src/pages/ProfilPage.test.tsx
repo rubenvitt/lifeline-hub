@@ -516,7 +516,7 @@ describe('ProfilPage — TOTP-Einrichtung nur mit Passwort (LFH-1013)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /Weiter/ }));
 
     expect(
-      await within(dialog).findByText('Bitte das aktuelle Passwort eingeben'),
+      await within(dialog).findByText('Passwort fehlt'),
     ).toBeInTheDocument();
     expect(aufrufe).toBe(0);
   });

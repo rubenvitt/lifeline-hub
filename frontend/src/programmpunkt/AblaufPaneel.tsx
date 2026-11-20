@@ -25,6 +25,7 @@ import PaneelZustand from '../components/instrument/PaneelZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { IconMuelleimer } from '../icons';
 import { istVerstrichen } from './programmpunkt';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   zeitpunkt: Dayjs | null;
@@ -240,17 +241,13 @@ export function AblaufListe({
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Feld
-          label="Zeitpunkt"
-          name="zeitpunkt"
-          rules={[{ required: true, message: 'Zeitpunkt ist erforderlich' }]}
-        >
+        <Feld label="Zeitpunkt" name="zeitpunkt" rules={[pflicht('Zeitpunkt')]}>
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Feld>
         <Feld
           label="Bezeichnung"
           name="bezeichnung"
-          rules={[{ required: true, whitespace: true, message: 'Bezeichnung ist erforderlich' }]}
+          rules={[pflicht('Bezeichnung', { whitespace: true })]}
         >
           <Input maxLength={PROGRAMMPUNKT_BEZEICHNUNG_MAX} placeholder="Feuerwerk" />
         </Feld>

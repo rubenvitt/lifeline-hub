@@ -315,7 +315,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Periode nachtragen: Anna' });
       await user.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
       expect(
-        await within(dialog).findByText('Bitte Alarmierung oder Eintreffen angeben'),
+        await within(dialog).findByText('Alarmierung oder Eintreffen fehlt'),
       ).toBeInTheDocument();
       expect(within(dialog).getByText('Entlassung fehlt')).toBeInTheDocument();
       expect(rumpf).toBeNull();

@@ -59,6 +59,7 @@ import VerbleibText from './VerbleibText';
 import VersorgtVon, { hatVersorgtVon } from './VersorgtVon';
 import { verbleibAusRettungsmittel, type VerbleibFormWerte } from './verbleibErfassungKern';
 import RettungsmittelZeile, { hatRettungsmittel } from './RettungsmittelZeile';
+import { pflicht } from '../components/pflichtRegel';
 
 export interface PatientenkopfProps {
   einsatzId: number;
@@ -891,7 +892,7 @@ function NotizZeile({
             name="text"
             noStyle
             rules={[
-              { required: true, whitespace: true, message: 'Bitte Text eingeben' },
+              pflicht('Notiz', { whitespace: true }),
               // Grenze des Servers (LLH-1329): ein zu langer Text geht weder hinaus noch in die
               // Warteschlange; der Zähler sagt „zu lang“, gekürzt wird nie.
               zeichenRegel(VERLAUFSNOTIZ_MAX, 'Notiztext'),

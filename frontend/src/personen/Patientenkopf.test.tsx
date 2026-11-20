@@ -748,7 +748,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
-    expect(await within(paneel).findByText('Bitte eine Maßnahme wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Maßnahme fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
 
@@ -1151,7 +1151,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
     );
-    expect(within(kopf).queryByText('Bitte einen Anlass wählen')).toBeNull();
+    expect(within(kopf).queryByText('Anlass fehlt')).toBeNull();
     expect(gesendet).toEqual([]);
     expect(
       (await vorgemerkt()).map((a) => [a.art, (a.daten as { anlass?: unknown }).anlass]),
@@ -1172,7 +1172,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
     paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect(await vorgemerkt()).toHaveLength(2);
   });
 
@@ -1203,7 +1203,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
       'false',
     );
     await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
       null,
     ]);
@@ -1752,7 +1752,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
     await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
     const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
 
