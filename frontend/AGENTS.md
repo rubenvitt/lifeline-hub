@@ -1762,7 +1762,7 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   öffnet die Betriebszeile `/api/live` (`live/useOrgLiveStream.ts`), der ruht, solange ein
   Einsatz-Strom offen ist (`live/einsatzStromStore.ts`). Verbindungsbau nur über
   `live/liveVerbindung.ts`, keine zweite `EventSource`.
-- **Präsenz ist kein Cache** (LLH-1946, ADR-0072): das Ereignis `praesenz` füllt den Store in
+- **Präsenz ist kein Cache** (LLH-1946, ADR-0074): das Ereignis `praesenz` füllt den Store in
   `live/praesenz.ts` (kein Query-Key, nicht über den Sammler), gelesen über `usePraesenzAnderer`.
   Gemeldet wird nur über die Prop `praesenz` an `InlineAngabe`, nie aus einer Seite selbst.
 - **Live-Ereignisse invalidieren nur über den Sammler** `live/liveInvalidierung.ts` (LFH-922,

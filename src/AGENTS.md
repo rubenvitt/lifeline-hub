@@ -709,7 +709,7 @@ Herleitung: `docs/superpowers/specs/2026-11-19-ywhuzag7-etb-system-live-verteile
 
 ## Backend — Präsenz an Einzelangaben (LLH-1946)
 
-Herleitung: `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`, ADR-0072;
+Herleitung: `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`, ADR-0074;
 `src/live/praesenz.rs`, `src/routes/praesenz.rs`.
 - **Flüchtiger Zustand geht am Replay-Ring vorbei**: Präsenz lebt nur im Speicher des `LiveHub`
   (Ablauf 45 s) und läuft als eigener Teilstrom ohne `id:` in den Einsatzstrom, nie über

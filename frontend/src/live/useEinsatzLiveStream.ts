@@ -179,7 +179,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734). Und nur die mit einem Stand
     // von vor dem Verbindungsaufbau, damit ein Kaltaufruf nichts doppelt lädt (LLH-1839).
     const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
-    // Präsenz (LLH-1946, ADR-0072): jedes Öffnen leert den Stand, bevor die Frames der neuen
+    // Präsenz (LLH-1946, ADR-0074): jedes Öffnen leert den Stand, bevor die Frames der neuen
     // Verbindung kommen; ein nicht leerer Stand folgt vom Server. So bleibt nach einem Abriss kein
     // Hinweis aus der alten Verbindung stehen.
     const mitPraesenz =

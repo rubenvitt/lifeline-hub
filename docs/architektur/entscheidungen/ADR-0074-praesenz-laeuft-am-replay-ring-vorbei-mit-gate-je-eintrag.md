@@ -1,5 +1,5 @@
 ---
-id: ADR-0072
+id: ADR-0074
 titel: Präsenz läuft am Replay-Ring vorbei, mit Gate je Eintrag
 status: vorgeschlagen
 datum: 2026-11-19
@@ -11,7 +11,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md
 ---
 
-# ADR-0072: Präsenz läuft am Replay-Ring vorbei, mit Gate je Eintrag
+# ADR-0074: Präsenz läuft am Replay-Ring vorbei, mit Gate je Eintrag
 
 ## Regeln
 

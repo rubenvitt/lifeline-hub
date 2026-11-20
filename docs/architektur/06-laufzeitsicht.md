@@ -159,7 +159,7 @@ sequenceDiagram
 
 - Der Stand lebt nur im Speicher (`src/live/praesenz.rs`, Ablauf 45 s, Aufräumtakt 5 s) und geht
   am Replay-Ring vorbei als eigener Teilstrom in den Einsatzstrom (`src/routes/live.rs`,
-  `routes::support::sse_praesenz_stream`). Entscheidung: ADR-0072.
+  `routes::support::sse_praesenz_stream`). Entscheidung: ADR-0074.
 - Der Client hält ihn in `frontend/src/live/praesenz.ts`; `InlineAngabe` zeigt „Wird gerade
   bearbeitet von …“ an Stelle der Vermerkzeile. Herleitung:
   `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`.
