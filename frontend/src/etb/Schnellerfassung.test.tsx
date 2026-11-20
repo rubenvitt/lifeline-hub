@@ -1095,6 +1095,9 @@ describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
 });
 
 describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', () => {
+  /** Das Feld der offenen Abfrage (ohne Standard, „Empfänger wie Absender“). */
+  const abfrageFeld = () => screen.getByRole('combobox', { name: 'Rufname für Von und An' });
+
   it('ohne Standard steht die Abfrage über der Zeile, und die Pflicht hält das Absenden auf', async () => {
     const p = props({ rufname: rufnameZugriff(null) });
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -1103,41 +1106,86 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     ).toBeInTheDocument();
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Pegel steigt{Enter}');
-    // Ohne Standard fehlt die Vorgabe für An; der Grund steht am Feld, der Fokus geht dorthin.
-    expect(await screen.findByText('Empfänger fehlt')).toBeVisible();
+    // Ohne Standard fehlt die Vorgabe für An: der Grund nennt die Abfrage, der Fokus geht hinein
+    // (LLH-1764); das Feld An bleibt markiert und verweist auf denselben Grund.
+    const grund = 'Empfänger fehlt – Rufname oben eintragen';
+    expect(await screen.findByText(grund)).toBeVisible();
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    expect(abfrageFeld()).toHaveAttribute('aria-invalid', 'true');
+    expect(abfrageFeld()).toHaveAccessibleDescription(grund);
     const an = screen.getByRole('combobox', { name: 'An' });
-    await waitFor(() => expect(an).toHaveFocus());
     expect(an).toHaveAttribute('aria-invalid', 'true');
-    expect(an).toHaveAccessibleDescription('Empfänger fehlt');
+    expect(an).toHaveAccessibleDescription(grund);
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld).toHaveValue('Pegel steigt');
   });
 
-  it('Kein Standard, kein Von: der Grund steht am Feld Von, das den Fokus hat', async () => {
+  it('Kein Standard, Lage ohne Von: der Grund nennt die Abfrage, die den Fokus hat', async () => {
     const p = props({
       rufname: rufnameZugriff(null),
       initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: { an: 'ELW 1' } },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    expect(await screen.findByText('Absender fehlt')).toBeVisible();
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
-    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    expect(await screen.findByText('Absender fehlt – Rufname oben eintragen')).toBeVisible();
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    expect(screen.queryByText(/Empfänger fehlt/)).toBeNull();
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Lage ruhig');
   });
 
-  it('fehlen beide Seiten, sind beide Felder markiert', async () => {
+  it('fehlen beide Seiten, steht EIN Grund da und beide Felder sind markiert (LLH-1764)', async () => {
     const p = props({
       rufname: rufnameZugriff(null),
       initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: {} },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    const grund = 'Absender und Empfänger fehlen – Rufname oben eintragen';
+    expect(await screen.findByText(grund)).toBeVisible();
+    expect(
+      screen.getAllByRole('alert').filter((a) => /fehl/.test(a.textContent ?? '')),
+    ).toHaveLength(1);
+    expect(screen.queryByText('Absender fehlt')).toBeNull();
+    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    for (const name of ['Von', 'An']) {
+      const f = screen.getByRole('combobox', { name });
+      expect(f).toHaveAttribute('aria-invalid', 'true');
+      expect(f).toHaveAccessibleDescription(grund);
+    }
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+  });
+
+  it('Meldung ohne Von und ohne Standard: Von bleibt von Hand, An nennt die Abfrage', async () => {
+    // Der Absender einer Meldung ist die Stelle draußen, kein Rufname aus der Abfrage.
+    const p = props({
+      rufname: rufnameZugriff(null),
+      initialWerte: { inhalt: 'Pegel steigt', typ: 'meldung', metadaten: {} },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Absender fehlt')).toBeVisible();
-    expect(screen.getByText('Empfänger fehlt')).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('combobox', { name: 'An' })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Empfänger fehlt – Rufname oben eintragen')).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveAccessibleDescription(
+      'Absender fehlt',
+    );
+    // Die Abfrage zuerst: sie ist der Schritt, der einmal für alle Einträge gilt.
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+  });
+
+  it('nach dem Übernehmen des Rufnamens geht der Fokus ins nächste leere Pflichtfeld', async () => {
+    const rufname = rufnameZugriff(null);
+    const p = props({
+      rufname,
+      initialWerte: { inhalt: 'Pegel steigt', typ: 'meldung', metadaten: {} },
+    });
+    const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    await userEvent.type(abfrageFeld(), 'ELW 1{Enter}{Enter}');
+    await waitFor(() => expect(rufname.setze).toHaveBeenCalled());
+    rerender(<Schnellerfassung {...p} rufname={rufnameZugriff({ von: 'ELW 1', an: 'ELW 1' })} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
   });
 
   it('ein gesetztes An räumt seinen Grund', async () => {
@@ -1147,10 +1195,20 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
-    expect(await screen.findByText('Empfänger fehlt')).toBeInTheDocument();
+    expect(await screen.findByText('Empfänger fehlt – Rufname oben eintragen')).toBeInTheDocument();
     expect(p.erfassen).not.toHaveBeenCalled();
     await setzeAn('ELW 2');
-    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    expect(screen.queryByText(/Empfänger fehlt/)).toBeNull();
+    expect(abfrageFeld()).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('mit Standard bleibt der Grund am Feld, ohne Hinweis auf die Abfrage', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    expect(screen.queryByText(/Rufname oben eintragen/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
   });
 
   it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
@@ -1618,6 +1676,24 @@ describe('Schnellerfassung – Startfokus', () => {
       />,
     );
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+  });
+
+  it('ohne Standard steht der Startfokus in der Rufname-Abfrage (LLH-1764)', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          rufname: rufnameZugriff(null),
+          initialWerte: { inhalt: '', typ: 'lage', metadaten: {} },
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveFocus(),
+    );
+    expect(document.querySelector('[data-lfh="etb-erfassung"]')).toHaveAttribute(
+      'data-startfeld',
+      'rufname',
+    );
   });
 
   it('Alles vorbelegt: Lage mit eigener Stelle fokussiert den Inhalt', async () => {
