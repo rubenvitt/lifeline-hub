@@ -84,7 +84,8 @@ export { MASKE_HAELT_FOKUS };
  * **Der Fuß klebt am unteren Rand** (`klebenderFuss`), solange das Formular höher ist als der
  * Schirm: im Dialog (LLH-1274, `fussKlebt="dialog"`, der Dialogkopf hält das 72-px-Schließkreuz
  * des Handschuhs vom ersten Feld fern, `kopfBoden`) und auf einer Seite mit langer Maske
- * (LLH-1761, `fussKlebt="seite"`: Aufnahme, Meldung erfassen). Steht der Fokus im Formular und
+ * (LLH-1761, `fussKlebt="seite"`: Aufnahme, Meldung erfassen; in der Gerätehülle auch Melden,
+ * dort bündig an der Navigation, LLH-1760, `seitenfussKante`). Steht der Fokus im Formular und
  * verdeckt die Bildschirmtastatur den Rand, rückt er über sie (`useTastaturVersatz`). Kurze
  * Inline-Formulare in Paneelen kleben nicht: ihr Knopf steht ohnehin bei den Feldern.
  *
@@ -841,18 +842,33 @@ function klebenderFuss(
 ) {
   return {
     position: 'sticky',
-    bottom: versatz,
+    bottom: ort === 'seite' ? seitenfussKante(versatz) : versatz,
     // Über antds `Space.Compact`, das seine Glieder auf z-index 2 hebt: das Fundort-Feld der
     // Aufnahme lag sonst über „Speichern und nächste“ (LLH-1761).
     zIndex: 3,
     paddingBottom: ort === 'dialog' ? token.paddingMD : token.paddingSM,
     ...(ort === 'dialog'
       ? { backgroundColor: token.colorBgElevated, marginBottom: -token.paddingMD }
-      : { backgroundColor: seitenGrund ?? token.colorBgLayout }),
+      : { backgroundColor: seitenGrund ?? 'Canvas' }),
   } as const;
 }
 
-/** Erster nicht durchsichtiger Hintergrund ab `el` aufwärts; ohne Treffer `undefined`. */
+/**
+ * Klebekante des Seitenfußes (LLH-1760): rollt die Seite in einem Behälter mit Polster (die
+ * Gerätehülle rollt nur in `main`), zieht der Browser dieses Polster vom Scrollport ab, und in
+ * der Lücke rollten die Felder sichtbar unter der Knopfleiste durch (gemessen in Chromium, 24 px).
+ * Der Behälter nennt sein Polster in `--lfh-fuss-kante`; der Fuß klebt um so viel tiefer und
+ * endet bündig an der Navigation. Im Dokument fehlt die Variable, dort gilt allein `versatz`.
+ */
+export function seitenfussKante(versatz: number): string {
+  return `calc(${versatz}px - var(--lfh-fuss-kante, 0px))`;
+}
+
+/**
+ * Erster nicht durchsichtiger Hintergrund ab `el` aufwärts; ohne Treffer `undefined`, dann deckt
+ * der Fuß mit `Canvas`: die Leinwand des Dokuments, die dann sichtbar ist (Gerätehülle, LLH-1760;
+ * ein fester Token stand dort als grauer Balken), in hell und dunkel über `color-scheme`.
+ */
 function deckenderGrund(el: Element | null): string | undefined {
   for (let e = el; e; e = e.parentElement) {
     const farbe = getComputedStyle(e).backgroundColor;

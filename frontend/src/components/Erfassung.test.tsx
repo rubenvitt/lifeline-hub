@@ -9,6 +9,7 @@ import {
   ErfassungsFormular,
   ErfassungsModal,
   SERIEN_KUERZEL_KLASSE,
+  seitenfussKante,
   kopfBoden,
   serienKuerzel,
   titelzeilenHoehe,
@@ -856,7 +857,8 @@ describe('ErfassungsFormular — klebender Fuß auf der Seite (LLH-1761)', () =>
     expect(fuss).not.toBeNull();
     expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
     expect(fuss!.style.position).toBe('sticky');
-    expect(fuss!.style.bottom).toBe('0px');
+    // Um das Polster des Behälters tiefer, falls er eins nennt (LLH-1760); im Dokument 0.
+    expect(fuss!.style.bottom).toBe(seitenfussKante(0));
     // Kein negativer Rand: der reicht nur im Dialog über dessen Polster.
     expect(fuss!.style.marginBottom).toBe('');
     expect(
@@ -952,7 +954,7 @@ describe('ErfassungsFormular — klebender Fuß auf der Seite (LLH-1761)', () =>
       vv.dispatchEvent(new Event('resize'));
     });
     const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
-    expect(fuss!.style.bottom).toBe('344px');
+    expect(fuss!.style.bottom).toBe(seitenfussKante(344));
   });
 });
 
@@ -1012,6 +1014,20 @@ describe('ErfassungsModal', () => {
 
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
     expect(document.querySelector('[data-lfh="erfassung-fuss"]')).toBeNull();
+  });
+
+  it('ohne deckende Fläche dahinter deckt der Seitenfuß mit der Leinwand (LLH-1760)', () => {
+    // Die Gerätehülle malt keinen Grund; ein fester Token stand dort als grauer Balken.
+    renderMitProviders(
+      <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    expect(fuss.style.backgroundColor.toLowerCase()).toBe('canvas');
+  });
+
+  it('seitenfussKante zieht das Polster ab, das der Behälter nennt (LLH-1760)', () => {
+    expect(seitenfussKante(0)).toBe('calc(0px - var(--lfh-fuss-kante, 0px))');
+    expect(seitenfussKante(312)).toBe('calc(312px - var(--lfh-fuss-kante, 0px))');
   });
 
   it('fokussiert beim Öffnen das erste Feld und sendet per Enter', async () => {

@@ -28,6 +28,7 @@ import { navigationZeigt } from './GeraeteLayout';
 import { rahmenFarben } from '../theme/tokens';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
+import { seitenfussKante } from '../components/Erfassung';
 
 // Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -390,6 +391,19 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
     await user.click(screen.getByRole('button', { name: 'Empfang für UA Nord-Ost quittieren' }));
     await user.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
     await waitFor(() => expect(quittiert).toEqual(['31/1']));
+  });
+
+  it('„Erfassen“ beim Melden klebt über der Navigation der Hülle (LLH-1760)', async () => {
+    stelleBereit();
+    renderApp('/geraet/7/melden');
+    const knopf = await screen.findByRole('button', { name: 'Erfassen' });
+    const fuss = knopf.closest<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe(seitenfussKante(0));
+    // Die Hülle nennt ihr Polster, damit der Fuß bündig an der Navigation endet.
+    const main = knopf.closest<HTMLElement>('main')!;
+    expect(main.style.getPropertyValue('--lfh-fuss-kante')).toBe('var(--lfh-seiten-polsterung)');
   });
 
   it('meldet mit Abschnitt und Gerät als Absender', async () => {

@@ -403,6 +403,34 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7');
   });
+
+  it('bestätigt „Erfassen“ nach dem Seitenwechsel mit der Quittung als Toast (LLH-1760)', async () => {
+    render(
+      einsatzAktiv,
+      [http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 }))],
+      '/einsaetze/1/personen/aufnahme?uhs=7',
+    );
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    // Die stehende Quittung geht mit der Seite; die Registriernummer steht danach im Toast.
+    expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
+    expect(await screen.findByText('Erfasst als R-047 · SK II')).toBeInTheDocument();
+    expect(document.querySelector('.ant-message-success')).not.toBeNull();
+  });
+
+  it('nennt nach „Erfassen“ ohne Netz die Vormerkung als Toast, nicht als Erfolg (LLH-1760)', async () => {
+    render();
+    await screen.findByRole('radiogroup');
+    setzeOnline(false);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('PERSONENLISTE')).toBeInTheDocument();
+    expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
+    expect(document.querySelector('.ant-message-success')).toBeNull();
+  });
 });
 
 /**
