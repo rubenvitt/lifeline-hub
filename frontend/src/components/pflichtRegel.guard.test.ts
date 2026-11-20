@@ -11,7 +11,9 @@
  *
  * ── Was er NICHT sieht ──────────────────────────────────────────────────────────
  * Eine bedingte Pflicht (`required: ausdruck`), deren Text von Hand „‹Feld› fehlt“ heißt, Texte
- * des Servers und Prüffehler, die keine Pflicht sind (Format, Länge, Bereich).
+ * aus Konstanten (`message: TEXT`) und aus Optionen eigener Regelbauer (`meldung:` von
+ * `ortRegeln`, `pflichtText:` von `dauerRegel`), Texte des Servers und Prüffehler, die keine
+ * Pflicht sind (Format, Länge, Bereich).
  */
 import { describe, expect, it } from 'vitest';
 

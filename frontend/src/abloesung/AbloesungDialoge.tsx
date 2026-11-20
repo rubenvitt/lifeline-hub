@@ -76,14 +76,14 @@ const RHYTHMUS_MIN_MINUTEN = 30;
  * Das Rhythmusfeld als Dauer. `required` setzt nur die Pflichtmarke (und `aria-required`); die
  * Prüfung selbst trägt `dauerRegel`, auch für ein leeres Pflichtfeld.
  */
-const rhythmusField = (platzhalter: string | undefined, pflicht: boolean) => (
+const rhythmusField = (platzhalter: string | undefined, isPflicht: boolean) => (
   <Feld
     name="rhythmus"
     label="Rhythmus"
-    required={pflicht}
+    required={isPflicht}
     rules={[
       dauerRegel({
-        pflicht,
+        pflicht: isPflicht,
         min: RHYTHMUS_MIN_MINUTEN,
         max: ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
         pflichtText: 'Rhythmus fehlt',

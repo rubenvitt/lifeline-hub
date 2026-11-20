@@ -23,6 +23,15 @@ describe('NachrichtEingabe', () => {
     expect(onSenden).toHaveBeenCalledWith('Lage\nruhig', [], []);
   });
 
+  it('sendet nicht, solange eine Eingabemethode noch komponiert', async () => {
+    const onSenden = vi.fn();
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Lage');
+    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, isComposing: true });
+    expect(onSenden).not.toHaveBeenCalled();
+  });
+
   it('sendet mit feinem Zeiger bei Enter, Umschalt+Enter bricht um', async () => {
     const onSenden = vi.fn();
     renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);

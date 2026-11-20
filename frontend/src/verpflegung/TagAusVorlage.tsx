@@ -42,7 +42,7 @@ import { ListenRueckweg } from '../components/ListenRueckweg';
  * Tag aus Vorlage anlegen (LLH-1058, Spec `kraefte-verpflegung`, „Tag aus der Vorlage in der
  * Oberfläche“): ein Nebenweg der Verpflegungsseite. Tag wählen (`?tag=`, Vorgabe heute in der
  * Anzeigezone) → je aktiver Mahlzeit des Verpflegungsplans ein Fenster mit vorgeschlagenem Bedarf
- * → „Zeitfenster anlegen“. Danach zurück zur Verpflegung, die Quittung nennt Übersprungenes.
+ * → „Anlegen“. Danach zurück zur Verpflegung, die Quittung nennt Übersprungenes.
  *
  * Eigene Seite statt Dialog (UI-Form-Leitlinie): je Fenster zwei Bedarfsfelder, bei vier
  * Mahlzeiten acht Felder, weit über dem Feldbudget eines Modals; die Adresse mit `?tag=` taugt als

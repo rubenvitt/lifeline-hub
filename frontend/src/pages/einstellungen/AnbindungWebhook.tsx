@@ -123,10 +123,9 @@ const URL_REGELN = [
   { pattern: /^\s*https:\/\//i, message: 'Die Ziel-URL muss mit https:// beginnen' },
 ];
 
-const ARTEN_REGELN = [
-  pflicht('Ereignisarten'),
-  { type: 'array' as const, min: 1, message: 'Mindestens eine Art wählen' },
-];
+// `pflicht` lehnt auch eine leere Auswahl (`[]`) ab; eine zweite Regel `min: 1` zeigte nur
+// denselben Fehler ein zweites Mal (LLH-1766).
+const ARTEN_REGELN = [pflicht('Ereignisarten')];
 
 function ArtenText({ arten }: { arten: readonly EventType[] }) {
   return <>{arten.map((a) => ART_TEXT[a] ?? a).join(', ')}</>;

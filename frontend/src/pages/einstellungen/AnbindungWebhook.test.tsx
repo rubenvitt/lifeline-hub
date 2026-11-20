@@ -150,6 +150,7 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
     // die zweite später als die erste. Deshalb auf beide warten.
     expect(await within(dialog).findByText(/muss mit https:\/\/ beginnen/)).toBeInTheDocument();
     expect(await within(dialog).findByText('Ereignisarten fehlt')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Mindestens eine Art wählen')).not.toBeInTheDocument();
     expect(aufrufe).toEqual([]);
   });
 

@@ -95,6 +95,15 @@ describe('MeldungFormular', () => {
     );
   });
 
+  // Pflichtfehler „‹Feld› fehlt“ mit ausdrücklichem Namen (LLH-1766, Review Focus 1).
+  it('nennt fehlenden Absender und Inhalt als „Absender fehlt“ und „Inhalt fehlt“', async () => {
+    const onAnlegen = renderFormular();
+    await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
+    expect(await screen.findByText('Inhalt fehlt')).toBeInTheDocument();
+    expect(await screen.findByText('Absender fehlt')).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
+
   it('sendet ohne Pflicht keine Frist', async () => {
     const onAnlegen = renderFormular();
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');

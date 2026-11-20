@@ -200,10 +200,7 @@ export default function AnbindungAnsicht() {
           </Stapel>
         </Checkbox.Group>
       ),
-      regeln: [
-        pflicht('Rechte'),
-        { type: 'array', min: 1, message: 'Mindestens ein Recht wählen' },
-      ],
+      regeln: [pflicht('Rechte')],
     },
   ];
 

@@ -23,7 +23,7 @@ export type EnterTaste = Pick<
 export function isSendeTaste(e: EnterTaste, k: EnterKontext): boolean {
   if (e.key !== 'Enter' || e.repeat || e.altKey || e.isComposing) return false;
   if (e.ctrlKey || e.metaKey) return true;
-  if (e.shiftKey) return !k.mehrzeilig;
+  if (e.shiftKey) return false;
   if (!k.mehrzeilig) return true;
   return k.inZeile && !k.istBeruehrung;
 }

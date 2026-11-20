@@ -40,8 +40,9 @@ describe('isSendeTaste (Enter-Vertrag nach Feldart, LLH-1766)', () => {
     }
   });
 
-  it('Umschalt+Enter sendet in einem mehrzeiligen Feld nie', () => {
+  it('Umschalt+Enter sendet nie', () => {
     expect(isSendeTaste({ ...enter, shiftKey: true }, k(true, true, false))).toBe(false);
+    expect(isSendeTaste({ ...enter, shiftKey: true }, k(false, true, false))).toBe(false);
   });
 
   it('wiederholtes, Alt- oder komponierendes Enter und andere Tasten senden nicht', () => {

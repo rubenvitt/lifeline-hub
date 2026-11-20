@@ -331,14 +331,7 @@ export default function Anbindungen() {
         >
           <Input placeholder="Alarm-Adapter Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
         </Feld>
-        <Feld
-          label="Rechte"
-          name="scopes"
-          rules={[
-            pflicht('Rechte'),
-            { type: 'array', min: 1, message: 'Mindestens ein Recht wählen' },
-          ]}
-        >
+        <Feld label="Rechte" name="scopes" rules={[pflicht('Rechte')]}>
           <Checkbox.Group>
             <Stapel abstand="xxs">
               {SCOPES.map((s) => (
