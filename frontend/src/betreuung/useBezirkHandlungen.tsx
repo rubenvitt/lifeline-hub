@@ -28,6 +28,7 @@ import {
 import type { BezirkAktion } from './BezirkTabelle';
 import { personenZahl } from './betreuungText';
 import { gebietZeichnenPfad, type GebietKreis } from './gebietZeichnen';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /**
  * Welcher Dialog offen ist — einer zur Zeit, jeder frisch montiert (`initialValues`). Der Datensatz
@@ -212,7 +213,10 @@ export function useBezirkHandlungen({
     onMutate: () => resetZurueck(),
     onSuccess: (ergebnis, { bezirk, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Standmeldung ${bezirk.bezeichnung}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Standmeldung ${bezirk.bezeichnung}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Meldung.

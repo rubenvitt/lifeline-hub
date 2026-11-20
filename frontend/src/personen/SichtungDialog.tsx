@@ -8,6 +8,7 @@ import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import SichtungsWahl from './SichtungsWahl';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import { Feld } from '../components/instrument';
+import type { VormerkGrund } from '../offline/fehler';
 
 export interface SichtungWerte {
   kategorie: Sichtungskategorie;
@@ -66,7 +67,8 @@ interface SichtungDialogProps {
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
   /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand, die Seite quittiert am Ort. */
-  onVorgemerkt?: () => void;
+  /** Nur vorgemerkt, mit Grund (LLH-1758): der Aufrufer bildet daraus den Wortlaut. */
+  onVorgemerkt?: (grund: VormerkGrund) => void;
   onSchliessen: () => void;
 }
 
@@ -89,7 +91,11 @@ export default function SichtungDialog({
     // Die Funktion merkt ohne Netz selbst vor (`frontend/src/offline/AGENTS.md`).
     networkMode: 'always',
     mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person, v),
-    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
+    // Vorgemerkt mit Grund (LLH-1758); beantragt (Spiegel) bleibt beim bisherigen Wortlaut.
+    onSuccess: (ergebnis) =>
+      ergebnis.zustand === 'gesendet'
+        ? onErfasst()
+        : onVorgemerkt?.(ergebnis.zustand === 'vorgemerkt' ? ergebnis.grund : 'offline'),
   });
 
   return (

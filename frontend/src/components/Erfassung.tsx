@@ -24,6 +24,7 @@ import {
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useTastaturVersatz } from './tastaturVersatz';
 import { useViewport } from './useViewport';
+import { useRollen } from './instrument/rollenwerte';
 import './Erfassung.css';
 
 /**
@@ -45,7 +46,9 @@ import './Erfassung.css';
  * überflüssig.
  *
  * Der Zähler heisst **„Erfasst: n"**, nicht „heute erfasst": er zählt seit dem Öffnen dieses
- * Dialogs, eine Tagesangabe behauptete Daten, die die Hülle nicht kennt.
+ * Dialogs, eine Tagesangabe behauptete Daten, die die Hülle nicht kennt. Er zählt nur, was der
+ * Server angenommen hat; nur Vorgemerktes steht daneben als **„nicht gesendet: m"** in der
+ * Achtung-Farbe (LLH-1758, `offline/AGENTS.md`, „Vorgemerkt heißt nicht offline“).
  *
  * ── EINE FALLE ─────────────────────────────────────────────────────
  *
@@ -297,6 +300,7 @@ export function ErfassungsFormular<T extends object>({
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const fussRefDialog = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const fussRefSeite = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG_SEITE);
   const zusammenfassungId = useId();
@@ -326,6 +330,8 @@ export function ErfassungsFormular<T extends object>({
     setSeitenGrund(deckenderGrund(wurzel.current?.parentElement ?? null));
   }, [fussKlebt, token.colorBgLayout, token.colorBgContainer]);
   const [zaehler, setZaehler] = useState(0);
+  // Nur vorgemerkt, nicht angenommen (LLH-1758): eigener Zähler, nie in „Erfasst: n“.
+  const [nichtGesendet, setNichtGesendet] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
   const [behalten, setBehalten] = useState(false);
   // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug gelesen.
@@ -407,15 +413,17 @@ export function ErfassungsFormular<T extends object>({
         (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
       ) as Partial<T>;
       let serverErfolg = false;
+      let vorgemerkt = false;
       try {
         try {
           const ergebnis = await (aktion === undefined
             ? onErfassen(werte)
             : onErfassen(werte, aktion));
           serverErfolg = true;
+          vorgemerkt = istVorgemerkt(ergebnis);
           // Haptik der Hülle (Spec `huellen-vertrag`): angenommen `success`, ohne Netz nur
           // vorgemerkt `tap` — kein „gespeichert“-Gefühl für etwas, das der Server nicht kennt.
-          huelleHaptics(istVorgemerkt(ergebnis) ? 'tap' : 'success');
+          huelleHaptics(vorgemerkt ? 'tap' : 'success');
         } catch {
           // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
           // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
@@ -433,7 +441,8 @@ export function ErfassungsFormular<T extends object>({
         // hat Reset/Callback bereits selbst ausgeführt.
         if (abbruchGenerationRef.current !== abbruchGeneration) return;
 
-        setZaehler((n) => n + 1);
+        if (vorgemerkt) setNichtGesendet((n) => n + 1);
+        else setZaehler((n) => n + 1);
         if (!serienlauf) {
           form.resetFields();
           onFertig();
@@ -525,7 +534,11 @@ export function ErfassungsFormular<T extends object>({
         </Checkbox>
       )}
       <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
-        {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+        {zaehler > 0 && <span>Erfasst: {zaehler}</span>}
+        {zaehler > 0 && nichtGesendet > 0 && <span aria-hidden="true"> · </span>}
+        {nichtGesendet > 0 && (
+          <span style={{ color: rollen.achtungText }}>nicht gesendet: {nichtGesendet}</span>
+        )}
       </Typography.Text>
     </div>
   );

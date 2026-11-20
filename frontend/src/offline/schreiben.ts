@@ -31,7 +31,7 @@ import { erfasseAusgabe } from '../api/verpflegung';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { neueClientId } from './clientId';
-import { istOfflineTransient } from './fehler';
+import { istOfflineTransient, vormerkGrund, type VormerkGrund } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 import { serverJetzt } from './serveruhr';
 import {
@@ -49,7 +49,7 @@ import {
  */
 export type OfflineSchreibErgebnis<T> =
   | { zustand: 'gesendet'; daten: T }
-  | { zustand: 'vorgemerkt'; client_id: string }
+  | { zustand: 'vorgemerkt'; client_id: string; grund: VormerkGrund }
   | { zustand: 'beantragt'; antrag: AntragAngenommen['antrag'] };
 
 /** Gesendet oder, an einem Spiegel, beantragt: die Antwort entscheidet (202 mit `antrag`). */
@@ -67,9 +67,10 @@ async function vormerken(
   einsatzId: number,
   aktion: Parameters<typeof schreibaktionEinreihen>[2],
   client_id: string,
-): Promise<{ zustand: 'vorgemerkt'; client_id: string }> {
+  grund: VormerkGrund,
+): Promise<{ zustand: 'vorgemerkt'; client_id: string; grund: VormerkGrund }> {
   await schreibaktionEinreihen(benutzerId, einsatzId, aktion);
-  return { zustand: 'vorgemerkt', client_id };
+  return { zustand: 'vorgemerkt', client_id, grund };
 }
 
 /** Person atomar mit Initialstatus anlegen oder sicher für den späteren Flush
@@ -102,7 +103,7 @@ export async function erfasseMeldungOfflineFaehig(
     client_id: clientId(eingabe.client_id),
   };
   if (!navigator.onLine) {
-    return vormerken(benutzerId, einsatzId, { art: 'meldung', daten }, daten.client_id!);
+    return vormerken(benutzerId, einsatzId, { art: 'meldung', daten }, daten.client_id!, 'offline');
   }
   try {
     return gesendetOderBeantragt(
@@ -113,7 +114,13 @@ export async function erfasseMeldungOfflineFaehig(
   } catch (e) {
     if (!istOfflineTransient(e)) throw e;
     if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
-    return vormerken(benutzerId, einsatzId, { art: 'meldung', daten }, daten.client_id!);
+    return vormerken(
+      benutzerId,
+      einsatzId,
+      { art: 'meldung', daten },
+      daten.client_id!,
+      vormerkGrund(e),
+    );
   }
 }
 
@@ -137,12 +144,13 @@ function vormerkbar<E extends { client_id?: string | null; zeitpunkt_at?: string
 ) {
   const erfasst = alsBackendZeit(serverJetzt());
   const daten: E = { ...eingabe, client_id: clientId(eingabe.client_id) };
-  const vormerkenMitZeit = () =>
+  const vormerkenMitZeit = (grund: VormerkGrund) =>
     vormerken(
       benutzerId,
       einsatzId,
       aktion({ ...daten, zeitpunkt_at: daten.zeitpunkt_at ?? erfasst }),
       daten.client_id!,
+      grund,
     );
   return { daten, vormerkenMitZeit };
 }
@@ -170,13 +178,13 @@ async function mitErfassungszeitOfflineFaehig<
   aktion: (daten: E) => Parameters<typeof schreibaktionEinreihen>[2],
 ): Promise<OfflineSchreibErgebnis<T>> {
   const { daten, vormerkenMitZeit } = vormerkbar(benutzerId, einsatzId, eingabe, aktion);
-  if (!navigator.onLine) return vormerkenMitZeit();
+  if (!navigator.onLine) return vormerkenMitZeit('offline');
   try {
     return gesendetOderBeantragt(await senden(daten));
   } catch (e) {
     if (!istOfflineTransient(e)) throw e;
     if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
-    return vormerkenMitZeit();
+    return vormerkenMitZeit(vormerkGrund(e));
   }
 }
 
@@ -320,7 +328,9 @@ export function merkeVerpflegungsausgabeVor(
   zeitfenster: SchreibZiel,
   eingabe: AusgabeEingabe,
 ): Promise<{ zustand: 'vorgemerkt'; client_id: string }> {
-  return vormerkbar(benutzerId, einsatzId, eingabe, ausgabeAktion(zeitfenster)).vormerkenMitZeit();
+  return vormerkbar(benutzerId, einsatzId, eingabe, ausgabeAktion(zeitfenster)).vormerkenMitZeit(
+    'offline',
+  );
 }
 
 /**

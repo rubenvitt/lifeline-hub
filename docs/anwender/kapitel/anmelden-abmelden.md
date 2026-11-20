@@ -139,7 +139,7 @@ gehört:
 - welche Startlisten „Einsatz starten“ im Überblick ausgeblendet sind,
 - die zuletzt verwendeten Absender und Empfänger aus Einsatztagebuch und Meldungen,
 - die zuletzt gezählte Zahl vorgemerkter und abgelehnter Einträge, mit der die Kopfleiste
-  „WARTET“ und „PRÜFEN“ schon beim Laden zeigt,
+  „NICHT GESENDET“ und „PRÜFEN“ schon beim Laden zeigt,
 - ungesendete Entwürfe im Einsatztagebuch.
 
 **Es bleiben** die vorgemerkten Einträge, die noch nicht beim Server angekommen sind (siehe

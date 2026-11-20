@@ -13,7 +13,8 @@ export interface BeantragtEintrag {
  * Was an diesem Ort am Spiegel beantragt ist (LLH-1492, Spec `spiegel-antraege`, „Anträge stehen
  * dort, wo Vorgemerktes steht“): über der Liste, getrennt von ihren Daten und nicht in ihren
  * Kennzahlen, in der Form der Quittung „Offline vorgemerkt“ (`personen/Patientenkopf.tsx`). Es
- * verschwindet, sobald die übernommene Zeile im Spiegel steht. Leer steht nichts da.
+ * verschwindet, sobald die übernommene Zeile im Spiegel steht. Leer steht nichts da. Mit dem Titel
+ * „Nicht gesendet“ trägt sie auch vorgemerkte Meldungen (LLH-1758).
  */
 export default function BeantragtListe({
   titel = 'Beantragt',

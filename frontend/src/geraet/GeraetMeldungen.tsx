@@ -14,6 +14,7 @@ import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
 import StandortFeld from './StandortFeld';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
   { wert: 'normal', label: 'normal' },
@@ -141,7 +142,7 @@ export default function GeraetMeldungen({
     // Netz- und Leitungsfehler merkt die Funktion vor, nur eine fachliche Ablehnung kommt an.
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt');
+        message.warning(vorgemerktText(ergebnis.grund, ''), vorgemerktDauer(ergebnis.grund));
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.

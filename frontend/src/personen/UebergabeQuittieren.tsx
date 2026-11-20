@@ -9,6 +9,7 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { useSavePersonEintrag } from './personEintragSpeichern';
 import { uebergabeBody } from './verbleibErfassungKern';
 import { Feld } from '../components/instrument';
+import type { VormerkGrund } from '../offline/fehler';
 
 /**
  * „Übergabe quittieren“ (LLH-1332, Change `y4l621ih-patientenverbleib-uebergabe`, design.md D6):
@@ -108,7 +109,8 @@ export function UebergabeDialog({
   person: UebergabePerson;
   onErfasst: () => void;
   /** Ohne Netz vorgemerkt: kein Serverstand; der Ort quittiert. */
-  onVorgemerkt?: () => void;
+  /** Nur vorgemerkt, mit Grund (LLH-1758): der Aufrufer bildet daraus den Wortlaut. */
+  onVorgemerkt?: (grund: VormerkGrund) => void;
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<UebergabeWerte>();
@@ -117,7 +119,11 @@ export function UebergabeDialog({
     // Merkt ohne Netz vor (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
     networkMode: 'always',
     mutationFn: (eingabe: VerbleibEingabe) => save(einsatzId, person, 'verbleib', eingabe),
-    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
+    // Vorgemerkt mit Grund (LLH-1758); beantragt (Spiegel) bleibt beim bisherigen Wortlaut.
+    onSuccess: (ergebnis) =>
+      ergebnis.zustand === 'gesendet'
+        ? onErfasst()
+        : onVorgemerkt?.(ergebnis.zustand === 'vorgemerkt' ? ergebnis.grund : 'offline'),
   });
   return (
     <ErfassungsModal<UebergabeWerte>
