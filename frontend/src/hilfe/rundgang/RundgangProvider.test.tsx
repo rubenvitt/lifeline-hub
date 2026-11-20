@@ -122,6 +122,19 @@ describe('RundgangProvider (LLH-1990)', () => {
     expect(document.querySelector('[data-lfh="rundgang"]')).toBeNull();
   });
 
+  it('unter Browser-Automatisierung kein Selbststart, auf Wunsch schon', async () => {
+    Object.defineProperty(navigator, 'webdriver', { value: true, configurable: true });
+    try {
+      zeige(<Ort teil="liste" selbst />);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(document.querySelector('[data-lfh="rundgang"]')).toBeNull();
+      act(() => starteAussen!());
+      expect(await screen.findByText(ERSTER)).toBeInTheDocument();
+    } finally {
+      delete (navigator as { webdriver?: boolean }).webdriver;
+    }
+  });
+
   it('ohne sichtbares Ziel kein Start und nichts gemerkt', async () => {
     zeige(<Ort teil="liste" selbst={false} ziele={false} />);
     act(() => starteAussen!());

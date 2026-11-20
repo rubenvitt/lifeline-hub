@@ -836,7 +836,8 @@ anwendbar), „nicht geprüft" ist keins.
   die Bedienung erklären. Seine Texte stehen nur in `hilfe/rundgang/rundgangTexte.ts`, die der
   Wächter als einzige Datei ausnimmt (`AUSNAHMEN`); die Anrede-Regel gilt dort weiter. Er startet
   von selbst nur für Erstnutzer und im Einsatz nur in einer Übung, nie am Handschirm oder auf einem
-  gekoppelten Gerät, und öffnet weder Paneel noch Schublade. Herleitung:
+  gekoppelten Gerät oder unter Browser-Automatisierung (`navigator.webdriver`), und öffnet weder
+  Paneel noch Schublade. Herleitung:
   `docs/superpowers/specs/2026-11-20-kgsx7ta3-einfuehrung-erstnutzer-design.md`.
 - **Anrede: niemand wird angesprochen** (LLH-1830, Entscheidung 19.11.2026). Kein Du, kein Sie,
   auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene

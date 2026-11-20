@@ -105,6 +105,15 @@ export function useRundgang(): { ort: RundgangTeil | null; starte: (() => void) 
  * Meldet die Seite als Ort eines Teils an. Ist `selbststart` wahr, startet der Teil einmal je
  * Mount von selbst (Regeln: `rundgangSchluessel.ts`).
  */
+/**
+ * Ein automatisierter Browser (Playwright, `navigator.webdriver`) ist kein Erstnutzer: die
+ * e2e-Suiten melden sich mit frischen Konten an und öffnen die Demo-Übung, die Maske des
+ * Rundgangs hielte jeden Klick auf. Auf Wunsch startet er dort trotzdem.
+ */
+function istAutomatisiert(): boolean {
+  return typeof navigator !== 'undefined' && navigator.webdriver === true;
+}
+
 export function useRundgangOrt(teil: RundgangTeil, selbststart: boolean): void {
   const { setzeOrt, starteTeil, aktiv } = useContext(RundgangKontext);
   const versucht = useRef(false);
@@ -115,7 +124,7 @@ export function useRundgangOrt(teil: RundgangTeil, selbststart: boolean): void {
   }, [setzeOrt, teil]);
 
   useEffect(() => {
-    if (!selbststart || !aktiv || versucht.current) return;
+    if (!selbststart || !aktiv || versucht.current || istAutomatisiert()) return;
     versucht.current = true;
     starteTeil(teil);
   }, [selbststart, aktiv, starteTeil, teil]);

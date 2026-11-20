@@ -129,6 +129,12 @@ Kategorien und sagt, dass ein Tippen auf eine Kategorie ihre Module öffnet; ist
 nicht sichtbar (Schublade), zeigt er auf ihren Öffner im Kopf. Fehlt jedes Ziel, entfällt der
 Schritt. *(Entscheidung des Agenten.)*
 
+### Automatisierte Browser
+
+Unter Browser-Automatisierung (`navigator.webdriver`, Playwright) startet kein Teil von selbst; auf
+Wunsch schon. Die e2e-Suiten melden sich mit frischen Konten an und öffnen die Demo-Übung; die
+Maske hielte dort jeden Klick auf. *(Entscheidung des Agenten bei der Umsetzung.)*
+
 ### Bedienung in beiden Teilen
 
 - Jede Sprechblase hat einen Titel (die Sache, z. B. „Kategorien“), ein bis zwei Sätze ohne
