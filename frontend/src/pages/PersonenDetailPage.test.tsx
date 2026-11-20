@@ -628,7 +628,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
       within(paneel).getByRole('combobox', { name: /Rettungsmittel/ }),
       'RTW 3/83-2',
     );
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(gesendet).toMatchObject({
         art: 'transport',
@@ -665,7 +665,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
     // Die Folge steht als Beschreibung an der Zeile, nicht als Überschrift (LFH-1078).
     expect(feld).toHaveAccessibleDescription('nicht änderbar · nicht im ETB');
     await userEvent.type(feld, 'trinkt Wasser');
-    await userEvent.click(within(kopf()).getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet.text).toBe('trinkt Wasser'));
     // Nach dem Erfolg ist die Zeile leer. Neu gesucht: antd ersetzt das Eingabeelement beim
     // Sperren während des Speicherns.
@@ -1663,7 +1663,7 @@ describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-11
       'Minka',
     );
     await userEvent.click(await screen.findByTitle(/Minka/));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
     await waitFor(() =>
       expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }),
     );
@@ -1710,7 +1710,7 @@ describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-11
     ]);
     const dialog = await oeffneSuche();
     await userEvent.click(await screen.findByTitle(/S-009/));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
     await waitFor(() =>
       expect(patch).toMatchObject({
         geschaedigt_person_id: 10,
@@ -2569,7 +2569,7 @@ describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (L
     {
       dialog: 'Bezug hinzufügen',
       ausloeser: 'Bezug hinzufügen',
-      knopf: 'Hinzufügen',
+      knopf: 'Zuordnen',
       bezuege: true,
     },
   ])(
@@ -2588,7 +2588,7 @@ describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (L
 
   it.each([
     { paneel: 'Sichtung erfassen', ausloeser: 'Sichten, bisher ungesichtet', knopf: 'Übernehmen' },
-    { paneel: 'Verbleib erfassen', ausloeser: 'Verbleib erfassen', knopf: 'Verbleib erfassen' },
+    { paneel: 'Verbleib erfassen', ausloeser: 'Verbleib erfassen', knopf: 'Erfassen' },
   ])(
     '$paneel: Paneel im Kopf, Knopf im Formular, kein Dialog',
     async ({ paneel, ausloeser, knopf }) => {
@@ -2617,13 +2617,13 @@ describe('PersonenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
     const user = userEvent.setup();
     const notiz = await screen.findByRole('textbox', { name: 'Verlaufsnotiz' });
     await user.type(notiz, 'Klagt über Schwindel');
-    expect(screen.getByRole('button', { name: 'Notiz anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
 
     stand = { storniert_at: '2026-05-27 09:30:00', storniert_von_name: 'Anna Beispiel' };
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.personStand(1, 10) }));
 
     expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Notiz anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
     const gesperrt = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
     expect(gesperrt).toHaveValue('Klagt über Schwindel');
     expect(gesperrt).toHaveAttribute('readonly');

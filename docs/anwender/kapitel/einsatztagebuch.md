@@ -272,7 +272,7 @@ Für Einsatzleitung und Führungspersonal:
 2. Den vorbelegten „Titel“ prüfen.
 3. „Fällig am“ setzen; die „Schnellwahl“ bietet +15 min, +30 min, +1 h und +2 h und, wenn
    geplant, die nächste Lagebesprechung.
-4. Bei Bedarf eine „Beschreibung (optional)“ schreiben und „Anlegen“ wählen.
+4. Bei Bedarf eine „Beschreibung (optional)“ schreiben und „Erfassen“ wählen.
 
 Die Wiedervorlage erscheint als Erinnerung (Kapitel [Erinnerungen](erinnerungen.md)) mit einem
 Verweis zurück auf den Eintrag.

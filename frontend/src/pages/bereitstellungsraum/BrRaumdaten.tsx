@@ -13,6 +13,7 @@ import BearbeitbaresPaneel, {
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import AufKarteVerorten from './AufKarteVerorten';
 import { brPatch, brRaumdatenWerte, type BrRaumdatenWerte } from './brPatch';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Paneel „Raumdaten“ eines Bereitstellungsraums (LFH-1147), bearbeitet in der Ansicht (LLH-1920,
@@ -44,7 +45,7 @@ export default function BrRaumdaten({
       anzeige: br.bezeichnung,
       eingabe: <Input placeholder="z. B. BR Ost" count={zeichenGrenze(BR_BEZEICHNUNG_MAX)} />,
       regeln: [
-        { required: true, whitespace: true, message: 'Bezeichnung erforderlich' },
+        pflicht('Bezeichnung', { whitespace: true }),
         zeichenRegel(BR_BEZEICHNUNG_MAX, 'Bezeichnung'),
       ],
     },

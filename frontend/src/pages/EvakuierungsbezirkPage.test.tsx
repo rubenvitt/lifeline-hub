@@ -497,7 +497,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       const feld = await screen.findByLabelText('Plangröße (Personen)');
       await userEvent.clear(feld);
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      expect(await screen.findByText('Bitte eine Plangröße angeben')).toBeInTheDocument();
+      expect(await screen.findByText('Plangröße fehlt')).toBeInTheDocument();
       await userEvent.type(feld, '0');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       expect(await screen.findByText('Mindestens 1 Person')).toBeInTheDocument();

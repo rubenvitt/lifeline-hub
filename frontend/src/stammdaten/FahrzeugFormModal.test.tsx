@@ -100,7 +100,7 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     handler();
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
 
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
@@ -121,6 +121,25 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
     renderMitProviders(<Harness />);
     await screen.findByLabelText('Funkrufname');
     expect(screen.getByRole('button', { name: 'Speichern und nächste' })).toBeInTheDocument();
+  });
+
+  /**
+   * Ein Sendeverb (LLH-1766, `frontend/AGENTS.md`, „Erfassungs-Norm“): derselbe Dialog heißt
+   * beim Anlegen „Anlegen“, beim Bearbeiten „Speichern“. Beide Hälften zusammen — ein fester
+   * Text bestünde eine allein.
+   */
+  it('nennt den Sendeknopf nach Modus — Anlegen ohne Bestand, Speichern mit', async () => {
+    handler();
+    const { unmount } = renderMitProviders(<Harness />);
+    await screen.findByLabelText('Funkrufname');
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    unmount();
+
+    renderMitProviders(<Harness bestand={fahrzeug} />);
+    await screen.findByLabelText('Funkrufname');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anlegen' })).not.toBeInTheDocument();
   });
 
   it('Bearbeiten: KEIN Serienweg — „Speichern und nächste" wäre ein toter Knopf', async () => {
@@ -180,7 +199,7 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 1');
     await nutzer.type(within(dialog).getByLabelText('Kennzeichen'), 'XX-AB 1');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Funkrufname bereits vergeben',
@@ -198,7 +217,7 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
 
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 1');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await within(dialog).findByRole('alert');
 
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs

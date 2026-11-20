@@ -168,12 +168,12 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
    Entlassung und Transport „Gegen Rat“: „Behandlung abgelehnt“ oder „Transport abgelehnt“.
    Ist das gewählt, hält „Unterschrift“ fest, ob die Unterschrift auf Papier vorliegt oder
    verweigert wurde. Die Unterschrift selbst bleibt auf dem Papier.
-5. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib, etwa „entlassen an
+5. „Erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib, etwa „entlassen an
    Polizei · gegen Rat: Transport abgelehnt, Unterschrift liegt vor“.
 
 Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
 wird zum Ziel. Mit Zugriff auf das Modul Betreuung öffnet ein Klick auf den Verbleib die Seite der
-Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anlegen“.
+Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Erfassen“.
 
 ### Die Übergabe eines Eigentransports quittieren
 
@@ -213,7 +213,7 @@ der Transport aufgehoben.
 2. Unter „Maßnahme“ die Fläche wählen, etwa „Zugang“, „Sauerstoff“ oder „Immobilisation“.
 3. Liegt die Durchführung zurück, unter „Durchgeführt (optional)“ die Uhrzeit eintragen, auch
    eine vor dem Erfassen der Person; ohne Angabe gilt der Zeitpunkt der Erfassung.
-4. „Maßnahme erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
+4. „Erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
 
 Eine versehentlich erfasste Maßnahme hebt „Aufheben“ unter „Erfasst“ im selben Paneel auf, nach
 der Rückfrage mit „Maßnahme aufheben“; sie bleibt im Verlauf als aufgehoben stehen.
@@ -270,13 +270,13 @@ Person aus einer Meldung angelegt, steht dahinter „aus Meldung #…“, ein Kl
    „Nachforderungen“ öffnet das Formular mit „Für R-…“, der Art „RTW“, der Unfallhilfsstelle als
    Ziel und der Priorität aus der Transportpriorität. Die Begründung nennt nur die
    Registriernummer, keine medizinischen Angaben.
-2. Art und Adressat prüfen und „Nachforderung absetzen“ wählen.
+2. Art und Adressat prüfen und „Erfassen“ wählen.
 
 Danach steht unter „Rettungsmittel“ der Stand, etwa „RTW · Zugesagt · RTW 1/83-1 · erwartet … ·
 Einsatznr. …“; ein Klick auf die Art öffnet die Karte der Nachforderung. Erst nach einer Absage
 lässt sich wieder anfordern. Ist das Rettungsmittel eingetroffen, belegt „Verbleib erfassen“ den
-Transport mit ihm und der Einsatznummer der Leitstelle vor; gespeichert wird erst mit „Verbleib
-erfassen“. Am gekoppelten Gerät steht nur der Stand.
+Transport mit ihm und der Einsatznummer der Leitstelle vor; gespeichert wird erst mit
+„Erfassen“ im Paneel. Am gekoppelten Gerät steht nur der Stand.
 
 ### Das Blatt einer Person drucken
 
@@ -299,7 +299,7 @@ nicht, sagt die Seite „Person nicht gefunden“.
 2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
    „Bezug hinzufügen“ wählen.
 3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und
-   „Hinzufügen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
+   „Zuordnen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
 4. „Bezug lösen“ an der Zeile hebt einen Bezug wieder auf.
 
 ### Personendaten ergänzen und berichtigen

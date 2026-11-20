@@ -398,7 +398,7 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Melden' })).toBeVisible();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Deich hält');
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       absender: 'EA Nord · Tablet A',

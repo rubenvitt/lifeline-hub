@@ -508,7 +508,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
     await user.click(within(paneel).getByRole('combobox', { name: 'Bestätigt von' }));
     await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
-    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     expect(await within(kopf).findByText('Offline vorgemerkt')).toBeVisible();
     expect(gesendet).toEqual([]);
 
@@ -797,7 +797,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
 
     await user.type(screen.getByLabelText('Inhalt'), 'Zwei Tragen frei');
     await user.click(screen.getByRole('radio', { name: 'dringend' }));
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       absender: 'UHS Nord · Laptop 1',
@@ -822,7 +822,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     await user.type(screen.getByLabelText('Inhalt'), 'Lage ruhig');
     await user.click(within(art()).getByRole('radio', { name: 'Lagemeldung' }));
     await user.click(screen.getByRole('radio', { name: 'sofort' }));
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ meldungsart: 'lagemeldung', prioritaet: 'sofort' });
     await waitFor(() =>
@@ -831,14 +831,14 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
 
     await user.type(screen.getByLabelText('Inhalt'), 'Patient kritisch');
     await user.click(screen.getByRole('radio', { name: 'sofort' }));
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(2));
     expect(gesendet[1]).toMatchObject({ meldungsart: 'sofortmeldung', prioritaet: 'sofort' });
   });
 
   /**
    * Speicherfehler an den Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
-   * steht im Formular über „Meldung senden“, nicht im Toast, bis zum nächsten Absenden.
+   * steht im Formular über „Erfassen“, nicht im Toast, bis zum nächsten Absenden.
    */
   it('Meldung abgelehnt: der Grund steht im Formular, der Wortlaut bleibt stehen, die Priorität auch', async () => {
     vi.useRealTimers();
@@ -858,7 +858,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     await user.click(await screen.findByRole('tab', { name: 'Meldungen' }));
     await user.type(await screen.findByLabelText('Inhalt'), 'Zwei Tragen frei');
     await user.click(screen.getByRole('radio', { name: 'sofort' }));
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     const treffer = await screen.findByText('Einsatz ist abgeschlossen');
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -866,13 +866,13 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     expect(alarm).toHaveTextContent('Meldung nicht gesendet');
     expect(alarm.closest('form')).toContainElement(screen.getByLabelText('Inhalt'));
     expect(alarm.closest('form')).toContainElement(
-      screen.getByRole('button', { name: 'Meldung senden' }),
+      screen.getByRole('button', { name: 'Erfassen' }),
     );
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(screen.getByLabelText('Inhalt')).toHaveValue('Zwei Tragen frei');
     expect(screen.getByRole('radio', { name: 'sofort' })).toBeChecked();
 
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(versuch).toBe(2));
     await waitFor(() => expect(screen.queryByText('Einsatz ist abgeschlossen')).toBeNull());
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
@@ -1033,7 +1033,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Melden' })).toBeVisible();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Raum voll');
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       absender: 'BR Sportplatz · Tablet BR',
@@ -1083,7 +1083,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
 
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Raum voll');
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ absender: 'BR Festwiese · Tablet BR' });
   });
@@ -1198,7 +1198,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     );
     // Aus der Adresse geräumt: ein Neuladen füllt nicht erneut.
     expect(pfad(router)).toBe('/geraet/7/meldungen');
-    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       absender: 'Verpflegung · Ausgabe Deich',

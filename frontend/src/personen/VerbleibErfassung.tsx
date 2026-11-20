@@ -32,6 +32,7 @@ import {
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import RettungsmittelFeld from './RettungsmittelFeld';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 import type { VormerkGrund } from '../offline/fehler';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
@@ -114,7 +115,7 @@ export function useVerbleibFelder(
 
   const elemente = (
     <>
-      <Feld label="Art" name="art" rules={[{ required: true, message: 'Art wählen' }]}>
+      <Feld label="Art" name="art" rules={[pflicht('Art')]}>
         <Select
           options={VERBLEIB_ART_OPTIONEN}
           onChange={(neueArt: VerbleibFormWerte['art']) => {
@@ -134,7 +135,7 @@ export function useVerbleibFelder(
         <Feld
           label={stellePflicht ? 'Betreuungsstelle' : 'Betreuungsstelle (optional)'}
           name="betreuungsstelle_id"
-          rules={stellePflicht ? [{ required: true, message: 'Stelle wählen' }] : undefined}
+          rules={stellePflicht ? [pflicht('Betreuungsstelle')] : undefined}
           // Nur ein 403 heißt „keine Auswahl" (dann fehlt das Feld). Jeder andere Fehler ist ein Ausfall
           // der Quelle und sagt sich.
           extra={

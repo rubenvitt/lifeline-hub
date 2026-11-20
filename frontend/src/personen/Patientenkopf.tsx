@@ -61,6 +61,7 @@ import VerbleibText from './VerbleibText';
 import VersorgtVon, { hatVersorgtVon } from './VersorgtVon';
 import { verbleibAusRettungsmittel, type VerbleibFormWerte } from './verbleibErfassungKern';
 import RettungsmittelZeile, { hatRettungsmittel } from './RettungsmittelZeile';
+import { pflicht } from '../components/pflichtRegel';
 
 export interface PatientenkopfProps {
   einsatzId: number;
@@ -892,7 +893,7 @@ function VerbleibPaneel({
       <ErfassungsFormular<VerbleibFormWerte>
         form={form}
         initialValues={vorbelegung}
-        erfassenText="Verbleib erfassen"
+        erfassenText="Erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Verbleib nicht erfasst"
@@ -960,7 +961,7 @@ function NotizZeile({
             name="text"
             noStyle
             rules={[
-              { required: true, whitespace: true, message: 'Bitte Text eingeben' },
+              pflicht('Notiz', { whitespace: true }),
               // Grenze des Servers (LLH-1329): ein zu langer Text geht weder hinaus noch in die
               // Warteschlange; der Zähler sagt „zu lang“, gekürzt wird nie.
               zeichenRegel(VERLAUFSNOTIZ_MAX, 'Notiztext'),
@@ -977,7 +978,7 @@ function NotizZeile({
           </Feld>
           {!gesperrt && (
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-              Notiz anlegen
+              Erfassen
             </Button>
           )}
         </Flex>

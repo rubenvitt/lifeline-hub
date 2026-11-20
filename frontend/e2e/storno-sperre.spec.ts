@@ -39,7 +39,9 @@ test('Storno an Platz A sperrt die offene Personen-Detailseite an Platz B', asyn
   await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/personen/${pid}`, einsatzId);
   const notiz = page.getByRole('textbox', { name: 'Verlaufsnotiz' });
   await notiz.fill('Klagt über Schwindel');
-  await expect(page.getByRole('button', { name: 'Notiz anlegen' })).toBeVisible();
+  await expect(
+    page.locator('[data-lfh="notiz-zeile"]').getByRole('button', { name: 'Erfassen', exact: true }),
+  ).toBeVisible();
 
   const platzA = await browser.newContext();
   try {
@@ -52,7 +54,9 @@ test('Storno an Platz A sperrt die offene Personen-Detailseite an Platz B', asyn
   }
 
   await expect(page.getByText(/^Storniert von .+ (um|am) /)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Notiz anlegen' })).toHaveCount(0);
+  await expect(
+    page.locator('[data-lfh="notiz-zeile"]').getByRole('button', { name: 'Erfassen', exact: true }),
+  ).toHaveCount(0);
   await expect(notiz).toHaveValue('Klagt über Schwindel');
   await expect(notiz).toHaveAttribute('readonly', '');
 

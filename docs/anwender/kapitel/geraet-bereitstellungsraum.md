@@ -133,7 +133,7 @@ Die Sektion fehlt, wenn das Modul Material im Einsatz nicht freigegeben ist.
 
    ![Seite „Melden“ mit einer dringenden Meldung zur Zufahrt und der leeren Liste „Eigene Meldungen“](../bilder/geraet-bereitstellungsraum/melden.png)
 
-3. „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; die Meldung steht danach
+3. „Erfassen“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; die Meldung steht danach
    unter „Eigene Meldungen“.
 
 ## Hintergrund

@@ -54,6 +54,7 @@ import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortEingabe } from '../anzeige/ortsfeldFormular';
 import { Marke } from '../components/instrument/Marke';
 import { useAdressWert } from '../routing/useAdressWert';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Formularwerte: der Fundort ist ein Ortsfeld mit Text und Koordinate (LLH-1114). */
 type TierFormular = Omit<TierEingabe, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
@@ -588,11 +589,7 @@ export default function TierePage() {
         onAbbrechen={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
       >
         <FormularEingehaengt onWechsel={formular.melde} />
-        <Feld
-          label="Spezies"
-          name="spezies"
-          rules={[{ required: true, message: 'Bitte Spezies wählen' }]}
-        >
+        <Feld label="Spezies" name="spezies" rules={[pflicht('Spezies')]}>
           <Select
             placeholder="Bitte wählen"
             options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))}

@@ -186,7 +186,7 @@ test('Schichtplan: derselbe Ablauf nur mit der Tastatur', async ({ page }) => {
   await dialog.getByRole('combobox', { name: 'Personen' }).focus();
   await page.keyboard.type('Ben');
   await page.keyboard.press('Enter');
-  await dialog.getByRole('button', { name: 'Block anlegen' }).focus();
+  await dialog.getByRole('button', { name: 'Anlegen', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await bloecke()).length).toBe(1);

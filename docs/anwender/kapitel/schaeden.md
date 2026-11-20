@@ -50,7 +50,7 @@ und einen Ort, bei Bedarf eine Gefahr und einen Schadensgrad. Er ist „offen“
 3. Unter „Weitere Angaben“ bei Bedarf eine „Beschreibung“, den „Schadensgrad“ („angeschlagen“,
    „teilzerstört“, „total zerstört“), „Geschädigt“ (eine betroffene Person, eine Einsatzkraft,
    die eigene Organisation oder ein freier Kontakt) eintragen.
-4. „Anlegen“ wählen. Der Schaden steht als „offen“ in der Liste.
+4. „Erfassen“ wählen. Der Schaden steht als „offen“ in der Liste.
 
 Mehrere Schäden am selben Ort: „Speichern und nächste“ hält den Dialog offen, mit „Werte
 behalten“ bleibt der Ort samt Koordinate stehen.
@@ -119,7 +119,7 @@ hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).
 
 „Speichern“ und „Abbrechen“ bleiben am unteren Rand stehen, auch wenn die Seite rollt. Ohne Ort
 oder mit einer Beschreibung über 8.000 Zeichen speichert die Seite nicht; der Grund steht unter
-dem Feld („Ort ist Pflicht“), und das Feld hat den Fokus. Wer die Seite mit ungespeicherten
+dem Feld („Ort fehlt“), und das Feld hat den Fokus. Wer die Seite mit ungespeicherten
 Eingaben verlassen will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die
 Eingaben, „Verwerfen“ verlässt die Seite ohne sie.
 

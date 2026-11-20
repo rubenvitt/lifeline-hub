@@ -77,7 +77,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
     mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
     Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
     sendet einen Einzeiler). Den Vertrag zeigt die Tastenkappe ↵ an „Erfassen“ (nur feiner
-    Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“.
+    Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“. Das ist der
+    Enter-Vertrag „mehrzeilig in der Zeile“ (`frontend/AGENTS.md`, „Erfassungs-Norm“, LLH-1766),
+    verschärft: nach einem Umbruch sendet auch mit feinem Zeiger nur noch Strg/⌘+Enter.
   - **Feldbreite per Opt-in:** `Schnellerfassungszeile feldFuellt` streckt das Kind der Feldzelle
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.

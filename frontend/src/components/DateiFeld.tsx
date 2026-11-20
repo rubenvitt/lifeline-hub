@@ -2,6 +2,7 @@ import { IconHochladen } from '../icons';
 import { Button, Upload, type UploadFile } from 'antd';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
 import Feld from './instrument/Feld';
+import { pflicht } from './pflichtRegel';
 
 /** Wortgleich mit der Server-Absage (`src/anhang/mod.rs`, `pruefe_groesse`): eine Absage, ein
  *  Wortlaut — gleich, ob der Dialog sie vorab gibt oder der Server. */
@@ -38,7 +39,7 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
         Array.isArray(e) ? e : e?.fileList
       }
       rules={[
-        { required: true, message: 'Bitte eine Datei wählen' },
+        pflicht('Datei'),
         {
           // Vorab statt nach 25 MiB Upload: der Server lehnt dieselbe Grenze mit `>` ab.
           validator: (_, liste?: UploadFile[]) => {

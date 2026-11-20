@@ -31,7 +31,7 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Ist der Ort bekannt, unter „Weitere Angaben“ bei „Verortung (optional)“ die Koordinate
    eingeben. Dort stehen auch Richtung, Priorität und Ereigniszeit.
-4. „Lagemeldung erfassen“ wählen. Der Dialog schließt, die neue Lagemeldung steht mit der Marke
+4. „Erfassen“ wählen. Der Dialog schließt, die neue Lagemeldung steht mit der Marke
    „Neu“ oben in der Zeitachse.
 
 Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der Meldungsart

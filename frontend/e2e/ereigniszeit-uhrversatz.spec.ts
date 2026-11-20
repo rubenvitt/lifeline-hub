@@ -85,7 +85,7 @@ test('Meldung eines vorgehenden Geräts trägt die Serverzeit', async ({ page })
   await formular.getByLabel('Absender').fill('RTW 2');
   await formular.getByLabel('Inhalt / Wortlaut').fill(inhalt);
   const erfasstMs = Date.now();
-  await formular.getByRole('button', { name: 'Meldung erfassen' }).click();
+  await formular.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const meldung = async () => {
     const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);

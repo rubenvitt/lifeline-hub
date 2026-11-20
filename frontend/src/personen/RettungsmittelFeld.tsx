@@ -11,6 +11,7 @@ import {
 } from './verbleibErfassungKern';
 import { Status } from '../components/instrument/Status';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Das Feld „Rettungsmittel“ der Verbleib-Maske beim Transport (LLH-1332, Change
@@ -56,7 +57,7 @@ export default function RettungsmittelFeld({
           </span>
         }
         name="transportmittel"
-        rules={[{ required: true, whitespace: true, message: 'Rettungsmittel angeben' }]}
+        rules={[pflicht('Rettungsmittel', { whitespace: true })]}
       >
         <RettungsmittelEingabe
           optionen={rettungsmittelOptionen(auswahl.data)}

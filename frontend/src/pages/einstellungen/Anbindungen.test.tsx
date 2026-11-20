@@ -208,7 +208,7 @@ describe('Anbindungen (LLH-1652)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Anbindung anlegen' });
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'x');
     await user.click(within(dialog).getByRole('button', { name: 'Anlegen und Code zeigen' }));
-    expect(await within(dialog).findByText('Mindestens ein Recht wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Rechte fehlt')).toBeInTheDocument();
     expect(aufrufe).toEqual([]);
   });
 

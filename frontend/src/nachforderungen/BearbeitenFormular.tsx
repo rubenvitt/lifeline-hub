@@ -30,6 +30,7 @@ import {
   type AenderungWerte,
 } from './zusage';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
   { value: 'sofort', label: 'Sofort' },
@@ -83,7 +84,7 @@ export default function BearbeitenFormular({
   // Nicht unter die verknüpften Einheiten (LLH-1387 D5): der Server lehnte mit 422 ab (LLH-1395).
   const verknuepft = n.einheit_ids.length;
   const mengenRegeln: Rule[] = [
-    ...(n.anzahl != null ? [{ required: true, message: 'Anzahl ist erforderlich' }] : []),
+    ...(n.anzahl != null ? [pflicht('Anzahl')] : []),
     ...(verknuepft > 0
       ? [
           {

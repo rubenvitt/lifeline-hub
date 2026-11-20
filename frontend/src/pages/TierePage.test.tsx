@@ -577,7 +577,7 @@ describe('TierePage', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByTitle('Hund')).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
-    expect(await within(dialog).findByText('Bitte Spezies wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Spezies fehlt')).toBeInTheDocument();
     expect(posts).toBe(0);
   });
 

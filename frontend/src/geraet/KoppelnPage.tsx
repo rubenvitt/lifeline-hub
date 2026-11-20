@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { GERAET_START_PFAD } from '../routing/deeplinks';
 import { GeraeteKarte } from './GeraeteKarte';
 import { merkeGeraet } from './geraetMarke';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Einlösen eines Kopplungscodes (LFH-892, Spec `geraete-kopplung`). Der QR der Einsatzleitung
@@ -106,7 +107,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
             name="code"
             label="Kopplungscode"
             extra="Von der Einsatzleitung, gilt 10 Minuten und einmal"
-            rules={[{ required: true, whitespace: true, message: 'Code eingeben' }]}
+            rules={[pflicht('Kopplungscode', { whitespace: true })]}
           >
             <Input
               size="large"

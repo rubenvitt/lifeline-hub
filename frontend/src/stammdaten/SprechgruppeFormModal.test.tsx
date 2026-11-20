@@ -53,7 +53,7 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     handler();
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
 
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
@@ -150,7 +150,7 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
     expect(screen.queryByLabelText('Netz')).toBeNull();
     expect(screen.getByRole('button', { name: /Netz und Sicherheit/ })).toBeInTheDocument();
 
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(body).toEqual({
         bezeichnung: '311',

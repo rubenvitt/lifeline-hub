@@ -2134,7 +2134,7 @@ describe('AbloesungPage — Helfer im Schichtplan (Change y106s29r, Spec kraefte
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Mia Beispiel');
     await userEvent.type(within(dialog).getByLabelText('Organisation'), 'DRK OV Nord');
     await waehle('Qualifikationen', 'Sanitäter');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(createSchichtplanHelfer).toHaveBeenCalledWith(1, {
         name: 'Mia Beispiel',

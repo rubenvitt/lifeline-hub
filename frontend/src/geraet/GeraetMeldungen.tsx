@@ -14,6 +14,7 @@ import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
 import StandortFeld from './StandortFeld';
+import { pflicht } from '../components/pflichtRegel';
 import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
@@ -138,7 +139,7 @@ export default function GeraetMeldungen({
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
     },
     // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut,
-    // und der Grund steht über „Meldung senden“ (`speicherung`, LFH-1077). Kein `onError`-Toast:
+    // und der Grund steht über „Erfassen“ (`speicherung`, LFH-1077). Kein `onError`-Toast:
     // Netz- und Leitungsfehler merkt die Funktion vor, nur eine fachliche Ablehnung kommt an.
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
@@ -187,7 +188,7 @@ export default function GeraetMeldungen({
             // Inline: nach dem Senden bleibt das Formular stehen, leer, für die nächste Meldung.
             onFertig={() => {}}
             laeuft={senden.isPending}
-            erfassenText="Meldung senden"
+            erfassenText="Erfassen"
             speicherung={senden}
             speicherFehlerTitel="Meldung nicht gesendet"
             speicherFehlerFallback="Senden fehlgeschlagen"
@@ -195,7 +196,7 @@ export default function GeraetMeldungen({
             <Feld<MeldungWerte>
               name="inhalt"
               label="Inhalt"
-              rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
+              rules={[pflicht('Inhalt', { whitespace: true })]}
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
             </Feld>

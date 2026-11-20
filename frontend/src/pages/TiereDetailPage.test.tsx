@@ -449,7 +449,7 @@ describe('TiereDetailPage — Status/Verbleib', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
     // Ohne Verbleib: Submit blockiert (Pflichtfeld) → kein Request.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Verbleib speichern' }));
-    expect(await screen.findByText('Verbleib ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Verbleib fehlt')).toBeInTheDocument();
     expect(body.status).toBeUndefined();
     // Mit Verbleib in Handlungsform; der Drahtwert bleibt `freilauf`:
     await userEvent.click(within(dialog).getByRole('combobox'));

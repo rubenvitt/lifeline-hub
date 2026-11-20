@@ -45,6 +45,7 @@ import {
   kopplungBeendetText,
   offeneUebernahmeTitel,
 } from './fuehrungText';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
 const ABGABE_FOLGE = 'Danach ist der Einsatz hier nur noch zu lesen.';
@@ -210,10 +211,7 @@ function GrundFeld() {
     <Feld
       label="Grund"
       name="grund"
-      rules={[
-        { required: true, whitespace: true, message: 'Grund angeben' },
-        zeichenRegel(FUEHRUNG_GRUND_MAX, 'Grund'),
-      ]}
+      rules={[pflicht('Grund', { whitespace: true }), zeichenRegel(FUEHRUNG_GRUND_MAX, 'Grund')]}
     >
       <Input.TextArea
         autoSize={{ minRows: 2, maxRows: 5 }}
@@ -695,11 +693,7 @@ export default function FuehrungPaneel({
               </Feld>
             )}
             {(!moeglich.unterschrift || beweisWahl === 'code') && (
-              <Feld
-                label="Code"
-                name="code"
-                rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
-              >
+              <Feld label="Code" name="code" rules={[pflicht('Code', { whitespace: true })]}>
                 <Input
                   autoComplete="off"
                   maxLength={19}

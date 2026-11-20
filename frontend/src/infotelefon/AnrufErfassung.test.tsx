@@ -15,6 +15,11 @@ async function waehleAnliegen(label: string) {
 }
 
 describe('AnrufErfassung (LFH-554)', () => {
+  it('zeigt am Notizfeld den Tastaturknopf „Senden“ (Enter-Vertrag, LLH-1766)', () => {
+    renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
+    expect(screen.getByLabelText('Notiz')).toHaveAttribute('enterkeyhint', 'send');
+  });
+
   it('speichert per Enter, leert die Felder und steht wieder im Anliegen', async () => {
     const erfassen = vi.fn().mockResolvedValue({});
     renderMitProviders(<AnrufErfassung onErfassen={erfassen} laeuft={false} fehler={null} />);
@@ -64,7 +69,7 @@ describe('AnrufErfassung (LFH-554)', () => {
     expect(nummer).toBeVisible();
     await waehleAnliegen('Vermisstensuche');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    expect(await screen.findByText('Für einen Rückruf erforderlich')).toBeInTheDocument();
+    expect(await screen.findByText('Rückrufnummer fehlt')).toBeInTheDocument();
     expect(erfassen).not.toHaveBeenCalled();
     await userEvent.type(nummer, '0171 000{Enter}');
     await waitFor(() =>

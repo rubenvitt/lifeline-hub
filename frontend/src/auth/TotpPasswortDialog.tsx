@@ -5,6 +5,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { enrollStart } from '../api/totp';
 import type { TotpEnrollStart } from '../api/types';
+import { pflicht } from '../components/pflichtRegel';
 
 interface PasswortWerte {
   passwort: string;
@@ -59,11 +60,7 @@ export default function TotpPasswortDialog({
           <SpeicherFehler fehler={mutation.error} titel="Einrichtung nicht gestartet" />
         </div>
       )}
-      <Feld
-        label="Aktuelles Passwort"
-        name="passwort"
-        rules={[{ required: true, message: 'Bitte das aktuelle Passwort eingeben' }]}
-      >
+      <Feld label="Aktuelles Passwort" name="passwort" rules={[pflicht('Passwort')]}>
         <Input.Password autoComplete="current-password" />
       </Feld>
     </ErfassungsModal>

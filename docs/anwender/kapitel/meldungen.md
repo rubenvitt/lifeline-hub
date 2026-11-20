@@ -67,9 +67,9 @@ Für Einsatzleitung und Führungspersonal:
 4. Unter „Weitere Angaben“ bei Bedarf „Von Einheit / Abschnitt“ (belegt den Absender vor),
    „Meldeweg“, „Meldungsart“, „Priorität“, „Richtung“, „Zeitpunkt des Ereignisses“ und die Frist
    der Bestätigung setzen.
-5. „Meldung erfassen“ wählen. Fehlt eine Pflichtangabe, rollt das Formular zum ersten
+5. „Erfassen“ wählen. Fehlt eine Pflichtangabe, rollt das Formular zum ersten
    betroffenen Feld und setzt den Cursor hinein; über dem Knopf steht in Rot, was fehlt, etwa
-   „Inhalt ist erforderlich · Absender ist erforderlich“.
+   „Inhalt fehlt · Absender fehlt“.
 
 Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, auch nach außen; bei
 dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel

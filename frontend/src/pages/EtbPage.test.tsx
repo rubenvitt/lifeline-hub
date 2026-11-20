@@ -318,7 +318,7 @@ describe('EtbPage', () => {
       if (termin) {
         await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
         await user.click(
-          within(screen.getByRole('dialog')).getByRole('button', { name: 'Anlegen' }),
+          within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
         );
         await waitFor(() => expect(gesendet?.faellig_at).toBe(termin));
       } else {
@@ -357,7 +357,7 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Wiedervorlage');
     await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
     const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2099-09-09 13:17:43'));
   });
 
@@ -673,7 +673,7 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Wiedervorlage');
     // Titel ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue(/Wiedervorlage: Erste Meldung/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.bezug_typ).toBe('etb');

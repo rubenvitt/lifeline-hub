@@ -1,6 +1,7 @@
 import { Form, Input } from 'antd';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface KanalFormWerte {
   name: string;
@@ -46,11 +47,7 @@ export default function KanalAnlegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name erforderlich' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input placeholder="z. B. S2/S3 oder Abschnitt Nord" />
       </Feld>
       <Feld label="Beschreibung (optional)" name="beschreibung">

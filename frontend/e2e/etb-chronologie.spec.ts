@@ -80,7 +80,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
         antwort.url().endsWith(`/api/einsaetze/${einsatzId}/erinnerungen`) &&
         antwort.request().method() === 'POST',
     );
-    await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
     const antwort = await gespeichert;
     expect(antwort.ok()).toBeTruthy();
     expect(antwort.request().postDataJSON().faellig_at).toBe('2099-09-09 13:17:43');

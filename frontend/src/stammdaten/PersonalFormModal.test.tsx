@@ -114,7 +114,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     renderMitProviders(<Harness />);
     await screen.findByLabelText('Name');
     expect(screen.getByRole('button', { name: /Speichern und nächste/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
   });
 
   it('Bearbeiten: KEIN Serienweg — „Speichern und nächste" wäre ein toter Knopf', async () => {
@@ -158,7 +158,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
 
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Name'), 'Erika Mustermann');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Personalnummer bereits vergeben',

@@ -200,9 +200,7 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await userEvent.clear(await screen.findByLabelText('Einsatzkräfte (EP)'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     // Der Fehltext blendet per antd-Motion ein (erst Höhe 0, Deckkraft 0): auf das Ende warten.
-    await waitFor(() =>
-      expect(screen.getByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toBeVisible(),
-    );
+    await waitFor(() => expect(screen.getByText('Anzahl fehlt — 0, wenn niemand')).toBeVisible());
     expect(onBedarfSpeichern).not.toHaveBeenCalled();
   });
 

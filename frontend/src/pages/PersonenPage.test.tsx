@@ -319,7 +319,14 @@ describe('PersonenPage', () => {
     await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Person erfassen' })).toBeInTheDocument();
+    expect(
+      within(document.querySelector<HTMLElement>('[data-lfh="schnellerfassung"]')!).getByRole(
+        'button',
+        {
+          name: 'Erfassen',
+        },
+      ),
+    ).toBeInTheDocument();
     const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     expect(within(kopf).getByRole('button', { name: 'Betroffene erfassen' })).toHaveClass(
       'ant-btn-primary',
@@ -430,7 +437,9 @@ describe('PersonenPage', () => {
     // Der Name liegt unter „Weitere Angaben" — hier genügt der Fundort, die Maske hat keine
     // Pflichtfelder.
     await userEvent.type(screen.getByLabelText('Fundort'), 'Brücke');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
     // Der Filter steht in der Adresse (LLH-1826) und kommt mit der Navigation, kurz nach der Quittung.
@@ -465,7 +474,9 @@ describe('PersonenPage', () => {
       screen.getByRole('radiogroup', { name: 'Sichtungskategorie' }),
     ).getAllByRole('radio')[1];
     await userEvent.click(skZwei);
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-048 · SK II')).toBeInTheDocument();
     expect(gesendet.sichtung).toBe('sk2');
@@ -481,7 +492,9 @@ describe('PersonenPage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
   });
@@ -544,7 +557,9 @@ describe('PersonenPage', () => {
     await ersterStart;
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.type(screen.getByLabelText('Fundort'), 'Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     await zweiterStart;
 
     expect(await screen.findByText('R-047')).toBeInTheDocument();
@@ -607,7 +622,9 @@ describe('PersonenPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.type(screen.getByLabelText('Fundort'), 'Person A');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
@@ -639,7 +656,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Offline Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
 
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
@@ -688,7 +707,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Nach Reload');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
 
@@ -901,7 +922,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Offline A');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
@@ -942,7 +965,7 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
     expect(screen.queryByRole('button', { name: 'Betroffene erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Kurzeingabe Person' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Person erfassen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).not.toBeInTheDocument();
   });
 
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
@@ -1419,7 +1442,14 @@ describe('PersonenPage', () => {
 
       // Zweiter Datensatz, direkt weiter — per Knopf statt Enter, derselbe Weg.
       await userEvent.type(feld(), 'Hoffmann SK II');
-      await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+      await userEvent.click(
+        within(document.querySelector<HTMLElement>('[data-lfh="schnellerfassung"]')!).getByRole(
+          'button',
+          {
+            name: 'Erfassen',
+          },
+        ),
+      );
       await waitFor(() => expect(koerper).toHaveLength(2));
       expect(koerper[1]).toMatchObject({ name: 'Hoffmann', sichtung: 'sk2' });
       expect(koerper[1].client_id).not.toBe(koerper[0].client_id);

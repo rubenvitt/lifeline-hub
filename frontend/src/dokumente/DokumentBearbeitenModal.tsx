@@ -10,6 +10,7 @@ import type { Dokument, DokumentKategorie } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
 import { bezugAusWert, bezugWert } from './bezug';
 import { useBezugswahl } from './bezugswahl';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Props {
   einsatzId: number;
@@ -98,11 +99,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
       erfassenText="Speichern"
     >
       <SpeicherFehler fehler={mutation.error} titel="Nicht geändert" />
-      <Form.Item
-        name="kategorie"
-        label="Kategorie"
-        rules={[{ required: true, message: 'Bitte eine Kategorie wählen' }]}
-      >
+      <Form.Item name="kategorie" label="Kategorie" rules={[pflicht('Kategorie')]}>
         <Select
           options={DOKUMENT_KATEGORIE_REIHENFOLGE.map((k) => ({
             value: k,
@@ -110,11 +107,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
           }))}
         />
       </Form.Item>
-      <Form.Item
-        name="titel"
-        label="Titel"
-        rules={[{ required: true, whitespace: true, message: 'Bitte einen Titel angeben' }]}
-      >
+      <Form.Item name="titel" label="Titel" rules={[pflicht('Titel', { whitespace: true })]}>
         <Input maxLength={200} />
       </Form.Item>
       <Form.Item name="bezug" label="Bezug">

@@ -547,7 +547,7 @@ describe('EintreffenDialog — Schritt 2: unangemeldet', () => {
       'MTW',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Unangemeldet buchen' }));
-    expect(await within(dialog()).findByText('Funkrufname angeben')).toBeInTheDocument();
+    expect(await within(dialog()).findByText('Funkrufname fehlt')).toBeInTheDocument();
     expect(koerper).toEqual([]);
   });
 

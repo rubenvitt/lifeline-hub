@@ -254,8 +254,8 @@ describe('StelleDialog anlegen', () => {
   it('verlangt Bezeichnung und Art', async () => {
     const { onErfassen, dialog } = zeigeAnlegen();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Bitte eine Bezeichnung angeben')).toBeInTheDocument();
-    expect(within(dialog).getByText('Bitte eine Art wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Bezeichnung fehlt')).toBeInTheDocument();
+    expect(within(dialog).getByText('Art fehlt')).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
   });
 

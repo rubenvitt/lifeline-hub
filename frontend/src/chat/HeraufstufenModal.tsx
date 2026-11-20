@@ -9,6 +9,7 @@ import { ETB_ANHAENGE_MAX } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import type { ChatNachricht, EtbTyp } from '../api/types';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Für die Heraufstufung zulässige ETB-Typen (Server erzwingt dieselbe Allowlist). */
 const TYP_OPTIONEN: { value: EtbTyp; label: string }[] = [
@@ -117,7 +118,7 @@ export default function HeraufstufenModal({
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
-      <Feld label="ETB-Typ" name="typ" rules={[{ required: true }]}>
+      <Feld label="ETB-Typ" name="typ" rules={[pflicht('ETB-Typ')]}>
         <Select options={TYP_OPTIONEN} />
       </Feld>
       {mitMeldung && meldungenFrei && (
@@ -134,7 +135,7 @@ export default function HeraufstufenModal({
         label="Text"
         name="inhalt"
         rules={[
-          { required: true, whitespace: true, message: 'Text erforderlich' },
+          pflicht('Text', { whitespace: true }),
           // Eine ältere, längere Nachricht wird nicht still gekürzt (LFH-937, design.md D8).
           zeichenRegel(ETB_INHALT_MAX, 'Text'),
         ]}

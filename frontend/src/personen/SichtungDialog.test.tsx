@@ -65,7 +65,7 @@ describe('SichtungDialog (LLH-1083)', () => {
   it('verlangt eine Kategorie, bevor es speichert', async () => {
     const { onErfasst } = zeige();
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    expect(await screen.findByText('Bitte eine Sichtungskategorie wählen')).toBeInTheDocument();
+    expect(await screen.findByText('Sichtungskategorie fehlt')).toBeInTheDocument();
     expect(onErfasst).not.toHaveBeenCalled();
     expect(gesendet).toHaveLength(0);
   });

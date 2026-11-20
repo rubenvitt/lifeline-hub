@@ -32,6 +32,7 @@ import type {
   NeueMeldung,
   Richtung,
 } from '../api/types';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -391,7 +392,7 @@ export default function MeldungFormular({
     initialValues: vorgaben,
     onErfassen: absenden,
     // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
-    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
+    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Erfassen"
     // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
     // Serie schließt der Aufrufer über `onFertig`.
     onFertig: onFertig ?? (() => {}),
@@ -399,7 +400,7 @@ export default function MeldungFormular({
     speicherung,
     speicherFehlerTitel: 'Meldung nicht erfasst',
     speicherFehlerFallback: 'Erfassen fehlgeschlagen',
-    erfassenText: artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen',
+    erfassenText: 'Erfassen',
     serie,
     uebernahme: UEBERNAHME,
     onPruefungGescheitert: (felder: string[]) => {
@@ -427,10 +428,7 @@ export default function MeldungFormular({
       <Feld
         name="inhalt"
         label="Inhalt / Wortlaut"
-        rules={[
-          { required: true, whitespace: true, message: 'Inhalt ist erforderlich' },
-          zeichenRegel(ETB_INHALT_MAX, 'Inhalt'),
-        ]}
+        rules={[pflicht('Inhalt', { whitespace: true }), zeichenRegel(ETB_INHALT_MAX, 'Inhalt')]}
       >
         {/* Ausdrückliches Fokusziel der Hülle: beim Öffnen und nach jedem Serien-Speichern. */}
         <TextArea
@@ -448,7 +446,7 @@ export default function MeldungFormular({
           <Feld
             name="absender"
             label="Absender (Funkrufname/Stelle)"
-            rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
+            rules={[pflicht('Absender', { whitespace: true })]}
           >
             <StammdatenFeld
               nurText

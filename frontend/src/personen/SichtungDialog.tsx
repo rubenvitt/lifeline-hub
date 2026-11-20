@@ -8,6 +8,7 @@ import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import SichtungsWahl from './SichtungsWahl';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 import type { VormerkGrund } from '../offline/fehler';
 
 export interface SichtungWerte {
@@ -25,11 +26,7 @@ export interface SichtungWerte {
 export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
   return (
     <>
-      <Feld
-        label="Kategorie"
-        name="kategorie"
-        rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
-      >
+      <Feld label="Kategorie" name="kategorie" rules={[pflicht('Sichtungskategorie')]}>
         <SichtungsWahl aria-label="Sichtungskategorie" />
       </Feld>
       <Feld label="Kurzbegründung (optional)" name="notiz">

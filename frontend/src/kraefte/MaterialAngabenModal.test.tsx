@@ -98,7 +98,7 @@ describe('MaterialAngabenModal', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.clear(within(dialog).getByLabelText('Bezeichnung'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    expect(await within(dialog).findByText('Bezeichnung eintragen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(onSpeichern).not.toHaveBeenCalled();
   });
 

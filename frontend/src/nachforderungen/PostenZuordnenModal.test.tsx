@@ -80,7 +80,7 @@ describe('PostenZuordnenModal (LLH-1259 D5)', () => {
     const { onZuordnen } = zeige();
     await screen.findByRole('dialog');
     await userEvent.click(screen.getByRole('button', { name: 'Zuordnen' }));
-    expect(await screen.findByText('Posten wählen')).toBeInTheDocument();
+    expect(await screen.findByText('Posten fehlt')).toBeInTheDocument();
     expect(onZuordnen).not.toHaveBeenCalled();
   });
 

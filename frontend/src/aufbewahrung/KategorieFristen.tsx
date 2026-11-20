@@ -22,6 +22,7 @@ import { aufbewahrungZustand } from '../theme/statusFarben';
 import { fristAusEingabe, istFristverkuerzung } from './fristModell';
 import { KATEGORIE_TEXT, vorgabeSatz } from './kategorieText';
 import { Status } from '../components/instrument/Status';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Aufbewahrung je Datenkategorie (LFH-749, Spec `aufbewahrung-kategorien` und
@@ -243,7 +244,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
         <Feld
           label="Neue Frist"
           name="frist"
-          rules={[{ required: true, message: 'Zeitpunkt wählen' }]}
+          rules={[pflicht('Frist')]}
           extra={
             auswahl?.vorgemerkt_at
               ? 'Vorgemerkt; eine Frist in der Zukunft nimmt die Vormerkung zurück.'
@@ -257,9 +258,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
           name="rechtsgrundlage"
           rules={[
             { max: 500, message: 'Höchstens 500 Zeichen' },
-            ...(auswahl?.rechtsgrundlage
-              ? []
-              : [{ required: true, whitespace: true, message: 'Rechtsgrundlage angeben' }]),
+            ...(auswahl?.rechtsgrundlage ? [] : [pflicht('Rechtsgrundlage', { whitespace: true })]),
           ]}
         >
           <Input placeholder="z. B. Paragraf und Gesetz" />

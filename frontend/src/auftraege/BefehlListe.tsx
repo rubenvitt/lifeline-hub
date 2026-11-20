@@ -24,6 +24,7 @@ import BefehlListenKarte from './BefehlListenKarte';
 import BefehlDetail from './BefehlDetail';
 import { befehlSchemaLabel } from './befehlTexte';
 import EmpfaengerFilter, { istEmpfaengerFilter, matchesEmpfaenger } from './EmpfaengerFilter';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Befehlsliste des Reiters „Einsatzbefehle“ im Muster „Liste + Detailpaneel“ (Spec
@@ -341,15 +342,11 @@ export default function BefehlListe({
         }}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Feld label="Schema" name="vorlage" rules={[{ required: true }]}>
+        <Feld label="Schema" name="vorlage" rules={[pflicht('Schema')]}>
           {/* Nur Vorlagen für neue Befehle; der Bestand liest weiter `VORLAGEN` (LLH-1091). */}
           <Select options={NEW_SELECTABLE.map((v) => ({ value: v.schluessel, label: v.label }))} />
         </Feld>
-        <Feld
-          label="Titel"
-          name="titel"
-          rules={[{ required: true, message: 'Titel erforderlich' }]}
-        >
+        <Feld label="Titel" name="titel" rules={[pflicht('Titel')]}>
           <Input placeholder="z. B. Befehl an 2. Zug 10:30" />
         </Feld>
       </ErfassungsModal>
