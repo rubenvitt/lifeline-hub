@@ -9,7 +9,9 @@ Textfeld zuerst (D1–D8):
   („161430okt26“, Entscheidung E1), beim Tippen daneben die Deutung oder den Grund.
 - Enter übernimmt (und das Formular sendet wie gewohnt), Verlassen übernimmt eine lesbare
   Eingabe, Escape verwirft. Unlesbares wird nie übernommen und nie still korrigiert: Enter sendet
-  dann nicht, Verlassen zeigt wieder den geltenden Wert und nennt den Grund.
+  dann nicht, beim Verlassen bleibt der Text samt Grund stehen, und ein Formular mit `Feld`
+  sendet nicht (Eingabesperre, LLH-1768). „gestern“/„morgen“ steht am Feld, solange der Wert
+  dort liegt.
 - `value`/`onChange` tauschen ABSOLUTE Zeitpunkte; `onChange` feuert nur bei einem anderen
   Zeitpunkt, ein unberührtes Feld behält den gelesenen (Spec: „Unverändertes Speichern
   verschiebt nichts“).
