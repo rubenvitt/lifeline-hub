@@ -490,6 +490,12 @@ App erst „Eingaben verwerfen?“: „Weiter bearbeiten“ (vorgewählt, Enter)
 „Verwerfen“ leert den Dialog und schließt ihn. Was die App selbst vorbelegt hat, zählt dabei nicht
 als Eingabe.
 
+Dasselbe gilt für die übrigen Dialoge, in die etwas eingetragen wird, etwa „Vollzug melden“, den
+Grund beim Ablehnen oder Zurückziehen einer Nachforderung, den Namen einer Kartenansicht oder die
+Postenliste einer Unterkunft. Ein Dialog, in dem nur etwas gewählt wird, etwa ein taktisches
+Zeichen, schließt ebenfalls nicht durch einen Klick daneben; Escape und das Schließkreuz schließen
+ihn ohne Rückfrage.
+
 ### Ansicht, Filter und Rollposition beim Zurück
 
 Was über einer Liste gewählt ist, steht in der Adresse der Seite: die Ansicht (etwa „Offen“ oder
