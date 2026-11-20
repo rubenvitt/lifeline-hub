@@ -505,8 +505,9 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
   `openspec/changes/archive/2026-10-12-oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn
   Objekte je Stück gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
   Ab `lg` Liste links, Detail rechts (klebt), darunter klappt es unter der gewählten Karte auf; kein
-  Drawer. Die Karte trägt nur das Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen
-  im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
+  Drawer; unter `lg` holt die Wahl von Hand das aufgeklappte Detail in den Blick, wenn es unter den
+  Fensterrand fällt (LLH-1761, nie bei Vorauswahl, Deeplink oder Zuklappen). Die Karte trägt nur das
+  Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
   weiter auf der Vollseite geschrieben. Vorbild Aufträge/Befehle; Einsatzabschnitte und Gefahren
   sind ältere Einzelbauten.
 
@@ -1673,6 +1674,12 @@ Spec `bedien-arbeitsplatz`).
   prüfen: kein `.ant-modal-footer` **und** `knopf.closest('form')` ≠ `null`
   (`components/Erfassung.test.tsx`).
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern (`requestAnimationFrame`).
+- **Der Fuß klebt am unteren Rand**, solange die Maske höher ist als der Schirm: im Dialog
+  (`fussKlebt="dialog"`, setzt `ErfassungsModal`, LLH-1274) und auf einer Seite mit langer Maske
+  (`fussKlebt="seite"`: Aufnahme, Meldung erfassen; LLH-1761). Steht der Fokus im Formular, rückt
+  er über die Bildschirmtastatur (`components/tastaturVersatz.ts`, VisualViewport; kein
+  `interactive-widget` im Viewport-Meta). Kurze Formulare in Paneelen kleben nicht. Entwurf:
+  `docs/superpowers/specs/2026-11-20-j45fvu8l-handy-hauptaktion-kleben-design.md`.
 - **Zurückgesetzt wird auf JEDEM Weg hinaus** (Erfassen, Abbrechen, Kreuz, Escape, Maske); der
   Aufrufer ruft kein `resetFields()`; Vorbelegen zum Bearbeiten (`setFieldsValue`) ist kein Reset. **`destroyOnHidden` setzt rc-field-form nicht zurück.**
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.
