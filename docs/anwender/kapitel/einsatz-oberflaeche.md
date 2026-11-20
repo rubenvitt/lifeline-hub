@@ -334,8 +334,9 @@ Von links nach rechts:
 - **Verbindung**: Das grüne Funkzeichen heißt, die Live-Verbindung steht; gelb wird sie beim Start
   gerade aufgebaut. „VERBINDE“ (die Verbindung wird wiederhergestellt, auch wenn sie 45 Sekunden
   lang nichts mehr geliefert hat, etwa im Funkloch), „GETRENNT“, „OFFLINE“,
-  „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung mit Wort; was dann gilt, steht in
-  [Arbeiten ohne Netz](ohne-netz.md).
+  „NICHT GESENDET“ mit Zahl (vorgemerkte Einträge, auch nach einem Server-Fehler) und „PRÜFEN“
+  (abgelehnte Einträge) melden eine Störung mit Wort; die beiden letzten öffnen auf Antippen die
+  Liste der Einträge. Was dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
 - **Hilfe zu dieser Seite** (Fragezeichen) öffnet die Seitenleiste mit dem Kapitel zur Seite
   (siehe „Hilfe zur Seite öffnen“).

@@ -3,6 +3,7 @@ import {
   IconChevronRunter,
   IconDokumente,
   IconGlocke,
+  IconHilfe,
   IconPerson,
   IconPosteingang,
 } from '../icons';
@@ -23,6 +24,7 @@ import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import { useAbmeldenRueckfrage } from '../auth/AbmeldenRueckfrage';
+import { useHilfeSeitenleiste } from '../hilfe/HilfeSeitenleisteProvider';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
@@ -45,9 +47,12 @@ function initialen(name: string): string {
 const MENUE_BREITE = 320;
 /**
  * Breite ab `md` im Handschuh-Betrieb (D12): fünf Helligkeitsstufen à 72 px plus Zielabstand
- * (2 × 8 px) brauchen 440 px; mit Polsterung des Menüs 480.
+ * (2 × 8 px), Fugen und Rand brauchen 446 px. Die Gruppe „Anzeige“ rückt seit dem Steuerelement-
+ * Polster aus dem Raster (`tfabqe09`, `controlPaddingHorizontal` = 24 px im Handschuh) beidseits
+ * um 24 px ein; mit 480 px blieben jeder Stufe 69 px. 504 = 456 Leiste (vorher bei 12 px Polster)
+ * + 2 × 24 px.
  */
-const MENUE_BREITE_HANDSCHUH = 480;
+const MENUE_BREITE_HANDSCHUH = 504;
 
 /** Deckel des Etiketts am Trigger: längere Funktionen und Namen enden mit „…“. */
 const ETIKETT_DECKEL = 180;
@@ -117,6 +122,13 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * `inNavigation` (LLH-1728, D3): am Handy steht der Auslöser im Fuß des Drawers „Navigation“ statt
  * im Kopf. Dann ist er eine volle Zeile mit Kachel und Name (oder Funktion) in den Farben der
  * Fläche, nicht des dunklen Rahmens, und das Menü öffnet nach oben. Das Menü selbst bleibt gleich.
+ *
+ * `hilfeZurSeite` (LLH-1824): wo der Kopf für den Knopf „?“ keinen Platz hat (App-Rahmen unter
+ * `md`, Einsatz-Kopf von `md` bis unter `xl`), steht „Hilfe zu dieser Seite“ als Eintrag vor „Hilfe“
+ * und öffnet die Seitenleiste. Am Handy (unter `md`) ersetzt er „Hilfe“, die Seitenleiste verlinkt
+ * die volle Hilfe (Entscheidung 20.11.2026). Ohne Leiste (Gerät, Hilfeseite) fehlt der Eintrag.
+ *
+ * Unter `md` und im Handschuh-Betrieb fehlt im Kopf die Versionszeile; sie steht in der Hilfe.
  */
 /**
  * Aus der Navigation darf das Menü seitlich ins Fenster rücken (`shiftX`, LLH-1728). antds Typ
@@ -129,17 +141,20 @@ export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
   hilfeDaneben = false,
+  hilfeZurSeite = false,
   inNavigation = false,
 }: {
   funktion?: string | null;
   hasFixedWidth?: boolean;
   hilfeDaneben?: boolean;
+  hilfeZurSeite?: boolean;
   inNavigation?: boolean;
 } = {}) {
   const { benutzer } = useAuth();
   const abmelden = useAbmeldenRueckfrage();
   const navigate = useNavigate();
   const location = useLocation();
+  const { oeffneHilfe } = useHilfeSeitenleiste();
   const { data: versionsstand } = useVersionsstand();
   const neuigkeitenUngelesen = istUngelesen(versionsstand);
   const { token } = theme.useToken();
@@ -155,8 +170,16 @@ export default function BenutzerMenu({
   // Tablet hochkant, mit grobem Zeiger das Führungs-Tablet quer (1024–1280 px). Dort verdeckte ein
   // zweiter Tab den Einsatz nur. Die Zeigerart, nicht die Breite, erkennt das Tablet (`useViewport`).
   const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg') && !istBeruehrung;
+  const isHandy = !abBreite('md');
+  // Ohne Versionszeile im Kopf: im Handschuh-Betrieb (LLH-1818) und am Handy in jeder Dichte
+  // (Entscheidung 20.11.2026) — mit den Rollenmarken ragte „Abmelden“ in `komfortabel` sonst
+  // unter den Fensterrand. Die Version steht in der Hilfe.
+  const isOhneVersion = isKnapp || isHandy;
+  // Am Handy ersetzt „Hilfe zu dieser Seite“ den Eintrag „Hilfe“ (Entscheidung 20.11.2026): beide
+  // zusammen kosteten „Abmelden“ den Platz im Fenster; die Seitenleiste verlinkt die volle Hilfe.
+  const isHilfeZurSeite = hilfeZurSeite && Boolean(oeffneHilfe);
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
-  const menueBreite = !abBreite('md')
+  const menueBreite = isHandy
     ? 'calc(100vw - 16px)'
     : isKnapp
       ? MENUE_BREITE_HANDSCHUH
@@ -258,7 +281,7 @@ export default function BenutzerMenu({
                 </Space>
               </div>
             )}
-            {!isKnapp && (
+            {!isOhneVersion && (
               <Typography.Text
                 type="secondary"
                 style={{
@@ -318,7 +341,14 @@ export default function BenutzerMenu({
     // Hilfe (LFH-1096). Rückmeldung (LLH-1549) und Lizenzhinweis (LFH-1000) stehen seit LLH-1642
     // auf der Hilfe-Seite; die Hilfe bekommt den Pfad mit, aus dem sie geöffnet wurde, damit die
     // Rückmeldung dort den Bereich der App vorbefüllt (design.md D5).
-    { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
+    // Hilfe zur Seite, wo der Kopf für „?“ keinen Platz hat (LLH-1824, `hilfeZurSeite`); am Handy
+    // statt „Hilfe“ (`isHilfeZurSeite`, oben).
+    ...(isHilfeZurSeite
+      ? [{ key: 'hilfe-seite', icon: <IconHilfe />, label: 'Hilfe zu dieser Seite' }]
+      : []),
+    ...(isHilfeZurSeite && isHandy
+      ? []
+      : [{ key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' }]),
     // ZULETZT, DURCH EINEN TRENNER ABGESETZT (LLH-1730, Spec `benutzermenue`): direkt unter
     // „Profil“ (LFH-952) lag es im Griff, und ein Klick beendete die Sitzung sofort. Jetzt steht es
     // am Ende, wo man es sucht, und fragt zurück. Seit LLH-1642 passt das Menü am Handy in
@@ -330,6 +360,7 @@ export default function BenutzerMenu({
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') abmelden.open();
+    else if (key === 'hilfe-seite') oeffneHilfe?.('seite');
     else if (key === 'hilfe' && isHilfeImNeuenTab) {
       window.open(hilfePfad({ von: location.pathname }), '_blank', 'noopener');
     } else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });

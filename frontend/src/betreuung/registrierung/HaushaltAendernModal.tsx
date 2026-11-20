@@ -7,6 +7,7 @@ import { ErfassungsModal } from '../../components/Erfassung';
 import { Feld, useRollen } from '../../components/instrument';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { haushaltKennung } from './registrierKern';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Dialog „Haushalt ändern“ (LLH-1615, Change `lm62ud0b-haushalt-umbauen`, design.md D4): eine an
@@ -94,7 +95,7 @@ export default function HaushaltAendernModal({
         </Typography.Paragraph>
       )}
       {folge && <Typography.Paragraph>{folge}</Typography.Paragraph>}
-      <Feld name="ziel" label="Ziel" rules={[{ required: true, message: 'Haushalt wählen' }]}>
+      <Feld name="ziel" label="Ziel" rules={[pflicht('Ziel')]}>
         <Radio.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
           {andere.map((h) => (
             <Radio key={h.id} value={String(h.id)} data-lfh="haushalt-ziel">

@@ -319,7 +319,14 @@ describe('PersonenPage', () => {
     await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Person erfassen' })).toBeInTheDocument();
+    expect(
+      within(document.querySelector<HTMLElement>('[data-lfh="schnellerfassung"]')!).getByRole(
+        'button',
+        {
+          name: 'Erfassen',
+        },
+      ),
+    ).toBeInTheDocument();
     const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     expect(within(kopf).getByRole('button', { name: 'Betroffene erfassen' })).toHaveClass(
       'ant-btn-primary',
@@ -430,7 +437,9 @@ describe('PersonenPage', () => {
     // Der Name liegt unter „Weitere Angaben" — hier genügt der Fundort, die Maske hat keine
     // Pflichtfelder.
     await userEvent.type(screen.getByLabelText('Fundort'), 'Brücke');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
     // Der Filter steht in der Adresse (LLH-1826) und kommt mit der Navigation, kurz nach der Quittung.
@@ -465,7 +474,9 @@ describe('PersonenPage', () => {
       screen.getByRole('radiogroup', { name: 'Sichtungskategorie' }),
     ).getAllByRole('radio')[1];
     await userEvent.click(skZwei);
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-048 · SK II')).toBeInTheDocument();
     expect(gesendet.sichtung).toBe('sk2');
@@ -481,7 +492,9 @@ describe('PersonenPage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
 
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
   });
@@ -544,7 +557,9 @@ describe('PersonenPage', () => {
     await ersterStart;
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.type(screen.getByLabelText('Fundort'), 'Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     await zweiterStart;
 
     expect(await screen.findByText('R-047')).toBeInTheDocument();
@@ -607,7 +622,9 @@ describe('PersonenPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.type(screen.getByLabelText('Fundort'), 'Person A');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
@@ -639,7 +656,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Offline Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
 
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
@@ -688,7 +707,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Nach Reload');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
 
@@ -901,7 +922,9 @@ describe('PersonenPage', () => {
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Offline A');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Erfassen' }),
+    );
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
@@ -942,14 +965,14 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
     expect(screen.queryByRole('button', { name: 'Betroffene erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Kurzeingabe Person' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Person erfassen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).not.toBeInTheDocument();
   });
 
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
     // Redirect → Detailseite rendert die Überschrift:
-    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
   });
 
   it('zeigt die Sichtung als BBK-Etikett und zählt das Sichtungsbild der Seitenleiste', async () => {
@@ -1259,7 +1282,7 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, [person]);
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     // Die Detailseite zeigt den Personen-Titel als Überschrift:
-    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
   });
 
   it('rendert genau einen Datensatz-Link pro Personenzeile', async () => {
@@ -1419,7 +1442,14 @@ describe('PersonenPage', () => {
 
       // Zweiter Datensatz, direkt weiter — per Knopf statt Enter, derselbe Weg.
       await userEvent.type(feld(), 'Hoffmann SK II');
-      await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+      await userEvent.click(
+        within(document.querySelector<HTMLElement>('[data-lfh="schnellerfassung"]')!).getByRole(
+          'button',
+          {
+            name: 'Erfassen',
+          },
+        ),
+      );
       await waitFor(() => expect(koerper).toHaveLength(2));
       expect(koerper[1]).toMatchObject({ name: 'Hoffmann', sichtung: 'sk2' });
       expect(koerper[1].client_id).not.toBe(koerper[0].client_id);
@@ -1492,13 +1522,13 @@ describe('PersonenPage', () => {
        */
       render(einsatzAktiv, []);
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
-      expect(zeile).toHaveAccessibleDescription(/#Fundort \(52\.2691\/9\.1342\)/);
-      // Die Buchstaben-Kürzel stehen aufgelöst da, ebenso das „@“ (LFH-948).
+      expect(zeile).toHaveAccessibleDescription(/Fundort: #52\.2691\/9\.1342/);
+      // Die Buchstaben-Kürzel stehen aufgelöst da, ebenso das „@“ (LFH-948, Legende LLH-1767).
       expect(zeile).toHaveAccessibleDescription(/skt = tot · sku = unverletzt/);
-      expect(zeile).toHaveAccessibleDescription(/@Unfallhilfsstelle/);
+      expect(zeile).toHaveAccessibleDescription(/@ Unfallhilfsstelle/);
       await userEvent.type(zeile, 'Kowalski sk2');
-      // Die Ebene des Stapels: über der Kürzel-Gruppe (die unter `md` einklappt, LFH-963).
-      const hinweis = screen.getByText('#Fundort (52.2691/9.1342)').parentElement!.parentElement!;
+      // Die Ebene des Stapels: über der Legende (die unter `md` einklappt, LFH-963).
+      const hinweis = document.querySelector('[data-lfh="kuerzel"]')!.parentElement!;
       expect(hinweis).toHaveStyle({ visibility: 'hidden' });
       expect(hinweis).toHaveAttribute('aria-hidden', 'true');
       expect(zeile).toHaveAccessibleDescription(/^erkannt:/);
@@ -1529,7 +1559,7 @@ describe('PersonenPage', () => {
       render(einsatzAktiv, []);
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
       // Die leere Zeile nennt das Kürzel — sonst wäre es nur über den Code auffindbar.
-      expect(screen.getByText('#Fundort (52.2691/9.1342)')).toBeInTheDocument();
+      expect(screen.getByText('Fundort: #52.2691/9.1342')).toBeInTheDocument();
       await userEvent.type(zeile, 'Kowalski, Anna w 34 sk3 #52.2691/9.1342');
       expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent('#52.2691/9.1342');
       await userEvent.keyboard('{Enter}');

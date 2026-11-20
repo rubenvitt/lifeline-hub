@@ -36,6 +36,7 @@ import TotpPasswortDialog from '../auth/TotpPasswortDialog';
 import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
 import ZeitdarstellungGeraetWahl from '../anzeige/ZeitdarstellungGeraetWahl';
 import AnzeigeLeisten, { ANZEIGE_LEISTEN_BREITE } from '../components/AnzeigeLeisten';
+import { pflicht } from '../components/pflichtRegel';
 
 interface TotpCodeWerte {
   code: string;
@@ -381,7 +382,7 @@ export default function ProfilPage() {
                       <Feld
                         label="Code aus der Authenticator-App"
                         name="code"
-                        rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+                        rules={[pflicht('Code')]}
                       >
                         {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
                           Längengrenze, Ziffern-Optik). */}

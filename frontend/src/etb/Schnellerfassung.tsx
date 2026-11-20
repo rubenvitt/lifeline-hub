@@ -25,7 +25,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import EtbFeldzeile, { FEHLT, TypKnopf, type ParteiRef } from './EtbFeldzeile';
+import EtbFeldzeile, { FEHLT, rufnameFehltText, TypKnopf, type ParteiRef } from './EtbFeldzeile';
 import { useFunkrufnamen } from './funkrufnamen';
 import { anVorbelegung } from '../fuehrung/funktionsOptionenKern';
 import {
@@ -38,16 +38,21 @@ import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import { useRahmenOben } from '../components/rahmenOben';
 import { useEtbKopfHoehe } from './etbKopfKleben';
 import RufnameAbfrage from './RufnameAbfrage';
-import { auchInMeldungseingang, ausStandard, wirksameMetadaten } from './standardRufname';
+import {
+  auchInMeldungseingang,
+  ausStandard,
+  hatVorgabe,
+  wirksameMetadaten,
+} from './standardRufname';
 import type { StandardRufnameZugriff } from './useStandardRufname';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
   amZeilenanfang,
   baueEintrag,
   einheitAusSchluessel,
-  erkenneAtTrigger,
-  erkenneSlashTrigger,
-  erkenneTypBefehl,
+  parseAtTrigger,
+  parseSlashTrigger,
+  parseTypBefehl,
   TYP_BEFEHLE,
   TYP_BEFEHLE_MITARBEIT,
   fehlendeSeiten,
@@ -61,7 +66,8 @@ import {
   type SlashEintrag,
   type TextRange,
   laengenVerstoss,
-  erkenneZeitBefehl,
+  parseZeitBefehl,
+  parseNurBefehl,
   zukunftsVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
@@ -344,6 +350,8 @@ export default function Schnellerfassung({
   const anRef = useRef<ParteiRef>(null);
   const meldewegRef = useRef<RefSelectProps>(null);
   const veranlassungRef = useRef<InputRef>(null);
+  /** Das Feld der Rufname-Abfrage, solange sie ohne Standard offen steht (LLH-1764). */
+  const rufnameRef = useRef<ParteiRef>(null);
   /** „+ Veranlassung“ hat das Feld in die Zeile geholt (auch ohne Wert, bis es leer verlassen wird). */
   const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
@@ -388,12 +396,29 @@ export default function Schnellerfassung({
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
   const [pflicht, setPflicht] = useState<('von' | 'an')[]>([]);
+  /**
+   * „Erfassen“ (Knopf oder Strg+Enter) bei leerem Inhalt: der Grund steht am Feld, statt dass der
+   * Knopf stumm bleibt (LLH-1771). Blankes Enter im leeren Feld sendet nie und meldet nichts.
+   * Geht, sobald Text getippt wird, und kehrt erst mit dem nächsten Versuch zurück. Text von außen
+   * (Baustein, Berichtigung) prüft die Bedingung mit.
+   */
+  const [inhaltFehlt, setInhaltFehlt] = useState(false);
+  const inhaltFehltSichtbar = inhaltFehlt && inhalt.trim() === '';
   // Ein Pflichtgrund steht nur, solange die Seite wirklich fehlt: eine Vorgabe nach Typwechsel oder
   // ein `@` füllen sie ohne `setzeFeld` (Review E5).
   const fehltJetzt = fehlendeSeiten(wirksam);
   const pflichtSichtbar = pflicht.filter((seite) => fehltJetzt.includes(seite));
+  /**
+   * Ohne Standard steht die Abfrage über der Zeile (LLH-1764). Seiten, die beim Typ der Rufname
+   * füllt, haben dann EINEN Grund, der auf sie verweist, und der Fokus geht in die Abfrage; eine
+   * Seite ohne Vorgabe (Von einer Meldung: die Stelle draußen) bleibt ein Feld von Hand.
+   */
+  const ohneStandardGefragt = !berichtigungZu && rufname.geladen && rufname.standard == null;
+  const ausRufname = (seite: 'von' | 'an') => ohneStandardGefragt && hatVorgabe(seite, vorgabeTyp);
+  const rufnameSichtbar = pflichtSichtbar.filter(ausRufname);
   /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
   const pflichtGrundId = useId();
+  const inhaltGrundId = useId();
   const zeitGrundId = useId();
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
@@ -401,6 +426,8 @@ export default function Schnellerfassung({
   const protokollGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
+  /** Ein Text nur aus einem unbekannten `/wort` wurde nicht gesendet (LLH-1754); geht beim Tippen. */
+  const [befehlHinweis, setBefehlHinweis] = useState<string | null>(null);
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   /**
@@ -422,8 +449,13 @@ export default function Schnellerfassung({
    * Unlesbare Angabe hinter `/zeit` (LLH-1088): abgeleitet aus dem Text, nicht gespeichert, damit
    * auch ein neu eingehängter Entwurf sie kennt (Nach-Review 1 zu LLH-1866).
    */
-  const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
-  const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
+  const zeitImInhalt = parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
+  // Am Textende ohne Leerzeichen tippt womöglich noch jemand: dort meldet sich der Grund erst mit
+  // dem angehaltenen Senden (LLH-1754), nicht bei jeder Ziffer.
+  const zeitBefehlGrund =
+    zeitImInhalt && !zeitImInhalt.ok && (zeitImInhalt.abgeschlossen || isUnlesbarHalted)
+      ? zeitImInhalt.grund
+      : null;
   function handleZeitDiscard(grund: string | null) {
     zeitDiscardedRef.current = grund;
     setZeitDiscardedState(grund);
@@ -594,18 +626,45 @@ export default function Schnellerfassung({
     });
   }
 
-  /** Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). */
+  /**
+   * Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). Füllt
+   * eine fehlende Seite der Rufname aus der offenen Abfrage, geht der Fokus zuerst dorthin
+   * (LLH-1764): sie gilt einmal für alle Einträge.
+   */
   function fokusStart(nurOhneFremdenFokus = false) {
-    const fehlt = berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0];
-    if (fehlt) fokusFeld(fehlt, nurOhneFremdenFokus);
+    const fehlen = berichtigungZu ? [] : fehlendeSeiten(wirksam);
+    if (fehlen.length > 0) fokusPflicht(fehlen, nurOhneFremdenFokus);
     else textRef.current?.focus();
   }
 
+  /** Fokus auf den Weg, der die fehlenden Seiten füllt: die Abfrage, sonst das erste Feld. */
+  function fokusPflicht(fehlen: readonly ('von' | 'an')[], nurOhneFremdenFokus = false) {
+    if (!fehlen.some(ausRufname)) {
+      fokusFeld(fehlen[0], nurOhneFremdenFokus);
+      return;
+    }
+    requestAnimationFrame(() => {
+      if (nurOhneFremdenFokus && istEingabefeld(document.activeElement)) return;
+      // Eingeklappt (Handschirm) steht die Abfrage nicht: dann das Feld selbst.
+      const ziel = rufnameRef.current ?? (fehlen[0] === 'von' ? vonRef : anRef).current;
+      ziel?.focus();
+    });
+  }
+
+  /** Nach dem Übernehmen des Rufnamens: Fokus, sobald der Standard gilt (nächstes leeres Feld). */
+  const fokusNachRufname = useRef(false);
+  useEffect(() => {
+    if (!fokusNachRufname.current || rufname.standard == null) return;
+    fokusNachRufname.current = false;
+    fokusStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rufname.standard]);
+
   function aktualisiereTrigger(text: string, caret: number) {
-    const slash = erkenneSlashTrigger(text, caret);
+    const slash = parseSlashTrigger(text, caret);
     // `@` gibt es im Berichtigungsmodus nicht: dort bleiben Von/An über `/von`, `/an`
     // erreichbar, aber die Zeile soll nichts still umschreiben, was das Original trug.
-    const at = slash.aktiv || berichtigungZu ? null : erkenneAtTrigger(text, caret);
+    const at = slash.aktiv || berichtigungZu ? null : parseAtTrigger(text, caret);
     const t = at?.aktiv ? at : slash;
     setMenuModus(at?.aktiv ? 'at' : 'slash');
     setTypenAnbieten(slash.aktiv && !berichtigungZu && amZeilenanfang(text, slash.start));
@@ -615,8 +674,10 @@ export default function Schnellerfassung({
   }
 
   function onInhaltChange(neu: string) {
+    setBefehlHinweis(null);
+    if (neu.trim() !== '') setInhaltFehlt(false);
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
-    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
+    const befehl = berichtigungZu ? null : parseTypBefehl(neu, erlaubteTypen);
     let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
@@ -628,9 +689,15 @@ export default function Schnellerfassung({
     // wer in „/zeit 2590 Pumpe“ eine Ziffer löscht, meint nicht 02:59.
     const caretRoh = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
     const caretImRest = caretRoh - (neu.length - text.length);
-    const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    const zeit = parseZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    // Beim Tippen nur ein abgeschlossener Befehl (Leerzeichen hinter der Angabe); ein offener am
+    // Textende geht erst mit Enter bzw. „Erfassen“ ins Feld (LLH-1754).
     const ausloesen =
-      zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
+      zeit != null &&
+      zeit.abgeschlossen &&
+      (befehl != null ||
+        caretImRest === zeit.ende ||
+        parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() }) == null);
     if (zeit?.ok && ausloesen) {
       applyZeitFromText(zeit.zeitpunkt);
       text = zeit.rest;
@@ -791,7 +858,13 @@ export default function Schnellerfassung({
   }
 
   async function absenden() {
-    if (sendet || inhalt.trim() === '') return;
+    if (sendet) return;
+    if (inhalt.trim() === '') {
+      setInhaltFehlt(true);
+      fokusInsFeld();
+      return;
+    }
+    setInhaltFehlt(false);
     // Ein lesbares `/zeit`, das beim Tippen nicht übernommen wurde (berichtigt mitten in der
     // Angabe, dort löst LLH-1088 bewusst nicht aus): dieser Klick übernimmt die Zeit sichtbar ins
     // Feld und sendet noch nicht. Erst der nächste sendet, mit Nachtrag am Knopf (Review B1,
@@ -802,12 +875,30 @@ export default function Schnellerfassung({
       fokusInsFeld();
       return;
     }
+    // Ein Text nur aus einem Befehl geht nie ins Tagebuch (LLH-1754): der Befehl wirkt wie die Wahl
+    // im `/`-Menü, ein unbekannter bleibt stehen und heißt „kein Befehl“.
+    const nurBefehl = parseNurBefehl(inhalt, berichtigungZu ? [] : erlaubteTypen);
+    if (nurBefehl) {
+      if (nurBefehl.art === 'unbekannt') {
+        setBefehlHinweis(`„${nurBefehl.befehl}“ ist kein Befehl`);
+        fokusInsFeld();
+        return;
+      }
+      setInhalt('');
+      if (nurBefehl.art === 'typ') {
+        setTyp(nurBefehl.typ);
+        fokusInsFeld();
+      } else {
+        fokusFeld(nurBefehl.feld);
+      }
+      return;
+    }
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
     // bleiben stehen; der Grund steht am Feld, der Fokus geht dorthin (Spec „Pflicht im Client“).
     const fehlen = fehlendeSeiten(wirksam);
     setPflicht(fehlen);
     if (fehlen.length > 0) {
-      fokusFeld(fehlen[0]);
+      fokusPflicht(fehlen);
       return;
     }
     // Zeichengrenzen des Servers (LFH-937, design.md D8): ebenfalls VOR Upload und Warteschlange.
@@ -1034,18 +1125,42 @@ export default function Schnellerfassung({
   });
   const gruende = (
     <>
-      {pflichtSichtbar.map((seite) => (
+      {inhaltFehltSichtbar && (
         <span
-          key={seite}
-          id={`${pflichtGrundId}-${seite}`}
+          id={inhaltGrundId}
+          role="alert"
+          data-lfh="etb-inhalt-hinweis"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Inhalt fehlt</span>
+        </span>
+      )}
+      {rufnameSichtbar.length > 0 && (
+        <span
+          id={`${pflichtGrundId}-rufname`}
           role="alert"
           data-lfh="etb-pflicht-hinweis"
           style={grundStil(rollen.alarmText)}
         >
           <IconWarndreieck />
-          <span>{FEHLT[seite]}</span>
+          <span>{rufnameFehltText(rufnameSichtbar)}</span>
         </span>
-      ))}
+      )}
+      {pflichtSichtbar
+        .filter((seite) => !ausRufname(seite))
+        .map((seite) => (
+          <span
+            key={seite}
+            id={`${pflichtGrundId}-${seite}`}
+            role="alert"
+            data-lfh="etb-pflicht-hinweis"
+            style={grundStil(rollen.alarmText)}
+          >
+            <IconWarndreieck />
+            <span>{FEHLT[seite]}</span>
+          </span>
+        ))}
       {/* EIN Grund zur Zeit, und zwar der, an dem der Halt hängt: `absenden` prüft die unlesbare
           Zeit vor der Zukunft (Review 3, B1). Alle tragen dieselbe `id`, also nur einer im Bild; je
           ein `key`, damit ein neuer Grund neu einhängt und ein Vorleser den Alarm ansagt. */}
@@ -1088,6 +1203,12 @@ export default function Schnellerfassung({
       {nachtragMin != null && (
         <span data-lfh="etb-nachtrag-hinweis" style={grundStil(rollen.achtungText)}>
           {nachtragHinweis(nachtragMin)}
+        </span>
+      )}
+      {befehlHinweis && (
+        <span role="alert" data-lfh="etb-befehl-hinweis" style={grundStil(rollen.alarmText)}>
+          <IconWarndreieck />
+          <span>{befehlHinweis}</span>
         </span>
       )}
       {laengenHinweis && (
@@ -1246,7 +1367,14 @@ export default function Schnellerfassung({
       className="etb-erfassung-card"
       data-lfh="etb-erfassung"
       // Das erste leere Pflichtfeld, für Fokuswege von außen (`EtbPage`, `?neu=1`).
-      data-startfeld={(berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0]) ?? undefined}
+      // Ohne Standard „rufname“, wenn die Abfrage eine fehlende Seite füllt (LLH-1764).
+      data-startfeld={
+        berichtigungZu
+          ? undefined
+          : fehltJetzt.some(ausRufname)
+            ? 'rufname'
+            : (fehltJetzt[0] ?? undefined)
+      }
     >
       {berichtigungZu && (
         <Alert
@@ -1271,11 +1399,23 @@ export default function Schnellerfassung({
           quellen={vonAnQuellen}
           standard={rufname.standard}
           vorschlag={anVorbelegung(einsatz)}
+          feldRef={rufname.standard ? undefined : rufnameRef}
+          pflichtGrundId={rufnameSichtbar.length > 0 ? `${pflichtGrundId}-rufname` : undefined}
           onUebernehmen={async (wert) => {
-            await rufname.setze(wert);
+            // Die erste Abfrage: weiter ins nächste leere Pflichtfeld, sobald der Standard gilt
+            // (eine Meldung braucht noch ihr Von); das Ändern geht wie bisher in den Inhalt. Vor
+            // `setze` gemerkt: der Standard kann schon vor dessen Antwort im Cache stehen.
+            const erste = rufname.standard == null;
+            fokusNachRufname.current = erste;
+            try {
+              await rufname.setze(wert);
+            } catch (e) {
+              fokusNachRufname.current = false;
+              throw e;
+            }
             setRufnameAendern(false);
             setPflicht([]);
-            fokusInsFeld();
+            if (!erste) fokusInsFeld();
           }}
           onAbbrechen={rufname.standard ? () => setRufnameAendern(false) : undefined}
         />
@@ -1294,7 +1434,7 @@ export default function Schnellerfassung({
             onFeld={setzeFeld}
             onFertig={fokusInsFeld}
             pflicht={pflichtSichtbar}
-            pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
+            pflichtId={(seite) => `${pflichtGrundId}-${ausRufname(seite) ? 'rufname' : seite}`}
             zeitGrund={unlesbarGrund ?? zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
             onZeitDiscard={handleZeitDiscard}
@@ -1333,7 +1473,8 @@ export default function Schnellerfassung({
           // Feld behält so beim Aufklappen seinen Platz im Baum.
           feldFuellt
           praefix={praefix}
-          rahmenFarbe={typFarbe.kante}
+          // „Inhalt fehlt“ färbt den Rahmen der Zeile, die das rahmenlose Feld trägt (LLH-1771).
+          rahmenFarbe={inhaltFehltSichtbar ? rollen.alarm : typFarbe.kante}
           hinweis={
             istSchmal ? undefined : (
               <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
@@ -1355,6 +1496,8 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            aria-invalid={inhaltFehltSichtbar}
+            aria-describedby={inhaltFehltSichtbar ? inhaltGrundId : undefined}
             // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
             enterKeyHint="enter"
             readOnly={sendet}

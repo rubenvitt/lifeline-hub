@@ -69,7 +69,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     datei: 'offline/queueZaehlerMerker.ts',
     entscheidung: 'jeder-ausgang',
     grund:
-      'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „WARTET n“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
+      'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „n NICHT GESENDET“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
   },
   {
     ort: 'IndexedDB lifeline-etb-entwuerfe; localStorage lifeline-etb-entwuerfe-ausstehend:<id>',

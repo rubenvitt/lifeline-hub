@@ -46,6 +46,7 @@ import {
 } from './zeitachse';
 import { serverJetzt } from '../offline/serveruhr';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Zeitachse einer Kraft (LFH-552) — Einheit-Detailseite und aufgeklappte Personalzeile teilen
@@ -465,21 +466,13 @@ export default function KraftZeitachse({
         onFertig={() => setNachtragOffen(false)}
         onAbbrechen={() => setNachtragOffen(false)}
       >
-        <Feld<NachtragWerte>
-          name="art"
-          label="Ereignis"
-          rules={[{ required: true, message: 'Bitte ein Ereignis wählen' }]}
-        >
+        <Feld<NachtragWerte> name="art" label="Ereignis" rules={[pflicht('Ereignis')]}>
           <Select
             placeholder="Ereignis wählen…"
             options={NACHTRAG_ARTEN.map((a) => ({ value: a, label: ART_WORT[a] }))}
           />
         </Feld>
-        <Feld<NachtragWerte>
-          name="zeitpunkt"
-          label="Zeitpunkt"
-          rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
-        >
+        <Feld<NachtragWerte> name="zeitpunkt" label="Zeitpunkt" rules={[pflicht('Zeitpunkt')]}>
           {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Feld>
@@ -522,17 +515,13 @@ export default function KraftZeitachse({
               validator: (_, wert) =>
                 wert || getFieldValue('alarmierung')
                   ? Promise.resolve()
-                  : Promise.reject(new Error('Bitte Alarmierung oder Eintreffen angeben')),
+                  : Promise.reject(new Error('Alarmierung oder Eintreffen fehlt')),
             }),
           ]}
         >
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Feld>
-        <Feld<PeriodeWerte>
-          name="entlassung"
-          label="Entlassung"
-          rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
-        >
+        <Feld<PeriodeWerte> name="entlassung" label="Entlassung" rules={[pflicht('Entlassung')]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Feld>
         <Feld<PeriodeWerte>
@@ -567,18 +556,14 @@ export default function KraftZeitachse({
         <Typography.Paragraph>
           {berichtige && `${ART_WORT[berichtige.art]} ${zeit(berichtige.zeitpunkt_at)}`}
         </Typography.Paragraph>
-        <Feld<BerichtigWerte>
-          name="zeitpunkt"
-          label="Zeitpunkt"
-          rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
-        >
+        <Feld<BerichtigWerte> name="zeitpunkt" label="Zeitpunkt" rules={[pflicht('Zeitpunkt')]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Feld>
         <Feld<BerichtigWerte>
           name="grund"
           label="Grund"
           rules={[
-            { required: true, whitespace: true, message: 'Bitte einen Grund angeben' },
+            pflicht('Grund', { whitespace: true }),
             zeichenRegel(ZEITACHSE_GRUND_MAX, 'Grund'),
           ]}
         >
@@ -610,7 +595,7 @@ export default function KraftZeitachse({
           name="grund"
           label="Grund"
           rules={[
-            { required: true, whitespace: true, message: 'Bitte einen Grund angeben' },
+            pflicht('Grund', { whitespace: true }),
             zeichenRegel(ZEITACHSE_GRUND_MAX, 'Grund'),
           ]}
         >

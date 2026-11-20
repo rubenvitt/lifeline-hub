@@ -65,7 +65,7 @@ describe('SchadenErfassenModal — Eingabegrenzen (LFH-937)', () => {
     expect(screen.getByText('6.400 / 8.000')).toBeInTheDocument();
     fireEvent.change(beschreibung, { target: { value: 'b'.repeat(8_001) } });
     expect(beschreibung).toHaveValue('b'.repeat(8_001));
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(
       await screen.findByText('Beschreibung darf höchstens 8.000 Zeichen lang sein'),
     ).toBeInTheDocument();
@@ -88,7 +88,7 @@ describe('SchadenErfassenModal — Eingabegrenzen (LFH-937)', () => {
     const ort = await screen.findByLabelText('Ort');
     fireEvent.change(ort, { target: { value: 'o'.repeat(501) } });
     expect(ort).toHaveValue('o'.repeat(501));
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Ort darf höchstens 500 Zeichen lang sein')).toBeInTheDocument();
     expect(gesendet).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
     await waehle(dialog, 'Typ', 'Sachschaden');
     await waehle(dialog, 'Ausmaß', 'gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
   }
 
   const ablehnen = () => HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
@@ -171,7 +171,7 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
     await fuelleUndLegeAn(dialog);
     await within(dialog).findByRole('alert');
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
   });
@@ -289,7 +289,7 @@ describe('SchadenErfassenModal — Gefahr und Schadensgrad (LLH-1115)', () => {
     await waehle(dialog, 'Gefahr', 'Elektrizität');
     await userEvent.click(within(dialog).getByText('Weitere Angaben'));
     await waehle(dialog, 'Schadensgrad', 'total zerstört');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toBeDefined());
     expect(gesendet).toMatchObject({
       typ: 'infrastruktur',
@@ -312,7 +312,7 @@ describe('SchadenErfassenModal — Gefahr und Schadensgrad (LLH-1115)', () => {
     await waehle(dialog, 'Typ', 'Sachschaden');
     await waehle(dialog, 'Ausmaß', 'gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'A');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toBeDefined());
     expect(gesendet!.gefahrenart).toBeNull();
     expect(gesendet!.schadensgrad).toBeNull();
@@ -374,7 +374,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     expect(within(dialog).getByRole('group', { name: 'Karte: Schadensort' })).toHaveTextContent(
       '52.3,9.7',
     );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       ort: 'Hauptstraße 17, 12345 Musterstadt',
@@ -390,7 +390,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     await pflichtfelder(dialog);
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     expect(within(dialog).getByText('Nicht verortet')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ ort: 'Hauptstr. 17', lat: null, lon: null });
   });
@@ -401,7 +401,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     const dialog = await screen.findByRole('dialog');
     await pflichtfelder(dialog);
     await userEvent.type(within(dialog).getByLabelText('Ort'), '52.512, 13.401');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ ort: '52.512, 13.401', lat: 52.512, lon: 13.401 });
   });
@@ -412,8 +412,8 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     const dialog = await screen.findByRole('dialog');
     await pflichtfelder(dialog);
     await userEvent.type(within(dialog).getByLabelText('Ort'), '   ');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Ort ist Pflicht')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(await within(dialog).findByText('Ort fehlt')).toBeInTheDocument();
     expect(gesendet).toHaveLength(0);
   });
 
@@ -455,7 +455,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
     await userEvent.click(
       await within(dialog).findByRole('button', { name: /Hauptstraße 17, 12345 Musterstadt/ }),
     );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBe(
       'Hauptstraße 17, 12345 Musterstadt',
@@ -474,7 +474,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
       '52.3,9.7',
     );
     await pflichtfelder(dialog);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ ort: 'Marktplatz', lat: 52.3, lon: 9.7 });
   });

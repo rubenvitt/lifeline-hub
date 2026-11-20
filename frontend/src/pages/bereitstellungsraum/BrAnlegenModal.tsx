@@ -9,6 +9,7 @@ import type { Bereitstellungsraum } from '../../api/types';
 import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
 import { ortEingabe } from '../../anzeige/ortsfeldFormular';
+import { pflicht } from '../../components/pflichtRegel';
 
 /** Formularwerte: der Standort ist ein Ortsfeld (Text und Koordinate, LLH-1114). */
 type BrFormular = Omit<BrEingabe, 'standort' | 'lat' | 'lon'> & { standort?: OrtsfeldWert };
@@ -39,10 +40,7 @@ export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsra
       <Feld
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[
-          { required: true, message: 'Bezeichnung erforderlich' },
-          zeichenRegel(BR_BEZEICHNUNG_MAX, 'Bezeichnung'),
-        ]}
+        rules={[pflicht('Bezeichnung'), zeichenRegel(BR_BEZEICHNUNG_MAX, 'Bezeichnung')]}
       >
         <Input placeholder="z. B. BR Ost" count={zeichenGrenze(BR_BEZEICHNUNG_MAX)} />
       </Feld>

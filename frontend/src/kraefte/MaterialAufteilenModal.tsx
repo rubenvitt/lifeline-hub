@@ -14,6 +14,7 @@ import {
   toOrtValue,
   type MaterialOrtRef,
 } from './materialPosten';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Werte {
   menge?: number;
@@ -114,7 +115,7 @@ export default function MaterialAufteilenModal({
         label="Menge abteilen"
         name="menge"
         rules={[
-          { required: true, message: 'Menge eintragen' },
+          pflicht('Menge'),
           {
             validator: (_, n: number | undefined) =>
               n == null || isValidMenge(n, hoechste)

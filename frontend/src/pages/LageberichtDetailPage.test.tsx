@@ -945,7 +945,7 @@ describe('LageberichtDetailPage — Verlassen-Schutz (LLH-1351)', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Lageberichte' }));
     const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
     await userEvent.click(dialog.getByRole('button', { name: 'Speichern und weiter' }));
-    await screen.findByText(/titel.*required/i);
+    await screen.findByText('Titel fehlt');
     expect(screen.queryByText('LB-LISTE')).toBeNull();
   });
 

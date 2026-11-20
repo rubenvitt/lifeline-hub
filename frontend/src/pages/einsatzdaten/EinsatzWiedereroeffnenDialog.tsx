@@ -7,6 +7,7 @@ import { ErfassungsModal } from '../../components/Erfassung';
 import { Feld, schriftStil, useRollen } from '../../components/instrument';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { SOFORT_ODER_NIE } from './EinsatzAbschlussDialog';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Dialog „Einsatz wieder öffnen“ (LLH-1814, Spec `einsatz-abschluss`, design.md D6): Pflichtfeld
@@ -79,7 +80,7 @@ export default function EinsatzWiedereroeffnenDialog({
         label="Grund"
         name="grund"
         rules={[
-          { required: true, whitespace: true, message: 'Grund angeben' },
+          pflicht('Grund', { whitespace: true }),
           { max: ETB_INHALT_MAX, message: `Höchstens ${ETB_INHALT_MAX} Zeichen` },
         ]}
       >

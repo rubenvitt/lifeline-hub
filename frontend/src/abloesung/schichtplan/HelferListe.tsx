@@ -21,6 +21,7 @@ import { nachText, werteAus } from '../../components/katalogVergleich';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { teilwortSuche } from '../../components/teilwortSuche';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface HelferWerte {
   name: string;
@@ -99,7 +100,7 @@ function HelferDialog({
       titel={helfer ? `Helfer ${helfer.name}` : 'Helfer anlegen'}
       form={form}
       initialValues={anfang}
-      erfassenText={helfer ? 'Speichern' : 'Helfer anlegen'}
+      erfassenText={helfer ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={helfer ? 'Helfer nicht gespeichert' : 'Helfer nicht angelegt'}
@@ -120,11 +121,7 @@ function HelferDialog({
           {helfer.herkunft && <Datenfeld label="Herkunft">{helfer.herkunft}</Datenfeld>}
         </Datenraster>
       )}
-      <Feld<HelferWerte>
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld<HelferWerte> label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input maxLength={SCHICHTPLAN_HELFER_TEXT_MAX} />
       </Feld>
       <Feld<HelferWerte> label="Organisation" name="organisation">

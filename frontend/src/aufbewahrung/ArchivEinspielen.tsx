@@ -17,6 +17,7 @@ import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { IconHochladen } from '../icons';
 import { einsatzPfad } from '../routing/deeplinks';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Archivblock in der Verwaltung einspielen (LLH-1711, Change
@@ -131,7 +132,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
         valuePropName="fileList"
         getValueFromEvent={dateiAusListe}
         rules={[
-          { required: true, message: 'Archivblock wählen' },
+          pflicht('Archivblock'),
           {
             validator: (_, liste?: UploadFile[]) =>
               (liste?.[0]?.originFileObj?.size ?? 0) > ARCHIV_BLOCK_MAX_BYTES
@@ -162,7 +163,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           valuePropName="fileList"
           getValueFromEvent={dateiAusListe}
           rules={[
-            { required: true, message: 'Schlüsseldatei wählen' },
+            pflicht('Schlüsseldatei'),
             {
               validator: (_, liste?: UploadFile[]) =>
                 (liste?.[0]?.originFileObj?.size ?? 0) > ARCHIV_PRIVATSCHLUESSEL_MAX
@@ -180,7 +181,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           name="schluesselText"
           label="Schlüssel"
           rules={[
-            { required: true, whitespace: true, message: 'Schlüssel einfügen' },
+            pflicht('Schlüssel', { whitespace: true }),
             hoechstensBytes(ARCHIV_PRIVATSCHLUESSEL_MAX, 'Das ist kein Archiv-Schlüssel: zu lang'),
           ]}
         >

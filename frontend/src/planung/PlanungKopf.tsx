@@ -25,6 +25,7 @@ import {
   zeitraumRegel,
 } from './planungRegeln';
 import { applyPlanung } from './planungCache';
+import { pflicht } from '../components/pflichtRegel';
 
 export interface KopfWerte {
   bezeichnung: string;
@@ -112,7 +113,7 @@ export default function PlanungKopf({
       label: 'Bezeichnung',
       anzeige: kopf.bezeichnung,
       eingabe: <Input maxLength={PLANUNG_BEZEICHNUNG_MAX} />,
-      regeln: [{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }],
+      regeln: [pflicht('Bezeichnung', { whitespace: true })],
     },
     {
       name: 'einsatzart',

@@ -343,7 +343,7 @@ describe('SchaedenPage', () => {
         'gering',
         mitKoordinate ? '52.100, 8.500' : 'Hauptstr. 17',
       );
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
       await warteBisDialogWeg();
 
       const zeile = await screen.findByRole('row', { name: /S-001/ });
@@ -458,7 +458,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getAllByRole('combobox')[1]); // Ausmaß
     await waehleOption('groß');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.typ).toBe('umweltschaden'));
     expect(body.ausmass).toBe('gross');
     expect(body.ort).toBe('Hauptstr. 17');
@@ -534,7 +534,7 @@ describe('SchaedenPage', () => {
     await waehleOption('Umweltschaden');
     await userEvent.click(within(dialog).getAllByRole('combobox')[1]);
     await waehleOption('groß');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].geschaedigt_person_id).toBe(42);
@@ -544,7 +544,7 @@ describe('SchaedenPage', () => {
     expect(koerper[1]).toMatchObject({ ort: '52.100, 8.500', lat: 52.1, lon: 8.5 });
   });
 
-  it('„Anlegen" schließt den Dialog', async () => {
+  it('„Erfassen" schließt den Dialog', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -556,7 +556,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(koerper).toHaveLength(1));
     await warteBisDialogWeg();
@@ -576,7 +576,7 @@ describe('SchaedenPage', () => {
     await oeffneWeitereAngaben(ersterDialog);
     expect(within(ersterDialog).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
     await fuelleSchaden(ersterDialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
-    await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
@@ -605,7 +605,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Fehlerort Schaden');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(versuche).toBe(1));
     expect(within(dialog).getByLabelText('Ort')).toHaveValue('Fehlerort Schaden');
@@ -645,7 +645,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Wartort Schaden');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await postStart;
     expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
@@ -737,7 +737,7 @@ describe('SchaedenPage', () => {
     await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
     expect(body.geschaedigt_personal_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
@@ -763,7 +763,7 @@ describe('SchaedenPage', () => {
     await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('Schulz · Sanitäter');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
     expect(body.geschaedigt_person_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
@@ -796,7 +796,7 @@ describe('SchaedenPage', () => {
     );
     expect(externOption).toBeTruthy();
     await userEvent.click(externOption!);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.geschaedigt_kontakt).toBe('Familie Krause'));
     expect(body.geschaedigt_person_id).toBeNull();
     expect(body.geschaedigt_personal_id).toBeNull();

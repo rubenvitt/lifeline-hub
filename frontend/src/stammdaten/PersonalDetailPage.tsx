@@ -32,6 +32,7 @@ import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   name: string;
@@ -201,13 +202,7 @@ export default function PersonalDetailPage() {
             <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
               <Row gutter={token.margin}>
                 <Col xs={24} lg={12}>
-                  <Feld
-                    label="Name"
-                    name="name"
-                    rules={[
-                      { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
-                    ]}
-                  >
+                  <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
                     <Input />
                   </Feld>
                 </Col>

@@ -59,22 +59,28 @@ function Harness({
 }
 
 describe('VollzugMeldenModal — Speicherfehler im Dialog (LFH-1077)', () => {
-  it('sperrt Melden, solange die Rückmeldung leer ist, statt einen Toast zu zeigen', async () => {
+  it('nennt eine leere Rückmeldung am beschrifteten Feld, statt den Knopf stumm zu sperren (LLH-1771)', async () => {
     const onBestaetigen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <VollzugMeldenModal offen onAbbrechen={vi.fn()} onBestaetigen={onBestaetigen} />,
     );
     const melden = screen.getByRole('button', { name: 'Vollzug melden' });
-    expect(melden).toBeDisabled();
-    const feld = screen.getByPlaceholderText('Rückmeldung zur Erledigung');
+    expect(melden).toBeEnabled();
+    const feld = screen.getByRole('textbox', { name: 'Vollzugsmeldung' });
+    expect(screen.queryByText('Vollzugsmeldung fehlt')).not.toBeInTheDocument();
     await userEvent.type(feld, '   ');
-    expect(melden).toBeDisabled();
     await userEvent.click(melden);
     expect(onBestaetigen).not.toHaveBeenCalled();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(screen.getByText('Vollzugsmeldung fehlt')).toBeInTheDocument();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveFocus();
 
+    // Beim Tippen verschwindet der Grund; erst Text meldet.
     await userEvent.type(feld, 'Deich gehalten');
-    expect(melden).toBeEnabled();
+    expect(screen.queryByText('Vollzugsmeldung fehlt')).not.toBeInTheDocument();
+    await userEvent.click(melden);
+    expect(onBestaetigen).toHaveBeenCalledWith('Deich gehalten');
   });
 
   it('behält bei einer Ablehnung den Text und nennt den Grund im Dialog', async () => {

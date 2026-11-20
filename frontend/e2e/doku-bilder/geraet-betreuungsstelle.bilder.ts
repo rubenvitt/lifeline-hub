@@ -136,7 +136,7 @@ test.describe(KAPITEL, () => {
       // Nachgeklickt: Meldung an die Einsatzleitung aus dem Bereich „Meldungen“.
       await geraet.getByRole('tab', { name: 'Meldungen' }).click();
       await geraet.getByLabel('Inhalt').fill('Feldbetten werden knapp, noch 10 frei');
-      await geraet.getByRole('button', { name: 'Meldung senden' }).click();
+      await geraet.getByRole('button', { name: 'Erfassen', exact: true }).click();
       await expect(geraet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
       await expect(geraet.getByLabel('Inhalt')).toHaveValue('');
     } finally {

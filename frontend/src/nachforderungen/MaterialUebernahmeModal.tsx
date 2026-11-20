@@ -13,6 +13,7 @@ import {
   uebernahmeVorbelegung,
   type UebernahmeWerte,
 } from './materialUebernahme';
+import { pflicht } from '../components/pflichtRegel';
 
 type NachforderungImDialog = Pick<
   Nachforderung,
@@ -155,7 +156,7 @@ export default function MaterialUebernahmeModal({
         breite="kurz"
         label="Menge"
         name="menge"
-        rules={[{ required: true }]}
+        rules={[pflicht('Menge')]}
         extra={isGeraet ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
       >
         <MengenFeld beschriftung="Menge" disabled={isGeraet} />

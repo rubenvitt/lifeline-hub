@@ -617,7 +617,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden übergeben' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
-    expect(await screen.findByText('Adressat ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Adressat fehlt')).toBeInTheDocument();
     expect(body.uebergeben_an).toBeUndefined();
     await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
@@ -637,7 +637,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden abschließen' }));
-    expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Abschlussgrund fehlt')).toBeInTheDocument();
     expect(body.abschluss_grund).toBeUndefined();
     await userEvent.click(within(dialog).getByRole('combobox'));
     const option = (await screen.findAllByText('behoben')).find((el) =>
@@ -1077,7 +1077,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 /**
  * Prüfung am Feld (LLH-1101): die Zellen des Bearbeiten-Modus stehen auf `DatenfeldEingabe`, ein
  * Prüffehler steht sichtbar unter seiner Eingabe. Vorher lag `Form.Item noStyle` in der Zelle:
- * „Ort ist Pflicht“ verhinderte das Speichern, ohne dass irgendwo stand, warum.
+ * „Ort fehlt“ verhinderte das Speichern, ohne dass irgendwo stand, warum.
  */
 describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
   function mitPatch() {
@@ -1091,7 +1091,7 @@ describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
     return koerper;
   }
 
-  it('leerer Ort: „Ort ist Pflicht“ steht am Feld, der Fokus darin, kein PATCH', async () => {
+  it('leerer Ort: „Ort fehlt“ steht am Feld, der Fokus darin, kein PATCH', async () => {
     const koerper = mitPatch();
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     const ort = await screen.findByLabelText('Ort');
@@ -1099,9 +1099,9 @@ describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
     // Mutationsprobe: `noStyle` zurück an das `Form.Item` der Zelle — keine Meldung, rot.
-    const meldung = await screen.findByText('Ort ist Pflicht');
+    const meldung = await screen.findByText('Ort fehlt');
     expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(ort.closest('[data-lfh="datenfeld"]'));
-    expect(ort).toHaveAccessibleDescription('Ort ist Pflicht');
+    expect(ort).toHaveAccessibleDescription('Ort fehlt');
     // Mutationsprobe: ohne `scrollToFirstError` am Formular bleibt der Fokus am Knopf, rot.
     await waitFor(() => expect(ort).toHaveFocus());
     await new Promise((r) => setTimeout(r, 50));
@@ -1117,7 +1117,7 @@ describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(koerper).toHaveLength(1));
     expect(koerper[0].ort).toBe('Bahnhofstr. 3');
-    expect(screen.queryByText('Ort ist Pflicht')).toBeNull();
+    expect(screen.queryByText('Ort fehlt')).toBeNull();
   });
 
   it('eine zu lange Beschreibung nennt die Grenze am Feld', async () => {

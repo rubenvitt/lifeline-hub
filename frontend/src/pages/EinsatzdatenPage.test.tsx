@@ -1992,7 +1992,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
     expect(ok).not.toHaveClass('ant-btn-dangerous');
     // Ohne Grund geht nichts hinaus.
     await user.click(ok);
-    expect(await dialog.findByText('Grund angeben')).toBeInTheDocument();
+    expect(await dialog.findByText('Grund fehlt')).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
 
     await user.type(

@@ -843,6 +843,10 @@ export function CommandPalette({
          * Die Hinweise stehen STATISCH: ein je Zeile wechselnder Hinweis änderte die Zeilenzahl der
          * umbrechenden Fußzeile, die Palette spränge beim Pfeilen. Die Touch-Fußzeile bricht nie
          * um (eine Reihe Knöpfe gleicher Höhe in Liste und Vorschau), zu schmal scrollt sie.
+         *
+         * EINZEILIG BEI 1440 PX IN JEDER DICHTE (LFH-1055, `e2e/command-palette.spec.ts`): die
+         * Abstände kommen aus dem Raster, aber eine Stufe knapper als die übrigen Flächen. Mit
+         * `paddingLG` (44 px) und `margin` (24 px) brach die Zeile im Handschuh-Betrieb um.
          */}
         {istBeruehrung ? (
           <div
@@ -895,9 +899,9 @@ export function CommandPalette({
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
-              columnGap: token.margin,
+              columnGap: token.marginSM,
               rowGap: token.marginXS,
-              padding: `${token.paddingSM}px ${token.paddingLG}px`,
+              padding: `${token.paddingSM}px ${token.padding}px`,
               borderTop: `1px solid ${token.colorBorderSecondary}`,
               fontFamily: schrift.text,
               fontSize: schriftskala.textKlein.groesse,

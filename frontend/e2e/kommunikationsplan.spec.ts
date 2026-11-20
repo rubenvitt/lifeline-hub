@@ -197,7 +197,7 @@ test('Leitstelle und Verbindung anlegen: die zweite Seite folgt live, die Lücke
   const verbindung = page.getByRole('dialog', { name: /Verbindung hinzufügen/ });
   await waehleIn(verbindung.getByLabel('Mittel'), 'Festnetz');
   await verbindung.getByLabel('Nummer/Adresse').fill('0421 112 0');
-  await verbindung.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await verbindung.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(verbindung).toBeHidden();
 
   // Ohne Neuladen: das `stab`-Ereignis zieht den Plan der zweiten Seite nach.

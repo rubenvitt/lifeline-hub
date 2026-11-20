@@ -30,6 +30,14 @@ import { ThemeModeProvider, useWarnsperre } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
 import { adminFixture } from '../test/fixtures';
 
+/** Die Hilfe-Seitenleiste (LLH-1824): ihr Öffner, oder keiner wie auf dem Gerät. */
+const hilfe = vi.hoisted(() => ({
+  oeffneHilfe: undefined as ((reiter?: string) => void) | undefined,
+}));
+vi.mock('../hilfe/HilfeSeitenleisteProvider', () => ({
+  useHilfeSeitenleiste: () => ({ oeffneHilfe: hilfe.oeffneHilfe }),
+}));
+
 /** Zwei Wörter, damit die Initialen (erstes + letztes Wort) prüfbar sind. */
 const ANZEIGENAME = 'Chef Dienst';
 const INITIALEN = 'CD';
@@ -212,13 +220,84 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     [390, 'kompakt', 'calc(100vw - 16px)'],
     [1024, 'kompakt', '320px'],
     [390, 'handschuh', 'calc(100vw - 16px)'],
-    [1024, 'handschuh', '480px'],
+    [1024, 'handschuh', '504px'],
   ])('Menübreite bei %i px in %s: %s (LLH-1642 D12)', async (breite, dichte, erwartet) => {
     localStorage.setItem('lifeline-hub.dichte', dichte);
     setzeViewportBreite(breite);
     zeige();
     await oeffne();
     expect((await screen.findByRole('menu')).style.width).toBe(erwartet);
+  });
+
+  describe('„Hilfe zu dieser Seite“, wo der Kopf keinen Platz für „?“ hat (LLH-1824)', () => {
+    afterEach(() => {
+      hilfe.oeffneHilfe = undefined;
+    });
+
+    function zeigeMitHilfeZurSeite() {
+      server.use(meHandler(benutzer));
+      return renderMitProviders(
+        <ThemeModeProvider>
+          <BenutzerMenu hilfeZurSeite />
+        </ThemeModeProvider>,
+      );
+    }
+
+    // Am Handy (unter `md`) ERSETZT der Eintrag „Hilfe“ (Entscheidung 20.11.2026): beide zusammen
+    // schoben „Abmelden“ in `komfortabel` unter den Fensterrand. Die Seitenleiste verlinkt die
+    // volle Hilfe selbst.
+    it('am Handy ersetzt er „Hilfe“ und öffnet die Seitenleiste mit dem Kapitel zur Seite', async () => {
+      const oeffneHilfe = vi.fn();
+      hilfe.oeffneHilfe = oeffneHilfe;
+      zeigeMitHilfeZurSeite();
+      await oeffne();
+      const eintraege = await screen.findAllByRole('menuitem');
+      expect(eintraege.map((e) => e.textContent)).toEqual([
+        'Profil',
+        'Benachrichtigungen',
+        'Neuigkeiten',
+        'Hilfe zu dieser Seite',
+        'Abmelden',
+      ]);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Hilfe zu dieser Seite' }));
+      expect(oeffneHilfe).toHaveBeenCalledWith('seite');
+    });
+
+    it('ab `md` steht er vor „Hilfe“, beide bleiben', async () => {
+      setzeViewportBreite(1024);
+      hilfe.oeffneHilfe = vi.fn();
+      zeigeMitHilfeZurSeite();
+      await oeffne();
+      const eintraege = await screen.findAllByRole('menuitem');
+      expect(eintraege.map((e) => e.textContent)).toEqual([
+        'Profil',
+        'Benachrichtigungen',
+        'Neuigkeiten',
+        'Hilfe zu dieser Seite',
+        'Hilfe',
+        'Abmelden',
+      ]);
+    });
+
+    it('fehlt ohne Seitenleiste (Gerät, Hilfeseite)', async () => {
+      zeigeMitHilfeZurSeite();
+      await oeffne();
+      // Positive Gegenprobe mit derselben Abfrage: die Einträge sind geladen.
+      expect(await screen.findByRole('menuitem', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Hilfe zu dieser Seite' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('fehlt ohne `hilfeZurSeite`, auch mit Seitenleiste (Kopf mit „?“)', async () => {
+      hilfe.oeffneHilfe = vi.fn();
+      zeige();
+      await oeffne();
+      expect(await screen.findByRole('menuitem', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Hilfe zu dieser Seite' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('kein Eintrag „Rückmeldung“ und keiner „Lizenzen“ — die stehen auf der Hilfe-Seite', async () => {
@@ -278,6 +357,8 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     ['handschuh', true],
     ['komfortabel', false],
   ])('Dichte %s: Profil hat die volle Zeile, knapper Kopf = %s', async (dichte, knapp) => {
+    // Ab `md`: darunter fehlt die Version in jeder Dichte (Test unten).
+    setzeViewportBreite(1024);
     localStorage.setItem('lifeline-hub.dichte', dichte);
     zeige();
     await oeffne();
@@ -302,6 +383,17 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     const zeile = within(kopf).getByText(`@${benutzer.benutzername}`).parentElement!;
     expect(zeile.style.whiteSpace).toBe(knapp ? 'nowrap' : '');
     expect(zeile.getAttribute('title')).toBe(knapp ? `@${benutzer.benutzername}` : null);
+  });
+
+  // Am Handy ohne Version, auch in `komfortabel` (Entscheidung 20.11.2026): mit den Rollenmarken
+  // (LLH-1818) ragte „Abmelden“ sonst unter den Fensterrand. Die Version steht in der Hilfe.
+  it('unter `md` zeigt der Kopf keine Version, auch in komfortabel', async () => {
+    localStorage.setItem('lifeline-hub.dichte', 'komfortabel');
+    zeige();
+    await oeffne();
+    const kopf = await screen.findByTestId('benutzermenue-kopf');
+    expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
+    expect(within(kopf).queryAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(0);
   });
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {

@@ -1,10 +1,10 @@
 import { Form, Input, theme, type FormInstance } from 'antd';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
+import { createRef, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   ErfassungsFormular,
   ErfassungsModal,
@@ -13,6 +13,7 @@ import {
   serienKuerzel,
   titelzeilenHoehe,
   type ErfassungsFormularSteuerung,
+  type Nebenaktion,
   type Speicherung,
 } from './Erfassung';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -64,11 +65,13 @@ function Harness(props: {
   steuerungRef?: Ref<ErfassungsFormularSteuerung>;
   onErfasst?: (werte: Werte) => void | Promise<void>;
   zusammenfassung?: ReactNode;
+  fussKlebt?: 'dialog' | 'seite';
 }) {
   const [form] = Form.useForm<Werte>();
   return (
     <ErfassungsFormular<Werte>
       form={form}
+      fussKlebt={props.fussKlebt}
       onErfassen={props.onErfassen}
       onFertig={props.onFertig ?? (() => {})}
       onAbbrechen={props.onAbbrechen}
@@ -263,6 +266,44 @@ describe('ErfassungsFormular — Serienmodus', () => {
   it('ohne Serienmodus gibt es „Speichern und nächste" gar nicht', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
     expect(screen.queryByRole('button', { name: 'Speichern und nächste' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ErfassungsFormular — Zähler nur für Angenommenes (LLH-1758)', () => {
+  const vorgemerkt = { zustand: 'vorgemerkt', client_id: 'c-1', grund: 'serverfehler' };
+  const gesendet = { zustand: 'gesendet', daten: { id: 1 } };
+
+  async function speichere(nutzer: ReturnType<typeof userEvent.setup>, ort: string) {
+    await nutzer.type(screen.getByLabelText('Ort'), ort);
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  }
+
+  it('zählt Vorgemerktes als „nicht gesendet“, nie als erfasst', async () => {
+    const onErfassen = vi
+      .fn()
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(gesendet);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const nutzer = userEvent.setup();
+
+    await speichere(nutzer, 'A');
+    expect(screen.getByText('nicht gesendet: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Erfasst:/)).not.toBeInTheDocument();
+
+    await speichere(nutzer, 'B');
+    await speichere(nutzer, 'C');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.getByText('nicht gesendet: 2')).toBeInTheDocument();
+  });
+
+  it('eine Antwort ohne Vormerk-Zustand zählt als erfasst', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    await speichere(userEvent.setup(), 'A');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/nicht gesendet/)).not.toBeInTheDocument();
   });
 });
 
@@ -797,6 +838,124 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
   });
 });
 
+describe('ErfassungsFormular — klebender Fuß auf der Seite (LLH-1761)', () => {
+  class FalschesViewport extends EventTarget {
+    height = 844;
+    offsetTop = 0;
+  }
+
+  afterEach(() => {
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined });
+  });
+
+  it('auf der Seite klebt der Fuß mit eigenem Grund und eigener Variable', () => {
+    const { unmount } = renderMitProviders(
+      <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe('0px');
+    // Kein negativer Rand: der reicht nur im Dialog über dessen Polster.
+    expect(fuss!.style.marginBottom).toBe('');
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).not.toBe('');
+    unmount();
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).toBe('');
+  });
+
+  it('der Seitenfuß liegt über kompakten Eingabegruppen und nimmt den Grund der Fläche dahinter', () => {
+    renderMitProviders(
+      <div style={{ backgroundColor: 'rgb(1, 2, 3)' }}>
+        <div>
+          <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />
+        </div>
+      </div>,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    // antds `Space.Compact` hebt seine Glieder auf z-index 2 (Fundort der Aufnahme).
+    expect(Number(fuss.style.zIndex)).toBeGreaterThan(2);
+    expect(fuss.style.backgroundColor).toBe('rgb(1, 2, 3)');
+  });
+
+  it('unter md klebt auf der Seite nur der Abschluss samt „Abbrechen“, die Serie steht am Ende', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <Harness
+        fussKlebt="seite"
+        serie
+        uebernahme={['ort']}
+        onAbbrechen={() => {}}
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    const serie = document.querySelector<HTMLElement>('[data-lfh="erfassung-serie"]')!;
+    expect(fuss.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    // Eine Seite hat keinen Dialogkopf: „Abbrechen“ bleibt im klebenden Fuß.
+    expect(fuss.contains(screen.getByRole('button', { name: 'Abbrechen' }))).toBe(true);
+    expect(serie).not.toBeNull();
+    expect(serie.contains(screen.getByRole('button', { name: /Speichern und nächste/ }))).toBe(
+      true,
+    );
+    expect(serie.contains(screen.getByRole('checkbox', { name: /Werte behalten/ }))).toBe(true);
+  });
+
+  it('ohne fussKlebt klebt nichts', () => {
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    expect(document.querySelector('[data-lfh^="erfassung-fuss"]')).toBeNull();
+  });
+
+  it('Seite und Dialog messen getrennte Variablen', () => {
+    function Beide({ dialog }: { dialog: boolean }) {
+      const [form] = Form.useForm<Werte>();
+      return (
+        <>
+          <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />
+          <ErfassungsModal<Werte>
+            offen={dialog}
+            titel="Dialog"
+            form={form}
+            onErfassen={vi.fn().mockResolvedValue(undefined)}
+            onFertig={() => {}}
+            onAbbrechen={() => {}}
+          >
+            <Form.Item label="Feld" name="ort">
+              <Input />
+            </Form.Item>
+          </ErfassungsModal>
+        </>
+      );
+    }
+    const { rerender } = renderMitProviders(<Beide dialog />);
+    expect(document.querySelector('[data-lfh="erfassung-fuss"]')).not.toBeNull();
+    rerender(<Beide dialog={false} />);
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).not.toBe('');
+  });
+
+  it('mit Fokus und offener Tastatur rückt der Seitenfuß über sie', () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    const vv = new FalschesViewport();
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
+    renderMitProviders(
+      <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    act(() => screen.getByLabelText('Ort').focus());
+    act(() => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
+    expect(fuss!.style.bottom).toBe('344px');
+  });
+});
+
 describe('ErfassungsModal', () => {
   function ModalHarness(props: {
     offen: boolean;
@@ -804,6 +963,11 @@ describe('ErfassungsModal', () => {
     onErfasst?: (w: Werte) => void;
     onFertig?: () => void;
     onAbbrechen?: () => void;
+    speicherung?: Speicherung;
+    serie?: boolean;
+    uebernahme?: (keyof Werte)[];
+    nebenaktionen?: Nebenaktion[];
+    zusammenfassung?: ReactNode;
   }) {
     const [form] = Form.useForm<Werte>();
     return (
@@ -815,6 +979,11 @@ describe('ErfassungsModal', () => {
         onFertig={props.onFertig ?? (() => {})}
         onAbbrechen={props.onAbbrechen ?? (() => {})}
         onErfasst={props.onErfasst}
+        speicherung={props.speicherung}
+        serie={props.serie}
+        uebernahme={props.uebernahme}
+        nebenaktionen={props.nebenaktionen}
+        zusammenfassung={props.zusammenfassung}
       >
         <Form.Item label="Ort" name="ort">
           <Input />
@@ -997,6 +1166,154 @@ describe('ErfassungsModal', () => {
       expect(onFertig).not.toHaveBeenCalled();
       unmount();
     }
+  });
+
+  it('zeigt am Handy statt des Kreuzes „Abbrechen“ im Kopf (LLH-1763)', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const knoepfe = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(knoepfe).toHaveLength(1);
+    const [abbrechen] = knoepfe;
+    expect(abbrechen).toHaveClass('ant-modal-close');
+    expect(abbrechen.closest('form')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeNull();
+  });
+
+  it('behält ab md das Schließkreuz, ohne „Abbrechen“ im Kopf', () => {
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const kreuz = screen.getByRole('button', { name: /Close|Schliessen|Schließen/i });
+    expect(kreuz).toHaveClass('ant-modal-close');
+    expect(kreuz).not.toHaveTextContent('Abbrechen');
+  });
+
+  it('„Abbrechen“ im Kopf fragt nach, leert nach „Verwerfen“ und ruft onAbbrechen einmal (LLH-1763, LLH-1755)', async () => {
+    setzeViewportBreite(390);
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    await verwerfenBestaetigen();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('„Abbrechen“ im Kopf ist gesperrt, solange gespeichert wird (LLH-1763)', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        speicherung={{ isPending: true, error: null, reset: vi.fn() }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  describe('Fuß am Handy: nur der Abschluss klebt (LLH-1763)', () => {
+    const fussVon = () => document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss"]')!;
+    const serieVon = () => document.querySelector<HTMLElement>('[data-lfh="erfassung-serie"]');
+
+    it('klebt nur den Abschluss: Primärknopf im Fuß, kein Abbrechen, keine Serie', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          serie
+          uebernahme={['ort']}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const fuss = fussVon();
+      expect(fuss.style.position).toBe('sticky');
+      expect(within(fuss).getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+      expect(within(fuss).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
+      expect(within(fuss).queryByRole('button', { name: /Speichern und nächste/ })).toBeNull();
+      expect(within(fuss).queryByText('Werte behalten')).toBeNull();
+    });
+
+    it('Serienzeile und „Speichern und nächste“ stehen am Formularende, nicht klebend', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          serie
+          uebernahme={['ort']}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const serie = serieVon();
+      expect(serie).not.toBeNull();
+      expect(serie!.style.position).not.toBe('sticky');
+      expect(
+        within(serie!).getByRole('button', { name: /Speichern und nächste/ }),
+      ).toBeInTheDocument();
+      expect(within(serie!).getByText('Werte behalten')).toBeInTheDocument();
+      expect(serie!.closest('form')).not.toBeNull();
+      // Im Baum vor dem klebenden Fuß, also beim Rollen darüber.
+      expect(serie!.compareDocumentPosition(fussVon()) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
+
+    it('ohne Serie gibt es am Handy keinen Serienteil', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+      expect(serieVon()).toBeNull();
+    });
+
+    it('Nebenaktionen kleben mit dem Primärknopf, der Primärknopf zuletzt', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          nebenaktionen={[{ schluessel: 'rtw', text: 'RTW nötig', danger: true }]}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const knoepfe = within(fussVon()).getAllByRole('button');
+      expect(knoepfe.map((k) => k.textContent)).toEqual(['RTW nötig', 'Erfassen']);
+    });
+
+    it('die Zusammenfassung bleibt am Primärknopf im klebenden Fuß', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          zusammenfassung="3 Personen"
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      expect(within(fussVon()).getByText('3 Personen')).toBeInTheDocument();
+    });
+
+    it('Enter im Feld sendet weiter über den Primärknopf, nicht als Serie', async () => {
+      setzeViewportBreite(390);
+      const onErfassen = vi.fn().mockResolvedValue(undefined);
+      const onFertig = vi.fn();
+      renderMitProviders(<ModalHarness offen serie onErfassen={onErfassen} onFertig={onFertig} />);
+      await userEvent.type(screen.getByLabelText('Ort'), 'Brücke{Enter}');
+      await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+      expect(onErfassen).toHaveBeenCalledTimes(1);
+    });
+
+    it('ab md bleibt der Fuß eine klebende Reihe mit Abbrechen und Serie', () => {
+      renderMitProviders(
+        <ModalHarness offen serie onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+      );
+      expect(serieVon()).toBeNull();
+      const fuss = fussVon();
+      for (const name of ['Abbrechen', 'Speichern und nächste', 'Erfassen']) {
+        expect(within(fuss).getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
+      }
+    });
   });
 
   it('trägt keine eigene antd-Fusszeile — der Absende-Knopf liegt im Formular', () => {
@@ -1434,5 +1751,112 @@ describe('ErfassungsFormular — Rückfrage vor dem Verwerfen (LLH-1755)', () =>
     });
     expect(rueckfrage()).toBeNull();
     expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+});
+
+/** Zwei Pflichtfelder, dazu ein Abbrechen-Weg und ein Mitschnitt des Rollens (LLH-1759). */
+function ZweiPflichtHarness(props: {
+  onErfassen?: (w: Werte) => Promise<unknown>;
+  onAbbrechen?: () => void;
+  zusammenfassung?: ReactNode;
+  onPruefungGescheitert?: (felder: string[]) => void;
+  onRollen?: (...args: unknown[]) => void;
+}) {
+  const [form] = Form.useForm<Werte>();
+  // antd rollt über `scroll-into-view-if-needed`, das jsdom nicht abbildet; gemessen wird deshalb
+  // der Aufruf am Formular, das echte Rollen samt Fokus läuft weiter.
+  const echt = useRef(form.scrollToField);
+  form.scrollToField = (...args: Parameters<typeof form.scrollToField>) => {
+    props.onRollen?.(...args);
+    echt.current(...args);
+  };
+  return (
+    <ErfassungsFormular<Werte>
+      form={form}
+      onErfassen={props.onErfassen ?? vi.fn().mockResolvedValue(undefined)}
+      onFertig={() => {}}
+      onAbbrechen={props.onAbbrechen ?? (() => {})}
+      zusammenfassung={props.zusammenfassung}
+      onPruefungGescheitert={props.onPruefungGescheitert}
+    >
+      <Form.Item
+        label="Ort"
+        name="ort"
+        rules={[{ required: true, message: 'Ort ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+      <Form.Item
+        label="Melder"
+        name="melder"
+        rules={[{ required: true, message: 'Melder ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+    </ErfassungsFormular>
+  );
+}
+
+describe('ErfassungsFormular — Prüfung gescheitert (LLH-1759)', () => {
+  const pruefzeile = () => document.querySelector('[data-lfh="erfassung-pruefung"]');
+
+  it('rollt zum ersten fehlerhaften Feld und fokussiert es', async () => {
+    const rollen = vi.fn();
+    renderMitProviders(<ZweiPflichtHarness onRollen={rollen} />);
+    // Der Klick nimmt den Fokus vom Startfeld: geprüft wird, dass die Prüfung ihn zurücksetzt.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(rollen).toHaveBeenCalled());
+    expect(rollen).toHaveBeenCalledWith(
+      ['ort'],
+      expect.objectContaining({ block: 'center', focus: true }),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+  });
+
+  it('nennt die Fehler am Knopf', async () => {
+    renderMitProviders(<ZweiPflichtHarness zusammenfassung="1 Meldung" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    expect(pruefzeile()).toHaveTextContent('Ort ist erforderlich');
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    expect(pruefzeile()!.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
+    const beschreibung = screen
+      .getByRole('button', { name: 'Erfassen' })
+      .getAttribute('aria-describedby');
+    expect(beschreibung?.split(' ')).toContain(pruefzeile()!.id);
+    // Die Zusammenfassung bleibt Teil der Beschreibung.
+    expect(beschreibung?.split(' ')).toHaveLength(2);
+  });
+
+  it('die Zeile verschwindet, sobald die Felder stimmen', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.type(screen.getByLabelText('Ort'), 'Halle 3');
+    await waitFor(() => expect(pruefzeile()).not.toHaveTextContent('Ort ist erforderlich'));
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    await userEvent.type(screen.getByLabelText('Melder'), 'RTW 2');
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('Abbrechen räumt die Zeile', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('ruft onPruefungGescheitert vor dem Rollen', async () => {
+    const reihenfolge: string[] = [];
+    renderMitProviders(
+      <ZweiPflichtHarness
+        onPruefungGescheitert={() => reihenfolge.push('gescheitert')}
+        onRollen={() => reihenfolge.push('rollen')}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(reihenfolge).toContain('rollen'));
+    expect(reihenfolge[0]).toBe('gescheitert');
   });
 });

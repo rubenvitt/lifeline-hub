@@ -1462,7 +1462,7 @@ describe('AuftraegePage', () => {
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).getByText('Auftrag #4 aufheben')).toBeInTheDocument();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
-      expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Grund fehlt')).toBeInTheDocument();
       expect(hebeAuf).not.toHaveBeenCalled();
 
       const grund = within(dialog).getByLabelText('Grund');

@@ -8,6 +8,7 @@ import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
 import { uebernahmeBezeichnung, zuordenbarePosten } from './materialUebernahme';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Ein Posten, wie der Dialog ihn aus der Material-Query der Seite liest. */
 export type ZuordnenPosten = Pick<
@@ -131,7 +132,7 @@ function PostenFeld({
     );
   }
   return (
-    <Feld label="Posten" name="posten" rules={[{ required: true, message: 'Posten wählen' }]}>
+    <Feld label="Posten" name="posten" rules={[pflicht('Posten')]}>
       <Select<number> options={optionen} showSearch={teilwortSuche} />
     </Feld>
   );

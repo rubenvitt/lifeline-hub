@@ -136,7 +136,7 @@ describe('BesatzungUebernehmenDialog — Personal der Einheit übernehmen (LLH-1
     await userEvent.click(haekchen('Ulla'));
     await userEvent.click(haekchen('Ali'));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    expect(await screen.findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+    expect(await screen.findByText('Person fehlt')).toBeInTheDocument();
     expect(bodies).toEqual([]);
   });
 
@@ -174,7 +174,7 @@ describe('BesatzungUebernehmenDialog — Personal der Einheit übernehmen (LLH-1
     rerender(<Harness personal={PERSONAL.filter((x) => x.id !== 2 && x.id !== 4)} />);
     await waitFor(() => expect(screen.queryByRole('checkbox', { name: /^Ulla/ })).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    expect(await screen.findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+    expect(await screen.findByText('Person fehlt')).toBeInTheDocument();
     expect(bodies).toEqual([]);
   });
 

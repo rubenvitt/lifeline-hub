@@ -22,6 +22,7 @@ import {
   type SchichtmodellFormWerte,
   type SchichtmodellVorlage,
 } from './schichtmodellForm';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Anlegen und Ändern eines Schichtmodells (LLH-1122) — in den Stammdaten und als eigene Werte
@@ -113,7 +114,7 @@ export default function SchichtmodellModal({
       <Feld<SchichtmodellFormWerte>
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
       >
         <Input placeholder="z. B. 12-h-Schicht" maxLength={SCHICHTMODELL_BEZEICHNUNG_MAX} />
       </Feld>
@@ -130,7 +131,7 @@ export default function SchichtmodellModal({
               pflicht: true,
               min: 30,
               max: ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
-              pflichtText: 'Bitte einen Rhythmus angeben',
+              pflichtText: 'Rhythmus fehlt',
             }),
           ]}
         >
@@ -155,7 +156,7 @@ export default function SchichtmodellModal({
                 pflicht: true,
                 min: 0,
                 max: SCHICHTMODELL_MINDESTDAUER_MAX_MINUTEN,
-                pflichtText: 'Bitte eine Mindestdauer angeben',
+                pflichtText: 'Mindestdauer fehlt',
               }),
             ]}
           >

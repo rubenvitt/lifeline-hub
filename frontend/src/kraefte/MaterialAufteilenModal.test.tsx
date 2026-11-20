@@ -150,7 +150,7 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
     const { onAufteilen } = zeige();
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
-    expect(await within(dialog).findByText('Menge eintragen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Menge fehlt')).toBeInTheDocument();
     expect(onAufteilen).not.toHaveBeenCalled();
   });
 

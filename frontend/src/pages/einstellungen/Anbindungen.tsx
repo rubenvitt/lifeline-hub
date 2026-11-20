@@ -42,6 +42,7 @@ import {
   webhookZustandAnzeige,
   zustandAnzeige,
 } from './anbindungAnzeige';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface FormWerte {
   name?: string;
@@ -324,19 +325,13 @@ export default function Anbindungen() {
           label="Name"
           name="name"
           rules={[
-            { required: true, whitespace: true, message: 'Name angeben' },
+            pflicht('Name', { whitespace: true }),
             { max: ANBINDUNG_NAME_MAX, message: `Höchstens ${ANBINDUNG_NAME_MAX} Zeichen` },
           ]}
         >
           <Input placeholder="Alarm-Adapter Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
         </Feld>
-        <Feld
-          label="Rechte"
-          name="scopes"
-          rules={[
-            { required: true, type: 'array', min: 1, message: 'Mindestens ein Recht wählen' },
-          ]}
-        >
+        <Feld label="Rechte" name="scopes" rules={[pflicht('Rechte')]}>
           <Checkbox.Group>
             <Stapel abstand="xxs">
               {SCOPES.map((s) => (

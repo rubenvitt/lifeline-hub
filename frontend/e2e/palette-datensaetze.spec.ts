@@ -103,7 +103,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
 
   // Das Ziel ist der Datensatz, nicht die Liste — und er trägt die gesuchte Kennung.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+$`));
-  await expect(page.getByRole('heading', { name: `Person ${kennung}` })).toBeVisible();
+  await expect(page.getByRole('heading', { name: new RegExp(kennung) })).toBeVisible();
   await expect(paletteInput(page)).toBeHidden();
 });
 

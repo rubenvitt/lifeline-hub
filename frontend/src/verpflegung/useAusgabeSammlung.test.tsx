@@ -265,11 +265,11 @@ describe('useAusgabeSammlung (LLH-1032, design.md D2/D5)', () => {
   });
 
   it('ohne Netz vorgemerkt: Hinweis-Rückruf statt „Gebucht“', async () => {
-    erfasse.mockResolvedValue({ zustand: 'vorgemerkt', client_id: 'c1' });
+    erfasse.mockResolvedValue({ zustand: 'vorgemerkt', client_id: 'c1', grund: 'offline' });
     const { result, onGebucht, onVorgemerkt } = aufbau();
     tippe(result, 1, 8);
     await act(async () => vi.advanceTimersByTime(3000));
-    expect(onVorgemerkt).toHaveBeenCalledWith({ menge: 8 });
+    expect(onVorgemerkt).toHaveBeenCalledWith({ menge: 8 }, 'offline');
     expect(onGebucht).not.toHaveBeenCalled();
     expect(result.current.menge).toBe(0);
   });

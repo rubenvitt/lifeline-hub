@@ -5,6 +5,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { passwortAendern } from '../api/auth';
 import NeuesPasswortFelder from './NeuesPasswortFelder';
+import { pflicht } from '../components/pflichtRegel';
 
 interface PasswortWerte {
   altes_passwort: string;
@@ -69,7 +70,7 @@ export default function PasswortAendernDialog({
       <Feld
         label="Bisheriges Passwort"
         name="altes_passwort"
-        rules={[{ required: true, message: 'Bitte das bisherige Passwort eingeben' }]}
+        rules={[pflicht('Bisheriges Passwort')]}
       >
         <Input.Password autoComplete="current-password" />
       </Feld>

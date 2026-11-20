@@ -11,6 +11,7 @@ import {
   antdThema,
   type Dichte,
 } from './tokens';
+import { PFLICHT_STANDARD } from '../components/pflichtRegel';
 import { zeigerIstGrob } from '../components/useViewport';
 import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 import { DICHTE_DEFAULT, startDichte } from './dichte';
@@ -88,6 +89,8 @@ function gespeicherteHelligkeit(): Helligkeit {
 function systemBevorzugtDunkel(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
+
+const PFLICHT_FORM = { validateMessages: { required: PFLICHT_STANDARD } } as const;
 
 export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const [modus, setModusState] = useState<ThemeModus>(gespeicherterModus);
@@ -214,6 +217,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         // Boden des Schließen-Kreuzes jedes Hinweises (LLH-1798): antd zeichnet es in jeder Stufe
         // 12 × 14 px, ohne Komponenten-Token für seine Größe.
         alert={hinweis}
+        // Pflichtfehler „‹Feld› fehlt“ statt antds „Bitte geben Sie … an“ (LLH-1766,
+        // `frontend/AGENTS.md`, „Erfassungs-Norm“): Rückfall für eine Regel ohne `pflicht()`.
+        form={PFLICHT_FORM}
         // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
         // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
         // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3. Nachts hält

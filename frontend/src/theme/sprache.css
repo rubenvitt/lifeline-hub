@@ -184,6 +184,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Kopfzelle „n NICHT GESENDET“/„PRÜFEN“ (LLH-1758, `components/Kopfleiste.tsx`, `SyncZelle`):
+   handgebauter Knopf, Fokusring in `bedien` innerhalb der Zelle wie beim Kennzahl-Ziel. */
+.lfh-kopf-sync:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+
 /* Bündelzeile der Systemeinträge (LLH-1106, `etb/EtbZeitachse.tsx`): handgebautes Bedienziel,
    Fokusring in `bedien` wie oben, Hover als Unterstrich — die Zeile bleibt leise. */
 .lfh-etb-buendel:focus-visible {

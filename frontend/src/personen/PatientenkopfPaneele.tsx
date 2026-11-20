@@ -32,6 +32,7 @@ import {
   gueltig,
 } from './personMeta';
 import { uhrzeit } from '../anzeige/zeitDarstellung';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Die Paneele „Anlass festlegen“ (LLH-1566), „Transport festlegen“ und „Maßnahme erfassen“ des
@@ -205,11 +206,7 @@ export function AnlassPaneel({
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >
-        <Feld
-          label="Anlass"
-          name="anlass"
-          rules={hatAnlass ? [] : [{ required: true, message: 'Bitte einen Anlass wählen' }]}
-        >
+        <Feld label="Anlass" name="anlass" rules={hatAnlass ? [] : [pflicht('Anlass')]}>
           <AnlassWahl />
         </Feld>
       </ErfassungsFormular>
@@ -276,7 +273,7 @@ export function MassnahmePaneel({
     <section aria-label="Maßnahme erfassen" data-lfh="massnahme-paneel">
       <ErfassungsFormular<MassnahmeWerte>
         form={form}
-        erfassenText="Maßnahme erfassen"
+        erfassenText="Erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Maßnahme nicht erfasst"
@@ -284,11 +281,7 @@ export function MassnahmePaneel({
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >
-        <Feld
-          label="Maßnahme"
-          name="art"
-          rules={[{ required: true, message: 'Bitte eine Maßnahme wählen' }]}
-        >
+        <Feld label="Maßnahme" name="art" rules={[pflicht('Maßnahme')]}>
           <FlaechenWahl<MassnahmeArt> optionen={MASSNAHME_OPTIONEN} aria-label="Maßnahme" />
         </Feld>
         <Feld label="Durchgeführt (optional)" name="durchgefuehrt">

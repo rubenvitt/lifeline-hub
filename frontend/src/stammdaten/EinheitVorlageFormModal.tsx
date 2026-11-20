@@ -10,6 +10,7 @@ import { globalKeys } from '../api/queryKeys';
 import { EINHEIT_VORLAGE_NAME_MAX } from '../api/eingabegrenzen';
 import type { EinheitVorlage, NeueEinheitVorlage } from '../api/types';
 import { orderAsTree } from './einheitVorlagenBaum';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormValues {
   name: string;
@@ -87,14 +88,10 @@ export default function EinheitVorlageFormModal({
       }}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input placeholder="z. B. Sanitätszug Musterstadt" maxLength={EINHEIT_VORLAGE_NAME_MAX} />
       </Feld>
-      <Feld label="Typ" name="typ_id" rules={[{ required: true, message: 'Typ wählen' }]}>
+      <Feld label="Typ" name="typ_id" rules={[pflicht('Typ')]}>
         <Select<number> aria-label="Typ" options={typOptions} loading={typenQuery.isLoading} />
       </Feld>
       <Feld label="Unter" name="ueber_vorlage_id">
