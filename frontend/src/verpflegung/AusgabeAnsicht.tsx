@@ -100,6 +100,7 @@ import { flaeche as flaechenMass } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 import { pflicht } from '../components/pflichtRegel';
+import { vorgemerktText } from '../offline/vorgemerktText';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
@@ -351,9 +352,9 @@ export default function AusgabeAnsicht() {
         ausgabeId,
       );
     },
-    onVorgemerkt: (b) =>
+    onVorgemerkt: (b, grund) =>
       nachtrag.zeigeVorgemerkt(
-        `Offline vorgemerkt: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`,
+        vorgemerktText(grund, `${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`),
       ),
     onBeantragt: (b) =>
       nachtrag.zeigeVorgemerkt(`Beantragt: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`),

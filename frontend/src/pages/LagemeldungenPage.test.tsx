@@ -10,6 +10,7 @@ import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { setzeOnline } from '../test/utils';
 import { freigabenFixture } from '../test/fixtures';
 import { waehle } from '../test/auswahlListe';
+import { queueLeerenFuerTests, schreibaktionEinreihen } from '../offline/queue';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 // `useAuthOptional`: die Marke „berichtigt“ fragt, ob ein Gerät angemeldet ist (LLH-1382).
@@ -468,6 +469,35 @@ describe('LagemeldungenPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut laden' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine lagerelevanten Meldungen übergeben')).toBeNull();
+  });
+
+  // LLH-1758: eine vorgemerkte Lagemeldung steht als „Nicht gesendet“ über der Zeitachse.
+  describe('vorgemerkte Lagemeldungen (LLH-1758)', () => {
+    beforeEach(async () => {
+      await queueLeerenFuerTests();
+    });
+
+    it('zeigt nur vorgemerkte Lagemeldungen, keine anderen Meldungen', async () => {
+      const basis = { meldeweg: 'funk' as const, ereigniszeit: '2026-11-20 12:00:00' };
+      await schreibaktionEinreihen(1, 1, {
+        art: 'meldung',
+        daten: {
+          ...basis,
+          absender: 'ELW 1',
+          inhalt: 'Deich hält',
+          meldungsart: 'lagemeldung',
+          client_id: 'l-1',
+        },
+      });
+      await schreibaktionEinreihen(1, 1, {
+        art: 'meldung',
+        daten: { ...basis, absender: 'RTW 3', inhalt: 'Nur eine Meldung', client_id: 'm-1' },
+      });
+      renderPage();
+      const abschnitt = await screen.findByRole('region', { name: 'Nicht gesendet' });
+      expect(within(abschnitt).getByText(/ELW 1 · Deich hält/)).toBeInTheDocument();
+      expect(within(abschnitt).queryByText(/Nur eine Meldung/)).not.toBeInTheDocument();
+    });
   });
 
   describe('Lagemeldung als Meldungsart (LLH-1031)', () => {

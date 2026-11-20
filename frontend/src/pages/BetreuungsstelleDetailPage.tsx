@@ -101,6 +101,7 @@ import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 import { pflicht } from '../components/pflichtRegel';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 
@@ -321,7 +322,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     onMutate: () => resetBelegungZurueck(),
     onSuccess: (ergebnis, { ziel, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Belegungsmeldung ${ziel.bezeichnung}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Belegungsmeldung ${ziel.bezeichnung}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {

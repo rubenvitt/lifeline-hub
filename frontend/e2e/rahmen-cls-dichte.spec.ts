@@ -245,12 +245,12 @@ async function seedQueue(page: Page, einsatzId: string, anzahl: number) {
 /**
  * Vorgemerkte Offline-Einträge beim Laden (LLH-1910, Spec `kopfleiste`, „Eine beim Laden
  * feststehende Störung steht im ersten Bild“). Die Queue liegt in IndexedDB und antwortet erst
- * nach dem ersten Bild; vorher erschien „WARTET 2“ danach, und der Kopf sprang an der Kante in
- * eine zweite Zeile (52/72 px). Jetzt beginnt der Zähler mit dem zuletzt gelesenen Stand der
+ * nach dem ersten Bild; vorher erschien „WARTET 2“ (heute „2 NICHT GESENDET“) danach, und der
+ * Kopf sprang an der Kante in eine zweite Zeile (52/72 px). Jetzt beginnt der Zähler mit dem zuletzt gelesenen Stand der
  * Person (`offline/queueZaehlerMerker.ts`).
  *
  * Der Abgleich bleibt dabei hängen: die Wiedergabe der Einträge (`POST …/etb`) bekommt keine
- * Antwort. Sonst gingen die Einträge raus, und „WARTET“ verschwände zu Recht — ein echter
+ * Antwort. Sonst gingen die Einträge raus, und „NICHT GESENDET“ verschwände zu Recht — ein echter
  * Zustandswechsel, nicht der Startzustand, den dieser Fall misst.
  */
 for (const dichte of ['komfortabel', 'handschuh'] as const) {
@@ -273,7 +273,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     const sync = kopf(page).locator('[data-lfh="kopf-sync"]');
     // Vorbedingung: der Zustand, dessen Wort den Kopf verbreitert, steht.
     await expect(sync).toHaveAttribute('data-zustand', 'ausstehend');
-    await expect(sync).toContainText('WARTET 2');
+    await expect(sync).toContainText('2 NICHT GESENDET');
     const kante = await findWrapEdge(page);
 
     const werte: string[] = [`Kante ${kante.twoRows}/${kante.oneRow} px`];
@@ -283,7 +283,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     ] as const) {
       await page.setViewportSize({ width: breite, height: ARBEITSPLATZ.height });
       const m = await measure(page, pfad, dichte);
-      await expect(sync).toContainText('WARTET 2');
+      await expect(sync).toContainText('2 NICHT GESENDET');
       const hoehe = await kopfHeight(page);
       expect(
         hoehe > kante.rowHeight + 1 ? 'zweizeilig' : 'einzeilig',
@@ -291,7 +291,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
       ).toBe(zeilen);
       werte.push(`${breite} px (${zeilen}): ${bericht(m)}`);
       expect
-        .soft(m.summe, `${dichte}, WARTET 2 bei ${breite} px (${zeilen}): ${bericht(m)}`)
+        .soft(m.summe, `${dichte}, 2 NICHT GESENDET bei ${breite} px (${zeilen}): ${bericht(m)}`)
         .toBeLessThanOrEqual(HAUS_GRENZE);
     }
     test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });

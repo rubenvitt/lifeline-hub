@@ -102,7 +102,7 @@ describe('SichtungDialog ohne Netz (LLH-1138, design.md D8)', () => {
     await userEvent.click(screen.getByRole('radio', { name: /^SK I,/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
 
-    await waitFor(() => expect(onVorgemerkt).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onVorgemerkt).toHaveBeenCalledWith('offline'));
     expect(onErfasst).not.toHaveBeenCalled();
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(gesendet).toEqual([]);

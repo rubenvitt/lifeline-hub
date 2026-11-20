@@ -264,6 +264,44 @@ describe('ErfassungsFormular — Serienmodus', () => {
   });
 });
 
+describe('ErfassungsFormular — Zähler nur für Angenommenes (LLH-1758)', () => {
+  const vorgemerkt = { zustand: 'vorgemerkt', client_id: 'c-1', grund: 'serverfehler' };
+  const gesendet = { zustand: 'gesendet', daten: { id: 1 } };
+
+  async function speichere(nutzer: ReturnType<typeof userEvent.setup>, ort: string) {
+    await nutzer.type(screen.getByLabelText('Ort'), ort);
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  }
+
+  it('zählt Vorgemerktes als „nicht gesendet“, nie als erfasst', async () => {
+    const onErfassen = vi
+      .fn()
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(vorgemerkt)
+      .mockResolvedValueOnce(gesendet);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const nutzer = userEvent.setup();
+
+    await speichere(nutzer, 'A');
+    expect(screen.getByText('nicht gesendet: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Erfasst:/)).not.toBeInTheDocument();
+
+    await speichere(nutzer, 'B');
+    await speichere(nutzer, 'C');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.getByText('nicht gesendet: 2')).toBeInTheDocument();
+  });
+
+  it('eine Antwort ohne Vormerk-Zustand zählt als erfasst', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    await speichere(userEvent.setup(), 'A');
+    expect(screen.getByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/nicht gesendet/)).not.toBeInTheDocument();
+  });
+});
+
 describe('ErfassungsFormular — Wertübernahme', () => {
   it('steht beim Öffnen auf AUS', () => {
     renderMitProviders(

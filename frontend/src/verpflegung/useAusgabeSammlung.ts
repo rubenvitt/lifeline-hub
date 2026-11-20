@@ -37,6 +37,7 @@ import {
 import { AusgabeSammlung, type Buendel } from './ausgabeSammlung';
 import { empfaengerFelder, empfaengerSchluessel, type EmpfaengerWahl } from './empfaengerKern';
 import { KOSTFORMEN } from './verpflegungText';
+import type { VormerkGrund } from '../offline/fehler';
 
 interface ZeitfensterZiel {
   id: number;
@@ -58,7 +59,7 @@ export interface AusgabeSammlungOptionen {
    *  bestätigte Zeitfenster im Cache steht. */
   onGebucht?: (ausgabeId: number, buendel: Buendel) => void;
   /** Ohne Netz an Ort und Stelle vorgemerkt; nur, solange die Ansicht dieses Zeitfensters steht. */
-  onVorgemerkt?: (buendel: Buendel) => void;
+  onVorgemerkt?: (buendel: Buendel, grund: VormerkGrund) => void;
   /** Am Spiegel als Antrag angenommen (LLH-1492); nur, solange die Ansicht steht. */
   onBeantragt?: (buendel: Buendel) => void;
 }
@@ -180,7 +181,7 @@ export function useAusgabeSammlung({
         (ergebnis) => {
           if (ergebnis.zustand === 'vorgemerkt') {
             entferne();
-            if (amOrt()) aktuell.current.onVorgemerkt?.(buendel);
+            if (amOrt()) aktuell.current.onVorgemerkt?.(buendel, ergebnis.grund);
             return;
           }
           // Am Spiegel (LLH-1492): ein Antrag, noch keine Ausgabe; er steht als „ausstehend“.
