@@ -28,6 +28,7 @@ import { navigationZeigt } from './GeraeteLayout';
 import { rahmenFarben } from '../theme/tokens';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
+import { SEITENFUSS_KANTE } from '../components/Erfassung';
 
 // Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -399,7 +400,7 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
     const fuss = knopf.closest<HTMLElement>('[data-lfh="erfassung-fuss"]');
     expect(fuss).not.toBeNull();
     expect(fuss!.style.position).toBe('sticky');
-    expect(fuss!.style.bottom).toBe('0px');
+    expect(fuss!.style.bottom).toBe(SEITENFUSS_KANTE);
   });
 
   it('meldet mit Abschnitt und Gerät als Absender', async () => {

@@ -9,6 +9,7 @@ import {
   ErfassungsFormular,
   ErfassungsModal,
   SERIEN_KUERZEL_KLASSE,
+  SEITENFUSS_KANTE,
   kopfBoden,
   serienKuerzel,
   titelzeilenHoehe,
@@ -852,7 +853,8 @@ describe('ErfassungsModal', () => {
     expect(fuss).not.toBeNull();
     expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
     expect(fuss!.style.position).toBe('sticky');
-    expect(fuss!.style.bottom).toBe('0px');
+    // Um das Polster von `main` tiefer: der Browser zieht es vom Scrollport ab.
+    expect(fuss!.style.bottom).toBe(SEITENFUSS_KANTE);
     // Der Grund deckt die Felder, die darunter durchrollen.
     expect(fuss!.style.background).toBe('rgb(1, 2, 3)');
     // Auf der Seite kein negativer Rand: das Dialogpolster gibt es hier nicht.

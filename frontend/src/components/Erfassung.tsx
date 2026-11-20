@@ -236,7 +236,9 @@ interface ErfassungsFormularProps<T> {
   fussKlebt?: 'dialog' | 'seite';
   /**
    * Grund des klebenden Fußes bei `fussKlebt="seite"`: der Grund der Fläche, auf der das Formular
-   * steht (Seite oder Paneel), damit er die durchrollenden Felder deckt. Vorgabe `colorBgLayout`.
+   * steht, damit er die durchrollenden Felder deckt. Vorgabe `Canvas`: die Gerätehülle malt keinen
+   * eigenen Grund, sichtbar ist die Leinwand des Dokuments, und `Canvas` folgt ihr in hell und
+   * dunkel (`color-scheme` am `<html>`, `ThemeModeProvider`). Auf einem Paneel dessen Grund.
    */
   fussGrund?: string;
   /** Die `Form.Item`-Felder. */
@@ -494,7 +496,7 @@ export function ErfassungsFormular<T extends object>({
             borderTop: `1px solid ${token.colorBorderSecondary}`,
             ...(fussKlebt === 'dialog' ? klebenderFuss(token) : undefined),
             ...(fussKlebt === 'seite'
-              ? klebenderSeitenfuss(token, fussGrund ?? token.colorBgLayout)
+              ? klebenderSeitenfuss(token, fussGrund ?? 'Canvas')
               : undefined),
           }}
         >
@@ -648,13 +650,18 @@ function klebenderFuss(token: GlobalToken) {
  * der Knopfmitte lag der Reiter „Grundriss“. Klebend steht die Knopfleiste über der Navigation,
  * solange das Formular darüber hinausreicht; sonst unter dem letzten Feld.
  *
- * Anders als im Dialog kein negativer Rand: die Seite hat kein Dialogpolster, in das er reichen
- * könnte. Der Grund ist der der Fläche, auf der das Formular steht.
+ * Die Klebekante liegt um das Polster von `main` (`--lfh-seiten-polsterung`) tiefer: der Browser
+ * zieht es vom Scrollport ab, und in der Lücke rollten die Felder sichtbar unter der Knopfleiste
+ * durch (gemessen in Chromium, 24 px). So endet der Fuß geklebt bündig an der Navigation. Anders
+ * als im Dialog kein negativer Rand: ungeklebt steht er wie bisher unter dem letzten Feld. Der
+ * Grund ist der der Fläche, auf der das Formular steht.
  */
+export const SEITENFUSS_KANTE = 'calc(-1 * var(--lfh-seiten-polsterung, 0px))';
+
 function klebenderSeitenfuss(token: GlobalToken, grund: string) {
   return {
     position: 'sticky',
-    bottom: 0,
+    bottom: SEITENFUSS_KANTE,
     zIndex: 1,
     background: grund,
     paddingBottom: token.paddingSM,
