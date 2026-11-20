@@ -12,6 +12,7 @@ import { dauerMinuten, dauerRegel } from '../dauer';
 import type { RasterZeile } from './raster';
 import { MINDEST_MS } from './raster';
 import { PAUSE, postenEingabe } from './schichtplanZeilen';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * „Schichten erzeugen“ (LLH-1584, Server LLH-1552): füllt einen Zeitraum an einem Posten mit
@@ -81,7 +82,7 @@ export default function SchichtenErzeugenDialog({
   const huelle: Speicherung = konflikte.length > 0 ? { ...speicherung, error: null } : speicherung;
   const posten = Form.useWatch('posten', form);
   const postenLaenge = posten != null ? laengeVorgabe?.get(posten) : undefined;
-  const pflicht = schichtmodell == null && postenLaenge == null;
+  const isLaengePflicht = schichtmodell == null && postenLaenge == null;
   const laengePlatzhalter =
     postenLaenge != null
       ? mitVorgabe(postenLaenge)
@@ -118,11 +119,7 @@ export default function SchichtenErzeugenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld<ErzeugenWerte>
-        name="posten"
-        label="Posten"
-        rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
-      >
+      <Feld<ErzeugenWerte> name="posten" label="Posten" rules={[pflicht('Posten')]}>
         <Select placeholder="Posten wählen…" options={postenOptionen} />
       </Feld>
       <Feld<ErzeugenWerte>
@@ -146,15 +143,15 @@ export default function SchichtenErzeugenDialog({
       <Feld<ErzeugenWerte>
         name="laenge"
         label="Länge je Schicht"
-        required={pflicht}
+        required={isLaengePflicht}
         // Die Pflicht hängt am Posten (dessen Schichtlänge ist die Vorgabe): ein Wechsel prüft neu.
         dependencies={['posten']}
         rules={[
           dauerRegel({
-            pflicht,
+            pflicht: isLaengePflicht,
             min: LAENGE_MIN,
             max: LAENGE_MAX,
-            pflichtText: 'Bitte eine Länge angeben',
+            pflichtText: 'Länge fehlt',
           }),
           {
             validator: (_, wert: string | undefined) => {

@@ -199,6 +199,8 @@ describe('ErfassungsAnhangAblegenModal — Rückmeldung beim Ablegen (LFH-878)',
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
     await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    // Die gewählte Datei ist eine Eingabe: erst die Rückfrage (LLH-1755).
+    await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     await warteBisDialogWeg();
 
     d = await wiederOeffnen();

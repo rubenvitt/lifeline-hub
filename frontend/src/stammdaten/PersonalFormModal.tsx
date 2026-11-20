@@ -12,6 +12,7 @@ import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { personalDetailPfad } from './stammdatenDetail';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular (LFH-346) — dieselbe Entscheidung wie bei
@@ -108,7 +109,7 @@ export default function PersonalFormModal({
       offen={offen}
       titel={person ? 'Person bearbeiten' : 'Person anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={person ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
@@ -120,11 +121,7 @@ export default function PersonalFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input />
       </Feld>
       <Feld label="Personalnummer" name="personalnummer">

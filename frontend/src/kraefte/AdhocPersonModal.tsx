@@ -9,6 +9,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
+import { pflicht } from '../components/pflichtRegel';
 
 interface AdhocPersonModalProps {
   offen: boolean;
@@ -69,7 +70,7 @@ export default function AdhocPersonModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input placeholder="z. B. Dr. Schmidt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
       </Feld>
       <Feld label="Qualifikation" name="funktion">

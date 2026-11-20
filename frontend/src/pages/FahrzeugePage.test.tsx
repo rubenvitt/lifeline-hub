@@ -2470,7 +2470,7 @@ describe('FahrzeugePage · Disponieren im Dialog (LFH-983)', () => {
     expect(knopf.closest('form')).not.toBeNull();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
-    expect(await within(dialog).findByText('Mindestens ein Fahrzeug wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Fahrzeug fehlt')).toBeInTheDocument();
   });
 });
 

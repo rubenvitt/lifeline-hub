@@ -559,7 +559,7 @@ describe('BezirkAnlegenDialog', () => {
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    const meldung = await within(dialog).findByText('Bitte einen Radius angeben');
+    const meldung = await within(dialog).findByText('Radius fehlt');
     expect(onErfassen).not.toHaveBeenCalled();
     // Pflicht, Fehler und Meldung erreichen das Zahlenfeld (Hilfstechnik).
     const zahl = within(dialog).getByRole('spinbutton', { name: 'Radius in Metern' });

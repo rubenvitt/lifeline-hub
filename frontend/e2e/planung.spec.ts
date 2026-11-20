@@ -59,7 +59,7 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await anlegen.getByLabel('Bezeichnung').fill(name);
   await anlegen.getByPlaceholder('Beginn').fill(`${tag} 06:00`);
   await anlegen.getByPlaceholder('Ende').fill(`${tag} 22:00`);
-  await anlegen.getByRole('button', { name: 'Planung anlegen' }).click();
+  await anlegen.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/planungen\/\d+$/);
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   const planungId = Number(/\/planungen\/(\d+)/.exec(page.url())![1]);
@@ -74,7 +74,7 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await posten.getByLabel('Bezeichnung').fill('RTW 1');
   await posten.getByLabel('Schichtlänge').fill('4 h');
   await posten.getByLabel('Soll').fill('2');
-  await posten.getByRole('button', { name: 'Posten anlegen' }).click();
+  await posten.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(posten).toBeHidden();
   await expect(page.locator('[data-lfh="planung-posten"]').getByText('RTW 1')).toBeVisible();
 
@@ -83,7 +83,7 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await page.getByRole('button', { name: 'Helfer anlegen' }).click();
   const helfer = page.getByRole('dialog', { name: 'Helfer anlegen' });
   await helfer.getByLabel('Name').fill('Hanna Helfer');
-  await helfer.getByRole('button', { name: 'Helfer anlegen' }).click();
+  await helfer.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(helfer).toBeHidden();
 
   // ── Schichten erzeugen nach der Schichtlänge des Postens ─────────────────────────────────────

@@ -130,6 +130,23 @@ describe('AufnahmePage', () => {
     );
   });
 
+  // Befund LLH-1771: der Startfokus lag auf „SK I akut“, ein verirrtes Enter wählte „akut“.
+  it('legt den Startfokus auf die Sichtungsgruppe; ein verirrtes Enter wählt nichts und sendet nicht', async () => {
+    let gesendet = 0;
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => {
+        gesendet += 1;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ]);
+    const gruppe = await screen.findByRole('radiogroup');
+    await waitFor(() => expect(gruppe).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    for (const radio of within(gruppe).getAllByRole('radio')) expect(radio).not.toBeChecked();
+    expect(gruppe).toHaveFocus();
+    expect(gesendet).toBe(0);
+  });
+
   it('erfasst in Serie, ohne die Seite zu verlassen', async () => {
     let gesendet: { sichtung?: string } = {};
     render(einsatzAktiv, [
@@ -413,43 +430,6 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(await screen.findByText('PERSONENLISTE')).toBeInTheDocument();
     expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
     expect(document.querySelector('.ant-message-success')).toBeNull();
-  });
-});
-
-/**
- * Am gekoppelten Gerät rollt nur der Inhalt der Hülle, darunter steht die Navigation (LLH-1760):
- * der Fuß klebt dort am unteren Rand, sonst lag „Erfassen“ unter dem Rand, wo der Reiter
- * „Grundriss“ beginnt. In der Betriebsoberfläche bleibt er inline.
- */
-describe('AufnahmePage — Fuß in der Gerätehülle (LLH-1760)', () => {
-  it('klebt den Fuß am gekoppelten Gerät', async () => {
-    render(einsatzAktiv, [
-      meHandler({
-        ...nutzer,
-        geraet: {
-          kopplung_id: 3,
-          einsatz_id: 1,
-          ansicht: 'uhs-tablet',
-          uhs_id: 7,
-          stelle: 'UHS Nord',
-          bezeichnung: 'Tablet 1',
-          laeuft_ab_at: '2099-01-01 00:00:00',
-        },
-      }),
-    ]);
-    await screen.findByRole('radiogroup');
-    await waitFor(() =>
-      expect(document.querySelector('[data-lfh="erfassung-fuss"]')).not.toBeNull(),
-    );
-    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss"]')!;
-    expect(fuss.style.position).toBe('sticky');
-    expect(fuss.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
-  });
-
-  it('lässt den Fuß in der Betriebsoberfläche inline', async () => {
-    render();
-    await screen.findByRole('radiogroup');
-    expect(document.querySelector('[data-lfh="erfassung-fuss"]')).toBeNull();
   });
 });
 

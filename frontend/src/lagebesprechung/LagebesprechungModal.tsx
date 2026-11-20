@@ -25,6 +25,7 @@ import {
   terminBezug,
   type AbschlussFormWerte,
 } from './lagebesprechungAbschluss';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Teilmenge der geteilten Schnellwahl (+30/+60/+120). */
 const SCHNELLWAHL = schnellwahlAuswahl([30, 60, 120]);
@@ -100,7 +101,7 @@ export default function LagebesprechungModal({
         label="Entschluss"
         name="entschluss"
         rules={[
-          { required: true, whitespace: true, message: 'Entschluss angeben' },
+          pflicht('Entschluss', { whitespace: true }),
           zeichenRegel(LAGEBESPRECHUNG_ENTSCHLUSS_MAX, 'Entschluss'),
         ]}
       >

@@ -20,7 +20,7 @@ function renderZeile(
     <SchnellAnlegen
       beschriftung="Neue Qualifikation"
       platzhalter="z. B. Sanitäter"
-      knopfText="Qualifikation anlegen"
+      knopfText="Anlegen"
       onAnlegen={onAnlegen}
       laeuft={laeuft}
       gesperrt={gesperrt}
@@ -33,6 +33,11 @@ function renderZeile(
 const feld = () => screen.getByLabelText('Neue Qualifikation');
 
 describe('SchnellAnlegen', () => {
+  it('zeigt den Tastaturknopf „Senden“ (Enter-Vertrag, LLH-1766)', () => {
+    renderZeile(vi.fn());
+    expect(feld()).toHaveAttribute('enterkeyhint', 'send');
+  });
+
   it('Enter im Feld legt an — mit beschnittenem Text', async () => {
     const anlegen = vi.fn().mockResolvedValue(undefined);
     renderZeile(anlegen);
@@ -48,7 +53,7 @@ describe('SchnellAnlegen', () => {
     renderZeile(anlegen);
 
     await userEvent.type(feld(), 'Gruppenführer');
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(anlegen).toHaveBeenCalledWith('Gruppenführer'));
   });
@@ -58,11 +63,11 @@ describe('SchnellAnlegen', () => {
     renderZeile(anlegen);
 
     // Erst gar nichts …
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     // … dann Leerzeichen, über BEIDE Wege: sonst bliebe die Prüfung grün, wenn nur der Klick-Zweig
     // den Wert beschnitte.
     await userEvent.type(feld(), '   {Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     expect(anlegen).not.toHaveBeenCalled();
   });
@@ -74,7 +79,7 @@ describe('SchnellAnlegen', () => {
     await userEvent.type(feld(), 'Sanitäter');
     // Über den KNOPF: nur so verlässt der Fokus das Feld, mit Enter wäre die Fokus-Zusicherung
     // trivial grün.
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(feld()).toHaveValue(''));
     await waitFor(() => expect(feld()).toHaveFocus());
@@ -87,7 +92,7 @@ describe('SchnellAnlegen', () => {
     renderZeile(anlegen);
 
     await userEvent.type(feld(), 'Sanitäter');
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(anlegen).toHaveBeenCalledOnce());
     expect(feld()).toHaveValue('Sanitäter');
@@ -105,7 +110,7 @@ describe('SchnellAnlegen', () => {
     renderZeile(anlegen);
 
     await userEvent.type(feld(), 'A');
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(anlegen).toHaveBeenCalledWith('A'));
 
     await userEvent.type(feld(), 'B');
@@ -131,7 +136,7 @@ describe('SchnellAnlegen', () => {
     renderZeile(vi.fn().mockResolvedValue(undefined), false, true);
 
     expect(feld()).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
   });
 
   it('gesperrt legt auf KEINEM der beiden Wege an', async () => {
@@ -145,7 +150,7 @@ describe('SchnellAnlegen', () => {
       <SchnellAnlegen
         beschriftung="Neue Qualifikation"
         platzhalter="z. B. Sanitäter"
-        knopfText="Qualifikation anlegen"
+        knopfText="Anlegen"
         onAnlegen={anlegen}
         gesperrt
       />,
@@ -154,7 +159,7 @@ describe('SchnellAnlegen', () => {
 
     // Weg 1, der Knopf. `pointerEventsCheck: 0`, weil antd einem gesperrten Knopf
     // `pointer-events: none` gibt und userEvent den Klick sonst nicht absetzt.
-    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }), {
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }), {
       pointerEventsCheck: 0,
     });
 

@@ -15,6 +15,7 @@ import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 import { Status } from '../components/instrument/Status';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -124,10 +125,10 @@ const aktualisiere = (id: number, werte: FormWerte) =>
  */
 const felder = (
   <>
-    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
       <Input />
     </Feld>
-    <Feld label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+    <Feld label="Kategorie" name="kategorie" rules={[pflicht('Kategorie')]}>
       <Select options={kategorien.map((k) => ({ value: k, label: statusKategorie[k].label }))} />
     </Feld>
     <Collapse
@@ -174,7 +175,7 @@ export default function StatusKatalogTab() {
       schnell={{
         beschriftung: 'Neuer Fahrzeug-Status',
         platzhalter: 'z. B. einsatzbereit',
-        knopfText: 'Status anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Statuskatalog konnte nicht geladen werden"
       leerText="Kein Status"

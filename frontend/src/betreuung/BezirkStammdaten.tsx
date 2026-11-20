@@ -20,6 +20,7 @@ import {
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { bezirkPatchDreiseitig, type BezirkWerte } from './BetreuungDialoge';
 import { ERHEBUNG_LABEL, mengeText, personenZahl } from './betreuungText';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (darüber 400). */
 const MAX_PERSONEN = 1_000_000;
@@ -29,7 +30,7 @@ const MAX_PERSONEN = 1_000_000;
  * Die Meldung steht am Feld.
  */
 const PLAN_REGELN: FormRule[] = [
-  { required: true, message: 'Bitte eine Plangröße angeben' },
+  pflicht('Plangröße'),
   { type: 'number', min: 1, message: 'Mindestens 1 Person' },
   {
     type: 'number',
@@ -126,7 +127,7 @@ export default function BezirkStammdaten({
         bezirk.bezeichnung,
         {
           rules: [
-            { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+            pflicht('Bezeichnung', { whitespace: true }),
             zeichenRegel(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, 'Bezeichnung'),
           ],
         },
@@ -143,7 +144,7 @@ export default function BezirkStammdaten({
         'Erhebung der Plangröße',
         <Select options={ERHEBUNG_OPTIONEN} />,
         ERHEBUNG_LABEL[bezirk.plan_erhebung],
-        { rules: [{ required: true, message: 'Bitte die Erhebung angeben' }] },
+        { rules: [pflicht('Erhebung')] },
       )}
       {zelle(
         'abschnitt_id',

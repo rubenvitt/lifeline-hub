@@ -81,7 +81,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
     if (r.url().endsWith(`/personen/${personId}/anhaenge`)) listenAbrufe.push(r.method());
   });
   await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
-  await expect(page.getByRole('heading', { name: /Person R-001/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /R-001/ })).toBeVisible();
   expect(listenAbrufe, 'die Liste lädt nicht beim Öffnen der Person').toEqual([]);
 
   // ── 1 · Aufklappen und Ablegen über den Dialog ──────────────────────────────────────

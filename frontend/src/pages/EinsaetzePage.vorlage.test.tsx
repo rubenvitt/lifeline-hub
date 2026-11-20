@@ -17,6 +17,7 @@ import {
   gekoppelteVorlage,
   wahlNachStichwort,
 } from './einsatzVorlageWahlKern';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /**
  * Einsatz-Vorlage im Anlegedialog (LLH-1375, Spec `einsatz-vorlagen`, „Der Anlegedialog bietet die
@@ -272,6 +273,8 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
     await waehle('Einsatzart', 'Übung');
     await waehle('Vorlage', 'Kleinlage');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
 
     await oeffneDialog();
     expect(gewaehlt('Vorlage')).toBe('Alle Module');

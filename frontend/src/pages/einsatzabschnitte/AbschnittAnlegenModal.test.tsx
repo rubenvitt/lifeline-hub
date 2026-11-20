@@ -6,6 +6,7 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { Einsatzabschnitt } from '../../api/types';
 import AbschnittAnlegenModal from './AbschnittAnlegenModal';
+import { bestaetigeVerwerfen } from '../../test/verwerfen';
 
 const abschnitte = [
   { id: 5, einsatz_id: 1, name: 'Abschnitt Nord', kurzbezeichnung: 'EA 1' },
@@ -117,6 +118,8 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
     const { onClose } = renderModal();
     await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'Verworfen');
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(user);
     expect(onClose).toHaveBeenCalled();
     expect(bodies).toEqual([]);
   });

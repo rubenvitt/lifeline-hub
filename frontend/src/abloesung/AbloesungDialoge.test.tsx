@@ -530,9 +530,7 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
 
     // Pflicht: ohne neue Besatzung geht nichts hinaus.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
-    expect(
-      await within(dialog).findByText('Bitte die neue Besatzung auswählen'),
-    ).toBeInTheDocument();
+    expect(await within(dialog).findByText('Neue Besatzung fehlt')).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
 
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Neue Besatzung' }));

@@ -29,6 +29,7 @@ import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { modulName } from '../../einsatz/modulRegistry';
 import { ListenRueckweg } from '../../components/ListenRueckweg';
+import { vorgemerktText } from '../../offline/vorgemerktText';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -82,7 +83,7 @@ export default function AufnahmePage() {
   const { id } = useParams();
   const { token } = theme.useToken();
   const einsatzId = Number(id);
-  const { benutzer, geraet } = useAuth();
+  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const navigate = useNavigate();
   // Am gekoppelten Gerät führt der Rückweg in die Gerätehülle, ohne Brotkrumen in fremde Module
@@ -148,7 +149,11 @@ export default function AufnahmePage() {
         setQuittung(q);
       };
       if (ergebnis.zustand === 'vorgemerkt') {
-        quittiere({ einsatzId, art: 'vorgemerkt', text: 'Offline vorgemerkt · R-…' });
+        quittiere({
+          einsatzId,
+          art: 'vorgemerkt',
+          text: vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+        });
       } else if (ergebnis.zustand === 'beantragt') {
         // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
         quittiere({ einsatzId, art: 'beantragt', text: 'Beantragt · R-…' });
@@ -260,10 +265,10 @@ export default function AufnahmePage() {
           key={einsatzId}
           form={form}
           serie
+          // Der Fuß klebt (LLH-1761): am Handy lag „Erfassen“ bei y ≈ 1100 einer 1149 px hohen Seite.
+          // In der Gerätehülle bündig über der Navigation (LLH-1760, `seitenfussKante`).
+          fussKlebt="seite"
           uebernahme={['antreff_ort']}
-          // In der Gerätehülle rollt nur der Inhalt, darunter steht die Navigation: der Fuß klebt
-          // über ihr (LLH-1760, `geraet/AGENTS.md`, „Kopfzeile und Navigation“).
-          fussKlebt={geraet ? 'seite' : undefined}
           laeuft={anlegenSpeicherung.isPending}
           // Eine Ablehnung steht am Formular, bis zum nächsten Absenden, kein Toast (LFH-1077).
           // Ohne Netz merkt `erfassePersonOfflineFaehig` vor; hier landen nur Ablehnungen.

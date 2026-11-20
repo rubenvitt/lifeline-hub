@@ -183,7 +183,7 @@ describe('KategorieFristen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Frist Anhänge ändern' }));
     const dialog = await screen.findByRole('dialog');
     await fristSetzen(dialog, '2099-01-01 12:00');
-    expect(await within(dialog).findByText('Rechtsgrundlage angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Rechtsgrundlage fehlt')).toBeInTheDocument();
     expect(gesendet).toHaveLength(0);
   });
 

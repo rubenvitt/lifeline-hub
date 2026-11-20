@@ -9,12 +9,13 @@ import type { Meldung, MeldungPrioritaet, NeueMeldung } from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { Feld, Paneel, Segmentleiste, Stapel } from '../components/instrument';
-import { useRollen } from '../components/instrument/rollenwerte';
 import MeldungKarte from '../meldungen/MeldungKarte';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
 import StandortFeld from './StandortFeld';
+import { pflicht } from '../components/pflichtRegel';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
   { wert: 'normal', label: 'normal' },
@@ -117,7 +118,6 @@ export default function GeraetMeldungen({
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { rollen } = useRollen();
   const [form] = Form.useForm<MeldungWerte>();
 
   // Erst mit eingehängtem Formular: ohne Schreibrecht (oder solange es unbekannt ist) fehlt es.
@@ -139,11 +139,11 @@ export default function GeraetMeldungen({
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
     },
     // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut,
-    // und der Grund steht über „Meldung senden“ (`speicherung`, LFH-1077). Kein `onError`-Toast:
+    // und der Grund steht über „Erfassen“ (`speicherung`, LFH-1077). Kein `onError`-Toast:
     // Netz- und Leitungsfehler merkt die Funktion vor, nur eine fachliche Ablehnung kommt an.
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt');
+        message.warning(vorgemerktText(ergebnis.grund, ''), vorgemerktDauer(ergebnis.grund));
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
@@ -187,12 +187,11 @@ export default function GeraetMeldungen({
             onErfassen={absenden}
             // Inline: nach dem Senden bleibt das Formular stehen, leer, für die nächste Meldung.
             onFertig={() => {}}
-            // Nur in der Gerätehülle: „Meldung senden“ klebt über der Navigation (LLH-1760), auf
-            // dem Grund des Paneels.
+            // Nur in der Gerätehülle: „Meldung senden“ klebt über der Navigation (LLH-1760); den
+            // Grund des Paneels liest der Fuß selbst.
             fussKlebt="seite"
-            fussGrund={rollen.paneel}
             laeuft={senden.isPending}
-            erfassenText="Meldung senden"
+            erfassenText="Erfassen"
             speicherung={senden}
             speicherFehlerTitel="Meldung nicht gesendet"
             speicherFehlerFallback="Senden fehlgeschlagen"
@@ -200,7 +199,7 @@ export default function GeraetMeldungen({
             <Feld<MeldungWerte>
               name="inhalt"
               label="Inhalt"
-              rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
+              rules={[pflicht('Inhalt', { whitespace: true })]}
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
             </Feld>

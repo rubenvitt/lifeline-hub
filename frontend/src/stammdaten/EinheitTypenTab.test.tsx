@@ -62,7 +62,7 @@ describe('EinheitTypenTab', () => {
   it('Admin sieht „Typ anlegen"', async () => {
     render(admin);
     await screen.findByText('Zug');
-    expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeEnabled();
   });
 
   // Ordnung statt bloßer Anwesenheit: geprüft wird, was Sortierung und Suche mit den Zeilen TUN.
@@ -99,7 +99,7 @@ describe('EinheitTypenTab', () => {
     await screen.findByText('Zug');
     // `waitFor`, weil der Knopf beim ersten Anstrich noch ungesperrt sein kann: das
     // Recht kommt aus `auth/me` und trifft eine Runde nach der Tabelle ein.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled());
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });

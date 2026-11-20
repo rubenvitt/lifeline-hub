@@ -62,6 +62,7 @@ import {
   zertifikatZeile,
 } from './instanzText';
 import { Marke } from '../components/instrument/Marke';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
 const BEZEICHNUNG_MAX = 80;
@@ -566,14 +567,14 @@ export default function InstanzkopplungSeite() {
         <Feld
           label="Adresse der anderen Instanz"
           name="adresse"
-          rules={[{ required: true, whitespace: true, message: 'Adresse angeben' }]}
+          rules={[pflicht('Adresse', { whitespace: true })]}
         >
           <Input placeholder="https://hub.example.org" inputMode="url" />
         </Feld>
         <Feld
           label="Kopplungscode"
           name="code"
-          rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
+          rules={[pflicht('Kopplungscode', { whitespace: true })]}
         >
           <Input
             placeholder="ABCD-EFGH-JKMN-PQRS"
@@ -641,7 +642,10 @@ export default function InstanzkopplungSeite() {
                 name="ende"
                 breite="kurz"
                 rules={[
-                  { required: true, whitespace: true, message: 'Vier Zeichen angeben' },
+                  pflicht('Fingerabdruck', {
+                    whitespace: true,
+                    zusatz: 'die letzten vier Zeichen',
+                  }),
                   { len: 4, message: 'Genau vier Zeichen' },
                 ]}
                 normalize={(w: string) => w.toUpperCase()}
@@ -698,7 +702,7 @@ export default function InstanzkopplungSeite() {
           label="Bezeichnung"
           name="bezeichnung"
           rules={[
-            { required: true, whitespace: true, message: 'Bezeichnung angeben' },
+            pflicht('Bezeichnung', { whitespace: true }),
             { max: BEZEICHNUNG_MAX, message: `Höchstens ${BEZEICHNUNG_MAX} Zeichen` },
           ]}
         >

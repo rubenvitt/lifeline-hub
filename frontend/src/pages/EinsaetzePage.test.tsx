@@ -17,6 +17,7 @@ import { dichten } from '../theme/tokens';
 import { adminFixture } from '../test/fixtures';
 import { tippeZeit } from '../test/zeitEingabe';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 const admin = adminFixture();
 
@@ -69,6 +70,55 @@ beforeEach(() => {
       HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 08:00:00' } }),
     ),
   );
+});
+
+/**
+ * Die Willkommenskarte steht über dem Raster (LLH-1824). Käme sie nach dem Gerippe, schöbe sie es
+ * um ihre Höhe nach unten (`e2e/einsatzauswahl-cls.spec.ts`): der Inhalt wartet, bis feststeht, ob
+ * sie erscheint, und steht dann mit ihr im selben Bild.
+ */
+describe('EinsaetzePage — Willkommenskarte schiebt nichts', () => {
+  function einstellungenNachTor(antwort: () => Response) {
+    let oeffne!: () => void;
+    const tor = new Promise<void>((r) => {
+      oeffne = r;
+    });
+    server.use(
+      http.get('/api/benutzer-einstellungen', async () => {
+        await tor;
+        return antwort();
+      }),
+    );
+    return oeffne;
+  }
+
+  it('ohne Stand kein Raster; mit dem Stand stehen Karte und Raster zugleich', async () => {
+    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    const oeffne = einstellungenNachTor(() => HttpResponse.json({ eintraege: {} }));
+    setup();
+    // Positive Gegenprobe derselben Seite: der Kopf steht schon.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Einsätze' })).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.queryByTestId('einsaetze-raster')).not.toBeInTheDocument();
+    oeffne();
+    const raster = await screen.findByTestId('einsaetze-raster');
+    const karte = screen.getByText('Willkommen bei Lifeline Hub');
+    // Die Karte steht vor dem Raster im Fluss, und beide kamen im selben Bild.
+    expect(karte.compareDocumentPosition(raster) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('scheitert der Stand, steht das Raster ohne Karte und ohne auf Wiederholungen zu warten', async () => {
+    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    const oeffne = einstellungenNachTor(() => HttpResponse.json({}, { status: 500 }));
+    setup();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Einsätze' })).toBeInTheDocument();
+    expect(screen.queryByTestId('einsaetze-raster')).not.toBeInTheDocument();
+    oeffne();
+    expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+    expect(screen.queryByText('Willkommen bei Lifeline Hub')).not.toBeInTheDocument();
+  });
 });
 
 describe('EinsaetzePage', () => {
@@ -1137,6 +1187,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     expect(await within(dialog).findByText('Bezeichnung bereits vergeben')).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Neuer Einsatz' }));
     await screen.findByLabelText('Bezeichnung');
     expect(screen.queryByText('Bezeichnung bereits vergeben')).toBeNull();

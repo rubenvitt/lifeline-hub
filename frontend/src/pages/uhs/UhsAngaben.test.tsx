@@ -169,7 +169,7 @@ describe('UhsAngaben · Speichern', () => {
     await oeffne();
     await userEvent.clear(within(paneel()).getByLabelText('Bezeichnung'));
     await userEvent.click(within(paneel()).getByRole('button', { name: 'Speichern' }));
-    expect(await within(paneel()).findByText('Bezeichnung erforderlich')).toBeInTheDocument();
+    expect(await within(paneel()).findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(rumpfe).toEqual([]);
   });
 });

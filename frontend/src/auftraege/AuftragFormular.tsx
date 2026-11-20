@@ -7,8 +7,12 @@ import { ortEingabe, ortRegeln } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
 import { Feld, Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
-import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+  ErfassungsFormular,
+  type ErfassungsFormularSteuerung,
+  type Speicherung,
+} from '../components/Erfassung';
+import { useEffect, useState, type ReactNode, type Ref } from 'react';
 import type {
   AdressatKategorie,
   Auftrag,
@@ -44,6 +48,7 @@ import {
   type Klappteil,
   type SchemaFeld,
 } from './auftragsschemaKern';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -90,7 +95,7 @@ function pflichtEmpfaengerRegel(
         },
         katalog,
       ).length === 0
-        ? Promise.reject(new Error('Mindestens ein Empfänger ist erforderlich'))
+        ? Promise.reject(new Error('Empfänger fehlt'))
         : Promise.resolve(),
   };
 }
@@ -235,7 +240,19 @@ export default function AuftragFormular({
   card = true,
   einsatzId,
   berichtigen,
+  steuerungRef,
+  onAbbrechen,
+  rueckfrageTitel,
 }: {
+  /**
+   * Abbruch für die umgebende Dialoghülle (Kreuz, LLH-1755): läuft über die Pforte der
+   * Erfassungshülle, die bei geänderten Feldern erst nachfragt. Ohne eigenen Knopf im Fuß.
+   */
+  steuerungRef?: Ref<ErfassungsFormularSteuerung>;
+  /** Nach dem Abbruch (ohne Änderung sofort, sonst nach „Verwerfen“): der Dialog schließt. */
+  onAbbrechen?: () => void;
+  /** Titel des Dialogs für den Text der Rückfrage. */
+  rueckfrageTitel?: ReactNode;
   senden: boolean;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
@@ -456,6 +473,10 @@ export default function AuftragFormular({
       // Aufrufer selbst.
       onFertig={onFertig ?? (() => {})}
       speicherung={speicherung}
+      steuerungRef={steuerungRef}
+      onAbbrechen={onAbbrechen}
+      ohneAbbrechenKnopf
+      rueckfrageTitel={rueckfrageTitel}
       speicherFehlerTitel={speicherFehlerTitel}
       speicherFehlerFallback={speicherFehlerFallback}
       laeuft={senden}
@@ -496,7 +517,7 @@ export default function AuftragFormular({
         name="text"
         label="Auftrag / Was"
         rules={[
-          { required: true, message: 'Auftragstext ist erforderlich' },
+          pflicht('Auftragstext'),
           // Ein vorbelegter Text aus Meldung, Chat oder ETB über der Grenze wird nicht still
           // gekürzt: der Zähler zeigt die Überlänge, Senden scheitert hier (LFH-937, D8).
           zeichenRegel(AUFTRAG_TEXT_MAX, 'Auftragstext'),

@@ -93,7 +93,7 @@ Registrierung“): Die Belegung ergibt sich aus den registrierten Personen.
 1. Unten „Stelle“ öffnen und oben „Meldungen“ wählen.
 2. Den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die „Priorität“ (normal,
    dringend, sofort) wählen. Eine Lagemeldung steht bei der Führung gleich in den Lagemeldungen.
-3. „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
+3. „Erfassen“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 
 ## Hintergrund

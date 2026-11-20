@@ -44,6 +44,7 @@ import {
   vorlageWechselt,
   vorlageZeilen,
 } from './lautPlan';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
@@ -75,17 +76,17 @@ const RHYTHMUS_MIN_MINUTEN = 30;
  * Das Rhythmusfeld als Dauer. `required` setzt nur die Pflichtmarke (und `aria-required`); die
  * Prüfung selbst trägt `dauerRegel`, auch für ein leeres Pflichtfeld.
  */
-const rhythmusField = (platzhalter: string | undefined, pflicht: boolean) => (
+const rhythmusField = (platzhalter: string | undefined, isPflicht: boolean) => (
   <Feld
     name="rhythmus"
     label="Rhythmus"
-    required={pflicht}
+    required={isPflicht}
     rules={[
       dauerRegel({
-        pflicht,
+        pflicht: isPflicht,
         min: RHYTHMUS_MIN_MINUTEN,
         max: ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
-        pflichtText: 'Bitte einen Rhythmus angeben',
+        pflichtText: 'Rhythmus fehlt',
       }),
     ]}
   >
@@ -172,11 +173,7 @@ export function SchichtBeginnenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld<BeginnWerte>
-        name="einheit_id"
-        label="Einheit"
-        rules={[{ required: true, message: 'Bitte eine Einheit auswählen' }]}
-      >
+      <Feld<BeginnWerte> name="einheit_id" label="Einheit" rules={[pflicht('Einheit')]}>
         <Select
           placeholder="Einheit auswählen…"
           options={einheiten}
@@ -357,7 +354,7 @@ function BesatzungFelder({
   bisherigeBesatzung,
   personen,
   verteilung,
-  pflicht,
+  pflicht: isPflicht,
 }: BesatzungFelderProps) {
   const ids = (Form.useWatch('besatzung_ids', form) as number[] | undefined) ?? [];
   const werte = Form.useWatch('verteilung', form) as Verteilung | undefined;
@@ -382,13 +379,13 @@ function BesatzungFelder({
       <Feld<BesatzungWerte>
         name="besatzung_ids"
         label="Neue Besatzung"
-        rules={pflicht ? [{ required: true, message: 'Bitte die neue Besatzung auswählen' }] : []}
+        rules={isPflicht ? [pflicht('Neue Besatzung')] : []}
       >
         <Select
           mode="multiple"
           allowClear
           maxCount={ABLOESUNG_BESATZUNG_MAX}
-          placeholder={pflicht ? 'Personen auswählen…' : 'keine geplant'}
+          placeholder={isPflicht ? 'Personen auswählen…' : 'keine geplant'}
           options={personen}
         />
       </Feld>

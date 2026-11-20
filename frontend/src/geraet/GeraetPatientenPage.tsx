@@ -28,6 +28,7 @@ import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import { useGeraetDarf } from './geraetSicht';
 import LeichterFallModal, { LEICHTER_FALL_TITEL } from '../personen/LeichterFallModal';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /**
  * Spalten des Registers, die das Tablet zeigt; Fundort und Vermerk stehen im Detail. Der Zustand
@@ -104,7 +105,10 @@ export default function GeraetPatientenPage() {
     },
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        void message.warning('Offline vorgemerkt · R-…');
+        void message.warning(
+          vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.

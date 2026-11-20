@@ -529,6 +529,9 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
             minHeight: 0,
             overflow: 'auto',
             padding: 'var(--lfh-seiten-polsterung)',
+            // Ein klebender Seitenfuß endet bündig an der Navigation statt um das Polster darüber
+            // (LLH-1760, `seitenfussKante` in `components/Erfassung.tsx`).
+            ['--lfh-fuss-kante' as string]: 'var(--lfh-seiten-polsterung)',
           }}
         >
           <Outlet />

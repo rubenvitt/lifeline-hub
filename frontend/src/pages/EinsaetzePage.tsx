@@ -65,7 +65,7 @@ import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzlei
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
-import WillkommenKarte from '../hilfe/WillkommenKarte';
+import WillkommenKarte, { useWillkommenEntschieden } from '../hilfe/WillkommenKarte';
 import { useEinstellungMerken } from '../hilfe/useEinstellungMerken';
 import { useRundgangOrt } from '../hilfe/rundgang/RundgangProvider';
 import { sollListeSelbstStarten } from '../hilfe/rundgang/rundgangSchluessel';
@@ -73,6 +73,7 @@ import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import MitgliederKlappteil, { type AnlageMitglied } from './MitgliederKlappteil';
 import { useAdressSuche } from '../routing/useAdressWert';
+import { pflicht } from '../components/pflichtRegel';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -257,6 +258,10 @@ function EinsaetzeInhalt() {
         }
       />
     ) : undefined;
+
+  // Der Inhalt wartet, bis feststeht, ob die Willkommenskarte darüber steht (LLH-1824): käme sie
+  // nach dem Gerippe, schöbe sie es nach unten.
+  const willkommenEntschieden = useWillkommenEntschieden();
 
   // `isPending` (erster Abruf), nicht `isFetching`: nach dem Anlegen invalidiert die Mutation die
   // Liste, ein Ladezweig an `isFetching` nähme den Anlegen-Knopf beim Hintergrund-Nachladen weg.
@@ -587,110 +592,114 @@ function EinsaetzeInhalt() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
-      {/* Willkommen vor Neuigkeiten (LLH-1824): für Erstnutzer das Wichtigere. */}
-      <WillkommenKarte />
-      <NeuigkeitenHinweis />
+      {willkommenEntschieden && (
+        <>
+          {/* Willkommen vor Neuigkeiten (LLH-1824): für Erstnutzer das Wichtigere. */}
+          <WillkommenKarte />
+          <NeuigkeitenHinweis />
 
-      {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:
+          {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:
           der Weg heraus ist die Anlegen-Kachel direkt darunter; ein zweiter gleich
           beschrifteter Knopf machte jede Abfrage darauf mehrdeutig. */}
-      {!isPending && leer && (
-        <div style={{ marginBottom: token.marginLG }}>
-          <SeitenLeer titel="Keine Einsätze" hinweis={HINWEIS_KEINE_EINSAETZE} />
-        </div>
-      )}
-
-      <div ref={bereichRef} data-lfh="einsaetze-bereich" {...zuflussBereich}>
-        {!isPending && sucheZeigen && (
-          <div style={{ marginBottom: token.margin, maxWidth: flaeche.kachelMin * 2 }}>
-            <Input.Search
-              aria-label="Einsätze durchsuchen"
-              placeholder="Bezeichnung, Ort oder Stichwort"
-              allowClear
-              value={suche}
-              onChange={(ev) => {
-                setSuche(ev.target.value);
-                // Die eigene Suche ordnet sofort neu, sie ist kein Zufluss.
-                nachBenutzeraktion();
-              }}
-            />
-          </div>
-        )}
-
-        {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
-            heraus ist das `allowClear` am Suchfeld darüber. */}
-        {!isPending && keineTreffer && (
-          <div style={{ marginBottom: token.marginLG }}>
-            <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
-          </div>
-        )}
-
-        {/* Ein Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe Abstand,
-            dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
-        <div
-          data-testid="einsaetze-raster"
-          style={rasterStil(flaeche.kachelMin, token.margin)}
-          aria-busy={isPending || undefined}
-          aria-label={isPending ? 'Einsätze werden geladen' : undefined}
-        >
-          {isPending ? (
-            <>
-              <KachelSkelett />
-              <KachelSkelett />
-              <KachelSkelett />
-            </>
-          ) : (
-            <>
-              {darfAnlegen && (
-                <Button
-                  icon={<IconPlus />}
-                  onClick={() => setDialogOffen(true)}
-                  style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
-                >
-                  Neuer Einsatz
-                </Button>
-              )}
-              {gezeigteAktive.map((e: EinsatzAnzeige) => renderKarte(e))}
-            </>
-          )}
-        </div>
-
-        {gezeigteAbgeschlossene.length > 0 && (
-          <div style={{ marginTop: token.marginLG }}>
-            <SektionHeader titel="Abgeschlossen" />
-            <div style={rasterStil(flaeche.kachelMinKlein, token.margin)}>
-              {gezeigteAbgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
+          {!isPending && leer && (
+            <div style={{ marginBottom: token.marginLG }}>
+              <SeitenLeer titel="Keine Einsätze" hinweis={HINWEIS_KEINE_EINSAETZE} />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Überlagerung mit Nullhöhe am Ende des Bereichs (Muster `ErfassungsAnhaenge`,
+          <div ref={bereichRef} data-lfh="einsaetze-bereich" {...zuflussBereich}>
+            {!isPending && sucheZeigen && (
+              <div style={{ marginBottom: token.margin, maxWidth: flaeche.kachelMin * 2 }}>
+                <Input.Search
+                  aria-label="Einsätze durchsuchen"
+                  placeholder="Bezeichnung, Ort oder Stichwort"
+                  allowClear
+                  value={suche}
+                  onChange={(ev) => {
+                    setSuche(ev.target.value);
+                    // Die eigene Suche ordnet sofort neu, sie ist kein Zufluss.
+                    nachBenutzeraktion();
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
+            heraus ist das `allowClear` am Suchfeld darüber. */}
+            {!isPending && keineTreffer && (
+              <div style={{ marginBottom: token.marginLG }}>
+                <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
+              </div>
+            )}
+
+            {/* Ein Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe Abstand,
+            dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
+            <div
+              data-testid="einsaetze-raster"
+              style={rasterStil(flaeche.kachelMin, token.margin)}
+              aria-busy={isPending || undefined}
+              aria-label={isPending ? 'Einsätze werden geladen' : undefined}
+            >
+              {isPending ? (
+                <>
+                  <KachelSkelett />
+                  <KachelSkelett />
+                  <KachelSkelett />
+                </>
+              ) : (
+                <>
+                  {darfAnlegen && (
+                    <Button
+                      icon={<IconPlus />}
+                      onClick={() => setDialogOffen(true)}
+                      style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
+                    >
+                      Neuer Einsatz
+                    </Button>
+                  )}
+                  {gezeigteAktive.map((e: EinsatzAnzeige) => renderKarte(e))}
+                </>
+              )}
+            </div>
+
+            {gezeigteAbgeschlossene.length > 0 && (
+              <div style={{ marginTop: token.marginLG }}>
+                <SektionHeader titel="Abgeschlossen" />
+                <div style={rasterStil(flaeche.kachelMinKlein, token.margin)}>
+                  {gezeigteAbgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
+                </div>
+              </div>
+            )}
+
+            {/* Überlagerung mit Nullhöhe am Ende des Bereichs (Muster `ErfassungsAnhaenge`,
             `InfotelefonPage`): der Banner nimmt keinen Platz im Fluss und verschiebt keine Kachel.
             Unten statt oben: oben deckte er die Titel der ersten Reihe, also genau das, worauf der
             Zeiger zielt. Passt der Bereich ins Fenster, steht der Banner unter den Kacheln und
             deckt nichts; reicht er darüber hinaus, klebt er am unteren Fensterrand. Er schließt ohne
             Lücke an: ein Spalt läge außerhalb des Bereichs, und der Weg zum Banner taute auf. */}
-        <div style={{ position: 'sticky', bottom: bannerHoehe, height: 0, zIndex: 5 }}>
-          {bannerText !== null && (
-            <Sammelbanner
-              aktion={{ label: 'anzeigen', onKlick: zeigeWartende }}
-              style={{
-                position: 'absolute',
-                insetInline: 0,
-                height: bannerHoehe,
-                boxSizing: 'border-box',
-              }}
-            >
-              {bannerText}
-            </Sammelbanner>
-          )}
-        </div>
-      </div>
+            <div style={{ position: 'sticky', bottom: bannerHoehe, height: 0, zIndex: 5 }}>
+              {bannerText !== null && (
+                <Sammelbanner
+                  aktion={{ label: 'anzeigen', onKlick: zeigeWartende }}
+                  style={{
+                    position: 'absolute',
+                    insetInline: 0,
+                    height: bannerHoehe,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {bannerText}
+                </Sammelbanner>
+              )}
+            </div>
+          </div>
 
-      {!isPending && demoHinweis && (
-        <div data-lfh="demo-hinweis" style={{ marginTop: token.marginLG }}>
-          {demoHinweis}
-        </div>
+          {!isPending && demoHinweis && (
+            <div data-lfh="demo-hinweis" style={{ marginTop: token.marginLG }}>
+              {demoHinweis}
+            </div>
+          )}
+        </>
       )}
 
       {/* Sechs Felder (frontend/AGENTS.md, Feldbudget): zuerst die Einsatz-Vorlage, weil sie das
@@ -734,11 +743,7 @@ function EinsaetzeInhalt() {
             />
           </Feld>
         )}
-        <Feld
-          label="Bezeichnung"
-          name="bezeichnung"
-          rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
-        >
+        <Feld label="Bezeichnung" name="bezeichnung" rules={[pflicht('Bezeichnung')]}>
           {/* Ausdrückliches Fokusziel: sonst fokussiert die Erfassungs-Hülle die Vorlage darüber
               (LLH-1816, Design-Doc D3). */}
           <Input data-erfassung-fokus="" />
@@ -755,7 +760,7 @@ function EinsaetzeInhalt() {
             }}
           />
         </Feld>
-        <Feld label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
+        <Feld label="Einsatzart" name="einsatzart" rules={[pflicht('Einsatzart')]}>
           <Select
             options={EINSATZART_OPTIONEN}
             onChange={() => {
@@ -763,7 +768,7 @@ function EinsaetzeInhalt() {
             }}
           />
         </Feld>
-        <Feld label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
+        <Feld label="Alarmzeit" name="begonnen_at" rules={[pflicht('Alarmzeit')]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
         </Feld>
         <Feld label="Einsatzort" name="einsatzort">

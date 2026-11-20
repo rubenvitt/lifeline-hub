@@ -203,7 +203,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     await user.click(screen.getByRole('button', { name: /Einwurf-Zugang anlegen/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Einwurf-Zugang anlegen' });
     await user.click(within(dialog).getByRole('button', { name: 'Anlegen und Adresse zeigen' }));
-    expect(await within(dialog).findByText('Name angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Name fehlt')).toBeInTheDocument();
     expect(aufrufe).toEqual([]);
   });
 

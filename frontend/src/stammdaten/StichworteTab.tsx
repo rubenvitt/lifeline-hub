@@ -284,7 +284,7 @@ export default function StichworteTab() {
         // Der Platzhalter wiederholt die Beschriftung NICHT — er ergänzt sie um das
         // Beispiel. „Neues Stichwort" stünde sonst zweimal übereinander.
         platzhalter="z. B. H1Y"
-        knopfText="Hinzufügen"
+        knopfText="Anlegen"
         onAnlegen={(text) => {
           loeschenMutation.reset();
           return anlegenMutation.mutateAsync(text);

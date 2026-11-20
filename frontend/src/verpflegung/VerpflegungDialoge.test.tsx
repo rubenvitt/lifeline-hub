@@ -492,7 +492,7 @@ describe('ZeitfensterDialog — anlegen', () => {
     await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '180');
     await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '70');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Bitte Beginn und Ende angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Beginn und Ende fehlen')).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
   });
 

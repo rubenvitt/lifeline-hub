@@ -17,6 +17,7 @@ import {
   vorhersageSatz,
   type PrognoseFormWerte,
 } from './pegelPrognoseKern';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface PegelPrognoseModalProps {
   einsatzId: number;
@@ -112,7 +113,7 @@ export default function PegelPrognoseModal({
       <Feld
         label="Erwarteter Höchststand (m)"
         name="hoechststand_m"
-        rules={[{ required: true, message: 'Höchststand angeben' }]}
+        rules={[pflicht('Höchststand')]}
       >
         <DezimalFeld
           beschriftung="Erwarteter Höchststand (m)"
@@ -123,11 +124,7 @@ export default function PegelPrognoseModal({
           placeholder="z. B. 7,10"
         />
       </Feld>
-      <Feld
-        label="Zeitpunkt"
-        name="zeitpunkt"
-        rules={[{ required: true, message: 'Zeitpunkt angeben' }]}
-      >
+      <Feld label="Zeitpunkt" name="zeitpunkt" rules={[pflicht('Zeitpunkt')]}>
         <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
       </Feld>
       <SpeicherFehler fehler={speichern.error} titel="Prognose nicht gespeichert" />

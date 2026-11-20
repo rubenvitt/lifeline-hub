@@ -11,6 +11,7 @@ import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtu
 import { setzeViewportBreite } from '../test/viewport';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import { waehleMenueEintrag } from '../test/menue';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -1130,6 +1131,8 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     const wieder = await aktion('Zu Auftrag');
     expect(within(wieder).queryByRole('alert')).toBeNull();
   });

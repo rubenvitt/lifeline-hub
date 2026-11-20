@@ -70,6 +70,7 @@ import {
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import EinsatzAnbindungen from './EinsatzAnbindungen';
 import EinsatzLagebildExtern from './EinsatzLagebildExtern';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Ohne Einsatzleitung lädt die Sektion nichts (der Server lässt nur sie zu, auch keinen Admin):
@@ -429,7 +430,7 @@ export default function EinsatzGeraete() {
         <Feld
           label="Ansicht"
           name="ansicht"
-          rules={[{ required: true, message: 'Ansicht wählen' }]}
+          rules={[pflicht('Ansicht')]}
           extra={gewaehlteAnsicht ? ANSICHT_ZWECK[gewaehlteAnsicht] : undefined}
         >
           <Select<Funktionsansicht>
@@ -451,9 +452,7 @@ export default function EinsatzGeraete() {
             // Option, kein Pflichtfeld und kein Löschkreuz (Handschuh).
             initialValue={stellenFeld.pflicht ? undefined : OHNE_STELLE}
             rules={
-              stellenFeld.pflicht
-                ? [{ required: true, message: STELLENART_FELD[stellenFeld.art].platzhalter }]
-                : undefined
+              stellenFeld.pflicht ? [pflicht(STELLENART_FELD[stellenFeld.art].label)] : undefined
             }
           >
             <Select<StellenWert>
@@ -472,7 +471,7 @@ export default function EinsatzGeraete() {
           label="Gerätebezeichnung"
           name="bezeichnung"
           rules={[
-            { required: true, whitespace: true, message: 'Bezeichnung angeben' },
+            pflicht('Gerätebezeichnung', { whitespace: true }),
             { max: 60, message: 'Höchstens 60 Zeichen' },
           ]}
         >

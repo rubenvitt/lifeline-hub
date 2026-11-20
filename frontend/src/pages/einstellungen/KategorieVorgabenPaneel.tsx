@@ -60,7 +60,7 @@ export default function KategorieVorgabenPaneel() {
                 ({ getFieldValue }) => ({
                   validator: (_, wert: string | undefined) =>
                     getFieldValue(['kategorien', k, 'dauer_tage']) != null && !wert?.trim()
-                      ? Promise.reject(new Error('Rechtsgrundlage angeben'))
+                      ? Promise.reject(new Error('Rechtsgrundlage fehlt'))
                       : Promise.resolve(),
                 }),
               ]}

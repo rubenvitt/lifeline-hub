@@ -203,7 +203,7 @@ test.describe(KAPITEL, () => {
       await geraet.getByLabel('Inhalt').blur();
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'fehlmenge');
-      await geraet.getByRole('button', { name: 'Meldung senden' }).click();
+      await geraet.getByRole('button', { name: 'Erfassen', exact: true }).click();
       await expect(geraet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
     } finally {
       await kontext.close();

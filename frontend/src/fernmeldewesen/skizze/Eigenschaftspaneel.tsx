@@ -342,7 +342,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                     darf={darf}
                     onSpeichern={(art) =>
                       art == null
-                        ? Promise.reject(new Error('Art ist Pflicht'))
+                        ? Promise.reject(new Error('Art fehlt'))
                         : h.aendereKomponente(
                             stelle.key,
                             stelle.id,
@@ -572,7 +572,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 darf={darf}
                 onSpeichern={(art) =>
                   art == null
-                    ? Promise.reject(new Error('Art ist Pflicht'))
+                    ? Promise.reject(new Error('Art fehlt'))
                     : h.aendereVerbindung(verbindung, { art })
                 }
               />
@@ -652,7 +652,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 maxLaenge={100}
                 onSpeichern={(b) =>
                   b == null
-                    ? Promise.reject(new Error('Bezeichnung ist Pflicht'))
+                    ? Promise.reject(new Error('Bezeichnung fehlt'))
                     : h.aendereBereich(bereich, { bezeichnung: b })
                 }
               />

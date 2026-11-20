@@ -10,6 +10,7 @@ import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import type { LiveVerbindungsStatus } from '../live/liveVerbindung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useOnline } from '../offline/useOnline';
+import { openWiederherstellung } from '../offline/wiederherstellungOeffnen';
 import { useMinutenTakt } from './useMinutenTakt';
 import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
@@ -293,7 +294,8 @@ interface SyncDarstellung {
 /**
  * Wort, Satz und Farbe je Zustand. Die Farben sind die NACHT-Rollen, weil der Kopf in beiden
  * Modi dunkel ist: `normal` für die stehende Verbindung, `achtung` für Verzug, `alarm` für
- * Verlust. Die Anzeige ist ein Zustand, kein Knopf.
+ * Verlust. Ausstehend und abgelehnt ist die Zelle ein Knopf zum Wiederherstellungsbereich
+ * (LLH-1758), sonst ein Zustand.
  */
 export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstellung> = {
   verbunden: {
@@ -315,10 +317,11 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
     getrennt: false,
   },
   ausstehend: {
-    // Deutsch statt „QUEUE“ (LFH-944): wer das Wort nicht kennt, hält ausstehende Einträge für
-    // schon beim Server.
-    wort: 'WARTET',
-    satz: (q) => `${anzahl(q.ausstehend, 'Offline-Aktion', 'Offline-Aktionen')} ausstehend`,
+    // „nicht gesendet“ statt „WARTET“ (LLH-1758): ehrlich auch nach einem Serverfehler, und wer das
+    // Wort liest, hält den Eintrag nicht für schon beim Server (LFH-944).
+    wort: 'NICHT GESENDET',
+    // Name = sichtbarer Wortlaut (WCAG 2.5.3); wer antippt, sieht die Liste, keine Erklärung.
+    satz: (q) => `${q.ausstehend} nicht gesendet`,
     farbe: farbenDunkel.achtung,
     getrennt: false,
   },
@@ -345,8 +348,9 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
 
 /**
  * SYNC-Anzeige: WLAN-Icon (Haken verbunden, Kreuz getrennt; LFH-595) + Wort (Mono 11). Eine
- * ANZEIGE, kein Bedienziel — die Handlungen trägt die Betriebszeile (`LiveStatusBanner`) aus
- * demselben Store (LFH-336 · M3).
+ * Anzeige, außer bei ausstehenden oder abgelehnten Aktionen: dann ein Knopf, der den
+ * Wiederherstellungsbereich der Betriebszeile öffnet (LLH-1758); die übrigen Handlungen trägt
+ * die Betriebszeile (`LiveStatusBanner`) aus demselben Store (LFH-336 · M3).
  *
  * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste erscheint
  * die Zelle nur bei Netzverlust oder offener Queue.
@@ -355,13 +359,14 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * beim Start stehen in jeder Breite nur als Icon, der Aufbau in `achtung`. Beide verlangen nichts, und der
  * Aufbau beim Start wechselte sonst ohne Zutun die Breite des Kopfs (vorher hielt ein Platzhalter
  * dafür dauerhaft die Breite von „VERBINDE“, LLH-1158). Jede Störung (VERBINDE beim Wiederaufbau,
- * WARTET, GETRENNT, OFFLINE, PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
- * Fall `aria-label` und `title`. WARTET und PRÜFEN stehen beim Neuladen schon im ersten Bild: der
+ * NICHT GESENDET, GETRENNT, OFFLINE, PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
+ * Fall `aria-label` und `title`. NICHT GESENDET und PRÜFEN stehen beim Neuladen schon im ersten Bild: der
  * Zähler beginnt mit dem zuletzt gelesenen Stand der Person (LLH-1910,
  * `offline/queueZaehlerMerker.ts`); nicht beim ersten Laden nach einer Anmeldung und nicht ohne
  * Browserspeicher.
  *
- * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile.
+ * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile. Nur
+ * ausstehende Aktionen tragen dort ihre Zahl neben dem Icon (LLH-1758).
  * `zelle`: die Polsterung der Nachbarzellen, ohne das Wort zu nehmen (Gerätekopf unter `md`, der
  * keine Betriebszeile hat und das Wort selbst tragen muss).
  */
@@ -379,17 +384,97 @@ export function SyncAnzeige({
   kompakt?: boolean;
   zelle?: { padding: number };
 }) {
-  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const live = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
   const online = useOnline();
   const queue = useOfflineQueueZaehler(benutzer?.id);
   const zustand = syncZustand({ online, live, liveErwartet, queue });
   if (zustand === 'ruhe') return null;
+  return <SyncZelle zustand={zustand} queue={queue} kompakt={kompakt} zelle={zelle} />;
+}
+
+/** Zustände, die eine Handlung haben: der Wiederherstellungsbereich zeigt, was wartet (LLH-1758). */
+const SYNC_MIT_HANDLUNG: ReadonlySet<SyncZustand> = new Set(['ausstehend', 'abgelehnt']);
+
+/**
+ * Die Zelle selbst, ohne Datenquellen — exportiert, damit Knopf und Anzeige ohne Auth und Queue
+ * prüfbar sind. Ausstehende und abgelehnte Aktionen machen sie zum Knopf, der den
+ * Wiederherstellungsbereich öffnet (LLH-1758, `offline/AGENTS.md`, „Vorgemerkt heißt nicht
+ * offline“): ausstehend steht „n NICHT GESENDET“, unter `md` die Zahl neben dem Symbol.
+ */
+export function SyncZelle({
+  zustand,
+  queue,
+  kompakt,
+  zelle,
+}: {
+  zustand: Exclude<SyncZustand, 'ruhe'>;
+  queue: OfflineQueueZaehler;
+  kompakt: boolean;
+  zelle?: { padding: number };
+}) {
+  const { token } = theme.useToken();
   const d = SYNC_DARSTELLUNG[zustand];
   const Icon = d.getrennt ? IconWlanGetrennt : IconWlanVerbunden;
   const satz = d.satz(queue);
-  const wort = zustand === 'ausstehend' ? `${d.wort} ${queue.ausstehend}` : d.wort;
+  const zahl = zustand === 'ausstehend' ? queue.ausstehend : null;
+  // Im Gerätekopf (`zelle`) nur die Zahl: „2 NICHT GESENDET“ brach die rechte Gruppe auf 390 px
+  // in eine zweite Zeile (Review LLH-1758, LLH-1734); die Betriebszeile darunter trägt das Wort.
+  const nurZahl = zahl != null && (kompakt || zelle != null);
+  const wort = nurZahl
+    ? String(zahl)
+    : syncZeigtWort(zustand, kompakt)
+      ? zahl != null
+        ? `${zahl} ${d.wort}`
+        : d.wort
+      : null;
+  const stil = kopfZelleStil(zelle ?? (kompakt ? { padding: token.paddingXS } : token));
+  const inhalt = (
+    <>
+      <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
+        <Icon size={16} />
+      </span>
+      {wort != null && (
+        // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen.
+        <span
+          aria-hidden="true"
+          style={{
+            fontFamily: schrift.zahl,
+            fontSize: schriftskala.meta.groesse,
+            color: d.farbe,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {wort}
+        </span>
+      )}
+    </>
+  );
+  if (SYNC_MIT_HANDLUNG.has(zustand)) {
+    return (
+      <button
+        type="button"
+        className="lfh-kopf-sync"
+        data-lfh="kopf-sync"
+        data-zustand={zustand}
+        aria-label={satz}
+        title={satz}
+        onClick={openWiederherstellung}
+        style={{
+          ...stil,
+          background: 'none',
+          border: 'none',
+          ...(stil.borderInlineEnd ? { borderInlineEnd: stil.borderInlineEnd } : {}),
+          ...(stil.borderInlineStart ? { borderInlineStart: stil.borderInlineStart } : {}),
+          color: 'inherit',
+          font: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        {inhalt}
+      </button>
+    );
+  }
   return (
     <div
       data-lfh="kopf-sync"
@@ -399,24 +484,9 @@ export function SyncAnzeige({
       role="img"
       aria-label={satz}
       title={satz}
-      style={kopfZelleStil(zelle ?? (kompakt ? { padding: token.paddingXS } : token))}
+      style={stil}
     >
-      <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
-        <Icon size={16} />
-      </span>
-      {syncZeigtWort(zustand, kompakt) && (
-        // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen.
-        <span
-          aria-hidden="true"
-          style={{
-            fontFamily: schrift.zahl,
-            fontSize: schriftskala.meta.groesse,
-            color: d.farbe,
-          }}
-        >
-          {wort}
-        </span>
-      )}
+      {inhalt}
     </div>
   );
 }
