@@ -388,11 +388,23 @@ describe('Körperschema — Regionen sichtbar (LLH-1769)', () => {
 
   it('umrandet beim Markieren jede Region gestrichelt in der Konturfarbe', () => {
     zeige({ verletzungen: [] });
-    const flaechen = [...document.querySelectorAll('[data-lfh="koerperzone"] rect')];
-    expect(flaechen.length).toBeGreaterThan(0);
-    for (const r of flaechen) {
-      expect(r.getAttribute('stroke')).toBe(farben.kontur);
-      expect(r.getAttribute('stroke-dasharray')).toBeTruthy();
+    // Je Ansicht eine Gruppe Grenzen, auf den Umriss beschnitten, ohne Zeiger.
+    const gruppen = [...document.querySelectorAll('[data-lfh="zonengrenzen"]')];
+    expect(gruppen).toHaveLength(2);
+    for (const g of gruppen) {
+      const id = /^url\(#([\w-]+)\)$/.exec(g.getAttribute('clip-path') ?? '')?.[1];
+      expect(id && g.querySelector(`clipPath#${id} path`)).toBeTruthy();
+      expect(g.getAttribute('pointer-events')).toBe('none');
+      const grenzen = [...g.querySelectorAll(':scope > rect')];
+      expect(grenzen.length).toBeGreaterThan(0);
+      for (const r of grenzen) {
+        expect(r.getAttribute('stroke')).toBe(farben.kontur);
+        expect(r.getAttribute('stroke-dasharray')).toBeTruthy();
+      }
+    }
+    // Die Trefferflächen selbst bleiben ohne Strich, bis Fokus oder Wahl sie zeichnen.
+    for (const r of document.querySelectorAll('[data-lfh="koerperzone"] rect')) {
+      expect(r.getAttribute('stroke')).toBe('none');
     }
   });
 
@@ -409,5 +421,6 @@ describe('Körperschema — Regionen sichtbar (LLH-1769)', () => {
   it('zeigt beim Lesen keine Regionen', () => {
     zeige({ modus: 'lesen' });
     expect(document.querySelector('[data-lfh="koerperzone"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="zonengrenzen"]')).toBeNull();
   });
 });

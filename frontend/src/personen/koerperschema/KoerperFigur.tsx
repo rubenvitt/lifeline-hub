@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import type { VerletzungAnsicht } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { koerperschemaFarben, schrift } from '../../theme/tokens';
@@ -29,7 +29,8 @@ import { regionName, type NummerierteVerletzung } from './koerperschemaKern';
  * in `bedien`.
  *
  * TREFFERZONEN: je Region ein `<g role="button">` aus durchsichtigen Rechtecken
- * (`fill-opacity: 0`, nimmt aber Zeiger an), gestrichelt in der Kontur umrandet (LLH-1769).
+ * (`fill-opacity: 0`, nimmt aber Zeiger an); darunter ihre Grenzen gestrichelt in der Kontur, auf den
+ * Umriss beschnitten (LLH-1769).
  * Roving-Tabindex in der festen Folge aus `ZONEN`,
  * Pfeiltasten wandern, Pos1/Ende springen, Enter und Leertaste wählen. Fokus und Wahl zeichnen
  * den Umriss der Zone in `bedien`.
@@ -124,6 +125,8 @@ export default function KoerperFigur({
   const [fokusIndex, setFokusIndex] = useState(0);
   const [fokussiert, setFokussiert] = useState<number | null>(null);
   const [sternFokus, setSternFokus] = useState<number | null>(null);
+  // Zeichen wie „:“ oder „«“ aus `useId` brächen den Verweis `url(#…)`.
+  const umrissId = `umriss-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const bedienbar = modus === 'markieren' && !gesperrt;
   const druck = modus === 'druck';
   const einheit = 1 / massstab;
@@ -199,6 +202,32 @@ export default function KoerperFigur({
         />
       )}
 
+      {bedienbar && (
+        // Die Grenzen der Regionen gestrichelt in der Kontur (LLH-1769), auf den Umriss
+        // beschnitten: man sieht, wohin ein Tipp trifft, ohne die über die Figur hinausreichenden
+        // Trefferflächen (Handschuh-Stufe) als Kästen ins Leere zu zeichnen.
+        <g data-lfh="zonengrenzen" clipPath={`url(#${umrissId})`} pointerEvents="none">
+          <clipPath id={umrissId}>
+            <path d={umrissPfad(figur)} />
+          </clipPath>
+          {zonen.flatMap((zone) =>
+            zone.flaechen.map((r) => (
+              <rect
+                key={`${zone.region}:${r.x}:${r.y}`}
+                x={r.x}
+                y={r.y}
+                width={r.b}
+                height={r.h}
+                fill="none"
+                stroke={farben.kontur}
+                strokeWidth={einheit}
+                strokeDasharray={`${3 * einheit} ${3 * einheit}`}
+              />
+            )),
+          )}
+        </g>
+      )}
+
       {bedienbar &&
         zonen.map((zone, index) => {
           const aktiv = gewaehlt?.zone.region === zone.region || fokussiert === index;
@@ -233,11 +262,8 @@ export default function KoerperFigur({
                   fill="currentColor"
                   fillOpacity={0}
                   pointerEvents="all"
-                  // Jede Region gestrichelt in der Kontur (LLH-1769): man sieht, wohin ein Tipp
-                  // trifft; Fokus und Wahl durchgezogen in `bedien`.
-                  stroke={aktiv ? farben.bedien : farben.kontur}
-                  strokeWidth={(aktiv ? 2 : 1) * einheit}
-                  strokeDasharray={aktiv ? undefined : `${3 * einheit} ${3 * einheit}`}
+                  stroke={aktiv ? farben.bedien : 'none'}
+                  strokeWidth={2 * einheit}
                 />
               ))}
             </g>
