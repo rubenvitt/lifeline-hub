@@ -61,6 +61,15 @@ describe('useStueckweise (LLH-1974)', () => {
     expect(result.current).toBe(3);
   });
 
+  it('stückelt beim ersten Anzeigen mit Zeilen, auch wenn die Liste leer startete', () => {
+    const { result, rerender } = lauf(0);
+    expect(result.current).toBe(0);
+    rerender({ anzahl: 10, aktiv: true });
+    expect(result.current).toBe(4);
+    weiter();
+    expect(result.current).toBe(8);
+  });
+
   it('zeigt nach Abschluss eine gewachsene Liste sofort ganz', () => {
     const { result, rerender } = lauf(10);
     weiter();

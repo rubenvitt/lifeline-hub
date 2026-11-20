@@ -20,25 +20,36 @@ export function setzeStueckweise(an: boolean): void {
   stueckweiseAn = an;
 }
 
+/** `wartet`: noch keine Zeile gesehen; eine Zahl: so weit gerendert; `fertig`: nie mehr stückeln. */
+type Stand = 'wartet' | number | 'fertig';
+
+function ordne(stand: Stand, anzahl: number, aktiv: boolean): Stand {
+  if (stand === 'fertig' || !aktiv) return 'fertig';
+  if (stand === 'wartet') {
+    if (anzahl === 0) return 'wartet';
+    return anzahl > STUECK_ZEILEN ? STUECK_ZEILEN : 'fertig';
+  }
+  return stand >= anzahl ? 'fertig' : stand;
+}
+
 /**
- * Wie viele der `anzahl` Zeilen gerade zu rendern sind. Gestückelt wird nur, wenn die Liste beim
- * ersten Render `aktiv` ist und mehr als {@link STUECK_ZEILEN} Zeilen hat. Wird `aktiv` falsch
- * (Druck, Deeplink, Virtualisierung) oder sind alle Zeilen da, ist das Stückeln für diese
- * Instanz vorbei.
+ * Wie viele der `anzahl` Zeilen gerade zu rendern sind. Gestückelt wird beim ersten Render, der
+ * Zeilen hat (eine Liste startet oft leer, solange ihre Daten laden), wenn die Liste dann `aktiv`
+ * ist und mehr als {@link STUECK_ZEILEN} Zeilen hat. Wird `aktiv` falsch (Druck, Deeplink,
+ * Virtualisierung) oder sind alle Zeilen da, ist das Stückeln für diese Instanz vorbei.
  */
 export function useStueckweise(anzahl: number, aktiv: boolean): number {
-  const [bis, setBis] = useState<number | null>(() =>
-    aktiv && stueckweiseAn && anzahl > STUECK_ZEILEN ? STUECK_ZEILEN : null,
-  );
-  // Beim Rendern angepasst, nicht per Effekt: derselbe Render zeigt dann schon alles.
-  if (bis != null && (!aktiv || bis >= anzahl)) setBis(null);
-  const laeuft = bis != null && aktiv && bis < anzahl;
+  const [roh, setStand] = useState<Stand>(() => (stueckweiseAn ? 'wartet' : 'fertig'));
+  const stand = ordne(roh, anzahl, aktiv);
+  // Beim Rendern angepasst, nicht per Effekt: derselbe Render zeigt schon den neuen Stand.
+  if (stand !== roh) setStand(stand);
+  const bis = typeof stand === 'number' ? stand : null;
 
   useEffect(() => {
-    if (!laeuft) return;
-    const t = setTimeout(() => setBis((b) => (b == null ? null : b + STUECK_ZEILEN)), 0);
+    if (bis == null) return;
+    const t = setTimeout(() => setStand((s) => (typeof s === 'number' ? s + STUECK_ZEILEN : s)), 0);
     return () => clearTimeout(t);
-  }, [laeuft, bis]);
+  }, [bis]);
 
-  return laeuft ? bis : anzahl;
+  return bis ?? anzahl;
 }

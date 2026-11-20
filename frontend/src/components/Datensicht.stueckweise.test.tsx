@@ -62,6 +62,13 @@ describe('Datensicht rendert beim ersten Anzeigen stückweise (LLH-1974)', () =>
     await waitFor(() => expect(karten()).toHaveLength(10));
   });
 
+  it('stückelt auch, wenn die Daten erst nach dem Einhängen kommen', async () => {
+    const { rerender } = renderMitProviders(<Sicht daten={[]} />);
+    rerender(<Sicht daten={viele(10)} />);
+    expect(zeilen()).toHaveLength(STUECK_ZEILEN);
+    await waitFor(() => expect(zeilen()).toHaveLength(10));
+  });
+
   it('rendert sofort alle, wenn eine Zeile hervorgehoben ist', () => {
     renderMitProviders(<Sicht daten={viele(10)} hervorgehoben={9} />);
     expect(zeilen()).toHaveLength(10);
