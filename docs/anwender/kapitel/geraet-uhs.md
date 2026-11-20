@@ -90,8 +90,8 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
 
 ### Transport, Maßnahme und Verletzung mit „Bestätigt von“
 
-1. Die Person öffnen. Im Patientenkopf „Transport festlegen“, „Maßnahme erfassen“ oder
-   „Verletzung markieren“ wählen.
+1. Die Person öffnen. Im Patientenkopf „Transport festlegen“ (steht schon ein Transport da: auf
+   ihn tippen), „Maßnahme erfassen“ oder „Verletzung markieren“ wählen.
 2. Im Paneel die Angaben wählen wie am Arbeitsplatz
    ([Betroffene und Sichtung](betroffene.md)): beim Transport Priorität, Art und Fachrichtung,
    bei der Maßnahme die Fläche der Maßnahme, bei der Verletzung erst die Stelle am Körperschema.
