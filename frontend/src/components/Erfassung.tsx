@@ -414,6 +414,9 @@ export function ErfassungsFormular<T extends object>({
 
         setZaehler((n) => n + 1);
         touchedFieldsRef.current.clear();
+        // Gespeichert ist nichts mehr zu verwerfen: eine offene Rückfrage geht mit (LLH-1755).
+        rueckfrageOffenRef.current = false;
+        setRueckfrageOffen(false);
         if (!serienlauf) {
           form.resetFields();
           onFertig();

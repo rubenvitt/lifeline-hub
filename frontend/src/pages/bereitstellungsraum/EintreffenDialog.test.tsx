@@ -700,3 +700,15 @@ describe('EintreffenDialog — ohne Netz (LLH-1075 Teil III)', () => {
     expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeEnabled();
   });
 });
+
+describe('EintreffenDialog — Maske (LLH-1755)', () => {
+  it('ein Klick neben den Dialog schließt ihn nicht und lässt den Fokus stehen', async () => {
+    const { onClose } = zeige();
+    await screen.findByRole('searchbox', { name: 'Suche' });
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    expect(fireEvent.mouseDown(maske!)).toBe(false);
+    await userEvent.click(maske!);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});

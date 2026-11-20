@@ -1,5 +1,5 @@
 import { Button, Modal } from 'antd';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, type KeyboardEvent, type ReactNode } from 'react';
 import { useBlocker } from 'react-router';
 import { SpeicherFehler } from './SpeicherHinweis';
 import Knopfreihe from './instrument/Knopfreihe';
@@ -140,22 +140,20 @@ export function VerwerfenDialog({
       centered
       onCancel={onWeiter}
       mask={{ closable: false }}
-      wrapProps={MASKE_HAELT_FOKUS}
       // antd hört Escape global: dasselbe Escape, das die Rückfrage öffnet, schlösse sie sofort
-      // wieder. Escape gilt deshalb nur, solange der Fokus in der Rückfrage steht.
+      // wieder. Escape gilt deshalb am Rahmen der Rückfrage, wo immer der Fokus darin steht. Keine
+      // Taste läuft weiter: die Rückfrage hängt im React-Baum unter dem Erfassungsformular, dessen
+      // Strg/⌘+Enter sonst hinter ihr speicherte (LLH-1755, Review).
       keyboard={false}
-      modalRender={(knoten) => (
-        <div
-          onKeyDown={(e) => {
-            if (e.key !== 'Escape' || e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            e.stopPropagation();
-            onWeiter();
-          }}
-        >
-          {knoten}
-        </div>
-      )}
+      wrapProps={{
+        ...MASKE_HAELT_FOKUS,
+        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+          e.stopPropagation();
+          if (e.key !== 'Escape' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          onWeiter();
+        },
+      }}
       footer={
         <Knopfreihe fuss>
           <Button danger onClick={onVerwerfen}>
