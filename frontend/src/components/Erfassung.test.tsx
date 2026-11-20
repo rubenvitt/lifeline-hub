@@ -1,7 +1,7 @@
 import { Form, Input, theme } from 'antd';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
@@ -990,6 +990,105 @@ describe('ErfassungsModal', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  describe('Fuß am Handy: nur der Abschluss klebt (LLH-1763)', () => {
+    const fussVon = () => document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss"]')!;
+    const serieVon = () => document.querySelector<HTMLElement>('[data-lfh="erfassung-serie"]');
+
+    it('klebt nur den Abschluss: Primärknopf im Fuß, kein Abbrechen, keine Serie', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          serie
+          uebernahme={['ort']}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const fuss = fussVon();
+      expect(fuss.style.position).toBe('sticky');
+      expect(within(fuss).getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+      expect(within(fuss).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
+      expect(within(fuss).queryByRole('button', { name: /Speichern und nächste/ })).toBeNull();
+      expect(within(fuss).queryByText('Werte behalten')).toBeNull();
+    });
+
+    it('Serienzeile und „Speichern und nächste“ stehen am Formularende, nicht klebend', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          serie
+          uebernahme={['ort']}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const serie = serieVon();
+      expect(serie).not.toBeNull();
+      expect(serie!.style.position).not.toBe('sticky');
+      expect(
+        within(serie!).getByRole('button', { name: /Speichern und nächste/ }),
+      ).toBeInTheDocument();
+      expect(within(serie!).getByText('Werte behalten')).toBeInTheDocument();
+      expect(serie!.closest('form')).not.toBeNull();
+      // Im Baum vor dem klebenden Fuß, also beim Rollen darüber.
+      expect(serie!.compareDocumentPosition(fussVon()) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
+
+    it('ohne Serie gibt es am Handy keinen Serienteil', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+      expect(serieVon()).toBeNull();
+    });
+
+    it('Nebenaktionen kleben mit dem Primärknopf, der Primärknopf zuletzt', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          nebenaktionen={[{ schluessel: 'rtw', text: 'RTW nötig', danger: true }]}
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const knoepfe = within(fussVon()).getAllByRole('button');
+      expect(knoepfe.map((k) => k.textContent)).toEqual(['RTW nötig', 'Erfassen']);
+    });
+
+    it('die Zusammenfassung bleibt am Primärknopf im klebenden Fuß', () => {
+      setzeViewportBreite(390);
+      renderMitProviders(
+        <ModalHarness
+          offen
+          zusammenfassung="3 Personen"
+          onErfassen={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      expect(within(fussVon()).getByText('3 Personen')).toBeInTheDocument();
+    });
+
+    it('Enter im Feld sendet weiter über den Primärknopf, nicht als Serie', async () => {
+      setzeViewportBreite(390);
+      const onErfassen = vi.fn().mockResolvedValue(undefined);
+      const onFertig = vi.fn();
+      renderMitProviders(<ModalHarness offen serie onErfassen={onErfassen} onFertig={onFertig} />);
+      await userEvent.type(screen.getByLabelText('Ort'), 'Brücke{Enter}');
+      await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+      expect(onErfassen).toHaveBeenCalledTimes(1);
+    });
+
+    it('ab md bleibt der Fuß eine klebende Reihe mit Abbrechen und Serie', () => {
+      renderMitProviders(
+        <ModalHarness offen serie onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+      );
+      expect(serieVon()).toBeNull();
+      const fuss = fussVon();
+      for (const name of ['Abbrechen', 'Speichern und nächste', 'Erfassen']) {
+        expect(within(fuss).getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
+      }
+    });
   });
 
   it('trägt keine eigene antd-Fusszeile — der Absende-Knopf liegt im Formular', () => {

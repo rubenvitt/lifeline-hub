@@ -69,6 +69,12 @@ import './Erfassung.css';
  * höher ist als der Schirm, und der Dialogkopf hält das 72-px-Schließkreuz des Handschuhs vom
  * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht.
  *
+ * **Am Handy klebt im Dialog nur der Abschluss** (LLH-1763): der Primärknopf, die Nebenaktionen
+ * (gleichrangige Abschlüsse wie „RTW nötig“) und die Zusammenfassung. Gestapelt fraß der Fuß der
+ * Serie 271 von 844 px. „Abbrechen“ steht dort im Kopf, als Text im Schließknopf
+ * (`abbrechenImKopf`); die Einstellungszeile und „Speichern und nächste“ stehen am Formularende
+ * (`erfassung-serie`), nicht klebend. Ab `md` und inline gilt das obige unverändert.
+ *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
  * durchreicht. Der Riegel gegen doppeltes Absenden sitzt in `abschicken` (`sendetRef`): ein
@@ -454,6 +460,47 @@ export function ErfassungsFormular<T extends object>({
     },
   });
 
+  // EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
+  // IMMER, weil sie die Ansage-Region trägt: eine `aria-live`-Region meldet nur Änderungen an
+  // bereits vorhandenem Inhalt, sonst bliebe die erste Speicherung unangesagt.
+  const einstellung = serie && (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: token.marginXS,
+        flexWrap: 'wrap',
+        // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 8 / 12 / 16 px.
+        marginBottom: token.marginSM,
+      }}
+    >
+      {uebernahme != null && uebernahme.length > 0 && (
+        <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
+          <Typography.Text type="secondary">Werte behalten</Typography.Text>
+        </Checkbox>
+      )}
+      <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
+        {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+      </Typography.Text>
+    </div>
+  );
+
+  const serienKnopf = serie && (
+    // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
+    // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
+    // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
+    <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
+      Speichern und nächste
+      <span
+        aria-hidden
+        className={SERIEN_KUERZEL_KLASSE}
+        style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
+      >
+        {SERIEN_KUERZEL}
+      </span>
+    </Button>
+  );
+
   return (
     <div ref={wurzel} onKeyDown={aufTaste}>
       {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`: scheitert die Prüfung, läuft
@@ -478,6 +525,16 @@ export function ErfassungsFormular<T extends object>({
             fallback={speicherFehlerFallback}
           />
         )}
+        {/* Unter `md` im Dialog stehen Einstellung und Serienknopf am Formularende, nicht klebend:
+            klebend bleibt nur der Abschluss (LLH-1763, siehe Dateikopf). */}
+        {abbruchImKopf && serie && (
+          <div data-lfh="erfassung-serie" style={{ marginTop: token.margin }}>
+            {einstellung}
+            <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
+              <Knopfreihe fuss>{serienKnopf}</Knopfreihe>
+            </ConfigProvider>
+          </div>
+        )}
         <div
           ref={fussKlebt ? fussRef : undefined}
           data-lfh={fussKlebt ? 'erfassung-fuss' : undefined}
@@ -488,30 +545,7 @@ export function ErfassungsFormular<T extends object>({
             ...(fussKlebt ? klebenderFuss(token) : undefined),
           }}
         >
-          {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
-              IMMER, weil sie die Ansage-Region trägt: eine `aria-live`-Region meldet nur Änderungen an
-              bereits vorhandenem Inhalt, sonst bliebe die erste Speicherung unangesagt. */}
-          {serie && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: token.marginXS,
-                flexWrap: 'wrap',
-                // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 8 / 12 / 16 px.
-                marginBottom: token.marginSM,
-              }}
-            >
-              {uebernahme != null && uebernahme.length > 0 && (
-                <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
-                  <Typography.Text type="secondary">Werte behalten</Typography.Text>
-                </Checkbox>
-              )}
-              <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
-                {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
-              </Typography.Text>
-            </div>
-          )}
+          {!abbruchImKopf && einstellung}
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
               `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
           <div
@@ -543,21 +577,7 @@ export function ErfassungsFormular<T extends object>({
                     Abbrechen
                   </Button>
                 )}
-                {serie && (
-                  // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
-                  // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
-                  // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
-                  <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
-                    Speichern und nächste
-                    <span
-                      aria-hidden
-                      className={SERIEN_KUERZEL_KLASSE}
-                      style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
-                    >
-                      {SERIEN_KUERZEL}
-                    </span>
-                  </Button>
-                )}
+                {!abbruchImKopf && serienKnopf}
                 {nebenaktionen?.map((a) => (
                   // htmlType="button" wie „Speichern und nächste“: der Klick setzt erst die Aktion,
                   // dann prüft und sendet `form.submit()`.
