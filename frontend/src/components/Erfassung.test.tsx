@@ -907,6 +907,15 @@ describe('ErfassungsModal', () => {
     }
   });
 
+  it('ein Klick auf die Maske nimmt dem Feld den Fokus nicht, Escape bleibt wirksam (LLH-1755)', async () => {
+    renderMitProviders(<ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+    expect(maske).not.toBeNull();
+    // `fireEvent` liefert `false`, wenn der Standard verhindert wurde: der Browser verschiebt den
+    // Fokus dann nicht auf `<body>`, wo keine Tastatur-Ebene Escape hörte.
+    expect(fireEvent.mouseDown(maske!)).toBe(false);
+  });
+
   it('ein Klick auf die Maske schließt nie, auch ohne Änderung (LLH-1755)', async () => {
     const onAbbrechen = vi.fn();
     renderMitProviders(

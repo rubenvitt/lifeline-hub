@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useBlocker } from 'react-router';
 import { SpeicherFehler } from './SpeicherHinweis';
 import Knopfreihe from './instrument/Knopfreihe';
+import { MASKE_HAELT_FOKUS } from './maskeHaeltFokus';
 import Stapel from './instrument/Stapel';
 
 interface Props {
@@ -135,8 +136,26 @@ export function VerwerfenDialog({
     <Modal
       title="Eingaben verwerfen?"
       open={offen}
+      // Mittig, damit sie den Kopf des Erfassungsdialogs nicht verdeckt.
+      centered
       onCancel={onWeiter}
       mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
+      // antd hört Escape global: dasselbe Escape, das die Rückfrage öffnet, schlösse sie sofort
+      // wieder. Escape gilt deshalb nur, solange der Fokus in der Rückfrage steht.
+      keyboard={false}
+      modalRender={(knoten) => (
+        <div
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape' || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            e.stopPropagation();
+            onWeiter();
+          }}
+        >
+          {knoten}
+        </div>
+      )}
       footer={
         <Knopfreihe fuss>
           <Button danger onClick={onVerwerfen}>

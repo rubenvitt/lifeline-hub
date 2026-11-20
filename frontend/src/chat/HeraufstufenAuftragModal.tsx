@@ -1,6 +1,10 @@
 import { Modal, Typography, theme } from 'antd';
 import { useEffect, useRef } from 'react';
-import type { ErfassungsFormularSteuerung, Speicherung } from '../components/Erfassung';
+import {
+  MASKE_HAELT_FOKUS,
+  type ErfassungsFormularSteuerung,
+  type Speicherung,
+} from '../components/Erfassung';
 import type { ChatNachricht, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 
@@ -57,6 +61,7 @@ export default function HeraufstufenAuftragModal({
       closable={sperrt ? { disabled: true } : true}
       // Die Maske schließt nie; Escape läuft über die Tastatur-Ebene des Formulars.
       mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       keyboard={false}
       destroyOnHidden
       width={520}

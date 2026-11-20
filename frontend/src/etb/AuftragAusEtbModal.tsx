@@ -1,7 +1,11 @@
 import { Modal, Typography, theme } from 'antd';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
-import type { ErfassungsFormularSteuerung, Speicherung } from '../components/Erfassung';
+import {
+  MASKE_HAELT_FOKUS,
+  type ErfassungsFormularSteuerung,
+  type Speicherung,
+} from '../components/Erfassung';
 import { useRef } from 'react';
 
 interface Props {
@@ -52,6 +56,7 @@ export default function AuftragAusEtbModal({
       closable={sperrt ? { disabled: true } : true}
       // Die Maske schließt nie; Escape läuft über die Tastatur-Ebene des Formulars.
       mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       keyboard={false}
       destroyOnHidden
       width={520}

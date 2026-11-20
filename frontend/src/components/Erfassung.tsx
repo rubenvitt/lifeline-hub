@@ -18,7 +18,10 @@ import type { OfflineSchreibErgebnis } from '../offline/schreiben';
 import { FOKUSABSTAND_ERFASSUNG, useFokusabstandUnten } from './fokusabstandUnten';
 import { gleichFuerStand } from './aenderungsstand';
 import { SpeicherFehler } from './SpeicherHinweis';
+import { MASKE_HAELT_FOKUS } from './maskeHaeltFokus';
 import { VerwerfenDialog } from './VerlassenRueckfrage';
+
+export { MASKE_HAELT_FOKUS };
 import { useViewport } from './useViewport';
 import './Erfassung.css';
 
@@ -792,6 +795,7 @@ export function ErfassungsModal<T extends object>({
       closable={sperrtAbbruch ? { disabled: true } : true}
       // Die Maske schließt nie (LLH-1755): ein Tap neben den Dialog ist kein Abbruch.
       mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       footer={null}
       destroyOnHidden
       keyboard={false}
