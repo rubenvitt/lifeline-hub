@@ -99,3 +99,43 @@ describe('LagerelevantModal — Rückfrage vor dem Verwerfen (LLH-2010)', () => 
     expect(feld).toHaveValue('Deich bei km 3 durchweicht');
   });
 });
+
+/**
+ * Review-Befund (LLH-2010): Das Formular überlebt das Schließen. Ohne eigenes Formular je Meldung
+ * stünde beim Öffnen für Meldung B noch der Text von A, und „Übernehmen“ schriebe ihn zu B.
+ */
+describe('LagerelevantModal — je Meldung ein frisches Formular', () => {
+  function Wechsel() {
+    const [meldung, setMeldung] = useState<Meldung | null>({ id: 1, inhalt: 'Text A' } as Meldung);
+    return (
+      <>
+        <button type="button" onClick={() => setMeldung({ id: 2, inhalt: 'Text B' } as Meldung)}>
+          Meldung B
+        </button>
+        <LagerelevantModal
+          offen={meldung !== null}
+          meldung={meldung}
+          senden={false}
+          einsatzId={1}
+          onAbbrechen={() => setMeldung(null)}
+          onUebergeben={() => Promise.resolve()}
+        />
+      </>
+    );
+  }
+
+  it('nach Abbrechen bei A zeigt der Dialog für B den Text von B', async () => {
+    renderMitProviders(<Wechsel />);
+    expect(await screen.findByDisplayValue('Text A')).toBeInTheDocument();
+    await userEvent.click(kreuz());
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung B' }));
+    // jsdom hält den schließenden Dialog eingehängt: nur der offene zählt.
+    await waitFor(() => {
+      const offen = screen
+        .getAllByRole('dialog', { name: 'In die Lage übernehmen' })
+        .filter((d) => !d.classList.contains('ant-zoom-leave'));
+      expect(offen).toHaveLength(1);
+      expect(within(offen[0]).getByLabelText('Lage-Text')).toHaveValue('Text B');
+    });
+  });
+});

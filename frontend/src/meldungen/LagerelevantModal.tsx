@@ -44,7 +44,13 @@ interface FormWerte {
  * nie, ein geänderter Lage-Text fragt vor dem Verwerfen. Der Meldungsinhalt ist Startwert
  * (`initialValues`), zählt also allein nicht als Änderung.
  */
-export default function LagerelevantModal({
+export default function LagerelevantModal(props: Props) {
+  // Je Meldung ein eigenes Formular: der Store überlebt das Schließen, und `initialValues` einer
+  // neuen Meldung verlören gegen den alten Stand (Review LLH-2010).
+  return <LagerelevantDialog key={props.meldung?.id ?? 'ohne'} {...props} />;
+}
+
+function LagerelevantDialog({
   offen,
   meldung,
   senden,
