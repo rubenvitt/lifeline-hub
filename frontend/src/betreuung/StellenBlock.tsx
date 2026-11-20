@@ -19,7 +19,7 @@ import Datensicht, {
 import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import type { MenueEintrag } from '../components/MenueAusloeser';
-import { monoStil } from '../components/instrument';
+import { monoStil, Stapel } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { aktionsSpalte } from '../components/aktionsSpalte';
 import { leseTextSchrift } from '../components/textBreite';
@@ -218,12 +218,24 @@ const stellenSpalten = (
           );
         }
         const stufe = auslastung(s.belegung.belegt, s.kapazitaet_personen);
-        return (
-          <Space wrap>
+        const inhalt = (
+          <>
             <span>{personenZahl(s.belegung.belegt)}</span>
             {stufe && <Status darstellung={stufe} />}
             {hinweis}
-          </Space>
+          </>
+        );
+        /*
+         * Unter `md` steht das Auslastungswort unter der Zahl: die Tabelle ist inhaltsgetrieben
+         * breit, und neben der Zahl schöbe es „frei“ aus dem Bild (LFH-967; der `Status`-Baustein
+         * ist breiter als der frühere `StatusTag`).
+         */
+        return schmal ? (
+          <Stapel abstand="xxs" ausrichten="start">
+            {inhalt}
+          </Stapel>
+        ) : (
+          <Space wrap>{inhalt}</Space>
         );
       },
     },

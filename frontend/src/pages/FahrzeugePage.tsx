@@ -1149,7 +1149,9 @@ function FahrzeugeInhalt() {
     {
       title: 'Besatzung',
       key: 'besatzung',
-      width: 320,
+      // Urteil, Ist und Soll in EINER Zeile (LFH-1149): der randlose `Status` mit Formzeichen
+      // (eon26eat) misst „▲ unterbesetzt“ 95 px, dazu Lücke 12 und „Ist … · Soll …“ 202 px.
+      width: 344,
       // Nach der Ist-Stärke, wie das Abzeichen sie zählt.
       sortWert: (ef) => personal.filter((p) => p.fahrzeug_id === ef.id).length,
       render: (_, ef) =>

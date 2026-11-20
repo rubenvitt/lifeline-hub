@@ -98,6 +98,14 @@ export function wirksameMetadaten(
   };
 }
 
+/**
+ * Trägt diese Seite beim Typ die eigene Stelle als Vorgabe? Dann füllt sie der Rufname aus der
+ * Abfrage, und ein Pflichtgrund ohne Standard verweist dorthin (LLH-1764).
+ */
+export function hatVorgabe(feld: 'von' | 'an', typ: EtbTyp): boolean {
+  return VORGABE_JE_TYP[typ][feld];
+}
+
 /** Kommt der angezeigte Wert dieser Seite aus der Vorgabe (kein eigener Wert gesetzt)? */
 export function ausStandard(
   feld: 'von' | 'an',

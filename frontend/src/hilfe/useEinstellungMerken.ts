@@ -14,13 +14,15 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 export function useEinstellungMerken(): {
   stand: BenutzerEinstellungen | undefined;
   benutzerId: number | null;
+  /** Steht fest, ob ein Stand kommt: mit Stand, ohne Person oder nach dem ersten Fehlversuch. */
+  entschieden: boolean;
   merke: (schluessel: string) => void;
 } {
   const auth = useAuthOptional();
   const benutzerId = auth?.geraet ? null : ((auth?.benutzer as { id?: number } | null)?.id ?? null);
   const client = useQueryClient();
   const key = useMemo(() => globalKeys.benutzerEinstellungenVon(benutzerId), [benutzerId]);
-  const { data } = useQuery({
+  const { data, errorUpdateCount, failureCount } = useQuery({
     queryKey: key,
     queryFn: ladeBenutzerEinstellungen,
     enabled: benutzerId != null,
@@ -41,5 +43,10 @@ export function useEinstellungMerken(): {
     [client, key],
   );
 
-  return { stand: benutzerId == null ? undefined : data, benutzerId, merke };
+  // `errorUpdateCount`, nicht `isError`: wer dasselbe Fach später abonniert, ruft einen
+  // gescheiterten Stand neu ab; mit `isError` fiele `entschieden` dann wieder auf `false`.
+  const entschieden =
+    benutzerId == null || data !== undefined || errorUpdateCount > 0 || failureCount > 0;
+
+  return { stand: benutzerId == null ? undefined : data, benutzerId, entschieden, merke };
 }
