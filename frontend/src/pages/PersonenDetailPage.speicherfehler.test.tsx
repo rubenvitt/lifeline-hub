@@ -178,7 +178,7 @@ function render(
   );
 }
 
-const kopfueberschrift = () => screen.findByRole('heading', { name: /Person R-001/ });
+const kopfueberschrift = () => screen.findByRole('heading', { name: /R-001/ });
 const keinToast = () => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 const seitenHinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
 
@@ -859,7 +859,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
   }
   const zurZweiten = async () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Person' }));
-    await screen.findByRole('heading', { name: /Person R-011/ });
+    await screen.findByRole('heading', { name: /R-011/ });
   };
 
   it('räumt Notiz-, Personendaten- und Austrags-Grund und den getippten Notiztext', async () => {
@@ -880,7 +880,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     // Der abgelehnte Name ist ein offener Entwurf: der Wechsel fragt nach (LLH-1103).
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Person' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
-    await screen.findByRole('heading', { name: /Person R-011/ });
+    await screen.findByRole('heading', { name: /R-011/ });
     expect(screen.queryByText('Person storniert')).toBeNull();
     expect(screen.queryByText('Bereits entlassen')).toBeNull();
     expect(screen.queryByText('Name zu lang')).toBeNull();

@@ -1682,6 +1682,11 @@ Spec `bedien-arbeitsplatz`).
   prüfen: kein `.ant-modal-footer` **und** `knopf.closest('form')` ≠ `null`
   (`components/Erfassung.test.tsx`).
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern (`requestAnimationFrame`).
+- **Scheitert die Prüfung, rollt die Hülle zum ersten fehlerhaften Feld** (Mitte, mit Fokus, nach
+  `onPruefungGescheitert` und dem Commit, damit ein aufgehender Klappteil schon steht) **und nennt
+  die Fehlertexte über dem Knopf** (`data-lfh="erfassung-pruefung"`, Alarmfarbe, `aria-live`, am
+  Primärknopf `aria-describedby`); die Zeile folgt den Feldern und geht auf jedem Weg hinaus
+  (LLH-1759). Ein Formular baut das nicht selbst nach.
 - **Der Fuß klebt am unteren Rand**, solange die Maske höher ist als der Schirm: im Dialog
   (`fussKlebt="dialog"`, setzt `ErfassungsModal`, LLH-1274) und auf einer Seite mit langer Maske
   (`fussKlebt="seite"`: Aufnahme, Meldung erfassen; LLH-1761). Steht der Fokus im Formular, rückt

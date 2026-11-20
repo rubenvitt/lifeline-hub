@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
+import { createRef, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   ErfassungsFormular,
   ErfassungsModal,
@@ -1713,5 +1713,112 @@ describe('ErfassungsFormular — Rückfrage vor dem Verwerfen (LLH-1755)', () =>
     });
     expect(rueckfrage()).toBeNull();
     expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+});
+
+/** Zwei Pflichtfelder, dazu ein Abbrechen-Weg und ein Mitschnitt des Rollens (LLH-1759). */
+function ZweiPflichtHarness(props: {
+  onErfassen?: (w: Werte) => Promise<unknown>;
+  onAbbrechen?: () => void;
+  zusammenfassung?: ReactNode;
+  onPruefungGescheitert?: (felder: string[]) => void;
+  onRollen?: (...args: unknown[]) => void;
+}) {
+  const [form] = Form.useForm<Werte>();
+  // antd rollt über `scroll-into-view-if-needed`, das jsdom nicht abbildet; gemessen wird deshalb
+  // der Aufruf am Formular, das echte Rollen samt Fokus läuft weiter.
+  const echt = useRef(form.scrollToField);
+  form.scrollToField = (...args: Parameters<typeof form.scrollToField>) => {
+    props.onRollen?.(...args);
+    echt.current(...args);
+  };
+  return (
+    <ErfassungsFormular<Werte>
+      form={form}
+      onErfassen={props.onErfassen ?? vi.fn().mockResolvedValue(undefined)}
+      onFertig={() => {}}
+      onAbbrechen={props.onAbbrechen ?? (() => {})}
+      zusammenfassung={props.zusammenfassung}
+      onPruefungGescheitert={props.onPruefungGescheitert}
+    >
+      <Form.Item
+        label="Ort"
+        name="ort"
+        rules={[{ required: true, message: 'Ort ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+      <Form.Item
+        label="Melder"
+        name="melder"
+        rules={[{ required: true, message: 'Melder ist erforderlich' }]}
+      >
+        <Input />
+      </Form.Item>
+    </ErfassungsFormular>
+  );
+}
+
+describe('ErfassungsFormular — Prüfung gescheitert (LLH-1759)', () => {
+  const pruefzeile = () => document.querySelector('[data-lfh="erfassung-pruefung"]');
+
+  it('rollt zum ersten fehlerhaften Feld und fokussiert es', async () => {
+    const rollen = vi.fn();
+    renderMitProviders(<ZweiPflichtHarness onRollen={rollen} />);
+    // Der Klick nimmt den Fokus vom Startfeld: geprüft wird, dass die Prüfung ihn zurücksetzt.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(rollen).toHaveBeenCalled());
+    expect(rollen).toHaveBeenCalledWith(
+      ['ort'],
+      expect.objectContaining({ block: 'center', focus: true }),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+  });
+
+  it('nennt die Fehler am Knopf', async () => {
+    renderMitProviders(<ZweiPflichtHarness zusammenfassung="1 Meldung" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    expect(pruefzeile()).toHaveTextContent('Ort ist erforderlich');
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    expect(pruefzeile()!.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
+    const beschreibung = screen
+      .getByRole('button', { name: 'Erfassen' })
+      .getAttribute('aria-describedby');
+    expect(beschreibung?.split(' ')).toContain(pruefzeile()!.id);
+    // Die Zusammenfassung bleibt Teil der Beschreibung.
+    expect(beschreibung?.split(' ')).toHaveLength(2);
+  });
+
+  it('die Zeile verschwindet, sobald die Felder stimmen', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.type(screen.getByLabelText('Ort'), 'Halle 3');
+    await waitFor(() => expect(pruefzeile()).not.toHaveTextContent('Ort ist erforderlich'));
+    expect(pruefzeile()).toHaveTextContent('Melder ist erforderlich');
+    await userEvent.type(screen.getByLabelText('Melder'), 'RTW 2');
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('Abbrechen räumt die Zeile', async () => {
+    renderMitProviders(<ZweiPflichtHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(pruefzeile()).not.toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(pruefzeile()).toBeNull());
+  });
+
+  it('ruft onPruefungGescheitert vor dem Rollen', async () => {
+    const reihenfolge: string[] = [];
+    renderMitProviders(
+      <ZweiPflichtHarness
+        onPruefungGescheitert={() => reihenfolge.push('gescheitert')}
+        onRollen={() => reihenfolge.push('rollen')}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(reihenfolge).toContain('rollen'));
+    expect(reihenfolge[0]).toBe('gescheitert');
   });
 });

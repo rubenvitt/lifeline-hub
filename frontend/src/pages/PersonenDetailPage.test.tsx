@@ -284,7 +284,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
     const { pfade, loesen } = zaehleAbfragen();
     try {
       render(einsatzAktiv, detail);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       // Die Modulfreigaben (Sprung-Sperre „Auf Lagekarte verorten", LFH-888) zählen nicht: sie
       // liegen in der App schon im Cache des Einsatzrahmens; nur dieser nackte Test lädt sie.
       expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
@@ -308,7 +308,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
         aktuelle_uhs_id: 5,
         aufenthalt: imWartebereich('Turnhalle'),
       } as PersonDetail);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       expect(within(kopf()).getByText(/^Turnhalle · Wartebereich · seit/)).toBeInTheDocument();
       expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
         '/api/einsaetze/1',
@@ -328,7 +328,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
     const { pfade, adressen, loesen } = zaehleAbfragen();
     try {
       render(einsatzAktiv, detail);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       expect(screen.queryByText(/^Bezüge \d/)).not.toBeInTheDocument();
 
       await klappeBezuegeAuf();
@@ -355,7 +355,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
     const { pfade, loesen } = zaehleAbfragen();
     try {
       render(einsatzAktiv, detail);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       expect(pfade).not.toContain('/api/einsaetze/1/uhs');
       await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
       await waitFor(() => expect(pfade).toContain('/api/einsaetze/1/uhs'));
@@ -368,7 +368,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
     const { pfade, loesen } = zaehleAbfragen();
     try {
       render(einsatzAktiv, detail);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       expect(pfade).not.toContain('/api/einsaetze/1/personen/10/audit');
 
       await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
@@ -403,7 +403,7 @@ async function ausMenue(name: RegExp) {
  * dann. Ohne `forceRender` sind sie vorher nicht im Baum.
  */
 async function klappeBezuegeAuf() {
-  await screen.findByRole('heading', { name: /Person R-001/ });
+  await screen.findByRole('heading', { name: /R-001/ });
   await userEvent.click(screen.getByRole('button', { name: /Bezüge/ }));
 }
 
@@ -433,7 +433,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     },
   ])('trägt keine Primäraktion und kein „Bearbeiten“ ($fall)', async ({ person }) => {
     render(einsatzAktiv, person);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(kopfPrimaeraktionen()).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(
@@ -444,7 +444,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   it('das Menü trägt weder Sichten noch Verbleib noch Bearbeiten — die stehen im Kopf', async () => {
     const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail;
     render(einsatzAktiv, patient);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const menue = await oeffneKopfmenue();
     expect(within(menue).queryByText(/Sichten|Verbleib|Bearbeiten/)).not.toBeInTheDocument();
     expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
@@ -452,7 +452,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
 
   it('bündelt die Statuswechsel im Menü und lässt „Zurück zur Liste" weg', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     // Der Breadcrumb trägt den Rückweg — ein zweiter Knopf daneben wäre eine Aktion ohne Anlass.
     expect(screen.queryByRole('button', { name: 'Zurück zur Liste' })).not.toBeInTheDocument();
     /**
@@ -475,7 +475,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
    */
   it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const menue = await oeffneKopfmenue();
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
     const eintraege = [
@@ -497,7 +497,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
         return HttpResponse.json({ ...detail, status: 'vermisst' });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await ausMenue(/vermisst/);
     await waitFor(() => expect(gerufen.status).toBe('vermisst'));
   });
@@ -510,7 +510,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
         return HttpResponse.json({ ...detail, status: 'verstorben' });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await ausMenue(/verstorben/);
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(/verstorben/i);
@@ -522,7 +522,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
 
   it('ohne Schreibrecht steht weder Primäraktion noch Auslöser', async () => {
     render(einsatzBeobachter, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).not.toBeInTheDocument();
     expect(kopfPrimaeraktionen()).toHaveLength(0);
   });
@@ -531,7 +531,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
 describe('PersonenDetailPage — Druckansicht (LLH-1120)', () => {
   it('führt auch ohne Schreibrecht als Nebenweg auf die Druckansicht der Person', async () => {
     render(einsatzBeobachter, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
       'href',
       '/einsaetze/1/personen/10/druck',
@@ -562,7 +562,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
         return sichtungAntwort('sk2');
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     // Bei einer ungesichteten Person heißt der Auslöser „Sichten“ — „Nachsichten“ wäre für die
     // erste Sichtung falsch.
     const ausloeser = within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' });
@@ -594,7 +594,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
         return sichtungAntwort('sk1');
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const vorher = within(kopf()).getByText(/^gesichtet /).textContent;
     await userEvent.click(
       within(kopf()).getByRole('button', { name: 'Nachsichten, aktuell SK II · schwer' }),
@@ -617,7 +617,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Verbleib erfassen' }));
     const paneel = within(kopf()).getByRole('region', { name: 'Verbleib erfassen' });
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -660,7 +660,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
         );
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const feld = within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' });
     // Die Folge steht als Beschreibung an der Zeile, nicht als Überschrift (LFH-1078).
     expect(feld).toHaveAccessibleDescription('nicht änderbar · nicht im ETB');
@@ -695,7 +695,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
         },
       ],
     } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const k = kopf();
     expect(k).toHaveTextContent('SK II · schwer');
     expect(k).toHaveTextContent('Verdacht auf Hüftfraktur');
@@ -752,7 +752,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
       ],
     } as PersonDetail;
     render(einsatzAktiv, mitSichtung);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     // Der Chronologie-Zeitstempel erscheint als taktische DTG (dt. Monatskürzel), nicht roh.
     expect(
       await screen.findByText(/^\d{6}(jan|feb|mrz|apr|mai|jun|jul|aug|sep|okt|nov|dez)26$/),
@@ -807,7 +807,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
       ],
       true,
     );
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
     });
@@ -893,7 +893,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
       ],
       true,
     );
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
     });
@@ -946,14 +946,14 @@ describe('PersonenDetailPage — Stammdaten', () => {
 
   it('zeigt Read-Modus mit Stammdaten', async () => {
     render(einsatzAktiv, detail);
-    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
     expect(screen.getByText('Mustermann')).toBeInTheDocument();
     expect(screen.getByText('Brücke')).toBeInTheDocument();
   });
 
   it('Beobachter sieht weder „Bearbeiten“ noch einen schreibbaren Wert', async () => {
     render(einsatzBeobachter, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Name bearbeiten$/ })).not.toBeInTheDocument();
     expect(within(stammdatenRaster()).getByText('Mustermann')).toBeInTheDocument();
@@ -966,7 +966,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
    */
   it('beginnt mit dem Patientenkopf, darunter Verlauf und Personendaten, ohne Reiter', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const folge = [
       kopf(),
       screen.getByText('Verlauf', { exact: true }),
@@ -1005,7 +1005,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
 
   it('zeigt gesetzte Angaben als Begriff und Wert, ohne Descriptions', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(document.querySelector('.ant-descriptions')).toBeNull();
     const name = within(raster()).getByText('Name');
     expect(name.tagName).toBe('DT');
@@ -1021,7 +1021,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
 
   it('sammelt leere Angaben in einer Zeile „Ohne Angabe", statt Striche zu zeigen', async () => {
     render(einsatzBeobachter, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht ein zweites Mal hier.
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
       'Ohne Angabe: Geburtsdatum, Kostform, Unverträglichkeiten, Herkunft / Adresse, Koordinate, Melder / Kontakt, Notiz',
@@ -1034,7 +1034,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
 
   it('führt „Zustand / Verdacht“ im Kopf, nicht in den Stammdaten', async () => {
     render(einsatzAktiv, { ...detail, zustand: 'Verdacht auf Hüftfraktur' } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(begriffe().some((b) => b.startsWith('Zustand'))).toBe(false);
     expect(within(kopf()).getByText('Zustand / Verdacht')).toBeInTheDocument();
     expect(
@@ -1044,7 +1044,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
 
   it('ohne Zustand bietet der Kopf „Zustand / Verdacht … hinzufügen“ an', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(
       within(kopf()).getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
     ).toBeInTheDocument();
@@ -1052,7 +1052,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
 
   it('zeigt die Koordinate als Feld, sobald „Auf Lagekarte verorten" angeboten wird', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(begriffe()).toContain('Koordinate');
     expect(
       within(raster()).getByRole('link', { name: 'Auf Lagekarte verorten' }),
@@ -1066,7 +1066,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
       status: 'vermisst',
       vermisst_seit: null,
     } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
       'Ohne Angabe: Geburtsdatum, Kostform, Unverträglichkeiten, Herkunft / Adresse, vermisst seit, Melder / Kontakt, Notiz',
     );
@@ -1086,7 +1086,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
       kostform: 'normal',
       unvertraeglichkeiten: 'keine bekannt',
     } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.queryByText(/^Ohne Angabe:/)).toBeNull();
     expect(begriffe()).toContain('Notiz');
     expect(begriffe().some((b) => b.startsWith('Zustand'))).toBe(false);
@@ -1282,7 +1282,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
     });
     vi.setSystemTime(new Date('2026-05-27T10:05:30Z'));
     render(einsatzAktiv, gesichtet);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const zeit = within(kopf()).getByText(/^gesichtet /);
     // Rolle „kurz“ (LLH-1061): die Sichtung ist von heute, also nur die Uhrzeit.
     expect(zeit).toHaveTextContent(/^gesichtet \d{4} · vor 5 min · bestätigt: Dr\. Weiß$/);
@@ -1296,7 +1296,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
 
   it('zeigt ungesichtet ohne Zeit und ohne erfundene Angaben', async () => {
     render(einsatzBeobachter, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).getByText('ungesichtet')).toBeInTheDocument();
     expect(within(kopf()).queryByText(/^gesichtet /)).toBeNull();
     expect(within(kopf()).getByText('ohne Aufenthalt')).toBeInTheDocument();
@@ -1309,7 +1309,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
       aktueller_platz_id: 3,
       aufenthalt: { ...imWartebereich('Turnhalle'), platz_id: 3, platz_bezeichnung: 'Liege 3' },
     } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).getByText(/^Turnhalle · Liege 3 · seit/)).toBeInTheDocument();
   });
 
@@ -1333,7 +1333,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
         },
       ],
     } as unknown as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).getByText('Verbleib')).toBeInTheDocument();
     expect(within(kopf()).queryByText('Aufenthalt')).toBeNull();
     expect(within(kopf()).getByText(/^Transport → KH Mitte \(RTW 1\) ·/)).toHaveTextContent(
@@ -1404,7 +1404,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         return belegungsAntwort('eintritt', 5);
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).queryByRole('button', { name: 'Verlegen' })).toBeNull();
     expect(within(kopf()).queryByRole('button', { name: 'Austragen' })).toBeNull();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
@@ -1429,7 +1429,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         return belegungsAntwort('wechsel', 6);
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).getByText(/^BHP 50 · Wartebereich · seit/)).toBeInTheDocument();
     expect(within(kopf()).queryByRole('button', { name: 'In UHS aufnehmen' })).toBeNull();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Verlegen' }));
@@ -1449,7 +1449,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         return belegungsAntwort('austritt', 5);
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
@@ -1466,7 +1466,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         );
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
       '.ant-message-notice',
@@ -1503,7 +1503,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         ),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
       '.ant-message-notice',
@@ -1519,13 +1519,13 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
     render(einsatzAktiv, transportiert, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.queryByRole('button', { name: 'In UHS aufnehmen' })).not.toBeInTheDocument();
   });
 
   it('ohne Schreibrecht steht der Aufenthalt ohne „Verlegen“ und „Austragen“', async () => {
     render(einsatzBeobachter, belegt);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(kopf()).getByText(/^BHP 50 · Wartebereich · seit/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Verlegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Austragen' })).toBeNull();
@@ -1549,7 +1549,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
         ]),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     expect(await screen.findByText('BHP 50')).toBeInTheDocument();
@@ -1815,7 +1815,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
 
   it('zeigt Zustand und Koordinate im Lesemodus; der Verorten-Link trägt den Platzier-Auftrag', async () => {
     render(einsatzAktiv, mitKoordinate);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.getByText('gehfähig')).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="koordinate"]')).toHaveTextContent('52.2691/9.1343');
     const link = screen.getByRole('link', { name: 'Auf Lagekarte verorten' });
@@ -1834,7 +1834,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const knopf = await screen.findByRole('button', { name: 'Auf Lagekarte verorten' });
     expect(knopf).toBeDisabled();
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
@@ -1843,7 +1843,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
 
   it('zeigt Beobachtern keinen Verorten-Link', async () => {
     render(einsatzBeobachter, mitKoordinate);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.getByText('52.2691/9.1343')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
   });
@@ -1851,7 +1851,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
   it('vermisst: keine Koordinate, kein Verorten — ein Fundort gibt es nicht', async () => {
     const vermisst = { ...detail, status: 'vermisst' } as PersonDetail;
     render(einsatzAktiv, vermisst);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Koordinate / })).toBeNull();
     // Gegenaussage: „vermisst seit“ ist schreibbar.
@@ -1901,7 +1901,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     const ohneName = { ...detail, name: null } as PersonDetail;
     const { koerper, handler } = patchMitschnitt(ohneName);
     render(einsatzAktiv, ohneName, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
 
     const plus = within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' });
@@ -1929,7 +1929,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     server.events.on('request:start', merken);
     try {
       render(einsatzAktiv, detail, handler);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       const user = userEvent.setup();
       await user.click(
         within(ohneAngabe()).getByRole('button', { name: 'Herkunft / Adresse eintragen' }),
@@ -1952,7 +1952,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('Vorname ändern: nur `vorname` mit Altwert, die übrigen Felder bleiben unberührt', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Vorname bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Vorname' });
@@ -1966,7 +1966,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('der Altwert ist der Stand beim Öffnen, auch wenn das Detail inzwischen neu kam', async () => {
     const { koerper, handler } = patchMitschnitt();
     const { client } = render(einsatzAktiv, detail, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Name' });
@@ -2006,7 +2006,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         return HttpResponse.json({ ...detail, name: 'Müller' });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Name' }));
@@ -2032,7 +2032,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('ein offenes „+ Name“ bleibt mit Entwurf stehen, wenn ein neuer Stand einen Namen bringt', async () => {
     const ohneName = { ...detail, name: null } as PersonDetail;
     const { client } = render(einsatzAktiv, ohneName);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
     await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Mül');
@@ -2060,7 +2060,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('ein offener gesetzter Name bleibt mit Entwurf im Raster, wenn ein neuer Stand ihn leert', async () => {
     const { client } = render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
@@ -2109,7 +2109,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         );
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
     await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
@@ -2144,7 +2144,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         return HttpResponse.json({ error: 'geändert' }, { status: 409 });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Name' }));
@@ -2174,7 +2174,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         return HttpResponse.json({ error: 'geändert' }, { status: 409 });
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x{Enter}');
@@ -2196,7 +2196,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         ),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x{Enter}');
@@ -2210,7 +2210,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('Alter über 120: „höchstens 120“ am Feld, kein Request', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Alter (geschätzt) bearbeiten' }));
     const feld = screen.getByRole('spinbutton', { name: 'Alter (geschätzt)' });
@@ -2225,7 +2225,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('Geburtsdatum: „01.02.80“ wird 1980-02-01 und erscheint als 01.02.1980; Unsinn am Feld', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(within(ohneAngabe()).getByRole('button', { name: 'Geburtsdatum eintragen' }));
     const feld = screen.getByRole('textbox', { name: 'Geburtsdatum' });
@@ -2245,7 +2245,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     const alt = { ...detail, geburtsdatum: 'ca. 1980' } as PersonDetail;
     const { koerper, handler } = patchMitschnitt(alt);
     render(einsatzAktiv, alt, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(within(stammdatenRaster()).getByText('ca. 1980')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Geburtsdatum bearbeiten' }));
     await userEvent.keyboard('{Enter}');
@@ -2262,7 +2262,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   it('Name über der Grenze: Grund am Feld, kein Request, nie gekürzt', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Name' });
     // Eingefügt statt getippt: 201 Zeichen.
@@ -2291,7 +2291,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     it('eine neue Koordinate geht als Paar, der Altwert als Paar mit allen Stellen', async () => {
       const { koerper, handler } = patchMitschnitt(mitKoordinate);
       render(einsatzAktiv, mitKoordinate, handler);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       const user = userEvent.setup();
       await user.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
       const feld = screen.getByRole('textbox', { name: 'Koordinate' });
@@ -2309,7 +2309,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     it('unverändert geht nichts hinaus — keine stille Rundung auf vier Stellen', async () => {
       const { koerper, handler } = patchMitschnitt(mitKoordinate);
       render(einsatzAktiv, mitKoordinate, handler);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       await userEvent.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
       await userEvent.keyboard('{Enter}');
       expect(koerper).toEqual([]);
@@ -2318,7 +2318,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     it('Leeren nimmt das Paar', async () => {
       const { koerper, handler } = patchMitschnitt(mitKoordinate);
       render(einsatzAktiv, mitKoordinate, handler);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       await userEvent.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
       await userEvent.clear(screen.getByRole('textbox', { name: 'Koordinate' }));
       await userEvent.keyboard('{Enter}');
@@ -2329,7 +2329,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     it('eine unbrauchbare Koordinate steht am Feld, kein Request', async () => {
       const { koerper, handler } = patchMitschnitt();
       render(einsatzAktiv, detail, handler);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       // Ohne Koordinate, aber mit Verorten-Weg steht sie als Feld im Raster.
       await userEvent.click(
         within(stammdatenRaster()).getByRole('button', { name: 'Koordinate eintragen' }),
@@ -2347,7 +2347,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
       vermisst_seit: '2026-05-27 06:00:00',
     } as PersonDetail;
     render(einsatzAktiv, vermisst);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     expect(screen.getByRole('button', { name: 'vermisst seit bearbeiten' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Koordinate / })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
@@ -2355,7 +2355,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('leere Angaben mit Schreibrecht als Knöpfe „+ …“, ohne Schreibrecht als Satz', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     for (const etikett of ['Geburtsdatum', 'Herkunft / Adresse', 'Melder / Kontakt', 'Notiz']) {
       expect(
         within(ohneAngabe()).getByRole('button', { name: `${etikett} eintragen` }),
@@ -2365,7 +2365,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('eine offene Bearbeitung zur Zeit: die übrigen Felder gesperrt, der Grund steht einmal oben', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
@@ -2384,7 +2384,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('Rückfrage beim Verlassen: „Bleiben“ behält „Mül“, „Verwerfen“ wechselt in die Liste', async () => {
     render(einsatzAktiv, { ...detail, name: null } as PersonDetail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     const user = userEvent.setup();
     await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
@@ -2401,7 +2401,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('ohne Änderung keine Rückfrage beim Verlassen', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
@@ -2409,7 +2409,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
 
   it('ohne Netz alles gesperrt, mit einem Grund am Abschnitt', async () => {
     render(einsatzAktiv, detail);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     setzeOnline(false);
     try {
       const daten = document.querySelector<HTMLElement>('[data-lfh="personendaten"]')!;
@@ -2458,7 +2458,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
   }
 
   async function klappeAnhaengeAuf() {
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(screen.getByRole('button', { name: /Fotos und Dateien/ }));
     return screen.findByRole('region', { name: 'Fotos und Dateien' });
   }
@@ -2467,7 +2467,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
     const { abrufe, loesen } = zaehleListe();
     try {
       render(einsatzAktiv, detail, [http.get(ANHAENGE, () => HttpResponse.json([anhang]))]);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       expect(abrufe()).toBe(0);
       const bereich = await klappeAnhaengeAuf();
       const link = await within(bereich).findByRole('link', {
@@ -2518,7 +2518,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
         ]),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
     expect(await screen.findByText('Datei geladen')).toBeInTheDocument();
     expect(screen.queryByText('anhang')).toBeNull();
@@ -2542,7 +2542,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
         ]),
       ),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
     expect(await screen.findByText('Liste exportiert')).toBeInTheDocument();
     expect(screen.queryByText(/Export und Druck der Personenliste/)).toBeNull();
@@ -2593,7 +2593,7 @@ describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (L
     '$paneel: Paneel im Kopf, Knopf im Formular, kein Dialog',
     async ({ paneel, ausloeser, knopf }) => {
       render(einsatzAktiv, detail, leereListen);
-      await screen.findByRole('heading', { name: /Person R-001/ });
+      await screen.findByRole('heading', { name: /R-001/ });
       await userEvent.click(within(kopf()).getByRole('button', { name: ausloeser }));
       const bereich = within(kopf()).getByRole('region', { name: paneel });
       const absenden = within(bereich).getByRole('button', { name: knopf });
@@ -2657,7 +2657,7 @@ describe('PersonenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
         return HttpResponse.json(detail);
       }),
     ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
+    await screen.findByRole('heading', { name: /R-001/ });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       vi.advanceTimersByTime(60_000);
@@ -2671,5 +2671,33 @@ describe('PersonenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
       vi.useRealTimers();
     }
     expect(detailAbrufe).toBe(1);
+  });
+});
+
+describe('PersonenDetailPage — Name im Titel (LLH-1769)', () => {
+  it('zeigt Name, Vorname und klein die Kennung im Titel', async () => {
+    render(einsatzAktiv, detail);
+    const titel = await screen.findByRole('heading', { level: 1, name: /Mustermann, Max/ });
+    expect(titel).toHaveTextContent(/^Mustermann, MaxR-001/);
+    expect(titel.querySelector('[data-lfh="titel-kennung"]')).toHaveTextContent('R-001');
+  });
+
+  it('bleibt ohne Namen „Person R-001“', async () => {
+    render(einsatzAktiv, { ...detail, name: undefined, vorname: undefined } as PersonDetail);
+    const titel = await screen.findByRole('heading', { level: 1, name: /^Person R-001/ });
+    expect(titel.querySelector('[data-lfh="titel-kennung"]')).toBeNull();
+  });
+
+  it('nennt nur den Vornamen, wenn der Nachname fehlt', async () => {
+    render(einsatzAktiv, { ...detail, name: undefined } as PersonDetail);
+    await screen.findByRole('heading', { level: 1, name: /^Max\s?R-001/ });
+  });
+
+  it('der Breadcrumb bleibt ohne Namen', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { level: 1, name: /Mustermann/ });
+    const pfad = document.querySelector('.ant-breadcrumb');
+    expect(pfad).not.toHaveTextContent('Mustermann');
+    expect(pfad).toHaveTextContent('R-001');
   });
 });

@@ -75,7 +75,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   // Klick auf die Zeile → Detail-Vollseite.
   await page.getByText('Mustermann, Max').click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+`));
-  await expect(page.getByRole('heading', { name: /Person R-001/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /R-001/ })).toBeVisible();
 
   // Eine Spalte: Kopf, Verlauf, Personendaten untereinander, nichts in Reitern. Die alte
   // Überschrift „Medizinischer Verlauf" der rechten Spalte gibt es nicht mehr.
@@ -327,14 +327,22 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
 
   await pruefeKopf('Admin');
   // Vorbedingung des Admin-Zweigs: der Kopf trägt die Bedienung der neuen Paneele.
-  for (const knopf of ['Transport festlegen', 'Maßnahme erfassen', 'Verletzung markieren']) {
+  for (const knopf of [
+    /^Transport (festlegen|bearbeiten)$/,
+    'Maßnahme erfassen',
+    'Verletzung markieren',
+  ]) {
     await expect(patientenkopf(page).getByRole('button', { name: knopf })).toBeVisible();
   }
 
   await wechsleZuRolle(page, 'beobachter', String(e));
   await pruefeKopf('Beobachter');
   // Vorbedingung des Lesezweigs: keine Bedienung im Kopf.
-  for (const knopf of ['Transport festlegen', 'Maßnahme erfassen', 'Verletzung markieren']) {
+  for (const knopf of [
+    /^Transport (festlegen|bearbeiten)$/,
+    'Maßnahme erfassen',
+    'Verletzung markieren',
+  ]) {
     await expect(patientenkopf(page).getByRole('button', { name: knopf })).toHaveCount(0);
   }
   await expect(patientenkopf(page).getByRole('button', { name: /PAT-Nummer/ })).toHaveCount(0);
@@ -364,7 +372,8 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
   await page.setViewportSize(TABLET_QUER);
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
-  await expect(kopf.locator('[data-lfh="transport"]')).toHaveText('kein Transport');
+  // Leer fordert der Kopf als Wort auf (LLH-1769), der Stift kommt erst mit einem Stand.
+  await expect(kopf.getByRole('button', { name: 'Transport bearbeiten' })).toHaveCount(0);
 
   // ── Transport festlegen.
   await kopf.getByRole('button', { name: 'Transport festlegen' }).click();
@@ -506,7 +515,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
   await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Intoxikation');
-  await kopf.getByRole('button', { name: 'Anlass festlegen' }).click();
+  await kopf.getByRole('button', { name: 'Anlass bearbeiten' }).click();
 
   const paneel = page.getByRole('region', { name: 'Anlass festlegen' });
   await expect(page.getByRole('dialog')).toHaveCount(0);

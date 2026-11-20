@@ -146,7 +146,8 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
 
 ### Sichten und den Verbleib erfassen
 
-1. In der Liste die Person öffnen. Oben auf der Seite „Person R-…“ steht der Patientenkopf:
+1. In der Liste die Person öffnen. Oben auf der Seite steht ihr Name („Name, Vorname“) mit der
+   Registriernummer, ohne Namen „Person R-…“; darunter der Patientenkopf:
    PAT-Nummer und „kontaminiert“, falls angegeben, darunter Sichtung mit Zeit („gesichtet … · vor
    42 min“), „Anlass“, „Zustand / Verdacht“, Aufenthalt oder Verbleib, „Transport“, „Maßnahmen“,
    „Verletzungen“ und „Letzte Notiz“.
@@ -183,7 +184,8 @@ Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anl
 
 ### Den Anlass festlegen
 
-1. Im Patientenkopf bei „Anlass“ „Anlass festlegen“ wählen.
+1. Im Patientenkopf bei „Anlass“ „Anlass festlegen“ wählen; steht schon ein Anlass da, auf ihn
+   tippen (Stift).
 2. Die Fläche des Anlasses antippen: „Verletzung“, „Internistisch“, „Neurologisch“,
    „Intoxikation“, „Hitze / Kälte“, „Allergie / Insektenstich“, „Psychisch“ oder „Sonstiges“.
 3. „Anlass festlegen“ im Paneel wählen. Der Kopf zeigt den Anlass.
@@ -194,7 +196,8 @@ Wechsel steht im Verlauf.
 
 ### Den Transport festlegen
 
-1. Im Patientenkopf bei „Transport“ „Transport festlegen“ wählen.
+1. Im Patientenkopf bei „Transport“ „Transport festlegen“ wählen; steht schon ein Transport da,
+   auf ihn tippen (Stift).
 2. Unter „Priorität“ „sofort“, „dringlich“ oder „normal“ wählen, unter „Art“ „liegend“,
    „sitzend“ oder „mit Notarzt“, bei Bedarf die „Fachrichtung“, etwa „Unfallchirurgie“. „ohne“
    lässt Priorität oder Art leer.
@@ -217,8 +220,9 @@ der Rückfrage mit „Maßnahme aufheben“; sie bleibt im Verlauf als aufgehobe
 
 ### Eine Verletzung am Körperschema markieren
 
-1. Im Patientenkopf bei „Verletzungen“ „Verletzung markieren“ wählen. Das Paneel zeigt das
-   Körperschema mit vorn und hinten, daneben die nummerierte Liste. Ist der Platz zu schmal für
+1. Im Patientenkopf bei „Verletzungen“ „Verletzung markieren“ wählen. Die Seite rollt zum
+   Paneel; es zeigt das Körperschema mit vorn und hinten, jede Stelle gestrichelt umrandet,
+   daneben die nummerierte Liste. Ist der Platz zu schmal für
    beide Ansichten samt Wahl daneben (etwa in der Dichte „Handschuh“ am Tablet), steht eine Ansicht;
    „vorn“ und „hinten“ darüber schalten um.
 2. Auf die verletzte Stelle der Figur tippen, etwa den linken Unterarm. Daneben erscheint der
@@ -333,9 +337,12 @@ Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeiche
 
 ### Eine vermisste Person melden und abgleichen
 
-1. „Vermisst melden“ wählen. Unter „Weitere Angaben“ stehen statt Zustand und Koordinate
-   „vermisst seit“ und „Melder / Kontakt“; ohne Angabe gilt „vermisst seit“ ab der Meldung.
-2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste.
+1. „Vermisst melden“ wählen. Oben stehen „Name“, „Vorname“, „Geschlecht“ und „Fundort“, unter
+   „Weitere Angaben“ das geschätzte Alter, „vermisst seit“ und „Melder / Kontakt“; ohne Angabe
+   gilt „vermisst seit“ ab der Meldung.
+2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste. Eine Meldung ganz
+   ohne Angabe zur Person wird nicht angelegt: der Dialog nennt am Namen „Mindestens eine Angabe
+   zur vermissten Person“.
 3. Wird jemand gefunden, der die vermisste Person sein könnte: den Statusfilter „Vermisst“
    wählen und in der Spalte „Abgleich vorschlagen“ die gefundene Person wählen.
 4. Die Einsatzleitung öffnet die vermisste Person und entscheidet unter „Vermisstenabgleich“ mit

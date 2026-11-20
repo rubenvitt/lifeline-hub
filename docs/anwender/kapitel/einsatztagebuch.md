@@ -99,12 +99,12 @@ Für Einsatzleitung und Führungspersonal:
 
 Beim Öffnen steht der Cursor im ersten leeren Pflichtfeld, bei einer Meldung also in „Von“, sonst
 im Inhalt; nach dem Erfassen ebenso. Inhalt, „Von“ und „An“ sind Pflicht: fehlt eine Seite, nennt
-die Fußzeile „Absender fehlt“ oder „Empfänger fehlt“, das Feld ist rot markiert und hat den Cursor;
-Text und Felder bleiben stehen. Ist noch kein Standard-Rufname gesetzt, fragt die Erfassungsleiste
-zuerst danach, und der Cursor steht beim Öffnen in dieser Abfrage. Fehlt dann eine Seite, die der
-Rufname füllen würde, steht dort eine einzige Meldung, etwa „Absender und Empfänger fehlen –
-Rufname oben eintragen“, und der Cursor springt in die Abfrage. „Eigene Stelle ändern“ in der
-Fußzeile ändert den Rufnamen. „Vorschau“ erscheint, sobald der
+die Fußzeile „Absender fehlt“ oder „Empfänger fehlt“, bei leerem Inhalt „Inhalt fehlt“; das Feld
+ist rot markiert und hat den Cursor, Text und Felder bleiben stehen. Ist noch kein Standard-Rufname
+gesetzt, fragt die Erfassungsleiste zuerst danach, und der Cursor steht beim Öffnen in dieser
+Abfrage. Fehlt dann eine Seite, die der Rufname füllen würde, steht dort eine einzige Meldung, etwa
+„Absender und Empfänger fehlen – Rufname oben eintragen“, und der Cursor springt in die Abfrage.
+„Eigene Stelle ändern“ in der Fußzeile ändert den Rufnamen. „Vorschau“ erscheint, sobald der
 Text Formatierung trägt (etwa **fett**, eine Liste oder einen Verweis), und zeigt ihn so, wie er in
 der Zeitachse erscheinen wird.
 
