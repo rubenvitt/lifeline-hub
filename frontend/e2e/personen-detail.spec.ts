@@ -515,7 +515,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
   await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Intoxikation');
-  await kopf.getByRole('button', { name: 'Anlass festlegen' }).click();
+  await kopf.getByRole('button', { name: 'Anlass bearbeiten' }).click();
 
   const paneel = page.getByRole('region', { name: 'Anlass festlegen' });
   await expect(page.getByRole('dialog')).toHaveCount(0);

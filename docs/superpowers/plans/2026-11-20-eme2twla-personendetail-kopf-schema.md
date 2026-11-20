@@ -49,15 +49,15 @@ Pfade relativ zu `frontend/src/`, Befehle in `frontend/`.
 **Interfaces:** Consumes `nameText(p: Pick<Person,'name'|'vorname'>): string | null` aus
 `personen/personenSpalten.tsx`.
 
-- [ ] Test: `zeigt Name, Vorname und klein die Kennung im Titel` — heading level 1 enthält
+- [x] Test: `zeigt Name, Vorname und klein die Kennung im Titel` — heading level 1 enthält
   „Mustermann, Erika“ und „R-001“; das Element mit der Kennung trägt `data-lfh="titel-kennung"`.
-- [ ] Test: `bleibt ohne Namen „Person R-001“` — heading-Name beginnt mit „Person R-001“.
-- [ ] Test: Breadcrumb-Letztglied bleibt „R-001“ ohne Namen.
-- [ ] Rot sehen: `mise exec -- pnpm exec vitest run src/pages/PersonenDetailPage.test.tsx`
-- [ ] Umsetzen: Titel = `nameText(p)` gefolgt von `<span data-lfh="titel-kennung">` (Mono über
+- [x] Test: `bleibt ohne Namen „Person R-001“` — heading-Name beginnt mit „Person R-001“.
+- [x] Test: Breadcrumb-Letztglied bleibt „R-001“ ohne Namen.
+- [x] Rot sehen: `mise exec -- pnpm exec vitest run src/pages/PersonenDetailPage.test.tsx`
+- [x] Umsetzen: Titel = `nameText(p)` gefolgt von `<span data-lfh="titel-kennung">` (Mono über
   `monoStil('mono')`, `Typography.Text type="secondary"`) mit `registrierAnzeige(p.registrier_nr)`;
   ohne Namen „Person {Kennung}“ wie bisher.
-- [ ] Grün; betroffene Vitest/e2e-Erwartungen anpassen; Commit `feat: Name im Kopf des Personendetails (LLH-1769)`.
+- [x] Grün; betroffene Vitest/e2e-Erwartungen anpassen; Commit `feat: Name im Kopf des Personendetails (LLH-1769)`.
 
 ### Task 2: Anlass und Transport — Stift am Wert, Wort wenn leer
 
@@ -71,16 +71,16 @@ onClick: () => void; children: ReactNode }): JSX.Element` (Wertknopf: `wertAngab
 (`type="link"`, `leerKnopfStil`). Die Rahmenknöpfe „Maßnahme erfassen“/„Verletzung markieren“
 bekommen einen eigenen kleinen Baustein `EintragKnopf` (bisheriges `PaneelKnopf`-Aussehen).
 
-- [ ] Test: `bietet an einem gesetzten Anlass den Stift am Wert an` — button „Anlass bearbeiten“
+- [x] Test: `bietet an einem gesetzten Anlass den Stift am Wert an` — button „Anlass bearbeiten“
   enthält das Anlasswort, kein button „Anlass festlegen“; Klick öffnet region „Anlass festlegen“.
-- [ ] Test: `fordert ohne Anlass als Wort auf` — button „Anlass festlegen“ hat Klasse `ant-btn-link`.
-- [ ] Gleiche zwei Tests für Transport („Transport bearbeiten“ / „Transport festlegen“).
-- [ ] Test: ohne `darfBehandeln` bzw. storniert: weder „Transport bearbeiten“ noch „… festlegen“,
+- [x] Test: `fordert ohne Anlass als Wort auf` — button „Anlass festlegen“ hat Klasse `ant-btn-link`.
+- [x] Gleiche zwei Tests für Transport („Transport bearbeiten“ / „Transport festlegen“).
+- [x] Test: ohne `darfBehandeln` bzw. storniert: weder „Transport bearbeiten“ noch „… festlegen“,
   Lesetext steht.
-- [ ] Rot sehen: `mise exec -- pnpm exec vitest run src/personen/Patientenkopf.test.tsx`
-- [ ] Umsetzen; bestehende Tests, die bei gesetztem Transport „Transport festlegen“ klicken, auf
+- [x] Rot sehen: `mise exec -- pnpm exec vitest run src/personen/Patientenkopf.test.tsx`
+- [x] Umsetzen; bestehende Tests, die bei gesetztem Transport „Transport festlegen“ klicken, auf
   „Transport bearbeiten“ umstellen.
-- [ ] Grün; `src/test/verschachtelteZiele.ts` greift (kein Ziel im Wertknopf); Commit
+- [x] Grün; `src/test/verschachtelteZiele.ts` greift (kein Ziel im Wertknopf); Commit
   `feat: ein Bearbeiten im Patientenkopf (LLH-1769)`.
 
 ### Task 3: Körperschema ins Bild, Regionen umrandet
@@ -90,18 +90,18 @@ bekommen einen eigenen kleinen Baustein `EintragKnopf` (bisheriges `PaneelKnopf`
   (section „Verletzung markieren“)
 - Test: `personen/koerperschema/Koerperschema.test.tsx`, `personen/Patientenkopf.test.tsx`
 
-- [ ] Test (Koerperschema): `umrandet beim Markieren jede Region gestrichelt in der Konturfarbe` —
+- [x] Test (Koerperschema): `umrandet beim Markieren jede Region gestrichelt in der Konturfarbe` —
   jedes `[data-lfh="koerperzone"] rect` hat `stroke` = `koerperschemaFarben(farbenHell).kontur`
   und ein `stroke-dasharray`; gewählte Zone `stroke` = `bedien` ohne `stroke-dasharray`.
-- [ ] Test: im Modus `lesen` gibt es keine `koerperzone`.
-- [ ] Test (Patientenkopf): `rollt das Paneel „Verletzung markieren“ beim Öffnen ins Bild` —
+- [x] Test: im Modus `lesen` gibt es keine `koerperzone`.
+- [x] Test (Patientenkopf): `rollt das Paneel „Verletzung markieren“ beim Öffnen ins Bild` —
   `Element.prototype.scrollIntoView` gemockt, nach Klick einmal mit `{ block: 'nearest' }`
   (Verhalten `smooth`, bei `prefers-reduced-motion` `auto`) auf der region aufgerufen.
-- [ ] Rot sehen (beide Dateien).
-- [ ] Umsetzen: nicht aktive Zone `stroke={farben.kontur}`, `strokeDasharray={\`${3*einheit} ${3*einheit}\`}`,
+- [x] Rot sehen (beide Dateien).
+- [x] Umsetzen: nicht aktive Zone `stroke={farben.kontur}`, `strokeDasharray={\`${3*einheit} ${3*einheit}\`}`,
   `strokeWidth={einheit}`; aktive wie bisher. Im Kopf `useRef` auf die section + `useEffect` beim
   Wechsel auf `offen === 'verletzung'`.
-- [ ] Grün; Commit `feat: Körperschema rollt ins Bild und zeigt Regionen (LLH-1769)`.
+- [x] Grün; Commit `feat: Körperschema rollt ins Bild und zeigt Regionen (LLH-1769)`.
 
 ### Task 4: Regel, Doku-Bilder, Gates
 
@@ -110,9 +110,9 @@ bekommen einen eigenen kleinen Baustein `EintragKnopf` (bisheriges `PaneelKnopf`
 - Regenerate: `docs/anwender/bilder/betroffene/*.png` (+ `.dunkel.png`)
 - Check: `docs/anwender/kapitel/betroffene.md` nennt „Anlass festlegen“/„Transport festlegen“? ggf. Wortlaut anpassen.
 
-- [ ] Sätze laut Design-Doc „Regel (E2)“ eintragen; Prettier über `frontend/`.
-- [ ] `mise exec -- pnpm doku:bilder e2e/doku-bilder/betroffene.bilder.ts` (Spec ggf. auf neue
+- [x] Sätze laut Design-Doc „Regel (E2)“ eintragen; Prettier über `frontend/`.
+- [x] `mise exec -- pnpm doku:bilder e2e/doku-bilder/betroffene.bilder.ts` (Spec ggf. auf neue
   Knopfnamen anpassen); Bilder ansehen (hell und dunkel).
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün; zusätzlich
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün; zusätzlich
   `pnpm exec playwright test e2e/personen-detail.spec.ts e2e/betroffene-handy.spec.ts --trace off`.
-- [ ] Commit `docs: Regel Bearbeiten im Patientenkopf, Bilder Betroffene (LLH-1769)`.
+- [x] Commit `docs: Regel Bearbeiten im Patientenkopf, Bilder Betroffene (LLH-1769)`.
