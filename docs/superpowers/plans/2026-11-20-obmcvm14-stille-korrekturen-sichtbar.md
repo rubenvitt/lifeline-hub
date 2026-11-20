@@ -39,11 +39,11 @@
 - Produces: `zahlRegel(o: { min?: number; max?: number; ganz?: boolean; stellen?: number; einheit?: string }): FormRule` — Form-Regel in Funktionsform `({ isFieldTouched }) => ({ validator })`. Leer (`null`/`undefined`) → ok. Unberührt (`isFieldTouched(name)` false; Name aus `rule.field`, Punkt-Pfad, Ziffernsegmente als Zahl) → ok. Prüfreihenfolge: ganz → stellen → min → max. Meldungen: `Mindestens ${min}${einheit ? ' ' + einheit : ''}`, `Höchstens ${max}…`, `Nur ganze Zahlen`, `Höchstens ${stellen} Nachkommastellen`.
 - Produces: `pruefeZahl(wert: number | null | undefined, o): string | null` — der reine Kern (für Bausteine ohne Formular, Task 6).
 
-- [ ] **Step 1: Tests schreiben** — `pruefeZahl(250, { max: 120, einheit: 'Jahre' })` → `'Höchstens 120 Jahre'`; `pruefeZahl(-1, { min: 0 })` → `'Mindestens 0'`; `pruefeZahl(2.5, { ganz: true })` → `'Nur ganze Zahlen'`; `pruefeZahl(7.123, { stellen: 2 })` → `'Höchstens 2 Nachkommastellen'`; `pruefeZahl(7.1, { stellen: 2 })` → `null`; `pruefeZahl(null, { min: 1 })` → `null`. Formular-Test: `Form` mit `initialValues={{ alter: 130 }}`, `Feld name="alter" rules={[zahlRegel({ max: 120, einheit: 'Jahre' })]}` + `InputNumber`; Absenden ohne Berühren → `onFinish` gerufen; 250 tippen, Absenden → `onFinish` nicht gerufen, „Höchstens 120 Jahre“ sichtbar, Feld zeigt „250“.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/components/zahlRegel.test.tsx` → FAIL (Modul fehlt).
-- [ ] **Step 3:** `zahlRegel` und `pruefeZahl` implementieren. Nachkommastellen über Textform der Zahl (`String(wert)`, Exponentialform beachten), nicht über Fließkomma-Arithmetik.
-- [ ] **Step 4:** Test → PASS.
-- [ ] **Step 5:** Commit `feat(erfassung): Zahlregel prüft statt zu kappen`.
+- [x] **Step 1: Tests schreiben** — `pruefeZahl(250, { max: 120, einheit: 'Jahre' })` → `'Höchstens 120 Jahre'`; `pruefeZahl(-1, { min: 0 })` → `'Mindestens 0'`; `pruefeZahl(2.5, { ganz: true })` → `'Nur ganze Zahlen'`; `pruefeZahl(7.123, { stellen: 2 })` → `'Höchstens 2 Nachkommastellen'`; `pruefeZahl(7.1, { stellen: 2 })` → `null`; `pruefeZahl(null, { min: 1 })` → `null`. Formular-Test: `Form` mit `initialValues={{ alter: 130 }}`, `Feld name="alter" rules={[zahlRegel({ max: 120, einheit: 'Jahre' })]}` + `InputNumber`; Absenden ohne Berühren → `onFinish` gerufen; 250 tippen, Absenden → `onFinish` nicht gerufen, „Höchstens 120 Jahre“ sichtbar, Feld zeigt „250“.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/components/zahlRegel.test.tsx` → FAIL (Modul fehlt).
+- [x] **Step 3:** `zahlRegel` und `pruefeZahl` implementieren. Nachkommastellen über Textform der Zahl (`String(wert)`, Exponentialform beachten), nicht über Fließkomma-Arithmetik.
+- [x] **Step 4:** Test → PASS.
+- [x] **Step 5:** Commit `feat(erfassung): Zahlregel prüft statt zu kappen`.
 
 ### Task 2: Sperr-Baustein in `Feld` und `DatenfeldEingabe`
 
@@ -58,11 +58,11 @@
 - `Feld`: `<Stelle><Form.Item … rules={[...(rules ?? []), regel]} /></Stelle>` — der Provider steht **außen**, damit `Form.Item` sein Kind weiter klonen kann. Ohne `name` keine Regel, kein Provider.
 - `DatenfeldEingabe`: dasselbe um sein `Form.Item`.
 
-- [ ] **Step 1: Tests schreiben** — Testkomponente `Sperrer` (ruft `useEingabeSperre()` mit einem Grund aus Props). `Form` + `Feld name="x"` + `Sperrer grund="nicht lesbar"`: Absenden → `onFinish` nicht gerufen, „nicht lesbar“ in der Fehlerzeile. Grund auf `null` umgestellt → Fehlerzeile weg, Absenden → `onFinish` gerufen. Zwei Sperrer im selben Feld, einer räumt → weiter gesperrt. Sperrer ohne `Feld` → kein Fehler, kein Wurf. Gleicher Fall in `DatenfeldEingabe`.
-- [ ] **Step 2:** `… vitest run src/components/instrument/eingabeSperre.test.tsx` → FAIL.
-- [ ] **Step 3:** Baustein implementieren, in `Feld` und `DatenfeldEingabe` einhängen.
-- [ ] **Step 4:** Test → PASS; dazu `… vitest run src/components/instrument` → PASS (Feld-/Datenfeld-Tests unverändert grün).
-- [ ] **Step 5:** Commit `feat(erfassung): Feld sperrt das Senden bei gemeldetem Eingabegrund`.
+- [x] **Step 1: Tests schreiben** — Testkomponente `Sperrer` (ruft `useEingabeSperre()` mit einem Grund aus Props). `Form` + `Feld name="x"` + `Sperrer grund="nicht lesbar"`: Absenden → `onFinish` nicht gerufen, „nicht lesbar“ in der Fehlerzeile. Grund auf `null` umgestellt → Fehlerzeile weg, Absenden → `onFinish` gerufen. Zwei Sperrer im selben Feld, einer räumt → weiter gesperrt. Sperrer ohne `Feld` → kein Fehler, kein Wurf. Gleicher Fall in `DatenfeldEingabe`.
+- [x] **Step 2:** `… vitest run src/components/instrument/eingabeSperre.test.tsx` → FAIL.
+- [x] **Step 3:** Baustein implementieren, in `Feld` und `DatenfeldEingabe` einhängen.
+- [x] **Step 4:** Test → PASS; dazu `… vitest run src/components/instrument` → PASS (Feld-/Datenfeld-Tests unverändert grün).
+- [x] **Step 5:** Commit `feat(erfassung): Feld sperrt das Senden bei gemeldetem Eingabegrund`.
 
 ### Task 3: `ZeitpunktEingabe` — Hinweis bleibt, Unlesbares bleibt stehen und sperrt
 
@@ -79,7 +79,7 @@
   - Escape mit stehendem Text: Text weg, Grund weg, geltender Wert sichtbar (bestehender Zweig).
   - Doppelten Grund vermeiden: `Form.Item.useStatus()`; zeigt es `status === 'error'` und `errors` enthält den Grund, steht kein Grund im Suffix.
 
-- [ ] **Step 1: Tests umstellen und ergänzen** —
+- [x] **Step 1: Tests umstellen und ergänzen** —
   - Test „Unlesbares und Verlassen: geltender Wert zurück…“ (Zeile ~275) wird zu: „Unlesbares und Verlassen: Text bleibt stehen, Grund bleibt, Formular sendet nicht“ (Erwartung: Feld zeigt „morgen“, „nicht lesbar“ sichtbar, `onFinish` nicht gerufen).
   - Neu: Fristfeld, Uhr 17:59 (Serveruhr gestellt wie in den bestehenden Tests), „1700“ + Enter → Feld zeigt DTG des Folgetags **und** „morgen“.
   - Neu: optionales Feld ohne Wert (`value` null), „xyz“ getippt, verlassen, Absenden → `onFinish` nicht gerufen (nicht mit `null`).
@@ -87,10 +87,10 @@
   - Neu: `ZeitraumEingabe` in `Feld`, Beginn unlesbar, Ende lesbar → gesperrt; Beginn korrigiert → frei.
   - Neu: nach Absenden steht „nicht lesbar“ genau einmal im Dokument.
   - Bestehender LLH-1866-Test (`onDiscard`) bleibt grün.
-- [ ] **Step 2:** `… vitest run src/anzeige/ZeitpunktEingabe.test.tsx` → neue Fälle FAIL.
-- [ ] **Step 3:** Verhalten implementieren; Kopfkommentar („Verlassen zeigt wieder den geltenden Wert“, D3) auf die neue Regel umschreiben.
-- [ ] **Step 4:** `… vitest run src/anzeige src/etb` → PASS (ETB-Sperre LLH-1866 unverändert).
-- [ ] **Step 5:** Commit `fix(zeiteingabe): Unlesbares bleibt stehen und sperrt, gestern/morgen bleibt sichtbar`.
+- [x] **Step 2:** `… vitest run src/anzeige/ZeitpunktEingabe.test.tsx` → neue Fälle FAIL.
+- [x] **Step 3:** Verhalten implementieren; Kopfkommentar („Verlassen zeigt wieder den geltenden Wert“, D3) auf die neue Regel umschreiben.
+- [x] **Step 4:** `… vitest run src/anzeige src/etb` → PASS (ETB-Sperre LLH-1866 unverändert).
+- [x] **Step 5:** Commit `fix(zeiteingabe): Unlesbares bleibt stehen und sperrt, gestern/morgen bleibt sichtbar`.
 
 ### Task 4: `InlineAngabe` als Sperrstelle
 
@@ -101,11 +101,11 @@
 **Interfaces:**
 - Consumes: Sperr-Kontext aus Task 2. `InlineAngabe` stellt einen eigenen Provider (gleicher Kontext, ohne `Form`): Solange ein Grund gemeldet ist, sendet `abschicken()` nicht und zeigt den Grund über `FeldFehler` (wie `pruefGrund`). Dafür exportiert `eingabeSperre.tsx` zusätzlich `SperrKontextProvider`/`useSperrSammler(): { Stelle; grund: string | null }` (Name nach Wahl, in diesem Task festlegen und exportieren).
 
-- [ ] **Step 1: Test** — `InlineAngabe` mit `ZeitpunktEingabe` (wie `pages/EinsatzdatenPage.tsx:271`): „morgen“ tippen, Enter bzw. Verlassen → `onSpeichern` nicht gerufen, Zeile bleibt offen, Text steht.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** `… vitest run src/components/InlineAngabe.test.tsx src/pages` → PASS.
-- [ ] **Step 5:** Commit `fix(zeiteingabe): Inline-Angabe speichert keine unlesbare Zeit`.
+- [x] **Step 1: Test** — `InlineAngabe` mit `ZeitpunktEingabe` (wie `pages/EinsatzdatenPage.tsx:271`): „morgen“ tippen, Enter bzw. Verlassen → `onSpeichern` nicht gerufen, Zeile bleibt offen, Text steht.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** `… vitest run src/components/InlineAngabe.test.tsx src/pages` → PASS.
+- [x] **Step 5:** Commit `fix(zeiteingabe): Inline-Angabe speichert keine unlesbare Zeit`.
 
 ### Task 5: Erinnerung mit +30 min
 
@@ -114,11 +114,11 @@
 - Modify: `frontend/src/erinnerung/ErinnerungFormular.tsx`, `frontend/src/etb/WiedervorlageModal.tsx`
 - Test: `frontend/src/erinnerung/ErinnerungFormular.test.tsx` (anlegen, falls nicht vorhanden)
 
-- [ ] **Step 1: Test** — Serveruhr gestellt; Feld „Fällig“ zeigt DTG von jetzt + 30 min. „morgen“ in „Fällig“ getippt, „Anlegen“ geklickt → `onAnlegen` nicht gerufen. Alter Intervall-Fall: 20000 → „Höchstens 10080 Min“ über `zahlRegel({ max: INTERVALL_MAX_MINUTEN, einheit: 'Min' })` (bisherigen Wortlaut „(7 Tage)“ nicht behalten: Einheit-Form der Regel).
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** `initialValues.faellig = serverJetzt().add(VORGABE_FRIST_MINUTEN, 'minute')`; Intervall-Regel auf `zahlRegel`, `min={1}` an `InputNumber` → `zahlRegel({ min: 1, max: …, ganz: true, einheit: 'Min' })`.
-- [ ] **Step 4:** `… vitest run src/erinnerung src/etb` → PASS.
-- [ ] **Step 5:** Commit `fix(erinnerung): Fälligkeit mit +30 min vorbelegt`.
+- [x] **Step 1: Test** — Serveruhr gestellt; Feld „Fällig“ zeigt DTG von jetzt + 30 min. „morgen“ in „Fällig“ getippt, „Anlegen“ geklickt → `onAnlegen` nicht gerufen. Alter Intervall-Fall: 20000 → „Höchstens 10080 Min“ über `zahlRegel({ max: INTERVALL_MAX_MINUTEN, einheit: 'Min' })` (bisherigen Wortlaut „(7 Tage)“ nicht behalten: Einheit-Form der Regel).
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** `initialValues.faellig = serverJetzt().add(VORGABE_FRIST_MINUTEN, 'minute')`; Intervall-Regel auf `zahlRegel`, `min={1}` an `InputNumber` → `zahlRegel({ min: 1, max: …, ganz: true, einheit: 'Min' })`.
+- [x] **Step 4:** `… vitest run src/erinnerung src/etb` → PASS.
+- [x] **Step 5:** Commit `fix(erinnerung): Fälligkeit mit +30 min vorbelegt`.
 
 ### Task 6: Zahl-Bausteine ohne Kappen
 
@@ -133,11 +133,11 @@
 - `StaerkeEingabe`: kein `min`; ein negativer Wert zeigt `status="error"` mit „Mindestens 0“ und wird nicht gemeldet; exportiert `staerkeRegel` (lehnt negative Teile ab) für Aufrufer mit `Feld`.
 - `QualiSollFeld`: Anzahl ohne `min`/`max`/`precision`; exportiert `qualiSollRegel` (jede Zeile `pruefeZahl(anzahl, { min: 1, max: QUALI_SOLL_ANZAHL_MAX, ganz: true })`, erste Meldung gewinnt; Zeilenzahl > `QUALI_SOLL_MAX` → Meldung).
 
-- [ ] **Step 1: Tests** — `MengenFeld` in `Feld` mit `mengenRegel()`: „0“ → „Mindestens 1“, „2,5“/„2.5“ → „Nur ganze Zahlen“, Feld zeigt weiter die Eingabe. `DezimalFeld stellen={2}`: „7,123“ verlassen → Feld zeigt „7,123“, Regel meldet „Höchstens 2 Nachkommastellen“; „7,1“ verlassen → zeigt „7,10“. `RadiusEingabe` ohne Formular: „99999“ → Meldung, `onChange` nicht mit 99999. `StaerkeEingabe`: „-1“ → „Mindestens 0“, kein `onChange` mit negativem Teil. `QualiSollFeld` mit `qualiSollRegel`: Anzahl 0 → „Mindestens 1“.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Bausteine und alle Aufrufer umstellen; `pnpm exec tsc --noEmit` findet vergessene `min`/`max` an `MengenFeld`/`DezimalFeld`.
-- [ ] **Step 4:** `mise exec -- pnpm -C frontend exec tsc --noEmit` → keine Fehler; `… vitest run src/components src/anzeige src/kraefte src/pages/lagekarte src/stammdaten src/betreuung src/verpflegung` → PASS.
-- [ ] **Step 5:** Commit `fix(erfassung): Zahl-Bausteine prüfen statt zu kappen`.
+- [x] **Step 1: Tests** — `MengenFeld` in `Feld` mit `mengenRegel()`: „0“ → „Mindestens 1“, „2,5“/„2.5“ → „Nur ganze Zahlen“, Feld zeigt weiter die Eingabe. `DezimalFeld stellen={2}`: „7,123“ verlassen → Feld zeigt „7,123“, Regel meldet „Höchstens 2 Nachkommastellen“; „7,1“ verlassen → zeigt „7,10“. `RadiusEingabe` ohne Formular: „99999“ → Meldung, `onChange` nicht mit 99999. `StaerkeEingabe`: „-1“ → „Mindestens 0“, kein `onChange` mit negativem Teil. `QualiSollFeld` mit `qualiSollRegel`: Anzahl 0 → „Mindestens 1“.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Bausteine und alle Aufrufer umstellen; `pnpm exec tsc --noEmit` findet vergessene `min`/`max` an `MengenFeld`/`DezimalFeld`.
+- [x] **Step 4:** `mise exec -- pnpm -C frontend exec tsc --noEmit` → keine Fehler; `… vitest run src/components src/anzeige src/kraefte src/pages/lagekarte src/stammdaten src/betreuung src/verpflegung` → PASS.
+- [x] **Step 5:** Commit `fix(erfassung): Zahl-Bausteine prüfen statt zu kappen`.
 
 ### Task 7: Übrige `InputNumber` und Wächter
 
@@ -149,12 +149,12 @@
 - Wächter: Glob `/src/**/*.tsx` (`?raw`, eager, wie `anzeige/zahl.guard.test.ts`), ohne Tests. Für jedes `<InputNumber` bis zum schließenden `>` des Öffnungstags (über Zeilen, geschweifte Klammern mitzählen) darf kein Attribut `min`, `max` oder `precision` stehen. Keine Ausnahmeliste. Meldung nennt Datei und Zeile.
 - Alter: `zahlRegel({ min: 0, max: 120, ganz: true, einheit: 'Jahre' })` an `alter_geschaetzt` in Aufnahme und Leichter Fall.
 
-- [ ] **Step 1:** Wächter schreiben → `… vitest run src/components/zahlfeld.guard.test.ts` → FAIL mit Liste der Fundstellen.
-- [ ] **Step 2:** Jede Fundstelle umstellen: Grenzen in `rules` des umgebenden `Feld`/`DatenfeldEingabe` per `zahlRegel` (`precision={0}` → `ganz: true`). Liegt eine Fundstelle in keinem `Form.Item`: wie `RadiusEingabe` über `pruefeZahl` selbst prüfen.
-- [ ] **Step 3:** Test für das Alter in `personen/AufnahmeFelder` (bestehende Testdatei oder neu): 250 → „Höchstens 120 Jahre“, kein Senden, Feld zeigt 250.
-- [ ] **Step 4:** Wächter → PASS. Mutationsprobe: in einer Datei mehrzeilig `max={5}` an ein `InputNumber` setzen → Wächter FAIL, zurücknehmen.
-- [ ] **Step 5:** `… vitest run` über die geänderten Verzeichnisse und `tsc --noEmit` → PASS.
-- [ ] **Step 6:** Commit `fix(erfassung): Zahlenfelder ohne min/max/precision, Wächter`.
+- [x] **Step 1:** Wächter schreiben → `… vitest run src/components/zahlfeld.guard.test.ts` → FAIL mit Liste der Fundstellen.
+- [x] **Step 2:** Jede Fundstelle umstellen: Grenzen in `rules` des umgebenden `Feld`/`DatenfeldEingabe` per `zahlRegel` (`precision={0}` → `ganz: true`). Liegt eine Fundstelle in keinem `Form.Item`: wie `RadiusEingabe` über `pruefeZahl` selbst prüfen.
+- [x] **Step 3:** Test für das Alter in `personen/AufnahmeFelder` (bestehende Testdatei oder neu): 250 → „Höchstens 120 Jahre“, kein Senden, Feld zeigt 250.
+- [x] **Step 4:** Wächter → PASS. Mutationsprobe: in einer Datei mehrzeilig `max={5}` an ein `InputNumber` setzen → Wächter FAIL, zurücknehmen.
+- [x] **Step 5:** `… vitest run` über die geänderten Verzeichnisse und `tsc --noEmit` → PASS.
+- [x] **Step 6:** Commit `fix(erfassung): Zahlenfelder ohne min/max/precision, Wächter`.
 
 ### Task 8: Regeln, Doku, Gates
 
@@ -162,6 +162,6 @@
 - Modify: `frontend/AGENTS.md` (Abschnitt „Zeiteingabe ist ein Textfeld“: neue Regel zu Unlesbarem samt Sperre über `Feld`/`DatenfeldEingabe`/`InlineAngabe`, löst die Spec-Anforderung „Unlesbare Eingabe wird nicht übernommen“ ab, soweit sie „wieder den geltenden Wert zeigen“ verlangt, Verweis auf das Design-Doc; Abschnitt der Erfassungs-Norm: Regel „Zahlenfelder kappen und runden nie“ mit `zahlRegel` und Wächter `components/zahlfeld.guard.test.ts`)
 - Modify: `docs/anwender/…` nur, wenn ein Kapitel das alte Verhalten beschreibt (`grep -rn "geltenden Wert\|wieder den" docs/anwender`); Bilder nicht neu erzeugen, außer der Wächter der Anwenderdoku verlangt es.
 
-- [ ] **Step 1:** Regeln eintragen; `grep -rn "zeigt wieder den geltenden\|Verlassen zeigt wieder" frontend/src docs` → Verweise nachziehen.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 3:** Commit `docs(frontend): Regeln für Unlesbares und Zahlenfelder`.
+- [x] **Step 1:** Regeln eintragen; `grep -rn "zeigt wieder den geltenden\|Verlassen zeigt wieder" frontend/src docs` → Verweise nachziehen.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] **Step 3:** Commit `docs(frontend): Regeln für Unlesbares und Zahlenfelder`.
