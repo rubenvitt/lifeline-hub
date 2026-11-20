@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import StatusWahl from './StatusWahl';
+import type { StatusDarstellung } from '../theme/statusFarben';
 
 /**
  * Overlays in Zeilen erst bei Bedarf (LLH-1974): die Statuswahl hängt ihr `Dropdown` erst beim
@@ -19,6 +20,8 @@ vi.mock('antd', async (original) => {
   return { ...antd, Dropdown: Object.assign(DropdownSpy, Echt) };
 });
 
+const frei: StatusDarstellung = { rolle: 'normal', label: 'frei' };
+
 const OPTIONEN = [
   { wert: 1, label: 'frei' },
   { wert: 2, label: 'im Einsatz' },
@@ -28,6 +31,7 @@ const KNOPF = /Status von Florian 1 ändern/;
 function aufbauen() {
   renderMitProviders(
     <StatusWahl<number>
+      darstellung={frei}
       optionen={OPTIONEN}
       aktuell={1}
       kennung="Florian 1"
