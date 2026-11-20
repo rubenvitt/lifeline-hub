@@ -6,6 +6,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -294,6 +295,13 @@ export function ErfassungsFormular<T extends object>({
   const { istSchmal } = useViewport();
   const wurzel = useRef<HTMLDivElement>(null);
   const tastaturVersatz = useTastaturVersatz(wurzel);
+  // Der Grund des Seitenfußes ist der der Fläche dahinter (Seite oder Paneel): ein fester Token
+  // stand auf der Aufnahme als hellerer Balken auf dem Seitengrund. Neu gelesen beim Themewechsel.
+  const [seitenGrund, setSeitenGrund] = useState<string>();
+  useLayoutEffect(() => {
+    if (fussKlebt !== 'seite') return;
+    setSeitenGrund(deckenderGrund(wurzel.current?.parentElement ?? null));
+  }, [fussKlebt, token.colorBgLayout, token.colorBgContainer]);
   const [zaehler, setZaehler] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
   const [behalten, setBehalten] = useState(false);
@@ -506,7 +514,9 @@ export function ErfassungsFormular<T extends object>({
             marginTop: token.margin,
             paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
-            ...(fussKlebt ? klebenderFuss(token, fussKlebt, tastaturVersatz) : undefined),
+            ...(fussKlebt
+              ? klebenderFuss(token, fussKlebt, tastaturVersatz, seitenGrund)
+              : undefined),
           }}
         >
           {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
@@ -643,16 +653,32 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  * Felder, die darunter durchrollen: im Dialog der des Dialogs, auf der Seite der des Behälters.
  * `versatz` hebt ihn über die Bildschirmtastatur (`useTastaturVersatz`).
  */
-function klebenderFuss(token: GlobalToken, ort: 'dialog' | 'seite', versatz: number) {
+function klebenderFuss(
+  token: GlobalToken,
+  ort: 'dialog' | 'seite',
+  versatz: number,
+  seitenGrund: string | undefined,
+) {
   return {
     position: 'sticky',
     bottom: versatz,
-    zIndex: 1,
+    // Über antds `Space.Compact`, das seine Glieder auf z-index 2 hebt: das Fundort-Feld der
+    // Aufnahme lag sonst über „Speichern und nächste“ (LLH-1761).
+    zIndex: 3,
     paddingBottom: ort === 'dialog' ? token.paddingMD : token.paddingSM,
     ...(ort === 'dialog'
-      ? { background: token.colorBgElevated, marginBottom: -token.paddingMD }
-      : { background: token.colorBgContainer }),
+      ? { backgroundColor: token.colorBgElevated, marginBottom: -token.paddingMD }
+      : { backgroundColor: seitenGrund ?? token.colorBgLayout }),
   } as const;
+}
+
+/** Erster nicht durchsichtiger Hintergrund ab `el` aufwärts; ohne Treffer `undefined`. */
+function deckenderGrund(el: Element | null): string | undefined {
+  for (let e = el; e; e = e.parentElement) {
+    const farbe = getComputedStyle(e).backgroundColor;
+    if (farbe && farbe !== 'transparent' && farbe !== 'rgba(0, 0, 0, 0)') return farbe;
+  }
+  return undefined;
 }
 
 /** Was {@link kopfBoden} vom Theme braucht; `theme.useToken()` erfüllt es. */

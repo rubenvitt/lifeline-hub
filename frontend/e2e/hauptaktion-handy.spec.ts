@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import { einsatzPerApi } from './einsatz-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Hauptaktion am Handschirm im Blick (LLH-1761, Entwurf
@@ -19,32 +20,36 @@ async function ganzImBild(page: Page, name: string) {
   await expect(page.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
 }
 
-test('Aufnahme: „Erfassen“ und „Speichern und nächste“ stehen ohne Rollen im Bild', async ({
-  page,
-}) => {
-  await page.setViewportSize(HANDY);
-  await anmeldenAlsAdmin(page, { startseite: false });
-  const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Aufnahme ${Date.now()}`);
-  await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
-  await expect(page.getByRole('heading', { name: /Aufnahme/ })).toBeVisible();
-  // Vorbedingung: die Seite ist höher als der Schirm, sonst bewiese das Kleben nichts.
-  const hoehe = await page.evaluate(() => document.documentElement.scrollHeight);
-  expect(hoehe).toBeGreaterThan(HANDY.height);
-  await ganzImBild(page, 'Erfassen');
-  await ganzImBild(page, 'Speichern und nächste');
-});
+for (const kontext of [
+  { name: 'Handy', viewport: HANDY, dichte: 'komfortabel' },
+  { name: 'Handschuh-Tablet', viewport: { width: 1180, height: 820 }, dichte: 'handschuh' },
+] as const) {
+  test(`Aufnahme (${kontext.name}): „Erfassen“ und „Speichern und nächste“ stehen ohne Rollen im Bild`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(kontext.viewport);
+    await anmeldenAlsAdmin(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Aufnahme ${Date.now()}`);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/aufnahme`, kontext.dichte);
+    await expect(page.getByRole('heading', { name: /Aufnahme/ })).toBeVisible();
+    // Vorbedingung: die Seite ist höher als der Schirm, sonst bewiese das Kleben nichts.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+      .toBeGreaterThan(kontext.viewport.height);
+    await ganzImBild(page, 'Erfassen');
+    await ganzImBild(page, 'Speichern und nächste');
+  });
+}
 
 test('Meldung erfassen: der Absendeknopf steht ohne Rollen im Bild', async ({ page }) => {
   await page.setViewportSize(HANDY);
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Meldung ${Date.now()}`);
-  await page.goto(`/einsaetze/${einsatzId}/meldungen`);
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/meldungen`, 'komfortabel');
   await page.getByRole('button', { name: 'Meldung erfassen', exact: true }).click();
-  const paneel = page.locator('[data-lfh="erfassung-fuss-seite"]');
-  await expect(paneel).toBeVisible();
-  await expect(paneel.getByRole('button', { name: 'Meldung erfassen' })).toBeInViewport({
-    ratio: 1,
-  });
+  // Der Kopfknopf heißt jetzt „Formular schließen“; „Meldung erfassen“ ist der Absendeknopf.
+  await expect(page.getByRole('button', { name: 'Formular schließen' }).first()).toBeVisible();
+  await ganzImBild(page, 'Meldung erfassen');
 });
 
 test('Auftrag antippen holt „Quittieren“ ins Bild', async ({ page }) => {
@@ -60,7 +65,7 @@ test('Auftrag antippen holt „Quittieren“ ins Bild', async ({ page }) => {
     });
     expect(r.ok(), `Auftrag ${i}: ${r.status()}`).toBe(true);
   }
-  await page.goto(`/einsaetze/${einsatzId}/auftraege`);
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/auftraege`, 'komfortabel');
   const karten = page.getByRole('button', { name: /: Erkundung Abschnitt \d$/ });
   await expect(karten).toHaveCount(6);
   // Die unterste Karte, die noch im Bild steht: ihr Detail klappte bisher unter dem Rand auf.

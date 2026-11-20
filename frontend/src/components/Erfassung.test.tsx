@@ -820,6 +820,20 @@ describe('ErfassungsFormular — klebender Fuß auf der Seite (LLH-1761)', () =>
     ).toBe('');
   });
 
+  it('der Seitenfuß liegt über kompakten Eingabegruppen und nimmt den Grund der Fläche dahinter', () => {
+    renderMitProviders(
+      <div style={{ backgroundColor: 'rgb(1, 2, 3)' }}>
+        <div>
+          <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />
+        </div>
+      </div>,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    // antds `Space.Compact` hebt seine Glieder auf z-index 2 (Fundort der Aufnahme).
+    expect(Number(fuss.style.zIndex)).toBeGreaterThan(2);
+    expect(fuss.style.backgroundColor).toBe('rgb(1, 2, 3)');
+  });
+
   it('ohne fussKlebt klebt nichts', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
     expect(document.querySelector('[data-lfh^="erfassung-fuss"]')).toBeNull();
