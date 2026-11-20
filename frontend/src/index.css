@@ -63,20 +63,28 @@ mark.lfh-fundstelle {
 /* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).
    Negative Seitenränder ziehen sie randlos über die Seitenrinne, der Innenrand nimmt dieselbe
    Rinne wieder auf, damit der Text mit dem Seiteninhalt fluchtet; beide lesen dieselbe
-   Custom-Property aus `theme/rollen.css`. Der untere Außenrand schließt bündig mit dem Fenster ab. */
+   Custom-Property aus `theme/rollen.css`. Der untere Außenrand schließt bündig mit dem Fenster ab.
+   Kleine Rasterstufen, weil die Leiste unter dem Deckel von LFH-373 bleiben muss (höchstens die
+   halbe Fensterhöhe, `e2e/leisten-flaeche.spec.ts`): `luft-3`/`luft-4` hoben sie im Handschuh-
+   Betrieb darüber (Entscheidung 20.11.2026). Im Handschuh-Betrieb oben und unten nur `luft-1`,
+   sonst stieße die aufgeklappte Leiste auf dem Handschirm an den Deckel. */
 .etb-erfassung-sticky {
   position: sticky;
   bottom: 0;
   z-index: 20;
   margin: 0 calc(-1 * var(--lfh-seiten-polsterung)) calc(-1 * var(--lfh-seiten-polsterung));
-  padding: var(--lfh-luft-3) var(--lfh-seiten-polsterung) var(--lfh-luft-4);
+  padding: var(--lfh-luft-2) var(--lfh-seiten-polsterung);
   background: var(--lfh-kopf);
   border-top: 1px solid var(--lfh-linie-stark);
 }
 
+[data-dichte='handschuh'] .etb-erfassung-sticky {
+  padding-block: var(--lfh-luft-1);
+}
+
 /* Entwurfs-Reiter dicht an der Zeile, sonst drückte das Reiterband die Leiste unnötig hoch. */
 .etb-erfassung-sticky .ant-tabs-nav {
-  margin-bottom: var(--lfh-luft-2);
+  margin-bottom: var(--lfh-luft-1);
 }
 
 .etb-erfassung-sticky .markdown-editor__vorschau {
@@ -200,6 +208,14 @@ main:has([data-lfh='zaehltasten']) {
    C17 in `e2e/trefflaeche-pruefflaechen.spec.ts`. */
 :root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
+}
+
+/* Dasselbe für den klebenden Fuß eines Seitenformulars (LLH-1761, `fussKlebt="seite"`): der
+   Scrollport ist das Dokument, wie bei der Speicherleiste (LFH-475). */
+:root:has([data-lfh='erfassung-fuss-seite']),
+/* In der Gerätehülle ist `main` der Scrollport, die Hülle selbst hat feste Höhe (LLH-1760). */
+.geraet-huelle > main:has([data-lfh='erfassung-fuss-seite']) {
+  scroll-padding-block-end: var(--lfh-erfassung-seite-fokusabstand, 0px);
 }
 
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).

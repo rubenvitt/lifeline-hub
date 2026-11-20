@@ -12,6 +12,7 @@ import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 /** Ziel des Sprungs „Auf Karte verorten“ (LLH-1123): zeigt den Auftrag aus der Adresse. */
 function KartenSonde() {
@@ -448,7 +449,7 @@ describe('TiereDetailPage — Status/Verbleib', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
     // Ohne Verbleib: Submit blockiert (Pflichtfeld) → kein Request.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Verbleib speichern' }));
-    expect(await screen.findByText('Verbleib ist Pflicht')).toBeInTheDocument();
+    expect(await screen.findByText('Verbleib fehlt')).toBeInTheDocument();
     expect(body.status).toBeUndefined();
     // Mit Verbleib in Handlungsform; der Drahtwert bleibt `freilauf`:
     await userEvent.click(within(dialog).getByRole('combobox'));
@@ -864,6 +865,8 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(oeffnen);
     const wieder = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());

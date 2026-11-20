@@ -35,8 +35,7 @@ import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
 import { useAusgabeNebenwege } from '../abloesung/schichtplan/ausgabe/useSchichtplanAusgabe';
 import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname';
-import { NebenwegeImKopf } from '../components/EinsatzSeite';
-import { useViewport } from '../components/useViewport';
+import { NebenwegeImKopf, useNebenwegeImMenue } from '../components/EinsatzSeite';
 import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 
@@ -69,7 +68,8 @@ export default function PlanungPage() {
   const [loeschenOffen, setLoeschenOffen] = useState(false);
   const [isUebernahmeOpen, setUebernahmeOpen] = useState(false);
   const reiterflaecheId = useId();
-  const { istSchmal } = useViewport();
+  // Unter md und in den Stufen 48 / 72 stehen die Ausgabewege im Menü der Planung (LLH-1786).
+  const nebenwegeImMenue = useNebenwegeImMenue();
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
@@ -166,8 +166,9 @@ export default function PlanungPage() {
       pfad={pfad}
       aktionen={
         <Flex gap={token.marginSM} align="center">
-          {/* Ab `md` als Knöpfe; schmal im Menü der Planung, kein zweiter Auslöser (LLH-1836). */}
-          {!istSchmal && (
+          {/* In `kompakt` ab `md` als Knöpfe; sonst im Menü der Planung, kein zweiter Auslöser
+              (LLH-1836): `NebenwegeImKopf` bündelte dort mit demselben Namen ein zweites Menü. */}
+          {!nebenwegeImMenue && (
             <NebenwegeImKopf
               name={`Aktionen zu ${planung.kopf.bezeichnung}`}
               eintraege={ausgabeWege}
@@ -180,7 +181,7 @@ export default function PlanungPage() {
           )}
           <MenueAusloeser<string>
             eintraege={[
-              ...(istSchmal
+              ...(nebenwegeImMenue
                 ? ausgabeWege.map((w) =>
                     w.laeuft
                       ? { key: w.key, label: `${w.label} (läuft …)`, gesperrt: true as const }

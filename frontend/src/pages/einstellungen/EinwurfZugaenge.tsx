@@ -39,6 +39,7 @@ import type {
 } from '../../api/types';
 import { RechteText } from './AnbindungDialoge';
 import { ANBINDUNGEN_ABRUF_MS } from './anbindungAnzeige';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface FormWerte {
   name?: string;
@@ -493,13 +494,13 @@ export default function EinwurfZugaenge() {
           label="Name"
           name="name"
           rules={[
-            { required: true, whitespace: true, message: 'Name angeben' },
+            pflicht('Name', { whitespace: true }),
             { max: ANBINDUNG_NAME_MAX, message: `Höchstens ${ANBINDUNG_NAME_MAX} Zeichen` },
           ]}
         >
           <Input placeholder="BOSWatch Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
         </Feld>
-        <Feld label="Zweck" name="scope" rules={[{ required: true, message: 'Zweck wählen' }]}>
+        <Feld label="Zweck" name="scope" rules={[pflicht('Zweck')]}>
           <Radio.Group>
             <Stapel abstand="xxs">
               {EINWURF_ZWECKE.map((s) => (

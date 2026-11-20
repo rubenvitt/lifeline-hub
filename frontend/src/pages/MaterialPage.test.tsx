@@ -1332,7 +1332,7 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
     const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
     expect(knopf).toBeEnabled();
     await userEvent.click(knopf);
-    expect(await within(dialog).findByText('Material wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Material fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
 

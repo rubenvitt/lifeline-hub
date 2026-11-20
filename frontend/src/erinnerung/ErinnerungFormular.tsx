@@ -11,6 +11,7 @@ import type { NeueErinnerung } from '../api/types';
 import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
 import { dekodiere } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -22,7 +23,7 @@ interface FormWerte {
   intervall: number | null;
   /**
    * Höchstens EIN Wert: `funktion:<code>[:<Bezeichnung>]` aus dem Katalog (LFH-549) oder Freitext
-   * (`mode="tags"`, die jüngste Wahl ersetzt die alte). Kein Rückschluss von „S2“ auf den Code.
+   * (`EinWertAuswahl`, die jüngste Wahl ersetzt die alte). Kein Rückschluss von „S2“ auf den Code.
    */
   empfaenger: string[];
 }
@@ -99,15 +100,11 @@ export default function ErinnerungFormular({
       speicherung={speicherung}
       speicherFehlerTitel="Erinnerung nicht angelegt"
       speicherFehlerFallback="Anlegen fehlgeschlagen"
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       serie
       uebernahme={UEBERNAHME}
     >
-      <Feld
-        name="titel"
-        label="Titel / Anlass"
-        rules={[{ required: true, message: 'Titel ist erforderlich' }]}
-      >
+      <Feld name="titel" label="Titel / Anlass" rules={[pflicht('Titel')]}>
         <Input aria-label="Titel" placeholder="z. B. Lagemeldung aller EA" />
       </Feld>
       <Feld name="beschreibung" label="Beschreibung (optional)">
@@ -115,11 +112,7 @@ export default function ErinnerungFormular({
       </Feld>
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
-          <Feld
-            name="faellig"
-            label="Fällig"
-            rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
-          >
+          <Feld name="faellig" label="Fällig" rules={[pflicht('Fälligkeit')]}>
             <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
           </Feld>
         </Col>

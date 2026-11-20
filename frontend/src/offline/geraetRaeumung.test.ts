@@ -15,7 +15,8 @@ import {
   isStartlisteAusgeblendet,
   saveStartlisteAusgeblendet,
 } from '../pages/fuehrung/startlisteSpeicher';
-import { geraetFuerBenutzerRaeumen, geraetRaeumen } from './geraetRaeumung';
+import { geraetFuerBenutzerRaeumen, geraetPlatteRaeumen, geraetRaeumen } from './geraetRaeumung';
+import { verlaufInhalt } from '../alarm/benachrichtigungGedaechtnis';
 import {
   queueEinreihen,
   queueLeerenFuerTests,
@@ -131,6 +132,32 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(fehler).toHaveBeenCalled();
+  });
+});
+
+describe('geraetPlatteRaeumen (LLH-1770)', () => {
+  it('räumt Platte und localStorage, lässt sessionStorage und den Speicher des Tabs stehen', async () => {
+    await geraetBefuellen();
+    verlaufInhalt.set(99, { absender: 'Florian 1' } as never);
+
+    await geraetPlatteRaeumen();
+
+    // Platte und localStorage: sofort weg.
+    expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
+    expect(loadGemerkteStelle(7)).toBeNull();
+    expect(isStartlisteAusgeblendet(7)).toBe(false);
+    expect(ladeZuletzt('funkrufname')).toEqual([]);
+    expect(loadStoredQueueZaehler(A)).toBeNull();
+    // Tab-Speicher: bleibt bis zur Frist.
+    expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBe('Sammelstelle Süd');
+    expect(sessionStorage.getItem('lfh:liste:personen:7')).toBe('q=Meier');
+    expect(istAusgeblendet(40)).toBe(true);
+    expect(verlaufInhalt.has(99)).toBe(true);
+    // Entwürfe und Queue wie bei jedem Sitzungsende.
+    expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toHaveLength(1);
+    expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
+    verlaufInhalt.clear();
   });
 });
 

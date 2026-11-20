@@ -138,7 +138,7 @@ test.describe(KAPITEL, () => {
     await dialog.getByRole('combobox', { name: 'Absender' }).blur();
     await fotografiere(dialog, KAPITEL, 'lagemeldung-erfassen');
     // Ablauf weiter: erfassen; die neue steht in der Zeitachse.
-    await dialog.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+    await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(
       page

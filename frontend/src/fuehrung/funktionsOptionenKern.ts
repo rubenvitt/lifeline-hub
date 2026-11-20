@@ -89,19 +89,29 @@ export function funktionsOptionen(
   vorschlaege: FunktionsVorschlaege,
   suchtext = '',
 ): FunktionsOption[] {
-  const text = suchtext.trim();
   const feste = vorschlaege.katalog
     .filter((e) => !e.bezeichnung_pflicht)
     .map((e) => ({
       value: optionsWert(e.funktion),
       label: optionsLabel(e, vorschlaege.besetzung),
     }));
-  const mitBezeichnung = text
-    ? vorschlaege.katalog
-        .filter((e) => e.bezeichnung_pflicht)
-        .map((e) => ({ value: optionsWert(e.funktion, text), label: `${e.label}: ${text}` }))
-    : [];
-  return [...feste, ...mitBezeichnung];
+  return [...feste, ...bezeichnungsOptionen(vorschlaege, suchtext)];
+}
+
+/**
+ * Die Einträge, die erst der Tipptext bildet: „Führungshilfspersonal: <Text>“ und „Fachberater:
+ * <Text>“. Sie sind kein Stammdatentreffer; ein Vorschlagsfeld markiert sie nie von selbst
+ * (LLH-1753, `fuehrung/VorschlagsSelect.tsx`).
+ */
+export function bezeichnungsOptionen(
+  vorschlaege: FunktionsVorschlaege,
+  suchtext: string,
+): FunktionsOption[] {
+  const text = suchtext.trim();
+  if (!text) return [];
+  return vorschlaege.katalog
+    .filter((e) => e.bezeichnung_pflicht)
+    .map((e) => ({ value: optionsWert(e.funktion, text), label: `${e.label}: ${text}` }));
 }
 
 /**

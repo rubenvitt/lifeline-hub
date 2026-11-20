@@ -77,7 +77,7 @@ export function dauerRegel(opts: {
       const p = parseDauer(wert);
       if (p.art === 'leer') {
         return opts.pflicht
-          ? Promise.reject(new Error(opts.pflichtText ?? 'Bitte eine Dauer angeben'))
+          ? Promise.reject(new Error(opts.pflichtText ?? 'Dauer fehlt'))
           : Promise.resolve();
       }
       if (p.art === 'ungueltig') {
@@ -141,7 +141,7 @@ export function uhrzeitenRegel(max: number): FormRule {
     validator: (_regel, wert: string | undefined) => {
       const p = parseUhrzeiten(wert);
       if (p.art === 'leer') {
-        return Promise.reject(new Error('Bitte mindestens eine Wechselzeit angeben'));
+        return Promise.reject(new Error('Wechselzeit fehlt'));
       }
       if (p.art === 'ungueltig') {
         return Promise.reject(new Error(`„${p.text}“ ist keine Uhrzeit wie 0600 oder 18:00`));

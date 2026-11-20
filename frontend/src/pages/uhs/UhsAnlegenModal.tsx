@@ -10,6 +10,7 @@ import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
 import { ortEingabe } from '../../anzeige/ortsfeldFormular';
 import { uhsTyp } from '../../theme/statusFarben';
+import { pflicht } from '../../components/pflichtRegel';
 
 /** Formularwerte: der Standort ist ein Ortsfeld (Text und Koordinate, LLH-1114). */
 type UhsFormular = Omit<UhsEingabe, 'standort' | 'lat' | 'lon'> & { standort?: OrtsfeldWert };
@@ -56,14 +57,10 @@ export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
       listenKey={einsatzKeys.uhs}
       initialValues={{ typ: 'behandlungsplatz' }}
     >
-      <Feld
-        label="Bezeichnung"
-        name="bezeichnung"
-        rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}
-      >
+      <Feld label="Bezeichnung" name="bezeichnung" rules={[pflicht('Bezeichnung')]}>
         <Input placeholder="z. B. BHP 50" />
       </Feld>
-      <Feld label="Typ" name="typ" rules={[{ required: true }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select options={Object.entries(uhsTyp).map(([v, d]) => ({ value: v, label: d.label }))} />
       </Feld>
       <Feld label="Standort (optional)" name="standort">

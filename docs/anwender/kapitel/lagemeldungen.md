@@ -25,13 +25,13 @@ Für Einsatzleitung und Führungspersonal:
    Steht noch keine Lagemeldung da, steht der Knopf auch in der leeren Ansicht. Der Dialog
    „Lagemeldung erfassen“ öffnet sich.
 2. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ eingeben. Die Meldungsart ist
-   „Lagemeldung“.
+   „Lagemeldung“. Ist im ETB ein Standard-Rufname gesetzt, steht er schon als Absender da.
 
    ![Dialog „Lagemeldung erfassen“ mit Wortlaut und Absender](../bilder/lagemeldungen/lagemeldung-erfassen.png)
 
 3. Ist der Ort bekannt, unter „Weitere Angaben“ bei „Verortung (optional)“ die Koordinate
    eingeben. Dort stehen auch Richtung, Priorität und Ereigniszeit.
-4. „Lagemeldung erfassen“ wählen. Der Dialog schließt, die neue Lagemeldung steht mit der Marke
+4. „Erfassen“ wählen. Der Dialog schließt, die neue Lagemeldung steht mit der Marke
    „Neu“ oben in der Zeitachse.
 
 Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der Meldungsart

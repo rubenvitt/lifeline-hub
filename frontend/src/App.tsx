@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
+import SitzungBeendetDialog from './auth/SitzungBeendetDialog';
 import AppLayout from './components/AppLayout';
 import RollWiederherstellung from './components/RollWiederherstellung';
 import SprungZumInhalt from './components/SprungZumInhalt';
@@ -260,8 +261,8 @@ const EINSTELLUNGEN_ROUTEN = (
  * Einsatz-Workspace bleiben darunter Geschwister.
  */
 function BetriebsLayout() {
-  const { benutzer, konflikt } = useAuth();
-  useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  const { benutzer, konflikt, unterbrechung } = useAuth();
+  useOfflineSync(abgleichFuer(benutzer, konflikt !== null || unterbrechung !== null));
   // Org-Strom außerhalb eines Einsatzes (LFH-734); im Einsatz ruht er von selbst.
   useOrgLiveStream(benutzer != null);
   return (
@@ -303,6 +304,8 @@ function SitzungsLayout() {
       <Outlet />
       {/* Benutzerwechsel in einem anderen Tab (LFH-387) — neben der Wache, über jeder Route. */}
       <BenutzerKonfliktDialog />
+      {/* Sitzung im Betrieb beendet (LLH-1770): Anmeldung über der montierten, verdeckten Seite. */}
+      <SitzungBeendetDialog />
     </>
   );
 }

@@ -57,6 +57,22 @@ function zeige() {
 }
 
 describe('BenutzerKonfliktDialog (LFH-387)', () => {
+  it('verdeckt die Seite undurchsichtig, wenn er auf eine beendete Sitzung folgt (LLH-1770)', async () => {
+    konflikt = { bisher: anna, jetzt: bruno, ausUnterbrechung: true };
+    zeige();
+    await screen.findByRole('dialog', { name: 'Anderer Benutzer angemeldet' });
+    const maske = document.querySelector('.lfh-sitzung-beendet-maske') as HTMLElement | null;
+    expect(maske).not.toBeNull();
+    expect(maske!.style.background).toBe('var(--lfh-grund)');
+  });
+
+  it('bleibt sonst bei der gewohnten Maske', async () => {
+    konflikt = { bisher: anna, jetzt: bruno };
+    zeige();
+    await screen.findByRole('dialog', { name: 'Anderer Benutzer angemeldet' });
+    expect(document.querySelector('.lfh-sitzung-beendet-maske')).toBeNull();
+  });
+
   it('ist ohne Konflikt nicht da', () => {
     zeige();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

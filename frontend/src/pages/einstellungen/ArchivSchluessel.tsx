@@ -24,6 +24,7 @@ import {
 import { ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX, ARCHIV_SCHLUESSEL_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type { ArchivEmpfaengerAnzeige } from '../../api/types';
+import { pflicht } from '../../components/pflichtRegel';
 
 interface EintragenWerte {
   bezeichnung?: string;
@@ -238,7 +239,7 @@ export default function ArchivSchluessel() {
           label="Bezeichnung"
           name="bezeichnung"
           rules={[
-            { required: true, whitespace: true, message: 'Bezeichnung angeben' },
+            pflicht('Bezeichnung', { whitespace: true }),
             {
               max: ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX,
               message: `Höchstens ${ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX} Zeichen`,
@@ -250,7 +251,7 @@ export default function ArchivSchluessel() {
         <Feld
           label="Öffentlicher Schlüssel"
           name="schluessel"
-          rules={[{ required: true, whitespace: true, message: 'Schlüssel angeben' }]}
+          rules={[pflicht('Schlüssel', { whitespace: true })]}
         >
           <Input
             placeholder="age1…"
@@ -292,7 +293,7 @@ export default function ArchivSchluessel() {
           label="Code"
           name="code"
           breite="schmal"
-          rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
+          rules={[pflicht('Code', { whitespace: true })]}
         >
           <Input
             inputMode="numeric"

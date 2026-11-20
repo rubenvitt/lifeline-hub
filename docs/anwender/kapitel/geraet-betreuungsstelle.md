@@ -39,7 +39,8 @@ Wer die Stelle verlassen hat, steht in der Gruppe „Weitergezogen“ mit seinem
 3. „Erfassen“ wählen oder „Speichern und nächste“, um gleich die nächste Person aufzunehmen.
 
 Die Bestätigung lautet etwa „Erfasst als R-016 · untergebracht“: Die Person ist in dieser
-Betreuungsstelle untergebracht.
+Betreuungsstelle untergebracht. Nach „Erfassen“ öffnet sich die Liste der Betroffenen, und die
+Bestätigung steht dort einige Sekunden oben.
 
 ### Haushalte registrieren und abmelden
 
@@ -92,7 +93,7 @@ Registrierung“): Die Belegung ergibt sich aus den registrierten Personen.
 1. Unten „Stelle“ öffnen und oben „Meldungen“ wählen.
 2. Den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die „Priorität“ (normal,
    dringend, sofort) wählen. Eine Lagemeldung steht bei der Führung gleich in den Lagemeldungen.
-3. „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
+3. „Erfassen“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 
 ## Hintergrund

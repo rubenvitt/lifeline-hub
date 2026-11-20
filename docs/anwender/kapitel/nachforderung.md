@@ -40,7 +40,7 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Formular „Neue Nachforderung“ mit der Schnellwahl, Was „Tauchpumpe“, Anzahl 3, Wohin „Keller Hauptstraße 12“ und eingeklappt „Weitere Angaben“](../bilder/nachforderung/nachforderung-absetzen.png)
 
-5. Enter drücken oder „Nachforderung absetzen“ wählen.
+5. Enter drücken oder „Erfassen“ wählen.
 
 Alles Weitere steht eingeklappt unter „Weitere Angaben“, mit Vorgaben; der Kopf nennt, was davon
 abweicht:
@@ -106,9 +106,9 @@ Für Einsatzleitung und Führungspersonal:
    Ist das Modul Einheiten freigegeben, schlägt die Liste die Einheiten des Einsatzes vor, die noch
    aus keiner Nachforderung stammen.
 4. Unter „Eintreffen erwartet“ bei Bedarf den Zeitpunkt eintragen, den die Stelle nennt.
-   ![Karte „500× Sandsäcke“ mit dem Formular darunter: Zugesagt 300, Wer „THW OV Musterstadt“, Eintreffen erwartet leer, und den Knöpfen „Zusage erfassen“ und „Abbrechen“](../bilder/nachforderung/nachforderung-zusage.png)
+   ![Karte „500× Sandsäcke“ mit dem Formular darunter: Zugesagt 300, Wer „THW OV Musterstadt“, Eintreffen erwartet leer, und den Knöpfen „Erfassen“ und „Abbrechen“](../bilder/nachforderung/nachforderung-zusage.png)
 
-5. Enter drücken oder „Zusage erfassen“ wählen.
+5. Enter drücken oder „Erfassen“ wählen.
 
 Ohne weitere Angaben genügen „Zusage erfassen“ und Enter. Die Karte zeigt danach „Wer: 83-1“ und
 „Eintreffen erwartet: …“. „Rückgängig“ setzt die Zusage auf „Angefordert“ zurück und leert Wer und

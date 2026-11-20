@@ -16,6 +16,7 @@ import {
   schnellwahlZeit,
 } from '../anzeige/zeitSchnellwahl';
 import type { EtbEintragAnzeige } from '../api/types';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 dayjs.extend(utc);
@@ -114,7 +115,7 @@ export default function WiedervorlageModal({
       offen={eintrag !== null}
       titel="Wiedervorlage anlegen"
       form={form}
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       laeuft={speicherung.isPending}
       // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst räumt die Hülle
       // die Felder trotz Fehler.
@@ -133,11 +134,7 @@ export default function WiedervorlageModal({
           : undefined
       }
     >
-      <Feld
-        label="Titel"
-        name="titel"
-        rules={[{ required: true, message: 'Titel ist erforderlich' }]}
-      >
+      <Feld label="Titel" name="titel" rules={[pflicht('Titel')]}>
         <Input />
       </Feld>
       <Feld label="Fällig am" required>
@@ -173,11 +170,7 @@ export default function WiedervorlageModal({
             </Button>
           )}
         </Space>
-        <Feld
-          name="faellig"
-          noStyle
-          rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
-        >
+        <Feld name="faellig" noStyle rules={[pflicht('Fälligkeit')]}>
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Feld>
       </Feld>

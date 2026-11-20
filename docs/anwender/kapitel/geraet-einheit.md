@@ -54,7 +54,7 @@ dann nur an.
 2. Den „Inhalt“ eingeben, „Art“ und „Priorität“ wählen.
 3. Bei Bedarf „Mein Standort“ wählen. Das Handy ermittelt den Standort einmal und zeigt ihn mit
    seiner Genauigkeit an; das Kreuz daneben nimmt ihn wieder heraus.
-4. „Meldung senden“ wählen. Die Meldung steht danach unter „Eigene Meldungen“.
+4. „Erfassen“ wählen. Die Meldung steht danach unter „Eigene Meldungen“.
 
 ### Kontakt erfassen
 

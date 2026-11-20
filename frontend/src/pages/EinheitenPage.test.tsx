@@ -14,6 +14,7 @@ import { formatiereDatenstand } from '../components/Datenstand';
 import { einsatzFixture } from '../test/fixtures';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { useLocation } from 'react-router';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 const tmoSprechgruppe = {
   id: 7,
@@ -144,6 +145,8 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Verworfen');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
 
     /**
      * Keine Zusicherung über das Verschwinden des Dialogs: antd hält den Knoten samt
@@ -156,7 +159,7 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     expect(angelegt).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
   });
 
@@ -285,8 +288,10 @@ describe('EinheitenPage · Einheit bilden abgelehnt (LFH-1077)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
     // ein, und jsdom beendet die Animation nie.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 });

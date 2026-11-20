@@ -10,6 +10,7 @@ import { Feld, Textstufe, useRollen } from '../components/instrument';
 import { SK_META, personSichtung } from './personMeta';
 import { useSaveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Was die Seite einer Zeilenaktion mitgibt (LLH-1130, Change
@@ -135,10 +136,7 @@ export default function ZeilenSichtung({
         onFertig={() => {}}
         onAbbrechen={() => setOffen(false)}
       >
-        <Feld
-          name="kategorie"
-          rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
-        >
+        <Feld name="kategorie" rules={[pflicht('Sichtungskategorie')]}>
           <SichtungsWahl aria-label={`Sichtungskategorie für ${kennung}`} />
         </Feld>
       </ErfassungsFormular>

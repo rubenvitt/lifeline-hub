@@ -77,7 +77,7 @@ const INAKTIV: SlashTrigger = { aktiv: false, filter: '', start: -1 };
  * (Whitespace zwischen Zeichen und Cursor schließt das Menü). Ein Zeichen mitten im Wort
  * (z.B. "2/9", Datums-/Pfadangaben, eine Mailadresse) triggert nicht.
  */
-function erkenneTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashTrigger {
+function parseTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashTrigger {
   for (let i = caret - 1; i >= 0; i--) {
     const c = text[i];
     if (c === zeichen) {
@@ -90,13 +90,13 @@ function erkenneTrigger(text: string, caret: number, zeichen: '/' | '@'): SlashT
 }
 
 /** `/` am Wortanfang: Felder, Bausteine — und am Zeilenanfang zusätzlich der Typ. */
-export function erkenneSlashTrigger(text: string, caret: number): SlashTrigger {
-  return erkenneTrigger(text, caret, '/');
+export function parseSlashTrigger(text: string, caret: number): SlashTrigger {
+  return parseTrigger(text, caret, '/');
 }
 
 /** `@` am Wortanfang: Funkrufname für Von bzw. An. */
-export function erkenneAtTrigger(text: string, caret: number): SlashTrigger {
-  return erkenneTrigger(text, caret, '@');
+export function parseAtTrigger(text: string, caret: number): SlashTrigger {
+  return parseTrigger(text, caret, '@');
 }
 
 /**
@@ -252,7 +252,7 @@ export function zukunftsVerstoss(metadaten: MetadatenWerte, jetzt: dayjs.Dayjs):
  * den Text ohne den Befehl, sonst `null`. Nur exakte Typwörter: `/lagebericht` ist kein
  * Befehl und bleibt Text.
  */
-export function erkenneTypBefehl(
+export function parseTypBefehl(
   text: string,
   erlaubteTypen: readonly EtbTyp[] = TYP_BEFEHLE,
 ): { typ: EtbTyp; rest: string } | null {
@@ -264,30 +264,79 @@ export function erkenneTypBefehl(
 }
 
 /**
- * `/zeit <Angabe> ` am Textanfang (LLH-1088, Spec `etb-schnellerfassung-tastatur`, „Kurzeingabe der
- * Ereigniszeit“): die Angabe wird wie im Zeitfeld eines Ereignisses gedeutet (`deuteZeit`, `art:
- * 'ereignis'`: `1420`, `14:20`, `101420`, `-15` …), der Rest bleibt Inhalt. Wie beim Typbefehl
- * erst mit dem Leerzeichen dahinter — vorher tippt jemand noch. Unlesbar: `ok: false` mit Grund,
- * der Text bleibt stehen. Ein vorangestellter Typbefehl ist zuvor schon abgezogen.
+ * `/zeit <Angabe>` an einem Wortanfang irgendwo im Text (LLH-1088, LLH-1754, Spec
+ * `etb-schnellerfassung-tastatur`, „Kurzeingabe der Ereigniszeit“): die Angabe wird wie im
+ * Zeitfeld eines Ereignisses gedeutet (`deuteZeit`, `art: 'ereignis'`: `1420`, `14:20`, `101420`,
+ * `-15` …), der Befehl verlässt den Inhalt, der Rest bleibt. `abgeschlossen` heißt: hinter der
+ * Angabe steht ein Leerzeichen. Nur dann löst schon das Tippen aus — vorher tippt jemand noch;
+ * am Textende ohne Leerzeichen übernimmt erst Enter bzw. „Erfassen“ (LLH-1754: sonst ginge der
+ * Befehl als Text ins Tagebuch). Unlesbar: `ok: false` mit Grund, der Text bleibt stehen. Ein
+ * vorangestellter Typbefehl ist zuvor schon abgezogen. Es zählt das erste `/zeit` im Text.
  */
-export function erkenneZeitBefehl(
+export function parseZeitBefehl(
   text: string,
   optionen: { zone: string | null | undefined; jetzt: dayjs.Dayjs },
-):
-  | { ok: true; zeitpunkt: dayjs.Dayjs; rest: string; ende: number; angabe: TextRange }
-  | { ok: false; grund: string; ende: number; angabe: TextRange }
-  | null {
-  const treffer = /^\/zeit(\s+)(\S+)\s/.exec(text);
+): ZeitBefehl | null {
+  const treffer = /(^|\s)\/zeit(\s+)(\S+)(\s|$)/.exec(text);
   if (!treffer) return null;
-  // `ende`: wo der Befehl endet — der Aufrufer löst nur aus, wenn genau dort getippt wurde.
-  const ende = treffer[0].length;
+  // `start`/`ende`: wo der Befehl steht — der Aufrufer löst beim Tippen nur aus, wenn genau an
+  // `ende` getippt wurde.
+  const start = treffer.index + treffer[1].length;
+  const ende = treffer.index + treffer[0].length;
+  const abgeschlossen = treffer[4] !== '';
   // `angabe`: wo die Zeitangabe steht — dorthin geht der Cursor, wenn sie unlesbar ist (LLH-1866).
-  const start = '/zeit'.length + treffer[1].length;
-  const angabe = { start, end: start + treffer[2].length };
-  const deutung = deuteZeit(treffer[2], { ...optionen, art: 'ereignis' });
-  if (!deutung.ok) return { ok: false, grund: deutung.grund, ende, angabe };
+  const angabeStart = start + '/zeit'.length + treffer[2].length;
+  const angabe = { start: angabeStart, end: angabeStart + treffer[3].length };
+  const lage = { start, ende, angabe, abgeschlossen };
+  const deutung = deuteZeit(treffer[3], { ...optionen, art: 'ereignis' });
+  if (!deutung.ok) return { ok: false, grund: deutung.grund, ...lage };
   if (deutung.zeitpunkt == null) return null;
-  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(ende), ende, angabe };
+  // Am Textende fällt mit dem Befehl auch das Leerzeichen davor: „Pumpe läuft /zeit 1420“. Beim
+  // Tippen („Pumpe /zeit 1420 “) bleibt es, dahinter geht der Satz weiter.
+  const davor = text.slice(0, start);
+  const rest = abgeschlossen ? davor + text.slice(ende) : davor.trimEnd();
+  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest, ...lage };
+}
+
+interface ZeitBefehlLage {
+  /** Wo der Befehl beginnt (das `/`). */
+  start: number;
+  /** Wo er endet, samt Leerzeichen dahinter. */
+  ende: number;
+  /** Wo die Zeitangabe steht. */
+  angabe: TextRange;
+  /** Steht hinter der Angabe ein Leerzeichen? Sonst tippt womöglich noch jemand. */
+  abgeschlossen: boolean;
+}
+
+export type ZeitBefehl =
+  | ({ ok: true; zeitpunkt: dayjs.Dayjs; rest: string } & ZeitBefehlLage)
+  | ({ ok: false; grund: string } & ZeitBefehlLage);
+
+/** Ein Text, der nur aus einem Befehl besteht (LLH-1754), und was er meint. */
+export type NurBefehl =
+  | { art: 'typ'; typ: EtbTyp }
+  | { art: 'feld'; feld: MetaFeld }
+  | { art: 'unbekannt'; befehl: string };
+
+/**
+ * Besteht der ganze Text aus einem `/wort` (LLH-1754)? Dann sendet die Erfassung nie, sondern
+ * tut, was das Wort meint: ein erlaubter Typ setzt den Typ, ein Feld-Stichwort des `/`-Menüs
+ * springt ins Feld, alles andere bleibt stehen und heißt „kein Befehl“. Ein Eintrag „/lage“ oder
+ * „/zeit“ im Tagebuch wäre Müll, den nur noch eine Berichtigung heilt.
+ */
+export function parseNurBefehl(
+  text: string,
+  erlaubteTypen: readonly EtbTyp[] = TYP_BEFEHLE,
+): NurBefehl | null {
+  const treffer = /^\/(\p{L}*)$/u.exec(text.trim());
+  if (!treffer) return null;
+  const wort = treffer[1].toLowerCase();
+  const typ = erlaubteTypen.find((t) => t === wort);
+  if (typ) return { art: 'typ', typ };
+  const def = METADATEN_FELDER.find((d) => wort !== '' && d.trigger.includes(wort));
+  if (def) return { art: 'feld', feld: def.feld };
+  return { art: 'unbekannt', befehl: `/${treffer[1]}` };
 }
 
 /** Ein Abschnitt im Text, halboffen: `start` einschließlich, `end` ausschließlich. */

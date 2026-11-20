@@ -130,6 +130,23 @@ describe('AufnahmePage', () => {
     );
   });
 
+  // Befund LLH-1771: der Startfokus lag auf „SK I akut“, ein verirrtes Enter wählte „akut“.
+  it('legt den Startfokus auf die Sichtungsgruppe; ein verirrtes Enter wählt nichts und sendet nicht', async () => {
+    let gesendet = 0;
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => {
+        gesendet += 1;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ]);
+    const gruppe = await screen.findByRole('radiogroup');
+    await waitFor(() => expect(gruppe).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    for (const radio of within(gruppe).getAllByRole('radio')) expect(radio).not.toBeChecked();
+    expect(gruppe).toHaveFocus();
+    expect(gesendet).toBe(0);
+  });
+
   it('erfasst in Serie, ohne die Seite zu verlassen', async () => {
     let gesendet: { sichtung?: string } = {};
     render(einsatzAktiv, [
@@ -385,6 +402,34 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
 
     expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7');
+  });
+
+  it('bestätigt „Erfassen“ nach dem Seitenwechsel mit der Quittung als Toast (LLH-1760)', async () => {
+    render(
+      einsatzAktiv,
+      [http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 }))],
+      '/einsaetze/1/personen/aufnahme?uhs=7',
+    );
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    // Die stehende Quittung geht mit der Seite; die Registriernummer steht danach im Toast.
+    expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
+    expect(await screen.findByText('Erfasst als R-047 · SK II')).toBeInTheDocument();
+    expect(document.querySelector('.ant-message-success')).not.toBeNull();
+  });
+
+  it('nennt nach „Erfassen“ ohne Netz die Vormerkung als Toast, nicht als Erfolg (LLH-1760)', async () => {
+    render();
+    await screen.findByRole('radiogroup');
+    setzeOnline(false);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('PERSONENLISTE')).toBeInTheDocument();
+    expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
+    expect(document.querySelector('.ant-message-success')).toBeNull();
   });
 });
 

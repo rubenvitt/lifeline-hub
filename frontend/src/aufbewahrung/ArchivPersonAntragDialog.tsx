@@ -10,6 +10,7 @@ import { ZIEL_ART } from './archivText';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { personenUmfang, vollzugAb } from './SchwaerzungsantragDialog';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Löschersuchen für eine Person an einem archivierten Einsatz (LLH-1712, Spec
@@ -152,7 +153,7 @@ export default function ArchivPersonAntragDialog({
         name="aktenzeichen"
         extra="Ohne Namen; bleibt im Einsatztagebuch stehen"
         rules={[
-          { required: true, whitespace: true, message: 'Aktenzeichen angeben' },
+          pflicht('Aktenzeichen', { whitespace: true }),
           { max: 64, message: 'Höchstens 64 Zeichen' },
         ]}
       >

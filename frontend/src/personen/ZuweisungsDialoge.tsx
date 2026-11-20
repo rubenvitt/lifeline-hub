@@ -13,6 +13,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SPEZIES_META } from '../pages/tiere/tierHelfer';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Zuweisungsdialoge der Personen-Detailseite (Aufenthalt in einer UHS, Bezug zu Tier oder Schaden), auf
@@ -81,11 +82,7 @@ export function UhsZuweisenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld
-        label="Unfallhilfsstelle"
-        name="uhs_id"
-        rules={[{ required: true, message: 'Bitte UHS wählen' }]}
-      >
+      <Feld label="Unfallhilfsstelle" name="uhs_id" rules={[pflicht('Unfallhilfsstelle')]}>
         <Select
           placeholder="aktive UHS wählen"
           options={uhsListe
@@ -158,7 +155,7 @@ export function BezugHinzufuegenDialog({
       offen={offen}
       titel="Bezug hinzufügen"
       form={form}
-      erfassenText="Hinzufügen"
+      erfassenText="Zuordnen"
       laeuft={zuweisenMutation.isPending}
       speicherung={zuweisenMutation}
       speicherFehlerTitel="Bezug nicht hinzugefügt"
@@ -166,11 +163,7 @@ export function BezugHinzufuegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld
-        label="Tier oder Schaden"
-        name="bezug"
-        rules={[{ required: true, message: 'Bitte Tier oder Schaden wählen' }]}
-      >
+      <Feld label="Tier oder Schaden" name="bezug" rules={[pflicht('Tier oder Schaden')]}>
         <Select
           showSearch={{ optionFilterProp: 'label' }}
           placeholder="Kennung, Art, Name oder Ort suchen"

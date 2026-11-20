@@ -52,6 +52,7 @@ import {
   personenZahl,
 } from './betreuungText';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Die Erfassungsmasken des Fachmoduls Betreuung, alle auf `ErfassungsModal`.
@@ -338,21 +339,18 @@ export const hoechstensRegel = {
 
 function erhebungFeld(name: string, label: string) {
   return (
-    <Feld name={name} label={label} rules={[{ required: true }]}>
+    <Feld name={name} label={label} rules={[pflicht(label)]}>
       <SegmentFeld beschriftung={label} optionen={ERHEBUNG_OPTIONEN} />
     </Feld>
   );
 }
 
-function personenFeld(name: string, label: string, min: number, pflicht: boolean) {
+function personenFeld(name: string, label: string, min: number, isPflicht: boolean) {
   return (
     <Feld
       name={name}
       label={label}
-      rules={[
-        ...(pflicht ? [{ required: true, message: 'Bitte eine Anzahl angeben' }] : []),
-        hoechstensRegel,
-      ]}
+      rules={[...(isPflicht ? [pflicht('Anzahl')] : []), hoechstensRegel]}
     >
       <ZahlFeld min={min} ganz />
     </Feld>
@@ -508,7 +506,7 @@ export function BezirkAnlegenDialog({
         // Datenschutz: die Bezeichnung steht im Einsatztagebuch.
         extra="Keine Namen von Bewohnern."
         rules={[
-          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, 'Bezeichnung'),
         ]}
       >
@@ -526,7 +524,7 @@ export function BezirkAnlegenDialog({
         <Feld
           name="radius"
           label={einsatzort ? 'Radius um den Einsatzort' : 'Radius'}
-          rules={[{ required: true, message: 'Bitte einen Radius angeben' }]}
+          rules={[pflicht('Radius')]}
         >
           <RadiusFeld />
         </Feld>
@@ -607,7 +605,7 @@ export function RaeumungDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld name="raeumung" label="Räumungszustand" rules={[{ required: true }]}>
+      <Feld name="raeumung" label="Räumungszustand" rules={[pflicht('Räumungszustand')]}>
         <SegmentFeld
           beschriftung="Räumungszustand"
           optionen={RAEUMUNG_FOLGE.map((r) => ({ wert: r, label: raeumungszustand[r].label }))}
@@ -683,13 +681,13 @@ export function StelleAnlegenDialog({
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
-          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          pflicht('Bezeichnung', { whitespace: true }),
           zeichenRegel(BETREUUNG_STELLE_BEZEICHNUNG_MAX, 'Bezeichnung'),
         ]}
       >
         <Input count={zeichenGrenze(BETREUUNG_STELLE_BEZEICHNUNG_MAX)} />
       </Feld>
-      <Feld name="art" label="Art" rules={[{ required: true }]}>
+      <Feld name="art" label="Art" rules={[pflicht('Art')]}>
         <Select options={ART_OPTIONEN} />
       </Feld>
       <Feld name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>

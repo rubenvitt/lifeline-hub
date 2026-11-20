@@ -172,11 +172,25 @@ describe('AuftragFormular — Funktionskatalog (LFH-549)', () => {
     expect(await screen.findByTitle('S2 – Lage (Müller)')).toBeInTheDocument();
   });
 
-  it('lässt getipptes „S3“ + Enter Freitext bleiben, auch mit Katalog', async () => {
+  it('„S3“ + Enter nimmt den markierten Katalogeintrag (LLH-1753)', async () => {
     const onAnlegen = vi.fn();
     rendern({ onAnlegen, einsatzId: 7 });
 
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ empfaenger: [{ empfaenger_typ: 'funktion', funktion: 's3' }] }),
+    );
+  });
+
+  it('„S3“ bleibt Freitext nur über „„S3“ als Freitext übernehmen“, auch mit Katalog', async () => {
+    const onAnlegen = vi.fn();
+    rendern({ onAnlegen, einsatzId: 7 });
+
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3');
+    await userEvent.click(await screen.findByTitle('„S3“ als Freitext übernehmen'));
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
@@ -457,7 +471,7 @@ describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
-    const grund = await screen.findByText('Mindestens ein Empfänger ist erforderlich');
+    const grund = await screen.findByText('Empfänger fehlt');
     expect(grund.closest('.ant-form-item')).toContainElement(screen.getByLabelText('Empfänger'));
     expect(onAnlegen).not.toHaveBeenCalled();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
@@ -476,7 +490,7 @@ describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
 
     // Die Prüfung läuft asynchron: erst eine Runde abwarten, dann das Fehlen feststellen.
     await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByText('Mindestens ein Empfänger ist erforderlich')).toBeNull();
+    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
   });
 
   it('ein externer Adressat mit Bezeichnung räumt den Grund und genügt als Empfänger', async () => {
@@ -484,13 +498,11 @@ describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
     rendern({ onAnlegen });
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    await screen.findByText('Mindestens ein Empfänger ist erforderlich');
+    await screen.findByText('Empfänger fehlt');
 
     // Die Regel hängt an Richtung und Bezeichnung (`dependencies`), nicht nur am Feld selbst.
     await externMitBezeichnung();
-    await waitFor(() =>
-      expect(screen.queryByText('Mindestens ein Empfänger ist erforderlich')).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText('Empfänger fehlt')).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0].empfaenger).toEqual([
@@ -567,7 +579,7 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     rendern();
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    await screen.findByText('Mindestens ein Empfänger ist erforderlich');
+    await screen.findByText('Empfänger fehlt');
     for (const kopf of document.querySelectorAll('.ant-collapse-header')) {
       expect(kopf).toHaveAttribute('aria-expanded', 'false');
     }

@@ -22,6 +22,7 @@ import SpeicherKnopf from '../components/SpeicherKnopf';
 import { AenderungsstandProvider, useAenderungsstandMerken } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   name: string;
@@ -231,7 +232,7 @@ export default function OrganisationTab() {
               label="Name der Organisation"
               name="name"
               rules={[
-                { required: true, whitespace: true, message: 'Der Name darf nicht leer sein.' },
+                pflicht('Name', { whitespace: true }),
                 { max: MAX_NAME, message: `Höchstens ${MAX_NAME} Zeichen.` },
               ]}
             >

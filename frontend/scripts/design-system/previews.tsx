@@ -2134,6 +2134,12 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     height: 1173,
     source: 'components/Erfassung.tsx',
     docAnchor: 'export function ErfassungsModal',
+    regeln: [
+      'Zwei Muster.',
+      'Ein Sendeverb.',
+      'Ein Enter-Vertrag nach Feldart',
+      'Ein Pflichtfehler „‹Feld› fehlt“',
+    ],
     styles: ['components/Erfassung.css'],
     content: () => <DialogBeispiel />,
     interact: beendeBewegung,

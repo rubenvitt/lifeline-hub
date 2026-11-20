@@ -262,14 +262,18 @@ export default function AppLayout() {
               <CommandPaletteTrigger />
             </div>
           )}
-          {/* Hilfe zur Seite (LLH-1824) links vom Benutzermenü, in jeder Breite. */}
-          <div style={kopfZelleStil(zellToken)}>
-            <HilfeKnopf />
-          </div>
+          {/* Hilfe zur Seite (LLH-1824) links vom Benutzermenü ab `md`. Darunter hätte die eine
+              Kopfzeile mit Uhr keinen Platz mehr (390 px: 1 px zu breit in `kompakt`); dort steht
+              „Hilfe zu dieser Seite“ im Benutzermenü (Entwurf col12d3y, Abschnitt 2). */}
+          {mittel && (
+            <div style={kopfZelleStil(zellToken)}>
+              <HilfeKnopf />
+            </div>
+          )}
           <div
             style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
           >
-            <BenutzerMenu />
+            <BenutzerMenu hilfeZurSeite={!mittel} />
           </div>
         </KopfRechts>
       </Header>

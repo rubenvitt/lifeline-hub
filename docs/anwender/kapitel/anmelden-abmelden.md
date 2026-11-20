@@ -2,7 +2,7 @@
 titel: Anmelden und Abmelden
 gruppen: [alle, geraete]
 reihenfolge: 10
-quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/auth/AbmeldenRueckfrage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/queueZaehlerMerker.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/pages/fuehrung/startlisteSpeicher.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/auth/AbmeldenRueckfrage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/queueZaehlerMerker.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/pages/fuehrung/startlisteSpeicher.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/auth/SitzungBeendetDialog.tsx, frontend/src/auth/AuthContext.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -119,7 +119,7 @@ kann den zweiten Faktor nur die Administration.
 ### Wie lange eine Anmeldung gilt
 
 Eine Anmeldung gilt **sieben Tage ab dem Anmelden**, auch über Neustarts des Geräts hinweg. Sie
-verlängert sich nicht durch Benutzung; nach Ablauf geht es zurück zur Anmeldeseite.
+verlängert sich nicht durch Benutzung.
 
 Eine Anmeldung endet außerdem, wenn
 
@@ -127,6 +127,20 @@ Eine Anmeldung endet außerdem, wenn
 - die Administration ein Einmalpasswort vergibt: sofort, auf allen Geräten;
 - die Person ihr Passwort ändert: alle **anderen** Anmeldungen dieses Kontos enden, das Gerät,
   an dem geändert wurde, bleibt angemeldet.
+
+### Wenn die Anmeldung während der Arbeit endet
+
+Endet die Anmeldung, während eine Seite offen ist, bleibt die Seite stehen, und darüber erscheint
+der Dialog „Sitzung beendet“. Die Seite ist dabei vollständig verdeckt. Nach der Anmeldung mit
+demselben Konto geht die Arbeit dort weiter, wo sie stand: offene Formulare und Dialoge behalten
+ihre Eingaben, die Daten laden neu, und vorgemerkte Einträge gehen hinaus. Meldet sich jemand
+anderes an, lädt die Seite neu; ungesicherte Eingaben gehen dabei verloren. Die Anmeldung über
+die Organisation (SSO) verlässt die Seite, auch dann gehen ungesicherte Eingaben verloren.
+
+Ohne Anmeldung schließt sich die Seite nach **15 Minuten**, ebenso mit „Abmelden“ im Dialog; die
+Anmeldeseite zeigt dann „Sitzung beendet – bitte erneut anmelden“. Was auf dem Gerät gespeichert
+war, löscht es schon beim Erscheinen des Dialogs wie bei jedem Ende einer Anmeldung. Gekoppelte
+Geräte zeigen weiter „Kopplung beendet“.
 
 ### Was das Abmelden löscht
 
@@ -139,7 +153,7 @@ gehört:
 - welche Startlisten „Einsatz starten“ im Überblick ausgeblendet sind,
 - die zuletzt verwendeten Absender und Empfänger aus Einsatztagebuch und Meldungen,
 - die zuletzt gezählte Zahl vorgemerkter und abgelehnter Einträge, mit der die Kopfleiste
-  „WARTET“ und „PRÜFEN“ schon beim Laden zeigt,
+  „NICHT GESENDET“ und „PRÜFEN“ schon beim Laden zeigt,
 - ungesendete Entwürfe im Einsatztagebuch.
 
 **Es bleiben** die vorgemerkten Einträge, die noch nicht beim Server angekommen sind (siehe

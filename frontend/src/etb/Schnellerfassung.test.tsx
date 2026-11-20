@@ -212,20 +212,54 @@ describe('Schnellerfassung', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
+  /**
+   * LLH-1756: Enter im leeren Feld fügte eine unsichtbare Leerzeile ein; danach galt der Inhalt
+   * als mehrzeilig und Enter sendete nie mehr, obwohl die Kappe weiter ↵ zeigte.
+   */
   it.each([
     ['leer', ''],
     ['nur Whitespace', '  \t'],
-  ])('Plain Enter unterdrückt bei %s keinen nativen Zeilenumbruch', async (_fall, inhalt) => {
+  ])('Plain Enter tut bei %s nichts — keine Leerzeile, kein Senden', async (_fall, inhalt) => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     if (inhalt) await userEvent.type(feld, inhalt);
-    let nichtVerhindert = false;
+    let nichtVerhindert = true;
     await act(async () => {
       nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' });
     });
-    expect(nichtVerhindert).toBe(true);
+    expect(nichtVerhindert).toBe(false);
+    expect(feld).toHaveValue(inhalt);
     expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nach Enter im leeren Feld sendet Enter den Einzeiler weiter', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Enter}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('führende Leerzeilen (Umschalt+Enter) zählen nicht: Enter sendet den Einzeiler', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '{Shift>}{Enter}{Enter}{/Shift}Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('die Kappe wechselt mit dem Modus: mehrzeilig Strg + ↵, Einzeiler ↵', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    await userEvent.type(feld, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2');
+    expect(knopf.querySelector('kbd')).toHaveTextContent('Strg + ↵');
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '{Shift>}{Enter}{/Shift}Einzeiler');
+    expect(knopf.querySelector('kbd')).toHaveTextContent(/^↵$/);
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter Control+Enter Meta+Enter');
   });
 
   it('Plain Enter ergänzt bei mehrzeiligem Inhalt eine weitere Zeile', async () => {
@@ -1052,7 +1086,52 @@ describe('Schnellerfassung — Fußzeile (Spec „Einstellungen in der Fußzeile
   });
 });
 
+describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
+  it('„Erfassen“ bei leerem Feld nennt „Inhalt fehlt“ am Feld und setzt den Fokus hinein', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    const typRahmen = feld
+      .closest<HTMLElement>('[data-rahmen-farbe]')!
+      .style.getPropertyValue('--lfh-schnellerfassung-rahmen');
+    expect(typRahmen).not.toBe('');
+    await userEvent.type(feld, '  ');
+    await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(feld).toHaveFocus();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    // Die Zeile trägt den Rahmen des Felds: er wechselt von der Typfarbe in die Alarmfarbe.
+    const zeile = feld.closest<HTMLElement>('[data-rahmen-farbe]')!;
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).not.toBe(typRahmen);
+
+    // Beim Tippen geht der Grund.
+    await userEvent.type(feld, 'Pegel steigt');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    expect(feld).not.toHaveAttribute('aria-invalid');
+    expect(zeile.style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe(typRahmen);
+  });
+
+  it('Strg+Enter im leeren Feld nennt den Grund; blankes Enter bleibt still', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.click(feld);
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByText('Inhalt fehlt')).toBeNull();
+    await userEvent.clear(feld);
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+});
+
 describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', () => {
+  /** Das Feld der offenen Abfrage (ohne Standard, „Empfänger wie Absender“). */
+  const abfrageFeld = () => screen.getByRole('combobox', { name: 'Rufname für Von und An' });
+
   it('ohne Standard steht die Abfrage über der Zeile, und die Pflicht hält das Absenden auf', async () => {
     const p = props({ rufname: rufnameZugriff(null) });
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -1061,41 +1140,86 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     ).toBeInTheDocument();
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Pegel steigt{Enter}');
-    // Ohne Standard fehlt die Vorgabe für An; der Grund steht am Feld, der Fokus geht dorthin.
-    expect(await screen.findByText('Empfänger fehlt')).toBeVisible();
+    // Ohne Standard fehlt die Vorgabe für An: der Grund nennt die Abfrage, der Fokus geht hinein
+    // (LLH-1764); das Feld An bleibt markiert und verweist auf denselben Grund.
+    const grund = 'Empfänger fehlt – Rufname oben eintragen';
+    expect(await screen.findByText(grund)).toBeVisible();
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    expect(abfrageFeld()).toHaveAttribute('aria-invalid', 'true');
+    expect(abfrageFeld()).toHaveAccessibleDescription(grund);
     const an = screen.getByRole('combobox', { name: 'An' });
-    await waitFor(() => expect(an).toHaveFocus());
     expect(an).toHaveAttribute('aria-invalid', 'true');
-    expect(an).toHaveAccessibleDescription('Empfänger fehlt');
+    expect(an).toHaveAccessibleDescription(grund);
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld).toHaveValue('Pegel steigt');
   });
 
-  it('Kein Standard, kein Von: der Grund steht am Feld Von, das den Fokus hat', async () => {
+  it('Kein Standard, Lage ohne Von: der Grund nennt die Abfrage, die den Fokus hat', async () => {
     const p = props({
       rufname: rufnameZugriff(null),
       initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: { an: 'ELW 1' } },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    expect(await screen.findByText('Absender fehlt')).toBeVisible();
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
-    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    expect(await screen.findByText('Absender fehlt – Rufname oben eintragen')).toBeVisible();
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    expect(screen.queryByText(/Empfänger fehlt/)).toBeNull();
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Lage ruhig');
   });
 
-  it('fehlen beide Seiten, sind beide Felder markiert', async () => {
+  it('fehlen beide Seiten, steht EIN Grund da und beide Felder sind markiert (LLH-1764)', async () => {
     const p = props({
       rufname: rufnameZugriff(null),
       initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: {} },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    const grund = 'Absender und Empfänger fehlen – Rufname oben eintragen';
+    expect(await screen.findByText(grund)).toBeVisible();
+    expect(
+      screen.getAllByRole('alert').filter((a) => /fehl/.test(a.textContent ?? '')),
+    ).toHaveLength(1);
+    expect(screen.queryByText('Absender fehlt')).toBeNull();
+    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    for (const name of ['Von', 'An']) {
+      const f = screen.getByRole('combobox', { name });
+      expect(f).toHaveAttribute('aria-invalid', 'true');
+      expect(f).toHaveAccessibleDescription(grund);
+    }
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+  });
+
+  it('Meldung ohne Von und ohne Standard: Von bleibt von Hand, An nennt die Abfrage', async () => {
+    // Der Absender einer Meldung ist die Stelle draußen, kein Rufname aus der Abfrage.
+    const p = props({
+      rufname: rufnameZugriff(null),
+      initialWerte: { inhalt: 'Pegel steigt', typ: 'meldung', metadaten: {} },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Absender fehlt')).toBeVisible();
-    expect(screen.getByText('Empfänger fehlt')).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('combobox', { name: 'An' })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Empfänger fehlt – Rufname oben eintragen')).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveAccessibleDescription(
+      'Absender fehlt',
+    );
+    // Die Abfrage zuerst: sie ist der Schritt, der einmal für alle Einträge gilt.
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+  });
+
+  it('nach dem Übernehmen des Rufnamens geht der Fokus ins nächste leere Pflichtfeld', async () => {
+    const rufname = rufnameZugriff(null);
+    const p = props({
+      rufname,
+      initialWerte: { inhalt: 'Pegel steigt', typ: 'meldung', metadaten: {} },
+    });
+    const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(abfrageFeld()).toHaveFocus());
+    await userEvent.type(abfrageFeld(), 'ELW 1{Enter}{Enter}');
+    await waitFor(() => expect(rufname.setze).toHaveBeenCalled());
+    rerender(<Schnellerfassung {...p} rufname={rufnameZugriff({ von: 'ELW 1', an: 'ELW 1' })} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
   });
 
   it('ein gesetztes An räumt seinen Grund', async () => {
@@ -1105,10 +1229,20 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
-    expect(await screen.findByText('Empfänger fehlt')).toBeInTheDocument();
+    expect(await screen.findByText('Empfänger fehlt – Rufname oben eintragen')).toBeInTheDocument();
     expect(p.erfassen).not.toHaveBeenCalled();
     await setzeAn('ELW 2');
-    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    expect(screen.queryByText(/Empfänger fehlt/)).toBeNull();
+    expect(abfrageFeld()).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('mit Standard bleibt der Grund am Feld, ohne Hinweis auf die Abfrage', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    expect(screen.queryByText(/Rufname oben eintragen/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
   });
 
   it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
@@ -1576,6 +1710,24 @@ describe('Schnellerfassung – Startfokus', () => {
       />,
     );
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+  });
+
+  it('ohne Standard steht der Startfokus in der Rufname-Abfrage (LLH-1764)', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          rufname: rufnameZugriff(null),
+          initialWerte: { inhalt: '', typ: 'lage', metadaten: {} },
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveFocus(),
+    );
+    expect(document.querySelector('[data-lfh="etb-erfassung"]')).toHaveAttribute(
+      'data-startfeld',
+      'rufname',
+    );
   });
 
   it('Alles vorbelegt: Lage mit eigener Stelle fokussiert den Inhalt', async () => {
@@ -2268,5 +2420,105 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await userEvent.type(inhaltFeld(), 'Lage ruhig');
     await userEvent.click(erfassenKnopf());
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+});
+
+// LLH-1754: ein Kurzbefehl geht nie als Text ins Tagebuch.
+describe('Kurzbefehl wird nie als Text gesendet (LLH-1754)', () => {
+  mitProzessZone('Europe/Berlin');
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  const gesendet = (p: ReturnType<typeof props>) =>
+    (p.erfassen as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+
+  it('„/zeit 1420“ und Enter setzt die Zeit und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('„/zeit 1420“ am Satzende: Enter übernimmt die Zeit, das nächste Enter sendet ohne Befehl', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe läuft /zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('„/zeit 1420“ mitten im Satz wirkt schon beim Tippen', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 1420 läuft');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(feldWert('Zeit')).toBe('1420');
+  });
+
+  it('ein unlesbares „/zeit“ am Textende hält das Senden an', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 2590{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
+    expect(feld).toHaveValue('Pumpe /zeit 2590');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nur ein Typbefehl: „Erfassen“ setzt den Typ und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lage');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, 'Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({ typ: 'lage', inhalt: 'Lage ruhig' });
+  });
+
+  it('nur ein Feldbefehl: „Erfassen“ springt ins Feld und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('ein unbekanntes „/xyz“ bleibt stehen und heißt „kein Befehl“', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/xyz');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('/xyz');
+    expect(await screen.findByRole('alert')).toHaveTextContent('„/xyz“ ist kein Befehl');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, ' a');
+    expect(screen.queryByText('„/xyz“ ist kein Befehl')).toBeNull();
   });
 });

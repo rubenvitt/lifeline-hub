@@ -13,6 +13,7 @@ import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -72,7 +73,7 @@ export default function EtbBausteinFormModal({
       offen={offen}
       titel={baustein ? 'Baustein bearbeiten' : 'Baustein anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={baustein ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
@@ -93,10 +94,10 @@ export default function EtbBausteinFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
         <Input placeholder="z. B. Lage unverändert" />
       </Feld>
-      <Feld label="Typ" name="typ" rules={[{ required: true }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
       </Feld>
       {/* Die automatischen Platzhalter als sichtbare Legende, kein Satz (LFH-1078); die Form
@@ -106,7 +107,7 @@ export default function EtbBausteinFormModal({
       <Feld
         label="Inhalt"
         name="inhalt"
-        rules={[{ required: true, whitespace: true }]}
+        rules={[pflicht('Inhalt', { whitespace: true })]}
         extra={
           <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
             <Textstufe stufe="textKlein" ton="gedaempft">

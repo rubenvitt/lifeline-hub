@@ -125,7 +125,7 @@ export default function ZusageFormular({
         speicherung={speicherung}
         speicherFehlerTitel="Zusage nicht erfasst"
         speicherFehlerFallback="Zusage fehlgeschlagen"
-        erfassenText="Zusage erfassen"
+        erfassenText="Erfassen"
       >
         {/* Für eine Person ist es genau ein Rettungsmittel (LLH-1573 D1): statt der Menge die
             Einsatznummer der Leitstelle (D5), das Budget bleibt bei drei Feldern. */}

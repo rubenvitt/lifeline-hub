@@ -34,6 +34,7 @@ import {
   type PersonOption,
 } from './schichtplanZeilen';
 import { ZahlFeld } from '../../components/ZahlFeld';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Der Blockdialog des Schichtplans (LLH-1554): der Weg ohne Ziehen, für Tastatur und Telefon.
@@ -312,7 +313,7 @@ export default function SchichtplanBlockDialog({
       titel={titel}
       form={form}
       initialValues={anfang}
-      erfassenText={block ? 'Speichern' : 'Block anlegen'}
+      erfassenText={block ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       gesperrt={!darfSchreiben || !!kopierenLaeuft}
       speicherung={speicherung}
@@ -337,11 +338,7 @@ export default function SchichtplanBlockDialog({
             ))}
           </div>
         )}
-        <Feld<BlockWerte>
-          name="posten"
-          label="Posten"
-          rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
-        >
+        <Feld<BlockWerte> name="posten" label="Posten" rules={[pflicht('Posten')]}>
           <Select placeholder="Posten wählen…" options={postenOptionen} />
         </Feld>
         <Feld<BlockWerte>

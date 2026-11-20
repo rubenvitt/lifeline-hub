@@ -50,6 +50,7 @@ import {
   UntereinheitenSection,
 } from './EinheitVorlageSections';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormValues {
   name: string;
@@ -354,22 +355,12 @@ function DetailContent({
             <Formularpaneel titel="Kopf" dataUpdatedAt={dataUpdatedAt}>
               <Row gutter={token.margin}>
                 <Col xs={24} lg={12}>
-                  <Feld
-                    label="Name"
-                    name="name"
-                    rules={[
-                      { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
-                    ]}
-                  >
+                  <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
                     <Input maxLength={EINHEIT_VORLAGE_NAME_MAX} />
                   </Feld>
                 </Col>
                 <Col xs={24} lg={12}>
-                  <Feld
-                    label="Typ"
-                    name="typ_id"
-                    rules={[{ required: true, message: 'Typ wählen' }]}
-                  >
+                  <Feld label="Typ" name="typ_id" rules={[pflicht('Typ')]}>
                     <Select<number> aria-label="Typ" options={typOptions} />
                   </Feld>
                 </Col>

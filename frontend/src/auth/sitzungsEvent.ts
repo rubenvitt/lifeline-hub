@@ -31,3 +31,13 @@ export function sitzungsMeldungZuruecksetzen(): void {
  *  `/api/auth/me` selbst, sonst liefe die Prüfung im Kreis. Gehört die Sitzung weiter dem
  *  angezeigten Benutzer, ergibt die Prüfung nichts. */
 export const BENUTZER_PRUEFEN = 'lfh:benutzer-pruefen';
+
+/** Fensterereignis „Sitzung derselben Person wiederhergestellt“ (LLH-1770): die Seite blieb
+ *  während der Unterbrechung montiert, also baut nichts sie neu auf. Live-Ströme, die nach der
+ *  401 aufgegeben haben, hören darauf und verbinden neu. */
+export const SITZUNG_WIEDERHERGESTELLT = 'lfh:sitzung-wiederhergestellt';
+
+/** Meldet die Wiederherstellung; ohne Sperre, jeder Aufruf ein Ereignis. */
+export function meldeSitzungWiederhergestellt(): void {
+  window.dispatchEvent(new CustomEvent(SITZUNG_WIEDERHERGESTELLT));
+}

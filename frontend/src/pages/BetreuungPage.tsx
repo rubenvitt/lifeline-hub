@@ -46,6 +46,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const betreuungRechteText = einsatzRechteGrund;
@@ -195,7 +196,10 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
     onMutate: () => resetBelegungZurueck(),
     onSuccess: (ergebnis, { stelle, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Belegungsmeldung ${stelle.bezeichnung}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Belegungsmeldung ${stelle.bezeichnung}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {

@@ -12,6 +12,7 @@ import KatalogVerwaltung from './KatalogVerwaltung';
 import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/QualiSollFeld';
 import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   label: string;
@@ -92,7 +93,7 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 
 const felder = (bearbeite: EinheitTyp | null) => (
   <>
-    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[pflicht('Label', { whitespace: true })]}>
       <Input placeholder="z. B. Zug" />
     </Feld>
     {/* „Alle drei oder keiner“ setzt `StaerkeEingabe` selbst durch (leere Felder zählen als 0). */}
@@ -127,7 +128,7 @@ export default function EinheitTypenTab() {
       schnell={{
         beschriftung: 'Neuer Einheitstyp',
         platzhalter: 'z. B. Zug',
-        knopfText: 'Typ anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Einheitstypen konnten nicht geladen werden"
       leerText="Kein Einheitstyp"

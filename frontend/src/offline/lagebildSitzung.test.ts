@@ -17,6 +17,7 @@ import {
   lagebildBeenden,
   lagebildLoeschen,
   lagebildStarten,
+  lagebildUnterbrechen,
 } from './lagebildSitzung';
 import { HOECHSTLIEGEZEIT_MS } from './lagebildStart';
 import { nichtGeladen } from './lagebildKuerzung';
@@ -490,6 +491,31 @@ describe('Lagebild-Sitzung', () => {
     qc.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
     await warte(DROSSEL * 4);
     expect(await lagebildLesen()).toBeUndefined();
+  });
+
+  it('Unterbrechung löscht die Platte, behält den Query-Cache und schreibt nichts mehr (LLH-1770)', async () => {
+    const qc = neuerClient();
+    await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    qc.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+    await warteAufGeschrieben((n) => n > 0);
+    await lagebildUnterbrechen(qc);
+    expect(await lagebildLesen()).toBeUndefined();
+    expect(qc.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 1 }]);
+    qc.setQueryData(einsatzKeys.einheiten(3), [{ id: 2 }]);
+    await warte(DROSSEL * 4);
+    expect(await lagebildLesen()).toBeUndefined();
+  });
+
+  it('nach der Unterbrechung legt die Anmeldung derselben Person neu an und speichert wieder (LLH-1770)', async () => {
+    const qc = neuerClient();
+    await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    qc.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+    await warteAufGeschrieben((n) => n > 0);
+    await lagebildUnterbrechen(qc);
+    await lagebildAnmelden(qc, A, { drosselMs: DROSSEL });
+    expect(qc.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 1 }]);
+    const satz = await warteAufGeschrieben((n) => n > 0);
+    expect(satz.benutzer).toEqual(A);
   });
 
   it('lässt die Offline-Queue beim Löschen stehen', async () => {

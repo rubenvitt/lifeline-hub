@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { ChatNachricht } from '../api/types';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   inhalt: string;
@@ -58,10 +59,7 @@ export default function BearbeitenModal({
       <Feld
         label="Text"
         name="inhalt"
-        rules={[
-          { required: true, whitespace: true, message: 'Text erforderlich' },
-          zeichenRegel(ETB_INHALT_MAX, 'Text'),
-        ]}
+        rules={[pflicht('Text', { whitespace: true }), zeichenRegel(ETB_INHALT_MAX, 'Text')]}
       >
         <Input.TextArea
           autoSize={{ minRows: 2, maxRows: 6 }}

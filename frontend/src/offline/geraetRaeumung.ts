@@ -69,7 +69,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     datei: 'offline/queueZaehlerMerker.ts',
     entscheidung: 'jeder-ausgang',
     grund:
-      'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „WARTET n“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
+      'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „n NICHT GESENDET“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
   },
   {
     ort: 'IndexedDB lifeline-etb-entwuerfe; localStorage lifeline-etb-entwuerfe-ausstehend:<id>',
@@ -316,6 +316,28 @@ async function einzeln(schritte: Record<string, () => unknown>): Promise<void> {
   );
 }
 
+/** Was auf der Platte liegt (IndexedDB, `localStorage`) und bei jedem Ausgang geht. Nicht der
+ *  Speicher des Tabs (`sessionStorage`, Arbeitsspeicher). */
+const PLATTE: Record<string, () => unknown> = {
+  personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
+  ortCache: ortCacheRaeumen,
+  verpflegungsstelle: gemerkteStellenRaeumen,
+  startlisteAusgeblendet: clearStartlisteAusgeblendet,
+  stammdatenfeldZuletzt: zuletztRaeumen,
+  queueZaehlerMerker: queueZaehlerMerkerRaeumen,
+};
+
+/** Was nur im Tab liegt (`sessionStorage`, Arbeitsspeicher) und bei jedem Ausgang geht. */
+const TAB: Record<string, () => unknown> = {
+  erfassungsSitzung: erfassungsSitzungRaeumen,
+  alarmAusgeblendet: ausgeblendetRaeumen,
+  // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
+  verlaufInhalt: () => verlaufInhalt.clear(),
+  listenGedaechtnis: listenGedaechtnisRaeumen,
+  verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
+  rollGedaechtnis: rollGedaechtnisRaeumen,
+};
+
 /**
  * Der Weg hinaus (LFH-767, design.md D2): läuft nach `lagebildLoeschen` in `abmeldenLokal`.
  * Was der Server wieder liefern kann, geht bei jedem Anlass; die ETB-Entwürfe nur beim
@@ -323,21 +345,35 @@ async function einzeln(schritte: Record<string, () => unknown>): Promise<void> {
  */
 export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
   await einzeln({
-    personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
-    ortCache: ortCacheRaeumen,
-    erfassungsSitzung: erfassungsSitzungRaeumen,
-    alarmAusgeblendet: ausgeblendetRaeumen,
-    // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
-    verlaufInhalt: () => verlaufInhalt.clear(),
-    listenGedaechtnis: listenGedaechtnisRaeumen,
-    verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
-    rollGedaechtnis: rollGedaechtnisRaeumen,
-    verpflegungsstelle: gemerkteStellenRaeumen,
-    startlisteAusgeblendet: clearStartlisteAusgeblendet,
-    stammdatenfeldZuletzt: zuletztRaeumen,
-    queueZaehlerMerker: queueZaehlerMerkerRaeumen,
+    ...PLATTE,
+    ...TAB,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });
+}
+
+/**
+ * Unterbrochene Sitzung im Betrieb (LLH-1770): nur die Platte geht sofort. Der Speicher des Tabs
+ * bleibt, bis dieselbe Person sich wieder anmeldet oder die Frist den vollen Ausgang
+ * (`geraetRaeumen('sitzungsende')`) auslöst — sonst stünde sie nach der Anmeldung nicht dort, wo
+ * sie war. Wirft nie.
+ */
+export async function geraetPlatteRaeumen(): Promise<void> {
+  await einzeln(PLATTE);
+}
+
+/**
+ * Der Speicher des Tabs, wenn die unterbrochene Sitzung nicht mit derselben Person weitergeht
+ * (LLH-1770): andere Person (Neuladen), Konflikt, SSO aus dem Dialog. Die Platte ist schon leer
+ * (`geraetPlatteRaeumen`). Synchron — läuft unmittelbar vor einem Neuladen. Wirft nie.
+ */
+export function geraetTabRaeumen(): void {
+  for (const [ort, schritt] of Object.entries(TAB)) {
+    try {
+      void schritt();
+    } catch (e) {
+      console.error(`Gerät räumen: ${ort} ließ sich nicht leeren`, e);
+    }
+  }
 }
 
 /**

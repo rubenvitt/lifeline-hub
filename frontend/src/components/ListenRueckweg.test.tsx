@@ -10,7 +10,7 @@ function Liste() {
   return <output data-testid="liste">{`liste${search}`}</output>;
 }
 
-function baue(start: string, ziel = '/liste') {
+function baue(start: string, ziel = '/liste', zeilenmarke = false) {
   const router = createMemoryRouter(
     [
       {
@@ -24,7 +24,11 @@ function baue(start: string, ziel = '/liste') {
           { path: '/liste', element: <Liste /> },
           {
             path: '/detail/:id',
-            element: <ListenRueckweg to={ziel}>Liste</ListenRueckweg>,
+            element: (
+              <ListenRueckweg to={ziel} zeilenmarke={zeilenmarke}>
+                Liste
+              </ListenRueckweg>
+            ),
           },
         ],
       },
@@ -97,5 +101,17 @@ describe('ListenRueckweg', () => {
     // (`fireEvent` liefert dann `true`); die Seite selbst bleibt stehen.
     expect(fireEvent.click(link(), { ctrlKey: true })).toBe(true);
     expect(router.state.location.key).toBe(vorher);
+  });
+
+  it('mit Zeilenmarke immer ein Link auf das Ziel, auch von der Liste', async () => {
+    // Befehl (abgestimmt 19.11.2026): die Liste wählt und markiert den Befehl; ein Zurück verlöre das.
+    const router = baue('/liste?q=x', '/liste?befehl=5', true);
+    await act(() => router.navigate('/detail/1'));
+    expect(link()).toHaveAttribute('href', '/liste?befehl=5');
+    await act(async () => {
+      fireEvent.click(link());
+    });
+    expect(await screen.findByTestId('liste')).toHaveTextContent('liste?befehl=5');
+    expect(router.state.historyAction).toBe('PUSH');
   });
 });

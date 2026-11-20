@@ -1263,6 +1263,23 @@ describe('InlineAngabe · Nicht gespeichert (LLH-1829)', () => {
     expect(screen.getByText(HINWEIS)).toBeInTheDocument();
   });
 
+  it('steht unter den Knöpfen: sein Erscheinen verschiebt „Speichern“ nicht', async () => {
+    // Eine Zeiteingabe übernimmt erst beim Verlassen, also beim Drücken auf „Speichern“; stünde
+    // der Hinweis darüber, rutschte der Knopf unter dem Zeiger weg (alpha rot, LLH-1829).
+    renderMitProviders(<TextAngabe wert="ILS-1" />);
+    const feld = await oeffne();
+    await userEvent.type(feld, 'x');
+    const hinweis = screen.getByText(HINWEIS);
+    for (const knopf of [
+      screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' }),
+      screen.getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. abbrechen' }),
+    ]) {
+      expect(knopf.compareDocumentPosition(hinweis) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    }
+  });
+
   it('mehrzeilig ebenso, ohne Tastenerklärung', async () => {
     renderMitProviders(
       <TextAngabe

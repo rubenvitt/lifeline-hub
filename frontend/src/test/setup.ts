@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
+import { sitzungEntsperren } from '../auth/sitzungsSperre';
 import { onlineManager } from '@tanstack/react-query';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
@@ -23,7 +24,13 @@ dayjs.extend(utc);
 // an der Sache. 5 s bleiben unter testTimeout, damit ein echter Fehlschlag weiter die lesbare
 // RTL-Meldung mit DOM-Dump liefert. Vitests `vi.waitFor` liest diese Einstellung nicht und wartet
 // fest 1 s; die Suite wartet deshalb mit RTLs `waitFor` (LFH-890).
-configure({ asyncUtilTimeout: 5000 });
+// Die Prüfzeile der Erfassungshülle wiederholt die Fehlertexte der Felder über dem Knopf
+// (LLH-1759). Textabfragen sehen sie nicht, damit „der Fehler steht am Feld“ eindeutig bleibt;
+// wer die Zeile selbst prüft, greift sie über `[data-lfh="erfassung-pruefung"]`.
+configure({
+  asyncUtilTimeout: 5000,
+  defaultIgnore: 'script, style, [data-lfh="erfassung-pruefung"]',
+});
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
 // „not configured to support act(...)"-Warnung und deckt echte act-Verletzungen auf.
@@ -127,6 +134,8 @@ afterEach(() => {
   // Nach dem Unmount: Ein späterer Abbruch (Frist aus `api/client.ts`) einer noch offenen Anfrage
   // ließe msw im nächsten Test dessen Anfragen ins echte Netz (`offeneAnfragen.ts`, LLH-1536).
   trenneOffeneAnfragen();
+  // Eine stehende Sitzungssperre (LLH-1770) hielte im nächsten Test jede Leseanfrage an.
+  sitzungEntsperren('beendet');
   server.resetHandlers();
   // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
   // nicht TanStack online und `navigator.onLine` offline meldet.

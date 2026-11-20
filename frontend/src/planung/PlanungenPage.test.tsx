@@ -109,7 +109,7 @@ describe('PlanungenPage (LLH-1586)', () => {
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), ' Stadtfest ');
     await userEvent.type(within(dialog).getByPlaceholderText('Beginn'), '12.06.27 08:00');
     await userEvent.type(within(dialog).getByPlaceholderText('Ende'), '13.06.27 02:00');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Planung anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(body).toEqual({
         bezeichnung: 'Stadtfest',
@@ -134,7 +134,7 @@ describe('PlanungenPage (LLH-1586)', () => {
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Zu lang');
     await userEvent.type(within(dialog).getByPlaceholderText('Beginn'), '01.06.27 08:00');
     await userEvent.type(within(dialog).getByPlaceholderText('Ende'), '20.06.27 08:00');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Planung anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     expect(await within(dialog).findByText('Höchstens 14 Tage')).toBeInTheDocument();
     expect(post).not.toHaveBeenCalled();
   });

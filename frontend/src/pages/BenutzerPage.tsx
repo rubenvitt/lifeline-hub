@@ -50,6 +50,7 @@ import {
   ROLLE_IN_VERWALTUNG_FELD,
   SYSTEM_ROLLE,
 } from '../einsatz/rollenVokabular';
+import { pflicht } from '../components/pflichtRegel';
 
 interface BearbeitenWerte {
   anzeigename: string;
@@ -504,23 +505,19 @@ export default function BenutzerPage() {
         <Feld
           label="Anzeigename"
           name="anzeigename"
-          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
+          rules={[pflicht('Anzeigename'), anzeigenameRegel]}
         >
           <Input count={zeichenGrenze(ANZEIGENAME_MAX)} />
         </Feld>
-        <Feld
-          label="Benutzername"
-          name="benutzername"
-          rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
-        >
+        <Feld label="Benutzername" name="benutzername" rules={[pflicht('Benutzername')]}>
           <Input autoComplete="off" />
         </Feld>
         <Feld
           label="Passwort"
           name="passwort"
           rules={[
+            pflicht('Passwort'),
             {
-              required: true,
               min: PASSWORT_MIN_LAENGE,
               message: `Mindestens ${PASSWORT_MIN_LAENGE} Zeichen`,
             },
@@ -605,7 +602,7 @@ export default function BenutzerPage() {
         <Feld
           label="Anzeigename"
           name="anzeigename"
-          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
+          rules={[pflicht('Anzeigename'), anzeigenameRegel]}
         >
           <Input count={zeichenGrenze(ANZEIGENAME_MAX)} disabled={kontoVomHub(zuBearbeiten)} />
         </Feld>

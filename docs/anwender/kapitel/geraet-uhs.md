@@ -47,7 +47,8 @@ mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unte
 3. „Erfassen“ wählen oder „Speichern und nächste“, um gleich die nächste Person aufzunehmen.
 
 Die Bestätigung nennt die neue Registriernummer, die Kategorie und den Ort, etwa „Erfasst als
-R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
+R-013 · SK II · im Wartebereich“. Nach „Erfassen“ öffnet sich der Grundriss, und die Bestätigung
+steht dort einige Sekunden oben. Die Aufnahme geht immer in die eigene UHS.
 
 ### Leichten Fall versorgen und entlassen
 
@@ -90,13 +91,13 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
 
 ### Transport, Maßnahme und Verletzung mit „Bestätigt von“
 
-1. Die Person öffnen. Im Patientenkopf „Transport festlegen“, „Maßnahme erfassen“ oder
-   „Verletzung markieren“ wählen.
+1. Die Person öffnen. Im Patientenkopf „Transport festlegen“ (steht schon ein Transport da: auf
+   ihn tippen), „Maßnahme erfassen“ oder „Verletzung markieren“ wählen.
 2. Im Paneel die Angaben wählen wie am Arbeitsplatz
    ([Betroffene und Sichtung](betroffene.md)): beim Transport Priorität, Art und Fachrichtung,
    bei der Maßnahme die Fläche der Maßnahme, bei der Verletzung erst die Stelle am Körperschema.
 3. Unter „Bestätigt von“ die Person wählen, die den Eintrag verantwortet.
-4. Speichern: „Transport festlegen“ bzw. „Maßnahme erfassen“ wählen; bei der Verletzung
+4. Speichern: „Transport festlegen“ bzw. „Erfassen“ wählen; bei der Verletzung
    speichert der Tipp auf die Fläche der Art. Der Verlauf nennt danach „bestätigt: …“.
 
 Im Handschuh-Betrieb wächst das Körperschema mit, sodass auch Hand, Fuß und Hals groß genug zum
@@ -124,7 +125,7 @@ Für den UHS-Laptop:
    ![Bereich „UHS“ am Laptop mit dem Reiter „Kräfte“, der Stärke und den Kräften der UHS](../bilder/geraet-uhs/laptop-uhs.png)
 
 4. Unter „Meldungen“ den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die
-   „Priorität“ (normal, dringend, sofort) wählen und „Meldung senden“ wählen. Eine Lagemeldung steht
+   „Priorität“ (normal, dringend, sofort) wählen und „Erfassen“ wählen. Eine Lagemeldung steht
    bei der Führung gleich in den Lagemeldungen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 

@@ -275,8 +275,8 @@ function etbFlaeche(einsatzId: string): Flaeche {
       { sorte: 'ETB Werte behalten', ziele: kaestchen('Werte behalten'), mindestens: 1 },
       {
         sorte: 'ETB Entwurfstab schließen',
-        // Gemessen wird die Trefffläche selbst, das Kind des Knopfs (`entfernenStil`).
-        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove > span'),
+        // Gemessen wird der Knopf selbst; er trägt die Fläche (`entfernenStil`, LLH-1771).
+        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove'),
         mindestens: 1,
         kurz: true,
       },
@@ -1161,9 +1161,14 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
           .first(),
       ziele: [
         {
+          // „Ort“ und „Herkunft“ schalten keine Sicht: Auswahlfelder statt Segmente (Spec
+          // `bedien-umschalten`, „Eine Umschaltleiste je Ebene“). Gemessen wird die antd-Hülle.
           sorte: 'Lagemeldungen Filter',
-          ziele: segment(/^(Alle|Alle Orte|Mit Koordinaten|Ohne Koordinaten|Gerät|Übernommen)$/),
-          mindestens: 6,
+          ziele: (page) =>
+            inMain(page)
+              .locator('.ant-select')
+              .filter({ has: page.getByRole('combobox', { name: /^(Ort|Herkunft)$/ }) }),
+          mindestens: 2,
         },
         {
           // Dieselbe Zeitraum-Schnellwahl wie im ETB (LLH-1322): ein Knopf statt Segmenten.

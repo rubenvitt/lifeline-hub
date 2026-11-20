@@ -59,6 +59,7 @@ import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import { useStandardRufname } from '../etb/useStandardRufname';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { meldungsFunktionsOptionen } from '../fuehrung/funktionsOptionenKern';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
@@ -99,6 +100,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
+import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -138,12 +140,11 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
-  // Beantragte Meldungen am Spiegel (LLH-1492, D13); vorgemerkte zeigt der Wiederherstellungsbereich.
-  const beantragteMeldungen = useVorgemerkteSchreibaktionen(
-    benutzer?.id,
-    einsatzId,
-    'meldung',
-  ).filter((v) => v.antrag != null);
+  // Beantragte Meldungen am Spiegel (LLH-1492, D13) und auf diesem Gerät vorgemerkte, noch nicht
+  // gesendete (LLH-1758): beide über der Liste, getrennt von ihren Daten und Kennzahlen.
+  const meldungenAmGeraet = useVorgemerkteSchreibaktionen(benutzer?.id, einsatzId, 'meldung');
+  const beantragteMeldungen = meldungenAmGeraet.filter((v) => v.antrag != null);
+  const nichtGesendeteMeldungen = meldungenAmGeraet.filter((v) => v.antrag == null);
   // Unter `md` Zeile statt Band und Filterknopf statt Auswahlfeld (LFH-974): der Wortlaut der
   // ersten Karte gehört in den ersten Schirm.
   const { istSchmal } = useViewport();
@@ -212,6 +213,8 @@ export default function MeldungenPage() {
     neuAuftrag.raeume('neu');
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfMeldenRoh]);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  // Die eigene Stelle aus dem ETB belegt die Meldung nach Art vor (LLH-1759).
+  const eigeneStelle = useStandardRufname().standard;
   const vorschlagsquellen = useFunkrufnamenQuellen({
     einsatzId,
     funktionen: funktionsVorschlaege,
@@ -412,7 +415,10 @@ export default function MeldungenPage() {
     },
     onSuccess: (ergebnis, { einsatzId: eid, daten: d }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Meldung von ${d.absender}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Meldung von ${d.absender}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
@@ -549,7 +555,10 @@ export default function MeldungenPage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(eid) });
       invalidiere(eid);
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt · R-…');
+        message.warning(
+          vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {
@@ -949,6 +958,15 @@ export default function MeldungenPage() {
         </Kennzahlenband>
       )}
 
+      {/* Vorgemerkte Meldungen (LLH-1758): über der Liste, nicht in den Kennzahlen. */}
+      <BeantragtListe
+        titel="Nicht gesendet"
+        eintraege={nichtGesendeteMeldungen.map((v) => ({
+          schluessel: `vorgemerkt-${v.id}`,
+          text: `${v.aktion.daten.absender} · ${v.aktion.daten.inhalt}`,
+          zeit: v.erstellt_at,
+        }))}
+      />
       {/* Beantragte Meldungen am Spiegel (LLH-1492): über der Liste, nicht in den Kennzahlen. */}
       <BeantragtListe
         titel="Beantragte Meldungen"
@@ -985,6 +1003,7 @@ export default function MeldungenPage() {
             funktionsVorschlaege={funktionsVorschlaege}
             vorschlagsquellen={vorschlagsquellen}
             ohneLagemeldungsart={ohneLagemeldungsart}
+            eigeneStelle={eigeneStelle}
           />
         </Paneel>
       )}

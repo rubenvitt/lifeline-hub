@@ -114,6 +114,7 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../../api/anhangAbruf';
 import { useSpiegelAusCache } from '../../einsatz/spiegel/useSpiegelAntraege';
 import { ZahlFeld } from '../../components/ZahlFeld';
+import { vorgemerktDauer, vorgemerktText } from '../../offline/vorgemerktText';
 
 // Grundhöhe der Karte: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -2156,9 +2157,10 @@ export default function Grundriss({
             message.success('Verbleib erfasst');
             void invalidate();
           }}
-          onVorgemerkt={() =>
+          onVorgemerkt={(grund) =>
             message.warning(
-              `Offline vorgemerkt: Verbleib ${registrierAnzeige(transportPerson.registrier_nr)}`,
+              vorgemerktText(grund, `Verbleib ${registrierAnzeige(transportPerson.registrier_nr)}`),
+              vorgemerktDauer(grund),
             )
           }
           onSchliessen={() => setTransportPerson(null)}
@@ -2174,9 +2176,10 @@ export default function Grundriss({
             message.success('Übergabe quittiert');
             void invalidate();
           }}
-          onVorgemerkt={() =>
+          onVorgemerkt={(grund) =>
             message.warning(
-              `Offline vorgemerkt: Übergabe ${registrierAnzeige(uebergabePerson.registrier_nr)}`,
+              vorgemerktText(grund, `Übergabe ${registrierAnzeige(uebergabePerson.registrier_nr)}`),
+              vorgemerktDauer(grund),
             )
           }
           onSchliessen={() => setUebergabePerson(null)}

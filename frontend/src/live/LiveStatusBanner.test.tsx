@@ -21,6 +21,7 @@ import {
   schreibaktionEinreihen,
 } from '../offline/queue';
 import { confirmGeraetKonto } from '../offline/fruehereKopplung';
+import { openWiederherstellung } from '../offline/wiederherstellungOeffnen';
 
 function melde(status: string) {
   act(() => {
@@ -112,11 +113,23 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
     expect(screen.getByRole('button', { name: /Jetzt neu laden$/ })).toBeEnabled();
   });
 
-  it('zeigt Offline-Writes als Badge in derselben Betriebszeile', async () => {
+  it('zeigt Offline-Writes als „nicht gesendet“, antippbar zum Wiederherstellungsbereich (LLH-1758)', async () => {
     await queueEinreihen(11, 7, { typ: 'meldung', inhalt: 'Offline', client_id: 'etb-1' });
     renderBanner('/einsaetze/7/etb');
-    expect(await screen.findByLabelText('1 ausstehende Offline-Aktion')).toBeInTheDocument();
-    expect(screen.getByText('ausstehend')).toBeInTheDocument();
+    const knopf = await screen.findByRole('button', { name: '1 nicht gesendet' });
+    // Die Zahl sitzt im Icon-Platz des Knopfs, sonst fehlt der Abstand zum Wort (antd setzt einen
+    // Flex-Span im Inhalt auf `block`).
+    expect(knopf.querySelector('.ant-btn-icon .ant-badge')).not.toBeNull();
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
+  });
+
+  it('öffnet den Wiederherstellungsbereich, wenn der Kopf ihn anfordert (LLH-1758)', async () => {
+    await queueEinreihen(11, 7, { typ: 'meldung', inhalt: 'Offline', client_id: 'etb-2' });
+    renderBanner('/einsaetze/7/etb');
+    await screen.findByRole('button', { name: '1 nicht gesendet' });
+    act(() => openWiederherstellung());
+    expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
   });
 
   it('hält Aktionen anderer Einsätze im globalen Badge und in der Recovery sichtbar', async () => {

@@ -1504,7 +1504,7 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     await userEvent.click(await bearbeiten());
     await userEvent.clear(feld('Bezeichnung'));
     await userEvent.click(speichern());
-    expect(await within(paneel()).findByText('Bezeichnung erforderlich')).toBeInTheDocument();
+    expect(await within(paneel()).findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(stand.bodies).toEqual([]);
   });
 
@@ -3145,7 +3145,7 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await screen.findByText('HLF 20');
     await verlegenWaehlen('HLF 20');
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
-    expect(await within(dialog()).findByText('Ziel-Raum wählen')).toBeInTheDocument();
+    expect(await within(dialog()).findByText('Ziel-Raum fehlt')).toBeInTheDocument();
     expect(gebucht).toHaveLength(0);
   });
 });

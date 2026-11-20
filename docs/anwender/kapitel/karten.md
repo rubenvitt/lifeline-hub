@@ -28,7 +28,7 @@ Nachschlagen.
 
    ![Dialog „Online-Quelle hinzufügen“ mit einer Rasterquelle und aufgeklappten weiteren Angaben](../bilder/karten/online-quelle.png)
 
-5. „Speichern“ wählen.
+5. „Anlegen“ wählen.
 
 Zum Ändern einer Quelle in ihrer Zeile „Bearbeiten“ wählen, zum Entfernen „Löschen“ und die
 Rückfrage „Quelle löschen?“ mit „Löschen“ bestätigen.

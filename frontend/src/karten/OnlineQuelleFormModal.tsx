@@ -13,6 +13,7 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { Feld } from '../components/instrument';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
   name: string;
@@ -108,7 +109,7 @@ export default function OnlineQuelleFormModal({
       offen={offen}
       titel={quelle ? 'Online-Quelle bearbeiten' : 'Online-Quelle hinzufügen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={quelle ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       speicherung={mutation}
       // Proxy ist Default-an (key-frei + serverseitig gecacht).
@@ -132,27 +133,19 @@ export default function OnlineQuelleFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Feld
-        label="Name"
-        name="name"
-        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-      >
+      <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
         <Input placeholder="z. B. OpenStreetMap" />
       </Feld>
-      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+      <Feld label="Typ" name="typ" rules={[pflicht('Typ')]}>
         <Select options={TYP_OPTIONEN} />
       </Feld>
-      <Feld
-        label="URL"
-        name="url"
-        rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
-      >
+      <Feld label="URL" name="url" rules={[pflicht('URL', { whitespace: true })]}>
         <Input placeholder={URL_PLATZHALTER[typ]} />
       </Feld>
       <Feld
         label="Attribution"
         name="attribution"
-        rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
+        rules={[pflicht('Attribution', { whitespace: true })]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
       </Feld>

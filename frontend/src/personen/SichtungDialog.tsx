@@ -8,6 +8,8 @@ import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import SichtungsWahl from './SichtungsWahl';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
+import type { VormerkGrund } from '../offline/fehler';
 
 export interface SichtungWerte {
   kategorie: Sichtungskategorie;
@@ -24,11 +26,7 @@ export interface SichtungWerte {
 export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
   return (
     <>
-      <Feld
-        label="Kategorie"
-        name="kategorie"
-        rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
-      >
+      <Feld label="Kategorie" name="kategorie" rules={[pflicht('Sichtungskategorie')]}>
         <SichtungsWahl aria-label="Sichtungskategorie" />
       </Feld>
       <Feld label="Kurzbegründung (optional)" name="notiz">
@@ -66,7 +64,8 @@ interface SichtungDialogProps {
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
   /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand, die Seite quittiert am Ort. */
-  onVorgemerkt?: () => void;
+  /** Nur vorgemerkt, mit Grund (LLH-1758): der Aufrufer bildet daraus den Wortlaut. */
+  onVorgemerkt?: (grund: VormerkGrund) => void;
   onSchliessen: () => void;
 }
 
@@ -89,7 +88,11 @@ export default function SichtungDialog({
     // Die Funktion merkt ohne Netz selbst vor (`frontend/src/offline/AGENTS.md`).
     networkMode: 'always',
     mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person, v),
-    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
+    // Vorgemerkt mit Grund (LLH-1758); beantragt (Spiegel) bleibt beim bisherigen Wortlaut.
+    onSuccess: (ergebnis) =>
+      ergebnis.zustand === 'gesendet'
+        ? onErfasst()
+        : onVorgemerkt?.(ergebnis.zustand === 'vorgemerkt' ? ergebnis.grund : 'offline'),
   });
 
   return (

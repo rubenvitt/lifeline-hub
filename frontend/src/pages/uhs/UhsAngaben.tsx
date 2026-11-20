@@ -14,6 +14,7 @@ import QualiSollFeld from '../../kraefte/QualiSollFeld';
 import { qualiSollText } from '../../kraefte/qualiSoll';
 import { uhsAngabenWerte, uhsPatch, type UhsAngabenWerte } from './uhsPatch';
 import { ZahlFeld } from '../../components/ZahlFeld';
+import { pflicht } from '../../components/pflichtRegel';
 
 /**
  * Paneel „Angaben“ einer Unfallhilfsstelle im gleichnamigen Bereich der Detailseite (LLH-1920,
@@ -44,7 +45,7 @@ export default function UhsAngaben({
       label: 'Bezeichnung',
       anzeige: uhs.bezeichnung,
       eingabe: <Input placeholder="z. B. BHP 50" />,
-      regeln: [{ required: true, whitespace: true, message: 'Bezeichnung erforderlich' }],
+      regeln: [pflicht('Bezeichnung', { whitespace: true })],
     },
     {
       name: 'standort',

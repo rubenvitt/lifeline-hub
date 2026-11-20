@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /**
  * Die Online-Quellen-Maske auf `ErfassungsModal`. Kein Serienmodus: eine Instanz führt eine
@@ -60,7 +61,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     handler();
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
 
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
@@ -128,7 +129,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/style.json');
     await nutzer.type(screen.getByLabelText('Attribution'), '© OSM{Enter}ODbL');
     expect(screen.getByLabelText('Attribution')).toHaveValue('© OSM\nODbL');
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(rumpfe).not.toHaveLength(0));
     expect(rumpfe).toHaveLength(1);
@@ -291,8 +292,10 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
 
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
     await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen(nutzer);
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await findeDialogOhneRueckfrage();
     await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
     expect(within(wieder).queryByRole('alert')).toBeNull();
   });

@@ -83,6 +83,10 @@ export function authWertFixture(benutzer: MeAntwort | null): ReturnType<typeof u
     aktualisiere: vi.fn(),
     abmeldenLokal: vi.fn(),
     konflikt: null,
+    unterbrechung: null,
+    unterbrechen: vi.fn(() => false),
+    unterbrechungBeenden: vi.fn(),
+    sitzungBeendet: false,
   };
 }
 

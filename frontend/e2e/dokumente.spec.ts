@@ -799,7 +799,7 @@ for (const modus of ['light', 'dark'] as const) {
     await pruefe(dialog.getByText('Bezug (optional)'), KONTRAST_ZIEL[modus], `${modus}/Klappkopf`);
     // Pflichtmeldung: Rot als TEXT liest die Textrolle `alarmText` (LFH-652).
     await dialog.getByRole('button', { name: 'Ablegen' }).click();
-    const pflicht = dialog.getByText('Bitte eine Datei wählen');
+    const pflicht = dialog.getByText('Datei fehlt');
     await pruefe(pflicht, KONTRAST_ZIEL[modus], `${modus}/Pflichtmeldung`);
     werte.push(`Pflichtmeldung: ${(await kontrast(pflicht)).verhaeltnis.toFixed(2)}`);
     // Standardknopf unter dem Zeiger: die Beschriftung wechselt nicht auf den helleren Hover-Ton

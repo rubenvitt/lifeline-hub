@@ -21,6 +21,13 @@ import { seiteNeuLaden } from './seiteNeuLaden';
  * Kein Erfassungsformular, deshalb nicht `components/Erfassung.tsx`. Gehört ins
  * Sitzungs-Layout neben die Sitzungswache (`App.tsx`), innerhalb von Router und QueryClient.
  */
+/** Undurchsichtige Abdeckung wie im `SitzungBeendetDialog` (LLH-1770). */
+export const VERDECKT = {
+  zIndex: 2100,
+  classNames: { mask: 'lfh-sitzung-beendet-maske' },
+  styles: { mask: { background: 'var(--lfh-grund)', opacity: 1, backdropFilter: 'none' } },
+} as const;
+
 export default function BenutzerKonfliktDialog() {
   const { konflikt } = useAuth();
 
@@ -34,6 +41,9 @@ export default function BenutzerKonfliktDialog() {
       closable={false}
       keyboard={false}
       mask={{ closable: false }}
+      // Folgt er auf „Sitzung beendet“ (LLH-1770), hat `bisher` keine gültige Sitzung mehr:
+      // die Seite bleibt dann so verdeckt wie unter jenem Dialog.
+      {...(konflikt.ausUnterbrechung ? VERDECKT : {})}
       footer={
         <Flex justify="end">
           <Button type="primary" onClick={() => seiteNeuLaden('/einsaetze')}>

@@ -235,11 +235,10 @@ test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
   await expect(feld).toBeVisible();
-  // Was UNTER der Zeile steht: der Filterreiter „Alle", auf jeder Breite über der Liste.
-  const darunter = page
-    .getByRole('tab', { name: 'Alle', exact: true })
-    .or(page.getByRole('radio', { name: 'Alle', exact: true }))
-    .first();
+  // Was UNTER der Zeile steht: die Lagezeile mit der Sichtungszahl, unter `xl` direkt über der
+  // Liste. Die Statusreiter stehen bei 390 px erst hinter „Filter“ (LLH-1786).
+  const darunter = page.locator('[data-lfh="betroffene-lagezeile"]');
+  await expect(darunter).toBeVisible();
   const vorher = await kasten(darunter);
   const werte: string[] = [];
   let groesste = 0;

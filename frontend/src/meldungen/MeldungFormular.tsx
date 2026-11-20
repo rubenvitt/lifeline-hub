@@ -21,6 +21,7 @@ import {
   meldungsFunktionsOptionen,
   type FunktionsVorschlaege,
 } from '../fuehrung/funktionsOptionenKern';
+import type { StandardRufname } from '../etb/standardRufname';
 import type {
   Einheit,
   Einsatzabschnitt,
@@ -32,6 +33,7 @@ import type {
   Richtung,
 } from '../api/types';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { pflicht } from '../components/pflichtRegel';
 
 const { TextArea } = Input;
 
@@ -165,6 +167,7 @@ export default function MeldungFormular({
   vorschlagsquellen = KEINE_QUELLEN,
   dialog,
   ohneLagemeldungsart = false,
+  eigeneStelle = null,
 }: {
   senden: boolean;
   /**
@@ -211,6 +214,12 @@ export default function MeldungFormular({
    * Führungspersonal, der Server lehnt sie sonst mit 403 ab. Auch der Fast-Path dafür entfällt.
    */
   ohneLagemeldungsart?: boolean;
+  /**
+   * Die eigene Stelle, der Standard-Rufname der Person aus dem ETB (LLH-1759). Belegt nach Art vor
+   * wie das ETB: eine Meldung kommt von außen, also Empfänger = eigene Stelle; eine Lagemeldung
+   * geht von ihr aus, also Absender. `null`: keine Vorgabe.
+   */
+  eigeneStelle?: StandardRufname | null;
 }) {
   const { token } = theme.useToken();
   const vorgaben = useMemo<MeldungFormWerte>(
@@ -227,6 +236,8 @@ export default function MeldungFormular({
   const ereigniszeit = Form.useWatch('ereigniszeit', form);
   const fristMin = Form.useWatch('frist_min', form);
   const koord = Form.useWatch('koord', form);
+  const absenderWert = Form.useWatch('absender', form);
+  const empfaengerWert = Form.useWatch('empfaenger', form);
   const istLagemeldung = meldungsart === 'lagemeldung';
   const { zeitKurz } = useAnzeigeKonventionen();
   const wortlautRef = useRef<TextAreaRef>(null);
@@ -237,6 +248,31 @@ export default function MeldungFormular({
   useEffect(() => {
     if (istSofort) form.setFieldValue('bestaetigung_pflicht', true);
   }, [istSofort, form]);
+
+  // Eigene Stelle nach Art vorbelegen (LLH-1759, wie `VORGABE_JE_TYP` im ETB). Ein Feld gehört der
+  // Vorgabe, solange es unangefasst ist oder noch genau den Wert trägt, den sie zuletzt schrieb
+  // (`StammdatenFeld` meldet auch einen von außen gesetzten Wert als Änderung, `isFieldTouched`
+  // allein trüge also nicht). Nur so ein Feld wird gefüllt oder beim Wechsel der Art geleert; die
+  // Watches lösen den Effekt nach jedem Zurücksetzen erneut aus.
+  const vorgabeGeschriebenRef = useRef<Partial<Record<'absender' | 'empfaenger', string>>>({});
+  useEffect(() => {
+    if (!eigeneStelle || !meldungsart) return;
+    const lage = meldungsart === 'lagemeldung';
+    const ziel = lage ? 'absender' : 'empfaenger';
+    const gegen = lage ? 'empfaenger' : 'absender';
+    const gehoertVorgabe = (feld: 'absender' | 'empfaenger') =>
+      !form.isFieldTouched(feld) ||
+      (form.getFieldValue(feld) ?? '') === vorgabeGeschriebenRef.current[feld];
+    const schreibe = (feld: 'absender' | 'empfaenger', wert: string) => {
+      vorgabeGeschriebenRef.current[feld] = wert;
+      form.setFieldValue(feld, wert);
+    };
+    const gegenWert = lage ? eigeneStelle.an : eigeneStelle.von;
+    if (form.getFieldValue(gegen) === gegenWert && gehoertVorgabe(gegen)) schreibe(gegen, '');
+    if (!form.getFieldValue(ziel)?.trim() && gehoertVorgabe(ziel)) {
+      schreibe(ziel, lage ? eigeneStelle.von : eigeneStelle.an);
+    }
+  }, [eigeneStelle, meldungsart, absenderWert, empfaengerWert, form]);
 
   /** Fast-Path: Sofortmeldung vorbelegen (Art + Priorität sofort), Fokus auf den Wortlaut. */
   const sofortVorbelegen = () => {
@@ -320,10 +356,15 @@ export default function MeldungFormular({
     form.setFieldValue('empfaenger_funktion', 's2');
   }, [meldungsart, s2Verfuegbar, form]);
 
-  /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
+  /**
+   * Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8) oder
+   * noch unverändert die vorbelegte eigene Stelle trägt (LLH-1759): die Funktion ist genauer.
+   */
   const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
     const eintrag = funktionsVorschlaege.katalog.find((e) => e.funktion === funktion);
-    if (!eintrag || form.getFieldValue('empfaenger')?.trim()) return;
+    const empfaenger = form.getFieldValue('empfaenger')?.trim();
+    const nurVorgabe = !!empfaenger && empfaenger === vorgabeGeschriebenRef.current.empfaenger;
+    if (!eintrag || (empfaenger && !nurVorgabe)) return;
     form.setFieldValue('empfaenger', eintrag.kuerzel ?? eintrag.label);
   };
 
@@ -352,7 +393,7 @@ export default function MeldungFormular({
     initialValues: vorgaben,
     onErfassen: absenden,
     // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
-    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
+    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Erfassen"
     // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
     // Serie schließt der Aufrufer über `onFertig`.
     onFertig: onFertig ?? (() => {}),
@@ -360,7 +401,7 @@ export default function MeldungFormular({
     speicherung,
     speicherFehlerTitel: 'Meldung nicht erfasst',
     speicherFehlerFallback: 'Erfassen fehlgeschlagen',
-    erfassenText: artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen',
+    erfassenText: 'Erfassen',
     serie,
     uebernahme: UEBERNAHME,
     onPruefungGescheitert: (felder: string[]) => {
@@ -388,10 +429,7 @@ export default function MeldungFormular({
       <Feld
         name="inhalt"
         label="Inhalt / Wortlaut"
-        rules={[
-          { required: true, whitespace: true, message: 'Inhalt ist erforderlich' },
-          zeichenRegel(ETB_INHALT_MAX, 'Inhalt'),
-        ]}
+        rules={[pflicht('Inhalt', { whitespace: true }), zeichenRegel(ETB_INHALT_MAX, 'Inhalt')]}
       >
         {/* Ausdrückliches Fokusziel der Hülle: beim Öffnen und nach jedem Serien-Speichern. */}
         <TextArea
@@ -409,7 +447,7 @@ export default function MeldungFormular({
           <Feld
             name="absender"
             label="Absender (Funkrufname/Stelle)"
-            rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
+            rules={[pflicht('Absender', { whitespace: true })]}
           >
             <StammdatenFeld
               nurText
@@ -590,7 +628,12 @@ export default function MeldungFormular({
     );
   }
 
-  const formular = <ErfassungsFormular<MeldungFormWerte> {...huelle}>{felder}</ErfassungsFormular>;
+  // Im Seitenfluss klebt der Fuß (LLH-1761): am Handy lag „Erfassen“ bei y = 1218 von 844.
+  const formular = (
+    <ErfassungsFormular<MeldungFormWerte> {...huelle} fussKlebt="seite">
+      {felder}
+    </ErfassungsFormular>
+  );
 
   if (!card) return formular;
   return (

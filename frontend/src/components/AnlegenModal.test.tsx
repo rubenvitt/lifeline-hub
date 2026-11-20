@@ -5,6 +5,7 @@ import { Form, Input } from 'antd';
 import { useState } from 'react';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { ApiError } from '../api/client';
+import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 import AnlegenModal from './AnlegenModal';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
@@ -48,7 +49,8 @@ function Harness({ legeAn }: { legeAn: (einsatzId: number, d: Eingabe) => Promis
  * Ausblende-Animation in jsdom nicht, ein schließender Dialog bliebe im Baum.
  */
 function offenerDialog(): HTMLElement {
-  const offen = screen.getAllByRole('dialog');
+  // Die beantwortete Rückfrage „Eingaben verwerfen?“ bleibt in jsdom im Baum (LLH-1755).
+  const offen = ohneVerwerfenRueckfrage(screen.getAllByRole('dialog'));
   expect(offen).toHaveLength(1);
   return offen[0];
 }
@@ -121,6 +123,8 @@ describe('AnlegenModal (LFH-1077, LLH-1921)', () => {
     await within(offenerDialog()).findByText('Bezeichnung schon vergeben');
 
     await userEvent.click(within(offenerDialog()).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByLabelText('Zustand')).toHaveTextContent('offen');
     await waitFor(() =>
@@ -163,6 +167,8 @@ describe('AnlegenModal (LFH-1077, LLH-1921)', () => {
     await userEvent.click(
       within(offenerDialog()).getByRole('button', { name: /Close|Schliessen|Schließen/i }),
     );
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     await waitFor(() =>
       expect(within(offenerDialog()).getByLabelText('Bezeichnung')).toHaveValue(''),

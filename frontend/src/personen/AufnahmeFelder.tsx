@@ -1,4 +1,4 @@
-import { Collapse, Input, Typography } from 'antd';
+import { Collapse, Input, Typography, type FormRule } from 'antd';
 import { Select } from '../components/Select';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
@@ -107,6 +107,52 @@ export type AufnahmeModus = 'erfassen' | 'vermisst';
 /** Der Folgestatus der allgemeinen Maske, sichtbar im Dialog (LFH-963, Entscheidung 9). */
 export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffen';
 
+/** Grund am Namen, wenn „Vermisst melden“ ohne jede Angabe abgeschickt wird (LLH-1765). */
+export const VERMISST_ANGABE_HINWEIS = 'Mindestens eine Angabe zur vermissten Person';
+
+/**
+ * Trägt eine Vermisstmeldung irgendeine Angabe zur Person (LLH-1765)? Zählen Name, Vorname,
+ * Geschlecht außer „unbekannt“, geschätztes Alter, Fundort (Text oder Koordinate), Melder / Kontakt
+ * und Notiz; Leerzeichen zählen nicht. „vermisst seit“ zählt nicht: ohne Angabe setzt der Server
+ * die Meldezeit, es beschreibt die Person nicht.
+ */
+export function hatVermisstAngabe(werte: AufnahmeWerte): boolean {
+  const text = (w: unknown) => typeof w === 'string' && w.trim() !== '';
+  return (
+    text(werte.name) ||
+    text(werte.vorname) ||
+    (werte.geschlecht != null && werte.geschlecht !== 'unbekannt') ||
+    werte.alter_geschaetzt != null ||
+    text(werte.antreff_ort?.text) ||
+    werte.antreff_ort?.koordinate != null ||
+    text(werte.melder_kontakt) ||
+    text(werte.notiz)
+  );
+}
+
+/** Die Felder, deren Änderung die Prüfung am Namen neu anstößt. */
+const VERMISST_ANGABE_FELDER = [
+  'vorname',
+  'geschlecht',
+  'alter_geschaetzt',
+  'antreff_ort',
+  'melder_kontakt',
+  'notiz',
+];
+
+/**
+ * „Mindestens eine Angabe“ als Regel am Namen (LLH-1765): der Name steht im Vermisst-Modus oben,
+ * dort steht auch der Grund. Gelesen wird der ganze Formularstand (`getFieldsValue(true)`), auch
+ * eingeklappte Felder. Nur in der Maske: Server und API v1 bleiben unverändert (Abstimmung
+ * 20.11.2026).
+ */
+const vermisstAngabeRegel: FormRule = ({ getFieldsValue }) => ({
+  validator: () =>
+    hatVermisstAngabe(getFieldsValue(true) as AufnahmeWerte)
+      ? Promise.resolve()
+      : Promise.reject(new Error(VERMISST_ANGABE_HINWEIS)),
+});
+
 /**
  * Die Feldgruppe der Personen-Aufnahme — **ohne eigenes `<Form>`**, für zwei Mounts
  * (`PersonErfassungModal` und `pages/personen/AufnahmePage`): eine Maske, ein Feldbudget.
@@ -115,6 +161,10 @@ export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffe
  * Sichtung, Geschlecht, Geschätztes Alter, Fundort. Der Name liegt unter „Weitere Angaben":
  * an der Aufnahme wird zuerst die Kategorie vergeben, der Name ist meist unbekannt.
  * Pflichtfelder gibt es keine.
+ *
+ * Im Vermisst-Modus (LLH-1765) ist es umgekehrt: nach einer vermissten Person wird mit dem Namen
+ * gesucht. Sichtbar sind Name, Vorname, Geschlecht, Fundort; das Alter liegt unter „Weitere
+ * Angaben“. Eine leere Meldung hält an: mindestens eine Angabe ({@link hatVermisstAngabe}).
  *
  * Der Fundort ist ein Ortsfeld mit Suche im Einsatz und Kartenvorschau (LLH-1407): ein Treffer,
  * eine getippte Koordinate oder die Nadel liefern die Koordinate. Enter im Fundort sucht und sendet
@@ -159,15 +209,32 @@ export default function AufnahmeFelder({
 }) {
   const geraet = useAuthOptional()?.geraet ?? null;
   const ortssuche = einsatzId != null && geraet == null;
-  const weitereAngaben = (
+  const vermisst = modus === 'vermisst';
+  const namensFelder = (
     <>
-      <Feld label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
+      <Feld
+        label="Name"
+        name="name"
+        rules={[zeichenRegel(PERSON_NAME_MAX, 'Name'), ...(vermisst ? [vermisstAngabeRegel] : [])]}
+        dependencies={vermisst ? VERMISST_ANGABE_FELDER : undefined}
+      >
         <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
       </Feld>
       <Feld label="Vorname" name="vorname" rules={[zeichenRegel(PERSON_NAME_MAX, 'Vorname')]}>
         <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
       </Feld>
-      {modus === 'vermisst' && (
+    </>
+  );
+  const alterFeld = (
+    <Feld label="Geschätztes Alter (Jahre)" name="alter_geschaetzt" breite="kurz">
+      <ZahlFeld min={0} max={120} ganz einheit="Jahre" />
+    </Feld>
+  );
+  const weitereAngaben = (
+    <>
+      {/* Im Vermisst-Modus stehen die Namen oben, das Alter rückt hierher (LLH-1765). */}
+      {vermisst ? alterFeld : namensFelder}
+      {vermisst && (
         <>
           <VermisstSeitFeld platzhalter="Zeitpunkt der Meldung" />
           <Feld
@@ -182,7 +249,7 @@ export default function AufnahmeFelder({
           </Feld>
         </>
       )}
-      {modus !== 'vermisst' && (
+      {!vermisst && (
         <>
           {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
           {/* Wie die Sichtung ein Gesundheitsdatum: an der Betreuungsstelle nicht (403). */}
@@ -229,6 +296,7 @@ export default function AufnahmeFelder({
           <SichtungsWahl abwaehlbar aria-label="Sichtungskategorie" />
         </Feld>
       )}
+      {vermisst && namensFelder}
       <Feld label="Geschlecht" name="geschlecht">
         <Select
           allowClear
@@ -241,9 +309,7 @@ export default function AufnahmeFelder({
           ]}
         />
       </Feld>
-      <Feld label="Geschätztes Alter (Jahre)" name="alter_geschaetzt" breite="kurz">
-        <ZahlFeld min={0} max={120} ganz einheit="Jahre" />
-      </Feld>
+      {!vermisst && alterFeld}
       {/* „Fundort" ist das LETZTE sichtbare Eingabefeld: der Ort steht am Ende eines
          Aufnahmegesprächs. */}
       {ortssuche ? (
