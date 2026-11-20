@@ -21,19 +21,37 @@ import {
  */
 type Melden = (quelle: string, grund: string | null) => void;
 
-const SperrKontext = createContext<Melden | null>(null);
+/** `zeigtGrund`: die Stelle nennt einen gemeldeten Grund selbst (Fehlerzeile, `FeldFehler`). */
+const SperrKontext = createContext<{ melden: Melden; zeigtGrund: boolean } | null>(null);
 
 /** Für Steuerelemente: meldet den eigenen Grund (`null` = frei); räumt beim Aushängen ab. */
 export function useEingabeSperre(): (grund: string | null) => void {
-  const melden = useContext(SperrKontext);
+  const melden = useContext(SperrKontext)?.melden;
   const quelle = useId();
   useEffect(() => () => melden?.(quelle, null), [melden, quelle]);
   return useCallback((grund: string | null) => melden?.(quelle, grund), [melden, quelle]);
 }
 
+/**
+ * Nennt die Stelle darüber einen gemeldeten Grund selbst? Dann nennt das Steuerelement ihn nicht
+ * noch einmal.
+ */
+export function useSperrStelleZeigtGrund(): boolean {
+  return useContext(SperrKontext)?.zeigtGrund ?? false;
+}
+
 /** Die Stelle, an die Steuerelemente darunter melden. */
-export function SperrStelle({ melden, children }: { melden: Melden; children: ReactNode }) {
-  return <SperrKontext.Provider value={melden}>{children}</SperrKontext.Provider>;
+export function SperrStelle({
+  melden,
+  zeigtGrund = true,
+  children,
+}: {
+  melden: Melden;
+  zeigtGrund?: boolean;
+  children: ReactNode;
+}) {
+  const wert = useMemo(() => ({ melden, zeigtGrund }), [melden, zeigtGrund]);
+  return <SperrKontext.Provider value={wert}>{children}</SperrKontext.Provider>;
 }
 
 /**
@@ -62,13 +80,13 @@ export function useSperrSammler(onWechsel?: (grund: string | null) => void): {
 }
 
 /**
- * Die Stelle eines Formularfelds: Prüfregel und Meldeweg. Weicht der Grund, während das Feld einen
- * Fehler zeigt, prüft es neu, damit die Fehlerzeile mit dem Grund verschwindet.
+ * Die Stelle eines Formularfelds: Prüfregel und Meldeweg. Wechselt der Grund, prüft das Feld neu:
+ * die Fehlerzeile nennt ihn sofort und verschwindet mit ihm.
  */
 export function useSperrStelle(name: NamePath | undefined): { melden: Melden; regel: FormRule } {
   const form = Form.useFormInstance();
   const { melden, grund } = useSperrSammler(() => {
-    if (name === undefined || form.getFieldError(name).length === 0) return;
+    if (name === undefined) return;
     form.validateFields([name]).catch(() => {});
   });
   const regel = useMemo<FormRule>(

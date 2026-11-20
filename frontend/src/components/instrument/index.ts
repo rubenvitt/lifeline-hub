@@ -93,5 +93,11 @@ export { default as Stapel, rasterAbstand, type Abstandsstufe, type StapelProps 
 export { default as Knopfreihe, type KnopfreiheProps } from './Knopfreihe';
 export { default as MetaZeile } from './MetaZeile';
 export { default as Feld, FELD_KLASSE, type FeldProps } from './Feld';
-export { SperrStelle, useEingabeSperre, useSperrSammler, useSperrStelle } from './eingabeSperre';
+export {
+  SperrStelle,
+  useEingabeSperre,
+  useSperrSammler,
+  useSperrStelle,
+  useSperrStelleZeigtGrund,
+} from './eingabeSperre';
 export { default as GeaendertPunkt } from './GeaendertPunkt';
