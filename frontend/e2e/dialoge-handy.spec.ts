@@ -5,7 +5,9 @@ import { anmeldenAlsAdmin, wechsleZuRolle, type Rolle } from './rollen-kern';
  * Dialoge am Handy (LFH-953): auf 390 px liegt jedes Bedienziel im Schirm und lässt sich klicken.
  *
  * - **Erfassungsfuß** (`components/Erfassung.tsx`): die drei Knöpfe der Serie liefen nebeneinander
- *   links aus dem Dialog („Abbrechen“ bei x = −75). Unter `md` stehen sie untereinander.
+ *   links aus dem Dialog („Abbrechen“ bei x = −75). Unter `md` stehen sie untereinander. Seit
+ *   LLH-1763 klebt dort nur der Abschluss (unter 20 % der Höhe), „Abbrechen“ steht im Kopf, die
+ *   Serie am Formularende.
  * - **Zeiteingabe** (`anzeige/ZeitpunktEingabe.tsx`): antds Panel mit Uhrzeit war 437 px breit,
  *   „OK“ und die Uhrzeit lagen außerhalb, die Seite scrollte seitlich. Unter `md` steht es als
  *   Blatt am unteren Rand (`anzeige/ZeitpunktEingabe.css`). Auf dem Führungs-Tablet (820 und
@@ -300,6 +302,32 @@ async function pruefeSerienfuss(page: Page, einsatzId: string, wer: string) {
     ).toBe(true);
   }
   await keinSeitlicherUeberlauf(page, `${wer}, Serienmaske`);
+
+  // LLH-1763: „Abbrechen“ steht im Kopf (Text im Schließknopf), klebend nur der Abschluss; die Serie
+  // steht am Formularende. Gestapelt fraß der Fuß vorher 271 von 844 px.
+  await expect(knoepfe[0]).toHaveClass(/ant-modal-close/);
+  const fuss = dialog.locator('[data-lfh="erfassung-fuss"]');
+  await expect(fuss.getByRole('button', { name: 'Erfassen', exact: true })).toHaveCount(1);
+  await expect(fuss.getByRole('button', { name: 'Speichern und nächste' })).toHaveCount(0);
+  await expect(fuss.getByRole('button', { name: 'Abbrechen' })).toHaveCount(0);
+  const fussHoehe = (await kasten(fuss)).height;
+  expect(
+    fussHoehe,
+    `${wer}: klebender Fuß ${fussHoehe} px, Soll < 20 % von ${HANDY.height}`,
+  ).toBeLessThan(HANDY.height * 0.2);
+  const titel = await kasten(dialog.locator('.ant-modal-title'));
+  const kopfKnopf = await kasten(knoepfe[0]);
+  expect(
+    titel.x + titel.width <= kopfKnopf.x + SUBPIXEL ||
+      titel.y + titel.height <= kopfKnopf.y + SUBPIXEL ||
+      kopfKnopf.y + kopfKnopf.height <= titel.y + SUBPIXEL,
+    `${wer}: Titel ${JSON.stringify(titel)} läuft unter „Abbrechen“ ${JSON.stringify(kopfKnopf)}`,
+  ).toBe(true);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `${wer}: klebender Fuß ${Math.round(fussHoehe)} px`,
+  });
+
   // Die Speicherknöpfe würden absenden; `trial` prüft dieselbe Klickbarkeit ohne Klick.
   await knoepfe[1].click({ trial: true });
   await knoepfe[2].click({ trial: true });
