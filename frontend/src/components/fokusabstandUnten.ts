@@ -35,6 +35,12 @@ export const FOKUSABSTAND_ZAEHLTASTEN = '--lfh-zaehltasten-fokusabstand';
 /** Klebender Fuß der Erfassungs-Hülle im Dialog (LLH-1274): `scroll-padding` am Dialog (`index.css`). */
 export const FOKUSABSTAND_ERFASSUNG = '--lfh-erfassung-fokusabstand';
 /**
+ * Klebender Fuß der Erfassungs-Hülle auf einer Seite (LLH-1761): `scroll-padding` am Dokument
+ * (`index.css`). Eigene Variable, weil über einer solchen Seite ein Dialog mit eigenem Fuß stehen
+ * kann; dessen Aufräumen beim Schließen darf die Variable der Seite nicht mitnehmen.
+ */
+export const FOKUSABSTAND_ERFASSUNG_SEITE = '--lfh-erfassung-seite-fokusabstand';
+/**
  * Kurzzeile der Ausgabeansicht (LLH-1504), dieselbe Messung für die OBERE Kante: rückwärts
  * getabbt rollt der Browser ein Ziel an den oberen Rand, unter die klebende Zeile mit Soll,
  * ausgegeben und fehlt. `scroll-padding-block-start` am Scrollport (`index.css`), wie beim Rahmen
