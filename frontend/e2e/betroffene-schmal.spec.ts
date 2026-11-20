@@ -142,10 +142,15 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
  * BLEIBT — erst dessen Sichtbarkeit belegt, dass die Seite gerendert hat, sonst wäre die
  * Abwesenheit auch bei einem Tippfehler im Namen grün.
  */
-const LESEZWEIG: Record<(typeof MODULE)[number]['route'], { weg: string[]; bleibt?: string }> = {
+const LESEZWEIG: Record<
+  (typeof MODULE)[number]['route'],
+  { weg: string[]; bleibt?: string; hinterFilter?: boolean }
+> = {
+  // Bei 390 px steht die Ansicht hinter dem Knopf „Filter“ im Seitenkopf (LLH-1786).
   personen: {
     weg: ['Betroffene erfassen', 'Vermisst melden'],
     bleibt: 'Ansicht',
+    hinterFilter: true,
   },
   tiere: { weg: ['Tier erfassen', 'Vermisst melden'], bleibt: 'Tiere nach Status filtern' },
   schaeden: { weg: ['Schaden erfassen'] },
@@ -176,7 +181,17 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
-    const { weg, bleibt } = LESEZWEIG[modul.route];
+    const { weg, bleibt, hinterFilter } = LESEZWEIG[modul.route];
+    if (hinterFilter) {
+      const filterKnopf = page
+        .locator('[data-lfh="seitenkopf"]')
+        .getByRole('button', { name: /^Filter/ });
+      await expect(
+        filterKnopf,
+        `${pfad}: Vorbedingung — der Filterknopf bleibt auch ohne Schreibrecht`,
+      ).toBeVisible();
+      await filterKnopf.click();
+    }
     if (bleibt) {
       await expect(
         page.getByRole('radiogroup', { name: bleibt }),
