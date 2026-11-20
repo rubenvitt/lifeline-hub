@@ -172,11 +172,25 @@ describe('AuftragFormular — Funktionskatalog (LFH-549)', () => {
     expect(await screen.findByTitle('S2 – Lage (Müller)')).toBeInTheDocument();
   });
 
-  it('lässt getipptes „S3“ + Enter Freitext bleiben, auch mit Katalog', async () => {
+  it('„S3“ + Enter nimmt den markierten Katalogeintrag (LLH-1753)', async () => {
     const onAnlegen = vi.fn();
     rendern({ onAnlegen, einsatzId: 7 });
 
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ empfaenger: [{ empfaenger_typ: 'funktion', funktion: 's3' }] }),
+    );
+  });
+
+  it('„S3“ bleibt Freitext nur über „„S3“ als Freitext übernehmen“, auch mit Katalog', async () => {
+    const onAnlegen = vi.fn();
+    rendern({ onAnlegen, einsatzId: 7 });
+
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3');
+    await userEvent.click(await screen.findByTitle('„S3“ als Freitext übernehmen'));
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 

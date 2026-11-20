@@ -488,8 +488,6 @@ export default function AuftragFormular({
           einheiten={einheiten}
           vorschlaege={funktionen}
           placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
-          // Bisheriges Verhalten des Auftrags: Verlassen übernimmt den Tipptext als Empfänger.
-          commitSearchOnBlur
         />
       </Feld>
       <Feld
