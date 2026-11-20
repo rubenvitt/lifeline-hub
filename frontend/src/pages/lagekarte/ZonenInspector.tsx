@@ -1,4 +1,4 @@
-import { Button, Input, InputNumber, Popconfirm, Typography, theme } from 'antd';
+import { Button, Input, Popconfirm, Typography, theme } from 'antd';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Select } from '../../components/Select';
@@ -39,6 +39,7 @@ import { gefahrenMatrixAbfrage } from '../gefahren/gefahrenMatrixAbfrage';
 import GefahrenStufe from '../gefahren/GefahrenStufe';
 import { erlaeuterungEinzeilig, gesetzteGefahren, zellTitel } from '../gefahren/erlaeuterungen';
 import { Status } from '../../components/instrument/Status';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /** So viele Gefahren zeigt der Inspector, danach „alle in Gefahren ↗“ (LLH-1110). */
 export const GEFAHREN_IM_INSPECTOR = 5;
@@ -365,12 +366,15 @@ export default function ZonenInspector({
         )}
 
         {kreis && darfSchreiben && (
-          <InputNumber<number>
+          <ZahlFeld
             aria-label="Radius in Metern"
             value={radiusEntwurf}
             min={1}
             max={KREIS_RADIUS_M_MAX}
-            precision={0}
+            ganz
+            einheit="m"
+            // Ohne Formular: ein Radius außerhalb bleibt stehen und geht nicht hinaus (LLH-1768).
+            nurGueltig
             suffix="m"
             inputMode="numeric"
             disabled={gesperrt}

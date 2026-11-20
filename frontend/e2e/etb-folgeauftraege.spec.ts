@@ -41,14 +41,13 @@ async function auftragErteilen(
   // auseinanderzuhalten sind.
   await expect(feld).toHaveValue(ENTSCHEIDUNG);
   await feld.fill(text);
-  // Ohne Empfänger lehnt das Formular ab; eine freie Funktion genügt, gepflegt ist nichts.
+  // Ohne Empfänger lehnt das Formular ab. „S3“ + Enter nimmt den markierten Katalogeintrag und
+  // schließt die Liste (LLH-1753).
   const empfaenger = dialog.getByRole('combobox', { name: 'Empfänger', exact: true });
   await empfaenger.fill('S3');
   await empfaenger.press('Enter');
-  // Die Liste bleibt offen (mehrere Empfänger erlaubt) und könnte den Sendeknopf verdecken.
-  // Tab schließt sie; Escape schlösse im Modal womöglich den Dialog mit.
-  await empfaenger.press('Tab');
-  await expect(dialog.getByTitle('S3', { exact: true })).toBeVisible();
+  await expect(empfaenger).toHaveAttribute('aria-expanded', 'false');
+  await expect(dialog.getByTitle(/^S3 – /)).toBeVisible();
   const erteilt = page.waitForResponse(
     (antwort) =>
       /\/api\/einsaetze\/\d+\/etb\/\d+\/auftrag$/.test(antwort.url()) &&

@@ -1,13 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { anmeldenOhneStartseite } from './lageplan-kern';
 import { waehleImMenue } from './menue-kern';
-import {
-  ADMIN,
-  ADMIN_PW,
-  anmeldenImFormular,
-  benutzerAnlegen,
-  mitgliedEintragen,
-} from './rollen-kern';
+import { ADMIN, ADMIN_PW, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /*
  * LFH-1092 — Sitzungen beenden ohne Deaktivieren.
@@ -109,9 +103,11 @@ async function verlorenesGeraet(
   return { kontext, geraet };
 }
 
-/** Ohne Bedienung zurück auf der Anmeldung, das Lagebild von der Platte. */
+/** Ohne Bedienung „Sitzung beendet“ über der Seite (LLH-1770), das Lagebild von der Platte. */
 async function geraeumt(geraet: Page) {
-  await expect(geraet).toHaveURL(/\/login/, { timeout: 30_000 });
+  await expect(geraet.getByRole('dialog', { name: 'Sitzung beendet' })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect.poll(() => vorgehalteneKeys(geraet), { timeout: 10_000 }).toBeNull();
 }
 
@@ -131,9 +127,13 @@ test('die Person beendet im Profil die Anmeldung des verlorenen Geräts', async 
   await expect(liste.getByText('Safari · iPadOS')).toHaveCount(0);
 
   await geraeumt(geraet);
-  // Das Konto bleibt: dieselbe Person meldet sich auf dem Gerät wieder an, im Formular, auf dem
-  // das Gerät eben gelandet ist (ohne erneute Seitenladung).
-  await anmeldenImFormular(geraet, person.benutzername, person.passwort);
+  // Das Konto bleibt: dieselbe Person meldet sich auf dem Gerät wieder an, im Dialog über der
+  // ETB-Seite (ohne erneute Seitenladung), und steht wieder im Tagebuch.
+  const dialog = geraet.getByRole('dialog', { name: 'Sitzung beendet' });
+  await dialog.getByLabel('Passwort').fill(person.passwort);
+  await dialog.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(geraet.getByPlaceholder('Inhalt …')).toBeVisible();
   await kontext.close();
 });
 

@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Form, theme } from 'antd';
+import { Alert, App, Breadcrumb, Form, theme } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -45,11 +45,46 @@ import { vorgemerktText } from '../../offline/vorgemerktText';
  * Anlegen mit, der Server bucht Person und Wartebereich-Eintritt atomar (auch über die
  * Offline-Queue), und der Rückweg führt zur UHS.
  */
+/** Quittung einer Aufnahme, am Einsatz festgemacht (LFH-1138). */
+interface Quittung {
+  einsatzId: number;
+  art: 'erfasst' | 'vorgemerkt' | 'beantragt';
+  text: string;
+}
+
+/**
+ * Wie lange der Toast nach „Erfassen“ steht, in Sekunden: lang genug, die Registriernummer am Ziel
+ * abzuschreiben (LLH-1760); antds Vorgabe von 3 s reicht dafür nicht.
+ */
+const QUITTUNG_TOAST_SEKUNDEN = 8;
+
+/**
+ * Die Quittung nach „Erfassen“, wenn die Seite wechselt (LLH-1760): Erfolg an den Toast
+ * (`frontend/AGENTS.md`, „Speicherfehler an die Seite, Erfolg an den Toast“). Vorgemerkt ist kein
+ * Erfolg (`warning` wie beim Melden am Gerät), ein Antrag am Spiegel nur `info`. Fester Schlüssel:
+ * eine zweite Aufnahme ersetzt den Toast der ersten.
+ */
+function zeigeQuittungNachWechsel(
+  message: ReturnType<typeof App.useApp>['message'],
+  quittung: Quittung | null,
+) {
+  if (!quittung) return;
+  const art =
+    quittung.art === 'erfasst' ? 'success' : quittung.art === 'vorgemerkt' ? 'warning' : 'info';
+  void message.open({
+    key: 'aufnahme-quittung',
+    type: art,
+    content: quittung.text,
+    duration: QUITTUNG_TOAST_SEKUNDEN,
+  });
+}
+
 export default function AufnahmePage() {
   const { id } = useParams();
   const { token } = theme.useToken();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
+  const { message } = App.useApp();
   const navigate = useNavigate();
   // Am gekoppelten Gerät führt der Rückweg in die Gerätehülle, ohne Brotkrumen in fremde Module
   // (LFH-892).
@@ -59,7 +94,10 @@ export default function AufnahmePage() {
   const [form] = Form.useForm<AufnahmeWerte>();
   // Am Einsatz festgemacht: eine Antwort, die erst nach dem Wechsel eintrifft, quittiert nicht im
   // neuen (LFH-1138); dort abgeschrieben, wäre ihre Registriernummer falsch.
-  const [quittung, setQuittung] = useState<{ einsatzId: number; text: string } | null>(null);
+  const [quittung, setQuittung] = useState<Quittung | null>(null);
+  // Dieselbe Quittung für den Toast nach „Erfassen“ (LLH-1760): `onFertig` läuft im selben Zug wie
+  // `onSuccess`, der State wäre dort noch der alte.
+  const letzteQuittungRef = useRef<Quittung | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
   const einsatzRef = useRef(einsatzId);
   einsatzRef.current = einsatzId;
@@ -101,13 +139,24 @@ export default function AufnahmePage() {
     },
     // Die Quittung der vorigen Person geht mit dem nächsten Absenden: neben einer Ablehnung
     // behauptete sie sonst Erfolg.
-    onMutate: () => setQuittung(null),
+    onMutate: () => {
+      letzteQuittungRef.current = null;
+      setQuittung(null);
+    },
     onSuccess: (ergebnis, { einsatzId }) => {
+      const quittiere = (q: Quittung) => {
+        letzteQuittungRef.current = q;
+        setQuittung(q);
+      };
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung({ einsatzId, text: vorgemerktText(ergebnis.grund, 'R-…', ' · ') });
+        quittiere({
+          einsatzId,
+          art: 'vorgemerkt',
+          text: vorgemerktText(ergebnis.grund, 'R-…', ' · '),
+        });
       } else if (ergebnis.zustand === 'beantragt') {
         // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
-        setQuittung({ einsatzId, text: 'Beantragt · R-…' });
+        quittiere({ einsatzId, art: 'beantragt', text: 'Beantragt · R-…' });
       } else {
         const person = ergebnis.daten;
         const zusatz =
@@ -126,8 +175,9 @@ export default function AufnahmePage() {
         }
         // Aus der ANTWORT gelesen, nicht aus den gesendeten Werten: das Backend schreibt
         // die Sichtung in derselben Transaktion und kann sie verwerfen.
-        setQuittung({
+        quittiere({
           einsatzId,
+          art: 'erfasst',
           text:
             (person.aktuelle_sichtung
               ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
@@ -198,7 +248,8 @@ export default function AufnahmePage() {
       hinweis={!darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />}
     >
       {quittung?.einsatzId === einsatzId && (
-        // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen.
+        // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen. Nur „Erfassen“,
+        // das die Seite verlässt, nimmt den Toast (`zeigeQuittungNachWechsel`).
         <Alert
           style={{ marginBottom: token.marginLG }}
           type="success"
@@ -215,6 +266,7 @@ export default function AufnahmePage() {
           form={form}
           serie
           // Der Fuß klebt (LLH-1761): am Handy lag „Erfassen“ bei y ≈ 1100 einer 1149 px hohen Seite.
+          // In der Gerätehülle bündig über der Navigation (LLH-1760, `seitenfussKante`).
           fussKlebt="seite"
           uebernahme={['antreff_ort']}
           laeuft={anlegenSpeicherung.isPending}
@@ -250,13 +302,15 @@ export default function AufnahmePage() {
           }}
           /**
            * „Speichern und nächste" hält die Seite; der Primär-Knopf speichert die letzte Person
-           * und geht zurück in die Liste — er heißt nicht „Fertig", weil er speichert.
+           * und geht zurück in die Liste — er heißt nicht „Fertig", weil er speichert. Die stehende
+           * Quittung geht mit der Seite, deshalb nennt ein Toast sie am Ziel (LLH-1760).
            */
-          onFertig={() =>
+          onFertig={() => {
+            zeigeQuittungNachWechsel(message, letzteQuittungRef.current);
             navigate(
               uhsAuftrag ? pfade.uhsDetail(einsatzId, uhsAuftrag) : pfade.personenListe(einsatzId),
-            )
-          }
+            );
+          }}
         >
           <AufnahmeFelder
             modus="erfassen"

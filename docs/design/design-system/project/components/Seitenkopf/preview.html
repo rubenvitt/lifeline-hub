@@ -843,7 +843,8 @@ main:has([data-lfh='zaehltasten']) {
 :root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
 }
-:root:has([data-lfh='erfassung-fuss-seite']) {
+:root:has([data-lfh='erfassung-fuss-seite']),
+.geraet-huelle > main:has([data-lfh='erfassung-fuss-seite']) {
   scroll-padding-block-end: var(--lfh-erfassung-seite-fokusabstand, 0px);
 }
 :root {

@@ -1,4 +1,4 @@
-import { Button, Form, Input, InputNumber, Space, type FormRule, theme } from 'antd';
+import { Button, Form, Input, Space, type FormRule, theme } from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
@@ -20,6 +20,7 @@ import {
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { bezirkPatchDreiseitig, type BezirkWerte } from './BetreuungDialoge';
 import { ERHEBUNG_LABEL, mengeText, personenZahl } from './betreuungText';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 /** Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (darüber 400). */
@@ -135,7 +136,7 @@ export default function BezirkStammdaten({
       {zelle(
         'plan_personen',
         'Plangröße (Personen)',
-        <InputNumber precision={0} />,
+        <ZahlFeld ganz />,
         mengeText(bezirk.plan_personen, bezirk.plan_erhebung),
         { mono: true, rules: PLAN_REGELN },
       )}

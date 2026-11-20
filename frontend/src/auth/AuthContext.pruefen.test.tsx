@@ -178,17 +178,18 @@ describe('AuthProvider prüft den Benutzer (LFH-387)', () => {
     expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
   });
 
-  it('keine gültige Sitzung: lokal abmelden und den Ablauf melden, ohne Server-Logout', async () => {
+  it('keine gültige Sitzung: unterbrechen und den Ablauf melden, ohne Server-Logout (LLH-1770)', async () => {
     await starte();
     const ablauf = vi.fn();
     window.addEventListener(SITZUNG_ABGELAUFEN, ablauf);
     try {
       sitzung = null;
       pruefenAnstossen();
-      await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
-      expect(ablauf).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(ablauf).toHaveBeenCalledTimes(1));
+      // Die Seite bleibt montiert: der Benutzer bleibt bis zur Anmeldung oder zur Frist.
+      expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
       expect(logoutAufrufe).toBe(0);
-      expect(await kopfBeimSchreiben()).toBeNull();
+      expect(await kopfBeimSchreiben()).toBe('1');
     } finally {
       window.removeEventListener(SITZUNG_ABGELAUFEN, ablauf);
     }
@@ -465,16 +466,20 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
     }
   });
 
-  it('lokales Abmelden nach einem Ablauf meldet den anderen Tabs „abgemeldet“', async () => {
+  it('eine Unterbrechung nach einem Ablauf meldet den anderen Tabs nichts (LLH-1770)', async () => {
     await starte();
     const ohr = mithoeren();
+    const ablauf = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, ablauf);
     try {
       sitzung = null;
       pruefenAnstossen();
-      await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
-      await waitFor(() =>
-        expect(ohr.gehoert).toEqual([{ art: 'abgemeldet', anlass: 'sitzungsende' }]),
-      );
+      await waitFor(() => expect(ablauf).toHaveBeenCalledTimes(1));
+      await new Promise((r) => setTimeout(r, 30));
+      // Die anderen Tabs teilen das Cookie und bemerken das Ende selbst; „abgemeldet“ käme erst
+      // mit dem vollen Ausgang (Frist oder „Abmelden“ im Dialog).
+      expect(ohr.gehoert).toEqual([]);
+      window.removeEventListener(SITZUNG_ABGELAUFEN, ablauf);
     } finally {
       ohr.schliessen();
     }

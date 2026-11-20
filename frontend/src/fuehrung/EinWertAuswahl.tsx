@@ -1,26 +1,24 @@
-import { useRef, useState } from 'react';
-import type { RefSelectProps } from 'antd';
-import { Select } from '../components/Select';
 import {
+  bezeichnungsOptionen,
   funktionsOptionen,
   type FunktionsOption,
   type FunktionsVorschlaege,
 } from './funktionsOptionenKern';
+import { VorschlagsSelect } from './VorschlagsSelect';
 
 /**
  * Auswahl EINES Empfängers aus dem Funktionskatalog oder als Freitext (LFH-549) — für
  * Erinnerung und Führungsstelle.
  *
- * Tags-Modus, damit Freitext bleibt; die jüngste Wahl ersetzt die alte (`getValueFromEvent` am
- * `Form.Item` des Aufrufers, {@link letzterWert}). Nach einer Wahl schließt die Liste (Blur): im
- * Tags-Modus bliebe sie sonst offen und läge über dem Absende-Knopf — ein Klick träfe erst die
- * Liste. Verlassen übernimmt getippten Freitext, Enter wählt die markierte Zeile.
+ * Mehrfach-Select, die jüngste Wahl ersetzt die alte (`getValueFromEvent` am `Form.Item` des
+ * Aufrufers, {@link letzterWert}). Tastatur nach der Regel der Vorschlagsfelder (LLH-1753,
+ * `VorschlagsSelect`): Enter und Tab nehmen den markierten Katalogtreffer, Freitext nur über
+ * „„…“ als Freitext übernehmen“; nach der Wahl schließt die Liste. Verlassen nimmt den Tipptext
+ * nur, wenn kein Treffer passt (Entscheidung 20.11.2026), sonst nichts.
  */
 export function EinWertAuswahl({
   vorschlaege,
   zusatz = [],
-  value,
-  onChange,
   ...rest
 }: {
   vorschlaege: FunktionsVorschlaege;
@@ -33,30 +31,14 @@ export function EinWertAuswahl({
   disabled?: boolean;
   id?: string;
 }) {
-  const ref = useRef<RefSelectProps>(null);
-  const [suche, setSuche] = useState('');
-  const katalogOptionen = funktionsOptionen(vorschlaege, suche);
-  const optionen = [
-    ...zusatz.filter((z) => !katalogOptionen.some((o) => o.value === z.value)),
-    ...katalogOptionen,
-  ];
+  const katalog = funktionsOptionen(vorschlaege);
+  const options = [...zusatz.filter((z) => !katalog.some((o) => o.value === z.value)), ...katalog];
   return (
-    <Select
+    <VorschlagsSelect
       {...rest}
-      ref={ref}
-      mode="tags"
-      value={value}
-      onChange={(werte: string[]) => onChange?.(werte)}
-      options={optionen}
-      allowClear
-      onSearch={setSuche}
-      onSelect={() => {
-        setSuche('');
-        // Erst im nächsten Frame: ein sofortiges Blur übernähme im Tags-Modus den noch stehenden
-        // Tipptext („THW“) als zweiten Wert, und der gewänne gegen die Wahl „Fachberater: THW“.
-        requestAnimationFrame(() => ref.current?.blur());
-      }}
-      onBlur={() => setSuche('')}
+      gruppen={[{ options }]}
+      zusatz={(text) => bezeichnungsOptionen(vorschlaege, text)}
+      freitextBeimVerlassen
     />
   );
 }

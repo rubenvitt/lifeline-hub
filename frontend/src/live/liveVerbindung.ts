@@ -1,4 +1,4 @@
-import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { SITZUNG_WIEDERHERGESTELLT, meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 
 /**
  * Verbindungsstatus des Live-Feeds, gemeldet per window-CustomEvent `lfh:live-status`, damit
@@ -124,6 +124,8 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
   // (design.md D6): ab dem zweiten wartet der Neuaufbau gestaffelt.
   let silentStreak = 0;
   let aktuelle: EventSource | null = null;
+  /** Hört nach einer 401 auf die Wiederherstellung der Sitzung (LLH-1770); `null` sonst. */
+  let wiederherstellungAbmelden: (() => void) | null = null;
 
   const schonfristBeenden = () => {
     if (schonfristTimer) clearTimeout(schonfristTimer);
@@ -151,6 +153,20 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     if (!sessionGueltig) {
       // Session abgelaufen → die Sitzungswache übernimmt (ein 401-Pfad für SSE und HTTP).
       meldeSitzungAbgelaufen();
+      // Meldet sich dieselbe Person im Dialog wieder an, bleibt die Seite montiert und baut
+      // nichts neu auf (LLH-1770): die Leitung tut es selbst, mit Abgleich wie jeder Neuaufbau.
+      const beiWiederherstellung = () => {
+        wiederherstellungAbmelden?.();
+        if (abgebrochen) return;
+        tote.close();
+        backoffStufe = 0;
+        verbinde();
+      };
+      window.addEventListener(SITZUNG_WIEDERHERGESTELLT, beiWiederherstellung);
+      wiederherstellungAbmelden = () => {
+        window.removeEventListener(SITZUNG_WIEDERHERGESTELLT, beiWiederherstellung);
+        wiederherstellungAbmelden = null;
+      };
       return;
     }
     if (opt.istEndzustand) {
@@ -286,6 +302,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
   return () => {
     abgebrochen = true;
     pausierbare.delete(pausieren);
+    wiederherstellungAbmelden?.();
     if (backoffTimer) clearTimeout(backoffTimer);
     schonfristBeenden();
     stopWatchdog();

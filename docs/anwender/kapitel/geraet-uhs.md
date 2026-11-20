@@ -47,7 +47,8 @@ mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unte
 3. „Erfassen“ wählen oder „Speichern und nächste“, um gleich die nächste Person aufzunehmen.
 
 Die Bestätigung nennt die neue Registriernummer, die Kategorie und den Ort, etwa „Erfasst als
-R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
+R-013 · SK II · im Wartebereich“. Nach „Erfassen“ öffnet sich der Grundriss, und die Bestätigung
+steht dort einige Sekunden oben. Die Aufnahme geht immer in die eigene UHS.
 
 ### Leichten Fall versorgen und entlassen
 

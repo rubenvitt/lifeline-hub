@@ -1,4 +1,4 @@
-import { App, AutoComplete, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
+import { App, AutoComplete, Col, Form, Input, Row, Switch, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
@@ -279,7 +280,7 @@ export default function FahrzeugDetailPage() {
               <Row gutter={token.margin}>
                 <Col xs={24} lg={12}>
                   <Feld label="Tragenkapazität" name="tragenkapazitaet" breite="schmal">
-                    <InputNumber min={0} />
+                    <ZahlFeld min={0} />
                   </Feld>
                 </Col>
                 <Col xs={24} lg={12}>

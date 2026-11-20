@@ -315,6 +315,16 @@ export function lagebildLoeschen(qc: QueryClient): Promise<void> {
   return reihe(qc, () => loeschen(qc));
 }
 
+/** Unterbrochene Sitzung im Betrieb (LLH-1770): das Speichern endet und die Platte wird
+ *  geleert, der Query-Cache bleibt — die verdeckte Seite liest weiter aus ihm. Die Anmeldung
+ *  derselben Person (`lagebildAnmelden`) legt den Datensatz neu an und speichert wieder. */
+export function lagebildUnterbrechen(qc: QueryClient): Promise<void> {
+  return reihe(qc, async () => {
+    await beenden(qc);
+    await lagebildLoeschenPlatte();
+  });
+}
+
 /** Beendet das Speichern ohne zu löschen — beim Aushängen des `AuthProvider`. */
 export function lagebildBeenden(qc: QueryClient): Promise<void> {
   return reihe(qc, () => beenden(qc));

@@ -1304,6 +1304,17 @@ anwendbar), „nicht geprüft" ist keins.
   Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
   oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
   Deutung steht deshalb immer im DOM.
+- **Unlesbares bleibt stehen und sperrt** (LLH-1768,
+  `docs/superpowers/specs/2026-11-20-obmcvm14-stille-korrekturen-sichtbar-design.md`; löst in der
+  Spec `zeiteingabe`, „Unlesbare Eingabe wird nicht übernommen“, das „wieder den geltenden Wert
+  zeigen“ ab): Verlässt man ein Zeitfeld mit unlesbarem Text, bleibt der Text samt Grund stehen,
+  der Formularwert bleibt der geltende. Der Grund geht an die **Eingabesperre**
+  (`components/instrument/eingabeSperre.tsx`), die `Feld`, `DatenfeldEingabe` und `InlineAngabe`
+  tragen: das Formular sendet nicht und nennt den Grund in der Fehlerzeile, das Feld dann nicht
+  noch einmal. Escape verwirft den Text, Enter auf ihm sendet nicht. Ein Zeitfeld in einem
+  Formular steht deshalb in `Feld` oder `DatenfeldEingabe`, nie in einem rohen `Form.Item`; das
+  ETB sperrt selbst (`onDiscard`, LLH-1866). Liegt der geltende Wert gestern oder morgen, steht
+  das am Feld, auch nach der Übernahme.
 - **Zeitdarstellung** (LLH-1053, Spec `zeitdarstellung`, Entscheidungen E1–E4 aus LLH-1045): eine
   Zeit für Menschen formatiert nur `anzeige/zeitDarstellung.ts`, in drei Rollen — `zeitpunkt`
   (`101430okt26` bzw. `10.10.26 14:30`), `zeitKurz` (heute `1430`, sonst `091430` bzw. `14:30` /
@@ -1750,6 +1761,17 @@ Spec `bedien-arbeitsplatz`).
   Auswahldialog sperrt nur die Maske (`mask={{ closable: false }}`,
   `wrapProps={MASKE_HAELT_FOKUS}`). Wächter: `components/dialogEingabe.guard.test.ts`.
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.
+- **Zahlenfelder prüfen statt kappen** (LLH-1768): kein `InputNumber` trägt `min`, `max` oder
+  `precision` (antd setzt den getippten Wert beim Verlassen still um: Alter 250 → 120, 2,5 → 3;
+  Wächter `components/zahlfeld.guard.test.ts`). Grenzen nimmt `components/ZahlFeld.tsx`
+  (`min`, `max`, `ganz`, `einheit`), Mengen `MengenFeld`, Dezimalzahlen `DezimalFeld` (`stellen`
+  prüft, rundet nicht); sie melden den Grund über `useZahlEingabe` an die Eingabesperre, das
+  Formular sendet dann nicht. Ohne Sperrstelle darüber (kein `Feld`, keine `InlineAngabe`) geht
+  ein abgelehnter Wert nicht hinaus und bleibt im Feld stehen; ein Dialog ohne Formular, der
+  sendet, stellt selbst eine `SperrStelle` und sperrt seinen Knopf (`useSperrSammler`). Eine Regel am `Feld` ist `zahlRegel` (`components/zahlRegel.ts`).
+  Geprüft wird nur, was die Person ändert: ein gespeicherter Altwert sperrt nicht.
+- **Eine Frist ist beim Anlegen mit „jetzt + 30 min“ vorbelegt** (`VORGABE_FRIST_MINUTEN`,
+  `anzeige/zeitSchnellwahl.ts`; Erinnerung, Wiedervorlage), nie mit „jetzt“.
 - **Serienmodus** (`serie`): „Speichern und nächste" hält offen, leert, zählt, fokussiert, ruft
   `form.submit()` von Hand; die Serien-Marke wird in `onFinish` verbraucht **und in
   `onFinishFailed` gelöscht**. **Strg/⌘ + Enter** löst es aus (nur bei `serie`); Riegel
@@ -1776,7 +1798,12 @@ Spec `bedien-arbeitsplatz`).
   nur über einen bestehenden Katalog mit reiner Textanlage (heute „Externe Stellen“), ohne
   Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Feldzeile und
   Rufname-Abfrage), Meldung Absender/Empfänger. Ein genau getippter Vorschlag steht zuoberst; ohne
-  Tippen oder Pfeilmarkierung nehmen Enter und Tab keinen Vorschlag.
+  Tippen oder Pfeilmarkierung nehmen Enter und Tab keinen Vorschlag. **Dieselbe Tastaturregel gilt
+  für Felder mit mehreren Werten** (LLH-1753): `fuehrung/VorschlagsSelect.tsx` trägt sie für
+  Auftragsempfänger, Verteiler (`EmpfaengerWahl`), Erinnerung und Führungsstelle
+  (`EinWertAuswahl`); nie `mode="tags"`, das den Tipptext vor die Treffer stellt und markiert. Nach
+  der Wahl schließt die Liste; Verlassen nimmt nichts, ein Ein-Wert-Feld den Tipptext nur, wenn
+  kein Treffer passt.
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
@@ -1791,7 +1818,7 @@ Spec `bedien-arbeitsplatz`).
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
-  bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
+  bleiben sichtbar (Auftrag: Empfänger als `fuehrung/EmpfaengerWahl.tsx`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht
   (`onPruefungGescheitert` der Hülle) und dessen Kopf jede Abweichung von der Vorgabe nennt
   (LFH-974, `meldungen/MeldungFormular.tsx`).

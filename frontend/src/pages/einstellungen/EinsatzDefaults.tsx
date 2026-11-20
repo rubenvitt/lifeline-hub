@@ -1,4 +1,4 @@
-import { App, Form, Input, InputNumber, Modal, Switch, Typography, theme } from 'antd';
+import { App, Form, Input, Modal, Switch, Typography, theme } from 'antd';
 import { useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
@@ -39,6 +39,7 @@ import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /** Vorgabe des Servers für ein leeres Einsatznummer-Präfix (`einsatz/nummer.rs`, `PRAEFIX_VORGABE`). */
 const EINSATZ_PRAEFIX_VORGABE = 'E-';
@@ -212,21 +213,21 @@ export default function EinsatzDefaults() {
         >
           <Formularpaneel titel="Aufbewahrung">
             <Feld breite="schmal" label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
-              <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine Frist')} />
+              <ZahlFeld min={1} max={3650} placeholder={mitVorgabe('keine Frist')} />
             </Feld>
             <Feld
               breite="schmal"
               label="Skelett endgültig löschen nach (Tage ab Abschluss)"
               name="skelett_dauer_tage"
             >
-              <InputNumber min={1} max={36500} placeholder={mitVorgabe('unbegrenzt')} />
+              <ZahlFeld min={1} max={36500} placeholder={mitVorgabe('unbegrenzt')} />
             </Feld>
             <Feld
               breite="schmal"
               label="Nachbereitung (Tage ab Abschluss)"
               name="nachbereitung_tage"
             >
-              <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine')} />
+              <ZahlFeld min={1} max={3650} placeholder={mitVorgabe('keine')} />
             </Feld>
           </Formularpaneel>
 
@@ -262,21 +263,21 @@ export default function EinsatzDefaults() {
               label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
               name="meldung_bestaetigung_frist_min"
             >
-              <InputNumber min={1} max={10080} placeholder={mitVorgabe('5')} />
+              <ZahlFeld min={1} max={10080} placeholder={mitVorgabe('5')} />
             </Feld>
             <Feld
               breite="schmal"
               label="Vorgabe-Quittierfrist Aufträge (Minuten)"
               name="auftrag_quittierung_frist_min"
             >
-              <InputNumber min={1} max={10080} placeholder={mitVorgabe('keine Frist')} />
+              <ZahlFeld min={1} max={10080} placeholder={mitVorgabe('keine Frist')} />
             </Feld>
             <Feld
               breite="schmal"
               label="Rückmeldefrist Einheiten (Minuten)"
               name="rueckmeldung_frist_min"
             >
-              <InputNumber min={1} max={10080} placeholder={mitVorgabe('60')} />
+              <ZahlFeld min={1} max={10080} placeholder={mitVorgabe('60')} />
             </Feld>
 
             <Feld

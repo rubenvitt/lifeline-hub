@@ -525,6 +525,20 @@ describe('InlineAngabe · Zeiteingabe als Eingabe', () => {
     );
   }
 
+  it('eine unlesbare Zeit wird nicht gespeichert, die Zeile bleibt offen (LLH-1768)', async () => {
+    const onSpeichern = vi.fn<(d: Dayjs | null) => Promise<unknown>>().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    await user.clear(feld);
+    await user.type(feld, 'morgen');
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toHaveValue('morgen');
+    expect(screen.getByText('nicht lesbar')).toBeInTheDocument();
+  });
+
   it('getippt + Enter sendet den NEUEN Zeitpunkt', async () => {
     const onSpeichern = vi.fn<(d: Dayjs | null) => Promise<unknown>>().mockResolvedValue(undefined);
     renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);

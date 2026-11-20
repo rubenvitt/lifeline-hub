@@ -1,5 +1,5 @@
 import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
-import { Input, InputNumber, type TableColumnsType } from 'antd';
+import { Input, type TableColumnsType } from 'antd';
 import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { staerkeSumme } from '../anzeige/staerke';
@@ -11,6 +11,7 @@ import { globalKeys } from '../api/queryKeys';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/QualiSollFeld';
 import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
@@ -103,7 +104,7 @@ const felder = (bearbeite: EinheitTyp | null) => (
       <QualiSollFeld bekannt={bearbeite?.quali_soll} />
     </Feld>
     <Feld label="Sortierung" name="sortier" breite="kurz">
-      <InputNumber min={0} />
+      <ZahlFeld min={0} />
     </Feld>
   </>
 );

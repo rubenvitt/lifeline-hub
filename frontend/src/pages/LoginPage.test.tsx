@@ -36,6 +36,22 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'lifeline-hub' })).toBeInTheDocument();
   });
 
+  it('nennt den Grund, wenn die Sitzung im Betrieb beendet wurde (LLH-1770)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+    renderMitProviders(<LoginPage />, {
+      route: { pathname: '/login', state: { von: '/einsaetze/4', grund: 'sitzung-beendet' } },
+    } as never);
+    expect(await screen.findByText('Sitzung beendet – bitte erneut anmelden')).toBeInTheDocument();
+  });
+
+  it('ohne Grund kein Hinweis auf ein Sitzungsende', async () => {
+    setup();
+    await screen.findByLabelText('Benutzername');
+    expect(screen.queryByText('Sitzung beendet – bitte erneut anmelden')).toBeNull();
+  });
+
   it('führt zur Hilfe beim Anmelden, ohne Sitzung (LFH-1096)', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
     server.use(http.get('/api/dev/users', () => HttpResponse.json([])));

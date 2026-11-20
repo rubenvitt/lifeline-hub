@@ -212,7 +212,9 @@ main:has([data-lfh='zaehltasten']) {
 
 /* Dasselbe für den klebenden Fuß eines Seitenformulars (LLH-1761, `fussKlebt="seite"`): der
    Scrollport ist das Dokument, wie bei der Speicherleiste (LFH-475). */
-:root:has([data-lfh='erfassung-fuss-seite']) {
+:root:has([data-lfh='erfassung-fuss-seite']),
+/* In der Gerätehülle ist `main` der Scrollport, die Hülle selbst hat feste Höhe (LLH-1760). */
+.geraet-huelle > main:has([data-lfh='erfassung-fuss-seite']) {
   scroll-padding-block-end: var(--lfh-erfassung-seite-fokusabstand, 0px);
 }
 

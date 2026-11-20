@@ -181,16 +181,29 @@ describe('ErinnerungFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
   const SERVER = Date.parse('2026-10-04T10:00:00Z');
   mitVorgehenderGeraeteuhr(SERVER);
 
-  it('ohne Eingabe ist die Serverzeit fällig', async () => {
+  it('ohne Eingabe ist die Serverzeit plus 30 min fällig (LLH-1768)', async () => {
     const onAnlegen = vi.fn().mockResolvedValue({});
     renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
-        expect.objectContaining({ faellig_at: '2026-10-04 10:00:00' }),
+        expect.objectContaining({ faellig_at: '2026-10-04 10:30:00' }),
       ),
     );
+  });
+
+  it('legt mit unlesbarer Fälligkeit nicht an und lässt den Text stehen (LLH-1768)', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    const feld = screen.getByRole('textbox', { name: 'Fällig' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'morgen');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('nicht lesbar')).toBeInTheDocument();
+    expect(feld).toHaveValue('morgen');
+    expect(onAnlegen).not.toHaveBeenCalled();
   });
 
   it('eine eingetragene Fälligkeit bleibt unverändert', async () => {

@@ -1,4 +1,4 @@
-import { Collapse, Input, InputNumber, type TableColumnsType } from 'antd';
+import { Collapse, Input, type TableColumnsType } from 'antd';
 import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
@@ -15,6 +15,7 @@ import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 import { Status } from '../components/instrument/Status';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
@@ -144,10 +145,10 @@ const felder = (
                 <Input placeholder="#22aa55" />
               </Feld>
               <Feld label="FMS-Anker (0–9, optional)" name="fms_anker" breite="kurz">
-                <InputNumber min={0} max={9} />
+                <ZahlFeld min={0} max={9} />
               </Feld>
               <Feld label="Sortierung" name="sortier" breite="kurz">
-                <InputNumber min={0} />
+                <ZahlFeld min={0} />
               </Feld>
               {markeFeld}
             </>

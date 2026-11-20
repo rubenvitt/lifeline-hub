@@ -13,8 +13,9 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   401). Kein anderer Schreibweg (`api/schreibwege.guard.test.ts`). Nachweis
   `tests/sitzung_benutzerwechsel.rs`, `e2e/sitzung-mehrere-tabs.spec.ts`.
 - `POST /api/auth/logout` mit fremder Kennung → 412, Sitzung bleibt; `logout()` liefert dann
-  `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 **nur lokal** ab
-  (`abmeldenLokal`) — ein Server-Logout träfe eine inzwischen neue Sitzung.
+  `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 nie über den Server ab — ein
+  Server-Logout träfe eine inzwischen neue Sitzung; im Betrieb unterbricht sie (unten), sonst
+  meldet sie **nur lokal** ab (`abmeldenLokal`).
 - Scheitert die Server-Abmeldung sonst (Netz, 5xx, 403), meldet `logout()` trotzdem lokal ab und
   hat die Sitzung schon **vor dem Serverruf** als aufgegeben gemerkt (`beginneAbmeldung` in
   `auth/abmeldungOffen.ts`, LLH-1535; Erfolg oder 412 vergisst genau diesen Vorgang): Benutzer-id
@@ -34,6 +35,31 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   (eine Aktion, nicht schließbar). Ein Kanalobjekt je Tab (kein Selbst-Echo). **Der Konflikt
   wird per Neuladen gelöst, nie im laufenden Baum** — sonst speicherte eine noch montierte Seite
   von A ihren Entwurf mit der Kennung von B. Offline-Abgleich ruht im Konflikt (`abgleichFuer`).
+
+## Sitzung beendet im Betrieb (LLH-1770)
+
+Herleitung: `docs/superpowers/specs/2026-11-20-fwmtnftn-sitzung-beendet-dialog-design.md`.
+
+- **Eine 401 im Betrieb unterbricht, statt abzumelden** (`unterbrechen()` im `AuthProvider`,
+  aufgerufen von Sitzungswache und Prüfung): Der Benutzer bleibt gesetzt, die Seite bleibt
+  montiert, und `SitzungBeendetDialog` legt die Anmeldung darüber. Ausgenommen: gekoppeltes Gerät
+  (LFH-892), kein Benutzer, angekündigtes Abmelden aus einem anderen Tab, 401 auf das erste `/me`
+  beim Start — dort gilt der bisherige Ausgang. Eine ohne Server gestartete Sitzung (LFH-780)
+  zählt als Betrieb.
+- **Die Abdeckung ist undurchsichtig** (`--lfh-grund`) und liegt über jedem Overlay der Seite;
+  der Dialog ist nicht schließbar.
+- **Leseanfragen warten** an der Sitzungssperre (`auth/sitzungsSperre.ts`, gelesen von `apiGet`)
+  statt mit 401 zu scheitern, und wiederholen nach der Auflösung höchstens einmal. Anmeldewege
+  unter `/api/auth/` warten nie.
+- **Auflösung:** dieselbe Person (Dialog, Passkey, anderer Tab) → Lagebild wieder vorhalten,
+  Abfragen invalidieren, `SITZUNG_WIEDERHERGESTELLT` (Live-Ströme verbinden neu), Web Push
+  abgleichen. Eine **andere** Person → Seite neu laden, nie im laufenden Baum übernehmen; im
+  anderen Tab angemeldet → Konfliktdialog, die Unterbrechung endet **ohne Räumen**.
+- **Frist 15 min** (`UNTERBRECHUNG_FRIST_MS`) ab Eintritt; danach oder mit „Abmelden“ im Dialog
+  der volle Ausgang (`unterbrechungBeenden` → `abmeldenLokal('sitzungsende')`), zuerst die
+  Navigation zur Anmeldeseite mit `state.grund = 'sitzung-beendet'`, die den Grund nennt.
+- Die Anmeldestufen liegen in `auth/AnmeldeFormular.tsx`, für Anmeldeseite und Dialog; was nach
+  der Anmeldung geschieht, entscheidet der `AuthProvider`.
 
 ## Sitzungen beenden (LFH-1092)
 

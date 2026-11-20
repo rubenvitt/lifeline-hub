@@ -187,6 +187,9 @@ export default function GeraetMeldungen({
             onErfassen={absenden}
             // Inline: nach dem Senden bleibt das Formular stehen, leer, für die nächste Meldung.
             onFertig={() => {}}
+            // Nur in der Gerätehülle: „Meldung senden“ klebt über der Navigation (LLH-1760); den
+            // Grund des Paneels liest der Fuß selbst.
+            fussKlebt="seite"
             laeuft={senden.isPending}
             erfassenText="Erfassen"
             speicherung={senden}

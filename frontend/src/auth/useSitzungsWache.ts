@@ -11,7 +11,7 @@ import { KOPPLUNG_BEENDET_PFAD } from '../routing/deeplinks';
  * 401-Behandlung hat.
  */
 export function useSitzungsWache(): void {
-  const { abmeldenLokal } = useAuth();
+  const { abmeldenLokal, unterbrechen } = useAuth();
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
 
@@ -20,6 +20,10 @@ export function useSitzungsWache(): void {
     if (pathname === '/login' || pathname === KOPPLUNG_BEENDET_PFAD) return;
 
     const beiAblauf = () => {
+      // Im Betrieb (Person, angemeldet): unterbrechen statt abmelden (LLH-1770). Die Seite bleibt
+      // montiert und verdeckt, der Dialog „Sitzung beendet“ übernimmt. Ein Gerät bekommt keine
+      // Personenanmeldung (LFH-892), ohne Benutzer gibt es nichts zu erhalten.
+      if (!warGeraet() && unterbrechen()) return;
       // Vollständige Rückkehr-URL: `pathname` allein verlöre die Deeplink-Selektion (`?eintrag=` …).
       const von = `${pathname}${search}${hash}`;
       // NUR lokal abmelden (LFH-387): ein Server-Logout liefe mit dem Cookie von JETZT und
@@ -40,5 +44,5 @@ export function useSitzungsWache(): void {
     };
     window.addEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
     return () => window.removeEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
-  }, [abmeldenLokal, navigate, pathname, search, hash]);
+  }, [abmeldenLokal, unterbrechen, navigate, pathname, search, hash]);
 }

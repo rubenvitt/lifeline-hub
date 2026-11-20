@@ -7,6 +7,8 @@ import { merkeGeraet } from '../geraet/geraetMarke';
 
 const logout = vi.fn(() => Promise.resolve(true));
 const abmeldenLokal = vi.fn();
+/** Ohne Benutzer (Vorgabe der Sonde) ist die Unterbrechung nicht zuständig. */
+const unterbrechen = vi.fn(() => false);
 
 vi.mock('./AuthContext', async (echt) => ({
   ...(await echt<typeof import('./AuthContext')>()),
@@ -18,6 +20,7 @@ vi.mock('./AuthContext', async (echt) => ({
     aktualisiere: vi.fn(),
     abmeldenLokal,
     konflikt: null,
+    unterbrechen,
   }),
 }));
 
@@ -25,6 +28,8 @@ afterEach(() => {
   sitzungsMeldungZuruecksetzen();
   logout.mockClear();
   abmeldenLokal.mockReset();
+  unterbrechen.mockReset();
+  unterbrechen.mockImplementation(() => false);
 });
 
 /** Rendert die Wache unter `route` und macht Pfad + Rückkehr-URL sichtbar. */
@@ -46,6 +51,15 @@ function renderWache(route: string) {
 }
 
 describe('useSitzungsWache', () => {
+  it('unterbricht im Betrieb und bleibt auf der Seite (LLH-1770)', async () => {
+    unterbrechen.mockImplementation(() => true);
+    const { getByTestId } = renderWache('/einsaetze/7/meldungen?neu=1');
+    window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
+    await waitFor(() => expect(unterbrechen).toHaveBeenCalledTimes(1));
+    expect(getByTestId('ort').textContent).toBe('/einsaetze/7/meldungen|');
+    expect(abmeldenLokal).not.toHaveBeenCalled();
+  });
+
   it('meldet ab und leitet zum Login, wenn die Sitzung abläuft', async () => {
     const { getByTestId } = renderWache('/admin/benutzer');
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));

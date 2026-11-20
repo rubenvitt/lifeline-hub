@@ -76,7 +76,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   - **Enter weicht nach der Zeigerart, nicht nach der Breite** (`useViewport().istBeruehrung`):
     mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
     Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
-    sendet einen Einzeiler). Den Vertrag zeigt die Tastenkappe ↵ an „Erfassen“ (nur feiner
+    sendet einen Einzeiler); blankes Enter im leeren Feld tut nichts, führende Leerzeilen machen
+    keinen Mehrzeiler (LLH-1756). Den Vertrag zeigt die Tastenkappe an „Erfassen“, ↵ beim
+    Einzeiler, „Strg + ↵“/„⌘ ↵“ beim Mehrzeiler (nur feiner
     Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“. Das ist der
     Enter-Vertrag „mehrzeilig in der Zeile“ (`frontend/AGENTS.md`, „Erfassungs-Norm“, LLH-1766),
     verschärft: nach einem Umbruch sendet auch mit feinem Zeiger nur noch Strg/⌘+Enter.
