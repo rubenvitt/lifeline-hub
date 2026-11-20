@@ -60,7 +60,11 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (LLH-1842, LLH-1865). Enter im Feld übernimmt und springt in den Inhalt. Fokus beim Laden und
   nach dem Erfassen im ersten leeren Pflichtfeld (`fokusStart`), sonst im Inhalt; ein Pflicht- oder
   Zeitgrund steht in der Fußzeile, das Feld ist `aria-invalid`, beschreibt sich per
-  `aria-describedby` und bekommt den Fokus. Eine Ereigniszeit ab einer Minute vor „jetzt“ ist ein
+  `aria-describedby` und bekommt den Fokus. **Ohne Standard-Rufname** (Abfrage offen, LLH-1764)
+  haben die fehlenden Seiten, die beim Typ die eigene Stelle tragen (`hatVorgabe`), EINEN Grund
+  („Absender und Empfänger fehlen – Rufname oben eintragen“, `rufnameFehltText`), auf den Feld und
+  Abfrage verweisen; Start- und Pflichtfokus gehen in die Abfrage (`data-startfeld="rufname"`),
+  nach dem Übernehmen ins nächste leere Pflichtfeld. Das Von einer Meldung bleibt ein Feld von Hand. Eine Ereigniszeit ab einer Minute vor „jetzt“ ist ein
   Nachtrag: Feld `status="warning"`, Fußzeile „Nachtrag · Ereignis vor n min“, Knopf „Erfassen als
   HHMM“. Fußzeile (`fusszeileStil`): links Gründe, „Auch in den Meldungseingang“, „Werte behalten“,
   rechts „+ Veranlassung“, „Anhang“, „+ weiterer Entwurf“, „Eigene Stelle ändern“ und bei Lage der

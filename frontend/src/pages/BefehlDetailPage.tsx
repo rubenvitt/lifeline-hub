@@ -404,7 +404,7 @@ function BefehlDetail() {
               {
                 // Zurück auf den Reiter Befehle, dieser Befehl gewählt und markiert (oxgob5gk D6).
                 title: (
-                  <ListenRueckweg to={auftraegePfad(einsatzId, { befehl: befehlId })}>
+                  <ListenRueckweg zeilenmarke to={auftraegePfad(einsatzId, { befehl: befehlId })}>
                     Aufträge/Befehle
                   </ListenRueckweg>
                 ),

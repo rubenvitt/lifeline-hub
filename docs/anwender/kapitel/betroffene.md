@@ -103,13 +103,21 @@ ausgetreten. Ohne Netz wird der Fall vorgemerkt und geht mit seiner Erfassungsze
 
    ![Kurzeingabe mit erkanntem Namen, Geschlecht, Alter, Sichtung SK III und Unfallhilfsstelle](../bilder/betroffene/kurzeingabe.png)
 
-2. Unter dem Feld steht, was erkannt wurde („erkannt: …“). Was sich nicht deuten lässt, nennt
-   die Zeile unter „Nicht erfasst: …“; dann wird nichts angelegt.
+2. Unter dem Feld steht, was erkannt wurde („erkannt: …“). Der Name ist nur die erste
+   zusammenhängende Gruppe freier Wörter; jedes weitere Wort, das kein Kürzel ist, steht dort
+   wellig unterstrichen mit „?“ (etwa „verwirrt ?“ in „Mann ca 40 rot verwirrt“). Was sich nicht
+   deuten lässt, nennt die Zeile beim Speichern unter „Nicht erfasst: …“; dann wird nichts
+   angelegt.
 3. Enter speichert. Das Feld leert sich, rechts steht „Zuletzt: …“ mit der Registriernummer.
-   Escape leert das Feld, ohne zu speichern.
+   Enter auf dem leeren Feld sagt „Noch nichts eingegeben“. Escape leert das Feld, ohne zu
+   speichern.
 
-Die Kürzel: „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alter (geschätzt als „~50“); „sk1“
-bis „sk4“, „skt“ für tot und „sku“ für unverletzt; „#Breite/Länge“ für die Koordinate des
+Die Kürzel stehen, solange das leere Feld den Fokus hat, als Tafel unter der Zeile (am Handy hinter
+„Kürzel anzeigen“): „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alter (geschätzt als „~50“
+oder „ca 50“); die Sichtung als Farbe „rot“, „gelb“, „grün“, „blau“ (SK I bis SK IV) oder als
+„sk1“ bis „sk4“, dazu „skt“ für tot und „sku“ für unverletzt. Eine Farbe direkt am Komma gehört
+zum Namen („Grün, Anna“); „schwarz“ und „weiß“ sind keine Sichtung, weil sie häufige Nachnamen
+sind; „#Breite/Länge“ für die Koordinate des
 Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird; „!“ mit einem
 Kürzel für den Anlass der Hilfeleistung: „!verl“, „!intern“, „!neuro“, „!intox“, „!hitze“ (auch
 „!kaelte“), „!allergie“ (auch „!stich“), „!psych“ und „!sonst“.

@@ -213,6 +213,8 @@ export default function AufnahmePage() {
           key={einsatzId}
           form={form}
           serie
+          // Der Fuß klebt (LLH-1761): am Handy lag „Erfassen“ bei y ≈ 1100 einer 1149 px hohen Seite.
+          fussKlebt="seite"
           uebernahme={['antreff_ort']}
           laeuft={anlegenSpeicherung.isPending}
           // Eine Ablehnung steht am Formular, bis zum nächsten Absenden, kein Toast (LFH-1077).

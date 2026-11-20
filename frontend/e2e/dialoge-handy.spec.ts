@@ -5,7 +5,9 @@ import { anmeldenAlsAdmin, wechsleZuRolle, type Rolle } from './rollen-kern';
  * Dialoge am Handy (LFH-953): auf 390 px liegt jedes Bedienziel im Schirm und lässt sich klicken.
  *
  * - **Erfassungsfuß** (`components/Erfassung.tsx`): die drei Knöpfe der Serie liefen nebeneinander
- *   links aus dem Dialog („Abbrechen“ bei x = −75). Unter `md` stehen sie untereinander.
+ *   links aus dem Dialog („Abbrechen“ bei x = −75). Unter `md` stehen sie untereinander. Seit
+ *   LLH-1763 klebt dort nur der Abschluss (unter 20 % der Höhe), „Abbrechen“ steht im Kopf, die
+ *   Serie am Formularende.
  * - **Zeiteingabe** (`anzeige/ZeitpunktEingabe.tsx`): antds Panel mit Uhrzeit war 437 px breit,
  *   „OK“ und die Uhrzeit lagen außerhalb, die Seite scrollte seitlich. Unter `md` steht es als
  *   Blatt am unteren Rand (`anzeige/ZeitpunktEingabe.css`). Auf dem Führungs-Tablet (820 und
@@ -37,7 +39,6 @@ type Groesse = { width: number; height: number };
 const STEUERHOEHE: Record<Stufe, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
 /** Freier Streifen über dem Blatt, auf den man zum Schließen tippt (Blatt ≤ 85 % der Höhe). */
 const streifen = (g: Groesse) => Math.floor(g.height * 0.15) - 1;
-const STREIFEN = streifen(HANDY);
 
 /**
  * Der offene Kalender einer Zeiteingabe (`anzeige/ZeitKalender.tsx`, ein antd-Popover), erkannt
@@ -162,6 +163,41 @@ async function waehleImPanel(
     true,
   );
   await ok.click();
+}
+
+/**
+ * Ein Punkt im Streifen über dem Blatt, unter dem kein Bedienziel liegt. Der Streifen deckt am
+ * Handy den Einsatzkopf mit; ein Tipp mitten darauf traf die Alarmzentrale, deren Menü sich über
+ * die Seite legte und den nächsten Tipp fing. Geprüft wird das Wegtippen, nicht der Kopf.
+ */
+async function ruhigerPunktImStreifen(page: Page, g: Groesse = HANDY) {
+  const punkt = await page.evaluate(
+    ({ breite, hoehe }) => {
+      const ziel = 'button, a, input, select, textarea, [role="button"], [role="menuitem"]';
+      // Ein Fingertipp rückt auf ein nahes Ziel (Chromium-Tippkorrektur): der Punkt braucht
+      // ringsum Abstand zu jedem Bedienziel, sonst öffnet der Tipp etwa die Navigation neben ihm.
+      const abstand = 24;
+      const kaesten = [...document.querySelectorAll(ziel)]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      const fern = (x: number, y: number) =>
+        kaesten.every((r) => {
+          const dx = Math.max(r.left - x, 0, x - r.right);
+          const dy = Math.max(r.top - y, 0, y - r.bottom);
+          return Math.hypot(dx, dy) >= abstand;
+        });
+      for (let y = Math.floor(hoehe / 2); y < hoehe; y += 4) {
+        for (let x = 8; x < breite - 8; x += 8) {
+          const el = document.elementFromPoint(x, y);
+          if (el && !el.closest(ziel) && fern(x, y)) return { x, y };
+        }
+      }
+      return null;
+    },
+    { breite: g.width, hoehe: streifen(g) },
+  );
+  expect(punkt, 'im Streifen über dem Blatt liegt ein Punkt ohne Bedienziel').not.toBeNull();
+  return punkt!;
 }
 
 /** Das offene Blatt liegt im Schirm und lässt oben einen Streifen zum Wegtippen frei. */
@@ -300,6 +336,32 @@ async function pruefeSerienfuss(page: Page, einsatzId: string, wer: string) {
     ).toBe(true);
   }
   await keinSeitlicherUeberlauf(page, `${wer}, Serienmaske`);
+
+  // LLH-1763: „Abbrechen“ steht im Kopf (Text im Schließknopf), klebend nur der Abschluss; die Serie
+  // steht am Formularende. Gestapelt fraß der Fuß vorher 271 von 844 px.
+  await expect(knoepfe[0]).toHaveClass(/ant-modal-close/);
+  const fuss = dialog.locator('[data-lfh="erfassung-fuss"]');
+  await expect(fuss.getByRole('button', { name: 'Erfassen', exact: true })).toHaveCount(1);
+  await expect(fuss.getByRole('button', { name: 'Speichern und nächste' })).toHaveCount(0);
+  await expect(fuss.getByRole('button', { name: 'Abbrechen' })).toHaveCount(0);
+  const fussHoehe = (await kasten(fuss)).height;
+  expect(
+    fussHoehe,
+    `${wer}: klebender Fuß ${fussHoehe} px, Soll < 20 % von ${HANDY.height}`,
+  ).toBeLessThan(HANDY.height * 0.2);
+  const titel = await kasten(dialog.locator('.ant-modal-title'));
+  const kopfKnopf = await kasten(knoepfe[0]);
+  expect(
+    titel.x + titel.width <= kopfKnopf.x + SUBPIXEL ||
+      titel.y + titel.height <= kopfKnopf.y + SUBPIXEL ||
+      kopfKnopf.y + kopfKnopf.height <= titel.y + SUBPIXEL,
+    `${wer}: Titel ${JSON.stringify(titel)} läuft unter „Abbrechen“ ${JSON.stringify(kopfKnopf)}`,
+  ).toBe(true);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `${wer}: klebender Fuß ${Math.round(fussHoehe)} px`,
+  });
+
   // Die Speicherknöpfe würden absenden; `trial` prüft dieselbe Klickbarkeit ohne Klick.
   await knoepfe[1].click({ trial: true });
   await knoepfe[2].click({ trial: true });
@@ -430,7 +492,8 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     await expect(blatt.getByRole('button', { name: 'Übernehmen', exact: true })).toBeVisible();
     // Auf dem Touchgerät nimmt das Uhrzeitfeld keinen Fokus an: die Tastatur deckte das Blatt.
     await expect(blatt.getByRole('textbox', { name: 'Uhrzeit', exact: true })).not.toBeFocused();
-    await page.touchscreen.tap(HANDY.width / 2, Math.floor(STREIFEN / 2));
+    const ruhig = await ruhigerPunktImStreifen(page);
+    await page.touchscreen.tap(ruhig.x, ruhig.y);
     await expect(panel(page)).toBeHidden();
     // Der Tipp liegt auch außerhalb der Zeitraum-Schnellwahl: sie schließt mit, nichts ist gewählt.
     await expect(zeitraumWahl(page)).toHaveAttribute('aria-expanded', 'false');

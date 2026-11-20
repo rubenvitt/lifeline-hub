@@ -1,5 +1,13 @@
 import { Button, Input, type InputRef } from 'antd';
-import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import type { Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
@@ -8,12 +16,14 @@ import { Zeichenzaehler } from '../components/zeichenGrenze';
 import SichtungsTag from '../components/SichtungsTag';
 import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, Textstufe, monoStil, useRollen } from '../components/instrument';
+import { schrift, schriftskala } from '../theme/tokens';
 import { formatKoordinate } from './koordinate';
 import {
   ANLASS_KUERZEL,
   ENTLASSEN_KUERZEL,
   MASSNAHME_KUERZEL,
   SICHTUNG_BUCHSTABEN,
+  SICHTUNG_FARBEN,
   loeseBefehl,
   loeseUhsAuf,
   parsePersonBefehl,
@@ -70,6 +80,35 @@ interface BetroffeneZeileProps {
   feldRef?: Ref<InputRef>;
 }
 
+/** Der Grund eines unerkannten Wortblocks aus `parsePersonBefehl` (LLH-1767). */
+const NICHT_VERSTANDEN = 'Nicht verstanden';
+
+/**
+ * Die Zeilen der Kürzel-Legende (LLH-1767): Zeichen und ausgeschriebene Bedeutung, die Listen
+ * aus denselben Quellen wie der Parser (LFH-948).
+ */
+const LEGENDE: readonly { zeichen: string; bedeutung: string }[] = [
+  { zeichen: 'Name, Vorname', bedeutung: 'Nachname zuerst · „unbekannt“ für ohne Namen' },
+  { zeichen: 'm / w / d', bedeutung: 'Geschlecht, dahinter das Alter: w 34 · m ca 50' },
+  {
+    zeichen: SICHTUNG_FARBEN.map((f) => f.farbe).join(' · '),
+    bedeutung: `Sichtung SK I–IV · auch sk1–sk4 · ${SICHTUNG_BUCHSTABEN.map(
+      (k) => `${k.kuerzel} = ${SK_META[k.kategorie].label}`,
+    ).join(' · ')}`,
+  },
+  {
+    zeichen: '!',
+    bedeutung: `Anlass: ${ANLASS_REIHE.map((a) => ANLASS_KUERZEL[a][0]).join(' · ')}`,
+  },
+  {
+    zeichen: '+',
+    bedeutung: `Maßnahme: ${LEICHTE_MASSNAHMEN.map((m) => MASSNAHME_KUERZEL[m][0]).join(' · ')}`,
+  },
+  { zeichen: `>${ENTLASSEN_KUERZEL[0]}`, bedeutung: 'versorgt und entlassen (braucht „!Anlass“)' },
+  { zeichen: '#', bedeutung: 'Fundort: #52.2691/9.1342' },
+  { zeichen: '@', bedeutung: 'Unfallhilfsstelle: @Weserstadion' },
+];
+
 function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] }) {
   const { rollen } = useRollen();
   switch (teil.art) {
@@ -119,6 +158,22 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
         </span>
       );
     case 'unerkannt':
+      // Ein nicht verstandener Wortblock (LLH-1767) ist keine verworfene Angabe, sondern eine
+      // Frage an den Schreiber: Wellenlinie und „?“ statt Durchstreichen.
+      if (teil.grund === NICHT_VERSTANDEN) {
+        return (
+          <span
+            style={{
+              ...monoStil('monoKlein'),
+              color: rollen.alarmText,
+              textDecoration: 'underline wavy',
+            }}
+            title={teil.grund}
+          >
+            {teil.text} ?
+          </span>
+        );
+      }
       return (
         <span
           style={{
@@ -154,6 +209,8 @@ export default function BetroffeneZeile({
   const [fokus, setFokus] = useState(false);
   /** Fehler des letzten Absende-Versuchs (Prüfung ODER Server) — steht bis zur nächsten Eingabe. */
   const [versuchFehler, setVersuchFehler] = useState<string[] | null>(null);
+  /** Enter auf dem leeren Feld (LLH-1767): leise sagen, dass nichts da ist, statt still zu bleiben. */
+  const [leerVersuch, setLeerVersuch] = useState(false);
 
   const befehl = useMemo(() => parsePersonBefehl(text), [text]);
   const ergebnis = useMemo(() => loeseBefehl(befehl, uhsListe), [befehl, uhsListe]);
@@ -167,8 +224,9 @@ export default function BetroffeneZeile({
   async function senden() {
     if (sendetRef.current || laeuft) return;
     if (!ergebnis.ok) {
-      // Leere Eingabe: nichts tun, kein Fehlerton. Mit Problemen: sagen, warum nicht.
-      if (ergebnis.probleme.length > 0) setVersuchFehler(ergebnis.probleme);
+      // Leere Eingabe: leiser Hinweis, kein Fehlerton (LLH-1767). Mit Problemen: sagen, warum nicht.
+      if (befehl.leer) setLeerVersuch(true);
+      else if (ergebnis.probleme.length > 0) setVersuchFehler(ergebnis.probleme);
       return;
     }
     sendetRef.current = true;
@@ -187,20 +245,61 @@ export default function BetroffeneZeile({
   }
 
   const leer = befehl.leer;
-  const kuerzelEingeklappt = istSchmal && !kuerzelOffen;
-  // Ab `md` nur bei Fokus auf dem leeren Feld (LFH-1078): sonst reichen Platzhalter und
-  // „erkannt:“-Marken. Durchsichtig, nicht ausgehängt: die Zeile behält ihre Höhe, und die Kürzel
-  // bleiben die Beschreibung des Felds (`visibility: hidden` nähme sie Vorlesenden).
-  const kuerzelVerdeckt = !istSchmal && !fokus;
-  // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle: der Hinweis bleibt
-  // im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe (sonst sprang bei 390 px
-  // der Inhalt darunter beim ersten Zeichen). Unter `md` hält der Knopf „Kürzel anzeigen“ in
-  // derselben Ebene die Höhe (LFH-963). Das Feld beschreibt sich je nach Lage mit den Kürzeln
+  // Die Legende (LLH-1767) ist ein Raster in Lauftextgröße. Unter `md` steht sie nur aufgeklappt
+  // da, im Fluss (LFH-963, design.md D6). Ab `md` liegt sie bei Fokus auf dem LEEREN Feld als
+  // Schicht unter der Zeile (LFH-1078: sonst reichen Platzhalter und „erkannt:“-Marken): drei, vier
+  // Zeilen im Fluss schöben die Liste dauerhaft nach unten. Sonst bleibt sie für Vorlesende im
+  // Baum, als Beschreibung des Felds.
+  const legendeLage: 'vorleser' | 'fluss' | 'schicht' = istSchmal
+    ? kuerzelOffen
+      ? 'fluss'
+      : 'vorleser'
+    : fokus && leer
+      ? 'schicht'
+      : 'vorleser';
+  const raster = {
+    display: 'grid',
+    // Am Handschirm Zeichen über Bedeutung: neben „rot · gelb · grün · blau“ bliebe der Bedeutung
+    // kaum ein Drittel der Breite.
+    gridTemplateColumns: istSchmal ? 'minmax(0, 1fr)' : 'max-content minmax(0, 1fr)',
+    columnGap: token.padding,
+    rowGap: token.marginXXS,
+    margin: 0,
+    fontFamily: schrift.text,
+    fontSize: schriftskala.text.groesse,
+    color: rollen.text,
+  } as const;
+  const legendeStil: CSSProperties =
+    legendeLage === 'vorleser'
+      ? NUR_VORLESER
+      : legendeLage === 'fluss'
+        ? { ...raster, flexBasis: '100%' }
+        : {
+            ...raster,
+            position: 'absolute',
+            top: '100%',
+            insetInlineStart: 0,
+            // Über Tabellenkopf und Zeilen der Liste, unter dem Eingangsband (`zIndexPopupBase - 1`)
+            // und allen Klappflächen.
+            zIndex: token.zIndexPopupBase - 2,
+            width: 'max-content',
+            maxWidth: 'min(720px, calc(100vw - 32px))',
+            marginBlockStart: token.marginXXS,
+            padding: `${token.paddingXS}px ${token.paddingSM}px`,
+            background: rollen.flaeche2,
+            border: `1px solid ${rollen.linie}`,
+          };
+  // Legende (bzw. unter `md` ihr Knopf) und „erkannt: …" liegen GESTAPELT in derselben
+  // Rasterzelle: die Ebene bleibt im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe
+  // (sonst sprang bei 390 px der Inhalt darunter beim ersten Zeichen). Ab `md` hält `minBlockSize`
+  // die eine Zeile, die „erkannt:“ braucht. Das Feld beschreibt sich je nach Lage mit der Legende
   // oder mit „erkannt: …“, nie mit beidem und nie mit dem Knopf.
   const stapel = { gridArea: '1 / 1' } as const;
   const hinweiszeile = (
     <>
-      <span style={{ display: 'inline-grid', minWidth: 0 }}>
+      <span
+        style={{ display: 'inline-grid', minWidth: 0, position: 'relative', minBlockSize: '1lh' }}
+      >
         <span
           aria-hidden={leer ? undefined : true}
           style={{
@@ -213,49 +312,21 @@ export default function BetroffeneZeile({
             visibility: leer ? 'visible' : 'hidden',
           }}
         >
-          {/* Unter `md` eingeklappt (LFH-963, design.md D6): drei Zeilen Kürzel kosteten am Handy
-              den Platz der ersten Person. Eingeklappt bleiben sie für Vorleser im Baum (die
-              Beschreibung des Felds), nur unsichtbar. */}
-          <span
-            id={kuerzelId}
-            style={
-              kuerzelEingeklappt
-                ? NUR_VORLESER
-                : {
-                    display: 'inline-flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    columnGap: token.padding,
-                    rowGap: token.marginXXS,
-                    ...(kuerzelVerdeckt ? { opacity: 0 } : {}),
-                  }
-            }
-          >
-            <span>
-              Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
-            </span>
-            <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-            {/* Die Buchstaben-Kürzel ausgeschrieben (LFH-948), aus derselben Quelle wie der
-                Parser. */}
-            <span style={{ color: rollen.gedaempft }}>
-              sk1–sk4 ·{' '}
-              {SICHTUNG_BUCHSTABEN.map((k) => `${k.kuerzel} = ${SK_META[k.kategorie].label}`).join(
-                ' · ',
-              )}
-            </span>
-            {/* Anlass (LLH-1566): je Anlass das erste Kürzel, aus derselben Quelle wie der Parser. */}
-            <span style={{ color: rollen.gedaempft }}>
-              !Anlass: {ANLASS_REIHE.map((a) => ANLASS_KUERZEL[a][0]).join(' · ')}
-            </span>
-            {/* Leichter Fall (LLH-1572): Maßnahmen der Kurzliste und die Entlassung, gleiche Quelle. */}
-            <span style={{ color: rollen.gedaempft }}>
-              +Maßnahme: {LEICHTE_MASSNAHMEN.map((m) => MASSNAHME_KUERZEL[m][0]).join(' · ')}
-            </span>
-            <span style={{ color: rollen.gedaempft }}>&gt;{ENTLASSEN_KUERZEL[0]}</span>
-            {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-            <span style={{ color: rollen.gedaempft }}>#Fundort (52.2691/9.1342)</span>
-            <span style={{ color: rollen.gedaempft }}>@Unfallhilfsstelle</span>
+          {/* In der Ebene des leeren Felds, ÜBER der Legenden-Schicht (die sonst den Hinweis
+              verdeckte). Immer im Baum, damit Vorlesende die Meldung beim Erscheinen hören. */}
+          <span role="status" style={leerVersuch ? undefined : NUR_VORLESER}>
+            {leerVersuch ? 'Noch nichts eingegeben' : ''}
           </span>
+          <dl id={kuerzelId} data-lfh="kuerzel" aria-label="Kürzel" style={legendeStil}>
+            {LEGENDE.map((z) => (
+              <div key={z.zeichen} style={{ display: 'contents' }}>
+                <dt style={{ ...monoStil('mono'), color: rollen.bedien }}>{z.zeichen}</dt>{' '}
+                <dd style={{ margin: 0, marginBlockEnd: istSchmal ? token.marginXS : 0 }}>
+                  {z.bedeutung}
+                </dd>
+              </div>
+            ))}
+          </dl>
           {/* EIN Knopf für beide Richtungen: er bleibt beim Umschalten derselbe Knoten, der Fokus
               bleibt auf ihm. Beim Tippen unsichtbar wie die Ebene, seine Höhe bleibt stehen. */}
           {istSchmal && (
@@ -303,10 +374,30 @@ export default function BetroffeneZeile({
     </>
   );
 
+  // Unter `md` gestapelt (LLH-1762): das Feld allein auf voller Breite, „/person“ und der Knopf
+  // in der zweiten Zeile der Box. Einzeilig blieben am Handy 96 px, etwa elf Zeichen, und die
+  // Eingabe ließ sich vor dem Senden nicht gegenlesen.
+  const erfassenKnopf = (
+    <Button
+      type="primary"
+      loading={laeuft}
+      onClick={() => void senden()}
+      style={istSchmal ? undefined : { marginInline: token.marginXS, flex: '0 0 auto' }}
+    >
+      Erfassen
+    </Button>
+  );
+
   return (
     // `feldFuellt` lässt das Feld wachsen und unter seine Inhaltsbreite schrumpfen (sonst drückte es
     // am Handschirm den Knopf hinaus); der Knopf hält sich mit `flex: 0 0 auto` heraus.
-    <Schnellerfassungszeile praefix="/person" hinweiszeile={hinweiszeile} feldFuellt>
+    <Schnellerfassungszeile
+      praefix="/person"
+      hinweiszeile={hinweiszeile}
+      feldFuellt
+      gestapelt={istSchmal}
+      hinweis={istSchmal ? erfassenKnopf : undefined}
+    >
       <Input
         ref={setzeFeld}
         value={text}
@@ -319,6 +410,7 @@ export default function BetroffeneZeile({
         onChange={(e) => {
           setText(e.target.value);
           setVersuchFehler(null);
+          setLeerVersuch(false);
         }}
         onPressEnter={() => void senden()}
         onFocus={() => setFokus(true)}
@@ -331,14 +423,7 @@ export default function BetroffeneZeile({
           }
         }}
       />
-      <Button
-        type="primary"
-        loading={laeuft}
-        onClick={() => void senden()}
-        style={{ marginInline: token.marginXS, flex: '0 0 auto' }}
-      >
-        Erfassen
-      </Button>
+      {!istSchmal && erfassenKnopf}
     </Schnellerfassungszeile>
   );
 }

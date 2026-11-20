@@ -22,6 +22,7 @@ import { druckansichtNebenweg } from '../../components/druck/useDruckNebenwege';
 import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
+import { useViewport } from '../../components/useViewport';
 import {
   Feld,
   Kennzahl,
@@ -119,6 +120,7 @@ export default function RegistrierungPaneel({
   const geraetDarfHier = useGeraetDarf();
   const { zone } = useZeitEingabe();
   const grundId = useId();
+  const { istSchmal } = useViewport();
   const abmeldungGrundId = useId();
   const [maske, setMaske] = useState<MaskeOffen>(null);
   const [abmelden, setAbmelden] = useState<Ziel | null>(null);
@@ -430,6 +432,11 @@ export default function RegistrierungPaneel({
   };
 
   const band = daten ? kostformBand(daten) : null;
+  const grundText = sperrGrund && (
+    <Typography.Text id={grundId} type="secondary">
+      {sperrGrund}
+    </Typography.Text>
+  );
 
   return (
     <Paneel
@@ -439,11 +446,7 @@ export default function RegistrierungPaneel({
       }
       aktion={
         <Stapel als="span" richtung="zeile" ausrichten="mitte" abstand="xs">
-          {sperrGrund && (
-            <Typography.Text id={grundId} type="secondary">
-              {sperrGrund}
-            </Typography.Text>
-          )}
+          {sperrGrund && !istSchmal && grundText}
           <Button
             disabled={sperrGrund != null}
             aria-describedby={sperrGrund ? grundId : undefined}
@@ -465,6 +468,9 @@ export default function RegistrierungPaneel({
         </Stapel>
       }
     >
+      {/* Unter md trägt der Kopf neben „Registrieren“ und „Weitere“ keinen Grund (Gate 1, 390 px):
+          er steht dann als eigene Zeile über dem Inhalt und beschreibt den Knopf weiter. */}
+      {sperrGrund && istSchmal && <div data-lfh="registrierung-sperrgrund">{grundText}</div>}
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
       {abmeldungBeantragt && (

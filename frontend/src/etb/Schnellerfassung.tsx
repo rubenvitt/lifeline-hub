@@ -25,7 +25,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import EtbFeldzeile, { FEHLT, TypKnopf, type ParteiRef } from './EtbFeldzeile';
+import EtbFeldzeile, { FEHLT, rufnameFehltText, TypKnopf, type ParteiRef } from './EtbFeldzeile';
 import { useFunkrufnamen } from './funkrufnamen';
 import { anVorbelegung } from '../fuehrung/funktionsOptionenKern';
 import {
@@ -38,7 +38,12 @@ import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import { useRahmenOben } from '../components/rahmenOben';
 import { useEtbKopfHoehe } from './etbKopfKleben';
 import RufnameAbfrage from './RufnameAbfrage';
-import { auchInMeldungseingang, ausStandard, wirksameMetadaten } from './standardRufname';
+import {
+  auchInMeldungseingang,
+  ausStandard,
+  hatVorgabe,
+  wirksameMetadaten,
+} from './standardRufname';
 import type { StandardRufnameZugriff } from './useStandardRufname';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
@@ -344,6 +349,8 @@ export default function Schnellerfassung({
   const anRef = useRef<ParteiRef>(null);
   const meldewegRef = useRef<RefSelectProps>(null);
   const veranlassungRef = useRef<InputRef>(null);
+  /** Das Feld der Rufname-Abfrage, solange sie ohne Standard offen steht (LLH-1764). */
+  const rufnameRef = useRef<ParteiRef>(null);
   /** „+ Veranlassung“ hat das Feld in die Zeile geholt (auch ohne Wert, bis es leer verlassen wird). */
   const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
@@ -392,6 +399,14 @@ export default function Schnellerfassung({
   // ein `@` füllen sie ohne `setzeFeld` (Review E5).
   const fehltJetzt = fehlendeSeiten(wirksam);
   const pflichtSichtbar = pflicht.filter((seite) => fehltJetzt.includes(seite));
+  /**
+   * Ohne Standard steht die Abfrage über der Zeile (LLH-1764). Seiten, die beim Typ der Rufname
+   * füllt, haben dann EINEN Grund, der auf sie verweist, und der Fokus geht in die Abfrage; eine
+   * Seite ohne Vorgabe (Von einer Meldung: die Stelle draußen) bleibt ein Feld von Hand.
+   */
+  const ohneStandardGefragt = !berichtigungZu && rufname.geladen && rufname.standard == null;
+  const ausRufname = (seite: 'von' | 'an') => ohneStandardGefragt && hatVorgabe(seite, vorgabeTyp);
+  const rufnameSichtbar = pflichtSichtbar.filter(ausRufname);
   /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
   const pflichtGrundId = useId();
   const zeitGrundId = useId();
@@ -594,12 +609,39 @@ export default function Schnellerfassung({
     });
   }
 
-  /** Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). */
+  /**
+   * Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). Füllt
+   * eine fehlende Seite der Rufname aus der offenen Abfrage, geht der Fokus zuerst dorthin
+   * (LLH-1764): sie gilt einmal für alle Einträge.
+   */
   function fokusStart(nurOhneFremdenFokus = false) {
-    const fehlt = berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0];
-    if (fehlt) fokusFeld(fehlt, nurOhneFremdenFokus);
+    const fehlen = berichtigungZu ? [] : fehlendeSeiten(wirksam);
+    if (fehlen.length > 0) fokusPflicht(fehlen, nurOhneFremdenFokus);
     else textRef.current?.focus();
   }
+
+  /** Fokus auf den Weg, der die fehlenden Seiten füllt: die Abfrage, sonst das erste Feld. */
+  function fokusPflicht(fehlen: readonly ('von' | 'an')[], nurOhneFremdenFokus = false) {
+    if (!fehlen.some(ausRufname)) {
+      fokusFeld(fehlen[0], nurOhneFremdenFokus);
+      return;
+    }
+    requestAnimationFrame(() => {
+      if (nurOhneFremdenFokus && istEingabefeld(document.activeElement)) return;
+      // Eingeklappt (Handschirm) steht die Abfrage nicht: dann das Feld selbst.
+      const ziel = rufnameRef.current ?? (fehlen[0] === 'von' ? vonRef : anRef).current;
+      ziel?.focus();
+    });
+  }
+
+  /** Nach dem Übernehmen des Rufnamens: Fokus, sobald der Standard gilt (nächstes leeres Feld). */
+  const fokusNachRufname = useRef(false);
+  useEffect(() => {
+    if (!fokusNachRufname.current || rufname.standard == null) return;
+    fokusNachRufname.current = false;
+    fokusStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rufname.standard]);
 
   function aktualisiereTrigger(text: string, caret: number) {
     const slash = erkenneSlashTrigger(text, caret);
@@ -807,7 +849,7 @@ export default function Schnellerfassung({
     const fehlen = fehlendeSeiten(wirksam);
     setPflicht(fehlen);
     if (fehlen.length > 0) {
-      fokusFeld(fehlen[0]);
+      fokusPflicht(fehlen);
       return;
     }
     // Zeichengrenzen des Servers (LFH-937, design.md D8): ebenfalls VOR Upload und Warteschlange.
@@ -1034,18 +1076,31 @@ export default function Schnellerfassung({
   });
   const gruende = (
     <>
-      {pflichtSichtbar.map((seite) => (
+      {rufnameSichtbar.length > 0 && (
         <span
-          key={seite}
-          id={`${pflichtGrundId}-${seite}`}
+          id={`${pflichtGrundId}-rufname`}
           role="alert"
           data-lfh="etb-pflicht-hinweis"
           style={grundStil(rollen.alarmText)}
         >
           <IconWarndreieck />
-          <span>{FEHLT[seite]}</span>
+          <span>{rufnameFehltText(rufnameSichtbar)}</span>
         </span>
-      ))}
+      )}
+      {pflichtSichtbar
+        .filter((seite) => !ausRufname(seite))
+        .map((seite) => (
+          <span
+            key={seite}
+            id={`${pflichtGrundId}-${seite}`}
+            role="alert"
+            data-lfh="etb-pflicht-hinweis"
+            style={grundStil(rollen.alarmText)}
+          >
+            <IconWarndreieck />
+            <span>{FEHLT[seite]}</span>
+          </span>
+        ))}
       {/* EIN Grund zur Zeit, und zwar der, an dem der Halt hängt: `absenden` prüft die unlesbare
           Zeit vor der Zukunft (Review 3, B1). Alle tragen dieselbe `id`, also nur einer im Bild; je
           ein `key`, damit ein neuer Grund neu einhängt und ein Vorleser den Alarm ansagt. */}
@@ -1246,7 +1301,14 @@ export default function Schnellerfassung({
       className="etb-erfassung-card"
       data-lfh="etb-erfassung"
       // Das erste leere Pflichtfeld, für Fokuswege von außen (`EtbPage`, `?neu=1`).
-      data-startfeld={(berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0]) ?? undefined}
+      // Ohne Standard „rufname“, wenn die Abfrage eine fehlende Seite füllt (LLH-1764).
+      data-startfeld={
+        berichtigungZu
+          ? undefined
+          : fehltJetzt.some(ausRufname)
+            ? 'rufname'
+            : (fehltJetzt[0] ?? undefined)
+      }
     >
       {berichtigungZu && (
         <Alert
@@ -1271,11 +1333,23 @@ export default function Schnellerfassung({
           quellen={vonAnQuellen}
           standard={rufname.standard}
           vorschlag={anVorbelegung(einsatz)}
+          feldRef={rufname.standard ? undefined : rufnameRef}
+          pflichtGrundId={rufnameSichtbar.length > 0 ? `${pflichtGrundId}-rufname` : undefined}
           onUebernehmen={async (wert) => {
-            await rufname.setze(wert);
+            // Die erste Abfrage: weiter ins nächste leere Pflichtfeld, sobald der Standard gilt
+            // (eine Meldung braucht noch ihr Von); das Ändern geht wie bisher in den Inhalt. Vor
+            // `setze` gemerkt: der Standard kann schon vor dessen Antwort im Cache stehen.
+            const erste = rufname.standard == null;
+            fokusNachRufname.current = erste;
+            try {
+              await rufname.setze(wert);
+            } catch (e) {
+              fokusNachRufname.current = false;
+              throw e;
+            }
             setRufnameAendern(false);
             setPflicht([]);
-            fokusInsFeld();
+            if (!erste) fokusInsFeld();
           }}
           onAbbrechen={rufname.standard ? () => setRufnameAendern(false) : undefined}
         />
@@ -1294,7 +1368,7 @@ export default function Schnellerfassung({
             onFeld={setzeFeld}
             onFertig={fokusInsFeld}
             pflicht={pflichtSichtbar}
-            pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
+            pflichtId={(seite) => `${pflichtGrundId}-${ausRufname(seite) ? 'rufname' : seite}`}
             zeitGrund={unlesbarGrund ?? zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
             onZeitDiscard={handleZeitDiscard}

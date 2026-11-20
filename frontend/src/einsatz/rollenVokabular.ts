@@ -54,6 +54,9 @@ export const SYSTEM_ROLLE: Record<SystemRolle, RollenBegriff> = {
   },
 };
 
+/** Grund „Nur Ansicht“ für Verwaltungsflächen (`components/nurAnsicht.ts` reicht ihn weiter). */
+export const NUR_ADMIN = `nur ${SYSTEM_ROLLE.admin.name}`;
+
 /**
  * Stufe der Modulsperre, von offen nach eng; `frei` steht für „keine Stufe“ (Wire: `null`). Die
  * Darf-Zeile nennt, wer das Modul öffnet (Spec `modul-freigabe`, Archiv: „Führung im Einsatz“

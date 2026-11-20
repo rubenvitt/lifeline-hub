@@ -587,7 +587,12 @@ export default function MeldungFormular({
     );
   }
 
-  const formular = <ErfassungsFormular<MeldungFormWerte> {...huelle}>{felder}</ErfassungsFormular>;
+  // Im Seitenfluss klebt der Fuß (LLH-1761): am Handy lag „Erfassen“ bei y = 1218 von 844.
+  const formular = (
+    <ErfassungsFormular<MeldungFormWerte> {...huelle} fussKlebt="seite">
+      {felder}
+    </ErfassungsFormular>
+  );
 
   if (!card) return formular;
   return (

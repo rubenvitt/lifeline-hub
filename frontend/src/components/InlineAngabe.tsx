@@ -786,12 +786,6 @@ export function InlineAngabe<T>({
         </div>
       ) : null}
       <SpeicherFehler fehler={fehler} />
-      {ungespeichert ? (
-        // `aria-live` statt `role="status"`: der Hinweis „Inzwischen geändert“ trägt die Rolle schon.
-        <div aria-live="polite" style={{ color: rollen.achtungText }}>
-          Nicht gespeichert
-        </div>
-      ) : null}
       {sperrHinweis}
       {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
       <Space wrap size="middle">
@@ -821,6 +815,15 @@ export function InlineAngabe<T>({
           </>
         )}
       </Space>
+      {ungespeichert ? (
+        // Unter den Knöpfen, nicht darüber: eine Zeiteingabe übernimmt erst beim Verlassen, also
+        // beim Drücken auf „Speichern“. Erschiene der Hinweis darüber, rutschte der Knopf unter dem
+        // Zeiger weg und der Klick ginge ins Leere (alpha rot, LLH-1829).
+        // `aria-live` statt `role="status"`: der Hinweis „Inzwischen geändert“ trägt die Rolle schon.
+        <div aria-live="polite" style={{ color: rollen.achtungText }}>
+          Nicht gespeichert
+        </div>
+      ) : null}
     </form>
   );
 
