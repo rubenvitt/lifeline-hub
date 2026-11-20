@@ -169,7 +169,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       speicherung={anlegenSpeicherung}
       speicherFehlerTitel="Nicht angelegt"
       speicherFehlerFallback="Anlegen fehlgeschlagen"
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       serie
       uebernahme={['ort']}
     >

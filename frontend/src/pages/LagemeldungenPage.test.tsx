@@ -500,7 +500,7 @@ describe('LagemeldungenPage', () => {
       await userEvent.type(within(paneel).getByRole('combobox', { name: 'Absender' }), 'Pegel Süd');
       // Die Vorbelegungsknöpfe wechselten die Art: hier entfallen sie.
       expect(within(paneel).queryByRole('button', { name: /Sofortmeldung/ })).toBeNull();
-      await userEvent.click(within(paneel).getByRole('button', { name: 'Lagemeldung erfassen' }));
+      await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
       expect(erfasseMeldungOfflineFaehig).toHaveBeenCalledWith(
         1,
         1,
@@ -587,7 +587,7 @@ describe('LagemeldungenPage', () => {
         'Aus Einsatz 1',
       );
       await userEvent.type(within(dialog).getByRole('combobox', { name: 'Absender' }), 'ELW 1');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Lagemeldung erfassen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
       await vi.waitFor(() => expect(erfasseMeldungOfflineFaehig).toHaveBeenCalledTimes(1));
 
       fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));

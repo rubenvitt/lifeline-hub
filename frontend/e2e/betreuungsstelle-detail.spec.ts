@@ -114,7 +114,7 @@ test('Detailseite → Bedarf anfordern → Nachforderung mit Stellenbezug steht 
   // Details stehen unter „Weitere Angaben“ (LLH-1089).
   await page.getByRole('button', { name: /^Weitere Angaben/ }).click();
   await page.getByLabel('Details / Zweck', { exact: true }).fill('Feldbetten für die Nacht');
-  await page.getByRole('button', { name: 'Nachforderung absetzen', exact: true }).click();
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // Gefiltert auf die Stelle; die Karte nennt sie und führt zurück.
   const karte = page

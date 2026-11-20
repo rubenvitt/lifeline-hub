@@ -151,7 +151,7 @@ export default function EinsatzVorlageFormModal({
       offen={offen}
       titel={vorlage ? 'Einsatz-Vorlage bearbeiten' : 'Einsatz-Vorlage anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={vorlage ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog (LFH-1077).
       speicherung={mutation}

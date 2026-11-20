@@ -217,8 +217,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
-    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → „Erfassen" ist der Submit.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
         1,
@@ -244,7 +244,7 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Offline-Lage');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Offline vorgemerkt: Meldung von RTW 2')).toBeInTheDocument();
     expect(legeMeldungAn).not.toHaveBeenCalled();
@@ -861,8 +861,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
-    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → „Erfassen" ist der Submit.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
         1,
@@ -913,7 +913,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle();
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
     // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter heißt gleich,
@@ -929,7 +929,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle('Wichtiger Wortlaut');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue('Wichtiger Wortlaut');
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
@@ -1151,7 +1151,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(paneel().getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(paneel().getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
-    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
   }
 
   it('Erfassen: der Grund steht im Paneel, der Wortlaut bleibt, kein Toast', async () => {
@@ -1176,7 +1176,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await erfasse();
     await paneel().findByText('Absender unbekannt');
 
-    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(2));
     expect(paneel().queryByText('Absender unbekannt')).toBeNull();
     expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeDisabled();

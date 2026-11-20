@@ -163,7 +163,7 @@ export default function PersonalStatusTab() {
       schnell={{
         beschriftung: 'Neuer Personal-Status',
         platzhalter: 'z. B. dienstbereit',
-        knopfText: 'Status anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Personal-Status konnte nicht geladen werden"
       leerText="Kein Status"

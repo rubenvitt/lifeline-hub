@@ -106,7 +106,7 @@ export default function MaterialFormModal({
       offen={offen}
       titel={material ? 'Material bearbeiten' : 'Material anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={material ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).

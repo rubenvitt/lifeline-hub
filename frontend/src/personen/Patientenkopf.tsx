@@ -824,7 +824,7 @@ function VerbleibPaneel({
       <ErfassungsFormular<VerbleibFormWerte>
         form={form}
         initialValues={vorbelegung}
-        erfassenText="Verbleib erfassen"
+        erfassenText="Erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Verbleib nicht erfasst"
@@ -909,7 +909,7 @@ function NotizZeile({
           </Feld>
           {!gesperrt && (
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-              Notiz anlegen
+              Erfassen
             </Button>
           )}
         </Flex>

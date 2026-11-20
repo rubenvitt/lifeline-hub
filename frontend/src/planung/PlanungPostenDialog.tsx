@@ -191,7 +191,7 @@ export default function PlanungPostenDialog({
       titel={posten ? `Posten ${posten.bezeichnung}` : 'Posten anlegen'}
       form={form}
       initialValues={anfang}
-      erfassenText={posten ? 'Speichern' : 'Posten anlegen'}
+      erfassenText={posten ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={posten ? 'Posten nicht gespeichert' : 'Posten nicht angelegt'}

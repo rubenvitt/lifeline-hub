@@ -117,7 +117,7 @@ export default function WiedervorlageModal({
       offen={eintrag !== null}
       titel="Wiedervorlage anlegen"
       form={form}
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       laeuft={speicherung.isPending}
       // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst räumt die Hülle
       // die Felder trotz Fehler.

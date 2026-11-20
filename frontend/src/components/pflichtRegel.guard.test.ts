@@ -32,7 +32,8 @@ const quellen = Object.entries(dateien).filter(
 const KOMMENTAR_BLOCK = /\/\*[\s\S]*?\*\//g;
 const KOMMENTAR_ZEILE = /(^|[^:'"`\\])\/\/.*$/gm;
 const REQUIRED_TRUE = /\brequired:\s*true\b/g;
-const FEHLERTEXT = /(?:message:|Error\()\s*('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)/g;
+const FEHLERTEXT =
+  /(?:message:|Error\()\s*('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)/g;
 const ALTE_FORM =
   /ist erforderlich|ist Pflicht|darf nicht leer sein|^.Bitte .*(?:angeben|eingeben|wählen|eintragen).$/;
 
@@ -40,9 +41,7 @@ const ALTE_FORM =
 export function pflichtVerstoesse(inhalt: string): string[] {
   const code = inhalt.replace(KOMMENTAR_BLOCK, '').replace(KOMMENTAR_ZEILE, '$1');
   const nackt = Array.from(code.matchAll(REQUIRED_TRUE), () => 'required: true ohne pflicht()');
-  const texte = Array.from(code.matchAll(FEHLERTEXT), (m) => m[1]).filter((t) =>
-    ALTE_FORM.test(t),
-  );
+  const texte = Array.from(code.matchAll(FEHLERTEXT), (m) => m[1]).filter((t) => ALTE_FORM.test(t));
   return [...nackt, ...texte];
 }
 

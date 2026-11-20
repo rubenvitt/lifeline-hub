@@ -100,7 +100,7 @@ function HelferDialog({
       titel={helfer ? `Helfer ${helfer.name}` : 'Helfer anlegen'}
       form={form}
       initialValues={anfang}
-      erfassenText={helfer ? 'Speichern' : 'Helfer anlegen'}
+      erfassenText={helfer ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={helfer ? 'Helfer nicht gespeichert' : 'Helfer nicht angelegt'}

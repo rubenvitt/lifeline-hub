@@ -43,7 +43,7 @@ describe('MeldungFormular', () => {
     const onAnlegen = renderFormular();
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await fuellePflichtfelder('RTW 2', 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({
         meldungsart: 'sofortmeldung',
@@ -71,7 +71,7 @@ describe('MeldungFormular', () => {
     ).toHaveStyle({ flexBasis: 'var(--lfh-feld-schmal)', flexShrink: '1' });
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({
         bestaetigung_pflicht: true,
@@ -86,7 +86,7 @@ describe('MeldungFormular', () => {
       screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
     );
     await fuellePflichtfelder('S3', 'Lage: ...');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({
         meldungsart: 'lagemeldung',
@@ -98,7 +98,7 @@ describe('MeldungFormular', () => {
   it('sendet ohne Pflicht keine Frist', async () => {
     const onAnlegen = renderFormular();
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({
         bestaetigung_pflicht: false,
@@ -164,7 +164,7 @@ describe('MeldungFormular', () => {
     const onAnlegen = anlegenMock().mockRejectedValue(new Error('Netz weg'));
     renderFormular(onAnlegen);
     await fuellePflichtfelder('RTW 2', 'Wichtiger Wortlaut');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue('Wichtiger Wortlaut');
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
@@ -208,7 +208,7 @@ describe('MeldungFormular', () => {
       await waehle('1. Zug');
       expect(screen.getByLabelText('Absender')).toHaveValue('1. Zug');
       await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage ruhig');
-      await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
       expect(onAnlegen.mock.calls[0][0]).toMatchObject({ einheit_id: 7, absender: '1. Zug' });
       expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('abschnitt_id');
@@ -217,7 +217,7 @@ describe('MeldungFormular', () => {
     it('ohne Auswahl geht kein Bezug mit', async () => {
       const onAnlegen = renderMitBezug();
       await fuellePflichtfelder('RTW 2', 'Lage ruhig');
-      await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
       expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('einheit_id');
       expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('abschnitt_id');
@@ -278,7 +278,7 @@ describe('MeldungFormular — Art vorgegeben (LLH-1031)', () => {
       /^Weitere Angaben$/,
     );
     await fuellePflichtfelder('Pegel Süd', 'Pegel steigt');
-    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({ meldungsart: 'lagemeldung', inhalt: 'Pegel steigt' }),
     );
@@ -291,7 +291,7 @@ describe('MeldungFormular — Art vorgegeben (LLH-1031)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(screen.getByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
     await fuellePflichtfelder('Pegel Süd', 'Pegel steigt');
-    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({ lat: 50.1, lon: 8.6 })),
     );
@@ -352,7 +352,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
     await waehleFunktion('S2 – Lage (Müller)');
     expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('S2');
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({
       empfaenger_funktion: 's2',
@@ -366,7 +366,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
     await waehleFunktion('S3 – Einsatz');
     expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('ELW 1');
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({
       empfaenger_funktion: 's3',
@@ -378,7 +378,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
     const onAnlegen = renderMitKatalog();
     expect(screen.getByText('keine')).toBeInTheDocument();
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({ empfaenger_funktion: undefined });
   });
@@ -395,7 +395,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
       screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
     );
     await fuellePflichtfelder('UHS Nord', 'Decken knapp');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({
       meldungsart: 'lagemeldung',
@@ -411,7 +411,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
       screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
     );
     await fuellePflichtfelder('UHS Nord', 'Decken knapp');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({ empfaenger_funktion: 's3' });
   });
@@ -436,7 +436,7 @@ describe('MeldungFormular — Ereigniszeit in der Anzeigezone (LFH-692)', () => 
     await userEvent.click(feld);
     await userEvent.type(feld, '2026-09-24 13:00');
     await userEvent.keyboard('{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({ ereigniszeit: '2026-09-24 11:00:00' }),
@@ -495,7 +495,7 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
   it('ein leeres Feld sendet die Serverzeit', async () => {
     const onAnlegen = renderFormular();
     await fuellePflichtfelder('RTW 2', 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     const ms = Date.parse(gesendeteEreigniszeit(onAnlegen).replace(' ', 'T') + 'Z');
     expect(Math.abs(ms - SERVER)).toBeLessThanOrEqual(1_000);
@@ -506,9 +506,9 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     const feld = screen.getByRole('textbox', { name: 'Zeitpunkt des Ereignisses' });
-    // Getippt und verlassen: der Klick auf „Meldung erfassen“ übernimmt die Zeit (blur).
+    // Getippt und verlassen: der Klick auf „Erfassen“ übernimmt die Zeit (blur).
     await userEvent.type(feld, '2026-10-04 09:30');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(gesendeteEreigniszeit(onAnlegen)).toBe('2026-10-04 09:30:00');
   });
@@ -530,7 +530,7 @@ describe('MeldungFormular — Eingabegrenzen (LFH-937)', () => {
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     fireEvent.change(inhalt, { target: { value: 'w'.repeat(20_001) } });
     expect(inhalt).toHaveValue('w'.repeat(20_001));
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(
       await screen.findByText('Inhalt darf höchstens 20.000 Zeichen lang sein'),
     ).toBeInTheDocument();
@@ -629,7 +629,7 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     await userEvent.click(klappkopf());
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
     await fuellePflichtfelder('RTW 2', 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
     expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
@@ -643,7 +643,7 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
       target: { value: '10081' },
     });
     await fuellePflichtfelder('RTW 2', 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Frist höchstens 10080 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
@@ -708,7 +708,7 @@ describe('MeldungFormular — Vorschlagsfeld Absender (Tastatur)', () => {
     expect(absender()).toHaveValue('Flo');
     expect(document.querySelector('[data-lfh="quellenmarke"]')).toHaveTextContent('frei');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({ absender: 'Flo' });
   });
@@ -756,7 +756,7 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     const dialog = screen.getByRole('dialog', { name: 'Lagemeldung erfassen' });
     expect(within(dialog).queryByRole('button', { name: 'Speichern und nächste' })).toBeNull();
     await fuellePflichtfelder('ELW 1', 'Lage ruhig');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({
       meldungsart: 'lagemeldung',
@@ -812,7 +812,7 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
 
     await userEvent.click(klappkopf());
     await fuellePflichtfelder('ELW 1', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
   });
@@ -828,7 +828,7 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     await userEvent.click(klappkopf());
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
     await fuellePflichtfelder('ELW 1', 'Lage ruhig');
-    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
     expect(onAnlegen).not.toHaveBeenCalled();
   });

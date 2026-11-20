@@ -108,7 +108,7 @@ export default function OnlineQuelleFormModal({
       offen={offen}
       titel={quelle ? 'Online-Quelle bearbeiten' : 'Online-Quelle hinzufügen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={quelle ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       speicherung={mutation}
       // Proxy ist Default-an (key-frei + serverseitig gecacht).

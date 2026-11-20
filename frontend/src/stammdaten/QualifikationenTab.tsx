@@ -108,7 +108,7 @@ export default function QualifikationenTab() {
       schnell={{
         beschriftung: 'Neue Qualifikation',
         platzhalter: 'z. B. Sanitäter',
-        knopfText: 'Qualifikation anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Qualifikationen konnten nicht geladen werden"
       leerText="Keine Qualifikationen"

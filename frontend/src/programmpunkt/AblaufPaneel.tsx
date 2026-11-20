@@ -234,7 +234,7 @@ export function AblaufListe({
         offen={anlegenOffen}
         titel="Programmpunkt anlegen"
         form={form}
-        erfassenText="Anlegen"
+        erfassenText="Erfassen"
         laeuft={anlegen.isPending}
         speicherung={anlegen}
         onErfassen={(w) => anlegen.mutateAsync(w)}

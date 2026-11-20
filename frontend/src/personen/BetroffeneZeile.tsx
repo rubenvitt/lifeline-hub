@@ -337,7 +337,7 @@ export default function BetroffeneZeile({
         onClick={() => void senden()}
         style={{ marginInline: token.marginXS, flex: '0 0 auto' }}
       >
-        Person erfassen
+        Erfassen
       </Button>
     </Schnellerfassungszeile>
   );

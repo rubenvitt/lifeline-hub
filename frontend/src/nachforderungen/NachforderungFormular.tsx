@@ -368,7 +368,7 @@ export default function NachforderungFormular({
       speicherung={speicherung}
       speicherFehlerTitel="Nachforderung nicht abgesetzt"
       speicherFehlerFallback="Absetzen fehlgeschlagen"
-      erfassenText="Nachforderung absetzen"
+      erfassenText="Erfassen"
       serie
       uebernahme={UEBERNAHME}
       onPruefungGescheitert={(felder) => {

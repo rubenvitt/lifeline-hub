@@ -127,7 +127,7 @@ export default function EinheitTypenTab() {
       schnell={{
         beschriftung: 'Neuer Einheitstyp',
         platzhalter: 'z. B. Zug',
-        knopfText: 'Typ anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Einheitstypen konnten nicht geladen werden"
       leerText="Kein Einheitstyp"

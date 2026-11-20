@@ -98,7 +98,7 @@ export default function ErinnerungFormular({
       speicherung={speicherung}
       speicherFehlerTitel="Erinnerung nicht angelegt"
       speicherFehlerFallback="Anlegen fehlgeschlagen"
-      erfassenText="Anlegen"
+      erfassenText="Erfassen"
       serie
       uebernahme={UEBERNAHME}
     >

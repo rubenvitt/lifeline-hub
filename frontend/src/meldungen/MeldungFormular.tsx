@@ -352,7 +352,7 @@ export default function MeldungFormular({
     initialValues: vorgaben,
     onErfassen: absenden,
     // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
-    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
+    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Erfassen"
     // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
     // Serie schließt der Aufrufer über `onFertig`.
     onFertig: onFertig ?? (() => {}),
@@ -360,7 +360,7 @@ export default function MeldungFormular({
     speicherung,
     speicherFehlerTitel: 'Meldung nicht erfasst',
     speicherFehlerFallback: 'Erfassen fehlgeschlagen',
-    erfassenText: artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen',
+    erfassenText: 'Erfassen',
     serie,
     uebernahme: UEBERNAHME,
     onPruefungGescheitert: (felder: string[]) => {

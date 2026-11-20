@@ -359,7 +359,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
       'RTW 3/83-2',
     );
     await userEvent.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet[0]).toMatchObject({
       pfad: 'verbleib',
@@ -400,7 +400,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
   it('legt eine Notiz über die Eingabezeile an', async () => {
     const { onGeschrieben } = zeige();
     await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
       { pfad: 'notizen', body: { text: 'Infusion läuft', client_id: expect.any(String) } },
@@ -736,7 +736,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(within(paneel).getByRole('radio', { name: 'Blutstillung' }));
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
       { pfad: 'massnahmen', body: { art: 'blutstillung', client_id: expect.any(String) } },
@@ -747,7 +747,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     const { kopf } = zeige();
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     expect(await within(paneel).findByText('Maßnahme fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
@@ -796,7 +796,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(within(paneel).getByRole('radio', { name: 'Sauerstoff' }));
-    const senden = within(paneel).getByRole('button', { name: 'Maßnahme erfassen' });
+    const senden = within(paneel).getByRole('button', { name: 'Erfassen' });
     await userEvent.click(senden);
     await waitFor(() => expect(senden).toHaveClass('ant-btn-loading'));
     const transport = within(kopf).getByRole('button', { name: 'Transport festlegen' });
@@ -837,7 +837,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
     await user.click(await within(paneel).findByRole('combobox', { name: 'Bestätigt von' }));
     await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
-    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0].body).toEqual({
       art: 'zugang',
@@ -1086,7 +1086,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await user.click(await screen.findByTitle('Transport'));
     await user.type(within(paneel).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 1');
     await user.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
-    await user.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull(),
     );
@@ -1102,7 +1102,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     setzeOnline(true);
     paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');
     await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
-    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Maßnahme erfassen' })).toBeNull(),
     );
@@ -1300,7 +1300,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await sitzungAbwarten(kopf);
     setzeOnline(false);
     await user.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await user.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     const zeile = kopf.querySelector<HTMLElement>('[data-lfh="notiz-zeile"]')!;
     expect(await within(zeile).findByText(/Offline vorgemerkt/)).toBeVisible();
@@ -1427,7 +1427,7 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
     const feld = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
     fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX + 1) } });
     expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -1437,7 +1437,7 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
 
     fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX) } });
     expect(screen.getByText('2.000 / 2.000')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
   });
 
@@ -1702,7 +1702,7 @@ describe('Patientenkopf — Rettungsmittel (LLH-1573)', () => {
     const paneel = await screen.findByRole('region', { name: 'Verbleib erfassen' });
     expect(within(paneel).getByLabelText(/Rettungsmittel/)).toHaveValue('RTW 1/83-1');
     expect(within(paneel).getByLabelText('Einsatznummer Leitstelle')).toHaveValue('2611-0815');
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(gesendet).toEqual([
         {
@@ -1818,7 +1818,7 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
     expect(kopf.querySelector('[data-lfh="zustand"]')).not.toBeNull();
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     // Beantragt ist kein neuer Serverstand: die Seite lädt nicht neu.
     await waitFor(() =>

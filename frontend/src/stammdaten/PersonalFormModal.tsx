@@ -109,7 +109,7 @@ export default function PersonalFormModal({
       offen={offen}
       titel={person ? 'Person bearbeiten' : 'Person anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={person ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).

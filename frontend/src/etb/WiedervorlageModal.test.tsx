@@ -108,7 +108,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     zeige(vi.fn(), '2026-08-21 13:17:43');
     await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
     expect(faelligFeld()).toHaveValue(dtgLokal(dayjs.utc('2026-08-21 13:17:43').local()));
-    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
   });
 
@@ -175,7 +175,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     // `components/Erfassung.test.tsx`): der Knopf liegt IM `<form>`, deshalb sendet die
     // eingebaute Formularübermittlung des Browsers.
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
-    const knopf = screen.getByRole('button', { name: 'Anlegen' });
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
     expect(knopf.closest('form')).not.toBeNull();
   });
 
@@ -191,7 +191,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     const titel = screen.getByLabelText('Titel');
     await nutzer.clear(titel);
     await nutzer.type(titel, 'Kellerpumpe nachfragen');
-    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     // Die Norm aus LFH-332: `onErfassen` muss bei Ablehnung ablehnen. Ein 422 darf den
     // Wortlaut nicht kosten — hier steht er in einer beweissichernden Anwendung.
     await waitFor(() => expect(titel).toHaveValue('Kellerpumpe nachfragen'));
@@ -240,7 +240,7 @@ describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeige(onClose);
     const dialog = await screen.findByRole('dialog');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Fälligkeit liegt zu weit zurück',
@@ -256,10 +256,10 @@ describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeige(onClose);
     const dialog = await screen.findByRole('dialog');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await within(dialog).findByRole('alert');
 
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
     await act(async () => freigeben());
@@ -274,7 +274,7 @@ describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await within(dialog).findByRole('alert');
 
     // rc-dialog friert den schließenden Dialog in jsdom ein: am neuen Dialog prüfen.
@@ -289,9 +289,9 @@ describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { rerender } = renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await within(dialog).findByRole('alert');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
 
     rerender(<Harness einsatzId={8} />);
@@ -342,7 +342,7 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
     zeigeBerlin('2026-08-21 13:17:43');
     await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
     expect(faelligFeld()).toHaveValue('211517aug26');
-    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
   });
 
@@ -392,7 +392,7 @@ describe('WiedervorlageModal — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     const gesendet = sendetNach();
     zeige();
     await userEvent.click(screen.getByRole('button', { name: '+2 h' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(gesendet()?.faellig_at).toBe(
         dayjs(JETZT).add(2, 'hour').utc().format('YYYY-MM-DD HH:mm:ss'),

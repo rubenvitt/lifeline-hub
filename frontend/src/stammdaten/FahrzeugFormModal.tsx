@@ -92,7 +92,7 @@ export default function FahrzeugFormModal({
       offen={offen}
       titel={fahrzeug ? 'Fahrzeug bearbeiten' : 'Fahrzeug anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={fahrzeug ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).

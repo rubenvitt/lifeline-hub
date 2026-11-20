@@ -245,7 +245,7 @@ function TagAusVorlageInhalt({
     inhalt = (
       <ErfassungsFormular<Werte>
         form={form}
-        erfassenText="Zeitfenster anlegen"
+        erfassenText="Anlegen"
         laeuft={anlegen.isPending}
         gesperrt={!darfSchreiben || gewaehlt.length === 0 || zuViele}
         speicherung={anlegen}

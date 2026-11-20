@@ -273,7 +273,7 @@ export function MassnahmePaneel({
     <section aria-label="Maßnahme erfassen" data-lfh="massnahme-paneel">
       <ErfassungsFormular<MassnahmeWerte>
         form={form}
-        erfassenText="Maßnahme erfassen"
+        erfassenText="Erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Maßnahme nicht erfasst"

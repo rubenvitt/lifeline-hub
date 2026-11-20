@@ -155,7 +155,7 @@ export function BezugHinzufuegenDialog({
       offen={offen}
       titel="Bezug hinzufügen"
       form={form}
-      erfassenText="Hinzufügen"
+      erfassenText="Zuordnen"
       laeuft={zuweisenMutation.isPending}
       speicherung={zuweisenMutation}
       speicherFehlerTitel="Bezug nicht hinzugefügt"

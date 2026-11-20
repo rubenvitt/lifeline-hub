@@ -261,7 +261,7 @@ export function VerbindungModal({
           ? { mittel: basis.mittel, wert: basis.wert, hinweis: basis.hinweis ?? '' }
           : undefined
       }
-      erfassenText="Speichern"
+      erfassenText={basis ? 'Speichern' : 'Anlegen'}
       serie={basis == null}
       uebernahme={basis == null ? ['mittel'] : undefined}
       laeuft={laeuft}

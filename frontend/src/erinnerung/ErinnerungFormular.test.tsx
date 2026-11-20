@@ -48,7 +48,7 @@ describe('ErinnerungFormular — Serienerfassung', () => {
     await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
     await userEvent.click(screen.getByLabelText('Empfänger'));
     await userEvent.click(await screen.findByText('S2 – Lage (Müller)'));
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen).toHaveBeenCalledWith(
@@ -59,7 +59,7 @@ describe('ErinnerungFormular — Serienerfassung', () => {
   it('hält den Absende-Knopf im <form>, obwohl der Empfänger ein Select ist (Erfassungs-Norm)', () => {
     renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
     // Ein Select schluckt Enter; gesendet wird dann nur über den Knopf im Formular.
-    expect(screen.getByRole('button', { name: 'Anlegen' }).closest('form')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Erfassen' }).closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
   });
 
@@ -72,7 +72,7 @@ describe('ErinnerungFormular — Serienerfassung', () => {
     await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
     await userEvent.type(screen.getByLabelText('Empfänger'), 'THW');
     await userEvent.click(await screen.findByText('Fachberater: THW'));
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen).toHaveBeenCalledWith(
@@ -88,7 +88,7 @@ describe('ErinnerungFormular — Serienerfassung', () => {
     renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
 
     await userEvent.type(screen.getByLabelText('Titel'), 'Lagemeldung aller EA');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onAnlegen).toHaveBeenCalled());
     // Ohne `mutateAsync` in der Kette wäre der Wortlaut trotz Fehler-Toast weg.
@@ -113,7 +113,7 @@ describe('ErinnerungFormular — Fälligkeit in der Anzeigezone (LFH-692)', () =
     await userEvent.clear(feld);
     await userEvent.type(feld, '2026-09-24 13:00');
     await userEvent.keyboard('{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({ faellig_at: '2026-09-24 11:00:00' }),
@@ -153,7 +153,7 @@ describe('ErinnerungFormular — Obergrenze des Intervalls', () => {
 
     await userEvent.type(screen.getByLabelText('Titel'), 'Lagemeldung');
     await userEvent.type(screen.getByLabelText('Intervall'), '999999999999');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText(/höchstens 10080 Min/i)).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe('ErinnerungFormular — Obergrenze des Intervalls', () => {
 
     await userEvent.type(screen.getByLabelText('Titel'), 'Wochenbericht');
     await userEvent.type(screen.getByLabelText('Intervall'), '10080');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({ intervall_minuten: 10080 })),
@@ -185,7 +185,7 @@ describe('ErinnerungFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     const onAnlegen = vi.fn().mockResolvedValue({});
     renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({ faellig_at: '2026-10-04 10:00:00' }),
@@ -202,7 +202,7 @@ describe('ErinnerungFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     await userEvent.clear(feld);
     await userEvent.type(feld, '2026-10-04 10:30');
     await userEvent.keyboard('{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({ faellig_at: '2026-10-04 10:30:00' }),

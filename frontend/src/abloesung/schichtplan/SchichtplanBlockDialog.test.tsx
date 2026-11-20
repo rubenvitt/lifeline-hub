@@ -147,7 +147,7 @@ describe('SchichtplanBlockDialog · Qualifikationssoll (LLH-1584)', () => {
         name: /Qualifikationssoll · mind\. 1 Rettungssanitäter \(Vorgabe\)/,
       }),
     ).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Block anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(onSpeichern).toHaveBeenCalledTimes(1));
     const s = onSpeichern.mock.calls[0][0];
     expect(s.art).toBe('anlegen');

@@ -78,7 +78,7 @@ describe('BetroffeneZeile — Grenze des Namens (LLH-1329)', () => {
     const lang = 'x'.repeat(PERSON_NAME_MAX + 1);
     fireEvent.change(feld, { target: { value: `${lang} sk2` } });
     expect(screen.getByText('201 / 200 · zu lang')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Nicht erfasst: Name darf höchstens 200 Zeichen lang sein',
     );

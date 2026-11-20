@@ -116,7 +116,7 @@ export default function ExterneStelleFormModal({
       offen={offen}
       titel={stelle ? 'Externe Stelle bearbeiten' : 'Externe Stelle anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={stelle ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       speicherung={mutation}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).

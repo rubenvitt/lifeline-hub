@@ -68,7 +68,7 @@ export default function PlanungAnlegenDialog({
       offen={offen}
       titel="Planung anlegen"
       form={form}
-      erfassenText="Planung anlegen"
+      erfassenText="Anlegen"
       laeuft={mutation.isPending}
       speicherung={mutation}
       speicherFehlerTitel="Planung nicht angelegt"

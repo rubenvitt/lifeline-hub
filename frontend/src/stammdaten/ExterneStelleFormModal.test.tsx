@@ -45,7 +45,7 @@ async function artWaehlen(nutzer: ReturnType<typeof userEvent.setup>, label: str
 describe('ExterneStelleFormModal', () => {
   it('Absende-Knopf im Formular, keine antd-Fusszeile, Fokus im ersten Feld', async () => {
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Bezeichnung')));
@@ -86,7 +86,7 @@ describe('ExterneStelleFormModal', () => {
     await artWaehlen(nutzer, 'Leitstelle');
     await nutzer.click(await screen.findByLabelText('Zuständige Leitstelle'));
 
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(body).toEqual({ bezeichnung: 'ILS Nord', art: 'leitstelle', zustaendig: true }),
     );
@@ -177,7 +177,7 @@ describe('ExterneStelleFormModal', () => {
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Bezeichnung'), 'Polizei');
     await artWaehlen(nutzer, 'Polizei');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('gibt es schon');
     expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('Polizei');
   });

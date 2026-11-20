@@ -291,7 +291,7 @@ describe('ErinnerungenPage · Ablehnung am Ort (LFH-1077)', () => {
   async function legeAn() {
     await userEvent.click(screen.getByRole('button', { name: /Erinnerung anlegen/ }));
     await userEvent.type(paneel().getByLabelText('Titel'), 'Funkcheck');
-    await userEvent.click(paneel().getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
   }
 
   it('Anlegen: der Grund steht im Paneel, die Eingabe bleibt, kein Toast', async () => {
@@ -316,7 +316,7 @@ describe('ErinnerungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await legeAn();
     await paneel().findByText('Fälligkeit liegt zurück');
 
-    await userEvent.click(paneel().getByRole('button', { name: 'Anlegen' }));
+    await userEvent.click(paneel().getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(legeErinnerungAn).toHaveBeenCalledTimes(2));
     expect(paneel().queryByText('Fälligkeit liegt zurück')).toBeNull();
     // Solange die Antwort aussteht, bleibt das Paneel offen.

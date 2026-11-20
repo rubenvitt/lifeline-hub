@@ -61,7 +61,7 @@ test('Eigentransport ist unterwegs, die quittierte Übergabe schließt ab', asyn
   await page.getByTitle('1/83-1').click();
   await expect(paneel).toContainText('Eigentransport');
   await paneel.getByLabel('Ziel').fill('KH Mitte');
-  await paneel.getByRole('button', { name: 'Verbleib erfassen' }).click();
+  await paneel.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(kopf).toContainText('Eigentransport → KH Mitte (1/83-1)');
 
   // Unterwegs: die Person bleibt in der Liste.

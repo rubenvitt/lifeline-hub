@@ -105,7 +105,7 @@ function renderSeite({
 
 /** Das Paneel eines Fensters (Augenbraue = Bezeichnung). */
 const fenster = (bezeichnung: string) => screen.findByRole('region', { name: bezeichnung });
-const anlegenKnopf = () => screen.getByRole('button', { name: 'Zeitfenster anlegen' });
+const anlegenKnopf = () => screen.getByRole('button', { name: 'Anlegen' });
 
 function liefert(
   bestand: VerpflegungZeitfenster[] = [],

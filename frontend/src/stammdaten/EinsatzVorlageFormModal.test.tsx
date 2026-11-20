@@ -122,7 +122,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await userEvent.type(screen.getByLabelText('Bezeichnung'), '  Großbrand ');
     await userEvent.click(kaestchen('Tiere'));
     await userEvent.click(kaestchen('Lagebesprechung'));
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
@@ -170,7 +170,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     renderMitProviders(<Harness />);
     await screen.findByRole('dialog');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), '   ');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     expect(await screen.findByText('Bezeichnung fehlt')).toBeInTheDocument();
     expect(anfragen).toHaveLength(0);
   });
@@ -180,7 +180,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'MANV');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     expect(await within(dialog).findByText('Bezeichnung bereits vergeben')).toBeInTheDocument();
     expect(screen.getByTestId('offen')).toHaveTextContent('offen');
   });
@@ -223,7 +223,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
 
       await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Konzert');
       await waehle('Schichtmodell', 'Sanitätsdienst 6 h');
-      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
       await waitFor(() => expect(anfragen).toHaveLength(1));
       expect(anfragen[0].rumpf).toMatchObject({ bezeichnung: 'Konzert', schichtmodell_id: 9 });
     });

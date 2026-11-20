@@ -72,7 +72,7 @@ export default function EtbBausteinFormModal({
       offen={offen}
       titel={baustein ? 'Baustein bearbeiten' : 'Baustein anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={baustein ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).

@@ -322,7 +322,7 @@ export default function SchichtplanBlockDialog({
       titel={titel}
       form={form}
       initialValues={anfang}
-      erfassenText={block ? 'Speichern' : 'Block anlegen'}
+      erfassenText={block ? 'Speichern' : 'Anlegen'}
       laeuft={laeuft}
       gesperrt={!darfSchreiben || !!kopierenLaeuft}
       speicherung={speicherung}

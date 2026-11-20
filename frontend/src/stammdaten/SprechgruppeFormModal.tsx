@@ -69,7 +69,7 @@ export default function SprechgruppeFormModal({
       offen={offen}
       titel={sprechgruppe ? 'Sprechgruppe bearbeiten' : 'Sprechgruppe anlegen'}
       form={form}
-      erfassenText="Speichern"
+      erfassenText={sprechgruppe ? 'Speichern' : 'Anlegen'}
       laeuft={mutation.isPending}
       // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
       // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).

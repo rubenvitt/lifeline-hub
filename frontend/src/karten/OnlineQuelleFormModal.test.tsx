@@ -60,7 +60,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     handler();
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
 
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
@@ -128,7 +128,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/style.json');
     await nutzer.type(screen.getByLabelText('Attribution'), '© OSM{Enter}ODbL');
     expect(screen.getByLabelText('Attribution')).toHaveValue('© OSM\nODbL');
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(rumpfe).not.toHaveLength(0));
     expect(rumpfe).toHaveLength(1);

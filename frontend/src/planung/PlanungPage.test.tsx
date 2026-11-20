@@ -209,7 +209,7 @@ describe('PlanungPage (LLH-1586)', () => {
     expect(screen.getByPlaceholderText('6 (Vorgabe)')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Schichtlänge'), '6 h');
     const dialog = screen.getByRole('dialog', { name: 'Posten anlegen' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Posten anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(body).toEqual({
         bezeichnung: 'SEG Nord',
@@ -234,7 +234,7 @@ describe('PlanungPage (LLH-1586)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Helfer anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Carl');
     await userEvent.type(within(dialog).getByLabelText('Organisation'), 'THW');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).toEqual({ name: 'Carl', organisation: 'THW' }));
   });
 

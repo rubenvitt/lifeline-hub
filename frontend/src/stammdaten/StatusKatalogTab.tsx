@@ -175,7 +175,7 @@ export default function StatusKatalogTab() {
       schnell={{
         beschriftung: 'Neuer Fahrzeug-Status',
         platzhalter: 'z. B. einsatzbereit',
-        knopfText: 'Status anlegen',
+        knopfText: 'Anlegen',
       }}
       ladefehlerText="Statuskatalog konnte nicht geladen werden"
       leerText="Kein Status"
