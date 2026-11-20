@@ -7,15 +7,16 @@ import {
   hatFormatierung,
   nachtragHinweis,
   nachtragMinuten,
-  erkenneZeitBefehl,
+  parseZeitBefehl,
+  parseNurBefehl,
   zukunftsVerstoss,
   amZeilenanfang,
   atZielFeld,
   baueEintrag,
   einheitAusSchluessel,
-  erkenneAtTrigger,
-  erkenneSlashTrigger,
-  erkenneTypBefehl,
+  parseAtTrigger,
+  parseSlashTrigger,
+  parseTypBefehl,
   filterAtEintraege,
   filterSlashEintraege,
   METADATEN_FELDER,
@@ -44,14 +45,14 @@ describe('METADATEN_FELDER', () => {
   });
 });
 
-describe('erkenneSlashTrigger', () => {
+describe('parseSlashTrigger', () => {
   it('aktiv, wenn / am Textanfang steht', () => {
-    expect(erkenneSlashTrigger('/vo', 3)).toEqual({ aktiv: true, filter: 'vo', start: 0 });
+    expect(parseSlashTrigger('/vo', 3)).toEqual({ aktiv: true, filter: 'vo', start: 0 });
   });
 
   it('aktiv, wenn / nach Whitespace steht', () => {
     const text = 'Pumpe läuft /zei';
-    expect(erkenneSlashTrigger(text, text.length)).toEqual({
+    expect(parseSlashTrigger(text, text.length)).toEqual({
       aktiv: true,
       filter: 'zei',
       start: 12,
@@ -59,23 +60,23 @@ describe('erkenneSlashTrigger', () => {
   });
 
   it('inaktiv bei / mitten im Wort (z.B. 2/9)', () => {
-    expect(erkenneSlashTrigger('2/9', 3)).toEqual({ aktiv: false, filter: '', start: -1 });
+    expect(parseSlashTrigger('2/9', 3)).toEqual({ aktiv: false, filter: '', start: -1 });
   });
 
   it('inaktiv, wenn zwischen / und Cursor ein Leerzeichen liegt', () => {
-    expect(erkenneSlashTrigger('/von bar', 8)).toEqual({ aktiv: false, filter: '', start: -1 });
+    expect(parseSlashTrigger('/von bar', 8)).toEqual({ aktiv: false, filter: '', start: -1 });
   });
 
   it('aktiv bei Caret mitten im Text direkt nach dem Filterwort (vor dem Space)', () => {
-    expect(erkenneSlashTrigger('/von bar', 4)).toEqual({ aktiv: true, filter: 'von', start: 0 });
+    expect(parseSlashTrigger('/von bar', 4)).toEqual({ aktiv: true, filter: 'von', start: 0 });
   });
 
   it('inaktiv ohne / links vom Cursor', () => {
-    expect(erkenneSlashTrigger('Lage stabil', 11)).toEqual({ aktiv: false, filter: '', start: -1 });
+    expect(parseSlashTrigger('Lage stabil', 11)).toEqual({ aktiv: false, filter: '', start: -1 });
   });
 
   it('leerer Filter direkt nach /', () => {
-    expect(erkenneSlashTrigger('Lage /', 6)).toEqual({ aktiv: true, filter: '', start: 5 });
+    expect(parseSlashTrigger('Lage /', 6)).toEqual({ aktiv: true, filter: '', start: 5 });
   });
 });
 
@@ -193,9 +194,9 @@ describe('Typbefehle (Neuentwurf S4)', () => {
   });
 
   it('lässt der Mitarbeit nur Meldung und Lage als Typbefehl und im Menü (LLH-1817)', () => {
-    expect(erkenneTypBefehl('/anordnung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
-    expect(erkenneTypBefehl('/entscheidung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
-    expect(erkenneTypBefehl('/lage x', TYP_BEFEHLE_MITARBEIT)).toEqual({ typ: 'lage', rest: 'x' });
+    expect(parseTypBefehl('/anordnung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
+    expect(parseTypBefehl('/entscheidung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
+    expect(parseTypBefehl('/lage x', TYP_BEFEHLE_MITARBEIT)).toEqual({ typ: 'lage', rest: 'x' });
     const treffer = filterSlashEintraege('', [], [], {
       typen: true,
       erlaubteTypen: TYP_BEFEHLE_MITARBEIT,
@@ -204,26 +205,26 @@ describe('Typbefehle (Neuentwurf S4)', () => {
   });
 
   it('setzt einen ausgetippten Befehl mit Leerzeichen, aber nur exakte Typwörter', () => {
-    expect(erkenneTypBefehl('/anordnung Sandsäcke')).toEqual({
+    expect(parseTypBefehl('/anordnung Sandsäcke')).toEqual({
       typ: 'anordnung',
       rest: 'Sandsäcke',
     });
-    expect(erkenneTypBefehl('/lage ')).toEqual({ typ: 'lage', rest: '' });
+    expect(parseTypBefehl('/lage ')).toEqual({ typ: 'lage', rest: '' });
     // Kein Leerzeichen: noch nicht fertig getippt.
-    expect(erkenneTypBefehl('/lage')).toBeNull();
+    expect(parseTypBefehl('/lage')).toBeNull();
     // Kein Typ, nur ähnlich — und nicht erfassbar.
-    expect(erkenneTypBefehl('/lagebericht x')).toBeNull();
-    expect(erkenneTypBefehl('/system x')).toBeNull();
-    expect(erkenneTypBefehl('/berichtigung x')).toBeNull();
+    expect(parseTypBefehl('/lagebericht x')).toBeNull();
+    expect(parseTypBefehl('/system x')).toBeNull();
+    expect(parseTypBefehl('/berichtigung x')).toBeNull();
     // Mitten im Text ist es kein Befehl.
-    expect(erkenneTypBefehl('Lage /anordnung x')).toBeNull();
+    expect(parseTypBefehl('Lage /anordnung x')).toBeNull();
   });
 });
 
 describe('@ für Von/An (Neuentwurf S4)', () => {
   it('erkennt @ am Wortanfang, nicht in einer Adresse', () => {
-    expect(erkenneAtTrigger('Lage @ELW', 9)).toEqual({ aktiv: true, filter: 'ELW', start: 5 });
-    expect(erkenneAtTrigger('mail@example', 12).aktiv).toBe(false);
+    expect(parseAtTrigger('Lage @ELW', 9)).toEqual({ aktiv: true, filter: 'ELW', start: 5 });
+    expect(parseAtTrigger('mail@example', 12).aktiv).toBe(false);
   });
 
   it('ordnet bei einer Anordnung den Empfänger zu, sonst den Absender', () => {
@@ -251,11 +252,11 @@ describe('@ für Von/An (Neuentwurf S4)', () => {
   });
 });
 
-describe('erkenneZeitBefehl (LLH-1088)', () => {
+describe('parseZeitBefehl (LLH-1088)', () => {
   // 14:31 in Berlin.
   const o = { zone: 'Europe/Berlin', jetzt: dayjs.utc('2026-10-17T12:31:00Z') };
   const zeit = (text: string, opt = o) => {
-    const r = erkenneZeitBefehl(text, opt);
+    const r = parseZeitBefehl(text, opt);
     return r && r.ok ? { iso: r.zeitpunkt.toISOString(), rest: r.rest } : r;
   };
 
@@ -274,23 +275,61 @@ describe('erkenneZeitBefehl (LLH-1088)', () => {
   });
 
   it('nennt bei einer unlesbaren Angabe den Grund und setzt nichts', () => {
-    const r = erkenneZeitBefehl('/zeit 2590 Pumpe', o);
+    const r = parseZeitBefehl('/zeit 2590 Pumpe', o);
     expect(r).toMatchObject({ ok: false });
     expect(r && !r.ok && r.grund).toBeTruthy();
   });
 
   it('nennt, wo die Angabe im Text steht, auch unlesbar (LLH-1866: dort hin mit dem Cursor)', () => {
-    expect(erkenneZeitBefehl('/zeit 2590 Pumpe', o)).toMatchObject({
+    expect(parseZeitBefehl('/zeit 2590 Pumpe', o)).toMatchObject({
       angabe: { start: 6, end: 10 },
     });
-    expect(erkenneZeitBefehl('/zeit  14:20 x', o)).toMatchObject({ angabe: { start: 7, end: 12 } });
+    expect(parseZeitBefehl('/zeit  14:20 x', o)).toMatchObject({ angabe: { start: 7, end: 12 } });
   });
 
-  it('greift erst nach dem Leerzeichen hinter der Angabe und nur am Textanfang', () => {
-    expect(erkenneZeitBefehl('/zeit', o)).toBeNull();
-    expect(erkenneZeitBefehl('/zeit 1420', o)).toBeNull();
-    expect(erkenneZeitBefehl('Lage /zeit 1420 x', o)).toBeNull();
-    expect(erkenneZeitBefehl('/zeitlich 1420 x', o)).toBeNull();
+  it('braucht eine Angabe und das ganze Wort „/zeit“ am Wortanfang', () => {
+    expect(parseZeitBefehl('/zeit', o)).toBeNull();
+    expect(parseZeitBefehl('/zeit ', o)).toBeNull();
+    expect(parseZeitBefehl('/zeitlich 1420 x', o)).toBeNull();
+    expect(parseZeitBefehl('Pegel/zeit 1420 x', o)).toBeNull();
+  });
+
+  it('erkennt den Befehl am Textende ohne Leerzeichen, aber als nicht abgeschlossen (LLH-1754)', () => {
+    expect(parseZeitBefehl('/zeit 1420', o)).toMatchObject({
+      ok: true,
+      rest: '',
+      abgeschlossen: false,
+    });
+    expect(parseZeitBefehl('/zeit 1420 Pumpe', o)).toMatchObject({ abgeschlossen: true });
+  });
+
+  it('erkennt den Befehl an jeder Stelle des Textes und nimmt ihn aus dem Inhalt (LLH-1754)', () => {
+    expect(zeit('Pumpe läuft /zeit 1420')).toEqual({
+      iso: '2026-10-17T12:20:00.000Z',
+      rest: 'Pumpe läuft',
+    });
+    expect(zeit('Pumpe /zeit 1420 läuft')).toEqual({
+      iso: '2026-10-17T12:20:00.000Z',
+      rest: 'Pumpe läuft',
+    });
+    // Beim Tippen: das Leerzeichen vor dem Befehl bleibt, dahinter geht es weiter.
+    expect(zeit('Pumpe /zeit 1420 ')).toEqual({
+      iso: '2026-10-17T12:20:00.000Z',
+      rest: 'Pumpe ',
+    });
+    expect(zeit('Lage\n/zeit 1420 ruhig')).toEqual({
+      iso: '2026-10-17T12:20:00.000Z',
+      rest: 'Lage\nruhig',
+    });
+  });
+
+  it('nennt Anfang, Ende und Angabe eines Befehls mitten im Text (LLH-1754)', () => {
+    expect(parseZeitBefehl('Pumpe /zeit 2590 läuft', o)).toMatchObject({
+      ok: false,
+      start: 6,
+      ende: 17,
+      angabe: { start: 12, end: 16 },
+    });
   });
 
   it('liest die Uhrzeit in der Anzeigezone: kurz nach Mitternacht liegt 2350 am Vortag', () => {
@@ -350,5 +389,38 @@ describe('Feldzeile (kwc2yszv)', () => {
     expect(fehlendeSeiten({})).toEqual(['von', 'an']);
     expect(fehlendeSeiten({ von: 'ELW 1' })).toEqual(['an']);
     expect(fehlendeSeiten({ von: 'ELW 1', an: 'S2' })).toEqual([]);
+  });
+});
+
+describe('parseNurBefehl (LLH-1754): ein Text nur aus einem Befehl wird nie gesendet', () => {
+  it('erkennt einen Typbefehl ohne Leerzeichen', () => {
+    expect(parseNurBefehl('/lage')).toEqual({ art: 'typ', typ: 'lage' });
+    expect(parseNurBefehl('  /anordnung  ')).toEqual({ art: 'typ', typ: 'anordnung' });
+  });
+
+  it('erkennt ein Feld an seinen Stichwörtern', () => {
+    expect(parseNurBefehl('/zeit')).toEqual({ art: 'feld', feld: 'ereigniszeit' });
+    expect(parseNurBefehl('/von')).toEqual({ art: 'feld', feld: 'von' });
+    expect(parseNurBefehl('/Empfänger')).toEqual({ art: 'feld', feld: 'an' });
+    expect(parseNurBefehl('/funk')).toEqual({ art: 'feld', feld: 'meldeweg' });
+  });
+
+  it('nennt ein unbekanntes Wort und ein nacktes „/“', () => {
+    expect(parseNurBefehl('/xyz')).toEqual({ art: 'unbekannt', befehl: '/xyz' });
+    expect(parseNurBefehl('/')).toEqual({ art: 'unbekannt', befehl: '/' });
+  });
+
+  it('ein nicht erlaubter Typ ist kein Befehl', () => {
+    expect(parseNurBefehl('/anordnung', TYP_BEFEHLE_MITARBEIT)).toEqual({
+      art: 'unbekannt',
+      befehl: '/anordnung',
+    });
+  });
+
+  it('Text mit mehr als dem Befehl ist kein reiner Befehl', () => {
+    expect(parseNurBefehl('/lage ruhig')).toBeNull();
+    expect(parseNurBefehl('Pumpe /von')).toBeNull();
+    expect(parseNurBefehl('1/2')).toBeNull();
+    expect(parseNurBefehl('')).toBeNull();
   });
 });

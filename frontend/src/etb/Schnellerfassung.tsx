@@ -50,9 +50,9 @@ import {
   amZeilenanfang,
   baueEintrag,
   einheitAusSchluessel,
-  erkenneAtTrigger,
-  erkenneSlashTrigger,
-  erkenneTypBefehl,
+  parseAtTrigger,
+  parseSlashTrigger,
+  parseTypBefehl,
   TYP_BEFEHLE,
   TYP_BEFEHLE_MITARBEIT,
   fehlendeSeiten,
@@ -66,7 +66,8 @@ import {
   type SlashEintrag,
   type TextRange,
   laengenVerstoss,
-  erkenneZeitBefehl,
+  parseZeitBefehl,
+  parseNurBefehl,
   zukunftsVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
@@ -425,6 +426,8 @@ export default function Schnellerfassung({
   const protokollGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
+  /** Ein Text nur aus einem unbekannten `/wort` wurde nicht gesendet (LLH-1754); geht beim Tippen. */
+  const [befehlHinweis, setBefehlHinweis] = useState<string | null>(null);
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   /**
@@ -446,8 +449,13 @@ export default function Schnellerfassung({
    * Unlesbare Angabe hinter `/zeit` (LLH-1088): abgeleitet aus dem Text, nicht gespeichert, damit
    * auch ein neu eingehängter Entwurf sie kennt (Nach-Review 1 zu LLH-1866).
    */
-  const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
-  const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
+  const zeitImInhalt = parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
+  // Am Textende ohne Leerzeichen tippt womöglich noch jemand: dort meldet sich der Grund erst mit
+  // dem angehaltenen Senden (LLH-1754), nicht bei jeder Ziffer.
+  const zeitBefehlGrund =
+    zeitImInhalt && !zeitImInhalt.ok && (zeitImInhalt.abgeschlossen || isUnlesbarHalted)
+      ? zeitImInhalt.grund
+      : null;
   function handleZeitDiscard(grund: string | null) {
     zeitDiscardedRef.current = grund;
     setZeitDiscardedState(grund);
@@ -653,10 +661,10 @@ export default function Schnellerfassung({
   }, [rufname.standard]);
 
   function aktualisiereTrigger(text: string, caret: number) {
-    const slash = erkenneSlashTrigger(text, caret);
+    const slash = parseSlashTrigger(text, caret);
     // `@` gibt es im Berichtigungsmodus nicht: dort bleiben Von/An über `/von`, `/an`
     // erreichbar, aber die Zeile soll nichts still umschreiben, was das Original trug.
-    const at = slash.aktiv || berichtigungZu ? null : erkenneAtTrigger(text, caret);
+    const at = slash.aktiv || berichtigungZu ? null : parseAtTrigger(text, caret);
     const t = at?.aktiv ? at : slash;
     setMenuModus(at?.aktiv ? 'at' : 'slash');
     setTypenAnbieten(slash.aktiv && !berichtigungZu && amZeilenanfang(text, slash.start));
@@ -666,9 +674,10 @@ export default function Schnellerfassung({
   }
 
   function onInhaltChange(neu: string) {
+    setBefehlHinweis(null);
     if (neu.trim() !== '') setInhaltFehlt(false);
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
-    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
+    const befehl = berichtigungZu ? null : parseTypBefehl(neu, erlaubteTypen);
     let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
@@ -680,9 +689,15 @@ export default function Schnellerfassung({
     // wer in „/zeit 2590 Pumpe“ eine Ziffer löscht, meint nicht 02:59.
     const caretRoh = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
     const caretImRest = caretRoh - (neu.length - text.length);
-    const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    const zeit = parseZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    // Beim Tippen nur ein abgeschlossener Befehl (Leerzeichen hinter der Angabe); ein offener am
+    // Textende geht erst mit Enter bzw. „Erfassen“ ins Feld (LLH-1754).
     const ausloesen =
-      zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
+      zeit != null &&
+      zeit.abgeschlossen &&
+      (befehl != null ||
+        caretImRest === zeit.ende ||
+        parseZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() }) == null);
     if (zeit?.ok && ausloesen) {
       applyZeitFromText(zeit.zeitpunkt);
       text = zeit.rest;
@@ -858,6 +873,24 @@ export default function Schnellerfassung({
       applyZeitFromText(zeitImInhalt.zeitpunkt);
       setInhalt(zeitImInhalt.rest);
       fokusInsFeld();
+      return;
+    }
+    // Ein Text nur aus einem Befehl geht nie ins Tagebuch (LLH-1754): der Befehl wirkt wie die Wahl
+    // im `/`-Menü, ein unbekannter bleibt stehen und heißt „kein Befehl“.
+    const nurBefehl = parseNurBefehl(inhalt, berichtigungZu ? [] : erlaubteTypen);
+    if (nurBefehl) {
+      if (nurBefehl.art === 'unbekannt') {
+        setBefehlHinweis(`„${nurBefehl.befehl}“ ist kein Befehl`);
+        fokusInsFeld();
+        return;
+      }
+      setInhalt('');
+      if (nurBefehl.art === 'typ') {
+        setTyp(nurBefehl.typ);
+        fokusInsFeld();
+      } else {
+        fokusFeld(nurBefehl.feld);
+      }
       return;
     }
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
@@ -1170,6 +1203,12 @@ export default function Schnellerfassung({
       {nachtragMin != null && (
         <span data-lfh="etb-nachtrag-hinweis" style={grundStil(rollen.achtungText)}>
           {nachtragHinweis(nachtragMin)}
+        </span>
+      )}
+      {befehlHinweis && (
+        <span role="alert" data-lfh="etb-befehl-hinweis" style={grundStil(rollen.alarmText)}>
+          <IconWarndreieck />
+          <span>{befehlHinweis}</span>
         </span>
       )}
       {laengenHinweis && (

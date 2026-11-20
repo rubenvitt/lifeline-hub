@@ -90,12 +90,16 @@ Ableitungen in `etb/zeitachseModell.ts`)
     Fokus nicht in ihr liegt und genau ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
-  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): die Zeile des Inhalts trägt
-    ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
-    (`Schnellerfassungszeile rahmenFarbe`); `/typ ` und danach
-    `/zeit <Angabe> ` setzen Typ und Ereigniszeit in der Feldzeile (`erkenneTypBefehl`,
-    `erkenneZeitBefehl`, gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`),
-    der Rest bleibt Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Eine
+  - **Typ am Textanfang, Ereigniszeit überall** (LLH-1112/LLH-1088/LLH-1754): die Zeile des
+    Inhalts trägt ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
+    (`Schnellerfassungszeile rahmenFarbe`); `/typ ` am Textanfang setzt den Typ
+    (`parseTypBefehl`), `/zeit <Angabe>` an jedem Wortanfang die Ereigniszeit (`parseZeitBefehl`,
+    gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
+    Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Beim Tippen löst `/zeit`
+    erst mit dem Leerzeichen hinter der Angabe aus, am Textende ohne Leerzeichen übernimmt
+    `absenden` die Zeit und sendet nicht. **Ein Befehl geht nie als Text ins Tagebuch:** ein Text
+    nur aus `/wort` (`parseNurBefehl`) setzt Typ oder springt ins Feld wie die Menüwahl, ein
+    unbekanntes Wort bleibt stehen („„/xyz“ ist kein Befehl“). Eine
     Ereigniszeit über 60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und
     Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ebenso wenig sendet eine
     unlesbare Zeit (LLH-1866): ein unlesbares `/zeit` oder eine im Feld Zeit verworfene Eingabe

@@ -122,8 +122,12 @@ der Zeitachse erscheinen wird.
    bis die Zeit stimmt. Dann steht in der Fußzeile „Zeit nicht übernommen“, und das Feld hat den
    Cursor. Eine lesbare Zeit eintippen oder das Feld leeren (dann gilt „jetzt“); Enter oder Escape im
    Feld behalten die gezeigte Zeit, bei einem leeren Feld also „jetzt“.
-3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
-   „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
+3. Schneller geht ein Nachtrag mit „/zeit“ an beliebiger Stelle im Text: „/zeit 1420 Pumpe läuft“
+   oder „Pumpe läuft /zeit 1420“ trägt 1420 in „Zeit“ ein, der Rest der Zeile bleibt der Inhalt.
+   Steht der Befehl am Ende, übernimmt Enter bzw. „Erfassen“ erst die Zeit ins Feld und sendet
+   noch nicht; das nächste Enter sendet. Ein Text, der nur aus einem Befehl besteht, geht nie ins
+   Tagebuch: „/lage“ setzt den Typ, „/zeit“ oder „/von“ springt ins Feld, und ein unbekanntes Wort
+   wie „/xyz“ bleibt stehen, die Fußzeile nennt „„/xyz“ ist kein Befehl“. Eine unlesbare Angabe bleibt als Text stehen,
    die Fußzeile nennt den Grund, und die Erfassung sendet nicht, bis die Angabe lesbar oder der
    Befehl aus dem Text gelöscht ist: „Erfassen“ markiert dann die Angabe im Text, Tippen
    überschreibt sie. Wer eine Angabe mitten im Text berichtigt, sieht die Zeit nach „Erfassen“ erst

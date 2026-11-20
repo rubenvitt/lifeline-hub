@@ -2377,3 +2377,103 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 });
+
+// LLH-1754: ein Kurzbefehl geht nie als Text ins Tagebuch.
+describe('Kurzbefehl wird nie als Text gesendet (LLH-1754)', () => {
+  mitProzessZone('Europe/Berlin');
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  const gesendet = (p: ReturnType<typeof props>) =>
+    (p.erfassen as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+
+  it('„/zeit 1420“ und Enter setzt die Zeit und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('„/zeit 1420“ am Satzende: Enter übernimmt die Zeit, das nächste Enter sendet ohne Befehl', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe läuft /zeit 1420{Enter}');
+    expect(feldWert('Zeit')).toBe('1420');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('„/zeit 1420“ mitten im Satz wirkt schon beim Tippen', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 1420 läuft');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(feldWert('Zeit')).toBe('1420');
+  });
+
+  it('ein unlesbares „/zeit“ am Textende hält das Senden an', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe /zeit 2590{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
+    expect(feld).toHaveValue('Pumpe /zeit 2590');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('nur ein Typbefehl: „Erfassen“ setzt den Typ und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lage');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, 'Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)[0]).toMatchObject({ typ: 'lage', inhalt: 'Lage ruhig' });
+  });
+
+  it('nur ein Feldbefehl: „Erfassen“ springt ins Feld und sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('ein unbekanntes „/xyz“ bleibt stehen und heißt „kein Befehl“', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/xyz');
+    await userEvent.click(screen.getByRole('button', { name: /erfassen/i }));
+    expect(feld).toHaveValue('/xyz');
+    expect(await screen.findByRole('alert')).toHaveTextContent('„/xyz“ ist kein Befehl');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.type(feld, ' a');
+    expect(screen.queryByText('„/xyz“ ist kein Befehl')).toBeNull();
+  });
+});
