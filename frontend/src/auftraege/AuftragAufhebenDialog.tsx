@@ -4,6 +4,7 @@ import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { AUFTRAG_HANDLUNG } from '../kommunikation';
 import { Feld } from '../components/instrument';
+import { pflicht } from '../components/pflichtRegel';
 
 interface AufhebenWerte {
   grund: string;
@@ -56,7 +57,7 @@ export default function AuftragAufhebenDialog({
         name="grund"
         label="Grund"
         rules={[
-          { required: true, whitespace: true, message: 'Bitte einen Grund angeben' },
+          pflicht('Grund', { whitespace: true }),
           zeichenRegel(AUFTRAG_AUFHEBUNGSGRUND_MAX, 'Grund'),
         ]}
       >

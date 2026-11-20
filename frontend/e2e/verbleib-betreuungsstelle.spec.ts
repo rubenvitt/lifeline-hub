@@ -94,7 +94,7 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
   await expect(paneel.getByLabel('Ziel')).toHaveValue('NU Turnhalle Nord');
   await page.screenshot({ path: info.outputPath('dialog-stelle-gewaehlt.png') });
 
-  await paneel.getByRole('button', { name: 'Verbleib erfassen' }).click();
+  await paneel.getByRole('button', { name: 'Erfassen', exact: true }).click();
   // Nach dem Erfolg klappt das Paneel zu; der Kopf zeigt den Verbleib.
   await expect(paneel).toHaveCount(0);
   await expect(

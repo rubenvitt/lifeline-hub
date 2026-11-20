@@ -65,7 +65,7 @@ describe('QualifikationenTab', () => {
   it('Admin sieht „Qualifikation anlegen"', async () => {
     render(admin);
     await screen.findByText('Sanitäter');
-    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeEnabled();
   });
 
   /**
@@ -77,7 +77,7 @@ describe('QualifikationenTab', () => {
   it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('Sanitäter');
-    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });

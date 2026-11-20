@@ -1,6 +1,6 @@
 import { Button, Flex, Form, Input, Typography } from 'antd';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   revokeMassnahme,
   revokeVerletzung,
@@ -19,6 +19,8 @@ import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { vorText } from '../anzeige/dauer';
 import { ErfassungsFormular } from '../components/Erfassung';
+import { leerKnopfStil, wertAngabeStil } from '../components/InlineAngabe';
+import { IconStift } from '../icons';
 import {
   Datenfeld,
   Datenraster,
@@ -59,6 +61,7 @@ import VerbleibText from './VerbleibText';
 import VersorgtVon, { hatVersorgtVon } from './VersorgtVon';
 import { verbleibAusRettungsmittel, type VerbleibFormWerte } from './verbleibErfassungKern';
 import RettungsmittelZeile, { hatRettungsmittel } from './RettungsmittelZeile';
+import { pflicht } from '../components/pflichtRegel';
 
 export interface PatientenkopfProps {
   einsatzId: number;
@@ -220,6 +223,12 @@ export default function Patientenkopf({
     (v) => v.aktion.person_id === person.id,
   );
   const vorgemerkteNotizen = vorgemerkt.filter((v) => v.aktion.art === 'notiz');
+  // Das Körperschema öffnet unter dem Kopf: ins Bild damit, sonst stünde es außer Sicht (LLH-1769).
+  // `scrollIntoView` fehlt in jsdom.
+  const verletzungPaneel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (offen === 'verletzung') verletzungPaneel.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [offen]);
 
   return (
     <section
@@ -268,22 +277,16 @@ export default function Patientenkopf({
           {/* Anlass der Hilfeleistung (LLH-1566): wer sichten darf, legt ihn fest; am Gerät nur
               die UHS. Ein Gesundheitsdatum, nie im ETB. */}
           <Datenfeld label="Anlass">
-            <span data-lfh="anlass">
-              {person.anlass ? (
-                ANLASS_WORT[person.anlass]
-              ) : (
-                <Typography.Text type="secondary">kein Anlass</Typography.Text>
-              )}
-            </span>
-            {erfassbar && darfSichten && angetroffen && (
-              <PaneelKnopf
-                offen={offen === 'anlass'}
-                gesperrt={isSpeichernd}
-                onClick={() => toggle('anlass')}
-              >
-                Anlass festlegen
-              </PaneelKnopf>
-            )}
+            <StandAngabe
+              etikett="Anlass"
+              lfh="anlass"
+              bedienbar={erfassbar && darfSichten && angetroffen}
+              offen={offen === 'anlass'}
+              gesperrt={isSpeichernd}
+              onClick={() => toggle('anlass')}
+              wert={person.anlass ? ANLASS_WORT[person.anlass] : null}
+              leer="kein Anlass"
+            />
           </Datenfeld>
 
           <Datenfeld label="Zustand / Verdacht">
@@ -361,32 +364,30 @@ export default function Patientenkopf({
           </Datenfeld>
 
           <Datenfeld label="Transport">
-            <span data-lfh="transport">
-              {transport ? (
-                <>
-                  {transport}
-                  {person.transport_at && (
-                    <Typography.Text type="secondary">
-                      {' '}
-                      · <ZeitAnzeige wert={person.transport_at} rolle="kurz" />
-                      {letzterTransport?.bestaetigt_name &&
-                        ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
-                    </Typography.Text>
-                  )}
-                </>
-              ) : (
-                <Typography.Text type="secondary">kein Transport</Typography.Text>
-              )}
-            </span>
-            {behandelbar && (
-              <PaneelKnopf
-                offen={offen === 'transport'}
-                gesperrt={isSpeichernd}
-                onClick={() => toggle('transport')}
-              >
-                Transport festlegen
-              </PaneelKnopf>
-            )}
+            <StandAngabe
+              etikett="Transport"
+              lfh="transport"
+              bedienbar={behandelbar}
+              offen={offen === 'transport'}
+              gesperrt={isSpeichernd}
+              onClick={() => toggle('transport')}
+              wert={
+                transport ? (
+                  <>
+                    {transport}
+                    {person.transport_at && (
+                      <Typography.Text type="secondary">
+                        {' '}
+                        · <ZeitAnzeige wert={person.transport_at} rolle="kurz" />
+                        {letzterTransport?.bestaetigt_name &&
+                          ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
+                      </Typography.Text>
+                    )}
+                  </>
+                ) : null
+              }
+              leer="kein Transport"
+            />
           </Datenfeld>
 
           {/* Angefordertes Rettungsmittel (LLH-1573, design.md D3/D4): lesend nur mit Stand. */}
@@ -522,7 +523,11 @@ export default function Patientenkopf({
         />
       )}
       {offen === 'verletzung' && (
-        <section aria-label="Verletzung markieren" data-lfh="verletzung-paneel">
+        <section
+          ref={verletzungPaneel}
+          aria-label="Verletzung markieren"
+          data-lfh="verletzung-paneel"
+        >
           <Stapel abstand="sm">
             <Koerperschema
               einsatzId={einsatzId}
@@ -749,6 +754,71 @@ type Paneel =
   'sichtung' | 'anlass' | 'verbleib' | 'uebergabe' | 'transport' | 'massnahme' | 'verletzung';
 
 /** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
+/**
+ * Ein Stand im Kopf, der über ein Paneel gesetzt wird (Anlass, Transport). Eine Form für
+ * „Bearbeiten“ (LLH-1769, `frontend/src/personen/AGENTS.md`, „Patientenkopf“): gesetzt der Wert
+ * mit Stift (Name „{Etikett} bearbeiten“), leer die Aufforderung als Wort („{Etikett}
+ * festlegen“), ohne Recht nur der Text. Der Wert trägt keine eigenen Ziele.
+ */
+function StandAngabe({
+  etikett,
+  lfh,
+  bedienbar,
+  offen,
+  gesperrt,
+  onClick,
+  wert,
+  leer,
+}: {
+  etikett: string;
+  lfh: string;
+  bedienbar: boolean;
+  offen: boolean;
+  gesperrt: boolean;
+  onClick: () => void;
+  wert: ReactNode | null;
+  leer: string;
+}) {
+  const { token, rollen } = useRollen();
+  if (!bedienbar) {
+    return (
+      <span data-lfh={lfh}>
+        {wert ?? <Typography.Text type="secondary">{leer}</Typography.Text>}
+      </span>
+    );
+  }
+  if (wert == null) {
+    return (
+      <Button
+        type="link"
+        aria-expanded={offen}
+        disabled={gesperrt}
+        style={leerKnopfStil(token, rollen.bedienText)}
+        onClick={onClick}
+      >
+        {`${etikett} festlegen`}
+      </Button>
+    );
+  }
+  return (
+    <Button
+      type="text"
+      aria-label={`${etikett} bearbeiten`}
+      aria-expanded={offen}
+      disabled={gesperrt}
+      style={wertAngabeStil(token)}
+      onClick={onClick}
+    >
+      <span data-lfh={lfh}>{wert}</span>
+      {/* Icon ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist kein Icon"). */}
+      <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
+        <IconStift />
+      </span>
+    </Button>
+  );
+}
+
+/** Rahmenknopf für einen neuen Eintrag (Maßnahme, Verletzung): er öffnet sein Paneel. */
 function PaneelKnopf({
   offen,
   gesperrt,
@@ -823,7 +893,7 @@ function VerbleibPaneel({
       <ErfassungsFormular<VerbleibFormWerte>
         form={form}
         initialValues={vorbelegung}
-        erfassenText="Verbleib erfassen"
+        erfassenText="Erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Verbleib nicht erfasst"
@@ -891,7 +961,7 @@ function NotizZeile({
             name="text"
             noStyle
             rules={[
-              { required: true, whitespace: true, message: 'Bitte Text eingeben' },
+              pflicht('Notiz', { whitespace: true }),
               // Grenze des Servers (LLH-1329): ein zu langer Text geht weder hinaus noch in die
               // Warteschlange; der Zähler sagt „zu lang“, gekürzt wird nie.
               zeichenRegel(VERLAUFSNOTIZ_MAX, 'Notiztext'),
@@ -908,7 +978,7 @@ function NotizZeile({
           </Feld>
           {!gesperrt && (
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-              Notiz anlegen
+              Erfassen
             </Button>
           )}
         </Flex>

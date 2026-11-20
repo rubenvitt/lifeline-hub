@@ -67,7 +67,7 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     handler();
     renderMitProviders(<Harness />);
-    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    const knopf = await screen.findByRole('button', { name: 'Anlegen' });
 
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
@@ -136,7 +136,7 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
 
     const dialog = await screen.findByRole('dialog');
     await nutzer.type(within(dialog).getByLabelText('Bezeichnung'), 'Wolldecke');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Bestandsnummer bereits vergeben',
@@ -289,7 +289,7 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     );
     await nutzer.type(screen.getByLabelText('Bezeichnung'), 'Wolldecke');
     await nutzer.click(within(art).getByRole('radio', { name: 'Verbrauchsgut' }));
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(rumpf).toMatchObject({ bezeichnung: 'Wolldecke', art: 'verbrauchsgut' }),
     );

@@ -66,7 +66,7 @@ describe('StatusKatalogTab', () => {
   it('Admin sieht „Status anlegen", Nicht-Admin nicht', async () => {
     render(admin);
     await screen.findByText('einsatzbereit');
-    expect(screen.getByRole('button', { name: 'Status anlegen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeEnabled();
   });
 
   /**
@@ -78,7 +78,7 @@ describe('StatusKatalogTab', () => {
   it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('einsatzbereit');
-    expect(screen.getByRole('button', { name: 'Status anlegen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });

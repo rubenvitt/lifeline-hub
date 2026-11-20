@@ -100,7 +100,7 @@ Bezeichnung und Rufnummer vorbelegt.
 
    ![Dialog „Verbindung hinzufügen · Ordnungsamt Musterstadt“ mit Mittel, Nummer und Hinweis](../bilder/funkplan/verbindung.png)
 
-3. „Speichern“ wählen; „Speichern und nächste“ hält den Dialog für die nächste Verbindung offen.
+3. „Anlegen“ wählen; „Speichern und nächste“ hält den Dialog für die nächste Verbindung offen.
 
 Über das Menü der Zeile lassen sich Verbindungen bearbeiten oder entfernen, die Bezeichnung
 ändern und die Stelle entfernen.

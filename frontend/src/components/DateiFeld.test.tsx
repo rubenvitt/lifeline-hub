@@ -53,7 +53,7 @@ describe('DateiFeld (LFH-21)', () => {
     const onFinish = vi.fn();
     renderMitProviders(<Formular onFinish={onFinish} />);
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    expect(await screen.findByText('Bitte eine Datei wählen')).toBeInTheDocument();
+    expect(await screen.findByText('Datei fehlt')).toBeInTheDocument();
     expect(onFinish).not.toHaveBeenCalled();
   });
 

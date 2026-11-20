@@ -46,6 +46,7 @@ import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import type { EinheitVorlage } from '../api/types';
 import { Status } from '../components/instrument/Status';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
@@ -450,7 +451,7 @@ export default function EinheitenPage() {
         )}
         {gewaehlteVorlage == null && (
           <>
-            <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+            <Feld label="Name" name="name" rules={[pflicht('Name', { whitespace: true })]}>
               <Input placeholder="z. B. 2. Zug" maxLength={EINHEIT_NAME_MAX} />
             </Feld>
             <Feld label="Typ" name="typ_id">

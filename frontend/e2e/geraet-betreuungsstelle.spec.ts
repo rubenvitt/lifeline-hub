@@ -98,7 +98,7 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
     await tablet.getByRole('tab', { name: 'Meldungen' }).click();
     await expect(tablet.getByText('Noch keine Meldungen von dieser Stelle')).toBeVisible();
     await tablet.getByLabel('Inhalt').fill('Feldbetten werden knapp');
-    await tablet.getByRole('button', { name: 'Meldung senden' }).click();
+    await tablet.getByRole('button', { name: 'Erfassen', exact: true }).click();
     // Erst die Quittung des Servers: der Text allein stünde schon im Eingabefeld (ein gesteuertes
     // `textarea` trägt seinen Wert als Textinhalt), die Abfrage unten liefe dann der Meldung voraus.
     await expect(tablet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();

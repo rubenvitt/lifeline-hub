@@ -1,3 +1,4 @@
+import { ConfigProvider } from 'antd';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -13,6 +14,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { tippeZeit } from '../test/zeitEingabe';
 import * as dateiSpeichern from '../components/dateiSpeichern';
 import { planungPfad } from '../routing/deeplinks';
+import { dichten } from '../theme/tokens';
 import PlanungPage from './PlanungPage';
 
 /** Planungsseite der Vorplanung (LLH-1586, Spec `vorplanung`). */
@@ -85,21 +87,28 @@ function Adresse() {
   return <div data-testid="adresse">{`${l.pathname}${l.search}`}</div>;
 }
 
-function setup(p: Planung = planung(), route = planungPfad(5)) {
+function setup(p: Planung = planung(), route = planungPfad(5), steuerhoehe?: number) {
   server.use(
     meHandler(adminFixture()),
     http.get('/api/planungen/5', () => HttpResponse.json(p)),
     http.get('/api/personal', () => HttpResponse.json([])),
     http.get('/api/qualifikationen', () => HttpResponse.json([])),
   );
-  return renderMitProviders(
+  const seite = (
     <>
       <Adresse />
       <Routes>
         <Route path="/planungen" element={<div>Liste der Planungen</div>} />
         <Route path="/planungen/:planungId" element={<PlanungPage />} />
       </Routes>
-    </>,
+    </>
+  );
+  return renderMitProviders(
+    steuerhoehe == null ? (
+      seite
+    ) : (
+      <ConfigProvider theme={{ token: { controlHeight: steuerhoehe } }}>{seite}</ConfigProvider>
+    ),
     { route, datenRouter: true },
   );
 }
@@ -209,7 +218,7 @@ describe('PlanungPage (LLH-1586)', () => {
     expect(screen.getByPlaceholderText('6 (Vorgabe)')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Schichtlänge'), '6 h');
     const dialog = screen.getByRole('dialog', { name: 'Posten anlegen' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Posten anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(body).toEqual({
         bezeichnung: 'SEG Nord',
@@ -234,7 +243,7 @@ describe('PlanungPage (LLH-1586)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Helfer anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Carl');
     await userEvent.type(within(dialog).getByLabelText('Organisation'), 'THW');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).toEqual({ name: 'Carl', organisation: 'THW' }));
   });
 
@@ -338,9 +347,9 @@ describe('PlanungPage (LLH-1586)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schichten erzeugen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Schichten erzeugen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schichten erzeugen' }));
-    expect(await within(dialog).findByText('Bitte eine Länge angeben')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Länge fehlt')).toBeInTheDocument();
     await waehle('Posten', 'RTW 1');
-    await waitFor(() => expect(within(dialog).queryByText('Bitte eine Länge angeben')).toBeNull());
+    await waitFor(() => expect(within(dialog).queryByText('Länge fehlt')).toBeNull());
   });
 
   it('Handy: Liste mit allen Blöcken je Posten', async () => {
@@ -356,6 +365,17 @@ describe('PlanungPage (LLH-1586)', () => {
     setzeViewportBreite(390);
     setup();
     const ausloeser = await screen.findByRole('button', { name: 'Aktionen zu Stadtfest' });
+    expect(screen.queryByRole('link', { name: 'Druckansicht' })).toBeNull();
+    await waehleMenueEintrag(ausloeser, 'Druckansicht');
+    await waitFor(() =>
+      expect(screen.getByTestId('adresse')).toHaveTextContent('/planungen/5/druck'),
+    );
+  });
+
+  it('Stufe 48 ab md: „Druckansicht“ steht im Menü der Planung, kein zweiter Auslöser (LLH-1786, LLH-1836)', async () => {
+    setup(planung(), planungPfad(5), dichten.komfortabel.zeilenhoehe);
+    const ausloeser = await screen.findByRole('button', { name: 'Aktionen zu Stadtfest' });
+    expect(screen.getAllByRole('button', { name: 'Aktionen zu Stadtfest' })).toHaveLength(1);
     expect(screen.queryByRole('link', { name: 'Druckansicht' })).toBeNull();
     await waehleMenueEintrag(ausloeser, 'Druckansicht');
     await waitFor(() =>

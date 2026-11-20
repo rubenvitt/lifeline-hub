@@ -359,7 +359,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
       'RTW 3/83-2',
     );
     await userEvent.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet[0]).toMatchObject({
       pfad: 'verbleib',
@@ -400,7 +400,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
   it('legt eine Notiz über die Eingabezeile an', async () => {
     const { onGeschrieben } = zeige();
     await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
       { pfad: 'notizen', body: { text: 'Infusion läuft', client_id: expect.any(String) } },
@@ -699,7 +699,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
 
   it('belegt das Paneel mit dem aktuellen Stand vor; „ohne“ leert ein Feld', async () => {
     const { kopf } = zeige(vollerKern);
-    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport festlegen' }));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport bearbeiten' }));
     const paneel = screen.getByRole('region', { name: 'Transport festlegen' });
     const prio = within(paneel).getByRole('radiogroup', { name: 'Priorität' });
     expect(within(prio).getByRole('radio', { name: 'dringlich' })).toBeChecked();
@@ -736,7 +736,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(within(paneel).getByRole('radio', { name: 'Blutstillung' }));
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
       { pfad: 'massnahmen', body: { art: 'blutstillung', client_id: expect.any(String) } },
@@ -747,8 +747,8 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     const { kopf } = zeige();
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
-    expect(await within(paneel).findByText('Bitte eine Maßnahme wählen')).toBeInTheDocument();
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
+    expect(await within(paneel).findByText('Maßnahme fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
 
@@ -796,7 +796,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(within(paneel).getByRole('radio', { name: 'Sauerstoff' }));
-    const senden = within(paneel).getByRole('button', { name: 'Maßnahme erfassen' });
+    const senden = within(paneel).getByRole('button', { name: 'Erfassen' });
     await userEvent.click(senden);
     await waitFor(() => expect(senden).toHaveClass('ant-btn-loading'));
     const transport = within(kopf).getByRole('button', { name: 'Transport festlegen' });
@@ -837,7 +837,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
     await user.click(await within(paneel).findByRole('combobox', { name: 'Bestätigt von' }));
     await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
-    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0].body).toEqual({
       art: 'zugang',
@@ -910,6 +910,24 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
     expect(
       [...feld.querySelectorAll('[data-lfh="stern"]')].map((s) => s.getAttribute('data-nummer')),
     ).toEqual(['1', '3', '5', '4']);
+  });
+
+  it('rollt das Paneel „Verletzung markieren“ beim Öffnen ins Bild (LLH-1769)', async () => {
+    const gerollt: { el: Element; arg: unknown }[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      gerollt.push({ el: this, arg });
+    };
+    try {
+      const { kopf } = zeige();
+      await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+      const paneel = screen.getByRole('region', { name: 'Verletzung markieren' });
+      expect(gerollt.filter((g) => g.el === paneel)).toEqual([
+        { el: paneel, arg: { block: 'nearest' } },
+      ]);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 
   it('lässt die Figur unter md weg', () => {
@@ -1086,7 +1104,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await user.click(await screen.findByTitle('Transport'));
     await user.type(within(paneel).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 1');
     await user.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
-    await user.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull(),
     );
@@ -1102,7 +1120,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     setzeOnline(true);
     paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');
     await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
-    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Maßnahme erfassen' })).toBeNull(),
     );
@@ -1129,8 +1147,9 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
     );
-    // Der Kopf zeigt weiter den Serverstand.
-    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('kein Anlass');
+    // Der Kopf zeigt weiter den Serverstand: leer, also die Aufforderung als Wort.
+    expect(within(kopf).getByRole('button', { name: 'Anlass festlegen' })).toBeInTheDocument();
+    expect(within(kopf).queryByRole('button', { name: 'Anlass bearbeiten' })).toBeNull();
     await waitFor(() =>
       expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
         'Intoxikation',
@@ -1151,7 +1170,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
     );
-    expect(within(kopf).queryByText('Bitte einen Anlass wählen')).toBeNull();
+    expect(within(kopf).queryByText('Anlass fehlt')).toBeNull();
     expect(gesendet).toEqual([]);
     expect(
       (await vorgemerkt()).map((a) => [a.art, (a.daten as { anlass?: unknown }).anlass]),
@@ -1172,14 +1191,14 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
     paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect(await vorgemerkt()).toHaveLength(2);
   });
 
   it('Anlass: eine vorgemerkte Aufhebung hebt die Vorbelegung mit dem Serverwert nicht wieder auf', async () => {
     const user = userEvent.setup();
     const { kopf } = zeige({ anlass: 'psychisch' });
-    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    let paneel = await paneelOhneNetz(kopf, 'Anlass bearbeiten', 'Anlass festlegen');
     await user.click(
       within(within(paneel).getByRole('radiogroup', { name: 'Anlass' })).getByRole('radio', {
         name: 'Psychisch',
@@ -1196,14 +1215,14 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('Psychisch');
 
     // Mutationsprobe: mit dem Serverwert vorbelegen — „Psychisch“ ginge erneut in die Warteschlange, rot.
-    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass bearbeiten' }));
     paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     expect(within(paneel).getByRole('radio', { name: 'Psychisch' })).toHaveAttribute(
       'aria-checked',
       'false',
     );
     await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
       null,
     ]);
@@ -1226,7 +1245,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
 
     // Unverändert abgeschickt: nichts geht hinaus, der Stand des anderen Tabs bleibt der letzte.
     // Mutationsprobe: gegen den laufend nachgeführten Stand vergleichen — „Psychisch“ ginge zurück, rot.
-    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    let paneel = await paneelOhneNetz(kopf, 'Anlass bearbeiten', 'Anlass festlegen');
     await anderer();
     await waitFor(() =>
       expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
@@ -1243,7 +1262,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
 
     // Eine bearbeitete Wahl bleibt und geht hinaus.
     await queueLeerenFuerTests();
-    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass bearbeiten' }));
     paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
     await user.click(within(gruppe).getByRole('radio', { name: 'Allergie / Insektenstich' }));
@@ -1300,7 +1319,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     await sitzungAbwarten(kopf);
     setzeOnline(false);
     await user.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await user.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     const zeile = kopf.querySelector<HTMLElement>('[data-lfh="notiz-zeile"]')!;
     expect(await within(zeile).findByText(/Offline vorgemerkt/)).toBeVisible();
@@ -1427,7 +1446,7 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
     const feld = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
     fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX + 1) } });
     expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -1437,7 +1456,7 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
 
     fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX) } });
     expect(screen.getByText('2.000 / 2.000')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
   });
 
@@ -1702,7 +1721,7 @@ describe('Patientenkopf — Rettungsmittel (LLH-1573)', () => {
     const paneel = await screen.findByRole('region', { name: 'Verbleib erfassen' });
     expect(within(paneel).getByLabelText(/Rettungsmittel/)).toHaveValue('RTW 1/83-1');
     expect(within(paneel).getByLabelText('Einsatznummer Leitstelle')).toHaveValue('2611-0815');
-    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>
       expect(gesendet).toEqual([
         {
@@ -1726,7 +1745,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
   });
 
   it('nennt ohne Anlass „kein Anlass“', () => {
-    const { kopf } = zeige();
+    const { kopf } = zeige({}, { darfSichten: false });
     expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('kein Anlass');
   });
 
@@ -1752,13 +1771,13 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
     await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
     const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
-    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await within(paneel).findByText('Anlass fehlt')).toBeInTheDocument();
     expect(gesendet).toEqual([]);
   });
 
   it('nimmt einen gesetzten Anlass per Tipp auf die gewählte Fläche zurück', async () => {
     const { kopf } = zeige({ anlass: 'psychisch' });
-    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass bearbeiten' }));
     const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
     expect(within(gruppe).getByRole('radio', { name: 'Psychisch' })).toHaveAttribute(
@@ -1776,7 +1795,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
 
   it('sendet einen unverändert abgeschickten Anlass nicht erneut', async () => {
     const { kopf } = zeige({ anlass: 'psychisch' });
-    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass bearbeiten' }));
     const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
     // Mutationsprobe: ohne Vergleich mit dem geltenden Stand abschicken — ein zweiter Verlaufseintrag, rot.
     await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
@@ -1788,7 +1807,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
 
   it('bietet ohne Sichtungsrecht (Betreuungsstelle) keinen Anlass an', () => {
     const { kopf } = zeige({ anlass: 'verletzung' }, { darfSichten: false });
-    expect(within(kopf).queryByRole('button', { name: 'Anlass festlegen' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: /^Anlass / })).toBeNull();
   });
 
   it('bietet an einer vermissten Person keinen Anlass an', () => {
@@ -1818,7 +1837,7 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
     expect(kopf.querySelector('[data-lfh="zustand"]')).not.toBeNull();
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     // Beantragt ist kein neuer Serverstand: die Seite lädt nicht neu.
     await waitFor(() =>
@@ -1856,5 +1875,73 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
     expect(block).toHaveTextContent('Sichtung SK I');
     expect(block).not.toHaveTextContent('SK III');
     expect(screen.queryByRole('region', { name: 'Offline vorgemerkt' })).toBeNull();
+  });
+});
+
+/**
+ * Eine Form für „Bearbeiten“ (LLH-1769): ein gesetzter Stand wird am Wert mit Stift geändert, eine
+ * leere Angabe fordert als Wort auf, ein neuer Eintrag entsteht über einen Rahmenknopf.
+ */
+describe('Patientenkopf — eine Form für Bearbeiten (LLH-1769)', () => {
+  it('bietet an einem gesetzten Anlass den Stift am Wert an', async () => {
+    const { kopf } = zeige({ anlass: 'internistisch' } as Partial<PersonDetail>);
+    const knopf = within(kopf).getByRole('button', { name: 'Anlass bearbeiten' });
+    expect(knopf).toHaveTextContent('Internistisch');
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(within(kopf).queryByRole('button', { name: 'Anlass festlegen' })).toBeNull();
+    await userEvent.click(knopf);
+    expect(screen.getByRole('region', { name: 'Anlass festlegen' })).toBeInTheDocument();
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('fordert ohne Anlass als Wort auf', () => {
+    const { kopf } = zeige();
+    const knopf = within(kopf).getByRole('button', { name: 'Anlass festlegen' });
+    expect(knopf.className).toMatch(/ant-btn-link/);
+    expect(within(kopf).queryByRole('button', { name: 'Anlass bearbeiten' })).toBeNull();
+  });
+
+  it('bietet an einem gesetzten Transport den Stift am Wert an', async () => {
+    const { kopf } = zeige({
+      transport_prioritaet: 'dringlich',
+      transport_art: 'liegend',
+    } as Partial<PersonDetail>);
+    const knopf = within(kopf).getByRole('button', { name: 'Transport bearbeiten' });
+    expect(knopf).toHaveTextContent(/dringlich · liegend/);
+    expect(within(kopf).queryByRole('button', { name: 'Transport festlegen' })).toBeNull();
+    await userEvent.click(knopf);
+    expect(screen.getByRole('region', { name: 'Transport festlegen' })).toBeInTheDocument();
+  });
+
+  it('fordert ohne Transport als Wort auf', () => {
+    const { kopf } = zeige();
+    const knopf = within(kopf).getByRole('button', { name: 'Transport festlegen' });
+    expect(knopf.className).toMatch(/ant-btn-link/);
+  });
+
+  it('ohne Behandlungsrecht steht der Transport nur als Text', () => {
+    const { kopf } = zeige(
+      { transport_prioritaet: 'dringlich', transport_art: 'liegend' } as Partial<PersonDetail>,
+      { darfBehandeln: false },
+    );
+    expect(within(kopf).queryByRole('button', { name: /^Transport / })).toBeNull();
+    expect(kopf.querySelector('[data-lfh="transport"]')).toHaveTextContent(/dringlich · liegend/);
+  });
+
+  it('an einer stornierten Person stehen Anlass und Transport nur als Text', () => {
+    const { kopf } = zeige({
+      anlass: 'internistisch',
+      transport_prioritaet: 'dringlich',
+      storniert_at: '2026-10-18 10:00:00',
+    } as Partial<PersonDetail>);
+    expect(within(kopf).queryByRole('button', { name: /^(Anlass|Transport) / })).toBeNull();
+    expect(kopf.querySelector('[data-lfh="anlass"]')).toHaveTextContent('Internistisch');
+  });
+
+  it('neue Einträge bleiben Rahmenknöpfe', () => {
+    const { kopf } = zeige();
+    for (const name of ['Maßnahme erfassen', 'Verletzung markieren']) {
+      expect(within(kopf).getByRole('button', { name }).className).not.toMatch(/ant-btn-link/);
+    }
   });
 });

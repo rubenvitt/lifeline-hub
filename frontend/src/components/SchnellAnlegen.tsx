@@ -116,6 +116,8 @@ export default function SchnellAnlegen({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPressEnter={() => void anlegen()}
+          // Einzeilig: Enter sendet, auch auf Touch (Enter-Vertrag, LLH-1766).
+          enterKeyHint="send"
           placeholder={platzhalter}
           disabled={gesperrt}
         />

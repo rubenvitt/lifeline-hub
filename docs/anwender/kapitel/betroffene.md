@@ -103,13 +103,21 @@ ausgetreten. Ohne Netz wird der Fall vorgemerkt und geht mit seiner Erfassungsze
 
    ![Kurzeingabe mit erkanntem Namen, Geschlecht, Alter, Sichtung SK III und Unfallhilfsstelle](../bilder/betroffene/kurzeingabe.png)
 
-2. Unter dem Feld steht, was erkannt wurde („erkannt: …“). Was sich nicht deuten lässt, nennt
-   die Zeile unter „Nicht erfasst: …“; dann wird nichts angelegt.
+2. Unter dem Feld steht, was erkannt wurde („erkannt: …“). Der Name ist nur die erste
+   zusammenhängende Gruppe freier Wörter; jedes weitere Wort, das kein Kürzel ist, steht dort
+   wellig unterstrichen mit „?“ (etwa „verwirrt ?“ in „Mann ca 40 rot verwirrt“). Was sich nicht
+   deuten lässt, nennt die Zeile beim Speichern unter „Nicht erfasst: …“; dann wird nichts
+   angelegt.
 3. Enter speichert. Das Feld leert sich, rechts steht „Zuletzt: …“ mit der Registriernummer.
-   Escape leert das Feld, ohne zu speichern.
+   Enter auf dem leeren Feld sagt „Noch nichts eingegeben“. Escape leert das Feld, ohne zu
+   speichern.
 
-Die Kürzel: „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alter (geschätzt als „~50“); „sk1“
-bis „sk4“, „skt“ für tot und „sku“ für unverletzt; „#Breite/Länge“ für die Koordinate des
+Die Kürzel stehen, solange das leere Feld den Fokus hat, als Tafel unter der Zeile (am Handy hinter
+„Kürzel anzeigen“): „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alter (geschätzt als „~50“
+oder „ca 50“); die Sichtung als Farbe „rot“, „gelb“, „grün“, „blau“ (SK I bis SK IV) oder als
+„sk1“ bis „sk4“, dazu „skt“ für tot und „sku“ für unverletzt. Eine Farbe direkt am Komma gehört
+zum Namen („Grün, Anna“); „schwarz“ und „weiß“ sind keine Sichtung, weil sie häufige Nachnamen
+sind; „#Breite/Länge“ für die Koordinate des
 Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird; „!“ mit einem
 Kürzel für den Anlass der Hilfeleistung: „!verl“, „!intern“, „!neuro“, „!intox“, „!hitze“ (auch
 „!kaelte“), „!allergie“ (auch „!stich“), „!psych“ und „!sonst“.
@@ -138,7 +146,8 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
 
 ### Sichten und den Verbleib erfassen
 
-1. In der Liste die Person öffnen. Oben auf der Seite „Person R-…“ steht der Patientenkopf:
+1. In der Liste die Person öffnen. Oben auf der Seite steht ihr Name („Name, Vorname“) mit der
+   Registriernummer, ohne Namen „Person R-…“; darunter der Patientenkopf:
    PAT-Nummer und „kontaminiert“, falls angegeben, darunter Sichtung mit Zeit („gesichtet … · vor
    42 min“), „Anlass“, „Zustand / Verdacht“, Aufenthalt oder Verbleib, „Transport“, „Maßnahmen“,
    „Verletzungen“ und „Letzte Notiz“.
@@ -159,12 +168,12 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
    Entlassung und Transport „Gegen Rat“: „Behandlung abgelehnt“ oder „Transport abgelehnt“.
    Ist das gewählt, hält „Unterschrift“ fest, ob die Unterschrift auf Papier vorliegt oder
    verweigert wurde. Die Unterschrift selbst bleibt auf dem Papier.
-5. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib, etwa „entlassen an
+5. „Erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib, etwa „entlassen an
    Polizei · gegen Rat: Transport abgelehnt, Unterschrift liegt vor“.
 
 Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
 wird zum Ziel. Mit Zugriff auf das Modul Betreuung öffnet ein Klick auf den Verbleib die Seite der
-Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anlegen“.
+Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Erfassen“.
 
 ### Die Übergabe eines Eigentransports quittieren
 
@@ -175,7 +184,8 @@ Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anl
 
 ### Den Anlass festlegen
 
-1. Im Patientenkopf bei „Anlass“ „Anlass festlegen“ wählen.
+1. Im Patientenkopf bei „Anlass“ „Anlass festlegen“ wählen; steht schon ein Anlass da, auf ihn
+   tippen (Stift).
 2. Die Fläche des Anlasses antippen: „Verletzung“, „Internistisch“, „Neurologisch“,
    „Intoxikation“, „Hitze / Kälte“, „Allergie / Insektenstich“, „Psychisch“ oder „Sonstiges“.
 3. „Anlass festlegen“ im Paneel wählen. Der Kopf zeigt den Anlass.
@@ -186,7 +196,8 @@ Wechsel steht im Verlauf.
 
 ### Den Transport festlegen
 
-1. Im Patientenkopf bei „Transport“ „Transport festlegen“ wählen.
+1. Im Patientenkopf bei „Transport“ „Transport festlegen“ wählen; steht schon ein Transport da,
+   auf ihn tippen (Stift).
 2. Unter „Priorität“ „sofort“, „dringlich“ oder „normal“ wählen, unter „Art“ „liegend“,
    „sitzend“ oder „mit Notarzt“, bei Bedarf die „Fachrichtung“, etwa „Unfallchirurgie“. „ohne“
    lässt Priorität oder Art leer.
@@ -202,15 +213,16 @@ der Transport aufgehoben.
 2. Unter „Maßnahme“ die Fläche wählen, etwa „Zugang“, „Sauerstoff“ oder „Immobilisation“.
 3. Liegt die Durchführung zurück, unter „Durchgeführt (optional)“ die Uhrzeit eintragen, auch
    eine vor dem Erfassen der Person; ohne Angabe gilt der Zeitpunkt der Erfassung.
-4. „Maßnahme erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
+4. „Erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
 
 Eine versehentlich erfasste Maßnahme hebt „Aufheben“ unter „Erfasst“ im selben Paneel auf, nach
 der Rückfrage mit „Maßnahme aufheben“; sie bleibt im Verlauf als aufgehoben stehen.
 
 ### Eine Verletzung am Körperschema markieren
 
-1. Im Patientenkopf bei „Verletzungen“ „Verletzung markieren“ wählen. Das Paneel zeigt das
-   Körperschema mit vorn und hinten, daneben die nummerierte Liste. Ist der Platz zu schmal für
+1. Im Patientenkopf bei „Verletzungen“ „Verletzung markieren“ wählen. Die Seite rollt zum
+   Paneel; es zeigt das Körperschema mit vorn und hinten, jede Stelle gestrichelt umrandet,
+   daneben die nummerierte Liste. Ist der Platz zu schmal für
    beide Ansichten samt Wahl daneben (etwa in der Dichte „Handschuh“ am Tablet), steht eine Ansicht;
    „vorn“ und „hinten“ darüber schalten um.
 2. Auf die verletzte Stelle der Figur tippen, etwa den linken Unterarm. Daneben erscheint der
@@ -258,13 +270,13 @@ Person aus einer Meldung angelegt, steht dahinter „aus Meldung #…“, ein Kl
    „Nachforderungen“ öffnet das Formular mit „Für R-…“, der Art „RTW“, der Unfallhilfsstelle als
    Ziel und der Priorität aus der Transportpriorität. Die Begründung nennt nur die
    Registriernummer, keine medizinischen Angaben.
-2. Art und Adressat prüfen und „Nachforderung absetzen“ wählen.
+2. Art und Adressat prüfen und „Erfassen“ wählen.
 
 Danach steht unter „Rettungsmittel“ der Stand, etwa „RTW · Zugesagt · RTW 1/83-1 · erwartet … ·
 Einsatznr. …“; ein Klick auf die Art öffnet die Karte der Nachforderung. Erst nach einer Absage
 lässt sich wieder anfordern. Ist das Rettungsmittel eingetroffen, belegt „Verbleib erfassen“ den
-Transport mit ihm und der Einsatznummer der Leitstelle vor; gespeichert wird erst mit „Verbleib
-erfassen“. Am gekoppelten Gerät steht nur der Stand.
+Transport mit ihm und der Einsatznummer der Leitstelle vor; gespeichert wird erst mit
+„Erfassen“ im Paneel. Am gekoppelten Gerät steht nur der Stand.
 
 ### Das Blatt einer Person drucken
 
@@ -287,7 +299,7 @@ nicht, sagt die Seite „Person nicht gefunden“.
 2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
    „Bezug hinzufügen“ wählen.
 3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und
-   „Hinzufügen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
+   „Zuordnen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
 4. „Bezug lösen“ an der Zeile hebt einen Bezug wieder auf.
 
 ### Personendaten ergänzen und berichtigen
@@ -325,9 +337,12 @@ Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeiche
 
 ### Eine vermisste Person melden und abgleichen
 
-1. „Vermisst melden“ wählen. Unter „Weitere Angaben“ stehen statt Zustand und Koordinate
-   „vermisst seit“ und „Melder / Kontakt“; ohne Angabe gilt „vermisst seit“ ab der Meldung.
-2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste.
+1. „Vermisst melden“ wählen. Oben stehen „Name“, „Vorname“, „Geschlecht“ und „Fundort“, unter
+   „Weitere Angaben“ das geschätzte Alter, „vermisst seit“ und „Melder / Kontakt“; ohne Angabe
+   gilt „vermisst seit“ ab der Meldung.
+2. „Erfassen“ wählen. Die Person steht mit dem Status „vermisst“ in der Liste. Eine Meldung ganz
+   ohne Angabe zur Person wird nicht angelegt: der Dialog nennt am Namen „Mindestens eine Angabe
+   zur vermissten Person“.
 3. Wird jemand gefunden, der die vermisste Person sein könnte: den Statusfilter „Vermisst“
    wählen und in der Spalte „Abgleich vorschlagen“ die gefundene Person wählen.
 4. Die Einsatzleitung öffnet die vermisste Person und entscheidet unter „Vermisstenabgleich“ mit

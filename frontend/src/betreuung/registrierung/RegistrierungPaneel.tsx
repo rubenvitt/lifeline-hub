@@ -22,6 +22,7 @@ import { druckansichtNebenweg } from '../../components/druck/useDruckNebenwege';
 import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
+import { useViewport } from '../../components/useViewport';
 import {
   Feld,
   Kennzahl,
@@ -53,6 +54,7 @@ import {
   kostformBand,
   personName,
 } from './registrierKern';
+import { vorgemerktDauer, vorgemerktText } from '../../offline/vorgemerktText';
 
 /**
  * Abschnitt „Registrierung“ einer Betreuungsstelle (LLH-1612, Spec `betreuung-registrierung`,
@@ -119,6 +121,7 @@ export default function RegistrierungPaneel({
   const geraetDarfHier = useGeraetDarf();
   const { zone } = useZeitEingabe();
   const grundId = useId();
+  const { istSchmal } = useViewport();
   const abmeldungGrundId = useId();
   const [maske, setMaske] = useState<MaskeOffen>(null);
   const [abmelden, setAbmelden] = useState<Ziel | null>(null);
@@ -155,7 +158,10 @@ export default function RegistrierungPaneel({
     onSuccess: (ergebnis, body) => {
       const n = personenWort(body.personen.length);
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Registrierung ${n}`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, `Registrierung ${n}`),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch kein Haushalt.
@@ -175,7 +181,10 @@ export default function RegistrierungPaneel({
     },
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Abmeldung`);
+        message.warning(
+          vorgemerktText(ergebnis.grund, 'Abmeldung'),
+          vorgemerktDauer(ergebnis.grund),
+        );
         return;
       }
       if (ergebnis.zustand === 'beantragt') {
@@ -430,6 +439,11 @@ export default function RegistrierungPaneel({
   };
 
   const band = daten ? kostformBand(daten) : null;
+  const grundText = sperrGrund && (
+    <Typography.Text id={grundId} type="secondary">
+      {sperrGrund}
+    </Typography.Text>
+  );
 
   return (
     <Paneel
@@ -439,11 +453,7 @@ export default function RegistrierungPaneel({
       }
       aktion={
         <Stapel als="span" richtung="zeile" ausrichten="mitte" abstand="xs">
-          {sperrGrund && (
-            <Typography.Text id={grundId} type="secondary">
-              {sperrGrund}
-            </Typography.Text>
-          )}
+          {sperrGrund && !istSchmal && grundText}
           <Button
             disabled={sperrGrund != null}
             aria-describedby={sperrGrund ? grundId : undefined}
@@ -465,6 +475,9 @@ export default function RegistrierungPaneel({
         </Stapel>
       }
     >
+      {/* Unter md trägt der Kopf neben „Registrieren“ und „Weitere“ keinen Grund (Gate 1, 390 px):
+          er steht dann als eigene Zeile über dem Inhalt und beschreibt den Knopf weiter. */}
+      {sperrGrund && istSchmal && <div data-lfh="registrierung-sperrgrund">{grundText}</div>}
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
       {abmeldungBeantragt && (

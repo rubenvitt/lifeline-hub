@@ -65,7 +65,7 @@ for (const fall of [
   { viewport: { width: 1280, height: 800 }, dichte: 'kompakt' },
   { viewport: { width: 1180, height: 820 }, dichte: 'handschuh' },
 ] as const) {
-  test(`${fall.viewport.width} px ${fall.dichte}: der Name steht ungekürzt in 16 px, Ruhezustände ohne Wort`, async ({
+  test(`${fall.viewport.width} px ${fall.dichte}: der Name steht ungekürzt in der Stufe kartentitel, Ruhezustände ohne Wort`, async ({
     page,
   }) => {
     await page.setViewportSize(fall.viewport);
@@ -75,7 +75,10 @@ for (const fall of [
 
     const masse = await nameMasse(page);
     expect(masse.gekuerzt, `Name gekürzt (Breite ${masse.breite} px)`).toBe(false);
-    expect(masse.schrift).toBe('16px');
+    // Stufe `kartentitel` (15 px) in jeder Dichte, seit die Schriftgrößen aus der festen Skala
+    // kommen (Spec `schriftstufen`, Einsatzwechsler 16 → `kartentitel`); als Literal, sonst prüfte
+    // der Wert sich selbst.
+    expect(masse.schrift).toBe('15px');
 
     // Ruhezustände ohne Wort: der Kopf trägt weder „Ton bereit“ noch „Benachrichtigung“ noch SYNC.
     const kopf = page.locator('header');

@@ -13,6 +13,7 @@ import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 const tmoSprechgruppe = {
   id: 7,
@@ -944,6 +945,8 @@ describe('EinsatzabschnittePage', () => {
     );
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Verworfen');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
 
     await waitFor(() => expect(isModalClosed()).toBe(true));
     expect(posts).toBe(0);

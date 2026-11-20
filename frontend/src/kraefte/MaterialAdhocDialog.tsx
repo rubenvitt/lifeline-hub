@@ -18,6 +18,7 @@ import {
   parseOrtValue,
   type MaterialOrtRef,
 } from './materialPosten';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Erfassung von Ad-hoc-Material ohne Stammeintrag (LLH-1133, design.md D4; vorher in
@@ -149,14 +150,18 @@ export default function MaterialAdhocDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld label="Bezeichnung" name="bezeichnung" rules={[{ required: true, whitespace: true }]}>
+      <Feld
+        label="Bezeichnung"
+        name="bezeichnung"
+        rules={[pflicht('Bezeichnung', { whitespace: true })]}
+      >
         <Input placeholder="z. B. Spende-Decken" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
       </Feld>
       <Feld
         breite="kurz"
         label="Menge"
         name="menge"
-        rules={[{ required: true }]}
+        rules={[pflicht('Menge')]}
         extra={isGeraet ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
       >
         <MengenFeld beschriftung="Menge" disabled={isGeraet} />

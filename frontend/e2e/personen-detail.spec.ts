@@ -57,7 +57,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   // Der Seitentitel heißt „Betroffene"; die Route bleibt `personen`.
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 
-  // Person per Schnellerfassung anlegen (Modal: okText „Erfassen").
+  // Person per Schnellerfassung anlegen (Modal: Sendeknopf „Erfassen“ im Dialog, die Zeile hat einen eigenen).
   await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -67,7 +67,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
   await dialog.getByLabel('Vorname', { exact: true }).fill('Max');
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // Erste Person bekommt Registriernummer R-001 und erscheint in der Liste.
   await expect(page.getByText('Mustermann, Max')).toBeVisible();
@@ -75,7 +75,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   // Klick auf die Zeile → Detail-Vollseite.
   await page.getByText('Mustermann, Max').click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+`));
-  await expect(page.getByRole('heading', { name: /Person R-001/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /R-001/ })).toBeVisible();
 
   // Eine Spalte: Kopf, Verlauf, Personendaten untereinander, nichts in Reitern. Die alte
   // Überschrift „Medizinischer Verlauf" der rechten Spalte gibt es nicht mehr.
@@ -219,12 +219,20 @@ test('Patientenkopf bei 1280 × 800 und 1440 × 900 ohne Bildlauf ganz im Bild, 
 
   await pruefeKopf('Admin');
   // Vorbedingung des Admin-Zweigs: der Kopf trägt Bedienung (Notizzeile).
-  await expect(patientenkopf(page).getByRole('button', { name: 'Notiz anlegen' })).toBeVisible();
+  await expect(
+    patientenkopf(page)
+      .locator('[data-lfh="notiz-zeile"]')
+      .getByRole('button', { name: 'Erfassen', exact: true }),
+  ).toBeVisible();
 
   await wechsleZuRolle(page, 'beobachter', String(e));
   await pruefeKopf('Beobachter');
   // Vorbedingung des Lesezweigs: keine Bedienung im Kopf.
-  await expect(patientenkopf(page).getByRole('button', { name: 'Notiz anlegen' })).toHaveCount(0);
+  await expect(
+    patientenkopf(page)
+      .locator('[data-lfh="notiz-zeile"]')
+      .getByRole('button', { name: 'Erfassen', exact: true }),
+  ).toHaveCount(0);
   await expect(patientenkopf(page).getByRole('button', { name: /^Nachsichten/ })).toHaveCount(0);
 });
 
@@ -327,14 +335,22 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
 
   await pruefeKopf('Admin');
   // Vorbedingung des Admin-Zweigs: der Kopf trägt die Bedienung der neuen Paneele.
-  for (const knopf of ['Transport festlegen', 'Maßnahme erfassen', 'Verletzung markieren']) {
+  for (const knopf of [
+    /^Transport (festlegen|bearbeiten)$/,
+    'Maßnahme erfassen',
+    'Verletzung markieren',
+  ]) {
     await expect(patientenkopf(page).getByRole('button', { name: knopf })).toBeVisible();
   }
 
   await wechsleZuRolle(page, 'beobachter', String(e));
   await pruefeKopf('Beobachter');
   // Vorbedingung des Lesezweigs: keine Bedienung im Kopf.
-  for (const knopf of ['Transport festlegen', 'Maßnahme erfassen', 'Verletzung markieren']) {
+  for (const knopf of [
+    /^Transport (festlegen|bearbeiten)$/,
+    'Maßnahme erfassen',
+    'Verletzung markieren',
+  ]) {
     await expect(patientenkopf(page).getByRole('button', { name: knopf })).toHaveCount(0);
   }
   await expect(patientenkopf(page).getByRole('button', { name: /PAT-Nummer/ })).toHaveCount(0);
@@ -364,7 +380,8 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
   await page.setViewportSize(TABLET_QUER);
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
-  await expect(kopf.locator('[data-lfh="transport"]')).toHaveText('kein Transport');
+  // Leer fordert der Kopf als Wort auf (LLH-1769), der Stift kommt erst mit einem Stand.
+  await expect(kopf.getByRole('button', { name: 'Transport bearbeiten' })).toHaveCount(0);
 
   // ── Transport festlegen.
   await kopf.getByRole('button', { name: 'Transport festlegen' }).click();
@@ -389,7 +406,7 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
   await kopf.getByRole('button', { name: 'Maßnahme erfassen' }).click();
   const massnahme = page.getByRole('region', { name: 'Maßnahme erfassen' });
   await massnahme.getByRole('radio', { name: 'Zugang' }).click();
-  await massnahme.getByRole('button', { name: 'Maßnahme erfassen' }).click();
+  await massnahme.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(massnahme).toHaveCount(0);
   await expect(kopf.locator('[data-lfh="massnahmen"]')).toContainText('Zugang');
 
@@ -506,7 +523,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
   await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Intoxikation');
-  await kopf.getByRole('button', { name: 'Anlass festlegen' }).click();
+  await kopf.getByRole('button', { name: 'Anlass bearbeiten' }).click();
 
   const paneel = page.getByRole('region', { name: 'Anlass festlegen' });
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -552,7 +569,7 @@ test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „
   await suche.click();
   await suche.fill('Bello');
   await waehleStehend(page, `${kennung} · Hund · „Bello“`);
-  await dialog.getByRole('button', { name: 'Hinzufügen', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Zuordnen', exact: true }).click();
   await expect(dialog).toBeHidden();
 
   await expect(bezuege).toContainText('Bezüge 1');

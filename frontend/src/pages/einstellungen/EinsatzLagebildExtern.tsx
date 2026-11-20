@@ -32,6 +32,7 @@ import type {
   LagebildStufe,
 } from '../../api/types';
 import { lagebildExternAdresse } from '../../routing/deeplinks';
+import { pflicht } from '../../components/pflichtRegel';
 
 export const STUFE_LABEL: Record<LagebildStufe, string> = {
   lagebild: 'Lagebild',
@@ -217,7 +218,7 @@ export default function EinsatzLagebildExtern({
           label="Empfänger"
           name="empfaenger"
           rules={[
-            { required: true, whitespace: true, message: 'Empfänger angeben' },
+            pflicht('Empfänger', { whitespace: true }),
             {
               max: LAGEBILD_EMPFAENGER_MAX,
               message: `Höchstens ${LAGEBILD_EMPFAENGER_MAX} Zeichen`,

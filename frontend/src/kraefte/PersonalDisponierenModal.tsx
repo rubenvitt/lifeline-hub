@@ -29,6 +29,7 @@ import {
   personalLabel,
   personalSuchtext,
 } from './sammelDisposition';
+import { pflicht } from '../components/pflichtRegel';
 
 interface PersonalDisponierenModalProps {
   offen: boolean;
@@ -164,7 +165,7 @@ export default function PersonalDisponierenModal({
         label="Personen"
         name="personal_ids"
         rules={[
-          { required: true, message: 'Mindestens eine Person wählen' },
+          pflicht('Person'),
           {
             type: 'array',
             max: SAMMEL_MAX,

@@ -133,8 +133,7 @@ Was eine Stelle braucht (Feldbetten, Decken, Hygieneartikel, Personal), wird als
 
 1. Auf der Seite der Stelle unter „Bedarf“ „Bedarf anfordern“ wählen.
 2. Das Formular „Neue Nachforderung“ öffnet sich mit „Für Betreuungsstelle …“ und der
-   vorbelegten Begründung. Art, Anzahl und Bezeichnung eintragen und „Nachforderung absetzen“
-   wählen.
+   vorbelegten Begründung. Art, Anzahl und Bezeichnung eintragen und „Erfassen“ wählen.
 3. Zurück auf der Seite der Stelle steht die Nachforderung unter „Bedarf“ mit ihrem Stand; ein
    Klick öffnet sie. „Alle Nachforderungen der Stelle“ zeigt auch die eingetroffenen und die
    abgelehnten.

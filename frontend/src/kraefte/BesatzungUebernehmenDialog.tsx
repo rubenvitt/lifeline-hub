@@ -11,6 +11,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { besatzungKandidaten, besatzungVorschlag } from './besatzungVorschlag';
 import { funktionText } from './einsatzfunktionKern';
 import { gruendeJeKraft } from './sammelDisposition';
+import { pflicht } from '../components/pflichtRegel';
 
 type Werte = { ep_ids: number[] };
 
@@ -135,7 +136,7 @@ export default function BesatzungUebernehmenDialog({
         label="Personen"
         name="ep_ids"
         rules={[
-          { required: true, message: 'Mindestens eine Person wählen' },
+          pflicht('Person'),
           { type: 'array', max: SAMMEL_MAX, message: `Höchstens ${SAMMEL_MAX} Personen` },
         ]}
         extra={

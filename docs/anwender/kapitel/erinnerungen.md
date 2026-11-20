@@ -34,7 +34,7 @@ Für Einsatzleitung und Führungspersonal:
    eintragen, höchstens 10 080 (sieben Tage).
 5. Bei Bedarf unter „Empfänger/Funktion (optional)“ eine Funktion wählen (zum Beispiel S2) oder
    einen Namen eintippen.
-6. „Anlegen“ wählen.
+6. „Erfassen“ wählen.
 
 „Speichern und nächste“ (Strg+Enter, am Mac ⌘+Enter) legt an und leert das Formular. Mit dem
 Häkchen „Werte behalten“ bleiben Empfänger und Intervall stehen.

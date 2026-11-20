@@ -10,6 +10,8 @@ import { erwaehnungenAusText, type ErwaehnungVorschlag } from './erwaehnung';
 import { AusgangUnbekannt, NetzFehler, fehlerText, type UploadFortschritt } from '../api/client';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
+import { enterKeyHintFuer, isSendeTaste, type EnterKontext } from '../components/enterVertrag';
+import { useViewport } from '../components/useViewport';
 
 /**
  * Überschrift eines Sende-Fehlers nach der Phase des Abbruchs (LFH-1021, wie `ablageFehlerKopf`):
@@ -51,6 +53,8 @@ export default function NachrichtEingabe({
 }: Props) {
   const { rollen } = useRollen();
   const { token } = theme.useToken();
+  const { istBeruehrung } = useViewport();
+  const enterKontext: EnterKontext = { mehrzeilig: true, inZeile: true, istBeruehrung };
   const [text, setText] = useState('');
   // Aus der Auswahl übernommene Vorschläge. Nur sie zählen: ein von Hand getipptes „@S4“ wird
   // nie zum Code (`frontend/src/fuehrung/AGENTS.md`, kein Rückschluss vom Freitext).
@@ -130,9 +134,12 @@ export default function NachrichtEingabe({
               ),
             },
           }}
-          // Enter bei offener Auswahl übernimmt den Vorschlag; gesendet wird erst danach.
+          // Enter bei offener Auswahl übernimmt den Vorschlag; gesendet wird erst danach. Sonst
+          // gilt der Enter-Vertrag „mehrzeilig in der Zeile“ (LLH-1766, `frontend/AGENTS.md`,
+          // „Erfassungs-Norm“): mit grobem Zeiger bricht Enter um, gesendet wird über den Knopf.
+          enterKeyHint={enterKeyHintFuer(enterKontext)}
           onPressEnter={(e) => {
-            if (!e.shiftKey) {
+            if (isSendeTaste(e, enterKontext)) {
               e.preventDefault();
               void absenden();
             }

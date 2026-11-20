@@ -121,7 +121,7 @@ test('Teilzusage teilt in zwei Karten; Zurückziehen über das Menü (LLH-1097)'
   const wer = karte.getByRole('combobox', { name: 'Wer' });
   await wer.fill('83-1');
   await wer.press('Enter');
-  await karte.getByRole('button', { name: 'Zusage erfassen' }).click();
+  await karte.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const zugesagt = spalte(page, 'zugesagt').locator(`[data-nachforderung-id="${nf.id}"]`);
   await expect(zugesagt).toContainText('1 von 2 zugesagt');

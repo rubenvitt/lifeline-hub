@@ -277,6 +277,27 @@ export default function ListeDetail<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vorauswahl, breit, gewaehlt, erster]);
 
+  /**
+   * Unter `lg` holt eine Wahl VON HAND das aufgeklappte Detail in den Blick (LLH-1761): am Handy
+   * klappte ein Auftrag bei y = 825 von 844 auf, „Quittieren“ lag bei 1170, und der Tipp wirkte
+   * wirkungslos. Gerollt wird einmal je Wahl und nur, wenn das Detail unter den Fensterrand fällt;
+   * nie bei Vorauswahl, Deeplink (der hat seinen eigenen Sprung), Zuklappen oder einem späteren
+   * Rendern. Die Karte steht danach oben unter dem Rahmen (`scroll-padding-block-start`).
+   */
+  const handWahl = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const id = handWahl.current;
+    if (id == null || breit || id !== gewaehlt) return;
+    handWahl.current = null;
+    const eintrag = liste.current?.querySelector(`[data-liste-detail-eintrag="${id}"]`);
+    const flaeche = eintrag?.querySelector('[data-lfh="liste-detail-detail"]');
+    if (!eintrag || !flaeche) return;
+    if (flaeche.getBoundingClientRect().bottom <= window.innerHeight) return;
+    // Sofort, nicht geglättet, wie der Deeplink-Sprung oben: keine Bewegung, die bei
+    // „reduzierter Bewegung“ abzuschalten wäre, und keine Medienabfrage außerhalb von `useViewport`.
+    eintrag.scrollIntoView?.({ block: 'start' });
+  });
+
   // Stabile Wahl für die gemerkten Auswahlziele: der Ref trägt die jüngsten Werte.
   const wahlStand = useRef({ breit, gewaehlt, onWahl });
   useLayoutEffect(() => {
@@ -295,7 +316,9 @@ export default function ListeDetail<T>({
     const select = (id: number) => {
       const s = wahlStand.current;
       // Unter `lg` klappt die erneute Wahl der aufgeklappten Karte zu.
-      s.onWahl(!s.breit && s.gewaehlt === id ? null : id);
+      const zu = !s.breit && s.gewaehlt === id;
+      handWahl.current = zu || s.breit ? null : id;
+      s.onWahl(zu ? null : id);
     };
     const alt = auswahlCache.current;
     const neu = new Map<number, { breit: boolean; isGewaehlt: boolean; props: AuswahlZielProps }>();

@@ -5,6 +5,7 @@ import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import { hoechsteTeilmenge, mengeText } from './materialPosten';
+import { pflicht } from '../components/pflichtRegel';
 
 interface Werte {
   menge?: number;
@@ -87,7 +88,7 @@ export default function MaterialHierherModal({
         label="Menge hierher"
         name="menge"
         rules={[
-          { required: true, message: 'Menge eintragen' },
+          pflicht('Menge'),
           {
             validator: (_, n: number | undefined) =>
               n == null || !posten || isValidMenge(n, posten)

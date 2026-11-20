@@ -126,7 +126,7 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
         <Feld
           label="Ende der Nachbereitung"
           name="bis"
-          rules={[{ required: !ohne, message: 'Zeitpunkt wählen' }]}
+          rules={[{ required: !ohne, message: 'Ende fehlt' }]}
           dependencies={['ohne']}
         >
           <ZeitpunktEingabe art="frist" disabled={ohne} style={{ width: '100%' }} />

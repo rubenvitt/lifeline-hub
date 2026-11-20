@@ -196,7 +196,7 @@ test.describe(KAPITEL, () => {
     try {
       await nav.getByRole('link', { name: 'Melden' }).click();
       await geraet.getByLabel('Inhalt').fill('Lage EA 1 stabil, Wartebereich leert sich');
-      await geraet.getByRole('button', { name: 'Meldung senden' }).click();
+      await geraet.getByRole('button', { name: 'Erfassen', exact: true }).click();
       await expect(geraet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
       await expect(geraet.getByLabel('Inhalt')).toHaveValue('');
     } finally {

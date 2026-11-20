@@ -10,6 +10,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import PersonalPage from './PersonalPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 import { waehle } from '../test/auswahlListe';
+import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
 
 /**
  * Abgelehnte Speichervorgänge der Personalseite stehen am Ort der Handlung (LFH-1077,
@@ -131,8 +132,10 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755).
+    await bestaetigeVerwerfen();
     await userEvent.click(screen.getByRole('button', { name: 'Personal disponieren' }));
-    expect(within(await screen.findByRole('dialog')).queryByRole('alert')).toBeNull();
+    expect(within(await findeDialogOhneRueckfrage()).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
   });
 
