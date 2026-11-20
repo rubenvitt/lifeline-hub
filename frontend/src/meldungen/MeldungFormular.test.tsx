@@ -631,7 +631,8 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
-    expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
+    // Der Text steht am Feld und seit LLH-1759 auch in der Zeile über dem Knopf.
+    expect(screen.getAllByText('Frist mindestens 1 Min')).toHaveLength(2);
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 
@@ -644,7 +645,8 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     });
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    expect(await screen.findByText('Frist höchstens 10080 Min')).toBeInTheDocument();
+    // Am Feld und in der Zeile über dem Knopf (LLH-1759).
+    expect(await screen.findAllByText('Frist höchstens 10080 Min')).toHaveLength(2);
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 });
@@ -831,5 +833,90 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
     expect(onAnlegen).not.toHaveBeenCalled();
+  });
+});
+
+describe('MeldungFormular — eigene Stelle (LLH-1759)', () => {
+  const EIGENE = { von: 'ELW 1', an: 'ELW 1 EL' };
+  const absender = () => screen.getByLabelText('Absender');
+  const empfaenger = () => screen.getByLabelText('Empfänger / Adressat');
+
+  function renderEigene(
+    props: Partial<Parameters<typeof MeldungFormular>[0]> = {},
+    onAnlegen = anlegenMock(),
+  ) {
+    const ui = (p: Partial<Parameters<typeof MeldungFormular>[0]>) => (
+      <AntApp>
+        <MeldungFormular senden={false} onAnlegen={onAnlegen} eigeneStelle={EIGENE} {...p} />
+      </AntApp>
+    );
+    const { rerender } = render(ui(props));
+    return { onAnlegen, rerender: (p: typeof props) => rerender(ui(p)) };
+  }
+
+  it('belegt bei einer Meldung den Empfänger vor, nicht den Absender', async () => {
+    renderEigene();
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    expect(absender()).toHaveValue('');
+  });
+
+  it('belegt bei einer Lagemeldung den Absender vor', async () => {
+    renderEigene({ artVorgabe: 'lagemeldung', serie: false });
+    await waitFor(() => expect(absender()).toHaveValue('ELW 1'));
+    expect(empfaenger()).toHaveValue('');
+  });
+
+  it('der Fast-Path Lagemeldung tauscht die unangefasste Vorgabe', async () => {
+    renderEigene();
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
+    await waitFor(() => expect(absender()).toHaveValue('ELW 1'));
+    expect(empfaenger()).toHaveValue('');
+  });
+
+  it('überschreibt keinen eingetragenen Empfänger', async () => {
+    renderEigene();
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    await userEvent.clear(empfaenger());
+    await userEvent.type(empfaenger(), 'Leitstelle');
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
+    await waitFor(() => expect(absender()).toHaveValue('ELW 1'));
+    expect(empfaenger()).toHaveValue('Leitstelle');
+  });
+
+  it('füllt einen bewusst geleerten Empfänger nicht wieder', async () => {
+    renderEigene();
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    await userEvent.clear(empfaenger());
+    await userEvent.type(absender(), 'RTW 2');
+    expect(empfaenger()).toHaveValue('');
+  });
+
+  it('greift auch, wenn der Standard erst später kommt', async () => {
+    const { rerender } = renderEigene({ eigeneStelle: null });
+    expect(empfaenger()).toHaveValue('');
+    rerender({ eigeneStelle: EIGENE });
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+  });
+
+  it('nach dem Erfassen steht die Vorgabe wieder', async () => {
+    const { onAnlegen } = renderEigene();
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    await fuellePflichtfelder('RTW 2', 'Erste Meldung');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({ absender: 'RTW 2', empfaenger: 'ELW 1 EL' });
+    await waitFor(() => expect(empfaenger()).toHaveValue('ELW 1 EL'));
+    expect(absender()).toHaveValue('');
+  });
+
+  it('ohne eigene Stelle bleibt alles leer', () => {
+    renderEigene({ eigeneStelle: null });
+    expect(absender()).toHaveValue('');
+    expect(empfaenger()).toHaveValue('');
   });
 });
