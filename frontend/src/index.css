@@ -210,6 +210,12 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
 }
 
+/* Dasselbe für den klebenden Fuß eines Seitenformulars (LLH-1761, `fussKlebt="seite"`): der
+   Scrollport ist das Dokument, wie bei der Speicherleiste (LFH-475). */
+:root:has([data-lfh='erfassung-fuss-seite']) {
+  scroll-padding-block-end: var(--lfh-erfassung-seite-fokusabstand, 0px);
+}
+
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).
    `scroll-padding-block-start` am SCROLLPORT, nicht `scroll-margin` an den Zielen: rückwärts
    getabbt bleibt ein Ziel, das schon im Fenster liegt, sonst ganz hinter dem Kopf (gemessen in

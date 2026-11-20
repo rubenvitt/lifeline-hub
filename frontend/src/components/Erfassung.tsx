@@ -6,6 +6,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -15,8 +16,13 @@ import {
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { huelleHaptics } from '../huelle/faehigkeiten';
 import type { OfflineSchreibErgebnis } from '../offline/schreiben';
-import { FOKUSABSTAND_ERFASSUNG, useFokusabstandUnten } from './fokusabstandUnten';
+import {
+  FOKUSABSTAND_ERFASSUNG,
+  FOKUSABSTAND_ERFASSUNG_SEITE,
+  useFokusabstandUnten,
+} from './fokusabstandUnten';
 import { SpeicherFehler } from './SpeicherHinweis';
+import { useTastaturVersatz } from './tastaturVersatz';
 import { useViewport } from './useViewport';
 import './Erfassung.css';
 
@@ -65,15 +71,20 @@ import './Erfassung.css';
  * auf 390 px breiter als der Dialog und liefen links hinaus („Abbrechen“ bei x = −75). Ab `md`
  * bleibt die Reihe rechtsbündig und bricht im Notfall um (`wrap`), statt hinauszulaufen.
  *
- * **Im Dialog klebt der Fuß am unteren Rand** (LLH-1274, `klebenderFuss`), solange der Dialog
- * höher ist als der Schirm, und der Dialogkopf hält das 72-px-Schließkreuz des Handschuhs vom
- * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht.
+ * **Der Fuß klebt am unteren Rand** (`klebenderFuss`), solange das Formular höher ist als der
+ * Schirm: im Dialog (LLH-1274, `fussKlebt="dialog"`, der Dialogkopf hält das 72-px-Schließkreuz
+ * des Handschuhs vom ersten Feld fern, `kopfBoden`) und auf einer Seite mit langer Maske
+ * (LLH-1761, `fussKlebt="seite"`: Aufnahme, Meldung erfassen). Steht der Fokus im Formular und
+ * verdeckt die Bildschirmtastatur den Rand, rückt er über sie (`useTastaturVersatz`). Kurze
+ * Inline-Formulare in Paneelen kleben nicht: ihr Knopf steht ohnehin bei den Feldern.
  *
  * **Am Handy klebt im Dialog nur der Abschluss** (LLH-1763): der Primärknopf, die Nebenaktionen
  * (gleichrangige Abschlüsse wie „RTW nötig“) und die Zusammenfassung. Gestapelt fraß der Fuß der
  * Serie 271 von 844 px. „Abbrechen“ steht dort im Kopf, als Text im Schließknopf
  * (`abbrechenImKopf`); die Einstellungszeile und „Speichern und nächste“ stehen am Formularende
- * (`erfassung-serie`), nicht klebend. Ab `md` und inline gilt das obige unverändert.
+ * (`erfassung-serie`), nicht klebend. Auf einer Seite (`fussKlebt="seite"`, LLH-1761) gilt dasselbe
+ * für Einstellung und Serie; „Abbrechen“ bleibt dort im Fuß, weil es keinen Dialogkopf gibt. Ab
+ * `md` und ohne `fussKlebt` gilt das obige unverändert.
  *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
@@ -233,10 +244,11 @@ interface ErfassungsFormularProps<T> {
    */
   zusammenfassung?: ReactNode;
   /**
-   * Nur für `ErfassungsModal`: der Fuß steht am unteren Rand des Dialogs, solange der Dialog höher
-   * ist als der Schirm (LLH-1274). Inline auf einer Seite klebt er nicht.
+   * Der Fuß klebt am unteren Rand, solange das Formular höher ist als der Schirm, und rückt über
+   * die Bildschirmtastatur. `dialog` setzt `ErfassungsModal` (LLH-1274); `seite` für ein langes
+   * Formular im Seitenfluss (LLH-1761). Ohne Angabe klebt nichts (kurze Formulare in Paneelen).
    */
-  fussKlebt?: boolean;
+  fussKlebt?: 'dialog' | 'seite';
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -280,17 +292,29 @@ export function ErfassungsFormular<T extends object>({
   speicherFehlerTitel,
   speicherFehlerFallback,
   zusammenfassung,
-  fussKlebt = false,
+  fussKlebt,
   nebenaktionen,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
-  const fussRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
+  const fussRefDialog = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
+  const fussRefSeite = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG_SEITE);
   const zusammenfassungId = useId();
   const { istSchmal } = useViewport();
-  // Im Dialog unter `md` steht „Abbrechen“ im Kopf, klebend nur der Abschluss (LLH-1763).
-  const abbruchImKopf = fussKlebt && istSchmal;
+  // Unter `md` klebt nur der Abschluss (LLH-1763), im Dialog wie auf der Seite (LLH-1761):
+  // Einstellung und Serienknopf stehen am Formularende. „Abbrechen“ wandert nur im Dialog in den
+  // Kopf; eine Seite hat keinen, dort bleibt es im Fuß beim Abschluss.
+  const serieAmEnde = fussKlebt != null && istSchmal;
+  const abbruchImKopf = fussKlebt === 'dialog' && istSchmal;
   const wurzel = useRef<HTMLDivElement>(null);
+  const tastaturVersatz = useTastaturVersatz(wurzel);
+  // Der Grund des Seitenfußes ist der der Fläche dahinter (Seite oder Paneel): ein fester Token
+  // stand auf der Aufnahme als hellerer Balken auf dem Seitengrund. Neu gelesen beim Themewechsel.
+  const [seitenGrund, setSeitenGrund] = useState<string>();
+  useLayoutEffect(() => {
+    if (fussKlebt !== 'seite') return;
+    setSeitenGrund(deckenderGrund(wurzel.current?.parentElement ?? null));
+  }, [fussKlebt, token.colorBgLayout, token.colorBgContainer]);
   const [zaehler, setZaehler] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
   const [behalten, setBehalten] = useState(false);
@@ -527,7 +551,7 @@ export function ErfassungsFormular<T extends object>({
         )}
         {/* Unter `md` im Dialog stehen Einstellung und Serienknopf am Formularende, nicht klebend:
             klebend bleibt nur der Abschluss (LLH-1763, siehe Dateikopf). */}
-        {abbruchImKopf && serie && (
+        {serieAmEnde && serie && (
           <div data-lfh="erfassung-serie" style={{ marginTop: token.margin }}>
             {einstellung}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
@@ -536,16 +560,30 @@ export function ErfassungsFormular<T extends object>({
           </div>
         )}
         <div
-          ref={fussKlebt ? fussRef : undefined}
-          data-lfh={fussKlebt ? 'erfassung-fuss' : undefined}
+          ref={
+            fussKlebt === 'dialog'
+              ? fussRefDialog
+              : fussKlebt === 'seite'
+                ? fussRefSeite
+                : undefined
+          }
+          data-lfh={
+            fussKlebt === 'dialog'
+              ? 'erfassung-fuss'
+              : fussKlebt === 'seite'
+                ? 'erfassung-fuss-seite'
+                : undefined
+          }
           style={{
             marginTop: token.margin,
             paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
-            ...(fussKlebt ? klebenderFuss(token) : undefined),
+            ...(fussKlebt
+              ? klebenderFuss(token, fussKlebt, tastaturVersatz, seitenGrund)
+              : undefined),
           }}
         >
-          {!abbruchImKopf && einstellung}
+          {!serieAmEnde && einstellung}
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
               `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
           <div
@@ -577,7 +615,7 @@ export function ErfassungsFormular<T extends object>({
                     Abbrechen
                   </Button>
                 )}
-                {!abbruchImKopf && serienKnopf}
+                {!serieAmEnde && serienKnopf}
                 {nebenaktionen?.map((a) => (
                   // htmlType="button" wie „Speichern und nächste“: der Klick setzt erst die Aktion,
                   // dann prüft und sendet `form.submit()`.
@@ -636,19 +674,38 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  * steht die Knopfleiste unten im Schirm, solange der Dialog darüber hinausreicht; reicht er nicht,
  * steht sie wie zuvor unter dem letzten Feld (`sticky` ändert dann nichts).
  *
- * Der Fuß reicht über das untere Polster des Dialogs (`paddingMD`, negativer Rand), damit er
- * geklebt nicht bündig am Schirmrand endet und ungeklebt aussieht wie bisher. Der Grund deckt
- * die Felder, die darunter durchrollen.
+ * Im Dialog reicht der Fuß über dessen unteres Polster (`paddingMD`, negativer Rand), damit er
+ * geklebt nicht bündig am Schirmrand endet und ungeklebt aussieht wie bisher. Auf der Seite
+ * (LLH-1761) gibt es kein solches Polster; der Fuß bekommt sein eigenes. Der Grund deckt die
+ * Felder, die darunter durchrollen: im Dialog der des Dialogs, auf der Seite der des Behälters.
+ * `versatz` hebt ihn über die Bildschirmtastatur (`useTastaturVersatz`).
  */
-function klebenderFuss(token: GlobalToken) {
+function klebenderFuss(
+  token: GlobalToken,
+  ort: 'dialog' | 'seite',
+  versatz: number,
+  seitenGrund: string | undefined,
+) {
   return {
     position: 'sticky',
-    bottom: 0,
-    zIndex: 1,
-    background: token.colorBgElevated,
-    marginBottom: -token.paddingMD,
-    paddingBottom: token.paddingMD,
+    bottom: versatz,
+    // Über antds `Space.Compact`, das seine Glieder auf z-index 2 hebt: das Fundort-Feld der
+    // Aufnahme lag sonst über „Speichern und nächste“ (LLH-1761).
+    zIndex: 3,
+    paddingBottom: ort === 'dialog' ? token.paddingMD : token.paddingSM,
+    ...(ort === 'dialog'
+      ? { backgroundColor: token.colorBgElevated, marginBottom: -token.paddingMD }
+      : { backgroundColor: seitenGrund ?? token.colorBgLayout }),
   } as const;
+}
+
+/** Erster nicht durchsichtiger Hintergrund ab `el` aufwärts; ohne Treffer `undefined`. */
+function deckenderGrund(el: Element | null): string | undefined {
+  for (let e = el; e; e = e.parentElement) {
+    const farbe = getComputedStyle(e).backgroundColor;
+    if (farbe && farbe !== 'transparent' && farbe !== 'rgba(0, 0, 0, 0)') return farbe;
+  }
+  return undefined;
 }
 
 /**
@@ -786,7 +843,7 @@ export function ErfassungsModal<T extends object>({
         onAbbrechen={onAbbrechen}
         {...rest}
         steuerungRef={formularSteuerung}
-        fussKlebt
+        fussKlebt="dialog"
       />
     </Modal>
   );

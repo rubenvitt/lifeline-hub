@@ -60,11 +60,13 @@ function Harness(props: {
   steuerungRef?: Ref<ErfassungsFormularSteuerung>;
   onErfasst?: (werte: Werte) => void | Promise<void>;
   zusammenfassung?: ReactNode;
+  fussKlebt?: 'dialog' | 'seite';
 }) {
   const [form] = Form.useForm<Werte>();
   return (
     <ErfassungsFormular<Werte>
       form={form}
+      fussKlebt={props.fussKlebt}
       onErfassen={props.onErfassen}
       onFertig={props.onFertig ?? (() => {})}
       onAbbrechen={props.onAbbrechen}
@@ -787,6 +789,124 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+});
+
+describe('ErfassungsFormular — klebender Fuß auf der Seite (LLH-1761)', () => {
+  class FalschesViewport extends EventTarget {
+    height = 844;
+    offsetTop = 0;
+  }
+
+  afterEach(() => {
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined });
+  });
+
+  it('auf der Seite klebt der Fuß mit eigenem Grund und eigener Variable', () => {
+    const { unmount } = renderMitProviders(
+      <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe('0px');
+    // Kein negativer Rand: der reicht nur im Dialog über dessen Polster.
+    expect(fuss!.style.marginBottom).toBe('');
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).not.toBe('');
+    unmount();
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).toBe('');
+  });
+
+  it('der Seitenfuß liegt über kompakten Eingabegruppen und nimmt den Grund der Fläche dahinter', () => {
+    renderMitProviders(
+      <div style={{ backgroundColor: 'rgb(1, 2, 3)' }}>
+        <div>
+          <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />
+        </div>
+      </div>,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    // antds `Space.Compact` hebt seine Glieder auf z-index 2 (Fundort der Aufnahme).
+    expect(Number(fuss.style.zIndex)).toBeGreaterThan(2);
+    expect(fuss.style.backgroundColor).toBe('rgb(1, 2, 3)');
+  });
+
+  it('unter md klebt auf der Seite nur der Abschluss samt „Abbrechen“, die Serie steht am Ende', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <Harness
+        fussKlebt="seite"
+        serie
+        uebernahme={['ort']}
+        onAbbrechen={() => {}}
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]')!;
+    const serie = document.querySelector<HTMLElement>('[data-lfh="erfassung-serie"]')!;
+    expect(fuss.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    // Eine Seite hat keinen Dialogkopf: „Abbrechen“ bleibt im klebenden Fuß.
+    expect(fuss.contains(screen.getByRole('button', { name: 'Abbrechen' }))).toBe(true);
+    expect(serie).not.toBeNull();
+    expect(serie.contains(screen.getByRole('button', { name: /Speichern und nächste/ }))).toBe(
+      true,
+    );
+    expect(serie.contains(screen.getByRole('checkbox', { name: /Werte behalten/ }))).toBe(true);
+  });
+
+  it('ohne fussKlebt klebt nichts', () => {
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    expect(document.querySelector('[data-lfh^="erfassung-fuss"]')).toBeNull();
+  });
+
+  it('Seite und Dialog messen getrennte Variablen', () => {
+    function Beide({ dialog }: { dialog: boolean }) {
+      const [form] = Form.useForm<Werte>();
+      return (
+        <>
+          <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />
+          <ErfassungsModal<Werte>
+            offen={dialog}
+            titel="Dialog"
+            form={form}
+            onErfassen={vi.fn().mockResolvedValue(undefined)}
+            onFertig={() => {}}
+            onAbbrechen={() => {}}
+          >
+            <Form.Item label="Feld" name="ort">
+              <Input />
+            </Form.Item>
+          </ErfassungsModal>
+        </>
+      );
+    }
+    const { rerender } = renderMitProviders(<Beide dialog />);
+    expect(document.querySelector('[data-lfh="erfassung-fuss"]')).not.toBeNull();
+    rerender(<Beide dialog={false} />);
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-seite-fokusabstand'),
+    ).not.toBe('');
+  });
+
+  it('mit Fokus und offener Tastatur rückt der Seitenfuß über sie', () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    const vv = new FalschesViewport();
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
+    renderMitProviders(
+      <Harness fussKlebt="seite" onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    act(() => screen.getByLabelText('Ort').focus());
+    act(() => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss-seite"]');
+    expect(fuss!.style.bottom).toBe('344px');
   });
 });
 
