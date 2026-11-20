@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber } from 'antd';
+import { Collapse, Form, Input } from 'antd';
 import { Feld, MetaZeile, Stapel, Textstufe } from '../components/instrument';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
@@ -12,6 +12,7 @@ import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 interface FormWerte {
   label: string;
@@ -145,7 +146,7 @@ export default function EtbBausteinFormModal({
                   <Input />
                 </Feld>
                 <Feld label="Sortierung" name="sortier" breite="kurz">
-                  <InputNumber min={0} />
+                  <ZahlFeld min={0} />
                 </Feld>
               </>
             ),

@@ -1,4 +1,4 @@
-import { App, Form, InputNumber } from 'antd';
+import { App, Form } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
@@ -26,6 +26,7 @@ import { Feld, Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
 import NachbereitungPaneel from '../../aufbewahrung/NachbereitungPaneel';
 import { EINSATZ_ABGESCHLOSSEN } from '../../components/nurAnsicht';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /**
  * Sektion `…/einstellungen/aufbewahrung` — die Aufbewahrungs-Dauer. Ein Feld, siebzehn mitfahrende:
@@ -128,7 +129,7 @@ export default function EinsatzAufbewahrung() {
                 )
               }
             >
-              <InputNumber
+              <ZahlFeld
                 min={1}
                 max={3650}
                 // Einsatz ?? Org (`einsatz/effektiv.rs`): der Platzhalter nennt den wirksamen Wert.

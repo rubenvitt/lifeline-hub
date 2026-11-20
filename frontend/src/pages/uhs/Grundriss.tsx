@@ -18,7 +18,6 @@ import {
   Button,
   Dropdown,
   Form,
-  InputNumber,
   Radio,
   Space,
   Tooltip,
@@ -114,6 +113,7 @@ import {
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../../api/anhangAbruf';
 import { useSpiegelAusCache } from '../../einsatz/spiegel/useSpiegelAntraege';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 // Grundhöhe der Karte: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -2371,6 +2371,7 @@ function NeuerPlatzKnopf({
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
   const [menge, setMenge] = useState(1);
+  const [mengenGrund, setMengenGrund] = useState<string | null>(null);
   // Die Ablehnung steht am Block, bis zum nächsten Anlegen; Öffnen und Abbrechen räumen sie
   // (LFH-1077). Solange die Anfrage läuft, ist Abbrechen gesperrt.
   const mut = useMutation({
@@ -2410,14 +2411,24 @@ function NeuerPlatzKnopf({
               aria-label="Platz-Typ"
             />
           </div>
-          <InputNumber
+          <ZahlFeld
             min={1}
             max={50}
+            ganz
+            // Ohne Formular darüber: eine Menge außerhalb geht nicht hinaus und sperrt „Anlegen“.
+            nurGueltig
+            onGrund={setMengenGrund}
             value={menge}
             onChange={(v) => setMenge(v ?? 1)}
             aria-label="Menge"
+            title={mengenGrund ?? undefined}
           />
-          <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
+          <Button
+            type="primary"
+            loading={mut.isPending}
+            disabled={mengenGrund !== null}
+            onClick={() => mut.mutate()}
+          >
             Anlegen
           </Button>
           <Button disabled={mut.isPending} onClick={() => umschalten(false)}>

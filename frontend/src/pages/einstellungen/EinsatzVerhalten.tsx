@@ -1,4 +1,4 @@
-import { App, Form, Input, InputNumber, theme } from 'antd';
+import { App, Form, Input, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Select } from '../../components/Select';
@@ -28,6 +28,7 @@ import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Feld, Formularpaneel, Stapel } from '../../components/instrument';
 import { mitVorgabe } from '../../components/vorgabeText';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
  *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */
@@ -164,7 +165,7 @@ export default function EinsatzVerhalten() {
                     Stil, darum trägt die Hülle die Spur. */}
                   <div style={{ flex: '0 1 160px', minWidth: 0 }}>
                     <Feld label={`Startwert ${nk.label}`} name={`${nk.key}_nummer_start`}>
-                      <InputNumber
+                      <ZahlFeld
                         min={1}
                         max={999999}
                         placeholder={mitVorgabe('1')}
@@ -181,7 +182,7 @@ export default function EinsatzVerhalten() {
                 name="meldung_bestaetigung_frist_min"
                 extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
               >
-                <InputNumber
+                <ZahlFeld
                   min={1}
                   max={10080}
                   placeholder={platzhalterVorgabe(orgDefaults?.meldung_bestaetigung_frist_min, '5')}
@@ -193,7 +194,7 @@ export default function EinsatzVerhalten() {
                 name="auftrag_quittierung_frist_min"
                 extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
               >
-                <InputNumber
+                <ZahlFeld
                   min={1}
                   max={10080}
                   placeholder={platzhalterVorgabe(
@@ -208,7 +209,7 @@ export default function EinsatzVerhalten() {
                 name="rueckmeldung_frist_min"
                 extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
               >
-                <InputNumber
+                <ZahlFeld
                   min={1}
                   max={10080}
                   placeholder={platzhalterVorgabe(orgDefaults?.rueckmeldung_frist_min, '60')}

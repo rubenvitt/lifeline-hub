@@ -1,8 +1,9 @@
-import { Form, Input, InputNumber, Typography } from 'antd';
+import { Form, Input, Typography } from 'antd';
 import { Feld, Formularpaneel } from '../../components/instrument';
 import { KATEGORIE_TEXT, KATEGORIEN, PERSONENSTAMM_TEXT } from '../../aufbewahrung/kategorieText';
 import { mitVorgabe } from '../../components/vorgabeText';
 import type { FormWerteEinsatz } from './orgEinstellungenForm';
+import { ZahlFeld } from '../../components/ZahlFeld';
 
 /**
  * Paneel „Aufbewahrung je Datenkategorie“ der Einsatz-Defaults (LFH-749, Spec
@@ -49,7 +50,7 @@ export default function KategorieVorgabenPaneel() {
                 </>
               }
             >
-              <InputNumber min={0} max={3650} placeholder={mitVorgabe('Einsatz-Frist')} />
+              <ZahlFeld min={0} max={3650} placeholder={mitVorgabe('Einsatz-Frist')} />
             </Feld>
             <Feld
               label={`Rechtsgrundlage ${text.bezeichnung}`}

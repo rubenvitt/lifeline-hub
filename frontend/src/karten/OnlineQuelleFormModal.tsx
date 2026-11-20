@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Switch, theme } from 'antd';
+import { Collapse, Form, Input, Switch, theme } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import {
 } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import { Feld } from '../components/instrument';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 interface FormWerte {
   name: string;
@@ -167,7 +168,7 @@ export default function OnlineQuelleFormModal({
             children: (
               <>
                 <Feld breite="schmal" label="Sortierung" name="sortier">
-                  <InputNumber min={0} />
+                  <ZahlFeld min={0} />
                 </Feld>
                 <Feld label="Aktiv" name="aktiv" valuePropName="checked">
                   <Switch />

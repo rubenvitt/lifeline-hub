@@ -1,4 +1,4 @@
-import { Button, InputNumber, Space, Typography, theme } from 'antd';
+import { Button, Space, Typography, theme } from 'antd';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
@@ -40,6 +40,7 @@ import {
 } from './stammdatenDetail';
 import { treeIds } from './einheitVorlagenBaum';
 import EinheitVorlageFormModal from './EinheitVorlageFormModal';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /**
  * Die Listen der Vorlagen-Detailseite (LLH-1042): Untereinheiten, Fahrzeuge, Stammbesetzung und
@@ -473,11 +474,13 @@ function MengeFeld({
   };
   return (
     <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-kurz)' }}>
-      <InputNumber
+      <ZahlFeld
         aria-label={`Menge ${bezeichnung}`}
         min={1}
         max={max}
-        precision={0}
+        ganz
+        // Ohne Formular darüber: eine Menge außerhalb bleibt im Feld stehen und geht nicht hinaus.
+        nurGueltig
         disabled={disabled}
         value={wert}
         onChange={setWert}

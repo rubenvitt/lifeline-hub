@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Modal, Typography, type FormRule } from 'antd';
+import { Collapse, Form, Input, Modal, Typography, type FormRule } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -51,6 +51,7 @@ import {
   uhrzeit,
   zitat,
 } from './verpflegungText';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 dayjs.extend(utc);
 
@@ -213,7 +214,7 @@ export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
  * `ZeitfensterBearbeiten`) ziehen es per Feld-Klasse auf die Zeile.
  */
 export function anzahlFeld(min = 0) {
-  return <InputNumber min={min} precision={0} />;
+  return <ZahlFeld min={min} ganz />;
 }
 
 /** Eingeklappter Bereich — `forceRender` ist TRAGEND (sonst fehlen die Werte in `onFinish`). */
@@ -256,7 +257,7 @@ function sonderkostFelder(vorschlag?: { hinweis: string | null; beruehrt: (k: Ko
       {KOSTFORMEN.map((k) => (
         <Feld key={k} name={['sonderkost', k]} label={KOSTFORM_LABEL[k]}>
           {vorschlag ? (
-            <InputNumber min={0} precision={0} onChange={() => vorschlag.beruehrt(k)} />
+            <ZahlFeld min={0} ganz onChange={() => vorschlag.beruehrt(k)} />
           ) : (
             anzahlFeld()
           )}
@@ -455,7 +456,7 @@ export function ZeitfensterDialog({
         }
         rules={[BEDARF_REGEL]}
       >
-        <InputNumber min={0} precision={0} onChange={merke('bedarf_kraefte')} />
+        <ZahlFeld min={0} ganz onChange={merke('bedarf_kraefte')} />
       </Feld>
       <Feld<ZeitfensterWerte>
         name="bedarf_betreute"
@@ -463,7 +464,7 @@ export function ZeitfensterDialog({
         extra={vorschlagHilfe(vorschlag.betreute, true)}
         rules={[BEDARF_REGEL]}
       >
-        <InputNumber min={0} precision={0} onChange={merke('bedarf_betreute')} />
+        <ZahlFeld min={0} ganz onChange={merke('bedarf_betreute')} />
       </Feld>
       {eingeklappt(
         sonderkostKopf

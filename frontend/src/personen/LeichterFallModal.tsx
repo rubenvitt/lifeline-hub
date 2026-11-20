@@ -1,4 +1,4 @@
-import { Form, Input, InputNumber } from 'antd';
+import { Form, Input } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ladeVersorgendeEinheiten, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -32,6 +32,7 @@ import FlaechenWahl, { FlaechenMehrfachWahl } from './FlaechenWahl';
 import { fundortAusText } from './AufnahmeFelder';
 import { LEICHTE_MASSNAHMEN, LEICHTE_MASSNAHMEN_MAX, MASSNAHME_WORT } from './personMeta';
 import { einheitText } from './VersorgtVon';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /** Titel und Primärknopf des Dialogs (LLH-1572, design.md D2). */
 export const LEICHTER_FALL_TITEL = 'Versorgt und entlassen';
@@ -419,7 +420,7 @@ export default function LeichterFallModal({
           </div>
           <div style={{ flex: '0 1 var(--lfh-feld-kurz)' }}>
             <Feld label="Alter" name="alter_geschaetzt" breite="kurz">
-              <InputNumber min={0} max={120} />
+              <ZahlFeld min={0} max={120} ganz einheit="Jahre" />
             </Feld>
           </div>
         </Stapel>

@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Checkbox, ConfigProvider, Form, InputNumber, Typography } from 'antd';
+import { App, Breadcrumb, Checkbox, ConfigProvider, Form, Typography } from 'antd';
 import type { FormInstance } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -37,6 +37,7 @@ import {
 import { useBedarfsvorschlag } from './useBedarfsvorschlag';
 import { VERPFLEGUNGSART_LABEL, zeitraumText } from './verpflegungText';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /**
  * Tag aus Vorlage anlegen (LLH-1058, Spec `kraefte-verpflegung`, „Tag aus der Vorlage in der
@@ -464,9 +465,9 @@ function BedarfsFelder({
         extra={hinweis ?? undefined}
         rules={[{ required: pflicht, message: ANZAHL_PFLICHT }]}
       >
-        <InputNumber
+        <ZahlFeld
           min={0}
-          precision={0}
+          ganz
           disabled={!aktiv}
           aria-label={`${label} zu ${name}`}
           onChange={merke(feldName)}

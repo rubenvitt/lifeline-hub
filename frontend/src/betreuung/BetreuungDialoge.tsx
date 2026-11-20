@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, theme } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Form, Input, Modal, theme } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
@@ -51,6 +51,7 @@ import {
   evakuiertText,
   personenZahl,
 } from './betreuungText';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /**
  * Die Erfassungsmasken des Fachmoduls Betreuung, alle auf `ErfassungsModal`.
@@ -353,7 +354,7 @@ function personenFeld(name: string, label: string, min: number, pflicht: boolean
         hoechstensRegel,
       ]}
     >
-      <InputNumber min={min} precision={0} />
+      <ZahlFeld min={min} ganz />
     </Feld>
   );
 }
@@ -693,7 +694,7 @@ export function StelleAnlegenDialog({
       </Feld>
       <Feld name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
         {/* Leer: keine Kapazität, dann auch keine Zahl freier Plätze. */}
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" />
+        <ZahlFeld min={1} ganz placeholder="keine Angabe" />
       </Feld>
       {weitere(
         <>

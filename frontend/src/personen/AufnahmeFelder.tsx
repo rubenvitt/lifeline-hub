@@ -1,4 +1,4 @@
-import { Collapse, Input, InputNumber, Typography } from 'antd';
+import { Collapse, Input, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
@@ -20,6 +20,7 @@ import AnlassWahl from './AnlassWahl';
 import SichtungsWahl from './SichtungsWahl';
 import { VersorgendeEinheitFeld } from './VersorgtVon';
 import { Feld } from '../components/instrument';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
@@ -241,7 +242,7 @@ export default function AufnahmeFelder({
         />
       </Feld>
       <Feld label="Geschätztes Alter (Jahre)" name="alter_geschaetzt" breite="kurz">
-        <InputNumber min={0} max={120} />
+        <ZahlFeld min={0} max={120} ganz einheit="Jahre" />
       </Feld>
       {/* „Fundort" ist das LETZTE sichtbare Eingabefeld: der Ort steht am Ende eines
          Aufnahmegesprächs. */}

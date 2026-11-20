@@ -1,5 +1,5 @@
 import { IconBlitz, IconPapierflieger } from '../icons';
-import { Button, Col, Collapse, Form, Input, InputNumber, Row, Space, Switch, theme } from 'antd';
+import { Button, Col, Collapse, Form, Input, Row, Space, Switch, theme } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -31,6 +31,7 @@ import type {
   NeueMeldung,
   Richtung,
 } from '../api/types';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 const { TextArea } = Input;
 
@@ -547,8 +548,8 @@ export default function MeldungFormular({
                             { type: 'integer', max: 10080, message: 'Frist höchstens 10080 Min' },
                           ]}
                         >
-                          <InputNumber
-                            precision={0}
+                          <ZahlFeld
+                            ganz
                             suffix="Min"
                             placeholder="Frist (Vorgabe)"
                             aria-label="Bestätigungsfrist in Minuten"
