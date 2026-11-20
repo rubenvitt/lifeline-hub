@@ -2,6 +2,7 @@ import { Input, Modal, theme } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { Speicherung } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { useVerwerfenSchutz } from '../components/VerlassenRueckfrage';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import { useEffect, useRef, useState } from 'react';
 
@@ -53,53 +54,62 @@ export default function VollzugMeldenModal({
   // `onCancel` zurück; Knopf und Kreuz zeigen die Sperre, Maske und Escape sind ausdrücklich aus.
   const meldet = speicherung?.isPending === true;
 
+  const schutz = useVerwerfenSchutz({
+    geaendert: !leer,
+    gesperrt: meldet,
+    titel: 'Vollzug melden',
+    onSchliessen: () => {
+      abbruchGeneration.current += 1;
+      setText('');
+      raeume();
+      onAbbrechen();
+    },
+  });
+
   return (
-    <Modal
-      title="Vollzug melden"
-      open={offen}
-      okText="Vollzug melden"
-      cancelText="Abbrechen"
-      okButtonProps={{ disabled: zuLang || leer }}
-      confirmLoading={meldet}
-      cancelButtonProps={{ disabled: meldet }}
-      closable={meldet ? { disabled: true } : true}
-      mask={{ closable: !meldet }}
-      keyboard={!meldet}
-      onCancel={() => {
-        abbruchGeneration.current += 1;
-        setText('');
-        raeume();
-        onAbbrechen();
-      }}
-      onOk={async () => {
-        if (zuLang || leer) return;
-        const generation = abbruchGeneration.current;
-        try {
-          await onBestaetigen(text.trim());
-        } catch {
-          // Der Grund steht über `speicherung` im Dialog, der Text bleibt stehen.
-          return;
-        }
-        if (generation === abbruchGeneration.current) setText('');
-      }}
-    >
-      <Input.TextArea
-        rows={3}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Rückmeldung zur Erledigung"
-        // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
-        count={zeichenGrenze(ETB_INHALT_MAX)}
-      />
-      {speicherung?.error != null && (
-        <div style={{ marginTop: token.marginSM }}>
-          <SpeicherFehler
-            fehler={speicherung.error}
-            titel="Vollzug nicht gemeldet"
-            fallback="Melden fehlgeschlagen"
-          />
-        </div>
-      )}
-    </Modal>
+    <>
+      <Modal
+        title="Vollzug melden"
+        open={offen}
+        okText="Vollzug melden"
+        cancelText="Abbrechen"
+        okButtonProps={{ disabled: zuLang || leer }}
+        confirmLoading={meldet}
+        cancelButtonProps={{ disabled: meldet }}
+        closable={meldet ? { disabled: true } : true}
+        // Maske, Kreuz, Escape und Abbrechen über den Schutz (LLH-2010): mit Text erst die Rückfrage.
+        {...schutz.modalProps}
+        onOk={async () => {
+          if (zuLang || leer) return;
+          const generation = abbruchGeneration.current;
+          try {
+            await onBestaetigen(text.trim());
+          } catch {
+            // Der Grund steht über `speicherung` im Dialog, der Text bleibt stehen.
+            return;
+          }
+          if (generation === abbruchGeneration.current) setText('');
+        }}
+      >
+        <Input.TextArea
+          rows={3}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Rückmeldung zur Erledigung"
+          // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
+          count={zeichenGrenze(ETB_INHALT_MAX)}
+        />
+        {speicherung?.error != null && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={speicherung.error}
+              titel="Vollzug nicht gemeldet"
+              fallback="Melden fehlgeschlagen"
+            />
+          </div>
+        )}
+      </Modal>
+      {schutz.rueckfrage}
+    </>
   );
 }

@@ -411,6 +411,44 @@ describe('NachforderungenPage', () => {
     expect(knopf).toBeEnabled();
   });
 
+  /**
+   * LLH-2010: ein getippter Grund geht nicht still verloren (`frontend/AGENTS.md`,
+   * „Erfassungs-Norm“): die Maske schließt nie, mit Grund fragt das Kreuz nach, ohne schließt es.
+   */
+  it.each([
+    { eintrag: 'Ablehnen', titel: 'Nachforderung ablehnen', feld: 'Ablehnungsgrund' },
+    {
+      eintrag: 'Zurückziehen',
+      titel: 'Nachforderung zurückziehen',
+      feld: 'Grund des Zurückziehens',
+    },
+  ])('$eintrag: Maske schließt nicht, das Kreuz fragt nur mit Grund nach', async (fall) => {
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue(fall.eintrag);
+    const dialog = await screen.findByRole('dialog', { name: fall.titel });
+    const maske = dialog.closest<HTMLElement>('.ant-modal-wrap')!;
+    await userEvent.click(maske);
+    expect(screen.getByRole('dialog', { name: fall.titel })).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByLabelText(fall.feld), 'Lage geklärt');
+    await userEvent.click(maske);
+    await userEvent.click(within(dialog).getByRole('button', { name: /Close|Schließen/i }));
+    expect(
+      await screen.findByText(`Die Eingaben in „${fall.titel}“ gehen verloren.`),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter bearbeiten' }));
+    expect(within(dialog).getByLabelText(fall.feld)).toHaveValue('Lage geklärt');
+
+    await userEvent.clear(within(dialog).getByLabelText(fall.feld));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Ohne Grund still zu; jsdom beendet die Ausblende-Animation nie.
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    // Die Rückfrage von eben blendet aus, eine neue erscheint nicht.
+    const rueckfragen = screen.queryAllByRole('dialog', { name: 'Eingaben verwerfen?' });
+    expect(rueckfragen.filter((d) => !d.classList.contains('ant-zoom-leave'))).toHaveLength(0);
+  });
+
   /** LLH-1097 D9: Bearbeiten im ⋮-Menü sendet nur Geändertes. */
   it('bearbeitet eine offene Nachforderung an der Karte (PATCH nur mit Geändertem)', async () => {
     patcheNachforderung.mockResolvedValue(nf({ prioritaet: 'sofort' }));
