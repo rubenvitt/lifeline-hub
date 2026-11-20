@@ -15,6 +15,7 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from './labels';
+import { pflicht } from '../components/pflichtRegel';
 
 /**
  * Schnellerfassung des Informationstelefons (LFH-554, Spec `stab-infotelefon`): am Fuß der Seite,
@@ -129,9 +130,7 @@ export default function AnrufErfassung({
     <Feld
       label="Rückrufnummer"
       name="rueckruf"
-      rules={[
-        { required: rueckrufNoetig, whitespace: true, message: 'Für einen Rückruf erforderlich' },
-      ]}
+      rules={[{ required: rueckrufNoetig, whitespace: true, message: 'Rückrufnummer fehlt' }]}
       abstand="ohne"
       zeile={zeile}
     >
@@ -153,7 +152,7 @@ export default function AnrufErfassung({
           <Flex wrap gap={token.marginXS} style={{ width: '100%', padding: token.paddingXS }}>
             <Feld
               name="anliegen"
-              rules={[{ required: true, message: 'Anliegen wählen' }]}
+              rules={[pflicht('Anliegen')]}
               abstand="ohne"
               zeile={eingeklappt ? 'voll' : 'schmal'}
             >
@@ -175,6 +174,8 @@ export default function AnrufErfassung({
                   <Input
                     aria-label="Notiz"
                     placeholder="Notiz zum Anruf"
+                    // Einzeilig in der Zeile: Enter sendet, auch auf Touch (Enter-Vertrag, LLH-1766).
+                    enterKeyHint="send"
                     // Zähler ab 80 % im Feld selbst (Suffix), keine weitere Zeile (LFH-937).
                     count={zeichenGrenze(INFOTELEFON_NOTIZ_MAX)}
                   />

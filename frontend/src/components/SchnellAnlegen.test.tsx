@@ -33,6 +33,11 @@ function renderZeile(
 const feld = () => screen.getByLabelText('Neue Qualifikation');
 
 describe('SchnellAnlegen', () => {
+  it('zeigt den Tastaturknopf „Senden“ (Enter-Vertrag, LLH-1766)', () => {
+    renderZeile(vi.fn());
+    expect(feld()).toHaveAttribute('enterkeyhint', 'send');
+  });
+
   it('Enter im Feld legt an — mit beschnittenem Text', async () => {
     const anlegen = vi.fn().mockResolvedValue(undefined);
     renderZeile(anlegen);
