@@ -45,9 +45,13 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   });
   await feld.fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
-  await expect(page.locator('[data-lfh="etb-pflicht-hinweis"]').first()).toContainText(
-    'Absender fehlt',
+  // Ein Grund für beide Seiten, der auf die Abfrage zeigt; der Cursor steht darin (LLH-1764).
+  await expect(page.locator('[data-lfh="etb-pflicht-hinweis"]')).toHaveText(
+    'Absender und Empfänger fehlen – Rufname oben eintragen',
   );
+  await expect(
+    abfrage(page).getByRole('combobox', { name: 'Rufname für Von und An' }),
+  ).toBeFocused();
   expect(gesendet).toEqual([]);
   await expect(feld).toHaveValue(inhalt);
 

@@ -10,6 +10,17 @@ import { useEinstellungMerken } from './useEinstellungMerken';
 import { useRundgang } from './rundgang/RundgangProvider';
 
 /**
+ * Steht fest, ob die Karte erscheint? Die Einsatzliste zeichnet ihren Inhalt erst dann
+ * (`frontend/AGENTS.md`, „Modulwechsel zeigt sofort Kopf und Gerippe“: was erst mit den Daten
+ * kommt, steht nicht über dem, was schon steht). Käme die Karte nach dem Gerippe, schöbe sie es um
+ * ihre Höhe nach unten (183 px, `e2e/einsatzauswahl-cls.spec.ts`). Ohne Stand bleibt die Karte
+ * ohnehin weg, deshalb wartet die Liste nicht auf Wiederholungen nach einem Fehlversuch.
+ */
+export function useWillkommenEntschieden(): boolean {
+  return useEinstellungMerken().entschieden;
+}
+
+/**
  * Willkommenskarte auf der Einsatzliste (LLH-1824): führt Erstnutzer an den Aufbau, die Hilfe zur
  * Seite und die Sprungpalette heran. Sie steht, bis man sie schließt; das merkt sich der Server je
  * Benutzer. „Rundgang starten“ zeigt die Oberfläche in Sprechblasen (LLH-1990).

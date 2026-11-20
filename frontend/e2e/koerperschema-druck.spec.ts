@@ -135,11 +135,12 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
   expect(eintraege.filter((e) => e.art === 'druck' && e.person_id === pid)).toHaveLength(1);
 });
 
-test('unbekannte Person: „nicht gefunden“, kein Druckknopf', async ({ page }) => {
+test('unbekannte Person: „gibt es nicht (mehr)“, kein Druckknopf', async ({ page }) => {
   await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Körperschema-Druck leer ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen/987654/druck`);
-  await expect(page.getByText('Person nicht gefunden')).toBeVisible();
+  // Muster „gibt es nicht (mehr)“ mit Rückweg zur Liste (LLH-1960, Spec `seiten-zustaende`).
+  await expect(page.getByText('Diese Person gibt es nicht (mehr)')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toHaveCount(0);
   await expect(page.locator('[data-lfh="druckwurzel"]')).toHaveCount(0);
 });

@@ -14,7 +14,7 @@ import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
-import { weitereOeffnen } from './nebenweg-kern';
+import { weitereAusloeser, weitereOeffnen } from './nebenweg-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
@@ -1223,13 +1223,13 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (das Paneel „Personal
-    // nach Status“ zählt sie) — erst danach sagt eine Abwesenheit etwas. Ohne Filter steht in der
-    // Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
+    // nach Status“ zählt sie als Personen, LLH-1830) — erst danach sagt eine Abwesenheit etwas.
+    // Ohne Filter steht in der Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
     await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
       page
         .getByRole('region', { name: 'Personal nach Status' })
-        .getByText(/^[1-9]\d* (Kraft|Kräfte)$/),
+        .getByText(/^[1-9]\d* (Person|Personen)$/),
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
@@ -1762,6 +1762,29 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
   return { einheit };
 }
 
+/**
+ * Misst den Seitendruck „Drucken / als PDF“ im Seitenkopf (LLH-1836, `druck/AGENTS.md`, „Wortlaut
+ * und Platz der Druckeinstiege“). In `kompakt` ab `md` ein Knopf; in `komfortabel` und `handschuh`
+ * steht er im Menü „Weitere“ (`nebenwegeImMenue`, LLH-1786): dann halten der Auslöser und der
+ * Eintrag die Stufe, und neben dem Auslöser steht kein Druckknopf.
+ */
+async function seitendruckMessen(
+  page: Page,
+  weitere: string,
+  dichte: string,
+  soll: number,
+): Promise<number> {
+  const knopf = page.getByRole('button', { name: 'Drucken / als PDF', exact: true });
+  if (dichte === 'kompakt') return haeltStufe(knopf, soll, `Drucken (${dichte})`);
+  await haeltStufe(weitereAusloeser(page, weitere), soll, `Weitere (${dichte})`);
+  await expect(knopf, `Drucken (${dichte}): kein Knopf neben „Weitere“`).toHaveCount(0);
+  const eintrag = await weitereOeffnen(page, weitere, 'Drucken / als PDF');
+  const hoehe = await haeltStufe(eintrag, soll, `Drucken im Menü (${dichte})`);
+  await page.keyboard.press('Escape');
+  await expect(eintrag).toBeHidden();
+  return hoehe;
+}
+
 test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
@@ -1801,10 +1824,11 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
       soll,
       `Übernahme Befehl (${dichte})`,
     );
-    const druck = await haeltStufe(
-      page.getByRole('button', { name: /Drucken/ }),
+    const druck = await seitendruckMessen(
+      page,
+      'Weitere Aktionen zum Fernmeldewesen',
+      dichte,
       soll,
-      `Drucken (${dichte})`,
     );
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, ` +
@@ -1847,10 +1871,11 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
       `Lücken-Verweis (${dichte})`,
       FUNKPLAN_LUECKEN_LINKS,
     );
-    const druck = await haeltStufe(
-      page.getByRole('button', { name: /Drucken/ }),
+    const druck = await seitendruckMessen(
+      page,
+      'Weitere Aktionen zum Fernmeldewesen',
+      dichte,
       soll,
-      `Drucken (${dichte})`,
     );
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, Drucken ${druck}`,
@@ -1979,10 +2004,11 @@ async function messeKommunikationsplan(
   }
   // Zwei Nummern (Leitstelle, Abschnitt) und ein Titel-Link (Abschnitt).
   const links = await alleHaltenStufe(tabelle.getByRole('link'), soll, `Link (${dichte})`, 3);
-  const druck = await haeltStufe(
-    page.getByRole('button', { name: /Drucken/ }),
+  const druck = await seitendruckMessen(
+    page,
+    'Weitere Aktionen zum Kommunikationsplan',
+    dichte,
     soll,
-    `Drucken (${dichte})`,
   );
   let schreiben = '';
   if (schreibend) {
@@ -2221,11 +2247,7 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     `Reiter (${dichte})`,
     4,
   );
-  const druck = await haeltStufe(
-    page.getByRole('button', { name: /Drucken/ }),
-    soll,
-    `Drucken (${dichte})`,
-  );
+  const druck = await seitendruckMessen(page, 'Weitere Aktionen zum Fernmeldewesen', dichte, soll);
   return (
     `${dichte} (Soll ≥ ${soll}): Werkzeug ${knoepfe}, Segment ${segmente}, ` +
     `${paletteKnoepfe == null ? '' : `Palette ${paletteKnoepfe}, `}Paneel ${paneelZiele}, ` +
@@ -2324,10 +2346,11 @@ async function messeOrganigramm(page: Page, soll: number, dichte: string, schrei
     soll,
     `Alle aufklappen (${dichte})`,
   );
-  const druck = await haeltStufe(
-    page.getByRole('button', { name: /Drucken/ }),
+  const druck = await seitendruckMessen(
+    page,
+    'Weitere Aktionen zu den Einsatzabschnitten',
+    dichte,
     soll,
-    `Drucken (${dichte})`,
   );
   const uebernahme = schreibend
     ? await haeltStufe(
