@@ -60,10 +60,16 @@ Für Einsatzleitung und Führungspersonal:
    Meldung an eine Funktion im Stab gerichtet, unter „Empfängerfunktion“ die Einsatzleitung oder
    das Sachgebiet wählen; ein leeres „Empfänger / Adressat“ füllt sich dabei mit dem Kürzel, etwa
    „S2“. Bei Bedarf „Empfänger / Adressat“ frei eintragen oder ändern.
+
+   Ist im ETB ein Standard-Rufname gesetzt, steht die eigene Stelle schon da: bei einer Meldung
+   als Empfänger, bei der Art „Lagemeldung“ als Absender. Eine gewählte Empfängerfunktion ersetzt
+   die vorbelegte eigene Stelle durch ihr Kürzel; was jemand selbst eingetragen hat, bleibt.
 4. Unter „Weitere Angaben“ bei Bedarf „Von Einheit / Abschnitt“ (belegt den Absender vor),
    „Meldeweg“, „Meldungsart“, „Priorität“, „Richtung“, „Zeitpunkt des Ereignisses“ und die Frist
    der Bestätigung setzen.
-5. „Meldung erfassen“ wählen.
+5. „Meldung erfassen“ wählen. Fehlt eine Pflichtangabe, rollt das Formular zum ersten
+   betroffenen Feld und setzt den Cursor hinein; über dem Knopf steht in Rot, was fehlt, etwa
+   „Inhalt ist erforderlich · Absender ist erforderlich“.
 
 Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, auch nach außen; bei
 dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel
