@@ -488,9 +488,7 @@ describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
 
     // Die Regel hängt an Richtung und Bezeichnung (`dependencies`), nicht nur am Feld selbst.
     await externMitBezeichnung();
-    await waitFor(() =>
-      expect(screen.queryByText('Empfänger fehlt')).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText('Empfänger fehlt')).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0].empfaenger).toEqual([
