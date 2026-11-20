@@ -36,7 +36,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
    Erfassungsdialog zählt „Erfasst“ nur, was der Server angenommen hat; Vorgemerktes steht daneben
    als „nicht gesendet“.
 
-   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 nicht gesendet“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ und „1 ausstehend“ im Seitenkopf, der vorgemerkte Eintrag unten in der Zeitachse und „1 Eintrag offline vorgemerkt“ über der Erfassung](../bilder/ohne-netz/etb-ohne-netz.png)
+   ![Einsatztagebuch ohne Netz: „OFFLINE“ in der Kopfzeile, „Stand · offline“ und „1 ausstehend“ im Seitenkopf, der vorgemerkte Eintrag unten in der Zeitachse und „1 Eintrag offline vorgemerkt“ über der Erfassung](../bilder/ohne-netz/etb-ohne-netz.png)
 
 3. Nichts weiter tun: Sobald wieder Netz da ist, geht der Eintrag von selbst hinaus.
 
