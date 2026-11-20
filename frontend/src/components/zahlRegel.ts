@@ -1,5 +1,7 @@
 import type { FormRule } from 'antd';
 import type { NamePath } from 'antd/es/form/interface';
+import { useCallback, useRef, useState } from 'react';
+import { useEingabeSperre } from './instrument/eingabeSperre';
 
 /**
  * Grenzen eines Zahlenfelds als Prüfregel (LLH-1768): Zahlenfelder kappen und runden nie
@@ -58,4 +60,33 @@ export function zahlRegel(o: ZahlGrenzen): FormRule {
       return grund ? Promise.reject(new Error(grund)) : Promise.resolve();
     },
   });
+}
+
+/**
+ * Für Zahl-Bausteine (`MengenFeld`, `DezimalFeld`, `RadiusEingabe`, `StaerkeEingabe`,
+ * `QualiSollFeld`): prüft eine Eingabe der Person und meldet den Grund an die Eingabesperre
+ * darüber. Ein Formular mit `Feld` sendet dann nicht und nennt den Grund in der Fehlerzeile; der
+ * Aufrufer muss keine Regel anhängen. Geprüft wird nur, was die Person ändert: ein gespeicherter
+ * Altwert sperrt nicht (wie {@link zahlRegel}).
+ */
+export function useZahlSperre(): {
+  grund: string | null;
+  pruefe: (wert: number | null | undefined, o: ZahlGrenzen, quelle?: string) => string | null;
+} {
+  const meldeSperre = useEingabeSperre();
+  const gruende = useRef<Record<string, string>>({});
+  const [grund, setGrund] = useState<string | null>(null);
+  const pruefe = useCallback(
+    (wert: number | null | undefined, o: ZahlGrenzen, quelle = '') => {
+      const neu = pruefeZahl(wert, o);
+      if (neu) gruende.current[quelle] = neu;
+      else delete gruende.current[quelle];
+      const erster = Object.values(gruende.current)[0] ?? null;
+      setGrund(erster);
+      meldeSperre(erster);
+      return neu;
+    },
+    [meldeSperre],
+  );
+  return { grund, pruefe };
 }

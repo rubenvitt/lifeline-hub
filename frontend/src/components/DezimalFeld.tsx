@@ -1,5 +1,6 @@
 import { InputNumber } from 'antd';
 import type { InputNumberProps } from 'antd';
+import { useZahlSperre } from './zahlRegel';
 
 /**
  * Zahlfeld für Dezimalzahlen (LLH-1146), Gegenstück zu `MengenFeld`: zeigt das Dezimalkomma und
@@ -8,15 +9,28 @@ import type { InputNumberProps } from 'antd';
  * Zahlenkern `anzeige/zahl.ts` schreibt) zählt beim Einfügen.
  *
  * Der zugängliche Name ist Pflicht (`beschriftung`), die Stellenzahl auch (`stellen`): sie legt
- * Anzeige und Pfeilschritt fest (2 → 7,10 und Schritt 0,01). Ohne Stufenknöpfe, Begründung wie
+ * Anzeige, Pfeilschritt und die Prüfung fest (2 → 7,10, Schritt 0,01, „7,123“ abgelehnt statt
+ * gerundet, LLH-1768). Ohne Stufenknöpfe, Begründung wie
  * `MengenFeld`; `inputMode="decimal"` öffnet die Ziffernstatur mit Trennzeichen.
  *
  * Wächter: `anzeige/zahl.guard.test.ts` (kein Dezimal-`InputNumber` außerhalb dieses Bausteins).
  */
 export type DezimalFeldProps = Omit<
   InputNumberProps<number>,
-  'controls' | 'aria-label' | 'precision' | 'step' | 'inputMode' | 'decimalSeparator' | 'parser'
+  | 'controls'
+  | 'aria-label'
+  | 'precision'
+  | 'step'
+  | 'inputMode'
+  | 'decimalSeparator'
+  | 'parser'
+  | 'formatter'
+  | 'min'
+  | 'max'
 > & {
+  /** Grenzen; geprüft, nicht gekappt (LLH-1768). */
+  min?: number;
+  max?: number;
   /** Zugänglicher Name, z. B. „Erwarteter Höchststand (m)“. */
   beschriftung: string;
   /** Nachkommastellen (≥ 1). */
@@ -39,11 +53,39 @@ export function parseDezimal(text: string | undefined): string {
  */
 const parser = parseDezimal as unknown as NonNullable<InputNumberProps<number>['parser']>;
 
-export function DezimalFeld({ beschriftung, stellen, ...rest }: DezimalFeldProps) {
+/**
+ * Mindestens `stellen` Nachkommastellen mit Komma, nie gekürzt: „7,1“ → „7,10“, „7,123“ bleibt
+ * „7,123“ und wird abgelehnt statt gerundet (LLH-1768; früher `precision`).
+ */
+export function mitStellen(wert: number, stellen: number): string {
+  const [ganz, bruch = ''] = String(wert).split('.');
+  return `${ganz},${bruch.padEnd(stellen, '0')}`;
+}
+
+export function DezimalFeld({
+  beschriftung,
+  stellen,
+  min,
+  max,
+  onChange,
+  status,
+  ...rest
+}: DezimalFeldProps) {
+  const { grund, pruefe } = useZahlSperre();
   return (
     <InputNumber<number>
       {...rest}
-      precision={stellen}
+      status={grund ? 'error' : status}
+      aria-invalid={grund ? true : rest['aria-invalid']}
+      onChange={(wert) => {
+        pruefe(wert, { min, max, stellen });
+        onChange?.(wert);
+      }}
+      formatter={(wert, { userTyping, input }) =>
+        userTyping || wert === undefined || wert === null || String(wert) === ''
+          ? input
+          : mitStellen(Number(wert), stellen)
+      }
       step={10 ** -stellen}
       decimalSeparator=","
       parser={parser}

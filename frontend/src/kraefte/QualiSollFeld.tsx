@@ -8,6 +8,7 @@ import type { QualiSollEingabe, QualiSollEintrag } from '../api/types';
 import { FELD_KLASSE, Stapel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { IconMuelleimer, IconPlus } from '../icons';
+import { pruefeZahl, useZahlSperre } from '../components/zahlRegel';
 
 /** Eine Zeile im Entwurf; die Qualifikation fehlt, bis jemand wählt. */
 export interface QualiSollZeile {
@@ -67,6 +68,9 @@ export default function QualiSollFeld({
       .map((b) => ({ value: b.qualifikation_id, label: b.label })),
   ];
 
+  // Geprüft statt gekappt (LLH-1768): eine Anzahl außerhalb bleibt stehen und sperrt.
+  const { pruefe } = useZahlSperre();
+  const ANZAHL = { min: 1, max: QUALI_SOLL_ANZAHL_MAX, ganz: true };
   const aendere = (index: number, aenderung: Partial<QualiSollZeile>) =>
     onChange?.(value.map((z, i) => (i === index ? { ...z, ...aenderung } : z)));
 
@@ -99,11 +103,12 @@ export default function QualiSollFeld({
             <div className={FELD_KLASSE} style={ANZAHL_HUELLE}>
               <InputNumber
                 aria-label={`Anzahl ${nummer}`}
-                min={1}
-                max={QUALI_SOLL_ANZAHL_MAX}
-                precision={0}
                 value={zeile.anzahl}
-                onChange={(anzahl) => aendere(index, { anzahl })}
+                status={pruefeZahl(zeile.anzahl, ANZAHL) ? 'error' : undefined}
+                onChange={(anzahl) => {
+                  pruefe(anzahl, ANZAHL, String(index));
+                  aendere(index, { anzahl });
+                }}
                 disabled={disabled}
               />
             </div>

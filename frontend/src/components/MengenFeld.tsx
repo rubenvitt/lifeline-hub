@@ -1,5 +1,6 @@
 import { InputNumber } from 'antd';
 import type { InputNumberProps } from 'antd';
+import { useZahlSperre } from './zahlRegel';
 
 /**
  * Zahlfeld für Mengen (LFH-983). Der zugängliche Name ist Pflicht (`beschriftung`), auch im
@@ -11,18 +12,37 @@ import type { InputNumberProps } from 'antd';
  */
 export type MengenFeldProps = Omit<
   InputNumberProps<number>,
-  'controls' | 'aria-label' | 'precision' | 'inputMode'
+  'controls' | 'aria-label' | 'precision' | 'inputMode' | 'min' | 'max'
 > & {
   /** Zugänglicher Name, z. B. „Menge“ oder „Menge Decken“. */
   beschriftung: string;
+  /** Untergrenze, Vorgabe 1. Geprüft, nicht gekappt (LLH-1768). */
+  min?: number;
+  max?: number;
 };
 
-export function MengenFeld({ beschriftung, min = 1, ...rest }: MengenFeldProps) {
+/**
+ * Ganze Zahlen ab `min`: eine Eingabe außerhalb wird nicht gekappt oder gerundet, sondern bleibt
+ * stehen; der Grund sperrt das Formular darüber (`zahlRegel.ts`, `useZahlSperre`, LLH-1768).
+ */
+export function MengenFeld({
+  beschriftung,
+  min = 1,
+  max,
+  onChange,
+  status,
+  ...rest
+}: MengenFeldProps) {
+  const { grund, pruefe } = useZahlSperre();
   return (
     <InputNumber<number>
       {...rest}
-      min={min}
-      precision={0}
+      status={grund ? 'error' : status}
+      aria-invalid={grund ? true : rest['aria-invalid']}
+      onChange={(wert) => {
+        pruefe(wert, { min, max, ganz: true });
+        onChange?.(wert);
+      }}
       controls={false}
       inputMode="numeric"
       aria-label={beschriftung}
