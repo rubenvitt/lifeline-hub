@@ -240,6 +240,12 @@ interface ErfassungsFormularProps<T> {
    * „Vermisst melden“ gehen verloren.“, LLH-1755). `ErfassungsModal` reicht seinen Titel.
    */
   rueckfrageTitel?: ReactNode;
+  /**
+   * Kein Knopf „Abbrechen“ im Fuß, obwohl `onAbbrechen` steht: der Dialog bricht nur über Kreuz
+   * und Escape ab (Auftragsdialoge, LLH-1755). `onAbbrechen` ruft dann der Abbruch über
+   * `steuerungRef` nach „Verwerfen“ bzw. ohne Änderung.
+   */
+  ohneAbbrechenKnopf?: boolean;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -286,6 +292,7 @@ export function ErfassungsFormular<T extends object>({
   fussKlebt = false,
   nebenaktionen,
   rueckfrageTitel,
+  ohneAbbrechenKnopf = false,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -604,7 +611,7 @@ export function ErfassungsFormular<T extends object>({
             )}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
               <Knopfreihe fuss>
-                {onAbbrechen && (
+                {onAbbrechen && !ohneAbbrechenKnopf && (
                   <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                     Abbrechen
                   </Button>

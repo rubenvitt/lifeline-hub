@@ -2,7 +2,7 @@ import { Modal, Typography, theme } from 'antd';
 import { useEffect, useRef } from 'react';
 import type { Meldung, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
-import type { Speicherung } from '../components/Erfassung';
+import type { ErfassungsFormularSteuerung, Speicherung } from '../components/Erfassung';
 
 interface Props {
   meldung: Meldung | null;
@@ -53,21 +53,25 @@ export default function AuftragErteilenModal({
     const s = speicherungRef.current;
     if (s && !s.isPending && s.error != null) s.reset();
   }, [offen]);
+  const steuerung = useRef<ErfassungsFormularSteuerung>(null);
   return (
     <Modal
       open={offen}
       title="Aus Meldung Auftrag erteilen"
       footer={null}
-      onCancel={() => {
-        if (!sperrt) onAbbrechen();
-      }}
+      // Kreuz über die Pforte der Erfassungshülle: bei Änderung erst die Rückfrage (LLH-1755).
+      onCancel={() => steuerung.current?.abbrechen()}
       closable={sperrt ? { disabled: true } : true}
-      mask={{ closable: !sperrt }}
-      keyboard={!sperrt}
+      // Die Maske schließt nie; Escape läuft über die Tastatur-Ebene des Formulars.
+      mask={{ closable: false }}
+      keyboard={false}
       destroyOnHidden
       width={520}
     >
       <AuftragFormular
+        steuerungRef={steuerung}
+        onAbbrechen={onAbbrechen}
+        rueckfrageTitel="Aus Meldung Auftrag erteilen"
         card={false}
         senden={senden}
         abschnitte={abschnitte}

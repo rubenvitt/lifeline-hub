@@ -1,7 +1,8 @@
 import { Modal, Typography, theme } from 'antd';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
-import type { Speicherung } from '../components/Erfassung';
+import type { ErfassungsFormularSteuerung, Speicherung } from '../components/Erfassung';
+import { useRef } from 'react';
 
 interface Props {
   eintrag: EtbEintragAnzeige | null;
@@ -40,25 +41,25 @@ export default function AuftragAusEtbModal({
 }: Props) {
   const { token } = theme.useToken();
   const sperrt = speicherung?.isPending === true;
+  const steuerung = useRef<ErfassungsFormularSteuerung>(null);
   return (
     <Modal
       open={eintrag !== null}
       title="Aus ETB-Eintrag Auftrag erteilen"
       footer={null}
-      // Kreuz, Maske und Escape: gesperrt, solange der Auftrag unterwegs ist. Schließen räumt den
-      // Grund, damit der Dialog nie mit einer alten Ablehnung öffnet.
-      onCancel={() => {
-        if (sperrt) return;
-        if (speicherung?.error != null) speicherung.reset();
-        onAbbrechen();
-      }}
+      // Kreuz über die Pforte der Erfassungshülle: bei Änderung erst die Rückfrage (LLH-1755).
+      onCancel={() => steuerung.current?.abbrechen()}
       closable={sperrt ? { disabled: true } : true}
-      mask={{ closable: !sperrt }}
-      keyboard={!sperrt}
+      // Die Maske schließt nie; Escape läuft über die Tastatur-Ebene des Formulars.
+      mask={{ closable: false }}
+      keyboard={false}
       destroyOnHidden
       width={520}
     >
       <AuftragFormular
+        steuerungRef={steuerung}
+        onAbbrechen={onAbbrechen}
+        rueckfrageTitel="Aus ETB-Eintrag Auftrag erteilen"
         card={false}
         senden={senden}
         abschnitte={abschnitte}
