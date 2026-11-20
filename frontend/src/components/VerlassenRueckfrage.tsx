@@ -1,7 +1,8 @@
 import { Button, Modal } from 'antd';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useBlocker } from 'react-router';
 import { SpeicherFehler } from './SpeicherHinweis';
+import Knopfreihe from './instrument/Knopfreihe';
 import Stapel from './instrument/Stapel';
 
 interface Props {
@@ -108,6 +109,48 @@ export function VerlassenDialog({
         <span>Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.</span>
         <SpeicherFehler fehler={speicherFehler} />
       </Stapel>
+    </Modal>
+  );
+}
+
+/**
+ * Rückfrage vor dem Verwerfen geänderter Eingaben eines Erfassungsdialogs (LLH-1755,
+ * `frontend/AGENTS.md`, „Erfassungs-Norm“). Dieselbe Form wie {@link VerlassenDialog}, eigener
+ * Wortlaut: „beim Verlassen“ passt nicht, wenn nur ein Dialog schließt. Escape und Kreuz heißen
+ * „Weiter bearbeiten“, die Maske schließt nicht; der Fokus steht auf „Weiter bearbeiten“.
+ */
+export function VerwerfenDialog({
+  offen,
+  titel,
+  onWeiter,
+  onVerwerfen,
+}: {
+  offen: boolean;
+  /** Titel des Erfassungsdialogs; nur als Text wird er genannt. */
+  titel?: ReactNode;
+  onWeiter: () => void;
+  onVerwerfen: () => void;
+}) {
+  return (
+    <Modal
+      title="Eingaben verwerfen?"
+      open={offen}
+      onCancel={onWeiter}
+      mask={{ closable: false }}
+      footer={
+        <Knopfreihe fuss>
+          <Button danger onClick={onVerwerfen}>
+            Verwerfen
+          </Button>
+          <Button type="primary" autoFocus onClick={onWeiter}>
+            Weiter bearbeiten
+          </Button>
+        </Knopfreihe>
+      }
+    >
+      {typeof titel === 'string' && titel !== ''
+        ? `Die Eingaben in „${titel}“ gehen verloren.`
+        : 'Die Eingaben gehen verloren.'}
     </Modal>
   );
 }

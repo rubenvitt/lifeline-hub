@@ -1,4 +1,4 @@
-import { Form, Input, theme } from 'antd';
+import { Form, Input, theme, type FormInstance } from 'antd';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
@@ -13,6 +13,7 @@ import {
   serienKuerzel,
   titelzeilenHoehe,
   type ErfassungsFormularSteuerung,
+  type Speicherung,
 } from './Erfassung';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
@@ -43,6 +44,11 @@ interface Werte {
   ort: string;
   melder: string;
   notiz: string;
+}
+
+/** Geänderte Eingaben gehen erst nach der Rückfrage verloren (LLH-1755): „Verwerfen“ bestätigen. */
+async function verwerfenBestaetigen() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
 }
 
 /**
@@ -727,6 +733,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await act(async () => {
       steuerung.current?.abbrechen();
     });
+    await verwerfenBestaetigen();
     await act(async () => {
       hookFreigeben();
       await hookAntwort;
@@ -762,6 +769,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
     await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
     await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await verwerfenBestaetigen();
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
@@ -782,6 +790,7 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await act(async () => {
       steuerung.current?.abbrechen();
     });
+    await verwerfenBestaetigen();
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
@@ -1115,5 +1124,203 @@ describe('ErfassungsFormular — Haptik in der Hülle', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue({})} onFertig={onFertig} />);
     await userEvent.setup().type(screen.getByLabelText('Melder'), 'Löschzug 1{Enter}');
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('ErfassungsFormular — Rückfrage vor dem Verwerfen (LLH-1755)', () => {
+  function RueckfrageHarness(props: {
+    onErfassen?: (w: Werte) => Promise<unknown>;
+    onAbbrechen?: () => void;
+    serie?: boolean;
+    uebernahme?: (keyof Werte)[];
+    steuerungRef?: Ref<ErfassungsFormularSteuerung>;
+    formRef?: { current: FormInstance<Werte> | null };
+    speicherung?: Speicherung;
+    rueckfrageTitel?: ReactNode;
+  }) {
+    const [form] = Form.useForm<Werte>();
+    if (props.formRef) props.formRef.current = form;
+    return (
+      <ErfassungsFormular<Werte>
+        form={form}
+        onErfassen={props.onErfassen ?? vi.fn().mockResolvedValue(undefined)}
+        onFertig={() => {}}
+        onAbbrechen={props.onAbbrechen ?? (() => {})}
+        serie={props.serie}
+        uebernahme={props.uebernahme}
+        steuerungRef={props.steuerungRef}
+        speicherung={props.speicherung}
+        rueckfrageTitel={props.rueckfrageTitel}
+      >
+        <Form.Item label="Ort" name="ort">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Melder" name="melder">
+          <Input />
+        </Form.Item>
+      </ErfassungsFormular>
+    );
+  }
+
+  /** Offene Rückfrage; antd schließt im jsdom animiert und hängt dann `ant-zoom-leave` an. */
+  const rueckfrage = () => {
+    const d = screen.queryByRole('dialog', { name: 'Eingaben verwerfen?' });
+    return d && !d.classList.contains('ant-zoom-leave') ? d : null;
+  };
+
+  it('ohne Änderung schließt Abbrechen sofort und still', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('mit Änderung fragt Abbrechen nach; „Weiter bearbeiten“ behält die Werte', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+
+    await nutzer.click(screen.getByRole('button', { name: 'Weiter bearbeiten' }));
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('„Verwerfen“ leert und meldet den Abbruch', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
+  it('nennt den Titel des Dialogs im Text der Rückfrage', async () => {
+    renderMitProviders(<RueckfrageHarness rueckfrageTitel="Vermisst melden" />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(
+      await screen.findByText('Die Eingaben in „Vermisst melden“ gehen verloren.'),
+    ).toBeInTheDocument();
+  });
+
+  it('der Fokus steht in der Rückfrage auf „Weiter bearbeiten“ und kehrt danach ins Feld zurück', async () => {
+    renderMitProviders(<RueckfrageHarness />);
+    const nutzer = userEvent.setup();
+    const melder = screen.getByLabelText('Melder');
+    await nutzer.type(melder, 'Florian');
+    await act(async () => {
+      fireEvent.keyDown(melder, { key: 'Escape' });
+    });
+
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+    await nutzer.click(weiter);
+    await waitFor(() => expect(document.activeElement).toBe(melder));
+  });
+
+  it('getippt und wieder gelöscht gilt als unverändert', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'x{Backspace}');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('setFieldsValue allein fragt nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const formRef: { current: FormInstance<Werte> | null } = { current: null };
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} formRef={formRef} />);
+    act(() => {
+      formRef.current!.setFieldsValue({ ort: 'Vorbelegt' });
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('nach einem Serien-Speichern mit „Werte behalten“ fragt Abbrechen nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <RueckfrageHarness
+        serie
+        uebernahme={['ort']}
+        onErfassen={onErfassen}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: /Speichern und nächste/ }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue('Brücke'));
+
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('Escape in der Rückfrage schließt nur die Rückfrage', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+    await waitFor(() => expect(document.activeElement).toBe(weiter));
+
+    await nutzer.keyboard('{Escape}');
+
+    await waitFor(() => expect(rueckfrage()).toBeNull());
+    // Keine zweite Rückfrage hinterher.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(rueckfrage()).toBeNull();
+    expect(screen.getByLabelText('Ort')).toHaveValue('Brücke');
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('der äußere Abbruch über steuerungRef fragt bei Änderung ebenso nach', async () => {
+    const onAbbrechen = vi.fn();
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    renderMitProviders(<RueckfrageHarness onAbbrechen={onAbbrechen} steuerungRef={steuerung} />);
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
+    expect(await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('während des Speicherns fragt und schließt der Abbruch nicht', async () => {
+    const onAbbrechen = vi.fn();
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    const speicherung: Speicherung = { isPending: true, error: null, reset: vi.fn() };
+    renderMitProviders(
+      <RueckfrageHarness
+        onAbbrechen={onAbbrechen}
+        steuerungRef={steuerung}
+        speicherung={speicherung}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
+    expect(rueckfrage()).toBeNull();
+    expect(onAbbrechen).not.toHaveBeenCalled();
   });
 });

@@ -16,7 +16,9 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { huelleHaptics } from '../huelle/faehigkeiten';
 import type { OfflineSchreibErgebnis } from '../offline/schreiben';
 import { FOKUSABSTAND_ERFASSUNG, useFokusabstandUnten } from './fokusabstandUnten';
+import { gleichFuerStand } from './aenderungsstand';
 import { SpeicherFehler } from './SpeicherHinweis';
+import { VerwerfenDialog } from './VerlassenRueckfrage';
 import { useViewport } from './useViewport';
 import './Erfassung.css';
 
@@ -231,6 +233,11 @@ interface ErfassungsFormularProps<T> {
    * ist als der Schirm (LLH-1274). Inline auf einer Seite klebt er nicht.
    */
   fussKlebt?: boolean;
+  /**
+   * Titel des umgebenden Dialogs; die Rückfrage vor dem Verwerfen nennt ihn („Die Eingaben in
+   * „Vermisst melden“ gehen verloren.“, LLH-1755). `ErfassungsModal` reicht seinen Titel.
+   */
+  rueckfrageTitel?: ReactNode;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -276,6 +283,7 @@ export function ErfassungsFormular<T extends object>({
   zusammenfassung,
   fussKlebt = false,
   nebenaktionen,
+  rueckfrageTitel,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -296,6 +304,17 @@ export function ErfassungsFormular<T extends object>({
   // Jeder Abbruch macht einen bereits laufenden Abschluss ungültig. Die Mutation
   // darf serverseitig zu Ende laufen, aber danach weder schließen noch navigieren.
   const abbruchGenerationRef = useRef(0);
+  /*
+   * Änderungsstand für die Rückfrage vor dem Verwerfen (LLH-1755): oberste Feldnamen, die die
+   * Person angefasst hat. `onValuesChange` ruft antd nur bei Bedienung, nie bei `setFieldsValue`;
+   * Vorbelegen allein fragt deshalb nicht. Jedes Zurücksetzen leert die Menge.
+   */
+  const touchedFieldsRef = useRef(new Set<string>());
+  const [rueckfrageOffen, setRueckfrageOffen] = useState(false);
+  const rueckfrageOffenRef = useRef(false);
+  const fokusVorRueckfrageRef = useRef<HTMLElement | null>(null);
+  const initialValuesRef = useRef(initialValues);
+  initialValuesRef.current = initialValues;
 
   /**
    * Der Fokus läuft über **Effekte, nicht über eine Zeitangabe**. Ein direkter `focus()` im
@@ -382,6 +401,7 @@ export function ErfassungsFormular<T extends object>({
         if (abbruchGenerationRef.current !== abbruchGeneration) return;
 
         setZaehler((n) => n + 1);
+        touchedFieldsRef.current.clear();
         if (!serienlauf) {
           form.resetFields();
           onFertig();
@@ -429,14 +449,57 @@ export function ErfassungsFormular<T extends object>({
     serienSpeichern();
   }
 
-  const abbrechen = useCallback(() => {
+  const verwerfen = useCallback(() => {
     if (sperrtAbbruchRef.current) return;
+    rueckfrageOffenRef.current = false;
+    setRueckfrageOffen(false);
     abbruchGenerationRef.current += 1;
     serienlaufRef.current = false;
+    touchedFieldsRef.current.clear();
     form.resetFields();
     raeumeSpeicherFehler();
     onAbbrechen?.();
   }, [form, onAbbrechen, raeumeSpeicherFehler]);
+
+  /** Weicht ein angefasstes Feld vom Startwert ab? (leer ≙ `null` ≙ nie gesetzt) */
+  const hasAenderungen = useCallback(() => {
+    const start = (initialValuesRef.current ?? {}) as Record<string, unknown>;
+    for (const name of touchedFieldsRef.current) {
+      if (!gleichFuerStand(form.getFieldValue(name), start[name])) return true;
+    }
+    return false;
+  }, [form]);
+
+  /**
+   * Der eine Abbruch aller Wege hinaus (Knopf, Escape, Kreuz über `steuerungRef`). Mit Änderung
+   * fragt er erst nach (LLH-1755); gesperrt während des Speicherns wie bisher.
+   */
+  const abbrechen = useCallback(() => {
+    if (sperrtAbbruchRef.current || rueckfrageOffenRef.current) return;
+    if (!hasAenderungen()) {
+      verwerfen();
+      return;
+    }
+    fokusVorRueckfrageRef.current =
+      document.activeElement instanceof HTMLElement &&
+      wurzel.current?.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+    rueckfrageOffenRef.current = true;
+    setRueckfrageOffen(true);
+  }, [hasAenderungen, verwerfen]);
+
+  const weiterBearbeiten = useCallback(() => {
+    rueckfrageOffenRef.current = false;
+    setRueckfrageOffen(false);
+    const ziel = fokusVorRueckfrageRef.current;
+    fokusVorRueckfrageRef.current = null;
+    // Nach dem Schließen der Rückfrage: antd gibt den Fokus sonst an seinen eigenen Auslöser.
+    requestAnimationFrame(() => {
+      if (ziel?.isConnected) ziel.focus();
+      else fokussiereErstesFeld(wurzel.current);
+    });
+  }, []);
 
   useImperativeHandle(steuerungRef, () => ({ abbrechen }), [abbrechen]);
 
@@ -462,6 +525,9 @@ export function ErfassungsFormular<T extends object>({
         layout="vertical"
         initialValues={initialValues}
         onFinish={abschicken}
+        onValuesChange={(geaendert: Partial<T>) => {
+          for (const name of Object.keys(geaendert)) touchedFieldsRef.current.add(name);
+        }}
         onFinishFailed={({ errorFields }) => {
           serienlaufRef.current = false;
           nebenaktionRef.current = undefined;
@@ -590,6 +656,12 @@ export function ErfassungsFormular<T extends object>({
           </div>
         </div>
       </Form>
+      <VerwerfenDialog
+        offen={rueckfrageOffen}
+        titel={rueckfrageTitel}
+        onWeiter={weiterBearbeiten}
+        onVerwerfen={verwerfen}
+      />
     </div>
   );
 }
