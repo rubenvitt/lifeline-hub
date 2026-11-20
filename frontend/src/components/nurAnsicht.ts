@@ -1,6 +1,6 @@
 import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
 import { istMitarbeit } from '../einsatz/schreibrecht';
-import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG, SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
+import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG } from '../einsatz/rollenVokabular';
 
 const LEITUNG = EINSATZ_ROLLE.einsatzleitung.name;
 const FUEHRUNG = EINSATZ_ROLLE.fuehrungspersonal.name;
