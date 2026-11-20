@@ -159,5 +159,5 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/e127jfu7zghh3h7z17tbbaw0
 
 - [x] **Step 1: Regel** einfügen (Wortlaut aus dem Design-Doc, „Regeln, die sich ändern“): eigenes `<Modal>` mit gesteuerten Feldern → `useVerwerfenSchutz`; reiner Auswahldialog → nur Maskensperre; Wächter `components/dialogEingabe.guard.test.ts`.
 - [x] **Step 2:** `grep -rn "Erfassungs-Norm\|Eingaben verwerfen" frontend/scripts/design-system docs/anwender | head`; trägt die README den Abschnitt, `mise exec -- pnpm -C frontend design-system` und Ergebnis mitcommitten. Anwenderdoku nur, wenn LLH-1755 dort Maske/Rückfrage beschreibt.
-- [ ] **Step 3: Gates:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün (Prettier, Lint, Typecheck, Vitest der berührten Suiten).
+- [x] **Step 3: Gates:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün (Prettier, Lint, Typecheck, Vitest der berührten Suiten).
 - [x] **Step 4: Commit** `docs: Erfassungs-Norm nennt den Schutz handgebauter Dialoge (LLH-2010)`.
