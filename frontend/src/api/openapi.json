@@ -14008,6 +14008,7 @@
           "einsatz",
           "mitglieder",
           "benachrichtigung",
+          "praesenz",
           "lagged"
         ]
       },
@@ -18314,6 +18315,76 @@
           "uhs",
           "pause"
         ]
+      },
+      "PraesenzEintrag": {
+        "type": "object",
+        "description": "Ein Fenster, das gerade Angaben eines Objekts bearbeitet.",
+        "required": [
+          "objekt",
+          "felder",
+          "benutzer_id",
+          "von",
+          "fenster"
+        ],
+        "properties": {
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "felder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fenster": {
+            "type": "string",
+            "description": "Zufällige Kennung des Tabs."
+          },
+          "objekt": {
+            "$ref": "#/components/schemas/PraesenzObjekt"
+          },
+          "von": {
+            "type": "string",
+            "description": "Anzeigename, wie `FeldVermerk.von`."
+          }
+        }
+      },
+      "PraesenzObjekt": {
+        "type": "string",
+        "description": "Wessen Angabe bearbeitet wird; dieselben Werte wie `objekt_art` des Änderungsvermerks.",
+        "enum": [
+          "einsatz",
+          "einheit",
+          "fuehrungsstelle"
+        ]
+      },
+      "PraesenzStand": {
+        "type": "object",
+        "description": "Der ganze Präsenzstand eines Einsatzes; Daten des Ereignisses `praesenz`.",
+        "required": [
+          "einsatz_id",
+          "eintraege"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PraesenzEintrag"
+            }
+          }
+        }
       },
       "Prioritaet": {
         "type": "string",

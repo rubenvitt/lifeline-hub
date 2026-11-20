@@ -1589,7 +1589,9 @@ und `pages/personen/`.
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.** Einzige Ausnahme ist die Alarmzone (LLH-1735, Entscheidung Ruben 15.11.2026):
   ein Alarm schiebt den Inhalt um seine Zeile, statt ihn zu verdecken; CLS-Messungen laufen ohne
-  anstehenden Alarm.
+  anstehenden Alarm. Zweite Ausnahme ist der Präsenzhinweis (LLH-1946, Entscheidung Ruben
+  19.11.2026): er ersetzt die Vermerkzeile, und nur an einer Angabe ohne Vermerk kommt eine Zeile
+  dazu.
 - **Ein Eingang ist Information, kein Alarm** (LLH-1062, LLH-1143, Spec `benachrichtigungen`,
   „Eingangshinweis“): alle Eingänge eines Einsatzes (Stufe `hinweis`) stehen gebündelt im
   Eingangsband **unten** (`alarm/Eingangsband.tsx`, `alarm/useEingangshinweis.tsx`), nie in der
@@ -1825,6 +1827,9 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   öffnet die Betriebszeile `/api/live` (`live/useOrgLiveStream.ts`), der ruht, solange ein
   Einsatz-Strom offen ist (`live/einsatzStromStore.ts`). Verbindungsbau nur über
   `live/liveVerbindung.ts`, keine zweite `EventSource`.
+- **Präsenz ist kein Cache** (LLH-1946, ADR-0074): das Ereignis `praesenz` füllt den Store in
+  `live/praesenz.ts` (kein Query-Key, nicht über den Sammler), gelesen über `usePraesenzAnderer`.
+  Gemeldet wird nur über die Prop `praesenz` an `InlineAngabe`, nie aus einer Seite selbst.
 - **Live-Ereignisse invalidieren nur über den Sammler** `live/liveInvalidierung.ts` (LFH-922,
   Spec `live-abgleich`): je Key ein Abgleich je 300-ms-Fenster, `cancelRefetch: false`, verdeckte
   Tabs markieren nur. `modulZaehler` läuft über einen zweiten Sammler mit 1-s-Fenster

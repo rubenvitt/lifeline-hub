@@ -1,4 +1,5 @@
 pub mod org;
+pub mod praesenz;
 pub mod strom;
 
 use crate::wire_enum::wire_enum;
@@ -62,6 +63,9 @@ wire_enum! {
         /// Benachrichtigungen eines `melden`-Aufrufs (LLH-1207, design.md D2): EINE Nachricht im
         /// Ring, je Verbindung nur mit der Nutzlast ihres Nutzers ([`LiveNachricht::empfaenger`]).
         Benachrichtigung => "benachrichtigung",
+        /// Wer gerade welche Einzelangabe bearbeitet (LLH-1946): der ganze sichtbare Stand eines
+        /// Einsatzes, am Ring vorbei und ohne `id:` (`praesenz`, `routes::live`).
+        Praesenz => "praesenz",
         Lagged => "lagged",
     }
 }
@@ -211,6 +215,12 @@ impl LiveEvent {
             // Empfänger niemanden ([`LiveEvent::braucht_empfaenger`]). Das Modulrecht am Bezug
             // prüft die Empfängerauflösung (`benachrichtigung::aufloesung`), nicht dieses Gate.
             LiveEvent::Benachrichtigung => &[],
+            // Präsenz (LLH-1946, Entwurf D2): ungegatet als Variante, weil das Gate je EINTRAG
+            // greift. Jeder Eintrag teilt das Gate seines Bezugsereignisses
+            // (`praesenz::PraesenzObjekt::bezug`: Einsatz und Führungsstelle wie `einsatz`, eine
+            // Einheit wie `einheit`); `PraesenzStand::fuer` filtert je Verbindung. Läuft nie durch
+            // den Ring, nur über den eigenen Präsenz-Broadcast.
+            LiveEvent::Praesenz => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
             LiveEvent::Lagged => &[],
@@ -406,6 +416,10 @@ pub struct LiveHub {
     /// ([`Self::web_push_einrichten`]). Hier, weil jede Benachrichtigung über den Hub zugestellt
     /// wird und `benachrichtigung::melden` sonst an jedem Aufrufer einen Parameter mehr bräuchte.
     web_push: Arc<std::sync::OnceLock<crate::web_push::WebPush>>,
+    /// Wer gerade welche Angabe bearbeitet (LLH-1946, Entwurf D3): nur im Speicher.
+    praesenz: Arc<praesenz::PraesenzSpeicher>,
+    /// Geänderte Präsenzstände, am Replay-Ring vorbei (Entwurf D2): ohne Id, ohne Nachlieferung.
+    praesenz_tx: broadcast::Sender<praesenz::PraesenzStand>,
 }
 
 impl Default for LiveHub {
@@ -474,6 +488,7 @@ impl LiveHub {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
+        let praesenz_tx = broadcast::channel(256).0;
         Self {
             kanaele: Arc::new(RwLock::new(Kanaele::default())),
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
@@ -482,7 +497,53 @@ impl LiveHub {
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
             web_push: Arc::default(),
+            praesenz: Arc::new(praesenz::PraesenzSpeicher::mit_melden(praesenz_tx.clone())),
+            praesenz_tx,
         }
+    }
+
+    /// Beginnt oder verlängert die Präsenz eines Fensters (LLH-1946) und verteilt den Stand,
+    /// wenn er sich geändert hat — auch den eines anderen Einsatzes, den das Fenster verlassen hat.
+    pub fn praesenz_setzen(
+        &self,
+        einsatz_id: i64,
+        eintrag: praesenz::PraesenzEintrag,
+    ) -> Result<(), crate::error::AppError> {
+        self.praesenz
+            .setze_mit_vorgaenger(einsatz_id, eintrag, Instant::now())?;
+        Ok(())
+    }
+
+    /// Beendet die Präsenz eines Fensters in diesem Einsatz; verteilt nur, wenn es eine gab.
+    pub fn praesenz_entfernen(&self, einsatz_id: i64, meldung: &praesenz::PraesenzEintrag) {
+        self.praesenz.entferne(einsatz_id, meldung);
+    }
+
+    /// Der ungefilterte Präsenzstand eines Einsatzes (für den Stand beim Verbinden).
+    pub fn praesenz_stand(&self, einsatz_id: i64) -> praesenz::PraesenzStand {
+        self.praesenz.stand(einsatz_id)
+    }
+
+    /// Abonniert geänderte Präsenzstände aller Einsätze; gefiltert wird beim Abonnenten.
+    pub fn abonniere_praesenz(&self) -> broadcast::Receiver<praesenz::PraesenzStand> {
+        self.praesenz_tx.subscribe()
+    }
+
+    /// Entfernt Abgelaufenes und verteilt die betroffenen Stände.
+    pub fn praesenz_raeumen(&self, jetzt: Instant) {
+        self.praesenz.raeume(jetzt);
+    }
+
+    /// Startet den Aufräumtakt der Präsenz (nur im Server-Lauf, wie [`Self::starte_kanal_sweep`]).
+    pub fn starte_praesenz_sweep(&self) {
+        let hub = self.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(praesenz::PRAESENZ_RAEUM_TAKT);
+            loop {
+                ticker.tick().await;
+                hub.praesenz_raeumen(Instant::now());
+            }
+        });
     }
 
     /// Richtet Web Push für diesen Hub ein (LLH-1223, nur beim Start mit `--web-push`). Ein
@@ -949,7 +1010,13 @@ mod tests {
         ungegatet.sort_unstable();
         assert_eq!(
             ungegatet,
-            vec!["benachrichtigung", "einsatz", "lagged", "mitglieder"]
+            vec![
+                "benachrichtigung",
+                "einsatz",
+                "lagged",
+                "mitglieder",
+                "praesenz"
+            ]
         );
         let mit_empfaengern: Vec<&str> = LiveEvent::ALLE
             .iter()
@@ -1095,6 +1162,8 @@ mod tests {
             (LiveEvent::Mitglieder, &[]),
             // Empfängerfilter statt Modul-Gate (LLH-1207, Begründung an der Variante).
             (LiveEvent::Benachrichtigung, &[]),
+            // Gate je Eintrag über das Bezugsereignis (LLH-1946, Begründung an der Variante).
+            (LiveEvent::Praesenz, &[]),
             (LiveEvent::Lagged, &[]),
         ];
         for (ev, keys) in erwartet {

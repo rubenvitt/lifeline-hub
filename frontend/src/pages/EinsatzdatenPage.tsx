@@ -61,6 +61,7 @@ import {
   vermerkFuer,
 } from '../components/feldVermerk';
 import { PaneelVermerk, VermerkZeile } from '../components/FeldVermerkAnzeige';
+import type { PraesenzSchluessel } from '../live/praesenz';
 import {
   alsEingabe as alsVerbindungsEingabe,
   bereinigeVerbindungen,
@@ -136,6 +137,15 @@ export function gleicherZeitpunkt(a: Dayjs | null, b: Dayjs | null): boolean {
 }
 
 /** Leer ist ein Text, der nach dem Trimmen nichts übrig lässt — wie `leerZuNull` beim Senden. */
+/** Präsenzschlüssel einer Angabe von Einsatzkopf oder Führungsstelle (LLH-1946). */
+function praesenzVon(
+  einsatzId: number,
+  objekt: 'einsatz' | 'fuehrungsstelle',
+  ...felder: string[]
+): PraesenzSchluessel {
+  return { einsatzId, objekt, felder };
+}
+
 function leererText(w: string): boolean {
   return w.trim() === '';
 }
@@ -166,9 +176,12 @@ function TextAngabe({
   speichern,
   zuPatch,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   etikett: string;
   wert: string | null | undefined;
   darfSchreiben: boolean;
@@ -183,6 +196,7 @@ function TextAngabe({
   return (
     <InlineAngabe<string>
       vermerk={vermerk}
+      praesenz={praesenz}
       etikett={etikett}
       wert={text}
       anzeige={mono ? <span style={monoStil('mono')}>{text}</span> : text}
@@ -222,9 +236,12 @@ function ZeitpunktAngabe({
   speichern,
   zuPatch,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   etikett: string;
   wire: string | null | undefined;
   pflicht?: boolean;
@@ -235,6 +252,7 @@ function ZeitpunktAngabe({
   return (
     <InlineAngabe<Dayjs | null>
       vermerk={vermerk}
+      praesenz={praesenz}
       etikett={etikett}
       wert={alsZeitpunkt(wire) ?? null}
       anzeige={wire ? <ZeitAnzeige wert={wire} rolle="zeitpunkt" /> : null}
@@ -284,9 +302,12 @@ function KoordinatenAngabe({
   darfSchreiben,
   speichern,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   einsatzId: number;
   lat: number | null | undefined;
   lon: number | null | undefined;
@@ -297,6 +318,7 @@ function KoordinatenAngabe({
   return (
     <InlineAngabe<KoordinatenWert>
       vermerk={vermerk}
+      praesenz={praesenz}
       etikett="Koordinate"
       wert={wert}
       anzeige={
@@ -367,12 +389,15 @@ function KopfAngabe({
   wert,
   mono,
   vermerk,
+  praesenz,
 }: {
   etikett: string;
   wert: ReactNode;
   mono?: boolean;
   /** Wer die Angabe zuletzt geändert hat (LLH-1834), leise unter dem Wert. */
   vermerk?: FeldVermerk;
+  /** Präsenz (LLH-1946): solange jemand anderes bearbeitet, weicht der Vermerk dem Hinweis. */
+  praesenz?: PraesenzSchluessel;
 }) {
   const { token, rollen } = useRollen();
   return (
@@ -396,7 +421,7 @@ function KopfAngabe({
       >
         {wert}
       </div>
-      <VermerkZeile vermerk={vermerk} />
+      <VermerkZeile vermerk={vermerk} praesenz={praesenz} />
     </div>
   );
 }
@@ -411,13 +436,19 @@ function Angaben({
   zeilen,
 }: {
   /** `vermerk`: wer die Angabe zuletzt geändert hat (LLH-1834), leise unter dem Wert. */
-  zeilen: { etikett: string; wert: ReactNode; vermerk?: FeldVermerk }[];
+  zeilen: {
+    etikett: string;
+    wert: ReactNode;
+    vermerk?: FeldVermerk;
+    /** Präsenz (LLH-1946): solange jemand anderes bearbeitet, weicht der Vermerk dem Hinweis. */
+    praesenz?: PraesenzSchluessel;
+  }[];
 }) {
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
   return (
     <dl style={{ margin: 0 }}>
-      {zeilen.map(({ etikett, wert, vermerk }) => (
+      {zeilen.map(({ etikett, wert, vermerk, praesenz }) => (
         <div
           key={etikett}
           style={{
@@ -431,7 +462,7 @@ function Angaben({
           <Augenbraue als="dt">{etikett}</Augenbraue>
           <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>
             {wert}
-            <VermerkZeile vermerk={vermerk} />
+            <VermerkZeile vermerk={vermerk} praesenz={praesenz} />
           </dd>
         </div>
       ))}
@@ -622,9 +653,17 @@ function EinsatzortPaneel({
             {
               etikett: 'Adresse',
               vermerk: einsatz.vermerke?.einsatzort,
+              praesenz: praesenzVon(einsatz.id, 'einsatz', 'einsatzort'),
               wert: (
                 <InlineAngabe<OrtsfeldWert>
                   vermerk={einsatz.vermerke?.einsatzort}
+
+                  praesenz={praesenzVon(
+                    einsatz.id,
+                    'einsatz',
+                    'einsatzort',
+                    'einsatzort_koordinate',
+                  )}
                   etikett="Adresse"
                   // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
                   // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
@@ -696,9 +735,12 @@ function EinsatzortPaneel({
             {
               etikett: 'Koordinate',
               vermerk: einsatz.vermerke?.einsatzort_koordinate,
+              praesenz: praesenzVon(einsatz.id, 'einsatz', 'einsatzort_koordinate'),
               wert: (
                 <KoordinatenAngabe
                   vermerk={einsatz.vermerke?.einsatzort_koordinate}
+
+                  praesenz={praesenzVon(einsatz.id, 'einsatz', 'einsatzort_koordinate')}
                   einsatzId={einsatzId}
                   lat={einsatz.einsatzort_lat}
                   lon={einsatz.einsatzort_lon}
@@ -863,6 +905,7 @@ function FuehrungsstellePaneel({
     <InlineAngabe<string>
       etikett={etikett}
       vermerk={fs?.vermerke?.[schluessel]}
+      praesenz={praesenzVon(einsatzId, 'fuehrungsstelle', schluessel)}
       wert={wert ?? ''}
       anzeige={wert}
       leer={leererText}
@@ -905,9 +948,11 @@ function FuehrungsstellePaneel({
                 {
                   etikett: 'Einsatzleiter',
                   vermerk: fs.vermerke?.einsatzleiter,
+                  praesenz: praesenzVon(einsatzId, 'fuehrungsstelle', 'einsatzleiter'),
                   wert: (
                     <EinsatzleiterAngabe
                       vermerk={fs.vermerke?.einsatzleiter}
+                      praesenz={praesenzVon(einsatzId, 'fuehrungsstelle', 'einsatzleiter')}
                       einsatzId={einsatzId}
                       fs={fs}
                       darfSchreiben={darfSchreiben}
@@ -933,6 +978,7 @@ function FuehrungsstellePaneel({
                 {
                   etikett: 'Bezeichnung',
                   vermerk: fs.vermerke?.bezeichnung,
+                  praesenz: praesenzVon(einsatzId, 'fuehrungsstelle', 'bezeichnung'),
                   wert: text(
                     'Bezeichnung',
                     fs.bezeichnung,
@@ -946,12 +992,24 @@ function FuehrungsstellePaneel({
                     'standort_adresse',
                     'standort_koordinate',
                   ]),
+                  praesenz: praesenzVon(
+                    einsatzId,
+                    'fuehrungsstelle',
+                    'standort_adresse',
+                    'standort_koordinate',
+                  ),
                   wert: (
                     <StandortAngabe
                       vermerk={juengsterVermerk(fs.vermerke, [
                         'standort_adresse',
                         'standort_koordinate',
                       ])}
+                      praesenz={praesenzVon(
+                        einsatzId,
+                        'fuehrungsstelle',
+                        'standort_adresse',
+                        'standort_koordinate',
+                      )}
                       fs={fs}
                       einsatz={einsatz}
                       darfSchreiben={darfSchreiben}
@@ -962,9 +1020,11 @@ function FuehrungsstellePaneel({
                 {
                   etikett: 'Rufname',
                   vermerk: fs.vermerke?.rufname,
+                  praesenz: praesenzVon(einsatzId, 'fuehrungsstelle', 'rufname'),
                   wert: (
                     <RufnameAngabe
                       vermerk={fs.vermerke?.rufname}
+                      praesenz={praesenzVon(einsatzId, 'fuehrungsstelle', 'rufname')}
                       rufname={fs.rufname}
                       fahrzeugIds={fs.fahrzeug_ids}
                       quelle={fahrzeugQuelle}
@@ -1106,9 +1166,12 @@ function StandortAngabe({
   darfSchreiben,
   onSpeichern,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   fs: Fuehrungsstelle;
   einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
@@ -1130,6 +1193,7 @@ function StandortAngabe({
   return (
     <InlineAngabe<StandortEntwurf>
       vermerk={vermerk}
+      praesenz={praesenz}
       etikett="Standort"
       wert={{ adresse: fs.standort_adresse ?? '', koord }}
       anzeige={
@@ -1228,9 +1292,12 @@ function RufnameAngabe({
   darfSchreiben,
   onSpeichern,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   rufname: string | null | undefined;
   fahrzeugIds: readonly number[];
   quelle: ReturnType<typeof useFahrzeugeQuelle>;
@@ -1240,6 +1307,7 @@ function RufnameAngabe({
   return (
     <InlineAngabe<string>
       vermerk={vermerk}
+      praesenz={praesenz}
       etikett="Rufname"
       wert={rufname ?? ''}
       anzeige={<span style={monoStil('mono')}>{rufname}</span>}
@@ -1547,10 +1615,14 @@ export default function EinsatzdatenPage() {
         <KopfAngabe
           etikett="Einsatzstichwort"
           vermerk={einsatz.vermerke?.stichwort}
+
+          praesenz={praesenzVon(einsatz.id, 'einsatz', 'stichwort')}
           wert={
             <InlineAngabe<string>
               etikett="Einsatzstichwort"
               vermerk={einsatz.vermerke?.stichwort}
+
+              praesenz={praesenzVon(einsatz.id, 'einsatz', 'stichwort')}
               wert={einsatz.stichwort ?? ''}
               anzeige={einsatz.stichwort}
               leer={leererText}
@@ -1580,11 +1652,15 @@ export default function EinsatzdatenPage() {
         <KopfAngabe
           etikett="Alarmzeit"
           vermerk={einsatz.vermerke?.begonnen_at}
+
+          praesenz={praesenzVon(einsatz.id, 'einsatz', 'begonnen_at')}
           mono
           wert={
             <ZeitpunktAngabe
               etikett="Alarmzeit"
               vermerk={einsatz.vermerke?.begonnen_at}
+
+              praesenz={praesenzVon(einsatz.id, 'einsatz', 'begonnen_at')}
               wire={einsatz.begonnen_at}
               pflicht
               darfSchreiben={darfBearbeiten}
@@ -1638,10 +1714,13 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Bezeichnung',
                 vermerk: einsatz.vermerke?.bezeichnung,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'bezeichnung'),
                 wert: (
                   <TextAngabe
                     etikett="Bezeichnung"
                     vermerk={einsatz.vermerke?.bezeichnung}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'bezeichnung')}
                     wert={einsatz.bezeichnung}
                     pflicht
                     darfSchreiben={darfBearbeiten}
@@ -1654,10 +1733,13 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Einsatzart',
                 vermerk: einsatz.vermerke?.einsatzart,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'einsatzart'),
                 wert: (
                   <InlineAngabe<Einsatzart>
                     etikett="Einsatzart"
                     vermerk={einsatz.vermerke?.einsatzart}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'einsatzart')}
                     wert={einsatz.einsatzart}
                     anzeige={EINSATZART_LABELS[einsatz.einsatzart]}
                     // Pflicht, aber ein `Select` ohne `allowClear` kann nicht leer werden.
@@ -1685,10 +1767,13 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Leitstellen-Nr.',
                 vermerk: einsatz.vermerke?.leitstellen_nr,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'leitstellen_nr'),
                 wert: (
                   <TextAngabe
                     etikett="Leitstellen-Nr."
                     vermerk={einsatz.vermerke?.leitstellen_nr}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'leitstellen_nr')}
                     wert={einsatz.leitstellen_nr}
                     mono
                     darfSchreiben={darfBearbeiten}
@@ -1735,12 +1820,15 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Meldende Stelle',
                 vermerk: einsatz.vermerke?.meldende_stelle,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'meldende_stelle'),
                 // Vorschläge aus dem Katalog „Externe Stellen“ (LFH-1194); gespeichert wird nur
                 // der Text (Speicherform A), Freitext bleibt.
                 wert: (
                   <InlineAngabe<string>
                     etikett="Meldende Stelle"
                     vermerk={einsatz.vermerke?.meldende_stelle}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'meldende_stelle')}
                     wert={einsatz.meldende_stelle ?? ''}
                     anzeige={einsatz.meldende_stelle}
                     leer={leererText}
@@ -1772,10 +1860,13 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Sachverhalt / Meldebild',
                 vermerk: einsatz.vermerke?.sachverhalt,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'sachverhalt'),
                 wert: (
                   <TextAngabe
                     etikett="Sachverhalt / Meldebild"
                     vermerk={einsatz.vermerke?.sachverhalt}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'sachverhalt')}
                     wert={einsatz.sachverhalt}
                     mehrzeilig
                     darfSchreiben={darfBearbeiten}
@@ -1787,10 +1878,13 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Anzahl Betroffene (initial)',
                 vermerk: einsatz.vermerke?.anzahl_betroffene_initial,
+                praesenz: praesenzVon(einsatz.id, 'einsatz', 'anzahl_betroffene_initial'),
                 wert: (
                   <InlineAngabe<number | null>
                     etikett="Anzahl Betroffene (initial)"
                     vermerk={einsatz.vermerke?.anzahl_betroffene_initial}
+
+                    praesenz={praesenzVon(einsatz.id, 'einsatz', 'anzahl_betroffene_initial')}
                     wert={einsatz.anzahl_betroffene_initial ?? null}
                     anzeige={
                       <span style={monoStil('mono')}>{einsatz.anzahl_betroffene_initial}</span>

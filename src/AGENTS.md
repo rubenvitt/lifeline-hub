@@ -752,6 +752,20 @@ Herleitung: `docs/superpowers/specs/2026-11-19-ywhuzag7-etb-system-live-verteile
 - **Ein neuer Scheduler-Lauf, der ETB schreibt, kommt unter die Klammer** (`nachlauf::klammer`).
   Was in einem per `tokio::spawn` gestarteten Task geschieht, sieht der Wächter nicht.
 
+## Backend — Präsenz an Einzelangaben (LLH-1946)
+
+Herleitung: `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`, ADR-0074;
+`src/live/praesenz.rs`, `src/routes/praesenz.rs`.
+- **Flüchtiger Zustand geht am Replay-Ring vorbei**: Präsenz lebt nur im Speicher des `LiveHub`
+  (Ablauf 45 s) und läuft als eigener Teilstrom ohne `id:` in den Einsatzstrom, nie über
+  `publiziere_*`. Ein Verbindungsaufbau bekommt den Stand nur, wenn er etwas zeigt; der Client
+  leert seinen Stand bei jedem Öffnen (`live/useEinsatzLiveStream.ts`).
+- **Gate je Eintrag über das Bezugsereignis** (`PraesenzObjekt::bezug`), nicht über
+  `LiveEvent::Praesenz` (dessen Gate-Menge ist leer). Ein neues Objekt bekommt ein Bezugsereignis,
+  das genau so offen ist wie das Objekt selbst, und seine feste Feldliste (`felder`).
+- **Nie an Geräte, nie in den Org-Strom.** Die Meldewege tragen das Gate des PATCH daneben und
+  stehen in keiner Routenliste einer Funktionsansicht.
+
 ## Backend — Benachrichtigungen (LLH-1207)
 
 Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonzept/design.md`

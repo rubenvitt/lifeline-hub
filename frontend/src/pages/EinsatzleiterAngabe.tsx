@@ -26,6 +26,7 @@ import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzl
 import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { personLabel } from '../kraefte/einsatzfunktionKern';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import type { PraesenzSchluessel } from '../live/praesenz';
 
 /**
  * Zeile „Einsatzleiter“ der eigenen Führungsstelle (LFH-1199): eine disponierte Person oder ein
@@ -117,9 +118,12 @@ export default function EinsatzleiterAngabe({
   darfSchreiben,
   onSpeichern,
   vermerk,
+  praesenz,
 }: {
   /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
+  /** Präsenz an dieser Angabe (LLH-1946). */
+  praesenz?: PraesenzSchluessel;
   einsatzId: number;
   fs: Fuehrungsstelle;
   darfSchreiben: boolean;
@@ -166,6 +170,7 @@ export default function EinsatzleiterAngabe({
     <InlineAngabe<Wahl>
       etikett="Einsatzleiter"
       vermerk={vermerk}
+      praesenz={praesenz}
       wert={gespeichert}
       anzeige={
         d.art === 'erfasst' ? (

@@ -1624,6 +1624,7 @@ fn live_event_wire() {
         Einsatz => "einsatz",
         Mitglieder => "mitglieder",
         Benachrichtigung => "benachrichtigung",
+        Praesenz => "praesenz",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }
@@ -2152,5 +2153,15 @@ fn lagebild_extern_wire() {
         ZwoelfStunden => "12h",
         VierundzwanzigStunden => "24h",
         Einsatzende => "einsatzende",
+    });
+}
+
+/// Präsenz an Einzelangaben (LLH-1946): dieselben Werte wie `objekt_art` des Änderungsvermerks.
+#[test]
+fn praesenz_objekt_wire() {
+    enum_wire!(lifeline_hub::live::praesenz::PraesenzObjekt {
+        Einsatz => "einsatz",
+        Einheit => "einheit",
+        Fuehrungsstelle => "fuehrungsstelle",
     });
 }
