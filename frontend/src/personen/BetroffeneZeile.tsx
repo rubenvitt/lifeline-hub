@@ -1,5 +1,13 @@
 import { Button, Input, type InputRef } from 'antd';
-import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import type { Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
@@ -261,7 +269,7 @@ export default function BetroffeneZeile({
     fontSize: schriftskala.text.groesse,
     color: rollen.text,
   } as const;
-  const legendeStil =
+  const legendeStil: CSSProperties =
     legendeLage === 'vorleser'
       ? NUR_VORLESER
       : legendeLage === 'fluss'
