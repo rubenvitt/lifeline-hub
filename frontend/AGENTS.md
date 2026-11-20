@@ -1425,7 +1425,9 @@ anwendbar), „nicht geprüft" ist keins.
 - **Knopfreihen über `Knopfreihe`** (LLH-1973, ADR-0070): zwei oder mehr Knöpfe nebeneinander
   stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
   bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
-  rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
+  rechtsbündig, darunter untereinander in voller Breite). Im `ErfassungsModal` unter `md` klebt nur der Abschluss
+  (Primärknopf, Nebenaktionen, Zusammenfassung); „Abbrechen“ steht dort als Text im Schließknopf des
+  Kopfs, Einstellungszeile und „Speichern und nächste“ am Formularende (LLH-1763). Primär steht im Kopf, im Paneel und in
   der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
   Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
   Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
@@ -1679,6 +1681,12 @@ Spec `bedien-arbeitsplatz`).
   prüfen: kein `.ant-modal-footer` **und** `knopf.closest('form')` ≠ `null`
   (`components/Erfassung.test.tsx`).
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern (`requestAnimationFrame`).
+- **Am Handy klebt im Dialog nur der Abschluss** (LLH-1763, Entwurf
+  `docs/superpowers/specs/2026-11-20-zpnrt6qz-handy-dialog-fuss-design.md`): unter `md` trägt das
+  `ErfassungsModal` „Abbrechen“ statt des Kreuzes im Kopf (derselbe Schließweg, dieselbe Sperre),
+  klebend nur Primärknopf, Nebenaktionen und Zusammenfassung; „Werte behalten“ und „Speichern und
+  nächste“ stehen nicht klebend am Formularende (`data-lfh="erfassung-serie"`). Ein Abschluss mit
+  Wirkung im Einsatz („RTW nötig“) ist Nebenaktion, nie Serienteil.
 - **Zurückgesetzt wird auf JEDEM Weg hinaus** (Erfassen, Abbrechen, Kreuz, Escape, Maske); der
   Aufrufer ruft kein `resetFields()`; Vorbelegen zum Bearbeiten (`setFieldsValue`) ist kein Reset. **`destroyOnHidden` setzt rc-field-form nicht zurück.**
 - **`onErfassen` lehnt bei Ablehnung ab** (`mutateAsync`); die Felder bleiben stehen.

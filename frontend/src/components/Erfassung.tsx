@@ -69,6 +69,12 @@ import './Erfassung.css';
  * höher ist als der Schirm, und der Dialogkopf hält das 72-px-Schließkreuz des Handschuhs vom
  * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht.
  *
+ * **Am Handy klebt im Dialog nur der Abschluss** (LLH-1763): der Primärknopf, die Nebenaktionen
+ * (gleichrangige Abschlüsse wie „RTW nötig“) und die Zusammenfassung. Gestapelt fraß der Fuß der
+ * Serie 271 von 844 px. „Abbrechen“ steht dort im Kopf, als Text im Schließknopf
+ * (`abbrechenImKopf`); die Einstellungszeile und „Speichern und nächste“ stehen am Formularende
+ * (`erfassung-serie`), nicht klebend. Ab `md` und inline gilt das obige unverändert.
+ *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
  * durchreicht. Der Riegel gegen doppeltes Absenden sitzt in `abschicken` (`sendetRef`): ein
@@ -282,6 +288,8 @@ export function ErfassungsFormular<T extends object>({
   const fussRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const zusammenfassungId = useId();
   const { istSchmal } = useViewport();
+  // Im Dialog unter `md` steht „Abbrechen“ im Kopf, klebend nur der Abschluss (LLH-1763).
+  const abbruchImKopf = fussKlebt && istSchmal;
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
@@ -452,6 +460,47 @@ export function ErfassungsFormular<T extends object>({
     },
   });
 
+  // EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
+  // IMMER, weil sie die Ansage-Region trägt: eine `aria-live`-Region meldet nur Änderungen an
+  // bereits vorhandenem Inhalt, sonst bliebe die erste Speicherung unangesagt.
+  const einstellung = serie && (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: token.marginXS,
+        flexWrap: 'wrap',
+        // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 8 / 12 / 16 px.
+        marginBottom: token.marginSM,
+      }}
+    >
+      {uebernahme != null && uebernahme.length > 0 && (
+        <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
+          <Typography.Text type="secondary">Werte behalten</Typography.Text>
+        </Checkbox>
+      )}
+      <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
+        {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+      </Typography.Text>
+    </div>
+  );
+
+  const serienKnopf = serie && (
+    // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
+    // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
+    // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
+    <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
+      Speichern und nächste
+      <span
+        aria-hidden
+        className={SERIEN_KUERZEL_KLASSE}
+        style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
+      >
+        {SERIEN_KUERZEL}
+      </span>
+    </Button>
+  );
+
   return (
     <div ref={wurzel} onKeyDown={aufTaste}>
       {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`: scheitert die Prüfung, läuft
@@ -476,6 +525,16 @@ export function ErfassungsFormular<T extends object>({
             fallback={speicherFehlerFallback}
           />
         )}
+        {/* Unter `md` im Dialog stehen Einstellung und Serienknopf am Formularende, nicht klebend:
+            klebend bleibt nur der Abschluss (LLH-1763, siehe Dateikopf). */}
+        {abbruchImKopf && serie && (
+          <div data-lfh="erfassung-serie" style={{ marginTop: token.margin }}>
+            {einstellung}
+            <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
+              <Knopfreihe fuss>{serienKnopf}</Knopfreihe>
+            </ConfigProvider>
+          </div>
+        )}
         <div
           ref={fussKlebt ? fussRef : undefined}
           data-lfh={fussKlebt ? 'erfassung-fuss' : undefined}
@@ -486,30 +545,7 @@ export function ErfassungsFormular<T extends object>({
             ...(fussKlebt ? klebenderFuss(token) : undefined),
           }}
         >
-          {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
-              IMMER, weil sie die Ansage-Region trägt: eine `aria-live`-Region meldet nur Änderungen an
-              bereits vorhandenem Inhalt, sonst bliebe die erste Speicherung unangesagt. */}
-          {serie && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: token.marginXS,
-                flexWrap: 'wrap',
-                // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 8 / 12 / 16 px.
-                marginBottom: token.marginSM,
-              }}
-            >
-              {uebernahme != null && uebernahme.length > 0 && (
-                <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
-                  <Typography.Text type="secondary">Werte behalten</Typography.Text>
-                </Checkbox>
-              )}
-              <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
-                {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
-              </Typography.Text>
-            </div>
-          )}
+          {!abbruchImKopf && einstellung}
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
               `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
           <div
@@ -536,26 +572,12 @@ export function ErfassungsFormular<T extends object>({
             )}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
               <Knopfreihe fuss>
-                {onAbbrechen && (
+                {onAbbrechen && !abbruchImKopf && (
                   <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                     Abbrechen
                   </Button>
                 )}
-                {serie && (
-                  // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
-                  // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
-                  // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
-                  <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
-                    Speichern und nächste
-                    <span
-                      aria-hidden
-                      className={SERIEN_KUERZEL_KLASSE}
-                      style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
-                    >
-                      {SERIEN_KUERZEL}
-                    </span>
-                  </Button>
-                )}
+                {!abbruchImKopf && serienKnopf}
                 {nebenaktionen?.map((a) => (
                   // htmlType="button" wie „Speichern und nächste“: der Klick setzt erst die Aktion,
                   // dann prüft und sendet `form.submit()`.
@@ -629,6 +651,37 @@ function klebenderFuss(token: GlobalToken) {
   } as const;
 }
 
+/**
+ * Unter `md` trägt der Kopf „Abbrechen“ statt des Schließkreuzes (LLH-1763): es ist antds
+ * Schließknopf selbst, nur mit Text. So bleibt es derselbe Ausweg wie Kreuz, Maske und Escape
+ * (`onCancel` → `schliessen`), dieselbe Sperre beim Speichern und dieselbe Lage im Kopf, deren
+ * Höhe {@link kopfBoden} rechnet; die Höhe des Knopfs bleibt antds Kreuzgröße (= Steuerhöhe).
+ * Der Rahmen macht ihn als Knopf erkennbar, ein nacktes Wort im Kopf läse sich als Titelteil.
+ */
+function abbrechenImKopf(token: GlobalToken) {
+  return {
+    width: 'auto',
+    paddingInline: token.paddingSM,
+    fontSize: token.fontSize,
+    fontWeight: 'normal',
+    color: token.colorText,
+    border: `${token.lineWidth}px solid ${token.colorBorder}`,
+  } as const;
+}
+
+/**
+ * Der Kopfknopf liegt wie das Kreuz absolut über dem Kopf; der Titel muss vor ihm umbrechen.
+ * `10ch` in der Schrift des Kopfs deckt „Abbrechen“ (9 Zeichen proportional, schmaler als 9
+ * Ziffern) samt Rahmen, dazu beide Polster des Knopfs und der Abstand des Knopfs zum Rand
+ * (`padding`, großzügig gegen antds `(Kopfhöhe − Kreuz) / 2`) und ein Zielabstand `marginXS`.
+ * Nachweis: `e2e/dialoge-handy.spec.ts`, Titel und Knopf schneiden sich nicht.
+ */
+function kopfMitAbbrechen(token: GlobalToken) {
+  return {
+    paddingInlineEnd: `calc(10ch + ${2 * token.paddingSM + token.padding + token.marginXS}px)`,
+  } as const;
+}
+
 /** Was {@link kopfBoden} vom Theme braucht; `theme.useToken()` erfüllt es. */
 type KopfToken = Pick<
   GlobalToken,
@@ -692,6 +745,7 @@ export function ErfassungsModal<T extends object>({
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   const sperrtAbbruch = rest.speicherung?.isPending === true;
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
   const schliessen = useCallback(() => {
@@ -707,13 +761,26 @@ export function ErfassungsModal<T extends object>({
       open={offen}
       title={titel}
       onCancel={schliessen}
-      closable={sperrtAbbruch ? { disabled: true } : true}
+      closable={
+        istSchmal
+          ? { closeIcon: 'Abbrechen', 'aria-label': 'Abbrechen', disabled: sperrtAbbruch }
+          : sperrtAbbruch
+            ? { disabled: true }
+            : true
+      }
       mask={{ closable: !sperrtAbbruch }}
       footer={null}
       destroyOnHidden
       keyboard={false}
       width={breite}
-      styles={{ header: { minHeight: kopfBoden(token) } }}
+      styles={
+        istSchmal
+          ? {
+              header: { minHeight: kopfBoden(token), ...kopfMitAbbrechen(token) },
+              close: abbrechenImKopf(token),
+            }
+          : { header: { minHeight: kopfBoden(token) } }
+      }
     >
       <ErfassungsFormular<T>
         onAbbrechen={onAbbrechen}
