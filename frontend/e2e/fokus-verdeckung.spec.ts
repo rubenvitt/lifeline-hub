@@ -2895,10 +2895,11 @@ for (const dialog of ['Posten anlegen', 'Schichten erzeugen'] as const) {
     await expect(modal.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
     await expect(modal.locator('button.ant-btn-primary[data-e2e-fokus]')).toHaveCount(1);
     // Posten: Herkunft, Bezeichnung, Abschnitt, Schichtlänge, Soll, Qualifikation hinzufügen,
-    // Kreuz, Werte behalten und drei Fußknöpfe. Erzeugen: Posten, Beginn, Ende, Länge, Kreuz
-    // und zwei Fußknöpfe.
+    // „Abbrechen“ im Kopf, Werte behalten, „Speichern und nächste“ und der Primärknopf. Erzeugen:
+    // Posten, Beginn, Ende, Länge, „Abbrechen“ im Kopf und der Primärknopf. Am Handy steht
+    // „Abbrechen“ nur im Kopf, nicht noch einmal im Fuß (LLH-1763).
     expect(ziele.length, ziele.join(' | ')).toBeGreaterThanOrEqual(
-      dialog === 'Posten anlegen' ? 11 : 7,
+      dialog === 'Posten anlegen' ? 10 : 6,
     );
 
     await modal.locator('[data-e2e-fokus]').first().focus();
