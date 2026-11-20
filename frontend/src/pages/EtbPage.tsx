@@ -578,7 +578,14 @@ export default function EtbPage() {
       // auf, zwei Bilder später steht das Feld.
       const fokussiereStart = (): boolean => {
         const ziel = leiste.querySelector('[data-startfeld]')?.getAttribute('data-startfeld');
-        const pflicht = ziel ? leiste.querySelector(`[data-lfh="etb-feld-${ziel}"] input`) : null;
+        // „rufname“: ohne Standard füllt die Abfrage die fehlende Seite (LLH-1764).
+        const pflicht = ziel
+          ? leiste.querySelector(
+              ziel === 'rufname'
+                ? '[data-lfh="etb-rufname-abfrage"] input'
+                : `[data-lfh="etb-feld-${ziel}"] input`,
+            )
+          : null;
         const feld = pflicht ?? leiste.querySelector('textarea');
         if (feld instanceof HTMLElement) feld.focus();
         return pflicht != null || !ziel;
