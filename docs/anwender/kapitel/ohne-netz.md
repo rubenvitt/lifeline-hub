@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbSendestatus.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbSendestatus.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/LagemeldungenPage.tsx, frontend/src/components/Erfassung.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
 ---
 
 ## Überblick
@@ -21,7 +21,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 2. Auf den Seitenkopf achten: Dort steht „Stand HH:MM · offline“, die Uhrzeit der letzten
    Verbindung.
 3. Auf die Betriebszeile ganz oben achten: Sie meldet „Offline — keine Verbindung zum Server.“
-   und die Zahl der Einträge, die noch „ausstehend“ sind.
+   und die Zahl der Einträge, die noch „nicht gesendet“ sind.
 
 ### Ohne Netz erfassen
 
@@ -30,12 +30,23 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 2. Die App merkt den Eintrag vor. Im Einsatztagebuch steht er als jüngste Zeile unten in der
    Zeitachse mit „vorgemerkt“, darunter über der Erfassung „1 Eintrag offline vorgemerkt“; der
    Seitenkopf nennt „1 ausstehend“, ein Klick darauf rollt zu ihm. Andere Erfassungen melden
-   „Offline vorgemerkt …“, etwa „Offline vorgemerkt: Meldung von …“. Die Betriebszeile zählt den
-   Eintrag als „ausstehend“.
+   „Offline vorgemerkt …“, etwa „Offline vorgemerkt: Meldung von …“; eine vorgemerkte Meldung
+   steht unter „Nicht gesendet“ über der Liste der Meldungen. Die Betriebszeile zählt den Eintrag
+   als „nicht gesendet“, mit Netz zeigt die Kopfzeile dazu „1 NICHT GESENDET“. Im
+   Erfassungsdialog zählt „Erfasst“ nur, was der Server angenommen hat; Vorgemerktes steht daneben
+   als „nicht gesendet“.
 
-   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 ausstehend“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ und „1 ausstehend“ im Seitenkopf, der vorgemerkte Eintrag unten in der Zeitachse und „1 Eintrag offline vorgemerkt“ über der Erfassung](../bilder/ohne-netz/etb-ohne-netz.png)
+   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 nicht gesendet“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ und „1 ausstehend“ im Seitenkopf, der vorgemerkte Eintrag unten in der Zeitachse und „1 Eintrag offline vorgemerkt“ über der Erfassung](../bilder/ohne-netz/etb-ohne-netz.png)
 
 3. Nichts weiter tun: Sobald wieder Netz da ist, geht der Eintrag von selbst hinaus.
+
+### Nicht gesendete Einträge ansehen
+
+1. „NICHT GESENDET“ in der Kopfzeile oder „nicht gesendet“ in der Betriebszeile wählen. Es öffnet
+   sich „Offline-Aktionen wiederherstellen“; oben stehen unter „Nicht gesendet“ alle Einträge, die
+   noch nicht beim Server sind, mit Art, Einsatz und Uhrzeit, über alle Einsätze.
+2. „Jetzt erneut senden“ wählen, um nicht auf den nächsten Versuch zu warten. Ein Eintrag
+   verschwindet aus der Liste, sobald der Server ihn angenommen hat.
 
 ### Abgelehnte Einträge prüfen
 
@@ -48,6 +59,14 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
      bestätigen.
 
 ## Hintergrund
+
+### Server-Fehler ist nicht offline
+
+Ist Netz da, aber der Server kann einen Eintrag gerade nicht speichern (Server-Fehler, Überlast,
+Zeitüberschreitung), merkt die App ihn ebenfalls vor und meldet „Server-Fehler – … vorgemerkt, wird
+erneut gesendet“, etwa „Server-Fehler – Meldung von RTW 2 vorgemerkt, wird erneut gesendet“. Sie
+versucht es nach wenigen Sekunden von selbst wieder. Bis dahin steht der Eintrag unter „nicht
+gesendet“ wie ohne Netz.
 
 ### Was ohne Netz lesbar bleibt
 
