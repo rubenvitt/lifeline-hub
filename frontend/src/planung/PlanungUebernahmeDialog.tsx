@@ -1,4 +1,5 @@
 import { Alert, Button, Flex, Modal, Spin, Typography } from 'antd';
+import { MASKE_HAELT_FOKUS } from '../components/maskeHaeltFokus';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -218,6 +219,7 @@ export default function PlanungUebernahmeDialog({
       width={760}
       destroyOnHidden
       mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       closable={!uebernehmenMut.isPending}
     >
       <div data-lfh="planung-uebernahme">

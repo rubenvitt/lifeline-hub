@@ -11,6 +11,7 @@
  */
 import { useState } from 'react';
 import { Button, Modal } from 'antd';
+import { MASKE_HAELT_FOKUS } from '../../components/maskeHaeltFokus';
 import Knopfreihe from '../../components/instrument/Knopfreihe';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
@@ -37,6 +38,9 @@ export default function ZeichenWahlDialog({ offen, quelle, onPlatzieren, onAbbre
       open={offen}
       title="Taktisches Zeichen"
       onCancel={onAbbrechen}
+      // Ein Tipp neben den Dialog verwirft die Auswahl nicht (LLH-2010, „Erfassungs-Norm“).
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       destroyOnHidden
       footer={
         <Knopfreihe fuss>

@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Modal, theme } from 'antd';
+import { MASKE_HAELT_FOKUS } from '../../components/maskeHaeltFokus';
 import Knopfreihe from '../../components/instrument/Knopfreihe';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Speicherung } from '../../components/Erfassung';
@@ -74,7 +75,9 @@ export default function ZeichenHierDialog({
       // Während des Anlegens gibt es kein Zurück: Schließen hielte den POST nicht auf, das Zeichen
       // entstünde trotzdem („Abbrechen legt nichts an“ wäre gelogen).
       closable={!laeuft}
-      mask={{ closable: !laeuft }}
+      // Ein Tipp neben den Dialog verwirft die Auswahl nie (LLH-2010, „Erfassungs-Norm“).
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       keyboard={!laeuft}
       footer={
         <Knopfreihe fuss>

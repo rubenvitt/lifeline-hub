@@ -700,3 +700,21 @@ describe('EintreffenDialog — ohne Netz (LLH-1075 Teil III)', () => {
     expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeEnabled();
   });
 });
+
+/** LLH-2010: die Maske schließt in keinem Schritt; Escape bleibt im Schritt „Suche“ der Ausweg. */
+describe('EintreffenDialog — Maske (LLH-2010)', () => {
+  it('im Schritt „Suche“ schließt die Maske nicht', async () => {
+    const { onClose } = zeige();
+    await screen.findByRole('searchbox', { name: 'Suche' });
+    await userEvent.click(dialog().closest('.ant-modal-wrap') as HTMLElement);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('im Schritt „Suche“ schließt Escape weiter sofort', async () => {
+    const { onClose } = zeige();
+    const feld = await screen.findByRole('searchbox', { name: 'Suche' });
+    await waitFor(() => expect(feld).toHaveFocus());
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+});

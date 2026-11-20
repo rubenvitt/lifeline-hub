@@ -1,4 +1,5 @@
 import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
+import { MASKE_HAELT_FOKUS } from '../../components/maskeHaeltFokus';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
@@ -817,7 +818,9 @@ export default function EintreffenDialog({
       title="Eintreffen buchen"
       onCancel={aufAbbruch}
       closable={sperrtAbbruch ? { disabled: true } : true}
-      mask={{ closable: !sperrtAbbruch }}
+      // Die Maske schließt in keinem Schritt (LLH-2010, „Erfassungs-Norm“).
+      mask={{ closable: false }}
+      wrapProps={MASKE_HAELT_FOKUS}
       footer={null}
       destroyOnHidden
       // Schritt 2 trägt Escape über die Tastaturebene der Erfassung.
