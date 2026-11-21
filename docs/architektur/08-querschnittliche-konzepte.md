@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 18.11.2026 (Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 21.11.2026 (Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -460,3 +460,24 @@ gemeinsamen Fällen unter `src-tauri/faelle/`, die beide Suiten prüfen. Regeln:
 [`ios/AGENTS.md`](../../ios/AGENTS.md), [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md),
 „Gemeinsame Fälle“; Betrieb: [`ios-app.md`](../betrieb/ios-app.md),
 [`desktop-app.md`](../betrieb/desktop-app.md).
+
+## 8.32 Geheimnisse und Abrufe der Adapter
+
+Was Lifeline Hub selbst bei einem Fremdsystem abruft (Divera, HiOrg, Postfach …), ist ein Adapter
+einer Art im Rahmen `src/adapter/` ([ADR-0076](entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
+Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md)).
+
+- **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`, mit
+  dessen Fingerabdruck je Zeile; die API setzt und ersetzt, liest aber nie. Ohne Schlüssel läuft der
+  Server, und Adapter mit Geheimnissen halten mit `geheimnisspeicher_gesperrt` an. Das übrige
+  Schlüsselmaterial der Instanz liegt weiter im Klartext der Datenbank (R19, R22).
+- **Abruf:** ein Hintergrundlauf neben dem der Webhooks, zwei Phasen je Abruf (Netz ohne
+  Datenbank, dann Übernahme in einer Transaktion), Zielschutz und Client wie bei den Webhooks.
+- **Zustand:** in der Zeile des Adapters (letzter Erfolg, letzter Fehler als Code, nächster
+  Abruf, Grund des Anhaltens) und in den letzten 50 Versuchen; ein vorübergehender Fehler wartet
+  höchstens 15 min, ein Fehler, den ein Mensch beheben muss, hält an. Kein stiller Fehler (G7 des
+  Konzepts [`2026-11-10-schnittstellen-ausbau.md`](../konzepte/2026-11-10-schnittstellen-ausbau.md)).
+- **Gekoppelter ELW:** Eingehendes kommt am Hub an; meldet sich eine Org bei einem Hub, läuft hier
+  kein Adapter, und die Verwaltung ist gesperrt.
+
+Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.

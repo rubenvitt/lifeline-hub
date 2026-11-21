@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 12.11.2026 (Direktkopplung vor Ort, LLH-1497).
+Stand: 21.11.2026 (Abruf eines Adapters, LLH-2017; Direktkopplung vor Ort, LLH-1497).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -57,7 +57,9 @@ sequenceDiagram
   (600 s, `src/einsatz/purge_scheduler.rs`), Sicherung (nur mit `--backup-verzeichnis`,
   `src/backup`), Datenträgerprüfung (stündlich, `src/datentraeger/mod.rs`), KRITIS-Import
   (`src/karte/kritis`), Wächter der Offline-Karten (erste Prüfung nach 60 s,
-  `src/karte/auto_aktualisierung.rs`).
+  `src/karte/auto_aktualisierung.rs`), Zustellung der Webhooks (2 s,
+  `src/public_api/webhook/lauf.rs`) und Abrufe der Adapter (5 s, `src/adapter/lauf.rs`; beide
+  wartet das Herunterfahren begrenzt ab).
 - Schalter, die eine Vertrauensgrenze verschieben, landen als Warnung im Log; die Liste steht in
   [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md). Beide Serve-Zweige laufen über
   `axum-server` mit `verbindung::SemaphorAkzeptor` und den Fristen aus `src/verbindung.rs`.
@@ -610,6 +612,39 @@ sequenceDiagram
   baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
   `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
   einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
+
+## 6.6g Adapter ruft ab
+
+Ein Adapter holt im Hintergrund bei einem Fremdsystem ab (LLH-2017,
+[ADR-0076](entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md)).
+
+```mermaid
+sequenceDiagram
+  participant Admin as frontend Anbindungen
+  participant Hub as lifeline-hub (src/routes/adapter.rs, src/adapter/)
+  participant DB as SQLite (adapter, adapter_geheimnis, adapter_versuch)
+  participant Q as Quelle (Divera, HiOrg …)
+  Admin->>Hub: PUT /api/admin/adapter/{id}/geheimnisse/accesskey {wert}
+  Hub->>DB: Chiffrat (age, Schlüssel aus der Umgebung) und Fingerabdruck
+  Hub-->>Admin: 204, der Wert kommt nie zurück
+  loop alle 5 s: fällige Adapter
+    Hub->>DB: Zeile und Chiffrate lesen, Verbindung zurückgeben
+    Hub->>Hub: entschlüsseln, Einstellungen prüfen
+    Hub->>Q: Abruf über den Abrufkontext (Zielschutz, keine Weiterleitung, Deckel)
+    Q-->>Hub: Antwort
+    Hub->>DB: BEGIN, Übernahme der Art, Zustand, Versuch, COMMIT
+  end
+```
+
+- Fällig ist ein aktiver Adapter einer bekannten Art, dessen nächster Abruf erreicht ist, und
+  dessen Org sich nicht bei einem Hub meldet (`src/adapter/lauf.rs`). Je Durchgang höchstens vier
+  Abrufe gleichzeitig, keiner doppelt.
+- Ein vorübergehender Fehler setzt den nächsten Abruf nach `max(Intervall, min(60 s · 2^(n−1),
+  15 min))`; ein Fehler, den ein Mensch beheben muss, hält an (`src/adapter/zustand.rs`). Ein
+  neues Geheimnis oder geänderte Einstellungen machen einen so angehaltenen Adapter sofort
+  wieder fällig.
+- „Verbindung prüfen“ (`POST …/pruefen`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
+  der Versuch steht im Verlauf (`lauf::probe`).
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

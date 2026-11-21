@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 21.11.2026 (schwere Suiten bei Push auf dem eigenen Server, LLH-2014; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 21.11.2026 (Geheimnisspeicher und Abrufe der Adapter, LLH-2017; schwere Suiten bei Push auf dem eigenen Server, LLH-2014; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App oder iOS-App darauf zu. Einen
@@ -99,6 +99,7 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 | `<Verzeichnis von --db-path>/karten` | Offline-Karten (MBTiles), `tile-cache.db`, Welt-Übersicht, `kritis/` | `default_karten_dir` in `src/config.rs`, `src/karte/tile_cache.rs`, `src/karte/kritis/scheduler.rs` |
 | neben der Datenbank | `lifeline-tls-cert.pem`/`lifeline-tls-key.pem` (Zertifikat-Cache), `lifeline-download-…` (Kopie für den Sicherungs-Download) | `src/tls/mod.rs`, `src/backup/mod.rs` |
 | `--backup-verzeichnis` | automatische Sicherungen, Vorgabe alle 360 min, 7 behalten, mit `--backup-empfaenger` per age verschlüsselt | `src/config.rs`, [`backup-restore.md`](../betrieb/backup-restore.md) |
+| `LIFELINE_GEHEIMNIS_SCHLUESSEL` (nur Umgebung oder Flag, nie Datei oder Datenbank) | privater age-Schlüssel des Geheimnisspeichers der Adapter; in der Datenbank liegen nur Chiffrate mit seinem Fingerabdruck (`adapter_geheimnis`). Getrennt sichern: ohne ihn sind die Geheimnisse nach einer Wiederherstellung neu zu setzen | `src/config.rs`, `src/adapter/geheimnis.rs`, [ADR-0076](entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md), [`backup-restore.md`](../betrieb/backup-restore.md) |
 | Endgerät, Browserprofil oder Webview | IndexedDB `lifeline-lagebild`, `lifeline-offline`, `lifeline-ortcache`, ETB-Entwürfe; Liste aller Orte in `GERAETESPEICHER` | `frontend/src/offline/geraetRaeumung.ts`, [`endgeraete.md`](../betrieb/endgeraete.md) |
 | Desktop-App | `verbindung.json` (Server, `bekannt`), `kanal.json` (Update-Kanal) im App-Konfigurationsverzeichnis (`app_config_dir`, Kennung `dev.rubeen.lifeline.desktop`) | `src-tauri/src/verbindung.rs`, `src-tauri/src/kanal.rs`, [`desktop-app.md`](../betrieb/desktop-app.md) |
 | iOS-App | Serverliste `server.json` in Application Support, Schalter „Haptik“ in `UserDefaults`; je Server ein eigener `WKWebsiteDataStore` mit der UUID des Eintrags (Cookies, IndexedDB, Cache) | `ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift` (`Serverablage`), `ios/App/Webview.swift` (`Webviewfabrik`), [`ios-app.md`](../betrieb/ios-app.md) |
@@ -146,6 +147,8 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 | clamd | `--clamav-addr`, ohne Angabe ungescannt; nicht erreichbar → 503 außer `--clamav-fail-open` |
 | Push-Dienste der Browser | `--web-push` aus |
 | OIDC-Anbieter | alle vier `--oidc-*` gesetzt |
+| Webhook-Empfänger der Anbindungen | je eingerichtetem Webhook; nur `https`, ohne Weiterleitung, LAN nur mit Ausnahme (ADR-0046) |
+| Quellen der Adapter (Divera, HiOrg …) | je angelegtem Adapter im Intervall, Vorgabe der Art; nur `https`, ohne Weiterleitung, LAN nur mit Ausnahme (ADR-0076). Ohne Adapter kein Abruf |
 
 ## 7.7 Release-Kette und Kanäle
 
