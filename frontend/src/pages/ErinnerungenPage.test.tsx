@@ -390,6 +390,32 @@ describe('ErinnerungenPage · Ablehnung am Ort (LFH-1077)', () => {
     vi.mocked(erledigeErinnerung).mockReset();
   });
 
+  /**
+   * LLH-1874: Erledigt und Erübrigt gibt es nur an einer offenen Erinnerung. Hat das System sie
+   * inzwischen geschlossen (Auto-Frist), lehnt der Server mit 422 ab; die Seite lädt dann neu,
+   * statt die veraltete Karte stehen zu lassen.
+   */
+  it('Erledigt auf einer inzwischen geschlossenen Erinnerung lädt die Liste neu', async () => {
+    const [offen] = await listeOffeneErinnerungen(1);
+    let geschlossen = false;
+    vi.mocked(listeOffeneErinnerungen).mockImplementation(async () => (geschlossen ? [] : [offen]));
+    onTestFinished(() => {
+      vi.mocked(listeOffeneErinnerungen).mockReset();
+      vi.mocked(listeOffeneErinnerungen).mockResolvedValue([offen]);
+    });
+    vi.mocked(erledigeErinnerung).mockImplementationOnce(async () => {
+      geschlossen = true;
+      throw new ApiError(422, 'Die Erinnerung ist nicht mehr offen');
+    });
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+
+    await waitFor(() => expect(screen.queryByText('Lagemeldung')).toBeNull());
+  });
+
   it('Erübrigt nach abgelehntem Erledigt räumt den Grund an der Karte', async () => {
     vi.mocked(erledigeErinnerung).mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'));
     vi.mocked(quittiereErinnerung).mockImplementationOnce(() => new Promise(() => {}));

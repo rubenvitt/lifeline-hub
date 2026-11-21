@@ -7,6 +7,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
+import { ApiError } from '../api/client';
 import {
   ERINNERUNGEN_SEITE,
   erinnerungCursor,
@@ -191,6 +192,14 @@ export default function ErinnerungenPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const invalidiere = (eid: number) =>
     qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(eid) });
+  /**
+   * Erledigt, Erübrigt und Rückgängig gibt es nur aus dem passenden Status (LLH-1874). Eine 422
+   * heißt, dass eine andere Stelle oder das System (Auto-Frist) die Erinnerung inzwischen
+   * umgeschaltet hat: neu laden, statt die veraltete Karte stehen zu lassen.
+   */
+  const ladeNachZustandsfehler = (fehler: unknown, eid: number) => {
+    if (fehler instanceof ApiError && fehler.status === 422) void invalidiere(eid);
+  };
 
   /*
    * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
@@ -246,6 +255,7 @@ export default function ErinnerungenPage() {
     onMutate: () => setSeitenFehler(null),
     onSuccess: (_daten, v) => invalidiere(v.einsatzId),
     onError: (e, v) => {
+      ladeNachZustandsfehler(e, v.einsatzId);
       if (nochDa(v.einsatzId)) setSeitenFehler({ einsatzId: v.einsatzId, fehler: e });
     },
   });
@@ -257,6 +267,7 @@ export default function ErinnerungenPage() {
       zeigeRueckgaengig(message, 'Erinnerung erledigt', () => oeffnenMutation.mutate(v));
     },
     onError: (e, v) => {
+      ladeNachZustandsfehler(e, v.einsatzId);
       if (nochDa(v.einsatzId)) kartenFehler.melde(v.eid, e, 'Erledigen fehlgeschlagen');
     },
   });
@@ -268,6 +279,7 @@ export default function ErinnerungenPage() {
       zeigeRueckgaengig(message, 'Erinnerung erübrigt', () => oeffnenMutation.mutate(v));
     },
     onError: (e, v) => {
+      ladeNachZustandsfehler(e, v.einsatzId);
       if (nochDa(v.einsatzId)) kartenFehler.melde(v.eid, e, 'Erübrigen fehlgeschlagen');
     },
   });
