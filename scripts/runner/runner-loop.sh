@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ein Platz des eigenen e2e-Runners (LLH-1666, Spec `ci-eigener-runner`, ADR-0025).
+# Ein Platz des eigenen Runners für die schweren Suiten (LLH-1666, LLH-2014, ADR-0075).
 #
 #   runner-loop.sh <platz>
 #
@@ -15,6 +15,13 @@
 # stdin an curl, die JIT-Konfiguration über eine Env-Datei mit Modus 600 an Docker. Der Container
 # bekommt weder Docker-Socket noch Privilegien noch das Host-Netz, und im eigenen Docker-Netz
 # erreichen sich gleichzeitige Jobs nicht (`enable_icc=false`).
+#
+# ABMELDEN (LLH-2014): Eine JIT-Registrierung, die nie einen Job bekam (Platz gestoppt, Host neu
+# gestartet), bliebe als Offline-Runner im Repo stehen. Deshalb meldet der Platz seinen Runner nach
+# jedem Container und beim Stopp ab (404 heißt: GitHub hat ihn nach dem Job schon entfernt), und
+# beim Start löscht er Offline-Runner, die ein früherer Lauf DIESES Platzes hinterließ
+# (`<host>-p<platz>-*`). Andere Plätze fasst er nicht an: deren frische Registrierung steht bis
+# zum Verbinden ebenfalls auf „offline“.
 #
 # Konfiguration aus der Umgebung (systemd: `EnvironmentFile=/etc/lifeline-runner/runner.env`):
 #   RUNNER_REPO          owner/repo                         (Pflicht)
@@ -72,26 +79,68 @@ beenden() {
   [ -z "$pause_pid" ] || kill "$pause_pid" 2> /dev/null || true
   docker stop --time 60 "$CONTAINER" > /dev/null 2>&1 || true
   [ -z "$container_pid" ] || wait "$container_pid" 2> /dev/null || true
+  runner_delete "$runner_id"
   aufraeumen
   exit 0
 }
 trap beenden TERM INT
 trap aufraeumen EXIT
 
-# Holt die JIT-Konfiguration; leer bei jedem Fehler.
+# Ruft die REST-API des Repos; das Token geht über stdin an curl, nie in die Kommandozeile.
+#   github_api <methode> <pfad unter /repos/<repo>/> [<json-daten>]
+github_api() {
+  local methode="$1" pfad="$2"
+  local daten=()
+  [ "$#" -lt 3 ] || daten=(--data "$3")
+  printf 'header = "Authorization: Bearer %s"\n' "$(tr -d '[:space:]' < "$TOKEN_FILE")" |
+    curl --config - --fail --silent --show-error --max-time 30 \
+      --request "$methode" \
+      --header 'Accept: application/vnd.github+json' \
+      --header 'X-GitHub-Api-Version: 2022-11-28' \
+      ${daten[@]+"${daten[@]}"} \
+      "https://api.github.com/repos/$RUNNER_REPO/$pfad"
+}
+
+# Präfix der Runner-Namen dieses Platzes; das Ende ist die Startzeit (`jit_holen`).
+PRAEFIX="$(hostname -s 2> /dev/null || echo server)-p$PLATZ-"
+
+# Holt eine JIT-Registrierung und setzt `jit` (leer bei jedem Fehler) und `runner_id` (für das
+# Abmelden). Kein `$(jit_holen)`: in der Subshell gingen beide Werte verloren.
+jit=""
+runner_id=""
 jit_holen() {
   local name antwort
-  name="$(hostname -s 2> /dev/null || echo server)-p$PLATZ-$(date +%s)"
-  antwort="$(
-    printf 'header = "Authorization: Bearer %s"\n' "$(tr -d '[:space:]' < "$TOKEN_FILE")" |
-      curl --config - --fail --silent --show-error --max-time 30 \
-        --request POST \
-        --header 'Accept: application/vnd.github+json' \
-        --header 'X-GitHub-Api-Version: 2022-11-28' \
-        --data "{\"name\":\"$name\",\"runner_group_id\":1,\"labels\":[\"self-hosted\",\"$LABEL\"],\"work_folder\":\"_work\"}" \
-        "https://api.github.com/repos/$RUNNER_REPO/actions/runners/generate-jitconfig"
-  )" || return 0
-  printf '%s' "$antwort" | sed -nE 's/.*"encoded_jit_config"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p'
+  jit=""
+  runner_id=""
+  name="$PRAEFIX$(date +%s)"
+  antwort="$(github_api POST actions/runners/generate-jitconfig \
+    "{\"name\":\"$name\",\"runner_group_id\":1,\"labels\":[\"self-hosted\",\"$LABEL\"],\"work_folder\":\"_work\"}")" || return 0
+  runner_id="$(printf '%s' "$antwort" | tr -d '[:space:]' | sed -nE 's/.*"runner":\{"id":([0-9]+).*/\1/p')"
+  jit="$(printf '%s' "$antwort" | sed -nE 's/.*"encoded_jit_config"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
+}
+
+# Meldet einen Runner ab. Scheitern ist kein Fehler: meist hat GitHub ihn schon entfernt (404).
+runner_delete() { # <id>
+  [ -n "$1" ] || return 0
+  github_api DELETE "actions/runners/$1" > /dev/null 2>&1 || true
+}
+
+# Löscht beim Start die Offline-Runner, die ein früherer Lauf dieses Platzes hinterließ. Die Liste
+# ohne Leerraum, dann je Runner `id`, `name`, `status` (Reihenfolge der API-Antwort); die Labels
+# tragen `os` nicht und fallen so heraus.
+stale_runners_delete() {
+  local liste id name status
+  liste="$(github_api GET 'actions/runners?per_page=100' 2> /dev/null)" || return 0
+  printf '%s' "$liste" | tr -d '[:space:]' |
+    { grep -oE '"id":[0-9]+,"name":"[^"]*","os":"[^"]*","status":"[a-z]+"' || true; } |
+    sed -E 's/"id":([0-9]+),"name":"([^"]*)","os":"[^"]*","status":"([a-z]+)"/\1 \2 \3/' |
+    while read -r id name status; do
+      # Der Bindestrich im Präfix hält `srv-p1-` von `srv-p10-…` fern.
+      case "$name" in "$PRAEFIX"*) ;; *) continue ;; esac
+      [ "$status" = offline ] || continue
+      echo "Platz $PLATZ: lösche liegengebliebenen Runner $name ($id)."
+      runner_delete "$id"
+    done
 }
 
 # Ein Job in einem frischen Container. Im Hintergrund plus `wait`, damit SIGTERM sofort greift
@@ -134,18 +183,22 @@ docker network inspect "$NETWORK" > /dev/null 2>&1 \
   || docker network create -o com.docker.network.bridge.enable_icc=false "$NETWORK" > /dev/null 2>&1 \
   || docker network inspect "$NETWORK" > /dev/null
 
+stale_runners_delete
+
 pause="$PAUSE_START"
 laeufe=0
 while :; do
   laeufe=$((laeufe + 1))
-  jit="$(jit_holen)"
+  jit_holen
   if [ -z "$jit" ]; then
     echo "Platz $PLATZ: keine JIT-Konfiguration von GitHub, nächster Versuch in ${pause}s." >&2
     pausieren "$pause"
     pause=$((pause * 2 > PAUSE_MAX ? PAUSE_MAX : pause * 2))
   elif job_ausfuehren "$jit"; then
+    runner_delete "$runner_id"
     pause="$PAUSE_START"
   else
+    runner_delete "$runner_id"
     echo "Platz $PLATZ: Container endete mit Fehler, nächster Versuch in ${pause}s." >&2
     pausieren "$pause"
     pause=$((pause * 2 > PAUSE_MAX ? PAUSE_MAX : pause * 2))
