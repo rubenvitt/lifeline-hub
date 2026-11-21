@@ -983,7 +983,11 @@ mod tests {
             matches!(err, AppError::NotFound),
             "fremder Platz → 404, war {err:?}"
         );
-        assert_eq!(cache(&pool, p).await, (Some(u), None), "Belegung unverändert");
+        assert_eq!(
+            cache(&pool, p).await,
+            (Some(u), None),
+            "Belegung unverändert"
+        );
     }
 
     #[tokio::test]
