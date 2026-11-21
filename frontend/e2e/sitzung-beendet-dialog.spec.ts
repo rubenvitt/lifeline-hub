@@ -49,7 +49,7 @@ test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, bas
   await expect(formular.getByLabel('Inhalt / Wortlaut')).toHaveValue(inhalt);
   await expect(formular.getByLabel('Absender')).toHaveValue('Florian Nord 1');
 
-  await formular.getByRole('button', { name: 'Meldung erfassen' }).click();
+  await formular.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect
     .poll(
       async () => {
