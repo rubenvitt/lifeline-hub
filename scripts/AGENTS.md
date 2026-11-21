@@ -186,10 +186,11 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   hängender Ubuntu-Spiegel hielt sonst jeden Job bis zu seinem Timeout fest, auf allen PRs
   zugleich; apts eigene Zeitgrenzen fangen einen tröpfelnden Spiegel nicht. Selbsttest
   `scripts/wiederholen.test.sh` (Schritt 11).
-- **Eigener Runner** (LLH-1666, LLH-2014, [ADR-0075](../docs/architektur/entscheidungen/ADR-0075-schwere-suiten-laufen-bei-push-auf-dem-eigenen-server.md)):
-  Rust-Suite, Frontend-Anteile, `e2e-Binary` und die e2e-Shards laufen bei Push auf einen
-  Kanal-Branch auf einem eigenen Server (Repo-Variable `E2E_RUNNER`, Wahl im Job `runner` von
-  `suiten.yml`, `scripts/runner/`); PR-Läufe nie. Dort gibt es kein `sudo`: ein neuer Schritt in
+- **Eigener Runner** (LLH-1666, LLH-2014, [ADR-0075](../docs/architektur/entscheidungen/ADR-0075-schwere-suiten-laufen-bei-push-auf-dem-eigenen-server.md),
+  [ADR-0076](../docs/architektur/entscheidungen/ADR-0076-frontend-anteile-laufen-immer-auf-github.md)):
+  Rust-Suite, `e2e-Binary` und die e2e-Shards laufen bei Push auf einen Kanal-Branch auf einem
+  eigenen Server (Repo-Variable `E2E_RUNNER`, Wahl im Job `runner` von `suiten.yml`,
+  `scripts/runner/`); PR-Läufe und die Frontend-Anteile nie. Dort gibt es kein `sudo`: ein neuer Schritt in
   diesen Jobs, der `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, trägt
   `runner.environment == 'github-hosted'`, und was der eigene Runner dafür braucht, kommt ins
   `scripts/runner/Dockerfile`. Nach einem Bump von `@playwright/test` oder einer Änderung unter

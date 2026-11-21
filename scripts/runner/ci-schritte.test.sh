@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wächter für die Jobs, die auf dem eigenen Server laufen können (LLH-1666, LLH-2014, ADR-0075):
-# `binaer` und `e2e` in `.github/workflows/e2e.yml`, `rust` und `frontend` in
-# `.github/workflows/suiten.yml`. Dort trägt jeder Schritt, der `sudo`, apt oder einen Cache nur
+# `binaer` und `e2e` in `.github/workflows/e2e.yml`, `rust` in `.github/workflows/suiten.yml`
+# (die Frontend-Anteile laufen seit LLH-2016 immer gehostet, ADR-0076). Dort trägt jeder Schritt, der `sudo`, apt oder einen Cache nur
 # der gehosteten Runner braucht, die Bedingung `runner.environment == 'github-hosted'`.
 #
 # Ohne ihn fiel genau das nicht auf: die Bedingung landete am gleichnamigen Schritt eines anderen
@@ -23,7 +23,7 @@ if [ "$#" -eq 0 ]; then
   # Ohne Argumente beide Dateien, jede in einem eigenen Aufruf.
   status=0
   "$0" "$ROOT/.github/workflows/e2e.yml" "binaer e2e" 5 || status=1
-  "$0" "$ROOT/.github/workflows/suiten.yml" "rust frontend" 3 || status=1
+  "$0" "$ROOT/.github/workflows/suiten.yml" rust 3 || status=1
   exit "$status"
 fi
 if [ "$#" -ne 3 ]; then
