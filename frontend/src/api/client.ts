@@ -302,8 +302,9 @@ function sitzungBeendetWerfen(): never {
  * Leseanfrage. Bei unterbrochener Sitzung (LLH-1770, `auth/sitzungsSperre.ts`) wartet sie auf
  * die Neuanmeldung, statt mit 401 zu scheitern: vor dem Abruf, wenn schon gesperrt ist, und nach
  * einer ersten 401, die über `meldeSitzungAbgelaufen` synchron die Sperre setzt (die
- * Sitzungswache unterbricht im selben Takt). Wiederholt wird höchstens einmal. `/me` und die
- * Anbieterliste warten nie (`OHNE_SPERRE`).
+ * Sitzungswache unterbricht im selben Takt). Wiederholt wird höchstens einmal; eine 401 darauf
+ * wird geworfen und beginnt über den QueryClient eine neue Unterbrechung (`auth/AGENTS.md`,
+ * „Sitzung beendet im Betrieb“). `/me` und die Anbieterliste warten nie (`OHNE_SPERRE`).
  */
 export async function apiGet<T>(pfad: string): Promise<T> {
   const ohneSperre = OHNE_SPERRE.has(pfad);

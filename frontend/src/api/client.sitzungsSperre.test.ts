@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { ApiError, apiGet } from './client';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
-import { sitzungEntsperren, sitzungSperren } from '../auth/sitzungsSperre';
+import { istSitzungGesperrt, sitzungEntsperren, sitzungSperren } from '../auth/sitzungsSperre';
+import { erzeugeQueryClient } from './queryClient';
 
 let antworten: number[];
 let aufrufe: Record<string, number>;
@@ -104,6 +105,28 @@ describe('apiGet bei unterbrochener Sitzung (LLH-1770)', () => {
     sitzungEntsperren('wiederhergestellt');
     await expect(abruf).rejects.toMatchObject({ status: 401 });
     expect(aufrufe.d).toBe(2);
+  });
+
+  it('eine 401 auf den Wiederholversuch beginnt eine neue Unterbrechung (LLH-2012)', async () => {
+    // Entschieden: Die Sitzung ist gleich wieder weg, also erscheint der Dialog erneut. Eine
+    // Schleife ohne Zutun gibt es nicht, jede Runde braucht eine Anmeldung; ein dritter Abruf
+    // folgt erst nach ihr. Gemeldet wird über den QueryClient, wie jede 401 einer Abfrage.
+    window.addEventListener(SITZUNG_ABGELAUFEN, sperren);
+    antworteMit(401, 401, 200);
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    const abfrage = client.fetchQuery({
+      queryKey: ['probe', 'f'],
+      queryFn: () => apiGet('/api/probe/f'),
+    });
+    await bisAngefragt(1);
+    expect(ereignisse).toBe(1);
+    // Wie der AuthProvider bei derselben Person: entsperren, Meldung wieder scharf.
+    sitzungEntsperren('wiederhergestellt');
+    sitzungsMeldungZuruecksetzen();
+    await expect(abfrage).rejects.toMatchObject({ status: 401 });
+    expect(aufrufe.f).toBe(2);
+    expect(ereignisse).toBe(2);
+    expect(istSitzungGesperrt()).toBe(true);
   });
 
   it('wartet vor dem Abruf, solange schon gesperrt ist', async () => {
