@@ -1,8 +1,9 @@
 ---
 id: ADR-0025
 titel: Die e2e-Jobs der CI laufen in Wegwerf-Containern auf dem eigenen Server
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-12
+ersetzt_durch: ADR-0075
 gilt_fuer:
   - scripts/runner/**
   - .github/workflows/ci.yml

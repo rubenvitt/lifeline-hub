@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Wächter für `.github/workflows/e2e.yml` (LLH-1666, Spec `ci-eigener-runner`, ADR-0025): In den
-# Jobs, die auf dem eigenen Runner laufen können (`binaer`, `e2e`), trägt jeder Schritt, der
-# `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, die Bedingung
-# `runner.environment == 'github-hosted'`.
+# Wächter für die Jobs, die auf dem eigenen Server laufen können (LLH-1666, LLH-2014, ADR-0075):
+# `binaer` und `e2e` in `.github/workflows/e2e.yml`, `rust` und `frontend` in
+# `.github/workflows/suiten.yml`. Dort trägt jeder Schritt, der `sudo`, apt oder einen Cache nur
+# der gehosteten Runner braucht, die Bedingung `runner.environment == 'github-hosted'`.
 #
 # Ohne ihn fiel genau das nicht auf: die Bedingung landete am gleichnamigen Schritt eines anderen
 # Jobs, der auf dem Server `sudo` gerufen hätte. Rot wäre erst der erste echte Lauf geworden, und
@@ -13,13 +13,26 @@
 # WebKit-Build jeder Ubuntu-Version unter demselben Verzeichnis ab; mit `runner.os` allein bekam das
 # Image ubuntu-26.04 den Build für 24.04, und WebKit startete in keinem Shard (Lauf 43535205929).
 #
-#   ci-schritte.test.sh [workflow-datei]    Vorgabe: .github/workflows/e2e.yml (seit LLH-1662
-#                                           stehen `binaer` und `e2e` dort, nicht in ci.yml)
+#   ci-schritte.test.sh                      prüft e2e.yml und suiten.yml
+#   ci-schritte.test.sh <datei> <jobs> <min>  eine Datei, Jobs mit Leerzeichen getrennt, mindestens
+#                                            <min> betroffene Schritte (für die Gegenprobe)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-DATEI="${1:-$ROOT/.github/workflows/e2e.yml}"
-JOBS="binaer e2e"
+if [ "$#" -eq 0 ]; then
+  # Ohne Argumente beide Dateien, jede in einem eigenen Aufruf.
+  status=0
+  "$0" "$ROOT/.github/workflows/e2e.yml" "binaer e2e" 5 || status=1
+  "$0" "$ROOT/.github/workflows/suiten.yml" "rust frontend" 3 || status=1
+  exit "$status"
+fi
+if [ "$#" -ne 3 ]; then
+  echo "Aufruf: $0 [<datei> <jobs> <min>]" >&2
+  exit 2
+fi
+DATEI="$1"
+JOBS="$2"
+MINDESTENS="$3"
 # Was nur auf einem gehosteten Runner geht oder nur dort Sinn hat.
 GEHOSTET='sudo |apt-pakete\.sh|install-deps|apt-get|Swatinem/rust-cache|ms-playwright|apt-playwright|AGENT_TOOLSDIRECTORY'
 BEDINGUNG="runner.environment == 'github-hosted'"
@@ -87,13 +100,14 @@ while IFS=$'\037' read -r -d $'\036' job block; do
   fi
 done < <(schritte)
 
-# Ein Wächter, der nichts findet, prüft nichts: in beiden Jobs gibt es solche Schritte.
-if [ "$geprueft" -lt 5 ]; then
+# Ein Wächter, der nichts findet, prüft nichts: in den Jobs gibt es solche Schritte.
+if [ "$geprueft" -lt "$MINDESTENS" ]; then
   echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi
-# Beide Caches stehen im Job `e2e`; findet die Prüfung einen nicht, prüft sie ihn nicht.
-if [ "$ms_caches" -lt 1 ] || [ "$apt_caches" -lt 1 ]; then
+# Beide Caches stehen im Job `e2e` von `e2e.yml`; findet die Prüfung einen nicht, prüft sie ihn
+# nicht. In anderen Dateien gibt es sie nicht.
+if [ "$(basename "$DATEI")" = e2e.yml ] && { [ "$ms_caches" -lt 1 ] || [ "$apt_caches" -lt 1 ]; }; then
   echo "ROT  Caches gefunden: ms-playwright $ms_caches, apt-playwright $apt_caches — passt das Muster noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi

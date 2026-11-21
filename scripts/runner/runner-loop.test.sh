@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/runner/runner-loop.sh (LLH-1666, Spec `ci-eigener-runner`, ADR-0025).
+# Selbsttest für scripts/runner/runner-loop.sh (LLH-1666, LLH-2014, ADR-0075).
 #
 # `curl`, `docker` und `sleep` sind gefälscht und schreiben mit, was sie bekommen. Geprüft wird,
 # was auf dem Server still schiefginge: ein Container mit Docker-Socket oder Privilegien, ein Token
 # oder eine JIT-Konfiguration in einer Kommandozeile (sichtbar in `ps`), ein Container, der nicht
 # mit `--rm` endet, eine Schleife, die bei einer gestörten API im Sekundentakt hämmert, und ein
-# Stopp, der den laufenden Container stehen lässt.
+# Stopp, der den laufenden Container stehen lässt, und ein Runner, der nach dem Stopp als
+# Offline-Leiche bei GitHub liegen bleibt (LLH-2014).
 set -euo pipefail
 
 SKRIPT="$(cd "$(dirname "$0")" && pwd)/runner-loop.sh"
@@ -26,19 +27,36 @@ trap 'rm -rf "$WERK"' EXIT
 
 # ── Fälschungen ──────────────────────────────────────────────────────────────────────────
 mkdir -p "$WERK/bin"
-# curl: Antworten der Reihe nach aus $WERK/antworten (ok|fehler), Aufrufe und stdin mitschreiben.
-cat > "$WERK/bin/curl" <<'EOF'
+# curl nach Ziel: `generate-jitconfig` antwortet der Reihe nach aus $WERK/antworten (ok|fehler);
+# DELETE schreibt mit und endet mit FAKE_DELETE_EXIT (22 = HTTP-Fehler wie 404); die Runner-Liste
+# kommt aus $WERK/liste. Aufrufe und stdin werden immer mitgeschrieben.
+cat > "$WERK/bin/curl" <<'EOF2'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$WERK/curl.args"
 cat >> "$WERK/curl.stdin"
+case "$*" in
+  *"--request DELETE"*)
+    printf '%s\n' "$*" >> "$WERK/delete.args"
+    exit "${FAKE_DELETE_EXIT:-0}"
+    ;;
+  *"actions/runners?per_page=100"*)
+    [ -z "${FAKE_LISTE_EXIT:-}" ] || exit "$FAKE_LISTE_EXIT"
+    if [ -e "$WERK/liste" ]; then cat "$WERK/liste"; else printf '{"total_count":0,"runners":[]}'; fi
+    exit 0
+    ;;
+esac
 antwort="$(head -n 1 "$WERK/antworten")"
 sed -i '1d' "$WERK/antworten"
 if [ "$antwort" = ok ]; then
-  printf '{"runner":{"id":7},"encoded_jit_config":"GEHEIMJIT"}'
+  printf '{"runner":{"id":7,"name":"srv-p1-1","os":"unknown","status":"offline"},"encoded_jit_config":"GEHEIMJIT"}'
 else
   exit 22
 fi
-EOF
+EOF2
+cat > "$WERK/bin/hostname" <<'EOF2'
+#!/usr/bin/env bash
+echo srv
+EOF2
 # docker: Aufrufe mitschreiben; bei `run` Inhalt und Rechte der Env-Datei festhalten.
 cat > "$WERK/bin/docker" <<'EOF'
 #!/usr/bin/env bash
@@ -166,6 +184,62 @@ else
   rot "Netz von einem anderen Platz angelegt → Abbruch"
 fi
 
+# ── Abmelden (LLH-2014): kein Runner bleibt als Offline-Leiche bei GitHub liegen ─────────
+lauf 1 ok
+pruefe "nach dem Job wird der Runner aus der JIT-Antwort abgemeldet" \
+  grep -q 'https://api.github.com/repos/rubenvitt/lifeline-hub/actions/runners/7$' "$WERK/delete.args"
+pruefe "auch beim Abmelden kein Token in der Kommandozeile" bash -c "! grep -q GEHEIMTOKEN '$WERK/curl.args'"
+
+# Nach einem normalen Job hat GitHub den Runner meist schon entfernt: 404 ist kein Fehler.
+rm -f "$WERK"/*.args
+printf 'ok\n' > "$WERK/antworten"
+if WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_DELETE_EXIT=22 RUNNER_MIN_JOB_SEK=0 \
+  RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS=1 \
+  "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1; then
+  pruefe "Runner schon weg (404): keine Pause" bash -c "[ ! -s '$WERK/sleep.args' ]"
+else
+  rot "Runner schon weg (404) → Abbruch"
+fi
+
+# Beim Start: Offline-Runner, die ein früherer Lauf DIESES Platzes hinterließ (Absturz,
+# Stromausfall), werden gelöscht; nichts von anderen Plätzen, anderen Hosts oder laufenden Runnern.
+# Die Liste ist eingerückt wie die echte API-Antwort, mit Labels, die selbst `id` und `name` tragen.
+cat > "$WERK/liste" <<'EOF2'
+{
+  "total_count": 5,
+  "runners": [
+    { "id": 11, "name": "srv-p1-1795102491", "os": "Linux", "status": "offline", "busy": false,
+      "labels": [ { "id": 1, "name": "self-hosted", "type": "read-only" } ] },
+    { "id": 12, "name": "srv-p1-1795186785", "os": "Linux", "status": "online", "busy": false,
+      "labels": [ { "id": 1, "name": "self-hosted", "type": "read-only" } ] },
+    { "id": 13, "name": "srv-p2-1795102491", "os": "Linux", "status": "offline", "busy": false,
+      "labels": [] },
+    { "id": 14, "name": "anders-p1-1795102491", "os": "Linux", "status": "offline", "busy": false,
+      "labels": [] },
+    { "id": 15, "name": "srv-p10-1795102491", "os": "Linux", "status": "offline", "busy": false,
+      "labels": [] }
+  ]
+}
+EOF2
+lauf 1 ok
+pruefe "beim Start: eigene Offline-Leiche gelöscht" grep -q 'actions/runners/11$' "$WERK/delete.args"
+pruefe "beim Start: nichts anderes gelöscht (online, anderer Platz, anderer Host, p10 ≠ p1)" \
+  bash -c "! grep -qE 'actions/runners/(12|13|14|15)\$' '$WERK/delete.args'"
+pruefe "Aufräumen vor dem ersten Job" \
+  bash -c "[ \"\$(head -n 1 '$WERK/delete.args' | grep -o 'runners/[0-9]*\$')\" = runners/11 ]"
+rm -f "$WERK/liste"
+
+# Gestörte API beim Aufräumen hält den Platz nicht auf.
+rm -f "$WERK"/*.args
+printf 'ok\n' > "$WERK/antworten"
+if WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_LISTE_EXIT=22 RUNNER_MIN_JOB_SEK=0 \
+  RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS=1 \
+  "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1; then
+  pruefe "Liste nicht lesbar: der Platz nimmt trotzdem einen Job" grep -q '^run ' "$WERK/docker.args"
+else
+  rot "Liste nicht lesbar → Abbruch"
+fi
+
 # ── Falsche Aufrufe ─────────────────────────────────────────────────────────────────────
 if WERK="$WERK" PATH="$WERK/bin:$PATH" RUNNER_REPO=x/y RUNNER_TOKEN_FILE="$WERK/token" "$SKRIPT" \
   > /dev/null 2>&1; then
@@ -202,6 +276,8 @@ done
 kill -TERM "$pid"
 if wait "$pid"; then status=0; else status=$?; fi
 pruefe "SIGTERM stoppt den Container" grep -q '^stop .*lifeline-runner-1' "$WERK/docker.args"
+pruefe "SIGTERM meldet den Runner ab, damit keine Offline-Leiche bleibt" \
+  grep -q 'actions/runners/7$' "$WERK/delete.args"
 pruefe "SIGTERM beendet die Schleife sauber" test "$status" -eq 0
 pruefe "Env-Datei auch nach SIGTERM gelöscht" bash -c "[ ! -e \"\$(cat '$WERK/envfile.pfad')\" ]"
 pkill -f "$WERK/bin/docker" 2>/dev/null || true

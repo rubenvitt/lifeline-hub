@@ -21,9 +21,9 @@
 # `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
 # nicht.
 #
-# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Anteile laufen auf dem eigenen
-# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
-# Fork stammt. Die Jobs und die Runner-Wahl stehen in `e2e.yml` (Kopf dort).
+# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075): Rust-Suite, Frontend-Anteile und die e2e-Jobs
+# laufen bei diesem Push auf dem eigenen Server, wenn die Repo-Variable `E2E_RUNNER` ein
+# Runner-Label nennt. Die Wahl steht im Job `runner` von `suiten.yml` (Kopf dort).
 #
 # Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
@@ -100,9 +100,11 @@ jobs:
         with:
           # shared-key statt key: sonst hängt rust-cache die Job-ID an, jeder Job hätte einen
           # eigenen mehrere GB großen Eintrag (GitHub deckelt bei 10 GB je Repository).
-          # `save-if: false` überall außer im Rust-Job: EINER pflegt den Eintrag.
+          # Den Eintrag pflegt die Rust-Suite, solange sie gehostet läuft. Läuft sie auf dem eigenen
+          # Server (Push mit `E2E_RUNNER`, LLH-2014), speichert ihn dieser Job, damit PR-Läufe warm
+          # bleiben. Im PR ist die Bedingung immer falsch; der Text ist in pr.yml wortgleich.
           shared-key: rust-openssl-vendored
-          save-if: false
+          save-if: ${{ github.event_name == 'push' && vars.E2E_RUNNER != '' }}
           cache-on-failure: true
       - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
@@ -142,7 +144,7 @@ jobs:
   suiten:
     name: Suiten
     uses: ./.github/workflows/suiten.yml
-    # `checks: read` braucht `e2e.yml` (Runner-Wahl).
+    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter.
     permissions:
       contents: read
       checks: read

@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
-# Runner-Wahl für `e2e-Binary` und die e2e-Shards (LLH-1666, Spec `ci-eigener-runner`, ADR zum
-# eigenen Runner). Aufruf aus dem Job `aenderungen` in `.github/workflows/e2e.yml`:
+# Runner-Wahl für die schweren Suiten (LLH-1666, LLH-2014, ADR-0075). Aufruf aus dem Job `runner`
+# in `.github/workflows/suiten.yml`:
 #
-#   select-runner.sh <ereignis> <kopf-repo> <repo> <label>
+#   select-runner.sh <ereignis> <label>
 #
-# Gibt das Label des eigenen Runners aus (Repo-Variable `E2E_RUNNER`) oder `ubuntu-latest`.
-# Das Label nur, wenn es gesetzt ist und der Lauf kein Pull Request aus einem anderen Repository
-# ist; jedes andere oder unbekannte Ereignis als `push` und `pull_request` bleibt auf GitHub.
+# Gibt das Label des eigenen Runners aus (Repo-Variable `E2E_RUNNER`) oder `ubuntu-latest`. Das
+# Label nur bei `push` (die Kanal-Branches `alpha`, `beta`, `main`) und nur, wenn es ein schlichtes
+# Runner-Label ist. Jeder PR-Lauf bleibt auf GitHub, auch mit dem Label `voll` und auch aus dem
+# eigenen Repo (Entscheidung 21.11.2026): auf den Server kommt nur gemergter Code.
 #
-# KEINE SICHERHEITSGRENZE: Ein Fork-PR kann `e2e.yml` ändern und das Label selbst eintragen. Die
-# Grenze ist die Fork-Freigabe im Repo („Require approval for all external contributors“). Die
-# Weiche sorgt nur dafür, dass das Repo selbst nie fremden Code auf den Server schickt.
+# KEINE SICHERHEITSGRENZE: Ein Fork-PR kann die Workflows ändern und das Label selbst eintragen.
+# Die Grenze ist die Fork-Freigabe im Repo („Require approval for all external contributors“).
+# Die Weiche sorgt nur dafür, dass das Repo selbst nie ungemergten Code auf den Server schickt.
 set -euo pipefail
 
-if [ "$#" -ne 4 ]; then
-  echo "Aufruf: $0 <ereignis> <kopf-repo> <repo> <label>" >&2
+if [ "$#" -ne 2 ]; then
+  echo "Aufruf: $0 <ereignis> <label>" >&2
   exit 2
 fi
 ereignis="$1"
-kopf_repo="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
-repo="$(printf '%s' "$3" | tr '[:upper:]' '[:lower:]')"
 # Leerzeichen drumherum aus der Variablen-Oberfläche verzeihen; alles andere als ein schlichtes
 # Label (Komma, Klammer, Ausdruck) abweisen: `runs-on` nähme sonst mehr, als gemeint ist.
-label="$(printf '%s' "$4" | tr -d '[:space:]')"
+label="$(printf '%s' "$2" | tr -d '[:space:]')"
 
 gehostet() {
   echo ubuntu-latest
@@ -31,15 +30,8 @@ gehostet() {
 
 [ -n "$label" ] || gehostet
 if ! printf '%s' "$label" | grep -Eq '^[A-Za-z0-9._-]+$'; then
-  echo "::warning::E2E_RUNNER='$4' ist kein schlichtes Runner-Label; e2e läuft auf GitHub." >&2
+  echo "::warning::E2E_RUNNER='$2' ist kein schlichtes Runner-Label; die Suiten laufen auf GitHub." >&2
   gehostet
 fi
-
-case "$ereignis" in
-  push) ;;
-  pull_request)
-    [ -n "$kopf_repo" ] && [ "$kopf_repo" = "$repo" ] || gehostet
-    ;;
-  *) gehostet ;;
-esac
+[ "$ereignis" = push ] || gehostet
 echo "$label"

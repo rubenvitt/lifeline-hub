@@ -12,12 +12,12 @@
 # ABBRUCH: Den steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in `suiten.yml`
 # eine Gruppe je Branch mit `cancel-in-progress`: ein neuer Push bricht diesen Lauf ab.
 #
-# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die Anteile laufen auf dem eigenen Server,
-# wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem Fork
-# stammt; die Wahl trifft `scripts/runner/select-runner.sh` im Job `aenderungen`. Leer heißt GitHub. Dort
-# läuft jeder Job in einem frischen Container ohne `sudo` (`scripts/runner/README.md`); Schritte,
-# die `sudo` oder die Caches der gehosteten Runner brauchen, tragen deshalb
-# `runner.environment == 'github-hosted'` (Wächter: `scripts/runner/ci-schritte.test.sh`).
+# EIGENER RUNNER (LLH-1666, LLH-2014, ADR-0075): Wo `e2e-Binary` und die Anteile laufen, wählt der
+# Job `runner` in `suiten.yml` und reicht es als Eingabe `runner` herein; leer heißt GitHub. Auf
+# den eigenen Server gehen nur Push-Läufe der Kanal-Branches, nie ein PR. Dort läuft jeder Job in
+# einem frischen Container ohne `sudo` (`scripts/runner/README.md`); Schritte, die `sudo` oder die
+# Caches der gehosteten Runner brauchen, tragen deshalb `runner.environment == 'github-hosted'`
+# (Wächter: `scripts/runner/ci-schritte.test.sh`).
 #
 # Regeln: scripts/AGENTS.md, „Leichte PR-Prüfung“. Formtest: scripts/ci-stufen.test.sh.
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in ci.yml.
@@ -25,6 +25,12 @@ name: e2e
 
 on:
   workflow_call:
+    inputs:
+      # Label des eigenen Runners oder leer (dann GitHub); gewählt in `suiten.yml`, Job `runner`.
+      runner:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -40,57 +46,13 @@ env:
   TZ: Europe/Berlin
 
 jobs:
-  # ── Wo laufen Binary und Anteile? ───────────────────────────────────────────────────
-  # Job-Id `aenderungen` wie in ADR-0025 (Regeltext), auch wenn er nur noch den Runner wählt.
-  aenderungen:
-    name: e2e-Runner
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      runner: ${{ steps.runner.outputs.runner }}
-    steps:
-      # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches. Auch bei
-      # Push ausgecheckt: die Runner-Wahl liegt im Repo.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 2
-      # Wo `e2e-Binary` und die Anteile laufen (LLH-1666, Kopf). Scheitert die Wahl, bleibt die
-      # Ausgabe leer, und die Jobs fallen auf `ubuntu-latest` zurück.
-      - name: Runner für die e2e-Jobs
-        id: runner
-        continue-on-error: true
-        env:
-          EREIGNIS: ${{ github.event_name }}
-          KOPF_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          REPO: ${{ github.repository }}
-          LABEL: ${{ vars.E2E_RUNNER }}
-        # Bei einem PR die Weiche aus dem ZIEL-Branch (HEAD^1 des Merge-Commits), nie aus dem PR:
-        # sonst stellte ein Fork sie mit einer Zeile in `select-runner.sh` auf den eigenen Server,
-        # ohne `.github/` anzufassen (ADR-0025). Fehlt sie dort noch, bleibt alles auf GitHub.
-        run: |
-          set -euo pipefail
-          weiche=./scripts/runner/select-runner.sh
-          if [ "$EREIGNIS" = pull_request ]; then
-            weiche="$RUNNER_TEMP/select-runner.sh"
-            git show HEAD^1:scripts/runner/select-runner.sh > "$weiche"
-            chmod +x "$weiche"
-          fi
-          runner="$("$weiche" "$EREIGNIS" "$KOPF_REPO" "$REPO" "$LABEL")"
-          echo "runner=$runner" >> "$GITHUB_OUTPUT"
-          echo "e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
-
   # ── Backend-Binary für die e2e-Anteile ──────────────────────────────────────────────
   # Eigener Job: so starten die Anteile nach dem Build statt nach Build PLUS Rust-Tests.
   binaer:
     name: e2e-Binary
-    needs: aenderungen
-    # Läuft auch, wenn die Runner-Wahl rot ist: dann auf `ubuntu-latest`.
-    if: ${{ !cancelled() }}
-    # Eigener Runner oder GitHub (LLH-1666, Kopf). Auf dem eigenen Runner bringt das Image nasm
-    # und den Compiler-Cache mit; die Schritte mit `sudo` und `rust-cache` laufen nur gehostet.
-    runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
+    # Eigener Runner oder GitHub (Kopf). Auf dem eigenen Runner bringt das Image nasm und den
+    # Compiler-Cache mit; die Schritte mit `sudo` und `rust-cache` laufen nur gehostet.
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -132,12 +94,12 @@ jobs:
   # ── e2e-Suite, auf vier Runner geteilt ──────────────────────────────────────────────
   e2e:
     name: e2e ${{ matrix.shard }}/4
-    needs: [aenderungen, binaer]
+    needs: binaer
     # Ein rotes Binary lässt die Anteile aus.
     if: ${{ !cancelled() && needs.binaer.result == 'success' }}
-    # Eigener Runner oder GitHub (LLH-1666, Kopf). Die Schritte für Systempakete und Browser-Cache
-    # laufen nur gehostet; das Image des eigenen Runners bringt beides mit, ohne `sudo`.
-    runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
+    # Eigener Runner oder GitHub (Kopf). Die Schritte für Systempakete und Browser-Cache laufen
+    # nur gehostet; das Image des eigenen Runners bringt beides mit, ohne `sudo`.
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     # 75 min (LLH-1488): gemessen am 27.10.2026 (Lauf 40581848993) brauchten die Tests je Shard
     # 33, 58, 47 und 49 min; Shard 2 lief zweimal in die alte Frist von 60 min, ohne roten Test.
     # Die Suite hat sich seit der Laufzeittabelle von LFH-1117 verdoppelt (180 → 267 Dateien,
@@ -244,7 +206,7 @@ jobs:
           fi
       # Gleich nach der Installation, nicht erst am Jobende (s. o.). Nur ohne exakten Treffer: ein
       # bestehender Schlüssel lässt sich nicht überschreiben.
-      # Auf dem eigenen Runner (LLH-1666): Browser und Systempakete stecken im Image. Passt dessen
+      # Auf dem eigenen Runner (LLH-1666, ADR-0075): Browser und Systempakete stecken im Image. Passt dessen
       # Playwright-Version nicht zum Lockfile, lädt `install` die neuen Browser (ohne `sudo`, die
       # Systempakete ändern sich selten), und die Warnung erinnert an den Neubau des Images.
       - name: Playwright-Browser (eigener Runner)

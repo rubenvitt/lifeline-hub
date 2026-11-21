@@ -1,9 +1,12 @@
-# Eigener e2e-Runner
+# Eigener Runner
 
-`e2e-Binary` und die vier e2e-Shards der CI laufen auf einem eigenen Server statt auf
-GitHub-Runnern, sobald die Repo-Variable `E2E_RUNNER` gesetzt ist (LLH-1666, ADR-0025, Spec
-`ci-eigener-runner`). Jeder Job bekommt einen frischen Container, der nach dem Job gelöscht
-wird. Fork-PRs laufen immer auf GitHub.
+Bei einem Push auf `alpha`, `beta` oder `main` laufen die schweren Suiten der CI auf einem
+eigenen Server statt auf GitHub-Runnern, sobald die Repo-Variable `E2E_RUNNER` gesetzt ist:
+Rust-Suite, die vier Frontend-Anteile, `e2e-Binary` und die vier e2e-Anteile (LLH-1666,
+LLH-2014, ADR-0075). Die Wahl trifft der Job `runner` in `.github/workflows/suiten.yml`. Jeder
+Job bekommt einen frischen Container, der nach dem Job gelöscht wird. **PR-Läufe laufen nie
+hier**, auch nicht mit dem Label `voll`. iOS-Kern, Schnellprüfungen, Berichte und Release bleiben
+bei GitHub.
 
 ## Wenn der Server ausfällt
 
@@ -15,10 +18,10 @@ starten.
 
 | Datei | Zweck |
 | --- | --- |
-| `Dockerfile` | Runner-Image: Runner, Playwright-Browser samt Systempaketen, Build-Werkzeuge, `sccache`, kein `sudo` |
+| `Dockerfile` | Runner-Image: Runner, Playwright-Browser samt Systempaketen, Build-Werkzeuge, GTK/WebKit für die Desktop-Hülle, `sccache`, kein `sudo` |
 | `build-image.sh` | baut `lifeline-runner:latest` mit der Playwright-Version aus dem Lockfile, löscht alte Images; `--update` holt vorher `alpha` und baut ohne Cache |
-| `runner-loop.sh` | ein Platz: JIT-Registrierung holen, Container für einen Job starten, von vorn |
-| `select-runner.sh` | Runner-Wahl in `e2e.yml` (Job `aenderungen`, bei PRs aus dem Ziel-Branch gelesen) |
+| `runner-loop.sh` | ein Platz: JIT-Registrierung holen, Container für einen Job starten, Runner abmelden, von vorn |
+| `select-runner.sh` | Runner-Wahl in `suiten.yml` (Job `runner`, bei PRs aus dem Ziel-Branch gelesen): Label nur bei Push |
 | `*.test.sh` | Selbsttests im Sammel-Gate (Schritt 11), auch der Wächter über die `sudo`-Schritte in `e2e.yml` |
 | `systemd/` | `lifeline-runner@.service` je Platz, Timer für den wöchentlichen Neubau |
 | `runner.env.beispiel` | Vorlage für `/etc/lifeline-runner/runner.env` |
@@ -95,19 +98,49 @@ der die Platte füllt, trifft dann nur die Runner, nicht den Host.
 
    Unter Repo → Settings → Actions → Runners stehen danach vier Runner mit dem Label
    `lifeline-e2e` auf *Idle*. Jeder heißt `<host>-p<platz>-<zeit>` und verschwindet nach seinem
-   Job; ein neuer nimmt seinen Platz ein.
+   Job; ein neuer nimmt seinen Platz ein. Ein gestoppter Platz meldet seinen wartenden Runner
+   ab, und beim Start löscht er Offline-Runner, die ein früherer Lauf desselben Platzes
+   hinterlassen hat (etwa nach einem Stromausfall). Fremde Plätze und Hosts fasst er nicht an.
 
 ## Im Repo einstellen
 
-1. **Fork-Freigabe (Pflicht, ADR-0025).** Settings → Actions → General → *Approval for running
+1. **Fork-Freigabe (Pflicht, ADR-0075).** Settings → Actions → General → *Approval for running
    fork pull request workflows from contributors* → **Require approval for all external
-   contributors**. Die Weiche hält Fork-PRs vom Server fern und wird bei PRs aus dem Ziel-Branch
-   gelesen, ein Fork kann sie also nicht umstellen. Eine Sicherheitsgrenze ist sie trotzdem
+   contributors**. Die Weiche hält jeden PR vom Server fern und wird bei PRs aus dem Ziel-Branch
+   gelesen, ein PR kann sie also nicht für sich umstellen. Eine Sicherheitsgrenze ist sie trotzdem
    nicht: ein Fork kann die Workflows unter `.github/` ändern und das Label selbst eintragen. Vor
    jeder Freigabe deshalb die Änderungen unter `.github/` lesen.
 2. **Einschalten.** Settings → Secrets and variables → Actions → Variables → `E2E_RUNNER` =
-   `lifeline-e2e` (derselbe Wert wie `RUNNER_LABEL`). Ein Probe-PR mit dem Label `voll` zeigt in der
-   Zusammenfassung des Jobs „e2e-Runner“, wohin die e2e-Jobs gingen.
+   `lifeline-e2e` (derselbe Wert wie `RUNNER_LABEL`), etwa mit
+   `gh variable set E2E_RUNNER --repo rubenvitt/lifeline-hub --body lifeline-e2e`. Der nächste Push
+   auf `alpha` zeigt in der Zusammenfassung des Jobs „Suiten-Runner“, wohin die Suiten gingen.
+
+## Nach einem Merge an `scripts/runner/`
+
+Der Timer zieht Klon und Image nur einmal die Woche nach. Nach einem Merge, der das Dockerfile
+oder `runner-loop.sh` ändert, beides von Hand: das Image neu bauen (holt vorher `alpha`) und die
+Plätze neu starten, damit sie das neue Skript laden. Ein laufender Job wird dabei abgebrochen;
+also wenn gerade nichts läuft.
+
+```bash
+sudo systemctl start lifeline-runner-image.service
+```
+
+```bash
+sudo systemctl restart 'lifeline-runner@*'
+```
+
+Fehlen dem Image die GTK/WebKit-Pakete, bricht die Rust-Suite auf dem Server früh mit einem
+Hinweis auf diesen Abschnitt ab.
+
+## Plätze und Größe
+
+Ein Push bringt bis zu zehn Jobs auf den Server (Rust, vier Frontend-Anteile, Binary, vier
+e2e-Anteile); mehr als Plätze da sind, warten. Je Platz rechnet man `RUNNER_CPUS` Kerne und
+`RUNNER_MEMORY` Speicher als Deckel, nicht als Reservierung. Die Rust-Suite linkt große
+Test-Binaries: reicht `RUNNER_MEMORY=6g` nicht (Abbruch mit „killed“ oder Signal 9), den Wert in
+`/etc/lifeline-runner/runner.env` heben. Einen Platz mehr: `sudo systemctl enable --now
+lifeline-runner@5`.
 
 ## Betrieb
 
@@ -147,9 +180,9 @@ Grenzen für Kerne, Speicher, Prozesse. Im eigenen Docker-Netz erreichen sich gl
 nicht (`enable_icc=false`). Im Image gibt es kein `sudo`. Die JIT-Konfiguration gilt für genau
 einen Job und geht über eine Env-Datei mit Modus 600 hinein, das Token gar nicht.
 
-Geteilt ist nur der Compiler-Cache. Ihn erreicht jeder Lauf aus dem eigenen Repository, auch ein
-Dependabot-PR mit neuem Fremdcode; ein vergifteter Eintrag träfe das e2e-Binary späterer Läufe,
-nicht die Release-Artefakte, die GitHub baut (ADR-0025, angenommen).
+Geteilt ist nur der Compiler-Cache. Ihn erreicht seit ADR-0075 nur noch gemergter Code (Push auf
+einen Kanal-Branch), kein offener PR mehr; ein gemergtes Dependabot-Update mit vergiftetem
+Fremdcode träfe aber die Suiten späterer Läufe, nicht die Release-Artefakte, die GitHub baut.
 
 Was Docker nicht abschirmt, sind der Host und das LAN: ein Job erreicht über das Gateway des
 Netzes jeden Dienst des Hosts und jedes Gerät im LAN, auf einem Cloud-Server auch den
