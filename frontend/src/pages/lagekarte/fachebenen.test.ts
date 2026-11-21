@@ -195,9 +195,9 @@ describe('Fachebenen-Registry', () => {
     // weitere, bis der neue Stand ankommt. Die TTL steht im Backend; gelesen wird die Quelle,
     // damit eine dort geänderte Zahl hier rot wird statt still auseinanderzulaufen.
     // Copernicus (LLH-1200) hat ein eigenes Modul neben `quellen.rs`.
-    const karte = join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte');
-    const quellen = ['quellen.rs', 'copernicus.rs']
-      .map((datei) => readFileSync(join(karte, datei), 'utf8'))
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const quellen = ['../../../../src/karte/quellen.rs', '../../../../src/karte/copernicus.rs']
+      .map((pfad) => readFileSync(join(hier, pfad), 'utf8'))
       .join('\n');
     const ttlKonstante: Partial<Record<FachebeneQuelle, string>> = {
       nina: 'NINA_TTL',
