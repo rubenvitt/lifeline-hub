@@ -1,4 +1,4 @@
-import { expect, request, test } from '@playwright/test';
+import { expect, request, test, type Page } from '@playwright/test';
 import { anmeldenOhneStartseite } from './lageplan-kern';
 import { ADMIN, ADMIN_PW } from './rollen-kern';
 
@@ -11,7 +11,8 @@ import { ADMIN, ADMIN_PW } from './rollen-kern';
  * Anmeldung derselben Person steht der Text noch im Formular und lässt sich senden.
  */
 
-test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, baseURL }) => {
+/** Bis zum Dialog „Sitzung beendet“ über der halb erfassten Meldung (Ablauf oben). */
+async function sitzungEndetUeberMeldung(page: Page, baseURL: string | undefined) {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const angelegt = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Sitzung beendet ${Date.now()}` },
@@ -42,14 +43,18 @@ test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, bas
   await expect(dialog).toContainText('Eingaben auf dieser Seite bleiben erhalten.');
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/meldungen`));
   await expect(dialog.getByLabel('Benutzername')).toHaveValue(ADMIN);
+  return { dialog, formular, inhalt, einsatzId };
+}
 
+test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, baseURL }) => {
+  const { dialog, formular, inhalt, einsatzId } = await sitzungEndetUeberMeldung(page, baseURL);
   await dialog.getByLabel('Passwort').fill(ADMIN_PW);
   await dialog.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(formular.getByLabel('Inhalt / Wortlaut')).toHaveValue(inhalt);
   await expect(formular.getByLabel('Absender')).toHaveValue('Florian Nord 1');
 
-  await formular.getByRole('button', { name: 'Meldung erfassen' }).click();
+  await formular.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect
     .poll(
       async () => {
@@ -60,4 +65,42 @@ test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, bas
       { timeout: 15_000 },
     )
     .toBe(true);
+});
+
+/*
+ * LLH-2012 — Der Fokus bleibt im Dialog: Tab und Umschalt+Tab erreichen kein Element der
+ * verdeckten Seite, auch nicht das offene Formular. Nur ein echter Browser belegt das; in jsdom
+ * hält die Fokussperre von antd ohne Layout nichts für fokussierbar. Beim Umlauf darf der Fokus
+ * kurz auf dem Dokument selbst stehen (`body`), wie in jedem Dialog vor der Browserleiste.
+ */
+test('Tab hält den Fokus im Dialog „Sitzung beendet“', async ({ page, baseURL }) => {
+  const { dialog } = await sitzungEndetUeberMeldung(page, baseURL);
+  await expect(dialog.getByLabel('Passwort')).toBeFocused();
+
+  /** Wo der Fokus steht: im Dialog, auf dem Dokument oder auf einem Element der Seite. */
+  const fokusOrt = () =>
+    page.evaluate(() => {
+      const aktiv = document.activeElement;
+      if (!aktiv || aktiv === document.body) return 'dokument';
+      const imDialog = [...document.querySelectorAll('[role="dialog"]')].some(
+        (d) => d.textContent?.includes('Sitzung beendet') && d.contains(aktiv),
+      );
+      if (imDialog) return 'dialog';
+      const name = aktiv.getAttribute('aria-label') ?? aktiv.textContent?.trim().slice(0, 40);
+      return `seite: ${aktiv.tagName} ${name ?? ''}`;
+    });
+
+  // Zweimal durch den Dialog (Benutzername, Passwort, Anzeigen, Anmelden, Abmelden …) und zurück.
+  for (const taste of ['Tab', 'Shift+Tab']) {
+    const orte: string[] = [];
+    for (let i = 0; i < 14; i++) {
+      await page.keyboard.press(taste);
+      orte.push(await fokusOrt());
+    }
+    expect(
+      orte.filter((o) => o.startsWith('seite')),
+      taste,
+    ).toEqual([]);
+    expect(orte.filter((o) => o === 'dialog').length, taste).toBeGreaterThan(8);
+  }
 });
