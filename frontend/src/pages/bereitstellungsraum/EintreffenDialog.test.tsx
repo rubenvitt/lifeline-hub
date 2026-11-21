@@ -711,4 +711,13 @@ describe('EintreffenDialog — Maske (LLH-1755)', () => {
     await userEvent.click(maske!);
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  // LLH-2010: Escape bleibt im Schritt „Suche“ der Ausweg.
+  it('im Schritt „Suche“ schließt Escape weiter sofort', async () => {
+    const { onClose } = zeige();
+    const feld = await screen.findByRole('searchbox', { name: 'Suche' });
+    await waitFor(() => expect(feld).toHaveFocus());
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
 });

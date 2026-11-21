@@ -145,6 +145,53 @@ describe('NachforderungenDialog', () => {
   });
 });
 
+/**
+ * LLH-2010: eine geänderte Postenliste geht nicht still verloren (`frontend/AGENTS.md`,
+ * „Erfassungs-Norm“). Die Maske schließt nie; „Schließen“ fragt nur nach einer Änderung.
+ */
+describe('NachforderungenDialog — Rückfrage vor dem Verwerfen (LLH-2010)', () => {
+  function oeffne(onSchliessen = vi.fn()) {
+    renderMitProviders(
+      <NachforderungenDialog
+        einsatzId={1}
+        stelleId={8}
+        stelleName="Turnhalle Ost"
+        posten={POSTEN}
+        onFertig={vi.fn()}
+        onSchliessen={onSchliessen}
+      />,
+    );
+    return onSchliessen;
+  }
+
+  it('die Maske schließt nicht', async () => {
+    const onSchliessen = oeffne();
+    const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(dialog.closest<HTMLElement>('.ant-modal-wrap')!);
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
+
+  it('unverändert schließt „Schließen“ still', async () => {
+    const onSchliessen = oeffne();
+    const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schließen' }));
+    expect(onSchliessen).toHaveBeenCalledTimes(1);
+  });
+
+  it('nach einem Haken fragt „Schließen“ nach', async () => {
+    const onSchliessen = oeffne();
+    const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Wasser/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schließen' }));
+    expect(
+      await screen.findByText(
+        'Die Eingaben in „Nachforderungen für Turnhalle Ost“ gehen verloren.',
+      ),
+    ).toBeInTheDocument();
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
+});
+
 describe('NachforderungenDialog prüft die Anzahl (LLH-1768)', () => {
   it('eine Anzahl außerhalb sperrt das Anlegen, statt still eine andere zu senden', async () => {
     renderMitProviders(

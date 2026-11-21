@@ -76,6 +76,7 @@ import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamS
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { useVerwerfenSchutz } from '../components/VerlassenRueckfrage';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useZuflussSteuerung } from '../components/useZuflussSchleuse';
 import { useMinutenTakt } from '../components/useMinutenTakt';
@@ -863,6 +864,16 @@ export default function NachforderungenPage() {
     });
   };
   const zieht = zurueckziehenMutation.isPending;
+  const zurueckziehenSchutz = useVerwerfenSchutz({
+    geaendert: zurueckziehenGrund.trim() !== '',
+    gesperrt: zieht,
+    titel: 'Nachforderung zurückziehen',
+    onSchliessen: () => {
+      raeumeZurueckziehen();
+      setZurueckziehenId(null);
+      setZurueckziehenGrund('');
+    },
+  });
 
   const ablehnenZuLang = istZuLang(ablehnenGrund, NACHFORDERUNG_ABLEHNEN_GRUND_MAX);
   const ablehnenBestaetigen = () => {
@@ -871,6 +882,16 @@ export default function NachforderungenPage() {
   };
   // Solange abgelehnt wird, sind alle Auswege gesperrt: der Dialog bleibt bis zur Antwort offen.
   const lehntAb = ablehnenMutation.isPending;
+  const ablehnenSchutz = useVerwerfenSchutz({
+    geaendert: ablehnenGrund.trim() !== '',
+    gesperrt: lehntAb,
+    titel: 'Nachforderung ablehnen',
+    onSchliessen: () => {
+      raeumeAblehnen();
+      setAblehnenId(null);
+      setAblehnenGrund('');
+    },
+  });
 
   if (einsatzQuery.isLoading) {
     return (
@@ -1161,14 +1182,9 @@ export default function NachforderungenPage() {
         confirmLoading={lehntAb}
         cancelButtonProps={{ disabled: lehntAb }}
         closable={lehntAb ? { disabled: true } : true}
-        mask={{ closable: !lehntAb }}
-        keyboard={!lehntAb}
+        // Maske, Kreuz, Escape und Abbrechen über den Schutz (LLH-2010).
+        {...ablehnenSchutz.modalProps}
         onOk={ablehnenBestaetigen}
-        onCancel={() => {
-          raeumeAblehnen();
-          setAblehnenId(null);
-          setAblehnenGrund('');
-        }}
       >
         <Input.TextArea
           aria-label="Ablehnungsgrund"
@@ -1197,14 +1213,9 @@ export default function NachforderungenPage() {
         confirmLoading={zieht}
         cancelButtonProps={{ disabled: zieht }}
         closable={zieht ? { disabled: true } : true}
-        mask={{ closable: !zieht }}
-        keyboard={!zieht}
+        // Maske, Kreuz, Escape und Abbrechen über den Schutz (LLH-2010).
+        {...zurueckziehenSchutz.modalProps}
         onOk={zurueckziehenBestaetigen}
-        onCancel={() => {
-          raeumeZurueckziehen();
-          setZurueckziehenId(null);
-          setZurueckziehenGrund('');
-        }}
       >
         <Input.TextArea
           aria-label="Grund des Zurückziehens"
@@ -1224,6 +1235,8 @@ export default function NachforderungenPage() {
           </div>
         )}
       </Modal>
+      {ablehnenSchutz.rueckfrage}
+      {zurueckziehenSchutz.rueckfrage}
     </EinsatzSeite>
   );
 }

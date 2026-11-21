@@ -122,7 +122,7 @@ describe('VollzugMeldenModal — Speicherfehler im Dialog (LFH-1077)', () => {
     // Öffnen.
     await waitFor(() => expect(melde).toHaveBeenCalledTimes(2));
     await userEvent.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await screen.findByRole('dialog', { name: 'Vollzug melden' });
     await waitFor(() =>
       expect(within(wieder).getByPlaceholderText('Rückmeldung zur Erledigung')).toHaveValue(''),
     );
@@ -142,8 +142,10 @@ describe('VollzugMeldenModal — Speicherfehler im Dialog (LFH-1077)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
     // ein, und jsdom beendet die Animation nie.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // Mit Text fragt Abbrechen nach (LLH-2010).
+    await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
-    const wieder = await screen.findByRole('dialog');
+    const wieder = await screen.findByRole('dialog', { name: 'Vollzug melden' });
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 
@@ -184,5 +186,60 @@ describe('VollzugMeldenModal — Speicherfehler im Dialog (LFH-1077)', () => {
     );
     expect(feld).toHaveValue('Deich gehalten');
     expect(document.querySelector('.ant-zoom-leave')).toBeNull();
+  });
+});
+
+/**
+ * LLH-2010: Eine getippte Vollzugsmeldung geht nicht still verloren (`frontend/AGENTS.md`,
+ * „Erfassungs-Norm“): die Maske schließt nie, mit Text fragen Kreuz und Abbrechen nach.
+ */
+describe('VollzugMeldenModal — Rückfrage vor dem Verwerfen (LLH-2010)', () => {
+  const kreuz = () => screen.getByRole('button', { name: /Close|Schliessen|Schließen/i });
+  const rueckfrage = () => {
+    const d = screen.queryByRole('dialog', { name: 'Eingaben verwerfen?' });
+    return d && !d.classList.contains('ant-zoom-leave') ? d : null;
+  };
+
+  it('die Maske schließt nicht, auch ohne Text', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<Harness melde={vi.fn()} onAbbrechen={onAbbrechen} />);
+    await screen.findByRole('dialog');
+    await userEvent.click(document.querySelector<HTMLElement>('.ant-modal-wrap')!);
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it('das Kreuz mit Text fragt nach; „Verwerfen“ schließt', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<Harness melde={vi.fn()} onAbbrechen={onAbbrechen} />);
+    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Erledigt');
+    await userEvent.click(kreuz());
+    expect(
+      await screen.findByText('Die Eingaben in „Vollzug melden“ gehen verloren.'),
+    ).toBeInTheDocument();
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it('das Kreuz ohne Text schließt still', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<Harness melde={vi.fn()} onAbbrechen={onAbbrechen} />);
+    await userEvent.click(kreuz());
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('nach „Verwerfen“ und erneutem Öffnen ist das Feld leer, und Abbrechen schließt still', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(<Harness melde={vi.fn()} onAbbrechen={onAbbrechen} />);
+    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Erledigt');
+    await userEvent.click(kreuz());
+    await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Vollzug melden' });
+    expect(within(dialog).getByPlaceholderText('Rückmeldung zur Erledigung')).toHaveValue('');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).toHaveBeenCalledTimes(2);
+    expect(rueckfrage()).toBeNull();
   });
 });

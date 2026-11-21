@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import ZeichenWahlDialog from './ZeichenWahlDialog';
 import type { FreiesZeichenUpdate } from '../../api/types';
@@ -93,5 +94,21 @@ describe('ZeichenWahlDialog (LLH-1038): der Zeichen-Picker aus „Weitere …“
     renderMitProviders(<MitSeite onPlatzieren={onPlatzieren} />);
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(onPlatzieren).not.toHaveBeenCalled();
+  });
+});
+
+/** LLH-2010: ein Tipp neben den Dialog verwirft die Auswahl nicht (`frontend/AGENTS.md`, „Erfassungs-Norm“). */
+describe('ZeichenWahlDialog — Maske (LLH-2010)', () => {
+  it('die Maske schließt den Dialog nicht', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ZeichenWahlDialog offen quelle="maus" onPlatzieren={vi.fn()} onAbbrechen={onAbbrechen} />,
+    );
+    const maske = screen
+      .getByRole('dialog', { name: 'Taktisches Zeichen' })
+      .closest('.ant-modal-wrap');
+    // userEvent statt fireEvent: rc-dialog schließt nur nach mousedown UND click auf der Maske.
+    await userEvent.click(maske as HTMLElement);
+    expect(onAbbrechen).not.toHaveBeenCalled();
   });
 });

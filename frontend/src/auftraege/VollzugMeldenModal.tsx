@@ -2,6 +2,7 @@ import { Input, Modal } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { Speicherung } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { useVerwerfenSchutz } from '../components/VerlassenRueckfrage';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import { useRollen } from '../components/instrument';
 import { IconWarndreieck } from '../icons';
@@ -61,87 +62,96 @@ export default function VollzugMeldenModal({
   // `onCancel` zurück; Knopf und Kreuz zeigen die Sperre, Maske und Escape sind ausdrücklich aus.
   const meldet = speicherung?.isPending === true;
 
+  const schutz = useVerwerfenSchutz({
+    geaendert: !leer,
+    gesperrt: meldet,
+    titel: 'Vollzug melden',
+    onSchliessen: () => {
+      abbruchGeneration.current += 1;
+      setText('');
+      setLeerGemeldet(false);
+      raeume();
+      onAbbrechen();
+    },
+  });
+
   return (
-    <Modal
-      title="Vollzug melden"
-      open={offen}
-      okText="Vollzug melden"
-      cancelText="Abbrechen"
-      okButtonProps={{ disabled: zuLang }}
-      confirmLoading={meldet}
-      cancelButtonProps={{ disabled: meldet }}
-      closable={meldet ? { disabled: true } : true}
-      mask={{ closable: !meldet }}
-      keyboard={!meldet}
-      onCancel={() => {
-        abbruchGeneration.current += 1;
-        setText('');
-        setLeerGemeldet(false);
-        raeume();
-        onAbbrechen();
-      }}
-      onOk={async () => {
-        if (zuLang) return;
-        if (leer) {
-          setLeerGemeldet(true);
-          feldRef.current?.focus();
-          return;
-        }
-        const generation = abbruchGeneration.current;
-        try {
-          await onBestaetigen(text.trim());
-        } catch {
-          // Der Grund steht über `speicherung` im Dialog, der Text bleibt stehen.
-          return;
-        }
-        if (generation === abbruchGeneration.current) setText('');
-      }}
-    >
-      <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
-        Vollzugsmeldung
-      </label>
-      <Input.TextArea
-        id={feldId}
-        ref={feldRef}
-        rows={3}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          if (e.target.value.trim() !== '') setLeerGemeldet(false);
+    <>
+      <Modal
+        title="Vollzug melden"
+        open={offen}
+        okText="Vollzug melden"
+        cancelText="Abbrechen"
+        okButtonProps={{ disabled: zuLang }}
+        confirmLoading={meldet}
+        cancelButtonProps={{ disabled: meldet }}
+        closable={meldet ? { disabled: true } : true}
+        // Maske, Kreuz, Escape und Abbrechen über den Schutz (LLH-2010): mit Text erst die Rückfrage.
+        {...schutz.modalProps}
+        onOk={async () => {
+          if (zuLang) return;
+          if (leer) {
+            setLeerGemeldet(true);
+            feldRef.current?.focus();
+            return;
+          }
+          const generation = abbruchGeneration.current;
+          try {
+            await onBestaetigen(text.trim());
+          } catch {
+            // Der Grund steht über `speicherung` im Dialog, der Text bleibt stehen.
+            return;
+          }
+          if (generation === abbruchGeneration.current) setText('');
         }}
-        placeholder="Rückmeldung zur Erledigung"
-        status={leerGemeldet ? 'error' : undefined}
-        aria-invalid={leerGemeldet || undefined}
-        aria-describedby={leerGemeldet ? grundId : undefined}
-        // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
-        count={zeichenGrenze(ETB_INHALT_MAX)}
-      />
-      {leerGemeldet && (
-        // Zeichen und Wort neben der Farbe (WCAG 1.4.1), wie die Gründe der ETB-Fußzeile.
-        <div
-          id={grundId}
-          role="alert"
-          style={{
-            color: rollen.alarmText,
-            display: 'flex',
-            alignItems: 'center',
-            gap: token.marginXXS,
-            marginTop: token.marginXXS,
+      >
+        <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
+          Vollzugsmeldung
+        </label>
+        <Input.TextArea
+          id={feldId}
+          ref={feldRef}
+          rows={3}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (e.target.value.trim() !== '') setLeerGemeldet(false);
           }}
-        >
-          <IconWarndreieck />
-          <span>Vollzugsmeldung fehlt</span>
-        </div>
-      )}
-      {speicherung?.error != null && (
-        <div style={{ marginTop: token.marginSM }}>
-          <SpeicherFehler
-            fehler={speicherung.error}
-            titel="Vollzug nicht gemeldet"
-            fallback="Melden fehlgeschlagen"
-          />
-        </div>
-      )}
-    </Modal>
+          placeholder="Rückmeldung zur Erledigung"
+          status={leerGemeldet ? 'error' : undefined}
+          aria-invalid={leerGemeldet || undefined}
+          aria-describedby={leerGemeldet ? grundId : undefined}
+          // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
+          count={zeichenGrenze(ETB_INHALT_MAX)}
+        />
+        {leerGemeldet && (
+          // Zeichen und Wort neben der Farbe (WCAG 1.4.1), wie die Gründe der ETB-Fußzeile.
+          <div
+            id={grundId}
+            role="alert"
+            style={{
+              color: rollen.alarmText,
+              display: 'flex',
+              alignItems: 'center',
+              gap: token.marginXXS,
+              marginTop: token.marginXXS,
+            }}
+          >
+            <IconWarndreieck />
+            <span>Vollzugsmeldung fehlt</span>
+          </div>
+        )}
+        {speicherung?.error != null && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={speicherung.error}
+              titel="Vollzug nicht gemeldet"
+              fallback="Melden fehlgeschlagen"
+            />
+          </div>
+        )}
+      </Modal>
+      {schutz.rueckfrage}
+    </>
   );
 }

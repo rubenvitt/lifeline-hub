@@ -1,9 +1,10 @@
 // src/etb/BausteinPlatzhalterModal.tsx
-import { Button, Form, Input, Modal } from 'antd';
+import { Form, Input } from 'antd';
 import { useEffect } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
-import { Feld, Stapel } from '../components/instrument';
+import { ErfassungsModal } from '../components/Erfassung';
+import { Feld } from '../components/instrument';
 import { ermittlePlatzhalter, setzeBausteinEin, type BausteinFelder } from './bausteinEinsetzen';
 
 interface Props {
@@ -27,56 +28,39 @@ export default function BausteinPlatzhalterModal({
   const { konventionen } = useAnzeigeKonventionen();
   const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz, konventionen) : [];
 
-  // Bausteine ohne manuelle Platzhalter sofort einsetzen (kein Dialog nötig).
+  // Bausteine ohne manuelle Platzhalter sofort einsetzen (kein Dialog nötig). Das Formular wird
+  // dabei nicht angefasst: antds `Modal` rendert sein `<Form>` erst beim ersten Öffnen (LFH-624).
   useEffect(() => {
     if (!baustein) return;
     if (offenePlatzhalter.length === 0) {
       onEinsetzen(setzeBausteinEin(baustein, einsatz, {}, konventionen));
-      return;
     }
-    // Zurückgesetzt wird nur, wenn der Dialog aufgeht: antds `Modal` rendert sein
-    // `<Form>` erst beim ersten Öffnen, und eine Formularinstanz ohne `<Form>`
-    // anzufassen meldet rc-field-form als „not connected" (LFH-624).
-    form.resetFields();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baustein]);
 
-  function anwenden(werte: Record<string, string>) {
-    if (!baustein) return;
-    onEinsetzen(setzeBausteinEin(baustein, einsatz, werte, konventionen));
-    form.resetFields();
-  }
-
-  function abbrechen() {
-    form.resetFields();
-    onAbbrechenAll();
-  }
-
   const dialogOffen = baustein !== null && offenePlatzhalter.length > 0;
 
+  // Über die Erfassungshülle (LLH-2010, `frontend/AGENTS.md`, „Erfassungs-Norm“): die Maske
+  // schließt nie, getippte Werte fragen vor dem Verwerfen, jeder Weg hinaus leert.
   return (
-    <Modal
-      open={dialogOffen}
-      title="Baustein einsetzen"
-      footer={null}
-      onCancel={abbrechen}
-      destroyOnHidden
+    <ErfassungsModal<Record<string, string>>
+      offen={dialogOffen}
+      titel="Baustein einsetzen"
+      form={form}
+      erfassenText="Einsetzen"
+      onErfassen={async (werte) => {
+        if (!baustein) return;
+        onEinsetzen(setzeBausteinEin(baustein, einsatz, werte, konventionen));
+      }}
+      // Geschlossen hat der Aufrufer schon in `onEinsetzen` (Baustein auf null).
+      onFertig={() => {}}
+      onAbbrechen={onAbbrechenAll}
     >
-      <Form<Record<string, string>> form={form} layout="vertical" onFinish={anwenden}>
-        <Stapel abstand="xs">
-          {offenePlatzhalter.map((name, index) => (
-            <Feld key={name} name={name} label={name}>
-              <Input aria-label={name} autoFocus={index === 0} />
-            </Feld>
-          ))}
-          {/* Eigene Hülle: im Stapel würde der Knopf sonst auf die ganze Breite gestreckt. */}
-          <div>
-            <Button type="primary" htmlType="submit">
-              Einsetzen
-            </Button>
-          </div>
-        </Stapel>
-      </Form>
-    </Modal>
+      {offenePlatzhalter.map((name, index) => (
+        <Feld key={name} name={name} label={name}>
+          <Input aria-label={name} autoFocus={index === 0} />
+        </Feld>
+      ))}
+    </ErfassungsModal>
   );
 }

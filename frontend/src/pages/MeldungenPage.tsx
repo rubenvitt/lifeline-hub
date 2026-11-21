@@ -1126,9 +1126,12 @@ export default function MeldungenPage() {
         senden={lageSpeicherung.isPending}
         einsatzId={einsatzId}
         onAbbrechen={() => setLageAuswahl(null)}
-        onUebergeben={(daten) => {
-          if (lageMeldung) lageMutation.mutate({ einsatzId, meldungId: lageMeldung.id, daten });
-        }}
+        // mutateAsync: die Erfassungshülle leert erst, wenn die Übernahme angekommen ist.
+        onUebergeben={(daten) =>
+          lageMeldung
+            ? lageMutation.mutateAsync({ einsatzId, meldungId: lageMeldung.id, daten })
+            : Promise.resolve()
+        }
         speicherung={lageSpeicherung}
       />
       <AuftragErteilenModal

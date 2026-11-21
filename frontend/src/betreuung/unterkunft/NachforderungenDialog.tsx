@@ -10,6 +10,7 @@ import type {
 import { MengenFeld } from '../../components/MengenFeld';
 import { Select } from '../../components/Select';
 import { SperrStelle, Stapel, useRollen, useSperrSammler } from '../../components/instrument';
+import { useVerwerfenSchutz } from '../../components/VerlassenRueckfrage';
 import { neueClientId } from '../../offline/clientId';
 import {
   ADRESSAT_OPTIONEN,
@@ -105,6 +106,18 @@ export default function NachforderungenDialog({
   const [laeuft, setLaeuft] = useState(false);
   const [schluessel] = useState(() => clientIds ?? new Map<string, string>());
 
+  // Stand beim Öffnen: geändert ist, was davon abweicht (Haken, Menge, Adressat, Priorität).
+  const [start] = useState(() => ({ zeilen, adressat, prioritaet }));
+  const geaendert =
+    adressat !== start.adressat ||
+    prioritaet !== start.prioritaet ||
+    zeilen.some((z, i) => {
+      const s0 = start.zeilen[i];
+      return !z.angelegt && (z.an !== s0.an || z.anzahl !== s0.anzahl);
+    });
+  const titel = `Nachforderungen für ${stelleName}`;
+  const schutz = useVerwerfenSchutz({ geaendert, gesperrt: laeuft, titel, onSchliessen });
+
   // Eine Anzahl außerhalb der Grenzen sperrt „Anlegen“ und steht als Grund darunter (LLH-1768).
   const [sperrGrund, setSperrGrund] = useState<string | null>(null);
   const sperre = useSperrSammler(setSperrGrund);
@@ -160,111 +173,114 @@ export default function NachforderungenDialog({
   };
 
   return (
-    <Modal
-      open
-      title={`Nachforderungen für ${stelleName}`}
-      okText={knopf}
-      cancelText="Schließen"
-      okButtonProps={{ disabled: n === 0 || sperrGrund !== null }}
-      confirmLoading={laeuft}
-      onOk={() => void anlegen()}
-      onCancel={laeuft ? undefined : onSchliessen}
-      closable={!laeuft}
-      mask={{ closable: !laeuft }}
-      destroyOnHidden
-    >
-      <Stapel abstand="md">
-        <SperrStelle melden={sperre.melden}>
-          <div role="group" aria-label="Posten">
-            {zeilen.map((z) => (
-              <div key={z.schluessel} style={zeile}>
-                <Checkbox
-                  checked={z.an}
-                  disabled={z.angelegt || laeuft}
-                  onChange={(ev) =>
-                    setZeilen((alt) =>
-                      alt.map((x) =>
-                        x.schluessel === z.schluessel ? { ...x, an: ev.target.checked } : x,
-                      ),
-                    )
-                  }
-                >
-                  <span style={{ display: 'grid' }}>
-                    <span>{z.art}</span>
-                    {z.bezeichnung && (
-                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                        {z.bezeichnung}
-                      </Typography.Text>
-                    )}
-                    {z.angelegt && (
-                      <Typography.Text type="success" style={{ fontSize: token.fontSizeSM }}>
-                        angelegt
-                      </Typography.Text>
-                    )}
-                    {z.fehler && (
-                      <Typography.Text type="danger" style={{ fontSize: token.fontSizeSM }}>
-                        {z.fehler}
-                      </Typography.Text>
-                    )}
-                  </span>
-                </Checkbox>
-                <MengenFeld
-                  beschriftung={`Anzahl ${z.art}`}
-                  min={1}
-                  max={1_000_000}
-                  value={z.anzahl}
-                  disabled={z.angelegt || laeuft}
-                  onChange={(v) =>
-                    setZeilen((alt) =>
-                      alt.map((x) =>
-                        x.schluessel === z.schluessel ? { ...x, anzahl: v ?? 0 } : x,
-                      ),
-                    )
-                  }
-                  style={{ width: '100%' }}
-                />
-              </div>
-            ))}
+    <>
+      <Modal
+        open
+        title={titel}
+        okText={knopf}
+        cancelText="Schließen"
+        okButtonProps={{ disabled: n === 0 || sperrGrund !== null }}
+        confirmLoading={laeuft}
+        onOk={() => void anlegen()}
+        closable={!laeuft}
+        // Maske, Kreuz, Escape und „Schließen“ über den Schutz (LLH-2010).
+        {...schutz.modalProps}
+        destroyOnHidden
+      >
+        <Stapel abstand="md">
+          <SperrStelle melden={sperre.melden}>
+            <div role="group" aria-label="Posten">
+              {zeilen.map((z) => (
+                <div key={z.schluessel} style={zeile}>
+                  <Checkbox
+                    checked={z.an}
+                    disabled={z.angelegt || laeuft}
+                    onChange={(ev) =>
+                      setZeilen((alt) =>
+                        alt.map((x) =>
+                          x.schluessel === z.schluessel ? { ...x, an: ev.target.checked } : x,
+                        ),
+                      )
+                    }
+                  >
+                    <span style={{ display: 'grid' }}>
+                      <span>{z.art}</span>
+                      {z.bezeichnung && (
+                        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                          {z.bezeichnung}
+                        </Typography.Text>
+                      )}
+                      {z.angelegt && (
+                        <Typography.Text type="success" style={{ fontSize: token.fontSizeSM }}>
+                          angelegt
+                        </Typography.Text>
+                      )}
+                      {z.fehler && (
+                        <Typography.Text type="danger" style={{ fontSize: token.fontSizeSM }}>
+                          {z.fehler}
+                        </Typography.Text>
+                      )}
+                    </span>
+                  </Checkbox>
+                  <MengenFeld
+                    beschriftung={`Anzahl ${z.art}`}
+                    min={1}
+                    max={1_000_000}
+                    value={z.anzahl}
+                    disabled={z.angelegt || laeuft}
+                    onChange={(v) =>
+                      setZeilen((alt) =>
+                        alt.map((x) =>
+                          x.schluessel === z.schluessel ? { ...x, anzahl: v ?? 0 } : x,
+                        ),
+                      )
+                    }
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </SperrStelle>
+          {sperrGrund && <Typography.Text type="danger">{sperrGrund}</Typography.Text>}
+          <div
+            style={{
+              display: 'grid',
+              gap: token.marginSM,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
+            }}
+          >
+            <label style={{ display: 'grid', gap: token.marginXS }}>
+              <Typography.Text type="secondary">Adressat</Typography.Text>
+              <Select<AdressatKategorie>
+                aria-label="Adressat"
+                options={ADRESSAT_OPTIONEN}
+                value={adressat}
+                onChange={setAdressat}
+                disabled={laeuft}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: token.marginXS }}>
+              <Typography.Text type="secondary">Priorität</Typography.Text>
+              <Select<NachforderungPrioritaet>
+                aria-label="Priorität"
+                options={PRIORITAET_OPTIONEN}
+                value={prioritaet}
+                onChange={setPrioritaet}
+                disabled={laeuft}
+              />
+            </label>
           </div>
-        </SperrStelle>
-        {sperrGrund && <Typography.Text type="danger">{sperrGrund}</Typography.Text>}
-        <div
-          style={{
-            display: 'grid',
-            gap: token.marginSM,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
-          }}
-        >
-          <label style={{ display: 'grid', gap: token.marginXS }}>
-            <Typography.Text type="secondary">Adressat</Typography.Text>
-            <Select<AdressatKategorie>
-              aria-label="Adressat"
-              options={ADRESSAT_OPTIONEN}
-              value={adressat}
-              onChange={setAdressat}
-              disabled={laeuft}
+          {gescheitert.length > 0 && (
+            <Alert
+              type="error"
+              showIcon
+              title={`${gescheitert.length} Posten nicht angelegt`}
+              description={gescheitert.map((z) => z.art).join(', ')}
             />
-          </label>
-          <label style={{ display: 'grid', gap: token.marginXS }}>
-            <Typography.Text type="secondary">Priorität</Typography.Text>
-            <Select<NachforderungPrioritaet>
-              aria-label="Priorität"
-              options={PRIORITAET_OPTIONEN}
-              value={prioritaet}
-              onChange={setPrioritaet}
-              disabled={laeuft}
-            />
-          </label>
-        </div>
-        {gescheitert.length > 0 && (
-          <Alert
-            type="error"
-            showIcon
-            title={`${gescheitert.length} Posten nicht angelegt`}
-            description={gescheitert.map((z) => z.art).join(', ')}
-          />
-        )}
-      </Stapel>
-    </Modal>
+          )}
+        </Stapel>
+      </Modal>
+      {schutz.rueckfrage}
+    </>
   );
 }
