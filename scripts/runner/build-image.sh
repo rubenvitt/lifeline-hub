@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Baut das Runner-Image `lifeline-runner:latest` für den eigenen Server (LLH-1666, ADR-0025,
+# Baut das Runner-Image `lifeline-runner:latest` für den eigenen Server (LLH-1666, ADR-0075,
 # `scripts/runner/README.md`).
 #
 #   build-image.sh            baut aus dem Stand dieses Checkouts
