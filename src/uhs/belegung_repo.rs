@@ -558,19 +558,17 @@ async fn pruefe_platz_belegbar(
     platz_id: i64,
     person_id: i64,
 ) -> Result<(), AppError> {
-    let row: Option<(i64, String, Option<i64>)> = sqlx::query_as(
-        "SELECT uhs_id, verfuegbarkeit, reserviert_fuer_person_id \
-         FROM uhs_platz WHERE id = ? AND storniert_at IS NULL",
+    // LLH-1879: Ein Platz einer anderen UHS antwortet wie ein fehlender mit 404, sonst verriete
+    // der Unterschied 400/404 die Existenz fremder Plätze (wie LLH-1694 beim Storno).
+    let row: Option<(String, Option<i64>)> = sqlx::query_as(
+        "SELECT verfuegbarkeit, reserviert_fuer_person_id \
+         FROM uhs_platz WHERE id = ? AND uhs_id = ? AND storniert_at IS NULL",
     )
     .bind(platz_id)
+    .bind(uhs_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (platz_uhs, verf, res_fuer) = row.ok_or(AppError::NotFound)?;
-    if platz_uhs != uhs_id {
-        return Err(AppError::Validation(
-            "Platz gehört nicht zu dieser UHS".into(),
-        ));
-    }
+    let (verf, res_fuer) = row.ok_or(AppError::NotFound)?;
     match verf.as_str() {
         "frei" => Ok(()),
         "reserviert" if res_fuer == Some(person_id) => Ok(()),
@@ -946,6 +944,46 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)));
+    }
+
+    /// LLH-1879: Ein Platz einer anderen UHS antwortet wie ein fehlender mit 404. Sonst verriete
+    /// der Unterschied 400/404 die Existenz fremder Plätze.
+    #[tokio::test]
+    async fn eintritt_auf_fremden_platz_ist_404_nicht_400() {
+        let pool = test_pool().await;
+        let (b, e, u, ug, pa, _, p) = setup(&pool).await;
+        uhs_repo::setze_status(&pool, e, ug, "aktiv", b)
+            .await
+            .unwrap();
+        // pa gehört zu u, nicht zu ug:
+        let err = eintritt(&pool, e, p, ug, Some(pa), None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fremder Platz → 404, war {err:?}"
+        );
+        assert_eq!(cache(&pool, p).await, (None, None), "nichts geschrieben");
+    }
+
+    /// LLH-1879: Der Wechsel auf einen Platz einer anderen UHS antwortet ebenso mit 404.
+    #[tokio::test]
+    async fn wechsel_auf_fremden_platz_ist_404_nicht_400() {
+        let pool = test_pool().await;
+        let (b, e, u, ug, pa, _, p) = setup(&pool).await;
+        uhs_repo::setze_status(&pool, e, ug, "aktiv", b)
+            .await
+            .unwrap();
+        eintritt(&pool, e, p, u, None, None, b).await.unwrap();
+        // Ziel ug, Platz pa aus u:
+        let err = wechsel(&pool, e, p, ug, Some(pa), None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fremder Platz → 404, war {err:?}"
+        );
+        assert_eq!(cache(&pool, p).await, (Some(u), None), "Belegung unverändert");
     }
 
     #[tokio::test]
