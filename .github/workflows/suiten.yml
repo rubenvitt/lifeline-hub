@@ -89,8 +89,9 @@ jobs:
           echo "Rust-, Frontend- und e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Rust-Suite ──────────────────────────────────────────────────────────────────────
-  # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Dieser Job pflegt als
-  # einziger den geteilten Cargo-Cache (save-if: true, die Vorgabe).
+  # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Läuft er gehostet, pflegt
+  # er den geteilten Cargo-Cache (save-if: true, die Vorgabe); auf dem eigenen Server übernehmen das
+  # die Schnellprüfungen (ci.yml).
   rust:
     name: Rust-Suite
     # Auf einem Kanal-Branch bricht ein neuer Push diesen Job ab (s. Kopf); im PR je Lauf.
@@ -103,8 +104,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen). Nur gehostet: auf dem eigenen Server gibt
+      # es kein `sudo`, und der Container beginnt leer.
       - name: Plattenplatz schaffen (nur bei Bedarf)
+        if: runner.environment == 'github-hosted'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -116,7 +119,10 @@ jobs:
           df -h /
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
+      # Auf dem eigenen Server bringt das Image dieselben Pakete mit (`scripts/runner/Dockerfile`,
+      # Liste dort gleich halten); der nächste Schritt prüft das.
       - name: System-Werkzeuge für die nativen Crates
+        if: runner.environment == 'github-hosted'
         # Die WebKit-Pakete sind groß: bei tröpfelndem Spiegel reichen 300 s je Versuch nicht
         # (LLH-1420). Was ein abgebrochener Versuch schon geladen hat, bleibt im apt-Cache liegen.
         env:
@@ -125,9 +131,19 @@ jobs:
           ./scripts/apt-pakete.sh nasm
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
           librsvg2-dev libayatana-appindicator3-dev
+      - name: Desktop-Pakete im Image (eigener Runner)
+        if: runner.environment != 'github-hosted'
+        run: |
+          pkg-config --exists webkit2gtk-4.1 gtk+-3.0 libsoup-3.0 javascriptcoregtk-4.1 librsvg-2.0 ayatana-appindicator3-0.1 || {
+            echo "::error::Dem Runner-Image fehlen die GTK/WebKit-Pakete der Desktop-Hülle. Image auf dem Server neu bauen (scripts/runner/README.md, „Nach einem Merge“)."
+            exit 1
+          }
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Nur gehostet: auf dem eigenen Server hält `sccache` den Build warm (Volume). Läuft dieser
+      # Job dort, pflegen die Schnellprüfungen den geteilten Eintrag (`save-if` in ci.yml).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: runner.environment == 'github-hosted'
         with:
           shared-key: rust-openssl-vendored
           cache-on-failure: true

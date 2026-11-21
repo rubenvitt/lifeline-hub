@@ -1,4 +1,4 @@
-# Runner-Image für die e2e-Jobs auf dem eigenen Server (LLH-1666, ADR-0025).
+# Runner-Image für die schweren Suiten auf dem eigenen Server (LLH-1666, LLH-2014, ADR-0075).
 #
 # Ein Container aus diesem Image nimmt genau einen Job und wird danach gelöscht
 # (`runner-loop.sh`). Darum steckt hier alles, wofür der Job auf einem gehosteten Runner `sudo`
@@ -31,10 +31,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # vendorte OpenSSL perl und make), dazu was Actions und Caches erwarten. DejaVu, weil die App für
 # Text auf die Systemschrift zurückfällt (kein `@font-face`, `frontend/src/theme/schriften.test.ts`)
 # und `ubuntu-latest` dafür DejaVu Sans nimmt: sonst wichen Textbreiten in den Layout-Gates ab.
+# Die GTK/WebKit-Pakete braucht die Rust-Suite für die Desktop-Hülle (LLH-2014); dieselbe Liste
+# steht im Job `rust` von `suiten.yml`.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     build-essential ca-certificates cmake curl fonts-dejavu-core git nasm perl pkg-config tzdata \
     unzip xz-utils zstd \
+    libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+    librsvg2-dev libayatana-appindicator3-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Playwright-Browser und ihre Systempakete, in genau der Version des Lockfiles. Node nur für diesen
