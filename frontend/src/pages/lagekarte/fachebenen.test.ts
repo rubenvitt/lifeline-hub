@@ -19,7 +19,7 @@ import {
   energieNennung,
   fachebeneAlter,
   copernicusAktivierungen,
-  copernicusAusschnittPasst,
+  fitsCopernicusAusschnitt,
 } from './fachebenen';
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
@@ -590,10 +590,10 @@ describe('Copernicus (LLH-1200)', () => {
   });
 
   it('bremst große Ausschnitte wie das Backend (3° je Achse)', () => {
-    expect(copernicusAusschnittPasst('9,48,12,51')).toBe(true);
-    expect(copernicusAusschnittPasst('9,48,12.1,51')).toBe(false);
-    expect(copernicusAusschnittPasst('9,48,12,51.1')).toBe(false);
-    expect(copernicusAusschnittPasst('kaputt')).toBe(true);
+    expect(fitsCopernicusAusschnitt('9,48,12,51')).toBe(true);
+    expect(fitsCopernicusAusschnitt('9,48,12.1,51')).toBe(false);
+    expect(fitsCopernicusAusschnitt('9,48,12,51.1')).toBe(false);
+    expect(fitsCopernicusAusschnitt('kaputt')).toBe(true);
   });
 
   it('färbt je Klasse und zeichnet Linien und Punkte mit', () => {

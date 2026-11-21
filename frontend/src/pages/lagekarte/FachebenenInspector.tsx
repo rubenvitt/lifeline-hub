@@ -34,7 +34,7 @@ import { istAngekuendigt } from './dwdGueltigkeit';
 import { alsText as s, fachebeneTitel, pick } from './fachebeneTitel';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
-import { copernicusAufnahmeAlt, copernicusDarstellung } from './copernicusStil';
+import { isCopernicusAufnahmeAlt, copernicusDarstellung } from './copernicusStil';
 import { hochwasserDarstellung } from './hochwasserStil';
 import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
@@ -775,7 +775,7 @@ function CopernicusInhalt({ p }: { p: Record<string, unknown> }) {
       <div style={{ marginBottom: token.marginSM }}>
         <Status darstellung={copernicusDarstellung(p.klasse)} />
       </div>
-      {copernicusAufnahmeAlt(aufnahme, jetzt) && (
+      {isCopernicusAufnahmeAlt(aufnahme, jetzt) && (
         <div
           data-lfh="copernicus-aufnahme-alt"
           style={{ marginBottom: token.marginSM, color: rollen.achtungText }}

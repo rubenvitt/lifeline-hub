@@ -76,7 +76,7 @@ pub(crate) enum EbenenArt {
 }
 
 /// Liest die öffentliche Liste. `None`, wenn `results` fehlt: ein Formatbruch, nicht „leer“.
-pub(crate) fn lies_liste(v: &Value) -> Option<Vec<Aktivierung>> {
+pub(crate) fn parse_liste(v: &Value) -> Option<Vec<Aktivierung>> {
     let ergebnisse = v.get("results")?.as_array()?;
     Some(
         ergebnisse
@@ -87,11 +87,11 @@ pub(crate) fn lies_liste(v: &Value) -> Option<Vec<Aktivierung>> {
                     mittelpunkt: a
                         .get("centroid")
                         .and_then(Value::as_str)
-                        .and_then(wkt_punkt),
+                        .and_then(parse_wkt_punkt),
                     letzte_aenderung: a
                         .get("lastUpdate")
                         .and_then(Value::as_str)
-                        .and_then(lies_zeit),
+                        .and_then(parse_zeit),
                     abgeschlossen: a.get("closed").and_then(Value::as_bool).unwrap_or(false),
                     produkte: a.get("n_products").and_then(Value::as_u64).unwrap_or(0),
                 })
@@ -101,8 +101,8 @@ pub(crate) fn lies_liste(v: &Value) -> Option<Vec<Aktivierung>> {
 }
 
 /// `POINT (lon lat)` → `(lon, lat)`.
-pub(crate) fn wkt_punkt(s: &str) -> Option<(f64, f64)> {
-    let g = wkt_geometrie(s)?;
+pub(crate) fn parse_wkt_punkt(s: &str) -> Option<(f64, f64)> {
+    let g = parse_wkt_geometrie(s)?;
     if g["type"] != "Point" {
         return None;
     }
@@ -112,7 +112,7 @@ pub(crate) fn wkt_punkt(s: &str) -> Option<(f64, f64)> {
 
 /// WKT `POINT`, `POLYGON` oder `MULTIPOLYGON` → GeoJSON-Geometrie. Andere Typen und kaputte
 /// Klammern → `None`.
-pub(crate) fn wkt_geometrie(s: &str) -> Option<Value> {
+pub(crate) fn parse_wkt_geometrie(s: &str) -> Option<Value> {
     let s = s.trim();
     let klammer = s.find('(')?;
     let typ = s[..klammer].trim().to_ascii_uppercase();
@@ -123,7 +123,7 @@ pub(crate) fn wkt_geometrie(s: &str) -> Option<Value> {
         _ => return None,
     };
     let mut rest = &s[klammer..];
-    let koordinaten = lies_wkt_gruppe(&mut rest, 0)?;
+    let koordinaten = parse_wkt_gruppe(&mut rest, 0)?;
     if !rest.trim().is_empty() {
         return None;
     }
@@ -133,16 +133,16 @@ pub(crate) fn wkt_geometrie(s: &str) -> Option<Value> {
     } else {
         koordinaten
     };
-    if wkt_tiefe(&koordinaten) != tiefe + 1 {
+    if wkt_depth(&koordinaten) != tiefe + 1 {
         return None;
     }
     Some(serde_json::json!({ "type": geojson_typ, "coordinates": koordinaten }))
 }
 
 /// Verschachtelungstiefe eines Koordinaten-Arrays: `[lon, lat]` hat 1.
-fn wkt_tiefe(v: &Value) -> usize {
+fn wkt_depth(v: &Value) -> usize {
     match v.as_array().and_then(|a| a.first()) {
-        Some(erstes) if erstes.is_array() => 1 + wkt_tiefe(erstes),
+        Some(erstes) if erstes.is_array() => 1 + wkt_depth(erstes),
         Some(_) => 1,
         None => 0,
     }
@@ -151,7 +151,7 @@ fn wkt_tiefe(v: &Value) -> usize {
 /// Liest `( … )` ab `rest`: entweder Untergruppen `((…), (…))` oder Punkte `x y, x y`. Die
 /// Tiefe wird VOR dem Abstieg geprüft: fremdes WKT mit Tausenden `(` liefe sonst über den Stack
 /// des Workers, und das ist keine Panik, sondern das Ende des Prozesses.
-fn lies_wkt_gruppe(rest: &mut &str, tiefe: usize) -> Option<Value> {
+fn parse_wkt_gruppe(rest: &mut &str, tiefe: usize) -> Option<Value> {
     *rest = rest.trim_start().strip_prefix('(')?;
     if rest.trim_start().starts_with('(') {
         if tiefe + 1 >= WKT_MAX_TIEFE {
@@ -159,7 +159,7 @@ fn lies_wkt_gruppe(rest: &mut &str, tiefe: usize) -> Option<Value> {
         }
         let mut teile = Vec::new();
         loop {
-            teile.push(lies_wkt_gruppe(rest, tiefe + 1)?);
+            teile.push(parse_wkt_gruppe(rest, tiefe + 1)?);
             let r = rest.trim_start();
             if let Some(weiter) = r.strip_prefix(',') {
                 *rest = weiter;
@@ -188,8 +188,8 @@ fn lies_wkt_gruppe(rest: &mut &str, tiefe: usize) -> Option<Value> {
 }
 
 /// Rechteck um alle Koordinaten einer GeoJSON-Geometrie.
-pub(crate) fn huelle(geometrie: &Value) -> Option<Bbox> {
-    fn sammle(v: &Value, h: &mut Option<Bbox>) {
+pub(crate) fn bounding_box(geometrie: &Value) -> Option<Bbox> {
+    fn collect_bbox(v: &Value, h: &mut Option<Bbox>) {
         let Some(a) = v.as_array() else { return };
         if let [x, y, ..] = a.as_slice() {
             if let (Some(x), Some(y)) = (x.as_f64(), y.as_f64()) {
@@ -207,16 +207,16 @@ pub(crate) fn huelle(geometrie: &Value) -> Option<Bbox> {
             }
         }
         for teil in a {
-            sammle(teil, h);
+            collect_bbox(teil, h);
         }
     }
     let mut h = None;
-    sammle(geometrie.get("coordinates")?, &mut h);
+    collect_bbox(geometrie.get("coordinates")?, &mut h);
     h
 }
 
 /// Schneiden sich zwei Rechtecke? Berührung zählt.
-pub(crate) fn schneidet(a: &Bbox, b: &Bbox) -> bool {
+pub(crate) fn intersects(a: &Bbox, b: &Bbox) -> bool {
     a.west <= b.ost && a.ost >= b.west && a.sued <= b.nord && a.nord >= b.sued
 }
 
@@ -231,7 +231,7 @@ const VORAUSWAHL_RADIUS_M: f64 = 500_000.0;
 /// Kandidaten für einen Ausschnitt: mit Produkten, im Zeitfenster (außer mit `archiv`) und mit
 /// dem Mittelpunkt höchstens [`VORAUSWAHL_RADIUS_M`] vom Ausschnitt entfernt. Reihenfolge der
 /// Liste.
-pub(crate) fn waehle_kandidaten<'a>(
+pub(crate) fn select_kandidaten<'a>(
     liste: &'a [Aktivierung],
     bbox: &Bbox,
     jetzt: NaiveDateTime,
@@ -254,7 +254,7 @@ pub(crate) fn waehle_kandidaten<'a>(
 
 /// Ebenenart aus einem Ebenennamen wie `…_DEL_PRODUCT_floodDepthA_v2_VT`. Der Teil vor der
 /// Version, ohne den letzten Buchstaben (A/L/P = Fläche, Linie, Punkt).
-pub(crate) fn ebenen_art(name: &str) -> Option<EbenenArt> {
+pub(crate) fn parse_ebenen_art(name: &str) -> Option<EbenenArt> {
     let datei = name.rsplit('/').next()?;
     let teile: Vec<&str> = datei.split('_').collect();
     let version = teile.iter().rposition(|t| {
@@ -275,7 +275,7 @@ pub(crate) fn ebenen_art(name: &str) -> Option<EbenenArt> {
 
 impl EbenenArt {
     /// Wire-Wort von `art`.
-    fn wort(self) -> &'static str {
+    fn wire_value(self) -> &'static str {
         match self {
             EbenenArt::Beobachtet => "beobachtet",
             EbenenArt::MaxAusdehnung => "max_ausdehnung",
@@ -289,14 +289,14 @@ impl EbenenArt {
 
 /// Wire-Wort von `klasse` (gepinnt in `bildet_die_copernicus_klassen_ab` und im Frontend in
 /// `theme/statusFarben.test.ts`). `None` ist der Gebietsumriss.
-pub(crate) fn klasse(art: Option<EbenenArt>, props: &Value) -> &'static str {
+pub(crate) fn klasse_of(art: Option<EbenenArt>, props: &Value) -> &'static str {
     let text = |k: &str| props.get(k).and_then(Value::as_str).unwrap_or("").trim();
     match art {
         None => "gebiet",
         Some(EbenenArt::Beobachtet) => "beobachtet",
         Some(EbenenArt::MaxAusdehnung) => "max_ausdehnung",
         Some(EbenenArt::NichtAusgewertet) => "nicht_ausgewertet",
-        Some(EbenenArt::Wassertiefe) => tiefe_klasse(text("value")),
+        Some(EbenenArt::Wassertiefe) => tiefe_klasse_of(text("value")),
         Some(EbenenArt::SchadenGebaeude | EbenenArt::SchadenVerkehr) => {
             match text("damage_gra").to_ascii_lowercase().as_str() {
                 "destroyed" => "zerstoert",
@@ -311,7 +311,7 @@ pub(crate) fn klasse(art: Option<EbenenArt>, props: &Value) -> &'static str {
 
 /// Wassertiefe wie „Below 0.50“, „0.50 - 1.00“, „1.00 - 2.00“ oder „Above 2.00“: die erste Zahl
 /// ist die Untergrenze.
-fn tiefe_klasse(wert: &str) -> &'static str {
+fn tiefe_klasse_of(wert: &str) -> &'static str {
     if wert.to_ascii_lowercase().starts_with("below") {
         return "tiefe_gering";
     }
@@ -329,7 +329,7 @@ fn tiefe_klasse(wert: &str) -> &'static str {
 
 /// Zeitpunkt der Quelle (`2024-06-01T05:06:00`, auch mit Sekundenbruchteil) als UTC im
 /// `zeit::FORMAT` (ADR-0012). Die Quelle nennt Zeiten in UTC ohne Zone.
-fn lies_zeit(s: &str) -> Option<NaiveDateTime> {
+fn parse_zeit(s: &str) -> Option<NaiveDateTime> {
     use chrono::Timelike;
     // Ein angehängtes `Z` sagt nur, was ohnehin gilt (UTC).
     let roh = s.trim().trim_end_matches('Z');
@@ -338,8 +338,8 @@ fn lies_zeit(s: &str) -> Option<NaiveDateTime> {
     t.with_nanosecond(0)
 }
 
-pub(crate) fn zeitpunkt(s: &str) -> Option<String> {
-    lies_zeit(s).map(crate::zeit::formatiere)
+pub(crate) fn format_zeitpunkt(s: &str) -> Option<String> {
+    parse_zeit(s).map(crate::zeit::formatiere)
 }
 
 /// Ein Produkt eines Gebiets, mit den Ebenen, die die Fachebene zeigt.
@@ -382,13 +382,13 @@ pub(crate) struct Details {
 
 /// Liest die Details einer Aktivierung. `None` ohne Ergebnis (auch bei 403 „Authentication
 /// credentials were not provided“, das die Quelle für alte Aktivierungen liefert).
-pub(crate) fn lies_details(v: &Value) -> Option<Details> {
+pub(crate) fn parse_details(v: &Value) -> Option<Details> {
     let a = v.get("results")?.as_array()?.first()?;
     let text = |k: &str| a.get(k).and_then(Value::as_str).unwrap_or("").to_string();
     let gebiete = a
         .get("aois")
         .and_then(Value::as_array)
-        .map(|aois| aois.iter().filter_map(lies_gebiet).collect())
+        .map(|aois| aois.iter().filter_map(parse_gebiet).collect())
         .unwrap_or_default();
     Some(Details {
         code: a.get("code")?.as_str()?.to_string(),
@@ -399,9 +399,9 @@ pub(crate) fn lies_details(v: &Value) -> Option<Details> {
     })
 }
 
-fn lies_gebiet(aoi: &Value) -> Option<Gebiet> {
-    let umriss = wkt_geometrie(aoi.get("extent")?.as_str()?)?;
-    let huelle = huelle(&umriss)?;
+fn parse_gebiet(aoi: &Value) -> Option<Gebiet> {
+    let umriss = parse_wkt_geometrie(aoi.get("extent")?.as_str()?)?;
+    let huelle = bounding_box(&umriss)?;
     Some(Gebiet {
         nummer: aoi.get("number").and_then(Value::as_u64).unwrap_or(0),
         name: aoi
@@ -414,12 +414,12 @@ fn lies_gebiet(aoi: &Value) -> Option<Gebiet> {
         produkte: aoi
             .get("products")
             .and_then(Value::as_array)
-            .map(|p| p.iter().filter_map(lies_produkt).collect())
+            .map(|p| p.iter().filter_map(parse_produkt).collect())
             .unwrap_or_default(),
     })
 }
 
-fn lies_produkt(p: &Value) -> Option<Produkt> {
+fn parse_produkt(p: &Value) -> Option<Produkt> {
     let version = p.get("version");
     let feld = |k: &str| version.and_then(|v| v.get(k));
     // Jüngstes Bild: seine Aufnahme ist der Stand des Produkts, sein Sensor steht daneben.
@@ -429,7 +429,7 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
         .into_iter()
         .flatten()
         .filter_map(|b| {
-            let zeit = lies_zeit(b.get("acquisitionTime")?.as_str()?)?;
+            let zeit = parse_zeit(b.get("acquisitionTime")?.as_str()?)?;
             Some((zeit, b.get("sensorName").and_then(Value::as_str)))
         })
         .max_by_key(|(zeit, _)| *zeit);
@@ -440,7 +440,7 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
         .flatten()
         .filter(|l| l.get("format").and_then(Value::as_str) == Some("vt"))
         .filter_map(|l| {
-            let art = ebenen_art(l.get("name")?.as_str()?)?;
+            let art = parse_ebenen_art(l.get("name")?.as_str()?)?;
             let url = l.get("json")?.as_str()?;
             url.starts_with(EBENEN_BASIS)
                 .then(|| (art, url.to_string()))
@@ -458,7 +458,7 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
         sensor: juengstes.and_then(|(_, sensor)| sensor.map(str::to_string)),
         geliefert: feld("deliveryTime")
             .and_then(Value::as_str)
-            .and_then(zeitpunkt),
+            .and_then(format_zeitpunkt),
         ebenen,
     })
 }
@@ -466,7 +466,7 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
 /// Je Produktart der jüngste fertige Stand mit Ebenen: höchste Monitoring-Nummer, dann höchste
 /// Version. Die erste Abschätzung (FEP) nur, solange es keine Abgrenzung (DEL) gibt. Reihenfolge
 /// nach Produktart.
-pub(crate) fn waehle_produkte(g: &Gebiet) -> Vec<&Produkt> {
+pub(crate) fn select_produkte(g: &Gebiet) -> Vec<&Produkt> {
     let mut je_typ: std::collections::BTreeMap<&str, &Produkt> = Default::default();
     for p in g
         .produkte
@@ -487,7 +487,7 @@ pub(crate) fn waehle_produkte(g: &Gebiet) -> Vec<&Produkt> {
 }
 
 /// Gemeinsame Herkunftsfelder jedes Features eines Produkts.
-fn herkunft(d: &Details, g: &Gebiet, p: &Produkt) -> serde_json::Map<String, Value> {
+fn herkunft_props(d: &Details, g: &Gebiet, p: &Produkt) -> serde_json::Map<String, Value> {
     let mut m = serde_json::Map::new();
     m.insert("emsr".into(), d.code.clone().into());
     m.insert("aktivierung".into(), d.name.clone().into());
@@ -510,14 +510,14 @@ fn herkunft(d: &Details, g: &Gebiet, p: &Produkt) -> serde_json::Map<String, Val
 
 /// Features einer Ebene der Quelle → einheitliche Features der Fachebene. Ohne Geometrie fällt
 /// ein Feature weg; ohne `features`-Liste ist das Ergebnis leer.
-pub(crate) fn normalisiere_ebene(
+pub(crate) fn normalize_ebene(
     fc: &Value,
     art: EbenenArt,
     d: &Details,
     g: &Gebiet,
     p: &Produkt,
 ) -> Vec<Value> {
-    let basis = herkunft(d, g, p);
+    let basis = herkunft_props(d, g, p);
     fc.get("features")
         .and_then(Value::as_array)
         .into_iter()
@@ -526,8 +526,8 @@ pub(crate) fn normalisiere_ebene(
             let geometrie = f.get("geometry").filter(|g| g.is_object())?;
             let roh = f.get("properties").cloned().unwrap_or(Value::Null);
             let mut props = basis.clone();
-            props.insert("art".into(), art.wort().into());
-            props.insert("klasse".into(), klasse(Some(art), &roh).into());
+            props.insert("art".into(), art.wire_value().into());
+            props.insert("klasse".into(), klasse_of(Some(art), &roh).into());
             let beschreibung = ["obj_desc", "info", "notation"]
                 .iter()
                 .filter_map(|k| roh.get(*k).and_then(Value::as_str))
@@ -556,7 +556,7 @@ pub(crate) fn gebiet_feature(
 ) -> Value {
     let juengstes = gewaehlt.iter().max_by(|a, b| a.aufnahme.cmp(&b.aufnahme));
     let mut props = match juengstes {
-        Some(p) => herkunft(d, g, p),
+        Some(p) => herkunft_props(d, g, p),
         None => {
             let mut m = serde_json::Map::new();
             m.insert("emsr".into(), d.code.clone().into());
@@ -567,7 +567,7 @@ pub(crate) fn gebiet_feature(
         }
     };
     props.insert("art".into(), "gebiet".into());
-    props.insert("klasse".into(), klasse(None, &Value::Null).into());
+    props.insert("klasse".into(), klasse_of(None, &Value::Null).into());
     props.insert("unvollstaendig".into(), unvollstaendig.into());
     props.insert("gekuerzt".into(), gekuerzt.into());
     serde_json::json!({ "type": "Feature", "geometry": g.umriss, "properties": props })
@@ -599,7 +599,7 @@ impl Grenzen {
     };
 }
 
-/// Ergebnis von [`baue_antwort`]: `vollstaendig` ist falsch, wenn eine Aktivierung ohne Details
+/// Ergebnis von [`build_antwort`]: `vollstaendig` ist falsch, wenn eine Aktivierung ohne Details
 /// blieb oder eine Ebene fehlt. Dann wird die Antwort ausgeliefert, aber nicht gespeichert: der
 /// nächste Abruf versucht es erneut, statt 30 min eine Lücke ohne Marke zu zeigen.
 pub(crate) struct Gebaut {
@@ -607,12 +607,12 @@ pub(crate) struct Gebaut {
     pub vollstaendig: bool,
 }
 
-/// Baut die Antwort für einen Ausschnitt. `hole` lädt eine URL als JSON (im Betrieb
+/// Baut die Antwort für einen Ausschnitt. `fetch` lädt eine URL als JSON (im Betrieb
 /// `quellen::hole_json`, in Tests ein Stub). `None`, wenn die Liste fehlt oder keine einzige
 /// Aktivierung ihre Details liefert: dann ist die Ebene `offline`.
-pub(crate) async fn baue_antwort<H, Fut>(
+pub(crate) async fn build_antwort<H, Fut>(
     pool: &SqlitePool,
-    hole: H,
+    fetch: H,
     bbox: Bbox,
     archiv: bool,
     jetzt: NaiveDateTime,
@@ -622,19 +622,19 @@ where
     H: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = Result<Value, String>> + Send,
 {
-    let liste_roh = teilstand(
+    let liste_roh = load_teilstand(
         pool,
         "copernicus-teil:liste",
         COPERNICUS_TTL,
-        &hole,
+        &fetch,
         LISTE_URL,
-        |v| lies_liste(v).is_some(),
+        |v| parse_liste(v).is_some(),
     )
     .await?;
-    let liste = lies_liste(&liste_roh)?;
-    let kandidaten = waehle_kandidaten(&liste, &bbox, jetzt, archiv);
+    let liste = parse_liste(&liste_roh)?;
+    let kandidaten = select_kandidaten(&liste, &bbox, jetzt, archiv);
 
-    let hole = &hole;
+    let fetch = &fetch;
     // Eigene Werte statt Referenzen in den Futures: sonst verlangt `Send` für den gespawnten
     // Abruf eine Lebensdauer, die der Compiler nicht beweisen kann.
     let auftraege: Vec<(String, Duration)> = kandidaten
@@ -654,11 +654,11 @@ where
             let url = format!("{DETAIL_URL}{code}");
             // Nur Details zur erfragten Aktivierung taugen; eine fremde Antwort läge sonst
             // unter dem falschen Schlüssel.
-            let passt = |v: &Value| lies_details(v).is_some_and(|d| d.code == code);
-            teilstand(pool, &schluessel, ttl, hole, &url, passt)
+            let is_valid_detail = |v: &Value| parse_details(v).is_some_and(|d| d.code == code);
+            load_teilstand(pool, &schluessel, ttl, fetch, &url, is_valid_detail)
                 .await
                 .as_ref()
-                .and_then(lies_details)
+                .and_then(parse_details)
                 .filter(|d| d.code == code)
         })
         .buffered(PARALLEL)
@@ -683,10 +683,10 @@ where
     let mut auftraege: Vec<(usize, Produkt, EbenenArt, String)> = Vec::new();
     for (di, d) in details.iter().enumerate().filter(|(_, d)| !d.sensibel) {
         for (gi, g) in d.gebiete.iter().enumerate() {
-            if !schneidet(&g.huelle, &bbox) {
+            if !intersects(&g.huelle, &bbox) {
                 continue;
             }
-            let gewaehlt: Vec<Produkt> = waehle_produkte(g).into_iter().cloned().collect();
+            let gewaehlt: Vec<Produkt> = select_produkte(g).into_iter().cloned().collect();
             let mut gekuerzt = false;
             for p in &gewaehlt {
                 for (art, url) in &p.ebenen {
@@ -710,7 +710,7 @@ where
     let geholt: Vec<_> = stream::iter(auftraege)
         .map(|(ti, p, art, url)| async move {
             let schluessel = format!("copernicus-teil:ebene:{url}");
-            let roh = teilstand(pool, &schluessel, COPERNICUS_EBENE_TTL, hole, &url, |v| {
+            let roh = load_teilstand(pool, &schluessel, COPERNICUS_EBENE_TTL, fetch, &url, |v| {
                 v.get("features").is_some_and(Value::is_array)
             })
             .await;
@@ -730,7 +730,7 @@ where
             vollstaendig = false;
             continue;
         };
-        let neu = normalisiere_ebene(fc, *art, d, &d.gebiete[t.gebiet], p);
+        let neu = normalize_ebene(fc, *art, d, &d.gebiete[t.gebiet], p);
         let groesse: usize = neu
             .iter()
             .map(|f| serde_json::to_vec(f).map_or(0, |b| b.len()))
@@ -775,17 +775,17 @@ where
     })
 }
 
-/// Ein Teilstand (Liste, Details oder Ebene): frisch aus dem Cache, sonst holen und, wenn `taugt`,
-/// speichern. Scheitert der Abruf oder taugt die Antwort nicht, gilt der alte Stand, solange der
+/// Ein Teilstand (Liste, Details oder Ebene): frisch aus dem Cache, sonst holen und, wenn `is_valid`,
+/// speichern. Scheitert der Abruf oder is_valid die Antwort nicht, gilt der alte Stand, solange der
 /// Cache ihn hält (48 h). Eine untaugliche Antwort wird nie gespeichert, sonst überschriebe ein
 /// Formatbruch einen brauchbaren Stand.
-async fn teilstand<H, Fut>(
+async fn load_teilstand<H, Fut>(
     pool: &SqlitePool,
     schluessel: &str,
     ttl: Duration,
-    hole: &H,
+    fetch: &H,
     url: &str,
-    taugt: impl Fn(&Value) -> bool,
+    is_valid: impl Fn(&Value) -> bool,
 ) -> Option<Value>
 where
     H: Fn(String) -> Fut,
@@ -797,8 +797,8 @@ where
             return Some(v.clone());
         }
     }
-    match hole(url.to_string()).await {
-        Ok(v) if taugt(&v) => {
+    match fetch(url.to_string()).await {
+        Ok(v) if is_valid(&v) => {
             cache::setze_wert(pool, schluessel, &v).await;
             Some(v)
         }
@@ -814,7 +814,7 @@ where
 }
 
 /// Ist der Ausschnitt klein genug? Geprüft wie bei Energie, mit eigener Grenze.
-pub(crate) fn pruefe_bbox(bbox: &Bbox) -> Result<(), String> {
+pub(crate) fn check_bbox(bbox: &Bbox) -> Result<(), String> {
     if bbox.ost - bbox.west > COPERNICUS_MAX_SPANNE_GRAD
         || bbox.nord - bbox.sued > COPERNICUS_MAX_SPANNE_GRAD
     {
@@ -834,7 +834,7 @@ pub async fn fetch_copernicus(
     archiv: bool,
 ) -> Result<FachebeneAntwort, AppError> {
     let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
-    pruefe_bbox(&bbox).map_err(AppError::Validation)?;
+    check_bbox(&bbox).map_err(AppError::Validation)?;
     let key = bbox.cache_key_mit(if archiv {
         "copernicus-archiv"
     } else {
@@ -848,12 +848,12 @@ pub async fn fetch_copernicus(
         COPERNICUS_TTL,
         tokio::time::Instant::now() + COPERNICUS_WARTE,
         move || async move {
-            let hole = move |url: String| {
+            let fetch = move |url: String| {
                 let c = client.clone();
                 async move { quellen::hole_json(&c, &url).await }
             };
             let jetzt = chrono::Utc::now().naive_utc();
-            let gebaut = baue_antwort(&p, hole, bbox, archiv, jetzt, Grenzen::STANDARD).await?;
+            let gebaut = build_antwort(&p, fetch, bbox, archiv, jetzt, Grenzen::STANDARD).await?;
             if gebaut.vollstaendig {
                 cache::setze(&p, &k, &gebaut.antwort).await;
             }
@@ -882,7 +882,7 @@ mod tests {
 
     #[test]
     fn liest_die_liste() {
-        let liste = lies_liste(&serde_json::from_str(LISTE).unwrap()).unwrap();
+        let liste = parse_liste(&serde_json::from_str(LISTE).unwrap()).unwrap();
         let emsr728 = liste.iter().find(|a| a.code == "EMSR728").unwrap();
         assert_eq!(emsr728.mittelpunkt, Some((10.890198, 48.973487)));
         assert!(emsr728.abgeschlossen);
@@ -892,26 +892,26 @@ mod tests {
 
     #[test]
     fn liste_ohne_ergebnisse_ist_formatbruch() {
-        assert_eq!(lies_liste(&json!({ "detail": "nope" })), None);
+        assert_eq!(parse_liste(&json!({ "detail": "nope" })), None);
     }
 
     #[test]
     fn liest_wkt() {
-        assert_eq!(wkt_punkt("POINT (7.5 50.25)"), Some((7.5, 50.25)));
-        assert_eq!(wkt_punkt("POLYGON ((1 2, 3 4))"), None);
-        let g = wkt_geometrie("POLYGON ((1 2, 3 2, 3 5, 1 2))").unwrap();
+        assert_eq!(parse_wkt_punkt("POINT (7.5 50.25)"), Some((7.5, 50.25)));
+        assert_eq!(parse_wkt_punkt("POLYGON ((1 2, 3 4))"), None);
+        let g = parse_wkt_geometrie("POLYGON ((1 2, 3 2, 3 5, 1 2))").unwrap();
         assert_eq!(g["type"], "Polygon");
         assert_eq!(
             g["coordinates"],
             json!([[[1.0, 2.0], [3.0, 2.0], [3.0, 5.0], [1.0, 2.0]]])
         );
-        let h = huelle(&g).unwrap();
+        let h = bounding_box(&g).unwrap();
         assert_eq!((h.west, h.sued, h.ost, h.nord), (1.0, 2.0, 3.0, 5.0));
-        let m = wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)), ((5 6, 7 6, 5 6)))").unwrap();
+        let m = parse_wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)), ((5 6, 7 6, 5 6)))").unwrap();
         assert_eq!(m["type"], "MultiPolygon");
-        assert_eq!(huelle(&m).unwrap().ost, 7.0);
-        assert_eq!(wkt_geometrie("POLYGON ((1 2, 3"), None);
-        assert_eq!(wkt_geometrie("LINESTRING (1 2, 3 4)"), None);
+        assert_eq!(bounding_box(&m).unwrap().ost, 7.0);
+        assert_eq!(parse_wkt_geometrie("POLYGON ((1 2, 3"), None);
+        assert_eq!(parse_wkt_geometrie("LINESTRING (1 2, 3 4)"), None);
     }
 
     fn akt(code: &str, lon: f64, lat: f64, geaendert: &str, zu: bool, n: u64) -> Aktivierung {
@@ -943,11 +943,11 @@ mod tests {
         ];
         let codes = |v: Vec<&Aktivierung>| v.iter().map(|a| a.code.clone()).collect::<Vec<_>>();
         assert_eq!(
-            codes(waehle_kandidaten(&liste, &stuttgart(), jetzt, false)),
+            codes(select_kandidaten(&liste, &stuttgart(), jetzt, false)),
             ["LAEUFT", "JUNG"]
         );
         assert_eq!(
-            codes(waehle_kandidaten(&liste, &stuttgart(), jetzt, true)),
+            codes(select_kandidaten(&liste, &stuttgart(), jetzt, true)),
             ["ALT", "LAEUFT", "JUNG", "ZU_ALT"]
         );
     }
@@ -957,7 +957,7 @@ mod tests {
         let jetzt = t("2026-11-21 12:00:00");
         let liste = vec![akt("GRENZE", 9.5, 48.8, "2026-10-22 12:00:00", true, 1)];
         assert_eq!(
-            waehle_kandidaten(&liste, &stuttgart(), jetzt, false).len(),
+            select_kandidaten(&liste, &stuttgart(), jetzt, false).len(),
             1
         );
     }
@@ -965,7 +965,7 @@ mod tests {
     #[test]
     fn erkennt_die_ebenenart_am_namen() {
         let n = |s: &str| {
-            ebenen_art(&format!(
+            parse_ebenen_art(&format!(
                 "EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_{s}_v2_VT"
             ))
         };
@@ -985,26 +985,26 @@ mod tests {
     #[test]
     fn bildet_die_copernicus_klassen_ab() {
         use EbenenArt::*;
-        let tiefe = |v: &str| klasse(Some(Wassertiefe), &json!({ "value": v }));
+        let tiefe = |v: &str| klasse_of(Some(Wassertiefe), &json!({ "value": v }));
         assert_eq!(tiefe("Below 0.50"), "tiefe_gering");
         assert_eq!(tiefe("0.50 - 1.00"), "tiefe_mittel");
         assert_eq!(tiefe("1.00 - 2.00"), "tiefe_hoch");
         assert_eq!(tiefe("Above 2.00"), "tiefe_hoch");
         assert_eq!(tiefe("?"), "unbekannt");
-        let schaden = |d: &str| klasse(Some(SchadenVerkehr), &json!({ "damage_gra": d }));
+        let schaden = |d: &str| klasse_of(Some(SchadenVerkehr), &json!({ "damage_gra": d }));
         assert_eq!(schaden("Destroyed"), "zerstoert");
         assert_eq!(schaden("Damaged"), "beschaedigt");
         assert_eq!(schaden("Possibly damaged"), "schaden_moeglich");
         assert_eq!(schaden("No visible damage"), "kein_schaden");
         assert_eq!(schaden("966"), "unbekannt");
-        assert_eq!(klasse(Some(SchadenGebaeude), &json!({})), "unbekannt");
-        assert_eq!(klasse(Some(Beobachtet), &json!({})), "beobachtet");
-        assert_eq!(klasse(Some(MaxAusdehnung), &json!({})), "max_ausdehnung");
+        assert_eq!(klasse_of(Some(SchadenGebaeude), &json!({})), "unbekannt");
+        assert_eq!(klasse_of(Some(Beobachtet), &json!({})), "beobachtet");
+        assert_eq!(klasse_of(Some(MaxAusdehnung), &json!({})), "max_ausdehnung");
         assert_eq!(
-            klasse(Some(NichtAusgewertet), &json!({})),
+            klasse_of(Some(NichtAusgewertet), &json!({})),
             "nicht_ausgewertet"
         );
-        assert_eq!(klasse(None, &json!({})), "gebiet");
+        assert_eq!(klasse_of(None, &json!({})), "gebiet");
     }
 
     const EMSR728: &str = include_str!("testdaten/copernicus-emsr728.json");
@@ -1012,7 +1012,7 @@ mod tests {
     const EBENE_VERKEHR: &str = include_str!("testdaten/copernicus-ebene-verkehr.json");
 
     fn emsr728() -> Details {
-        lies_details(&serde_json::from_str(EMSR728).unwrap()).unwrap()
+        parse_details(&serde_json::from_str(EMSR728).unwrap()).unwrap()
     }
 
     #[test]
@@ -1056,9 +1056,9 @@ mod tests {
 
     #[test]
     fn details_ohne_ergebnis_sind_formatbruch() {
-        assert_eq!(lies_details(&json!({ "count": 0, "results": [] })), None);
+        assert_eq!(parse_details(&json!({ "count": 0, "results": [] })), None);
         assert_eq!(
-            lies_details(&json!({ "detail": "Authentication credentials were not provided." })),
+            parse_details(&json!({ "detail": "Authentication credentials were not provided." })),
             None
         );
     }
@@ -1066,13 +1066,13 @@ mod tests {
     #[test]
     fn rechtecke_schneiden_sich() {
         let a = Bbox::parse("0,0,2,2").unwrap();
-        assert!(schneidet(&a, &Bbox::parse("1,1,3,3").unwrap()));
+        assert!(intersects(&a, &Bbox::parse("1,1,3,3").unwrap()));
         assert!(
-            schneidet(&a, &Bbox::parse("2,2,3,3").unwrap()),
+            intersects(&a, &Bbox::parse("2,2,3,3").unwrap()),
             "Berührung zählt"
         );
-        assert!(!schneidet(&a, &Bbox::parse("2.1,0,3,2").unwrap()));
-        assert!(!schneidet(&a, &Bbox::parse("0,2.1,2,3").unwrap()));
+        assert!(!intersects(&a, &Bbox::parse("2.1,0,3,2").unwrap()));
+        assert!(!intersects(&a, &Bbox::parse("0,2.1,2,3").unwrap()));
     }
 
     #[test]
@@ -1080,12 +1080,12 @@ mod tests {
         let d = emsr728();
         // Gebiet 1: DEL v2 (Erstprodukt), MONIT01..02 fertig, MONIT03/04 nicht fertig und ohne
         // Ebenen → MONIT02.
-        let g1: Vec<_> = waehle_produkte(&d.gebiete[0])
+        let g1: Vec<_> = select_produkte(&d.gebiete[0])
             .iter()
             .map(|p| (p.typ.clone(), p.monitoring))
             .collect();
         assert_eq!(g1, [("DEL".to_string(), 2)]);
-        let g9: Vec<_> = waehle_produkte(&d.gebiete[1])
+        let g9: Vec<_> = select_produkte(&d.gebiete[1])
             .iter()
             .map(|p| p.typ.clone())
             .collect();
@@ -1117,19 +1117,19 @@ mod tests {
             produkt("DEL", 0, 3, true),
             produkt("DEL", 0, 4, false),
         ];
-        let w: Vec<_> = waehle_produkte(&g)
+        let w: Vec<_> = select_produkte(&g)
             .iter()
             .map(|p| (p.typ.clone(), p.version))
             .collect();
         assert_eq!(w, [("DEL".to_string(), 3)]);
         g.produkte = vec![produkt("FEP", 0, 1, true), produkt("GRA", 0, 1, true)];
-        let w: Vec<_> = waehle_produkte(&g).iter().map(|p| p.typ.clone()).collect();
+        let w: Vec<_> = select_produkte(&g).iter().map(|p| p.typ.clone()).collect();
         assert_eq!(w, ["FEP", "GRA"]);
         // Ohne Ebenen zählt ein Produkt nicht.
         let mut leer = produkt("DEL", 5, 1, true);
         leer.ebenen.clear();
         g.produkte = vec![produkt("FEP", 0, 1, true), leer];
-        let w: Vec<_> = waehle_produkte(&g).iter().map(|p| p.typ.clone()).collect();
+        let w: Vec<_> = select_produkte(&g).iter().map(|p| p.typ.clone()).collect();
         assert_eq!(w, ["FEP"]);
     }
 
@@ -1137,9 +1137,9 @@ mod tests {
     fn normalisiert_eine_ebene() {
         let d = emsr728();
         let g = &d.gebiete[0];
-        let p = waehle_produkte(g)[0];
+        let p = select_produkte(g)[0];
         let fc: Value = serde_json::from_str(EBENE_TIEFE).unwrap();
-        let f = normalisiere_ebene(&fc, EbenenArt::Wassertiefe, &d, g, p);
+        let f = normalize_ebene(&fc, EbenenArt::Wassertiefe, &d, g, p);
         assert_eq!(f.len(), 5);
         let pr = &f[0]["properties"];
         assert_eq!(pr["art"], "wassertiefe");
@@ -1159,12 +1159,12 @@ mod tests {
 
         let fc: Value = serde_json::from_str(EBENE_VERKEHR).unwrap();
         let g9 = &d.gebiete[1];
-        let f = normalisiere_ebene(
+        let f = normalize_ebene(
             &fc,
             EbenenArt::SchadenVerkehr,
             &d,
             g9,
-            waehle_produkte(g9)[0],
+            select_produkte(g9)[0],
         );
         assert_eq!(f[0]["properties"]["art"], "schaden_verkehr");
         assert_eq!(f[0]["properties"]["klasse"], "schaden_moeglich");
@@ -1182,10 +1182,10 @@ mod tests {
             { "type": "Feature", "properties": {}, "geometry": { "type": "Point", "coordinates": [9.2, 48.8] } }
         ]});
         assert_eq!(
-            normalisiere_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0]).len(),
+            normalize_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0]).len(),
             1
         );
-        assert!(normalisiere_ebene(
+        assert!(normalize_ebene(
             &json!({ "x": 1 }),
             EbenenArt::Beobachtet,
             &d,
@@ -1202,10 +1202,10 @@ mod tests {
         let d = emsr728();
         let g = &d.gebiete[0];
         let fc: Value = serde_json::from_str(EBENE_TIEFE).unwrap();
-        let f = normalisiere_ebene(&fc, EbenenArt::Wassertiefe, &d, g, waehle_produkte(g)[0]);
+        let f = normalize_ebene(&fc, EbenenArt::Wassertiefe, &d, g, select_produkte(g)[0]);
         assert!(!f.is_empty());
         for feature in &f {
-            let h = huelle(&feature["geometry"]).unwrap();
+            let h = bounding_box(&feature["geometry"]).unwrap();
             assert!(
                 h.west >= g.huelle.west && h.ost <= g.huelle.ost,
                 "Länge außerhalb von Gebiet 1: {h:?}"
@@ -1223,7 +1223,7 @@ mod tests {
     fn gebiet_als_umriss_mit_marken() {
         let d = emsr728();
         let g = &d.gebiete[0];
-        let gewaehlt = waehle_produkte(g);
+        let gewaehlt = select_produkte(g);
         let f = gebiet_feature(&d, g, &gewaehlt, true, false);
         assert_eq!(f["geometry"]["type"], "Polygon");
         let pr = &f["properties"];
@@ -1242,7 +1242,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
-    /// Stub für `hole`: bekannte URLs aus den Testdaten, Ebenen nach ihrer Art, alles andere
+    /// Stub für `fetch`: bekannte URLs aus den Testdaten, Ebenen nach ihrer Art, alles andere
     /// scheitert. Zählt jeden Abruf.
     #[derive(Clone, Default)]
     struct Quelle {
@@ -1252,7 +1252,7 @@ mod tests {
     }
 
     impl Quelle {
-        fn hole(
+        fn fetch(
             &self,
         ) -> impl Fn(String) -> std::future::Ready<Result<Value, String>> + Send + Sync {
             let q = self.clone();
@@ -1287,7 +1287,7 @@ mod tests {
                 std::future::ready(antwort)
             }
         }
-        fn zahl(&self, teil: &str) -> usize {
+        fn count(&self, teil: &str) -> usize {
             self.aufrufe
                 .lock()
                 .unwrap()
@@ -1305,9 +1305,9 @@ mod tests {
     async fn zeigt_emsr728_im_archiv_ueber_stuttgart() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1332,18 +1332,18 @@ mod tests {
         assert!(f.iter().any(|f| f["properties"]["klasse"] == "tiefe_hoch"));
         assert!(f.iter().any(|f| f["properties"]["art"] == "max_ausdehnung"));
         // Gebiet 9 (Bogen) liegt außerhalb: keine Schadensebene geholt.
-        assert_eq!(q.zahl("transportation"), 0);
+        assert_eq!(q.count("transportation"), 0);
         // EMSR920 ist Kandidat (Archiv, 290 km), seine Details fehlen im Stub: kein Abbruch.
-        assert_eq!(q.zahl("code=EMSR920"), 1);
+        assert_eq!(q.count("code=EMSR920"), 1);
     }
 
     #[tokio::test]
     async fn ohne_archiv_ist_die_ebene_leer_ohne_detailabruf() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             false,
             heute(),
@@ -1353,7 +1353,7 @@ mod tests {
         .unwrap()
         .antwort;
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Leer);
-        assert_eq!(q.zahl("code="), 0);
+        assert_eq!(q.count("code="), 0);
     }
 
     #[tokio::test]
@@ -1364,9 +1364,9 @@ mod tests {
             .lock()
             .unwrap()
             .push("public-activations-info".into());
-        assert!(baue_antwort(
+        assert!(build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1381,9 +1381,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
         q.fehlt.lock().unwrap().push("code=".into());
-        assert!(baue_antwort(
+        assert!(build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1398,9 +1398,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
         q.fehlt.lock().unwrap().push("floodDepth".into());
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1423,9 +1423,9 @@ mod tests {
     async fn obergrenze_kuerzt_und_markiert() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1443,16 +1443,16 @@ mod tests {
             .find(|f| f["properties"]["art"] == "gebiet")
             .unwrap();
         assert_eq!(gebiet["properties"]["gekuerzt"], true);
-        assert_eq!(q.zahl(".json"), 1);
+        assert_eq!(q.count(".json"), 1);
     }
 
     #[tokio::test]
     async fn teilstaende_kommen_aus_dem_cache() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        baue_antwort(
+        build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1460,10 +1460,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let ebenen = q.zahl(".json");
-        baue_antwort(
+        let ebenen = q.count(".json");
+        build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1471,18 +1471,18 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(q.zahl(LISTE_URL), 1, "Liste frisch im Cache");
-        assert_eq!(q.zahl("code=EMSR728"), 1, "Details frisch im Cache");
-        assert_eq!(q.zahl(".json"), ebenen, "Ebenen frisch im Cache");
+        assert_eq!(q.count(LISTE_URL), 1, "Liste frisch im Cache");
+        assert_eq!(q.count("code=EMSR728"), 1, "Details frisch im Cache");
+        assert_eq!(q.count(".json"), ebenen, "Ebenen frisch im Cache");
     }
 
     #[tokio::test]
     async fn scheitert_der_abruf_gilt_der_alte_teilstand() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        baue_antwort(
+        build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1496,9 +1496,9 @@ mod tests {
             .await
             .unwrap();
         q.fehlt.lock().unwrap().push("https://".into());
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1520,9 +1520,9 @@ mod tests {
             .lock()
             .unwrap()
             .insert(format!("{DETAIL_URL}EMSR728"), d);
-        let a = baue_antwort(
+        let a = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1542,9 +1542,9 @@ mod tests {
             .lock()
             .unwrap()
             .insert(format!("{DETAIL_URL}EMSR728"), json!({ "detail": "nope" }));
-        let _ = baue_antwort(
+        let _ = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1561,9 +1561,9 @@ mod tests {
         // 100 000 `(` passen weit unter den Deckel von 16 MiB; ohne Grenze vor dem Abstieg liefe
         // der Stack des Workers über.
         let tief = format!("MULTIPOLYGON {}", "(".repeat(100_000));
-        assert_eq!(wkt_geometrie(&tief), None);
-        assert_eq!(wkt_geometrie("POLYGON ((((1 2, 3 4))))"), None);
-        assert!(wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)))").is_some());
+        assert_eq!(parse_wkt_geometrie(&tief), None);
+        assert_eq!(parse_wkt_geometrie("POLYGON ((((1 2, 3 4))))"), None);
+        assert!(parse_wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)))").is_some());
     }
 
     #[test]
@@ -1572,7 +1572,7 @@ mod tests {
         let ebene = &mut v["results"][0]["aois"][0]["products"][0]["layers"][0];
         ebene["json"] =
             json!("https://beispiel.invalid/EMSR728_AOI01_DEL_PRODUCT_floodDepthA_v2.json");
-        let d = lies_details(&v).unwrap();
+        let d = parse_details(&v).unwrap();
         let erst = d.gebiete[0]
             .produkte
             .iter()
@@ -1585,7 +1585,7 @@ mod tests {
     #[test]
     fn zeitpunkt_mit_z_gilt() {
         assert_eq!(
-            zeitpunkt("2024-06-01T05:06:00Z").as_deref(),
+            format_zeitpunkt("2024-06-01T05:06:00Z").as_deref(),
             Some("2024-06-01 05:06:00")
         );
     }
@@ -1596,9 +1596,9 @@ mod tests {
         let q = Quelle::default();
         // Ohne Archiv: nur EMSR728 wäre Kandidat, wenn es laufend wäre. Mit Archiv fehlen die
         // Details von EMSR920 im Stub.
-        let mit_luecke = baue_antwort(
+        let mit_luecke = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1607,9 +1607,9 @@ mod tests {
         .await
         .unwrap();
         assert!(!mit_luecke.vollstaendig);
-        let ohne = baue_antwort(
+        let ohne = build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             false,
             heute(),
@@ -1628,7 +1628,7 @@ mod tests {
             bytes: 1,
             ..Grenzen::STANDARD
         };
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), grenzen)
+        let a = build_antwort(&pool, q.fetch(), stuttgart(), true, heute(), grenzen)
             .await
             .unwrap()
             .antwort;
@@ -1648,9 +1648,9 @@ mod tests {
             .unwrap()
             .insert(format!("{DETAIL_URL}EMSR728"), fremd);
         // Weder EMSR728 (fremde Antwort) noch EMSR920 (fehlt) liefern Details: offline.
-        assert!(baue_antwort(
+        assert!(build_antwort(
             &pool,
-            q.hole(),
+            q.fetch(),
             stuttgart(),
             true,
             heute(),
@@ -1663,13 +1663,13 @@ mod tests {
     #[test]
     fn zeitpunkte_im_wire_format() {
         assert_eq!(
-            zeitpunkt("2024-06-01T05:06:00").as_deref(),
+            format_zeitpunkt("2024-06-01T05:06:00").as_deref(),
             Some("2024-06-01 05:06:00")
         );
         assert_eq!(
-            zeitpunkt("2024-09-04T15:58:13.172773").as_deref(),
+            format_zeitpunkt("2024-09-04T15:58:13.172773").as_deref(),
             Some("2024-09-04 15:58:13")
         );
-        assert_eq!(zeitpunkt("gestern"), None);
+        assert_eq!(format_zeitpunkt("gestern"), None);
     }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import {
-  copernicusAufnahmeAlt,
+  isCopernicusAufnahmeAlt,
   copernicusBreite,
   copernicusDarstellung,
   copernicusRadius,
@@ -62,15 +62,15 @@ describe('copernicusStil (LLH-1200)', () => {
   });
 });
 
-describe('copernicusAufnahmeAlt (LLH-1200)', () => {
+describe('isCopernicusAufnahmeAlt (LLH-1200)', () => {
   const jetzt = Date.UTC(2026, 10, 21, 12, 0, 0);
   it('gilt ab mehr als 24 h als alt, genau 24 h noch nicht', () => {
-    expect(copernicusAufnahmeAlt('2026-11-20 12:00:00', jetzt)).toBe(false);
-    expect(copernicusAufnahmeAlt('2026-11-20 11:59:59', jetzt)).toBe(true);
-    expect(copernicusAufnahmeAlt('2026-11-21 11:00:00', jetzt)).toBe(false);
+    expect(isCopernicusAufnahmeAlt('2026-11-20 12:00:00', jetzt)).toBe(false);
+    expect(isCopernicusAufnahmeAlt('2026-11-20 11:59:59', jetzt)).toBe(true);
+    expect(isCopernicusAufnahmeAlt('2026-11-21 11:00:00', jetzt)).toBe(false);
   });
   it('sagt ohne lesbare Aufnahme nichts', () => {
-    expect(copernicusAufnahmeAlt(undefined, jetzt)).toBe(false);
-    expect(copernicusAufnahmeAlt('gestern', jetzt)).toBe(false);
+    expect(isCopernicusAufnahmeAlt(undefined, jetzt)).toBe(false);
+    expect(isCopernicusAufnahmeAlt('gestern', jetzt)).toBe(false);
   });
 });

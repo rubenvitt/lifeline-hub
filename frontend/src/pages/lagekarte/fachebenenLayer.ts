@@ -223,14 +223,14 @@ export function sorgeFuerFachebeneLayer(
 }
 
 /** Geometrietyp, auch in der Multi-Form (je nach MapLibre-Version liefert `geometry-type` beide). */
-const istTyp = (typ: 'Polygon' | 'LineString' | 'Point') => [
+const isGeometrieTyp = (typ: 'Polygon' | 'LineString' | 'Point') => [
   'any',
   ['==', ['geometry-type'], typ],
   ['==', ['geometry-type'], `Multi${typ}`],
 ];
 
 /** Umriss des Auswertungsgebiets (Copernicus, LLH-1200): nur gestrichelte Kontur, keine Fläche. */
-const IST_GEBIET = ['==', ['get', 'klasse'], 'gebiet'];
+const IS_GEBIET = ['==', ['get', 'klasse'], 'gebiet'];
 
 /** Nicht ausgewertete Flächen treten zurück: sie sind keine Aussage über die Lage. */
 const GEMISCHT_DECKKRAFT = ['case', ['==', ['get', 'klasse'], 'nicht_ausgewertet'], 0.1, 0.3];
@@ -258,28 +258,28 @@ function sorgeFuerGemischteLayer(
     id: `fachebene-${key}-fill`,
     type: 'fill',
     source: src,
-    filter: ['all', istTyp('Polygon'), ['!', IST_GEBIET]] as never,
+    filter: ['all', isGeometrieTyp('Polygon'), ['!', IS_GEBIET]] as never,
     paint: { 'fill-color': farbe as never, 'fill-opacity': GEMISCHT_DECKKRAFT as never },
   });
   anlegen({
     id: `fachebene-${key}-line`,
     type: 'line',
     source: src,
-    filter: ['all', istTyp('Polygon'), ['!', IST_GEBIET]] as never,
+    filter: ['all', isGeometrieTyp('Polygon'), ['!', IS_GEBIET]] as never,
     paint: { 'line-color': farbe as never, 'line-width': 1 },
   });
   anlegen({
     id: `fachebene-${key}-gebiet`,
     type: 'line',
     source: src,
-    filter: ['all', istTyp('Polygon'), IST_GEBIET] as never,
+    filter: ['all', isGeometrieTyp('Polygon'), IS_GEBIET] as never,
     paint: { 'line-color': farbe as never, 'line-width': 1.5, 'line-dasharray': [3, 2] },
   });
   anlegen({
     id: `fachebene-${key}-linie`,
     type: 'line',
     source: src,
-    filter: istTyp('LineString') as never,
+    filter: isGeometrieTyp('LineString') as never,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': farbe as never,
@@ -291,21 +291,21 @@ function sorgeFuerGemischteLayer(
     id: `fachebene-${key}-treffer`,
     type: 'circle',
     source: src,
-    filter: istTyp('Point') as never,
+    filter: isGeometrieTyp('Point') as never,
     paint: { 'circle-radius': treffer / 2, 'circle-opacity': 0, 'circle-stroke-width': 0 },
   });
   anlegen({
     id: `fachebene-${key}-kante`,
     type: 'circle',
     source: src,
-    filter: istTyp('Point') as never,
+    filter: isGeometrieTyp('Point') as never,
     paint: { 'circle-radius': mitKante(PUNKT_RADIUS) as never, 'circle-color': KANTE_FARBE },
   });
   anlegen({
     id: `fachebene-${key}-circle`,
     type: 'circle',
     source: src,
-    filter: istTyp('Point') as never,
+    filter: isGeometrieTyp('Point') as never,
     paint: {
       'circle-radius': PUNKT_RADIUS as never,
       'circle-color': farbe as never,

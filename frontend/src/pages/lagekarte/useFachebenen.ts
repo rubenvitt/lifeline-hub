@@ -9,8 +9,8 @@ import {
 } from '../../api/fachebenen';
 import {
   copernicusAktivierungen,
-  copernicusAusschnittPasst,
-  energieAusschnittPasst,
+  fitsCopernicusAusschnitt,
+  fitsEnergieAusschnitt,
   energieNennung,
   FACHEBENEN,
   fachebeneKeys,
@@ -93,7 +93,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     energieMinZoom === undefined || (kartenZoom !== null && kartenZoom >= energieMinZoom);
   // Ohne Ausschnitt ist „zu groß" keine Aussage; dort entscheidet für den Zoom-Hinweis allein der
   // Zoom.
-  const energieBboxZuGross = viewportBbox !== null && !energieAusschnittPasst(viewportBbox);
+  const energieBboxZuGross = viewportBbox !== null && !fitsEnergieAusschnitt(viewportBbox);
   const energiePasst = energieZoomReicht && viewportBbox !== null && !energieBboxZuGross;
   // In Energie-Antworten gesehene Nennungsteile. Gezeigt wird, was die gesammelten Punkte tragen
   // (`energieNennung`), nicht die Nennung der letzten Antwort.
@@ -106,7 +106,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const copernicusMinZoom = FACHEBENEN.copernicus.minZoom;
   const copernicusZoomReicht =
     copernicusMinZoom === undefined || (kartenZoom !== null && kartenZoom >= copernicusMinZoom);
-  const copernicusBboxZuGross = viewportBbox !== null && !copernicusAusschnittPasst(viewportBbox);
+  const copernicusBboxZuGross = viewportBbox !== null && !fitsCopernicusAusschnitt(viewportBbox);
   const copernicusPasst = copernicusZoomReicht && viewportBbox !== null && !copernicusBboxZuGross;
 
   const kritis = useQuery({

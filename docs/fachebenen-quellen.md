@@ -139,7 +139,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     Ebene einen **Mindest-Zoom 10** (darunter keine Abfrage, Hinweis „näher heranzoomen")
     und eine **Größengrenze von 3° je Achse** (`karte::quellen::pruefe_energie_bbox`,
     größer → HTTP 400 „bbox zu groß — weiter hineinzoomen"; das Frontend prüft dieselbe
-    Spanne vorab, `energieAusschnittPasst` in `pages/lagekarte/fachebenen.ts`, und zeigt dann
+    Spanne vorab, `fitsEnergieAusschnitt` in `pages/lagekarte/fachebenen.ts`, und zeigt dann
     den Zoom-Hinweis statt eine Anfrage zu schicken). Bis LFH-83 stand eine 1°-Grenze in
     `Bbox::parse` und galt für beide Ebenen; bei Zoom 10 ist ein Grad aber rund 1456 px
     breit, auf einem 1920-px-Schirm lehnte das Backend den Ausschnitt deshalb ab und die

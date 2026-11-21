@@ -37,8 +37,8 @@ const ENERGIE_MAX_SPANNE_GRAD = 3;
  * Passt ein Ausschnitt `west,sued,ost,nord` in die Energie-Grenze? Rein und exportiert. Ein
  * nicht lesbarer Ausschnitt gilt als passend — über ihn entscheidet das Backend.
  */
-export function energieAusschnittPasst(bbox: string): boolean {
-  return ausschnittPasst(bbox, ENERGIE_MAX_SPANNE_GRAD);
+export function fitsEnergieAusschnitt(bbox: string): boolean {
+  return fitsAusschnitt(bbox, ENERGIE_MAX_SPANNE_GRAD);
 }
 
 /**
@@ -48,12 +48,12 @@ export function energieAusschnittPasst(bbox: string): boolean {
  */
 const COPERNICUS_MAX_SPANNE_GRAD = 3;
 
-/** Passt ein Ausschnitt in die Copernicus-Grenze? Regeln wie {@link energieAusschnittPasst}. */
-export function copernicusAusschnittPasst(bbox: string): boolean {
-  return ausschnittPasst(bbox, COPERNICUS_MAX_SPANNE_GRAD);
+/** Passt ein Ausschnitt in die Copernicus-Grenze? Regeln wie {@link fitsEnergieAusschnitt}. */
+export function fitsCopernicusAusschnitt(bbox: string): boolean {
+  return fitsAusschnitt(bbox, COPERNICUS_MAX_SPANNE_GRAD);
 }
 
-function ausschnittPasst(bbox: string, maxSpanne: number): boolean {
+function fitsAusschnitt(bbox: string, maxSpanne: number): boolean {
   const t = bbox.split(',').map(Number);
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
   const [w, s, e, n] = t;

@@ -88,7 +88,10 @@ const AUFNAHME_ALT_MS = 24 * 60 * 60_000;
  * (ADR-0012). Ohne lesbare Aufnahme `false`: die Warnung erfindet kein Alter. Genau 24 h gelten
  * noch nicht als alt.
  */
-export function copernicusAufnahmeAlt(aufnahme: string | null | undefined, jetzt: number): boolean {
+export function isCopernicusAufnahmeAlt(
+  aufnahme: string | null | undefined,
+  jetzt: number,
+): boolean {
   if (!aufnahme) return false;
   const t = Date.parse(`${aufnahme.replace(' ', 'T')}Z`);
   return Number.isFinite(t) && jetzt - t > AUFNAHME_ALT_MS;
