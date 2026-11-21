@@ -3,7 +3,8 @@
 Stand: 21.11.2026 · Zunder: https://zunder.rubeen.dev/#/aufgabe/r19tuh60j02y0c7o547p5d7z ·
 Teile: LLH-2017 (A, Backend), LLH-2018 (B, Admin-UI) · Konzept:
 [`docs/konzepte/2026-11-10-schnittstellen-ausbau.md`](../../konzepte/2026-11-10-schnittstellen-ausbau.md),
-Abschnitt „Gemeinsamer Unterbau“ · Freigabe: offen
+Abschnitt „Gemeinsamer Unterbau“ ·
+Freigabe: Ruben im Chat, 21.11.2026 („Entwurf passt, go“)
 
 ## Absicht
 
