@@ -566,10 +566,27 @@ describe('Copernicus (LLH-1200)', () => {
       ],
     } as never;
     expect(copernicusAktivierungen(fc)).toEqual([
-      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00' },
-      { emsr: 'EMSR712', aufnahme: '2023-12-24 06:00:00' },
-      { emsr: 'EMSR900', aufnahme: undefined },
+      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00', unvollstaendig: false, gekuerzt: false },
+      { emsr: 'EMSR712', aufnahme: '2023-12-24 06:00:00', unvollstaendig: false, gekuerzt: false },
+      { emsr: 'EMSR900', aufnahme: undefined, unvollstaendig: false, gekuerzt: false },
     ]);
+  });
+
+  it('trägt unvollständige und gekürzte Gebiete an ihre Aktivierung', () => {
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: { klasse: 'gebiet', emsr: 'EMSR728', gekuerzt: true } },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR728', unvollstaendig: true },
+        },
+        { type: 'Feature', properties: { klasse: 'gebiet', emsr: 'EMSR712' } },
+      ],
+    } as never;
+    const [a, b] = copernicusAktivierungen(fc);
+    expect(a).toMatchObject({ emsr: 'EMSR728', unvollstaendig: true, gekuerzt: true });
+    expect(b).toMatchObject({ emsr: 'EMSR712', unvollstaendig: false, gekuerzt: false });
   });
 
   it('bremst große Ausschnitte wie das Backend (3° je Achse)', () => {

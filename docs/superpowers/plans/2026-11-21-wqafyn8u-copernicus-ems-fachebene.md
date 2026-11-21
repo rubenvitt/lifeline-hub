@@ -18,7 +18,7 @@ läuft per TDD: erst der rote Test, dann der Code.
   `art` bleibt wie im Entwurf.
 - **Zeitpunkte** in den Feature-Properties (`aufnahme`, `geliefert`) als UTC im
   `zeit::FORMAT` (ADR-0012). `stand` des Umschlags ebenso.
-- **Wartefrist** im kalten Pfad: 15 s über `liefere_geloest` (wie Energie); danach `offline`,
+- **Wartefrist** im kalten Pfad: 10 s über `liefere_geloest` (wie Energie; nach Review von 15 s gesenkt, der Client bricht nach 15 s ab); danach `offline`,
   der Abruf läuft weiter. Das Frontend nimmt `aufwaermPollMs` 15 s.
 - **Hinweis bei `leer`** und die EMSR-Zeile stehen in der Zeile der Ebene im Ebenenbaum.
 

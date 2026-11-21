@@ -62,9 +62,17 @@ export default function CopernicusZusatz({
                   <span style={monoStil('meta')}>{zeitKurz(a.aufnahme)}</span>
                 </>
               )}
+              {a.unvollstaendig && (
+                <span style={{ color: rollen.achtungText }}> · nicht alle Ebenen geladen</span>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {aktivierungen.some((a) => a.gekuerzt) && (
+        <span data-lfh="copernicus-gekuerzt" style={{ color: rollen.achtungText }}>
+          Zu viele Ebenen im Ausschnitt – weiter hineinzoomen, um alle zu sehen.
+        </span>
       )}
       <Checkbox checked={archiv} onChange={(e) => onArchiv(e.target.checked)}>
         Ältere Aktivierungen

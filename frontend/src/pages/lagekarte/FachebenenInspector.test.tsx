@@ -1214,22 +1214,14 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
     expect(screen.getByText(/Aufnahme älter als 24 h/)).toBeInTheDocument();
   });
 
-  it('nennt unvollständige und gekürzte Gebiete', () => {
+  it('titelt ein Gebiet mit seinem Namen', () => {
     render(
       <FachebenenInspector
         quelle="copernicus"
-        properties={{
-          ...tiefe,
-          art: 'gebiet',
-          klasse: 'gebiet',
-          unvollstaendig: true,
-          gekuerzt: true,
-        }}
+        properties={{ ...tiefe, art: 'gebiet', klasse: 'gebiet' }}
         onSchliessen={() => {}}
       />,
     );
     expect(screen.getByText('Auswertungsgebiet Stuttgart')).toBeInTheDocument();
-    expect(screen.getByText(/Nicht alle Ebenen dieses Gebiets/)).toBeInTheDocument();
-    expect(screen.getByText(/weiter hineinzoomen/)).toBeInTheDocument();
   });
 });

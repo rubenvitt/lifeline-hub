@@ -806,16 +806,6 @@ function CopernicusInhalt({ p }: { p: Record<string, unknown> }) {
           <Descriptions.Item label="Angabe der Quelle">{s(p.beschreibung)}</Descriptions.Item>
         )}
       </Descriptions>
-      {p.unvollstaendig === true && (
-        <Typography.Paragraph style={{ marginTop: token.marginSM, marginBottom: 0 }}>
-          Nicht alle Ebenen dieses Gebiets konnten geladen werden.
-        </Typography.Paragraph>
-      )}
-      {p.gekuerzt === true && (
-        <Typography.Paragraph style={{ marginTop: token.marginSM, marginBottom: 0 }}>
-          Zu viele Ebenen im Ausschnitt – weiter hineinzoomen, um alle zu sehen.
-        </Typography.Paragraph>
-      )}
       {emsr && (
         <div style={{ marginTop: token.marginSM }}>
           <Button

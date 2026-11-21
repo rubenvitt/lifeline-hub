@@ -31,8 +31,22 @@ const COPERNICUS_TTL_ABGESCHLOSSEN: Duration = Duration::from_secs(24 * 3600);
 /// TTL einer Ebenen-Datei. Die Version steht im Dateinamen, der Inhalt ändert sich nicht.
 const COPERNICUS_EBENE_TTL: Duration = Duration::from_secs(24 * 3600);
 
-/// Wartefrist eines kalten Abrufs (Liste, Details, bis zu [`MAX_EBENEN`] Dateien).
-const COPERNICUS_WARTE: Duration = Duration::from_secs(15);
+/// Wartefrist eines kalten Abrufs (Liste, Details, bis zu [`MAX_EBENEN`] Dateien). Deutlich
+/// unter den 15 s, nach denen der Client abbricht (`frontend/src/api/client.ts`): sonst käme
+/// `offline` erst, wenn der Client schon „Server nicht erreichbar“ meldet. Wie Energie.
+const COPERNICUS_WARTE: Duration = Duration::from_secs(10);
+
+/// Obergrenze der normalisierten Features je Antwort in Byte. Fachebenen-Antworten gehen
+/// ungepackt hinaus (`src/AGENTS.md`, „Antwortkompression“); 6 MiB kommen auch über eine
+/// schmale Funkverbindung, bevor der Client nach 15 s abbricht. Darüber trägt das Gebiet
+/// `gekuerzt`.
+const MAX_ANTWORT_BYTES: usize = 6 * 1024 * 1024;
+
+/// Nur von hier lädt die Ebene GeoJSON: die URLs stehen in fremdem JSON.
+const EBENEN_BASIS: &str = "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/";
+
+/// Tiefste Verschachtelung einer WKT-Geometrie (MULTIPOLYGON: Polygone, Ringe, Punkte).
+const WKT_MAX_TIEFE: usize = 3;
 
 /// Gleichzeitige Abrufe von Ebenen-Dateien.
 const PARALLEL: usize = 6;
@@ -109,7 +123,7 @@ pub(crate) fn wkt_geometrie(s: &str) -> Option<Value> {
         _ => return None,
     };
     let mut rest = &s[klammer..];
-    let koordinaten = lies_wkt_gruppe(&mut rest)?;
+    let koordinaten = lies_wkt_gruppe(&mut rest, 0)?;
     if !rest.trim().is_empty() {
         return None;
     }
@@ -134,13 +148,18 @@ fn wkt_tiefe(v: &Value) -> usize {
     }
 }
 
-/// Liest `( … )` ab `rest`: entweder Untergruppen `((…), (…))` oder Punkte `x y, x y`.
-fn lies_wkt_gruppe(rest: &mut &str) -> Option<Value> {
+/// Liest `( … )` ab `rest`: entweder Untergruppen `((…), (…))` oder Punkte `x y, x y`. Die
+/// Tiefe wird VOR dem Abstieg geprüft: fremdes WKT mit Tausenden `(` liefe sonst über den Stack
+/// des Workers, und das ist keine Panik, sondern das Ende des Prozesses.
+fn lies_wkt_gruppe(rest: &mut &str, tiefe: usize) -> Option<Value> {
     *rest = rest.trim_start().strip_prefix('(')?;
     if rest.trim_start().starts_with('(') {
+        if tiefe + 1 >= WKT_MAX_TIEFE {
+            return None;
+        }
         let mut teile = Vec::new();
         loop {
-            teile.push(lies_wkt_gruppe(rest)?);
+            teile.push(lies_wkt_gruppe(rest, tiefe + 1)?);
             let r = rest.trim_start();
             if let Some(weiter) = r.strip_prefix(',') {
                 *rest = weiter;
@@ -312,7 +331,9 @@ fn tiefe_klasse(wert: &str) -> &'static str {
 /// `zeit::FORMAT` (ADR-0012). Die Quelle nennt Zeiten in UTC ohne Zone.
 fn lies_zeit(s: &str) -> Option<NaiveDateTime> {
     use chrono::Timelike;
-    let t = NaiveDateTime::parse_from_str(s.trim(), "%Y-%m-%dT%H:%M:%S%.f").ok()?;
+    // Ein angehängtes `Z` sagt nur, was ohnehin gilt (UTC).
+    let roh = s.trim().trim_end_matches('Z');
+    let t = NaiveDateTime::parse_from_str(roh, "%Y-%m-%dT%H:%M:%S%.f").ok()?;
     // Auf Sekunden: das Wire-Format kennt keine Bruchteile.
     t.with_nanosecond(0)
 }
@@ -421,7 +442,8 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
         .filter_map(|l| {
             let art = ebenen_art(l.get("name")?.as_str()?)?;
             let url = l.get("json")?.as_str()?;
-            url.starts_with("https://").then(|| (art, url.to_string()))
+            url.starts_with(EBENEN_BASIS)
+                .then(|| (art, url.to_string()))
         })
         .collect();
     Some(Produkt {
@@ -563,6 +585,28 @@ pub(crate) const DETAIL_URL: &str =
 /// Höchstzahl der Ebenen-Dateien je Antwort; darüber trägt das Gebiet `gekuerzt`.
 pub(crate) const MAX_EBENEN: usize = 40;
 
+/// Grenzen einer Antwort, in Tests kleiner.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Grenzen {
+    pub ebenen: usize,
+    pub bytes: usize,
+}
+
+impl Grenzen {
+    pub(crate) const STANDARD: Grenzen = Grenzen {
+        ebenen: MAX_EBENEN,
+        bytes: MAX_ANTWORT_BYTES,
+    };
+}
+
+/// Ergebnis von [`baue_antwort`]: `vollstaendig` ist falsch, wenn eine Aktivierung ohne Details
+/// blieb oder eine Ebene fehlt. Dann wird die Antwort ausgeliefert, aber nicht gespeichert: der
+/// nächste Abruf versucht es erneut, statt 30 min eine Lücke ohne Marke zu zeigen.
+pub(crate) struct Gebaut {
+    pub antwort: FachebeneAntwort,
+    pub vollstaendig: bool,
+}
+
 /// Baut die Antwort für einen Ausschnitt. `hole` lädt eine URL als JSON (im Betrieb
 /// `quellen::hole_json`, in Tests ein Stub). `None`, wenn die Liste fehlt oder keine einzige
 /// Aktivierung ihre Details liefert: dann ist die Ebene `offline`.
@@ -572,8 +616,8 @@ pub(crate) async fn baue_antwort<H, Fut>(
     bbox: Bbox,
     archiv: bool,
     jetzt: NaiveDateTime,
-    grenze: usize,
-) -> Option<FachebeneAntwort>
+    grenzen: Grenzen,
+) -> Option<Gebaut>
 where
     H: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = Result<Value, String>> + Send,
@@ -590,27 +634,42 @@ where
     let liste = lies_liste(&liste_roh)?;
     let kandidaten = waehle_kandidaten(&liste, &bbox, jetzt, archiv);
 
-    let mut details = Vec::new();
-    for a in &kandidaten {
-        let ttl = if a.abgeschlossen {
-            COPERNICUS_TTL_ABGESCHLOSSEN
-        } else {
-            COPERNICUS_TTL
-        };
-        let schluessel = format!("copernicus-teil:akt:{}", a.code);
-        let url = format!("{DETAIL_URL}{}", a.code);
-        let roh = teilstand(pool, &schluessel, ttl, &hole, &url, |v| {
-            lies_details(v).is_some()
+    let hole = &hole;
+    // Eigene Werte statt Referenzen in den Futures: sonst verlangt `Send` für den gespawnten
+    // Abruf eine Lebensdauer, die der Compiler nicht beweisen kann.
+    let auftraege: Vec<(String, Duration)> = kandidaten
+        .iter()
+        .map(|a| {
+            let ttl = if a.abgeschlossen {
+                COPERNICUS_TTL_ABGESCHLOSSEN
+            } else {
+                COPERNICUS_TTL
+            };
+            (a.code.clone(), ttl)
         })
+        .collect();
+    let geladen: Vec<Option<Details>> = stream::iter(auftraege)
+        .map(|(code, ttl)| async move {
+            let schluessel = format!("copernicus-teil:akt:{code}");
+            let url = format!("{DETAIL_URL}{code}");
+            // Nur Details zur erfragten Aktivierung taugen; eine fremde Antwort läge sonst
+            // unter dem falschen Schlüssel.
+            let passt = |v: &Value| lies_details(v).is_some_and(|d| d.code == code);
+            teilstand(pool, &schluessel, ttl, hole, &url, passt)
+                .await
+                .as_ref()
+                .and_then(lies_details)
+                .filter(|d| d.code == code)
+        })
+        .buffered(PARALLEL)
+        .collect()
         .await;
-        if let Some(d) = roh.as_ref().and_then(lies_details) {
-            details.push(d);
-        }
-    }
+    let details: Vec<Details> = geladen.into_iter().flatten().collect();
     // Keine einzige Aktivierung lieferte Details: die Quelle ist gestört, nicht leer.
     if !kandidaten.is_empty() && details.is_empty() {
         return None;
     }
+    let mut vollstaendig = details.len() == kandidaten.len();
 
     // Gebiete im Ausschnitt mit ihren gewählten Produkten, und die Ebenen, die zu holen sind.
     struct Treffer {
@@ -631,7 +690,7 @@ where
             let mut gekuerzt = false;
             for p in &gewaehlt {
                 for (art, url) in &p.ebenen {
-                    if auftraege.len() < grenze {
+                    if auftraege.len() < grenzen.ebenen {
                         auftraege.push((treffer.len(), p.clone(), *art, url.clone()));
                     } else {
                         gekuerzt = true;
@@ -648,7 +707,6 @@ where
         }
     }
 
-    let hole = &hole;
     let geholt: Vec<_> = stream::iter(auftraege)
         .map(|(ti, p, art, url)| async move {
             let schluessel = format!("copernicus-teil:ebene:{url}");
@@ -663,13 +721,26 @@ where
         .await;
 
     let mut features = Vec::new();
+    let mut bytes = 0usize;
     for (ti, p, art, roh) in &geholt {
         let t = &treffer[*ti];
         let d = &details[t.details];
-        match roh {
-            Some(fc) => features.extend(normalisiere_ebene(fc, *art, d, &d.gebiete[t.gebiet], p)),
-            None => treffer[*ti].unvollstaendig = true,
+        let Some(fc) = roh else {
+            treffer[*ti].unvollstaendig = true;
+            vollstaendig = false;
+            continue;
+        };
+        let neu = normalisiere_ebene(fc, *art, d, &d.gebiete[t.gebiet], p);
+        let groesse: usize = neu
+            .iter()
+            .map(|f| serde_json::to_vec(f).map_or(0, |b| b.len()))
+            .sum();
+        if bytes + groesse > grenzen.bytes {
+            treffer[*ti].gekuerzt = true;
+            continue;
         }
+        bytes += groesse;
+        features.extend(neu);
     }
 
     // Umrisse zuerst; die Reihenfolge im Array ist für die Karte belanglos, im Inspector stehen
@@ -693,12 +764,15 @@ where
         }
     }
     alle.extend(features);
-    Some(FachebeneAntwort::ok(
-        "copernicus",
-        COPERNICUS_ATTRIB,
-        stand,
-        serde_json::json!({ "type": "FeatureCollection", "features": alle }),
-    ))
+    Some(Gebaut {
+        antwort: FachebeneAntwort::ok(
+            "copernicus",
+            COPERNICUS_ATTRIB,
+            stand,
+            serde_json::json!({ "type": "FeatureCollection", "features": alle }),
+        ),
+        vollstaendig,
+    })
 }
 
 /// Ein Teilstand (Liste, Details oder Ebene): frisch aus dem Cache, sonst holen und, wenn `taugt`,
@@ -751,7 +825,8 @@ pub(crate) fn pruefe_bbox(bbox: &Bbox) -> Result<(), String> {
 
 /// `GET /api/karte/fachebenen/copernicus?bbox=…[&archiv=1]`. Kalt wartet die Anfrage höchstens
 /// [`COPERNICUS_WARTE`] und antwortet sonst `offline`; der Abruf läuft weiter und füllt den
-/// Cache für den nächsten Poll (Aufwärmtakt im Frontend).
+/// Cache für den nächsten Poll (Aufwärmtakt im Frontend). Eine unvollständige Antwort geht hinaus,
+/// wird aber nicht gespeichert.
 pub async fn fetch_copernicus(
     s: &FachebenenState,
     pool: &SqlitePool,
@@ -778,9 +853,11 @@ pub async fn fetch_copernicus(
                 async move { quellen::hole_json(&c, &url).await }
             };
             let jetzt = chrono::Utc::now().naive_utc();
-            let a = baue_antwort(&p, hole, bbox, archiv, jetzt, MAX_EBENEN).await?;
-            cache::setze(&p, &k, &a).await;
-            Some(a)
+            let gebaut = baue_antwort(&p, hole, bbox, archiv, jetzt, Grenzen::STANDARD).await?;
+            if gebaut.vollstaendig {
+                cache::setze(&p, &k, &gebaut.antwort).await;
+            }
+            Some(gebaut.antwort)
         },
     )
     .await;
@@ -1228,9 +1305,17 @@ mod tests {
     async fn zeigt_emsr728_im_archiv_ueber_stuttgart() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap()
+        .antwort;
         assert_eq!(a.quelle, "copernicus");
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
         assert_eq!(a.attribution, COPERNICUS_ATTRIB);
@@ -1256,9 +1341,17 @@ mod tests {
     async fn ohne_archiv_ist_die_ebene_leer_ohne_detailabruf() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), false, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            false,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap()
+        .antwort;
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Leer);
         assert_eq!(q.zahl("code="), 0);
     }
@@ -1271,11 +1364,16 @@ mod tests {
             .lock()
             .unwrap()
             .push("public-activations-info".into());
-        assert!(
-            baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-                .await
-                .is_none()
-        );
+        assert!(baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD
+        )
+        .await
+        .is_none());
     }
 
     #[tokio::test]
@@ -1283,11 +1381,16 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
         q.fehlt.lock().unwrap().push("code=".into());
-        assert!(
-            baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-                .await
-                .is_none()
-        );
+        assert!(baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD
+        )
+        .await
+        .is_none());
     }
 
     #[tokio::test]
@@ -1295,9 +1398,17 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
         q.fehlt.lock().unwrap().push("floodDepth".into());
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap()
+        .antwort;
         let f = a.features["features"].as_array().unwrap();
         let gebiet = f
             .iter()
@@ -1312,9 +1423,20 @@ mod tests {
     async fn obergrenze_kuerzt_und_markiert() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), 1)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen {
+                ebenen: 1,
+                ..Grenzen::STANDARD
+            },
+        )
+        .await
+        .unwrap()
+        .antwort;
         let f = a.features["features"].as_array().unwrap();
         let gebiet = f
             .iter()
@@ -1328,13 +1450,27 @@ mod tests {
     async fn teilstaende_kommen_aus_dem_cache() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
         let ebenen = q.zahl(".json");
-        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
         assert_eq!(q.zahl(LISTE_URL), 1, "Liste frisch im Cache");
         assert_eq!(q.zahl("code=EMSR728"), 1, "Details frisch im Cache");
         assert_eq!(q.zahl(".json"), ebenen, "Ebenen frisch im Cache");
@@ -1344,18 +1480,33 @@ mod tests {
     async fn scheitert_der_abruf_gilt_der_alte_teilstand() {
         let pool = crate::db::test_pool().await;
         let q = Quelle::default();
-        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
         // Alle Teilstände altern über jede TTL, dann fällt die Quelle aus.
         sqlx::query("UPDATE fachebenen_cache SET gespeichert_at = gespeichert_at - 90000")
             .execute(&pool)
             .await
             .unwrap();
         q.fehlt.lock().unwrap().push("https://".into());
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap()
+        .antwort;
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
     }
 
@@ -1369,9 +1520,17 @@ mod tests {
             .lock()
             .unwrap()
             .insert(format!("{DETAIL_URL}EMSR728"), d);
-        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
-            .await
-            .unwrap();
+        let a = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap()
+        .antwort;
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Leer);
     }
 
@@ -1383,10 +1542,122 @@ mod tests {
             .lock()
             .unwrap()
             .insert(format!("{DETAIL_URL}EMSR728"), json!({ "detail": "nope" }));
-        let _ = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN).await;
+        let _ = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await;
         let gespeichert: Option<(Value, i64)> =
             crate::karte::cache::eintrag_wert(&pool, "copernicus-teil:akt:EMSR728").await;
         assert!(gespeichert.is_none());
+    }
+
+    #[test]
+    fn tiefes_wkt_endet_ohne_absturz() {
+        // 100 000 `(` passen weit unter den Deckel von 16 MiB; ohne Grenze vor dem Abstieg liefe
+        // der Stack des Workers über.
+        let tief = format!("MULTIPOLYGON {}", "(".repeat(100_000));
+        assert_eq!(wkt_geometrie(&tief), None);
+        assert_eq!(wkt_geometrie("POLYGON ((((1 2, 3 4))))"), None);
+        assert!(wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)))").is_some());
+    }
+
+    #[test]
+    fn ebenen_nur_vom_bekannten_host() {
+        let mut v: Value = serde_json::from_str(EMSR728).unwrap();
+        let ebene = &mut v["results"][0]["aois"][0]["products"][0]["layers"][0];
+        ebene["json"] =
+            json!("https://beispiel.invalid/EMSR728_AOI01_DEL_PRODUCT_floodDepthA_v2.json");
+        let d = lies_details(&v).unwrap();
+        let erst = d.gebiete[0]
+            .produkte
+            .iter()
+            .find(|p| p.typ == "DEL" && p.monitoring == 0)
+            .unwrap();
+        let arten: Vec<_> = erst.ebenen.iter().map(|(a, _)| *a).collect();
+        assert_eq!(arten, [EbenenArt::Beobachtet]);
+    }
+
+    #[test]
+    fn zeitpunkt_mit_z_gilt() {
+        assert_eq!(
+            zeitpunkt("2024-06-01T05:06:00Z").as_deref(),
+            Some("2024-06-01 05:06:00")
+        );
+    }
+
+    #[tokio::test]
+    async fn teilausfall_ist_nicht_vollstaendig() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        // Ohne Archiv: nur EMSR728 wäre Kandidat, wenn es laufend wäre. Mit Archiv fehlen die
+        // Details von EMSR920 im Stub.
+        let mit_luecke = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
+        assert!(!mit_luecke.vollstaendig);
+        let ohne = baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            false,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
+        assert!(ohne.vollstaendig);
+    }
+
+    #[tokio::test]
+    async fn bytebudget_kuerzt_und_markiert() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let grenzen = Grenzen {
+            bytes: 1,
+            ..Grenzen::STANDARD
+        };
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), grenzen)
+            .await
+            .unwrap()
+            .antwort;
+        let f = a.features["features"].as_array().unwrap();
+        assert!(f.iter().all(|f| f["properties"]["art"] == "gebiet"));
+        assert_eq!(f[0]["properties"]["gekuerzt"], true);
+    }
+
+    #[tokio::test]
+    async fn fremde_details_werden_nicht_genommen() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let mut fremd: Value = serde_json::from_str(EMSR728).unwrap();
+        fremd["results"][0]["code"] = json!("EMSR999");
+        q.ersetzt
+            .lock()
+            .unwrap()
+            .insert(format!("{DETAIL_URL}EMSR728"), fremd);
+        // Weder EMSR728 (fremde Antwort) noch EMSR920 (fehlt) liefern Details: offline.
+        assert!(baue_antwort(
+            &pool,
+            q.hole(),
+            stuttgart(),
+            true,
+            heute(),
+            Grenzen::STANDARD
+        )
+        .await
+        .is_none());
     }
 
     #[test]

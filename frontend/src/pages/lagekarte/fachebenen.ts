@@ -303,7 +303,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // einem Drittel der TTL zeigt sie spätestens nach ~50 statt 90 min. Ein Poll ohne neuen
     // Stand kostet ein 304.
     pollMs: 600_000,
-    // Ein kalter Abruf holt Liste, Details und bis zu 40 Ebenen und antwortet nach 15 s mit
+    // Ein kalter Abruf holt Liste, Details und bis zu 40 Ebenen und antwortet nach 10 s mit
     // `offline`, während er im Hintergrund weiterläuft (`COPERNICUS_WARTE`).
     aufwaermPollMs: 15_000,
     bboxAbhaengig: true,
@@ -348,6 +348,10 @@ export function fachebeneAlter(
 /** Eine Copernicus-Aktivierung im Ausschnitt, wie die Zeile im Ebenenbaum sie nennt (LLH-1200). */
 export interface CopernicusAktivierung {
   emsr: string;
+  /** Ein Gebiet der Aktivierung kam ohne alle Ebenen (Quelle lieferte eine nicht). */
+  unvollstaendig: boolean;
+  /** Ein Gebiet wurde an der Obergrenze der Antwort gekürzt: hineinzoomen zeigt mehr. */
+  gekuerzt: boolean;
   /** Jüngste Aufnahme ihrer gezeigten Gebiete, UTC im Wire-Format; fehlt, wenn die Quelle keine nennt. */
   aufnahme?: string;
 }
@@ -357,18 +361,29 @@ export interface CopernicusAktivierung {
  * jüngste Aufnahme, die jüngste Aktivierung zuerst. Rein und exportiert.
  */
 export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivierung[] {
-  const je = new Map<string, string | undefined>();
+  const je = new Map<string, CopernicusAktivierung>();
   for (const f of fc.features) {
     const p = f.properties;
     if (p?.klasse !== 'gebiet' || typeof p.emsr !== 'string') continue;
     const aufnahme = typeof p.aufnahme === 'string' ? p.aufnahme : undefined;
-    const bisher = je.get(p.emsr);
-    // Wire-Format `YYYY-MM-DD HH:MM:SS`: Textvergleich ist Zeitvergleich.
-    je.set(p.emsr, bisher === undefined || (aufnahme ?? '') > bisher ? aufnahme : bisher);
+    const bisher = je.get(p.emsr) ?? {
+      emsr: p.emsr,
+      aufnahme: undefined,
+      unvollstaendig: false,
+      gekuerzt: false,
+    };
+    je.set(p.emsr, {
+      emsr: p.emsr,
+      // Wire-Format `YYYY-MM-DD HH:MM:SS`: Textvergleich ist Zeitvergleich.
+      aufnahme:
+        bisher.aufnahme === undefined || (aufnahme ?? '') > bisher.aufnahme
+          ? aufnahme
+          : bisher.aufnahme,
+      unvollstaendig: bisher.unvollstaendig || p.unvollstaendig === true,
+      gekuerzt: bisher.gekuerzt || p.gekuerzt === true,
+    });
   }
-  return [...je.entries()]
-    .map(([emsr, aufnahme]) => ({ emsr, aufnahme }))
-    .sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+  return [...je.values()].sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
 }
 
 /** Anzeige-Reihenfolge im Panel. */

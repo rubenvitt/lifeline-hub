@@ -26,7 +26,15 @@ describe('CopernicusZusatz (LLH-1200)', () => {
         status="ok"
         archiv
         onArchiv={() => {}}
-        aktivierungen={[{ emsr: 'EMSR728', aufnahme: '2024-06-03 17:16:00' }, { emsr: 'EMSR900' }]}
+        aktivierungen={[
+          {
+            emsr: 'EMSR728',
+            aufnahme: '2024-06-03 17:16:00',
+            unvollstaendig: false,
+            gekuerzt: false,
+          },
+          { emsr: 'EMSR900', unvollstaendig: false, gekuerzt: false },
+        ]}
       />,
     );
     const liste = screen.getByRole('list', { name: /Copernicus-Aktivierungen/ });
@@ -42,5 +50,20 @@ describe('CopernicusZusatz (LLH-1200)', () => {
     );
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ältere Aktivierungen' }));
     expect(onArchiv).toHaveBeenCalledWith(true);
+  });
+
+  it('nennt unvollständige und gekürzte Aktivierungen', () => {
+    renderMitProviders(
+      <CopernicusZusatz
+        status="ok"
+        archiv
+        onArchiv={() => {}}
+        aktivierungen={[{ emsr: 'EMSR728', unvollstaendig: true, gekuerzt: true }]}
+      />,
+    );
+    expect(screen.getByRole('list', { name: /Copernicus-Aktivierungen/ })).toHaveTextContent(
+      'nicht alle Ebenen geladen',
+    );
+    expect(screen.getByText(/weiter hineinzoomen/)).toBeInTheDocument();
   });
 });
