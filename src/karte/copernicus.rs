@@ -8,9 +8,14 @@
 //! Herleitung: `docs/superpowers/specs/2026-11-21-wqafyn8u-copernicus-ems-fachebene-design.md`.
 //! Lizenz, Takt und Grenzen: `docs/fachebenen-quellen.md`, Abschnitt „Copernicus EMS“.
 
-use crate::karte::typen::Bbox;
+use crate::error::AppError;
+use crate::karte::typen::{Bbox, FachebeneAntwort};
+use crate::karte::{cache, quellen, FachebenenState};
 use chrono::NaiveDateTime;
+use futures::stream::{self, StreamExt};
 use serde_json::Value;
+use sqlx::SqlitePool;
+use std::future::Future;
 use std::time::Duration;
 
 /// Server-TTL der Antwort, der Liste und der Details laufender Aktivierungen.
@@ -19,6 +24,18 @@ pub(crate) const COPERNICUS_TTL: Duration = Duration::from_secs(1800);
 /// Größte Spanne eines Ausschnitts in Grad je Achse (wie Energie). Das Frontend bremst mit
 /// derselben Zahl.
 pub(crate) const COPERNICUS_MAX_SPANNE_GRAD: f64 = 3.0;
+
+/// TTL der Details einer abgeschlossenen Aktivierung; unter dem Cache-Deckel von 48 h.
+const COPERNICUS_TTL_ABGESCHLOSSEN: Duration = Duration::from_secs(24 * 3600);
+
+/// TTL einer Ebenen-Datei. Die Version steht im Dateinamen, der Inhalt ändert sich nicht.
+const COPERNICUS_EBENE_TTL: Duration = Duration::from_secs(24 * 3600);
+
+/// Wartefrist eines kalten Abrufs (Liste, Details, bis zu [`MAX_EBENEN`] Dateien).
+const COPERNICUS_WARTE: Duration = Duration::from_secs(15);
+
+/// Gleichzeitige Abrufe von Ebenen-Dateien.
+const PARALLEL: usize = 6;
 
 pub(crate) const COPERNICUS_ATTRIB: &str =
     "© European Union, Copernicus Emergency Management Service";
@@ -53,7 +70,10 @@ pub(crate) fn lies_liste(v: &Value) -> Option<Vec<Aktivierung>> {
             .filter_map(|a| {
                 Some(Aktivierung {
                     code: a.get("code")?.as_str()?.to_string(),
-                    mittelpunkt: a.get("centroid").and_then(Value::as_str).and_then(wkt_punkt),
+                    mittelpunkt: a
+                        .get("centroid")
+                        .and_then(Value::as_str)
+                        .and_then(wkt_punkt),
                     letzte_aenderung: a
                         .get("lastUpdate")
                         .and_then(Value::as_str)
@@ -154,7 +174,12 @@ pub(crate) fn huelle(geometrie: &Value) -> Option<Bbox> {
         let Some(a) = v.as_array() else { return };
         if let [x, y, ..] = a.as_slice() {
             if let (Some(x), Some(y)) = (x.as_f64(), y.as_f64()) {
-                let b = h.get_or_insert(Bbox { west: x, sued: y, ost: x, nord: y });
+                let b = h.get_or_insert(Bbox {
+                    west: x,
+                    sued: y,
+                    ost: x,
+                    nord: y,
+                });
                 b.west = b.west.min(x);
                 b.ost = b.ost.max(x);
                 b.sued = b.sued.min(y);
@@ -198,9 +223,7 @@ pub(crate) fn waehle_kandidaten<'a>(
     liste
         .iter()
         .filter(|a| a.produkte > 0)
-        .filter(|a| {
-            archiv || !a.abgeschlossen || a.letzte_aenderung.is_some_and(|t| t >= grenze)
-        })
+        .filter(|a| archiv || !a.abgeschlossen || a.letzte_aenderung.is_some_and(|t| t >= grenze))
         .filter(|a| {
             a.mittelpunkt.is_some_and(|(lon, lat)| {
                 (umgebung.west..=umgebung.ost).contains(&lon)
@@ -215,9 +238,9 @@ pub(crate) fn waehle_kandidaten<'a>(
 pub(crate) fn ebenen_art(name: &str) -> Option<EbenenArt> {
     let datei = name.rsplit('/').next()?;
     let teile: Vec<&str> = datei.split('_').collect();
-    let version = teile
-        .iter()
-        .rposition(|t| t.len() > 1 && t.starts_with('v') && t[1..].bytes().all(|b| b.is_ascii_digit()))?;
+    let version = teile.iter().rposition(|t| {
+        t.len() > 1 && t.starts_with('v') && t[1..].bytes().all(|b| b.is_ascii_digit())
+    })?;
     let teil = teile.get(version.checked_sub(1)?)?;
     let stamm = teil.strip_suffix(['A', 'L', 'P'])?;
     match stamm {
@@ -360,7 +383,11 @@ fn lies_gebiet(aoi: &Value) -> Option<Gebiet> {
     let huelle = huelle(&umriss)?;
     Some(Gebiet {
         nummer: aoi.get("number").and_then(Value::as_u64).unwrap_or(0),
-        name: aoi.get("name").and_then(Value::as_str).unwrap_or("").to_string(),
+        name: aoi
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
         umriss,
         huelle,
         produkte: aoi
@@ -399,12 +426,17 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
         .collect();
     Some(Produkt {
         typ: p.get("type")?.as_str()?.to_string(),
-        monitoring: p.get("monitoringNumber").and_then(Value::as_u64).unwrap_or(0),
+        monitoring: p
+            .get("monitoringNumber")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
         version: feld("number").and_then(Value::as_u64).unwrap_or(0),
         fertig: feld("statusCode").and_then(Value::as_str) == Some("F"),
         aufnahme: juengstes.map(|(zeit, _)| crate::zeit::formatiere(zeit)),
         sensor: juengstes.and_then(|(_, sensor)| sensor.map(str::to_string)),
-        geliefert: feld("deliveryTime").and_then(Value::as_str).and_then(zeitpunkt),
+        geliefert: feld("deliveryTime")
+            .and_then(Value::as_str)
+            .and_then(zeitpunkt),
         ebenen,
     })
 }
@@ -414,7 +446,11 @@ fn lies_produkt(p: &Value) -> Option<Produkt> {
 /// nach Produktart.
 pub(crate) fn waehle_produkte(g: &Gebiet) -> Vec<&Produkt> {
     let mut je_typ: std::collections::BTreeMap<&str, &Produkt> = Default::default();
-    for p in g.produkte.iter().filter(|p| p.fertig && !p.ebenen.is_empty()) {
+    for p in g
+        .produkte
+        .iter()
+        .filter(|p| p.fertig && !p.ebenen.is_empty())
+    {
         let besser = je_typ
             .get(p.typ.as_str())
             .is_none_or(|b| (p.monitoring, p.version) > (b.monitoring, b.version));
@@ -438,7 +474,11 @@ fn herkunft(d: &Details, g: &Gebiet, p: &Produkt) -> serde_json::Map<String, Val
     m.insert("produkt".into(), p.typ.clone().into());
     m.insert("monitoring".into(), p.monitoring.into());
     m.insert("version".into(), p.version.into());
-    for (k, v) in [("aufnahme", &p.aufnahme), ("sensor", &p.sensor), ("geliefert", &p.geliefert)] {
+    for (k, v) in [
+        ("aufnahme", &p.aufnahme),
+        ("sensor", &p.sensor),
+        ("geliefert", &p.geliefert),
+    ] {
         if let Some(v) = v {
             m.insert(k.into(), v.clone().into());
         }
@@ -511,6 +551,242 @@ pub(crate) fn gebiet_feature(
     serde_json::json!({ "type": "Feature", "geometry": g.umriss, "properties": props })
 }
 
+/// Liste der öffentlichen Aktivierungen (ab EMSR656, März 2023).
+pub(crate) const LISTE_URL: &str =
+    "https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500";
+
+/// Details einer Aktivierung; die EMSR-Nummer wird angehängt. Ein Pfad des Dashboard-Backends ohne
+/// Stabilitätszusage: bricht er, ist die Ebene `offline`.
+pub(crate) const DETAIL_URL: &str =
+    "https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations/?code=";
+
+/// Höchstzahl der Ebenen-Dateien je Antwort; darüber trägt das Gebiet `gekuerzt`.
+pub(crate) const MAX_EBENEN: usize = 40;
+
+/// Baut die Antwort für einen Ausschnitt. `hole` lädt eine URL als JSON (im Betrieb
+/// `quellen::hole_json`, in Tests ein Stub). `None`, wenn die Liste fehlt oder keine einzige
+/// Aktivierung ihre Details liefert: dann ist die Ebene `offline`.
+pub(crate) async fn baue_antwort<H, Fut>(
+    pool: &SqlitePool,
+    hole: H,
+    bbox: Bbox,
+    archiv: bool,
+    jetzt: NaiveDateTime,
+    grenze: usize,
+) -> Option<FachebeneAntwort>
+where
+    H: Fn(String) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<Value, String>> + Send,
+{
+    let liste_roh = teilstand(
+        pool,
+        "copernicus-teil:liste",
+        COPERNICUS_TTL,
+        &hole,
+        LISTE_URL,
+        |v| lies_liste(v).is_some(),
+    )
+    .await?;
+    let liste = lies_liste(&liste_roh)?;
+    let kandidaten = waehle_kandidaten(&liste, &bbox, jetzt, archiv);
+
+    let mut details = Vec::new();
+    for a in &kandidaten {
+        let ttl = if a.abgeschlossen {
+            COPERNICUS_TTL_ABGESCHLOSSEN
+        } else {
+            COPERNICUS_TTL
+        };
+        let schluessel = format!("copernicus-teil:akt:{}", a.code);
+        let url = format!("{DETAIL_URL}{}", a.code);
+        let roh = teilstand(pool, &schluessel, ttl, &hole, &url, |v| {
+            lies_details(v).is_some()
+        })
+        .await;
+        if let Some(d) = roh.as_ref().and_then(lies_details) {
+            details.push(d);
+        }
+    }
+    // Keine einzige Aktivierung lieferte Details: die Quelle ist gestört, nicht leer.
+    if !kandidaten.is_empty() && details.is_empty() {
+        return None;
+    }
+
+    // Gebiete im Ausschnitt mit ihren gewählten Produkten, und die Ebenen, die zu holen sind.
+    struct Treffer {
+        details: usize,
+        gebiet: usize,
+        gewaehlt: Vec<Produkt>,
+        gekuerzt: bool,
+        unvollstaendig: bool,
+    }
+    let mut treffer: Vec<Treffer> = Vec::new();
+    let mut auftraege: Vec<(usize, Produkt, EbenenArt, String)> = Vec::new();
+    for (di, d) in details.iter().enumerate().filter(|(_, d)| !d.sensibel) {
+        for (gi, g) in d.gebiete.iter().enumerate() {
+            if !schneidet(&g.huelle, &bbox) {
+                continue;
+            }
+            let gewaehlt: Vec<Produkt> = waehle_produkte(g).into_iter().cloned().collect();
+            let mut gekuerzt = false;
+            for p in &gewaehlt {
+                for (art, url) in &p.ebenen {
+                    if auftraege.len() < grenze {
+                        auftraege.push((treffer.len(), p.clone(), *art, url.clone()));
+                    } else {
+                        gekuerzt = true;
+                    }
+                }
+            }
+            treffer.push(Treffer {
+                details: di,
+                gebiet: gi,
+                gewaehlt,
+                gekuerzt,
+                unvollstaendig: false,
+            });
+        }
+    }
+
+    let hole = &hole;
+    let geholt: Vec<_> = stream::iter(auftraege)
+        .map(|(ti, p, art, url)| async move {
+            let schluessel = format!("copernicus-teil:ebene:{url}");
+            let roh = teilstand(pool, &schluessel, COPERNICUS_EBENE_TTL, hole, &url, |v| {
+                v.get("features").is_some_and(Value::is_array)
+            })
+            .await;
+            (ti, p, art, roh)
+        })
+        .buffered(PARALLEL)
+        .collect()
+        .await;
+
+    let mut features = Vec::new();
+    for (ti, p, art, roh) in &geholt {
+        let t = &treffer[*ti];
+        let d = &details[t.details];
+        match roh {
+            Some(fc) => features.extend(normalisiere_ebene(fc, *art, d, &d.gebiete[t.gebiet], p)),
+            None => treffer[*ti].unvollstaendig = true,
+        }
+    }
+
+    // Umrisse zuerst; die Reihenfolge im Array ist für die Karte belanglos, im Inspector stehen
+    // die Gebiete so vorn.
+    let mut alle = Vec::with_capacity(treffer.len() + features.len());
+    let mut stand: Option<String> = None;
+    for t in &treffer {
+        let d = &details[t.details];
+        let gewaehlt: Vec<&Produkt> = t.gewaehlt.iter().collect();
+        alle.push(gebiet_feature(
+            d,
+            &d.gebiete[t.gebiet],
+            &gewaehlt,
+            t.unvollstaendig,
+            t.gekuerzt,
+        ));
+        for p in &t.gewaehlt {
+            if p.aufnahme > stand {
+                stand = p.aufnahme.clone();
+            }
+        }
+    }
+    alle.extend(features);
+    Some(FachebeneAntwort::ok(
+        "copernicus",
+        COPERNICUS_ATTRIB,
+        stand,
+        serde_json::json!({ "type": "FeatureCollection", "features": alle }),
+    ))
+}
+
+/// Ein Teilstand (Liste, Details oder Ebene): frisch aus dem Cache, sonst holen und, wenn `taugt`,
+/// speichern. Scheitert der Abruf oder taugt die Antwort nicht, gilt der alte Stand, solange der
+/// Cache ihn hält (48 h). Eine untaugliche Antwort wird nie gespeichert, sonst überschriebe ein
+/// Formatbruch einen brauchbaren Stand.
+async fn teilstand<H, Fut>(
+    pool: &SqlitePool,
+    schluessel: &str,
+    ttl: Duration,
+    hole: &H,
+    url: &str,
+    taugt: impl Fn(&Value) -> bool,
+) -> Option<Value>
+where
+    H: Fn(String) -> Fut,
+    Fut: Future<Output = Result<Value, String>>,
+{
+    let alt: Option<(Value, i64)> = cache::eintrag_wert(pool, schluessel).await;
+    if let Some((v, alter)) = &alt {
+        if *alter < ttl.as_secs() as i64 {
+            return Some(v.clone());
+        }
+    }
+    match hole(url.to_string()).await {
+        Ok(v) if taugt(&v) => {
+            cache::setze_wert(pool, schluessel, &v).await;
+            Some(v)
+        }
+        Ok(_) => {
+            tracing::warn!("Copernicus: unbrauchbare Antwort von {url}, alter Stand bleibt");
+            alt.map(|(v, _)| v)
+        }
+        Err(e) => {
+            tracing::warn!("Copernicus: Abruf {url} fehlgeschlagen: {e}");
+            alt.map(|(v, _)| v)
+        }
+    }
+}
+
+/// Ist der Ausschnitt klein genug? Geprüft wie bei Energie, mit eigener Grenze.
+pub(crate) fn pruefe_bbox(bbox: &Bbox) -> Result<(), String> {
+    if bbox.ost - bbox.west > COPERNICUS_MAX_SPANNE_GRAD
+        || bbox.nord - bbox.sued > COPERNICUS_MAX_SPANNE_GRAD
+    {
+        return Err("bbox zu groß — weiter hineinzoomen".to_string());
+    }
+    Ok(())
+}
+
+/// `GET /api/karte/fachebenen/copernicus?bbox=…[&archiv=1]`. Kalt wartet die Anfrage höchstens
+/// [`COPERNICUS_WARTE`] und antwortet sonst `offline`; der Abruf läuft weiter und füllt den
+/// Cache für den nächsten Poll (Aufwärmtakt im Frontend).
+pub async fn fetch_copernicus(
+    s: &FachebenenState,
+    pool: &SqlitePool,
+    bbox_roh: &str,
+    archiv: bool,
+) -> Result<FachebeneAntwort, AppError> {
+    let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
+    pruefe_bbox(&bbox).map_err(AppError::Validation)?;
+    let key = bbox.cache_key_mit(if archiv {
+        "copernicus-archiv"
+    } else {
+        "copernicus"
+    });
+    let (client, p, k) = (s.client.clone(), pool.clone(), key.clone());
+    let antwort = quellen::liefere_geloest(
+        pool,
+        &s.inflight,
+        &key,
+        COPERNICUS_TTL,
+        tokio::time::Instant::now() + COPERNICUS_WARTE,
+        move || async move {
+            let hole = move |url: String| {
+                let c = client.clone();
+                async move { quellen::hole_json(&c, &url).await }
+            };
+            let jetzt = chrono::Utc::now().naive_utc();
+            let a = baue_antwort(&p, hole, bbox, archiv, jetzt, MAX_EBENEN).await?;
+            cache::setze(&p, &k, &a).await;
+            Some(a)
+        },
+    )
+    .await;
+    Ok(antwort.unwrap_or_else(|| FachebeneAntwort::offline("copernicus", COPERNICUS_ATTRIB)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -548,7 +824,10 @@ mod tests {
         assert_eq!(wkt_punkt("POLYGON ((1 2, 3 4))"), None);
         let g = wkt_geometrie("POLYGON ((1 2, 3 2, 3 5, 1 2))").unwrap();
         assert_eq!(g["type"], "Polygon");
-        assert_eq!(g["coordinates"], json!([[[1.0, 2.0], [3.0, 2.0], [3.0, 5.0], [1.0, 2.0]]]));
+        assert_eq!(
+            g["coordinates"],
+            json!([[[1.0, 2.0], [3.0, 2.0], [3.0, 5.0], [1.0, 2.0]]])
+        );
         let h = huelle(&g).unwrap();
         assert_eq!((h.west, h.sued, h.ost, h.nord), (1.0, 2.0, 3.0, 5.0));
         let m = wkt_geometrie("MULTIPOLYGON (((1 2, 3 2, 1 2)), ((5 6, 7 6, 5 6)))").unwrap();
@@ -600,12 +879,19 @@ mod tests {
     fn genau_dreissig_tage_gelten_noch() {
         let jetzt = t("2026-11-21 12:00:00");
         let liste = vec![akt("GRENZE", 9.5, 48.8, "2026-10-22 12:00:00", true, 1)];
-        assert_eq!(waehle_kandidaten(&liste, &stuttgart(), jetzt, false).len(), 1);
+        assert_eq!(
+            waehle_kandidaten(&liste, &stuttgart(), jetzt, false).len(),
+            1
+        );
     }
 
     #[test]
     fn erkennt_die_ebenenart_am_namen() {
-        let n = |s: &str| ebenen_art(&format!("EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_{s}_v2_VT"));
+        let n = |s: &str| {
+            ebenen_art(&format!(
+                "EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_{s}_v2_VT"
+            ))
+        };
         assert_eq!(n("observedEventA"), Some(EbenenArt::Beobachtet));
         assert_eq!(n("observedEventL"), Some(EbenenArt::Beobachtet));
         assert_eq!(n("maximumFloodExtentA"), Some(EbenenArt::MaxAusdehnung));
@@ -637,7 +923,10 @@ mod tests {
         assert_eq!(klasse(Some(SchadenGebaeude), &json!({})), "unbekannt");
         assert_eq!(klasse(Some(Beobachtet), &json!({})), "beobachtet");
         assert_eq!(klasse(Some(MaxAusdehnung), &json!({})), "max_ausdehnung");
-        assert_eq!(klasse(Some(NichtAusgewertet), &json!({})), "nicht_ausgewertet");
+        assert_eq!(
+            klasse(Some(NichtAusgewertet), &json!({})),
+            "nicht_ausgewertet"
+        );
         assert_eq!(klasse(None, &json!({})), "gebiet");
     }
 
@@ -652,14 +941,21 @@ mod tests {
     #[test]
     fn liest_die_details() {
         let d = emsr728();
-        assert_eq!((d.code.as_str(), d.name.as_str()), ("EMSR728", "Flood in Germany"));
+        assert_eq!(
+            (d.code.as_str(), d.name.as_str()),
+            ("EMSR728", "Flood in Germany")
+        );
         assert_eq!(d.kategorie, "Flood");
         assert!(!d.sensibel);
         assert_eq!(d.gebiete.len(), 2);
         let g1 = &d.gebiete[0];
         assert_eq!((g1.nummer, g1.name.as_str()), (1, "Stuttgart"));
         assert_eq!(g1.umriss["type"], "Polygon");
-        assert!(g1.huelle.west < 9.0 && g1.huelle.ost > 9.5, "{:?}", g1.huelle);
+        assert!(
+            g1.huelle.west < 9.0 && g1.huelle.ost > 9.5,
+            "{:?}",
+            g1.huelle
+        );
         let erst = g1
             .produkte
             .iter()
@@ -669,24 +965,35 @@ mod tests {
         assert!(erst.fertig);
         assert_eq!(erst.aufnahme.as_deref(), Some("2024-06-01 05:43:00"));
         // Version 2 wurde am 04.06. neu geliefert, nach den Aufnahmen vom 01.06.
-        assert_eq!(erst.geliefert.as_deref().map(|s| &s[..10]), Some("2024-06-04"));
+        assert_eq!(
+            erst.geliefert.as_deref().map(|s| &s[..10]),
+            Some("2024-06-04")
+        );
         let arten: Vec<_> = erst.ebenen.iter().map(|(a, _)| *a).collect();
         assert_eq!(arten, [EbenenArt::Wassertiefe, EbenenArt::Beobachtet]);
-        assert!(erst.ebenen[0].1.starts_with("https://rapidmapping-viewer.s3."));
+        assert!(erst.ebenen[0]
+            .1
+            .starts_with("https://rapidmapping-viewer.s3."));
         assert!(erst.ebenen[0].1.ends_with("_floodDepthA_v2.json"));
     }
 
     #[test]
     fn details_ohne_ergebnis_sind_formatbruch() {
         assert_eq!(lies_details(&json!({ "count": 0, "results": [] })), None);
-        assert_eq!(lies_details(&json!({ "detail": "Authentication credentials were not provided." })), None);
+        assert_eq!(
+            lies_details(&json!({ "detail": "Authentication credentials were not provided." })),
+            None
+        );
     }
 
     #[test]
     fn rechtecke_schneiden_sich() {
         let a = Bbox::parse("0,0,2,2").unwrap();
         assert!(schneidet(&a, &Bbox::parse("1,1,3,3").unwrap()));
-        assert!(schneidet(&a, &Bbox::parse("2,2,3,3").unwrap()), "Berührung zählt");
+        assert!(
+            schneidet(&a, &Bbox::parse("2,2,3,3").unwrap()),
+            "Berührung zählt"
+        );
         assert!(!schneidet(&a, &Bbox::parse("2.1,0,3,2").unwrap()));
         assert!(!schneidet(&a, &Bbox::parse("0,2.1,2,3").unwrap()));
     }
@@ -701,7 +1008,10 @@ mod tests {
             .map(|p| (p.typ.clone(), p.monitoring))
             .collect();
         assert_eq!(g1, [("DEL".to_string(), 2)]);
-        let g9: Vec<_> = waehle_produkte(&d.gebiete[1]).iter().map(|p| p.typ.clone()).collect();
+        let g9: Vec<_> = waehle_produkte(&d.gebiete[1])
+            .iter()
+            .map(|p| p.typ.clone())
+            .collect();
         assert_eq!(g9, ["GRA"]);
     }
 
@@ -714,7 +1024,10 @@ mod tests {
             aufnahme: None,
             sensor: None,
             geliefert: None,
-            ebenen: vec![(EbenenArt::Beobachtet, format!("{typ}{monitoring}v{version}"))],
+            ebenen: vec![(
+                EbenenArt::Beobachtet,
+                format!("{typ}{monitoring}v{version}"),
+            )],
         }
     }
 
@@ -727,7 +1040,10 @@ mod tests {
             produkt("DEL", 0, 3, true),
             produkt("DEL", 0, 4, false),
         ];
-        let w: Vec<_> = waehle_produkte(&g).iter().map(|p| (p.typ.clone(), p.version)).collect();
+        let w: Vec<_> = waehle_produkte(&g)
+            .iter()
+            .map(|p| (p.typ.clone(), p.version))
+            .collect();
         assert_eq!(w, [("DEL".to_string(), 3)]);
         g.produkte = vec![produkt("FEP", 0, 1, true), produkt("GRA", 0, 1, true)];
         let w: Vec<_> = waehle_produkte(&g).iter().map(|p| p.typ.clone()).collect();
@@ -766,7 +1082,13 @@ mod tests {
 
         let fc: Value = serde_json::from_str(EBENE_VERKEHR).unwrap();
         let g9 = &d.gebiete[1];
-        let f = normalisiere_ebene(&fc, EbenenArt::SchadenVerkehr, &d, g9, waehle_produkte(g9)[0]);
+        let f = normalisiere_ebene(
+            &fc,
+            EbenenArt::SchadenVerkehr,
+            &d,
+            g9,
+            waehle_produkte(g9)[0],
+        );
         assert_eq!(f[0]["properties"]["art"], "schaden_verkehr");
         assert_eq!(f[0]["properties"]["klasse"], "schaden_moeglich");
         assert_eq!(f[0]["properties"]["beschreibung"], "21120-Primary Road");
@@ -782,8 +1104,18 @@ mod tests {
             { "type": "Feature", "properties": {} },
             { "type": "Feature", "properties": {}, "geometry": { "type": "Point", "coordinates": [9.2, 48.8] } }
         ]});
-        assert_eq!(normalisiere_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0]).len(), 1);
-        assert!(normalisiere_ebene(&json!({ "x": 1 }), EbenenArt::Beobachtet, &d, g, &g.produkte[0]).is_empty());
+        assert_eq!(
+            normalisiere_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0]).len(),
+            1
+        );
+        assert!(normalisiere_ebene(
+            &json!({ "x": 1 }),
+            EbenenArt::Beobachtet,
+            &d,
+            g,
+            &g.produkte[0]
+        )
+        .is_empty());
     }
 
     /// Abnahme (LLH-1200): Die Überflutungsflächen von EMSR728 liegen lagerichtig im Umriss von
@@ -828,9 +1160,241 @@ mod tests {
         assert_eq!(pr["gekuerzt"], false);
     }
 
+    // ------------------------------------------------------------------ Abruf (Stufe 3)
+
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+
+    /// Stub für `hole`: bekannte URLs aus den Testdaten, Ebenen nach ihrer Art, alles andere
+    /// scheitert. Zählt jeden Abruf.
+    #[derive(Clone, Default)]
+    struct Quelle {
+        aufrufe: Arc<Mutex<Vec<String>>>,
+        fehlt: Arc<Mutex<Vec<String>>>,
+        ersetzt: Arc<Mutex<HashMap<String, Value>>>,
+    }
+
+    impl Quelle {
+        fn hole(
+            &self,
+        ) -> impl Fn(String) -> std::future::Ready<Result<Value, String>> + Send + Sync {
+            let q = self.clone();
+            move |url: String| {
+                q.aufrufe.lock().unwrap().push(url.clone());
+                let antwort = if q
+                    .fehlt
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|f| url.contains(f.as_str()))
+                {
+                    Err("HTTP 503".to_string())
+                } else if let Some(v) = q.ersetzt.lock().unwrap().get(&url) {
+                    Ok(v.clone())
+                } else if url == LISTE_URL {
+                    Ok(serde_json::from_str(LISTE).unwrap())
+                } else if url == format!("{DETAIL_URL}EMSR728") {
+                    Ok(serde_json::from_str(EMSR728).unwrap())
+                } else if url.ends_with(".json") && url.contains("floodDepth") {
+                    Ok(serde_json::from_str(EBENE_TIEFE).unwrap())
+                } else if url.ends_with(".json") && url.contains("transportation") {
+                    Ok(serde_json::from_str(EBENE_VERKEHR).unwrap())
+                } else if url.ends_with(".json") {
+                    Ok(json!({ "type": "FeatureCollection", "features": [
+                        { "type": "Feature", "properties": { "notation": "Flooded area" },
+                          "geometry": { "type": "Polygon", "coordinates": [[[9.2, 48.8], [9.21, 48.8], [9.21, 48.81], [9.2, 48.8]]] } }
+                    ]}))
+                } else {
+                    Err("HTTP 404".to_string())
+                };
+                std::future::ready(antwort)
+            }
+        }
+        fn zahl(&self, teil: &str) -> usize {
+            self.aufrufe
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|u| u.contains(teil))
+                .count()
+        }
+    }
+
+    fn heute() -> NaiveDateTime {
+        t("2026-11-21 12:00:00")
+    }
+
+    #[tokio::test]
+    async fn zeigt_emsr728_im_archiv_ueber_stuttgart() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        assert_eq!(a.quelle, "copernicus");
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+        assert_eq!(a.attribution, COPERNICUS_ATTRIB);
+        // Nur Gebiet 1 (Stuttgart) schneidet den Ausschnitt, gezeigt wird MONIT02.
+        assert_eq!(a.stand.as_deref(), Some("2024-06-03 17:16:00"));
+        let f = a.features["features"].as_array().unwrap();
+        let gebiete: Vec<_> = f
+            .iter()
+            .filter(|f| f["properties"]["art"] == "gebiet")
+            .collect();
+        assert_eq!(gebiete.len(), 1);
+        assert_eq!(gebiete[0]["properties"]["gebiet"], "Stuttgart");
+        assert_eq!(gebiete[0]["properties"]["unvollstaendig"], false);
+        assert!(f.iter().any(|f| f["properties"]["klasse"] == "tiefe_hoch"));
+        assert!(f.iter().any(|f| f["properties"]["art"] == "max_ausdehnung"));
+        // Gebiet 9 (Bogen) liegt außerhalb: keine Schadensebene geholt.
+        assert_eq!(q.zahl("transportation"), 0);
+        // EMSR920 ist Kandidat (Archiv, 290 km), seine Details fehlen im Stub: kein Abbruch.
+        assert_eq!(q.zahl("code=EMSR920"), 1);
+    }
+
+    #[tokio::test]
+    async fn ohne_archiv_ist_die_ebene_leer_ohne_detailabruf() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), false, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Leer);
+        assert_eq!(q.zahl("code="), 0);
+    }
+
+    #[tokio::test]
+    async fn ohne_liste_offline() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        q.fehlt
+            .lock()
+            .unwrap()
+            .push("public-activations-info".into());
+        assert!(
+            baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn ohne_jede_details_offline() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        q.fehlt.lock().unwrap().push("code=".into());
+        assert!(
+            baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn fehlende_ebene_macht_das_gebiet_unvollstaendig() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        q.fehlt.lock().unwrap().push("floodDepth".into());
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        let f = a.features["features"].as_array().unwrap();
+        let gebiet = f
+            .iter()
+            .find(|f| f["properties"]["art"] == "gebiet")
+            .unwrap();
+        assert_eq!(gebiet["properties"]["unvollstaendig"], true);
+        assert!(!f.iter().any(|f| f["properties"]["art"] == "wassertiefe"));
+        assert!(f.iter().any(|f| f["properties"]["art"] == "beobachtet"));
+    }
+
+    #[tokio::test]
+    async fn obergrenze_kuerzt_und_markiert() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), 1)
+            .await
+            .unwrap();
+        let f = a.features["features"].as_array().unwrap();
+        let gebiet = f
+            .iter()
+            .find(|f| f["properties"]["art"] == "gebiet")
+            .unwrap();
+        assert_eq!(gebiet["properties"]["gekuerzt"], true);
+        assert_eq!(q.zahl(".json"), 1);
+    }
+
+    #[tokio::test]
+    async fn teilstaende_kommen_aus_dem_cache() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        let ebenen = q.zahl(".json");
+        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        assert_eq!(q.zahl(LISTE_URL), 1, "Liste frisch im Cache");
+        assert_eq!(q.zahl("code=EMSR728"), 1, "Details frisch im Cache");
+        assert_eq!(q.zahl(".json"), ebenen, "Ebenen frisch im Cache");
+    }
+
+    #[tokio::test]
+    async fn scheitert_der_abruf_gilt_der_alte_teilstand() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        // Alle Teilstände altern über jede TTL, dann fällt die Quelle aus.
+        sqlx::query("UPDATE fachebenen_cache SET gespeichert_at = gespeichert_at - 90000")
+            .execute(&pool)
+            .await
+            .unwrap();
+        q.fehlt.lock().unwrap().push("https://".into());
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+    }
+
+    #[tokio::test]
+    async fn sensible_aktivierung_bleibt_draussen() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        let mut d: Value = serde_json::from_str(EMSR728).unwrap();
+        d["results"][0]["sensitive"] = json!(true);
+        q.ersetzt
+            .lock()
+            .unwrap()
+            .insert(format!("{DETAIL_URL}EMSR728"), d);
+        let a = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN)
+            .await
+            .unwrap();
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Leer);
+    }
+
+    #[tokio::test]
+    async fn kaputte_details_werden_nicht_gespeichert() {
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        q.ersetzt
+            .lock()
+            .unwrap()
+            .insert(format!("{DETAIL_URL}EMSR728"), json!({ "detail": "nope" }));
+        let _ = baue_antwort(&pool, q.hole(), stuttgart(), true, heute(), MAX_EBENEN).await;
+        let gespeichert: Option<(Value, i64)> =
+            crate::karte::cache::eintrag_wert(&pool, "copernicus-teil:akt:EMSR728").await;
+        assert!(gespeichert.is_none());
+    }
+
     #[test]
     fn zeitpunkte_im_wire_format() {
-        assert_eq!(zeitpunkt("2024-06-01T05:06:00").as_deref(), Some("2024-06-01 05:06:00"));
+        assert_eq!(
+            zeitpunkt("2024-06-01T05:06:00").as_deref(),
+            Some("2024-06-01 05:06:00")
+        );
         assert_eq!(
             zeitpunkt("2024-09-04T15:58:13.172773").as_deref(),
             Some("2024-09-04 15:58:13")

@@ -602,6 +602,15 @@ pub async fn fachebenen(
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
             quellen::fetch_energie(&state.fachebenen, cache_pool, bbox).await?
         }
+        // LLH-1200: bbox-pflichtig wie Energie; `archiv=1` nimmt auch abgeschlossene
+        // Aktivierungen, die älter als 30 Tage sind.
+        "copernicus" => {
+            let bbox =
+                bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
+            let archiv = params.get("archiv").is_some_and(|a| a == "1");
+            crate::karte::copernicus::fetch_copernicus(&state.fachebenen, cache_pool, bbox, archiv)
+                .await?
+        }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };
     fachebene_antwort(&antwort, &headers)

@@ -1198,7 +1198,7 @@ where
 /// MaStR-Sperre trotzdem zu Ende, auch wenn axum den Handler verwirft. Holt schon eine andere
 /// Anfrage denselben Schlüssel, wartet diese nicht und trägt nichts bei; die nächste Anfrage
 /// trifft den Cache.
-async fn liefere_geloest<Fut>(
+pub(crate) async fn liefere_geloest<Fut>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
     key: &str,
