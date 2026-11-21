@@ -29,8 +29,9 @@ starten.
 ## Einrichten
 
 Voraussetzungen: Linux mit systemd, Docker Engine, `git` und `curl`; für vier Plätze mindestens
-8 Kerne, 16 GB Speicher und rund 60 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, je
-laufendem Job einige GB). Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job,
+8 Kerne, deutlich mehr als 16 GB Speicher (die Rust-Suite allein bis 14 GB, dazu die übrigen
+Jobs) und rund 110 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, die Rust-Suite rund
+60 GB, jeder andere laufende Job einige GB). Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job,
 der die Platte füllt, trifft dann nur die Runner, nicht den Host.
 
 1. **Dienstnutzer.** Mitglied der Gruppe `docker` heißt auf diesem Host root-gleich; deshalb ein
@@ -71,8 +72,8 @@ der die Platte füllt, trifft dann nur die Runner, nicht den Host.
 
    `runner-loop.sh` startet nicht, wenn die Datei für andere lesbar ist.
 
-4. **Konfiguration.** Vorgaben passen für 8 Kerne und 16 GB; die Grenzen sind Deckel je
-   Container, keine Reservierung.
+4. **Konfiguration.** Die Grenzen sind Deckel je Container, keine Reservierung; den Speicher
+   bestimmt die Rust-Suite (Abschnitt „Plätze und Größe“).
 
    ```bash
    sudo install -m 640 -o root -g lifeline-runner /opt/lifeline-runner/repo/scripts/runner/runner.env.beispiel /etc/lifeline-runner/runner.env
@@ -137,9 +138,15 @@ Hinweis auf diesen Abschnitt ab.
 
 Ein Push bringt bis zu zehn Jobs auf den Server (Rust, vier Frontend-Anteile, Binary, vier
 e2e-Anteile); mehr als Plätze da sind, warten. Je Platz rechnet man `RUNNER_CPUS` Kerne und
-`RUNNER_MEMORY` Speicher als Deckel, nicht als Reservierung. Die Rust-Suite linkt große
-Test-Binaries: reicht `RUNNER_MEMORY=6g` nicht (Abbruch mit „killed“ oder Signal 9), den Wert in
-`/etc/lifeline-runner/runner.env` heben. Einen Platz mehr: `sudo systemctl enable --now
+`RUNNER_MEMORY` Speicher als Deckel, nicht als Reservierung. Den Speicher bestimmt die Rust-Suite:
+rustc übersetzt das Crate `lifeline_hub` als Bibliothek (gemessen rund 6 GB Spitze) und zugleich
+als Testbibliothek (rund 10 GB), zusammen rund 13 GB. Ohne Debuginfo und mit einem Job sind es
+immer noch 9,8 GB; mit `RUNNER_MEMORY=6g` bricht sie deshalb immer mit „Compiler killed by
+signal 9“ ab (alpha, 21.11.2026). Vorgabe ist `14g`; wer den Wert in
+`/etc/lifeline-runner/runner.env` setzt, startet danach die Plätze neu. Der Host braucht den
+Speicher wirklich: die Grenze ist ein Deckel, und reicht der Host nicht, beendet der Kernel
+denselben Compiler. Platte: die Testbinaries der Rust-Suite belegen im Container rund 50 GB, der
+Inkrementalcache weitere 8 GB. Einen Platz mehr: `sudo systemctl enable --now
 lifeline-runner@5`.
 
 ## Betrieb

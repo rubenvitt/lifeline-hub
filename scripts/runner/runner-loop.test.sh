@@ -116,7 +116,7 @@ pruefe "Container mit --rm" grep -q -- '--rm' <<< "$run_zeile"
 pruefe "Container mit festem Namen je Platz" grep -q -- '--name lifeline-runner-1' <<< "$run_zeile"
 pruefe "Container im eigenen Netz" grep -q -- '--network lifeline-runner' <<< "$run_zeile"
 pruefe "Container mit CPU- und Speichergrenze (Vorgabe)" \
-  grep -q -- '--cpus 3 .*--memory 6g' <<< "$run_zeile"
+  grep -q -- '--cpus 3 .*--memory 14g' <<< "$run_zeile"
 pruefe "Container ohne neue Privilegien" grep -q -- '--security-opt no-new-privileges' <<< "$run_zeile"
 pruefe "Container hängt den Compiler-Cache als Volume ein" \
   grep -q -- '-v lifeline-sccache:/home/runner/.cache/sccache' <<< "$run_zeile"

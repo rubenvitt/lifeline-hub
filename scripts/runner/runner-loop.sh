@@ -29,7 +29,7 @@
 #   RUNNER_LABEL         Label, das `E2E_RUNNER` nennt      (lifeline-e2e)
 #   RUNNER_IMAGE         Image aus build-image.sh           (lifeline-runner:latest)
 #   RUNNER_CPUS          Kerne je Container                 (3)
-#   RUNNER_MEMORY        Speicher je Container              (6g)
+#   RUNNER_MEMORY        Speicher je Container              (14g; die Rust-Suite braucht ~13 GB)
 #   RUNNER_SCCACHE_SIZE  Obergrenze des Compiler-Caches     (20G)
 #   RUNNER_NETWORK       Docker-Netz der Runner             (lifeline-runner)
 #   RUNNER_MIN_JOB_SEK   kürzer endende Container gelten als Fehler (60); der Runner gibt auch
@@ -47,7 +47,7 @@ TOKEN_FILE="${RUNNER_TOKEN_FILE:-/etc/lifeline-runner/token}"
 LABEL="${RUNNER_LABEL:-lifeline-e2e}"
 IMAGE="${RUNNER_IMAGE:-lifeline-runner:latest}"
 CPUS="${RUNNER_CPUS:-3}"
-MEMORY="${RUNNER_MEMORY:-6g}"
+MEMORY="${RUNNER_MEMORY:-14g}"
 SCCACHE_SIZE="${RUNNER_SCCACHE_SIZE:-20G}"
 NETWORK="${RUNNER_NETWORK:-lifeline-runner}"
 MAX_RUNS="${RUNNER_MAX_RUNS:-0}"
