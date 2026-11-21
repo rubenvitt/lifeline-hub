@@ -422,7 +422,7 @@ pub(crate) async fn pruefe_zuordenbar(
 /// ist der Aufruf in der Schreibtransaktion der Zuordnung (LLH-1650): Unter BEGIN IMMEDIATE sieht
 /// sie eine gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die
 /// Nutzung. Ein Aufrufer, der vorher anderes schreibt, prüft zusätzlich vorab (Einheit-PATCH,
-/// LLH-1692), damit der vorhersehbare Fall nichts halb speichert.
+/// LLH-1692; Abschnitt-PATCH, LLH-1880), damit der vorhersehbare Fall nichts halb speichert.
 pub(crate) async fn pruefe_kein_lokales_paar(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,

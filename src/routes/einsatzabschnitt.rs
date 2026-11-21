@@ -406,6 +406,25 @@ pub async fn update(
         abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
     };
     abschnitt_repo::check_patch(&state.pool, einsatz_id, aid, &patch).await?;
+    // Ebenso die Sprechgruppen (LLH-1880, Vorbild Einheit-PATCH LLH-1692): eine nicht
+    // zuordenbare ID (422) und das Paar mit einer gleichnamigen Einsatz-Sprechgruppe (409,
+    // LLH-1645) scheitern, bevor Felder, Verbindungen oder Lage etwas speichern. Die Paarprüfung
+    // läuft in der Schreibtransaktion der Zuordnung noch einmal (LLH-1650).
+    if let Some(ids) = &sprechgruppe_ids {
+        crate::sprechgruppe::repo::pruefe_zuordenbar(
+            &state.pool,
+            ctx.einsatz.org_id,
+            einsatz_id,
+            ids,
+        )
+        .await?;
+        crate::sprechgruppe::repo::pruefe_kein_lokales_paar(
+            &mut *state.pool.acquire().await?,
+            einsatz_id,
+            ids,
+        )
+        .await?;
+    }
     // Altwerte, Spaltenfelder und Verbindungen in EINER Schreibtransaktion (LLH-1945, Vorbild
     // Einheit): ein überholter Altwert schreibt nichts. Nur ein echter Namenswechsel meldet die
     // Träger des Namens (LLH-1291).
@@ -428,58 +447,71 @@ pub async fn update(
         }
         Ok(name_vorher)
     })?;
-    let mut anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
     // Der Name ist jetzt gespeichert: sofort melden, auch wenn ein späterer Schritt (Lage,
-    // Sprechgruppen) mit 422 scheitert.
-    if name_vorher.is_some_and(|v| v != anzeige.name) {
+    // Sprechgruppen) noch scheitert.
+    let gespeichert = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
+    if name_vorher.is_some_and(|v| v != gespeichert.name) {
         sse_umbenannt(&state, einsatz_id, aid).await;
     }
-    // Lagewechsel + ETB-Eintrag atomar in EINER Tx, und zwar VOR der Sprechgruppen-
-    // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
-    // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
-    if let Some(neu) = lagezustand {
-        let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-        let etb_id = crate::write_retry!(&state.pool, |conn| {
-            match abschnitt_repo::set_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
-                Some(wechsel) => {
-                    let text = format!(
-                        "Lage Abschnitt «{}»: {} → {}",
-                        wechsel.name,
-                        lage_wort(wechsel.vorher),
-                        lage_wort(neu)
-                    );
-                    Ok(Some(
-                        crate::etb::system_audit_tx(
-                            conn,
-                            einsatz_id,
-                            ctx.benutzer.id,
-                            startwert,
-                            &text,
-                        )
-                        .await?,
-                    ))
+    // Lage und Sprechgruppen schreiben danach für sich. Scheitert einer dieser Schritte doch
+    // noch (ein Rennen mit der Prüfung oben oder 503), sind die übrigen Angaben schon
+    // gespeichert: das Live-Ereignis läuft trotzdem, der Fehler geht danach an den Client
+    // (LLH-1880, wie Einheit-PATCH LLH-1692).
+    let nachgeladen = lagezustand.is_some() || sprechgruppe_ids.is_some();
+    let rest: Result<(), AppError> = async {
+        // Lagewechsel + ETB-Eintrag atomar in EINER Tx, und zwar VOR der Sprechgruppen-
+        // Zuordnung: scheitert die trotz der Prüfung oben, bleibt der gespeicherte Wechsel
+        // nicht undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
+        if let Some(neu) = lagezustand {
+            let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+            let etb_id = crate::write_retry!(&state.pool, |conn| {
+                match abschnitt_repo::set_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
+                    Some(wechsel) => {
+                        let text = format!(
+                            "Lage Abschnitt «{}»: {} → {}",
+                            wechsel.name,
+                            lage_wort(wechsel.vorher),
+                            lage_wort(neu)
+                        );
+                        Ok(Some(
+                            crate::etb::system_audit_tx(
+                                conn,
+                                einsatz_id,
+                                ctx.benutzer.id,
+                                startwert,
+                                &text,
+                            )
+                            .await?,
+                        ))
+                    }
+                    None => Ok(None),
                 }
-                None => Ok(None),
+            })?;
+            if let Some(etb_id) = etb_id {
+                // Live erst nach dem Commit (Reinheits-Kontrakt wie beim Auflösen).
+                state.live.publiziere(einsatz_id, etb_id);
             }
-        })?;
-        if let Some(etb_id) = etb_id {
-            // Live erst nach dem Commit (Reinheits-Kontrakt wie beim Auflösen).
-            state.live.publiziere(einsatz_id, etb_id);
         }
-        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
+        if let Some(ids) = sprechgruppe_ids {
+            crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
+                &state.pool,
+                ctx.einsatz.org_id,
+                einsatz_id,
+                aid,
+                &ids,
+            )
+            .await?;
+        }
+        Ok(())
     }
-    if let Some(ids) = sprechgruppe_ids {
-        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
-            &state.pool,
-            ctx.einsatz.org_id,
-            einsatz_id,
-            aid,
-            &ids,
-        )
-        .await?;
-        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
-    }
+    .await;
     sse_abschnitt(&state, einsatz_id, aid);
+    rest?;
+    let anzeige = if nachgeladen {
+        abschnitt_repo::load(&state.pool, einsatz_id, aid).await?
+    } else {
+        gespeichert
+    };
     Ok(Json(anzeige))
 }
 

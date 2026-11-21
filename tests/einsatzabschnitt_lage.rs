@@ -277,10 +277,12 @@ async fn anlegen_mit_lagezustand_nennt_ihn_im_etb() {
     assert!(texte.contains(&"Abschnitt «West» angelegt".to_string()));
 }
 
+/// Das Formular schickt `sprechgruppe_ids` bei JEDEM Speichern mit. Eine nicht zuordenbare
+/// Sprechgruppe scheitert seit LLH-1880 vor dem ersten Schreiben: der Lagewechsel wird gar nicht
+/// gespeichert und steht deshalb auch nicht im ETB. Vorher blieb er gespeichert (LFH-608 sicherte
+/// nur den ETB-Eintrag dazu), obwohl der Client 422 bekam.
 #[tokio::test]
-async fn lagewechsel_bleibt_dokumentiert_wenn_die_sprechgruppen_zuordnung_scheitert() {
-    // Das Formular schickt `sprechgruppe_ids` bei JEDEM Speichern mit. Scheitert die
-    // Zuordnung, darf der schon gespeicherte Lagewechsel nicht ohne ETB-Eintrag bleiben.
+async fn lagewechsel_mit_unbekannter_sprechgruppe_speichert_nichts() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -303,18 +305,11 @@ async fn lagewechsel_bleibt_dokumentiert_wenn_die_sprechgruppen_zuordnung_scheit
         r#"{"lagezustand":"kritisch","sprechgruppe_ids":[987654]}"#,
     )
     .await;
-    assert!(
-        s.is_client_error(),
-        "unbekannte Sprechgruppe muss scheitern, war {s}"
-    );
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
-    assert_eq!(liste[0]["lagezustand"], "kritisch");
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher + 1);
-    assert_eq!(
-        system_texte(&app, &admin, einsatz).await[0],
-        "Lage Abschnitt «Nord»: planmäßig → kritisch"
-    );
+    assert_eq!(liste[0]["lagezustand"], "planmaessig");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher);
 }
 
 #[tokio::test]

@@ -849,3 +849,96 @@ async fn aufloesen_etb_geht_live_hinaus() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     etb.pruefe(&app, &admin, einsatz, "auflösen").await;
 }
+
+// ---------- LLH-1880: Sprechgruppen vor dem ersten Schreiben prüfen ----------
+
+/// LLH-1880: Eine nicht zuordenbare Sprechgruppe lehnt der Abschnitt-PATCH ab, bevor er etwas
+/// schreibt (Vorbild Einheit-PATCH, LLH-1692). Vorher standen Sortierung und Bemerkung schon
+/// gespeichert, ohne Live-Ereignis, und der Client bekam trotzdem 422.
+#[tokio::test]
+async fn patch_mit_unbekannter_sprechgruppe_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{a}"),
+        &admin,
+        Some(r#"{"sortier":7,"bemerkung":"Neu","sprechgruppe_ids":[987654]}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    let json = eintrag(&liste, a);
+    assert_eq!(json["sortier"], 42, "update_tx lief vor der Prüfung");
+    assert_eq!(json["bemerkung"], "Bem");
+    assert_eq!(bezeichnungen(&json["sprechgruppen"]), vec!["100_T_LAGE"]);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+}
+
+/// LLH-1880: Auch das Paar aus Katalog- und gleichnamiger Einsatz-Sprechgruppe (409, LLH-1645)
+/// erkennt der Abschnitt-PATCH vor dem ersten Schreiben. Die Prüfung in der Schreibtransaktion
+/// bleibt für das Rennen (LLH-1650).
+#[tokio::test]
+async fn sprechgruppen_paar_scheitert_vor_dem_ersten_schreiben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "412_F_DRK", "TMO", 10).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/sprechgruppen/{sg}/deaktivieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let a = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{a}"),
+        &admin,
+        Some(&format!(
+            r#"{{"sortier":7,"rufname":"Florian Nord","sprechgruppe_ids":[{sg}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    let json = eintrag(&liste, a);
+    assert_ne!(json["sortier"], 7, "update_tx lief vor der Paarprüfung");
+    assert!(json["rufname"].is_null());
+    assert!(json["sprechgruppen"].as_array().unwrap().is_empty());
+}
