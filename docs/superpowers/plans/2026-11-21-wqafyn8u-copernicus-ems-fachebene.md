@@ -25,58 +25,58 @@ läuft per TDD: erst der rote Test, dann der Code.
 ## Aufgaben
 
 ### 1. Testdaten aus dem echten Abruf
-- [ ] `src/karte/testdaten/copernicus/`: `liste.json` (gekürzt, enthält EMSR728, eine laufende
+- [x] `src/karte/testdaten/copernicus/`: `liste.json` (gekürzt, enthält EMSR728, eine laufende
       und eine `sensitive`), `emsr728.json` (Gebiete 1 und 9, gekürzt), `ebene_tiefe.json`
       (floodDepthA Gebiet 1, wenige Features), `ebene_verkehr.json` (transportationL Gebiet 9).
 
 ### 2. Backend, reine Teile (`src/karte/copernicus.rs`)
-- [ ] WKT lesen: `POINT (lon lat)` → Punkt, `POLYGON ((…))` → Rechteck (Hülle).
-- [ ] Auswahl der Kandidaten: `n_products > 0`, Zeitfilter mit/ohne Archiv, 500 km zum Ausschnitt.
-- [ ] Gebiet schneidet Ausschnitt; `sensitive` fällt heraus.
-- [ ] Produktwahl je Gebiet und Art (Monitoring, Version, Status `F`, FEP nur ohne DEL).
-- [ ] Ebenenart aus dem Ebenennamen; unbekannte Arten bleiben draußen.
-- [ ] Klassen: Wassertiefe, Schadensgrad, Rückfall `unbekannt`.
-- [ ] Normalisierung zu Features mit allen Feldern; Gebietsumriss als Feature.
-- [ ] Lagerichtig: Überflutungsflächen von EMSR728 liegen im Umriss von Gebiet 1 (lon/lat).
+- [x] WKT lesen: `POINT (lon lat)` → Punkt, `POLYGON ((…))` → Rechteck (Hülle).
+- [x] Auswahl der Kandidaten: `n_products > 0`, Zeitfilter mit/ohne Archiv, 500 km zum Ausschnitt.
+- [x] Gebiet schneidet Ausschnitt; `sensitive` fällt heraus.
+- [x] Produktwahl je Gebiet und Art (Monitoring, Version, Status `F`, FEP nur ohne DEL).
+- [x] Ebenenart aus dem Ebenennamen; unbekannte Arten bleiben draußen.
+- [x] Klassen: Wassertiefe, Schadensgrad, Rückfall `unbekannt`.
+- [x] Normalisierung zu Features mit allen Feldern; Gebietsumriss als Feature.
+- [x] Lagerichtig: Überflutungsflächen von EMSR728 liegen im Umriss von Gebiet 1 (lon/lat).
 
 ### 3. Backend, Abruf und Route
-- [ ] Kern mit austauschbarem Holer: Liste → Details → Ebenen, Teil-Caches mit eigenen TTLs,
+- [x] Kern mit austauschbarem Holer: Liste → Details → Ebenen, Teil-Caches mit eigenen TTLs,
       Rückfall auf alten Teilstand, Obergrenze 40 Dateien (`gekuerzt`), fehlende Ebene
       (`unvollstaendig`), Liste fehlt → `None`.
-- [ ] `fetch_copernicus` mit `liefere_geloest`, Schlüssel je Raster-bbox und Archiv.
-- [ ] Route-Arm `copernicus` mit bbox-Pflicht und 3°-Grenze; Route-Tests (400).
+- [x] `fetch_copernicus` mit `liefere_geloest`, Schlüssel je Raster-bbox und Archiv.
+- [x] Route-Arm `copernicus` mit bbox-Pflicht und 3°-Grenze; Route-Tests (400).
 
 ### 4. Frontend, Vertrag und Ebene
-- [ ] `FachebeneQuelle` + `copernicus`; Query-Key mit bbox und Archiv; `ladeFachebene` mit
+- [x] `FachebeneQuelle` + `copernicus`; Query-Key mit bbox und Archiv; `ladeFachebene` mit
       `archiv`.
-- [ ] Klassenvertrag `copernicusKlasse` in `theme/statusFarben.ts`, Pin der Wire-Wörter.
-- [ ] `copernicusStil.ts`: Farbe und Radius bzw. Linienbreite je Klasse einbacken.
-- [ ] Ton `copernicus` in `tokens.ts` (hell/dunkel) und `FACHEBENE_TON`.
-- [ ] Eintrag in `FACHEBENEN` (Takt 10 min, Aufwärmen 15 s, veraltet 120 min, `minZoom`,
+- [x] Klassenvertrag `copernicusKlasse` in `theme/statusFarben.ts`, Pin der Wire-Wörter.
+- [x] `copernicusStil.ts`: Farbe und Radius bzw. Linienbreite je Klasse einbacken.
+- [x] Ton `copernicus` in `tokens.ts` (hell/dunkel) und `FACHEBENE_TON`.
+- [x] Eintrag in `FACHEBENEN` (Takt 10 min, Aufwärmen 15 s, veraltet 120 min, `minZoom`,
       `geltung`, `gemischteGeometrie`), `fachebeneKeys`, Auswahl-Vorgabe aus, Gruppe `satellit`.
-- [ ] TTL-Wächter kennt `COPERNICUS_TTL`.
+- [x] TTL-Wächter kennt `COPERNICUS_TTL`.
 
 ### 5. Frontend, Abfrage und Ebenenbaum
-- [ ] `useFachebenen`: eigene `useQuery` mit bbox, Archiv, Takt und Aufwärmtakt; Spannen- und
+- [x] `useFachebenen`: eigene `useQuery` mit bbox, Archiv, Takt und Aufwärmtakt; Spannen- und
       Zoomriegel wie Energie.
-- [ ] Archiv-Schalter in der Ebenenzeile, Zustand nur im Speicher.
-- [ ] Hinweis bei `leer`, EMSR-Nummern mit Aufnahme bei `ok`.
+- [x] Archiv-Schalter in der Ebenenzeile, Zustand nur im Speicher.
+- [x] Hinweis bei `leer`, EMSR-Nummern mit Aufnahme bei `ok`.
 
 ### 6. Frontend, Zeichnen
-- [ ] `fachebenenLayer.ts`: für `gemischteGeometrie` Flächenfarbe je Feature, Gebiet nur als
+- [x] `fachebenenLayer.ts`: für `gemischteGeometrie` Flächenfarbe je Feature, Gebiet nur als
       gestrichelter Umriss, Linien- und Kreis-Layer mit Trefferzone; übrige Ebenen unverändert.
 
 ### 7. Frontend, Inspector
-- [ ] Zweig `CopernicusInhalt` mit Aktivierung, Gebiet, Produkt, Version, Aufnahme und Sensor,
+- [x] Zweig `CopernicusInhalt` mit Aktivierung, Gebiet, Produkt, Version, Aufnahme und Sensor,
       Lieferzeit, Klasse, Beschreibung, Link, Altersmarke über 24 h; Titel.
 
 ### 8. Doku
-- [ ] `docs/fachebenen-quellen.md`: Tabellen und Abschnitt.
-- [ ] `docs/anwender/kapitel/lagekarte.md`: Gruppe und Lesart.
-- [ ] Architektur: Kontextabgrenzung prüfen und nachziehen.
+- [x] `docs/fachebenen-quellen.md`: Tabellen und Abschnitt.
+- [x] `docs/anwender/kapitel/lagekarte.md`: Gruppe und Lesart.
+- [x] Architektur: Kontextabgrenzung prüfen und nachziehen.
 
 ### 9. Abschluss
-- [ ] Folgeaufgaben in Zunder (COG, Altbestand vor 2023).
+- [x] Folgeaufgaben in Zunder (COG LLH-2021, Altbestand vor 2023 LLH-2022).
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 - [ ] Bild der Änderung mit Live-Daten EMSR728.
 - [ ] PR gegen `alpha`.
