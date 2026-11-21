@@ -73,12 +73,14 @@ updates:
       prefix: 'chore(deps)'
     ignore:
       # DIESER PIN IST EIN FIX, KEIN ZUFALL — er darf nicht automatisch steigen.
-      # Version 10 des Presets verlangt `conventional-changelog-writer@9`; semantic-release 25
-      # bringt aber Version 8 mit. Die Folge war kein Installationsfehler, sondern ein Abbruch
+      # Version 10 des Presets verlangt `conventional-changelog-writer@9`; der konventionelle
+      # Generator unserer Notizen (`@semantic-release/release-notes-generator` 14.1.1, direkt in
+      # package.json) bringt aber Version 8 mit. Die Folge war kein Installationsfehler, sondern ein Abbruch
       # MITTEN im Release-Lauf: „Missing helper: … requires conventional-changelog-writer@9 or
       # newer", nach Analyse und Changelog, im Schritt `generateNotes` (gemessen im ersten
       # echten Release-Versuch). Ein automatischer Major-Bump führte genau dorthin zurück.
-      # Der Pin fällt, wenn semantic-release seinen Writer auf 9 hebt — dann von Hand.
+      # Nachgeprüft am 21.11.2026 mit semantic-release 26 (LLH-1617): bricht weiterhin. Der Pin
+      # fällt, wenn ein stabiler release-notes-generator Writer 9 mitbringt — dann von Hand.
       - dependency-name: conventional-changelog-conventionalcommits
         update-types: [version-update:semver-major]
 

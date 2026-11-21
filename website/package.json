@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": "26.7.0"
+    "node": "26.13.1"
   },
   "scripts": {
     "dev": "astro dev",
@@ -14,7 +14,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "7.4.12",
+    "astro": "7.4.13",
     "mermaid": "12.3.0"
   }
 }
