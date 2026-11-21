@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 use webauthn_rs::prelude::{
-    CreationChallengeResponse, DiscoverableKey, PublicKeyCredential, RegisterPublicKeyCredential,
+    CreationChallengeResponse, Credential, PublicKeyCredential, RegisterPublicKeyCredential,
     RequestChallengeResponse, WebauthnError,
 };
 
@@ -1620,10 +1620,11 @@ pub async fn webauthn_discoverable_start(
 ///
 /// 1. 404, wenn `webauthn` aus; `entnehme` synchron und nur für die Variante
 ///    `AuthentifizierungDiscoverable`, sonst 401.
-/// 2. `identify_discoverable_authentication` liefert den User-Handle aus der Assertion.
-/// 3. Benutzer per `benutzer_je_user_handle` (nur aktive) → sonst 401; dessen Passkeys als
-///    `DiscoverableKey`-Kandidaten laden.
-/// 4. `finish_discoverable_authentication` prüft Signatur und Counter/Klon; jeder Fehler → 401.
+/// 2. `identify_discoverable_authentication` liefert User-Handle und Credential-ID aus der
+///    Assertion.
+/// 3. Benutzer per `benutzer_je_user_handle` (nur aktive) → sonst 401; von dessen Passkeys genau
+///    den mit dieser Credential-ID nehmen, sonst 401.
+/// 4. `finish_discoverable_authentication_v2` prüft Signatur und Counter/Klon; jeder Fehler → 401.
 /// 5. Counter-Writeback über die genutzte `cred_id`; der darüber gefundene Benutzer MUSS der
 ///    per Handle aufgelöste sein.
 /// 6. Aktiv-Check, Session, Cookies, 200.
@@ -1683,7 +1684,7 @@ async fn webauthn_discoverable_pruefen(
         _ => return Err(Abgewiesen::ohne_spur()),
     };
 
-    let Ok((handle, _cred_id)) = webauthn.identify_discoverable_authentication(body) else {
+    let Ok((handle, cred_id)) = webauthn.identify_discoverable_authentication(body) else {
         return Err(Abgewiesen::anonym());
     };
 
@@ -1692,20 +1693,23 @@ async fn webauthn_discoverable_pruefen(
         .await?
         .ok_or_else(Abgewiesen::anonym)?;
 
-    // Die Kandidaten-Passkeys injiziert `finish_discoverable_authentication` erst jetzt als
-    // erlaubte Credentials in den Zeremonie-State.
+    // Genau der Passkey des Benutzers, dessen Credential-ID der Browser meldet; einen anderen
+    // nimmt `finish_discoverable_authentication_v2` nicht an. Kein Treffer → 401.
     let passkeys =
         crate::auth::webauthn::storage::passkeys_fuer_benutzer(pool, benutzer_id).await?;
-    if passkeys.is_empty() {
+    let Some(passkey) = passkeys
+        .into_iter()
+        .find(|p| p.cred_id().as_slice() == cred_id)
+    else {
         return Err(Abgewiesen::anonym());
-    }
-    let kandidaten: Vec<DiscoverableKey> = passkeys.iter().map(DiscoverableKey::from).collect();
+    };
+    let credential = Credential::from(passkey);
 
     // Counter-/Klon-Check in der Bibliothek, wie im Passkey-Flow.
-    let auth_result = match webauthn.finish_discoverable_authentication(
+    let auth_result = match webauthn.finish_discoverable_authentication_v2(
         body,
         disc_state,
-        &kandidaten,
+        &credential,
     ) {
         Ok(r) => r,
         Err(WebauthnError::CredentialPossibleCompromise) => {

@@ -18,8 +18,6 @@
 use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use argon2::password_hash::rand_core::{OsRng, RngCore};
-
 use crate::auth::ablauf_speicher::{BegrenzterAblaufSpeicher, Voll};
 
 /// Zeichenvorrat des Einmalpassworts: Kleinbuchstaben und Ziffern ohne die leicht verwechselbaren
@@ -33,14 +31,14 @@ const GRUPPENLAENGE: usize = 4;
 /// Erzeugt ein Einmalpasswort der Form `xxxx-xxxx-xxxx` aus [`ALPHABET`] (Design D5). Die
 /// Bindestriche gehören zum Passwort, damit es sich so abtippen lässt, wie es dasteht.
 ///
-/// Zufall aus `OsRng`; Bytes ab dem größten Vielfachen der Alphabetlänge werden verworfen, damit
+/// Zufall aus der Zufallsquelle des Systems (`getrandom`); Bytes ab dem größten Vielfachen der Alphabetlänge werden verworfen, damit
 /// jedes Zeichen gleich wahrscheinlich ist.
 pub fn erzeuge_einmalpasswort() -> String {
     let grenze = (256 / ALPHABET.len() * ALPHABET.len()) as u8;
     let mut zeichen = Vec::with_capacity(GRUPPEN * GRUPPENLAENGE);
     let mut puffer = [0u8; 32];
     while zeichen.len() < GRUPPEN * GRUPPENLAENGE {
-        OsRng.fill_bytes(&mut puffer);
+        getrandom::fill(&mut puffer).expect("Zufallsquelle des Systems");
         for &b in puffer.iter().filter(|&&b| b < grenze) {
             if zeichen.len() == GRUPPEN * GRUPPENLAENGE {
                 break;

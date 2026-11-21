@@ -2,7 +2,6 @@ use crate::app::AppState;
 use crate::auth::provider::Anmeldeweg;
 use crate::auth::Benutzer;
 use crate::error::AppError;
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum_extra::extract::cookie::CookieJar;
@@ -63,7 +62,7 @@ impl<S: Send + Sync> FromRequestParts<S> for SichererTransport {
 /// Erzeugt einen neuen, kryptografisch zufälligen Session-Token (64 Hex-Zeichen).
 pub fn neuer_token() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -81,7 +80,7 @@ pub fn hash_token(token: &str) -> String {
 /// Sie steht in der Sitzungsliste und adressiert das Beenden; aus ihr folgt nichts über den Token.
 fn neue_kennung() -> String {
     let mut bytes = [0u8; 16];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 

@@ -19,7 +19,6 @@ pub mod routen;
 
 use std::borrow::Cow;
 
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use base64::Engine;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -51,7 +50,7 @@ pub const POSITION_STUNDEN: i64 = 24;
 /// Erzeugt einen neuen Schlüssel: 32 Zufallsbytes, base64url ohne Auffüllung.
 pub fn neuer_schluessel() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     format!(
         "{SCHLUESSEL_PRAEFIX}{}",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)

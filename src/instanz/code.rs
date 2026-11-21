@@ -4,7 +4,6 @@
 //! öffentlichen Schlüssel beider Seiten an den Code. Der Code selbst geht nie über die Leitung.
 
 use super::basis32::{b64, ALPHABET};
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use hkdf::Hkdf;
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
@@ -22,7 +21,7 @@ pub const SALZ_MACHINE: &[u8] = b"lifeline-machine-client/1";
 /// Erzeugt einen neuen, zufälligen Code in Normalform (ohne Trennzeichen).
 pub fn generate() -> String {
     let mut bytes = [0u8; LAENGE];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     bytes
         .iter()
         .map(|b| ALPHABET[(*b & 0x1f) as usize] as char)

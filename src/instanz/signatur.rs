@@ -176,9 +176,8 @@ impl std::fmt::Display for SignaturError {
 
 /// Neue zufällige `jti` (128 Bit).
 pub fn new_jti() -> String {
-    use argon2::password_hash::rand_core::{OsRng, RngCore};
     let mut b = [0u8; 16];
-    OsRng.fill_bytes(&mut b);
+    getrandom::fill(&mut b).expect("Zufallsquelle des Systems");
     b64(&b)
 }
 

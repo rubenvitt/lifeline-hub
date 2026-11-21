@@ -15,7 +15,6 @@
 use crate::app::AppState;
 use crate::error::AppError;
 use crate::wire_enum::wire_enum;
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use base64::Engine;
@@ -73,7 +72,7 @@ impl LagebildDauer {
 /// Erzeugt einen neuen Schlüssel: 32 Zufallsbytes, base64url ohne Auffüllung.
 pub fn neuer_schluessel() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     format!(
         "{SCHLUESSEL_PRAEFIX}{}",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)

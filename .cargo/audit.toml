@@ -37,9 +37,9 @@ ignore = [
     # Operationen, die konstante Laufzeit versprechen. Gefixt erst in `crypto-bigint` >= 0.7.6.
     #
     # Kein Upgrade möglich: der Pfad ist crypto-bigint 0.5.5 ← elliptic-curve 0.13.8 ←
-    # p256 0.13 / p384 0.13 ← openidconnect 4.0.1 bzw. age 0.12.1 (über hpke) ← lifeline-hub.
-    # Die ganze RustCrypto-Linie 0.13 hängt an crypto-bigint 0.5, die 0.7 erst an
-    # elliptic-curve 0.14. Beide Direktabhängigen verlangen p256 0.13 (Stand 24.10.2026).
+    # p256 0.13 ← age 0.12.1 (direkt und über hpke) ← lifeline-hub. Die ganze RustCrypto-Linie
+    # 0.13 hängt an crypto-bigint 0.5, die 0.7 erst an elliptic-curve 0.14. openidconnect 4.1
+    # ist seit 21.11.2026 (LLH-1617) auf p256/p384 0.14; age verlangt weiter p256 0.13.
     #
     # Warum das Risiko hier nicht trägt: ein Timing-Angriff braucht eine Operation mit einem
     # GEHEIMEN Wert, deren Laufzeit der Angreifer misst. Die gibt es auf diesen Pfaden nicht.
@@ -49,29 +49,9 @@ ignore = [
     # X25519 (`src/backup/verschluesselung.rs`), nicht mit P-256; P-256-Identitäten gibt es in
     # age nur über Plugins, und die sind aus (`default-features = false` in `Cargo.toml`).
     #
-    # Neu bewerten, wenn: (a) openidconnect oder age auf elliptic-curve 0.14 gehen (dann
-    # Upgrade und Ignore streichen), (b) lifeline-hub selbst mit einem privaten P-256/P-384-
+    # Neu bewerten, wenn: (a) age auf elliptic-curve 0.14 geht (dann Upgrade und Ignore
+    # streichen), (b) lifeline-hub selbst mit einem privaten P-256/P-384-
     # Schlüssel signiert oder entschlüsselt (etwa private_key_jwt beim IdP, eigene JWTs,
     # ECDH), (c) das age-Feature `plugin` eingeschaltet wird.
     "RUSTSEC-2026-0387",
-
-    # RUSTSEC-2026-0459 (LLH-1617, BEFRISTET bis 30.11.2026) — SQLite < 3.54.0 (CVE-2026-119375)
-    # liefert uninitialisierten Page-Cache, wenn ein Prozess eine DB-Datei zusammen mit einer
-    # `-wal`-Datei anderer Seitengröße öffnet. Gefixt in `libsqlite3-sys` >= 0.39.0.
-    #
-    # Kein Upgrade möglich: `sqlx-sqlite` 0.9.0 verlangt `libsqlite3-sys >=0.30.1, <0.38.0`. Die
-    # Schranke ist upstream angehoben (transact-rs/sqlx#4502, gemergt 08.11.2026), aber noch in
-    # keinem Release (Stand 09.11.2026).
-    #
-    # Warum das Risiko hier nicht trägt: der Angriff braucht ein präpariertes Paar aus DB und
-    # `-wal`, das ein weniger vertrauenswürdiger Dritter geschrieben hat. lifeline-hub öffnet nur
-    # eigene Dateien im Datenverzeichnis; wer dort schreiben kann, hat die Datenbank ohnehin.
-    # `restore` spielt eine einzelne Sicherungsdatei ein und entfernt `-wal`/`-shm` vorher
-    # (`src/backup/restore.rs`); `deserialize` dient nur `db::test_pool` mit einem selbst
-    # erzeugten Abbild.
-    #
-    # Neu bewerten, wenn: (a) ein sqlx-Release `libsqlite3-sys` 0.39 erlaubt (dann heben und
-    # Ignore streichen), (b) lifeline-hub SQLite-Dateien von außen annimmt (Upload, Import einer
-    # DB mit `-wal`), (c) spätestens am 30.11.2026 (LLH-1617).
-    "RUSTSEC-2026-0459",
 ]

@@ -3,7 +3,6 @@
 //! `web_push::repo::schluessel_laden_oder_erzeugen`.
 
 use super::basis32::{b64, fingerabdruck, parse_b64};
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use sqlx::SqlitePool;
 
@@ -28,7 +27,7 @@ impl Identitaet {
     /// Neue Identität aus dem Zufall des Betriebssystems.
     pub fn create() -> Self {
         let mut geheim = [0u8; 32];
-        OsRng.fill_bytes(&mut geheim);
+        getrandom::fill(&mut geheim).expect("Zufallsquelle des Systems");
         Identitaet {
             kennung: uuid::Uuid::new_v4().to_string(),
             schluessel: SigningKey::from_bytes(&geheim),

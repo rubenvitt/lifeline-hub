@@ -8,7 +8,6 @@
 //! wird nur der Hash des Codes.
 
 use crate::error::AppError;
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
@@ -83,7 +82,7 @@ fn code_hash(code: &str) -> String {
 /// Ein zufälliger achtstelliger Code.
 fn neuer_code() -> String {
     let mut bytes = [0u8; 8];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     format!("{:08}", u64::from_le_bytes(bytes) % 100_000_000)
 }
 

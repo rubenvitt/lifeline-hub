@@ -181,7 +181,7 @@ pub mod test_authenticator {
             b64(self
                 .schluessel
                 .verifying_key()
-                .to_encoded_point(false)
+                .to_sec1_point(false)
                 .as_bytes())
         }
 

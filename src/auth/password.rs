@@ -1,14 +1,13 @@
 use crate::error::AppError;
-use argon2::password_hash::rand_core::OsRng;
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
-use argon2::Argon2;
+use argon2::password_hash::{PasswordHasher, PasswordVerifier};
+use argon2::{Argon2, PasswordHash};
 
 /// Hasht ein Klartext-Passwort mit Argon2id (OWASP-Defaultparameter)
 /// und liefert den PHC-String (inkl. eingebettetem Salt).
 pub fn hash(passwort: &str) -> Result<String, AppError> {
-    let salt = SaltString::generate(&mut OsRng);
+    // Das Salt (16 Byte) zieht `hash_password` selbst aus der Zufallsquelle des Systems.
     Argon2::default()
-        .hash_password(passwort.as_bytes(), &salt)
+        .hash_password(passwort.as_bytes())
         .map(|h| h.to_string())
         .map_err(|e| AppError::Internal(format!("Passwort-Hashing fehlgeschlagen: {e}")))
 }

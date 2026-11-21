@@ -1,8 +1,6 @@
 //! Kopplungscode (LFH-892, design.md D3): 8 Zeichen aus Crockfords Base32 ohne Verwechsler
 //! (kein I, L, O, U), in der DB nur als SHA-256.
 
-use argon2::password_hash::rand_core::{OsRng, RngCore};
-
 /// Alphabet des Codes (Crockford-Base32).
 const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 /// Länge des Codes in Zeichen.
@@ -11,7 +9,7 @@ pub const LAENGE: usize = 8;
 /// Erzeugt einen neuen, zufälligen Code.
 pub fn neu() -> String {
     let mut bytes = [0u8; LAENGE];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     bytes
         .iter()
         .map(|b| ALPHABET[(*b & 0x1f) as usize] as char)

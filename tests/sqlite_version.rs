@@ -20,7 +20,7 @@ use lifeline_hub::db;
 /// Wird dieser Test rot, ist `libsqlite3-sys` gebumpt worden. Dann BEIDES tun:
 /// 1. den Wert hier auf die neue Version setzen,
 /// 2. `docs/betrieb/packaging.md` (Abschnitt „Eingebettetes SQLite") nachziehen.
-const ERWARTETE_SQLITE_VERSION: &str = "3.51.3";
+const ERWARTETE_SQLITE_VERSION: &str = "3.54.1";
 
 #[tokio::test]
 async fn eingebettete_sqlite_version_ist_dokumentiert() {
