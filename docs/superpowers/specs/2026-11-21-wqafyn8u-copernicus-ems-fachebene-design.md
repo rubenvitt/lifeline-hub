@@ -2,7 +2,7 @@
 
 Stand: 21.11.2026 · Zunder: https://zunder.rubeen.dev/#/aufgabe/wqafyn8uobx1zzsuz1ps572q ·
 Abgestimmt: Ruben im Chat, 21.11.2026 (Phase-1-Checkpoint, alle vier Empfehlungen gewählt) ·
-Freigabe des Entwurfs: offen
+Freigabe des Entwurfs: Ruben im Chat, 21.11.2026 („Entwurf passt, go“)
 
 ## Absicht
 
