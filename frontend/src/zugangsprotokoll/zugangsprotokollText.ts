@@ -73,6 +73,15 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   maschinenzugang_webhook_wieder_aufgenommen: 'Webhook wieder aufgenommen',
   maschinenzugang_webhook_lan_erlaubt: 'Webhook: Ziel im lokalen Netz erlaubt',
   maschinenzugang_webhook_lan_entzogen: 'Webhook: Ziel im lokalen Netz nicht mehr erlaubt',
+  adapter_angelegt: 'Adapter angelegt',
+  adapter_geaendert: 'Adapter geändert',
+  adapter_geloescht: 'Adapter gelöscht',
+  adapter_geheimnis_gesetzt: 'Geheimnis eines Adapters gesetzt',
+  adapter_geheimnis_entfernt: 'Geheimnis eines Adapters entfernt',
+  adapter_lan_erlaubt: 'Adapter: Ziel im lokalen Netz erlaubt',
+  adapter_lan_entzogen: 'Adapter: Ziel im lokalen Netz nicht mehr erlaubt',
+  adapter_angehalten: 'Adapter angehalten',
+  adapter_fortgesetzt: 'Adapter fortgesetzt',
 };
 
 /**
@@ -80,7 +89,7 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
  * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber),
  * Führung je Einsatz (LLH-1491, die Gegenstelle), Archiv (LLH-1494, Bezeichnung des Schlüssels
  * bzw. Einsatzkennung), Anbindung eines Fremdsystems (LLH-1652, ihr Name), Einwurf-Zugang
- * (LLH-1654, sein Name).
+ * (LLH-1654, sein Name), Adapter (LLH-2017, sein Name).
  */
 export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
@@ -91,7 +100,8 @@ export function hasNamensziel(aktion: AdminAktion): boolean {
     aktion.startsWith('fuehrung_') ||
     aktion.startsWith('archiv_') ||
     aktion.startsWith('maschinenzugang_') ||
-    aktion.startsWith('einwurf_zugang_')
+    aktion.startsWith('einwurf_zugang_') ||
+    aktion.startsWith('adapter_')
   );
 }
 
@@ -157,7 +167,10 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
       ? `Rechte: ${a.scopes_vorher ? `${a.scopes_vorher.map(scopeText).join(', ')} → ` : ''}${a.scopes.map(scopeText).join(', ')}`
       : null,
     a.adresse ?? null,
-    // Webhook einer Anbindung (LLH-1656): nur der Host des Ziels.
+    // Adapter (LLH-2017): Code der Art und der Platz eines Geheimnisses, nie sein Wert.
+    a.adapter_art ? `Art: ${a.adapter_art}` : null,
+    a.platz ? `Geheimnis: ${a.platz}` : null,
+    // Webhook einer Anbindung (LLH-1656) oder Adapter: nur der Host des Ziels.
     a.host ? `Ziel: ${a.host}` : null,
     a.grund ? `Grund: ${a.grund}` : null,
     // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.

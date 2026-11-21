@@ -1,4 +1,5 @@
 pub mod abloesung;
+pub mod adapter;
 pub mod anhang;
 pub mod api_doc;
 pub mod app;

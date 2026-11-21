@@ -271,6 +271,10 @@ export const ARCHIV_SCHLUESSEL_MAX = 10;
 export const ANBINDUNG_NAME_MAX = 80;
 /** Ziel-URL eines Webhooks (LLH-1656), `public_api::webhook::URL_MAX`. */
 export const WEBHOOK_URL_MAX = 2048;
+/** Name eines Adapters (LLH-2017), `routes::adapter::NAME_MAX`. */
+export const ADAPTER_NAME_MAX = 80;
+/** Geheimnis eines Adapters in Bytes (LLH-2017), `adapter::geheimnis::GEHEIMNIS_MAX`. */
+export const ADAPTER_GEHEIMNIS_MAX = 4096;
 /** Anzeigename eines Kontos (LLH-1702); steht als Unterzeichner in der Erklärung einer Notübernahme. */
 export const ANZEIGENAME_MAX = 200;
 /** Größter Archivblock zum Einspielen in Bytes, 256 MiB (Spiegel `transfer::ARCHIV_BLOCK_MAX`, LLH-1711). */

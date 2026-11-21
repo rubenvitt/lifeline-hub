@@ -42,6 +42,9 @@ pub struct AppState {
     pub backup_empfaenger: crate::backup::Empfaenger,
     /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/datentraeger`.
     pub datentraeger: crate::datentraeger::Stand,
+    /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
+    /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
+    pub adapter: crate::adapter::Rahmen,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -2015,6 +2018,37 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/anbindungen/{id}/webhook/versuche",
             get(routes::anbindungen_webhook::versuche),
         )
+        // LLH-2017: Adapter verwalten (ADR-0076). Abgerufen wird im Hintergrund (`adapter::lauf`).
+        .route(
+            "/api/admin/adapter",
+            get(routes::adapter::list).post(routes::adapter::create),
+        )
+        .route(
+            "/api/admin/adapter/{id}",
+            get(routes::adapter::load)
+                .patch(routes::adapter::update)
+                .delete(routes::adapter::delete),
+        )
+        .route(
+            "/api/admin/adapter/{id}/geheimnisse/{name}",
+            put(routes::adapter::set_geheimnis).delete(routes::adapter::delete_geheimnis),
+        )
+        .route(
+            "/api/admin/adapter/{id}/pruefen",
+            post(routes::adapter::check),
+        )
+        .route(
+            "/api/admin/adapter/{id}/anhalten",
+            post(routes::adapter::halt),
+        )
+        .route(
+            "/api/admin/adapter/{id}/fortsetzen",
+            post(routes::adapter::resume),
+        )
+        .route(
+            "/api/admin/adapter/{id}/versuche",
+            get(routes::adapter::list_versuche),
+        )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(
@@ -3177,6 +3211,7 @@ mod tests {
             einsatzakte_bau: Default::default(),
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
+            adapter: Default::default(),
         }
     }
 

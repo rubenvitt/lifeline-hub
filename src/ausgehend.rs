@@ -46,6 +46,8 @@ pub enum Zweck {
     Anbindung,
     /// Zustellung signierter Ereignisse an Fremdsysteme per Webhook (LLH-1656).
     Webhook,
+    /// Abrufe der Adapter (Divera, HiOrg …) über den Adapter-Rahmen (LLH-2017).
+    Adapter,
 }
 
 impl Zweck {
@@ -62,6 +64,7 @@ impl Zweck {
             Zweck::Instanzkopplung => "Instanzkopplung",
             Zweck::Anbindung => "Anbindung",
             Zweck::Webhook => "Webhook",
+            Zweck::Adapter => "Adapter",
         }
     }
 }
@@ -164,6 +167,7 @@ mod tests {
             Zweck::Instanzkopplung,
             Zweck::Anbindung,
             Zweck::Webhook,
+            Zweck::Adapter,
         ] {
             for kontakt in [None, Some("https://drk.example.org/kontakt")] {
                 let ua = kennung(zweck, kontakt);

@@ -132,6 +132,22 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
   });
 });
 
+describe('Adapter (LLH-2017)', () => {
+  it('nennt die Aktionen, trägt den Namen des Adapters als Ziel und zeigt Art, Platz und Host', () => {
+    expect(AKTION_TEXT.adapter_geheimnis_gesetzt).toBe('Geheimnis eines Adapters gesetzt');
+    expect(AKTION_TEXT.adapter_lan_erlaubt).toBe('Adapter: Ziel im lokalen Netz erlaubt');
+    expect(hasNamensziel('adapter_angelegt')).toBe(true);
+    expect(
+      instanzText({
+        adapter_id: 'a1',
+        adapter_art: 'divera',
+        platz: 'accesskey',
+        host: 'app.divera247.com',
+      }),
+    ).toBe('Art: divera · Geheimnis: accesskey · Ziel: app.divera247.com');
+  });
+});
+
 describe('Einwurf-Zugang (LLH-1654)', () => {
   it('nennt die drei Aktionen und zeigt den Namen des Zugangs als Ziel', () => {
     expect(AKTION_TEXT.einwurf_zugang_angelegt).toBe('Einwurf-Zugang angelegt');
