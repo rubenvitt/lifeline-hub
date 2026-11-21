@@ -21,6 +21,8 @@ herleitung:
   Fingerabdruck dieses Empfängers je Zeile.
 - MUST NOT: Ein Geheimnis wird über eine API-Antwort gelesen, ins Log, in die Admin-Spur oder in
   einen Fehlertext geschrieben; die Verwaltung sieht nur, ob und wann es gesetzt ist.
+- MUST: Trägt eine Änderung der Einstellungen ein neues Ziel ein (anderer oder neuer Host einer
+  URL), werden die Geheimnisse des Adapters entfernt und müssen neu gesetzt werden.
 - MUST NOT: Der Schlüssel des Speichers liegt in der Datenbank, einer Sicherung oder einer Datei
   des Servers; er kommt nur aus der Umgebung.
 - MUST: Fehlt der Schlüssel, startet der Server; Geheimnisse lassen sich dann nicht speichern, und
@@ -38,6 +40,7 @@ herleitung:
 
 ```sh
 verlange 'age::encrypt\(' src/adapter/geheimnis.rs
+verlange 'has_neues_ziel\(' src/routes/adapter.rs
 verbiete 'load_chiffrate|\.decrypt\(' 'src/routes/**/*.rs'
 verbiete 'Zweck::Adapter' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclude)src/ausgehend.rs'
 verlange 'redirect::Policy::none\(\)' src/adapter/ziel.rs

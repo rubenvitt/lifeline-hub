@@ -588,3 +588,57 @@ async fn anhalten_fortsetzen_loeschen() {
         ]
     );
 }
+
+#[tokio::test]
+async fn neues_ziel_entfernt_die_geheimnisse() {
+    let (app, pool, _art, admin) = setup().await;
+    let (_, a) = anlegen(
+        &app,
+        &admin,
+        json!({ "art": "test", "name": "Quelle", "einstellungen": { "adresse": "https://api.example.org/a" } }),
+    )
+    .await;
+    let id = a["id"].as_str().unwrap().to_string();
+    let pfad = format!("{LISTE}/{id}");
+    anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
+
+    // Anderer Pfad am selben Host: das Geheimnis bleibt.
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "einstellungen": { "adresse": "https://api.example.org/b" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["geheimnisse"][0]["is_gesetzt"], true);
+
+    // Anderer Host: das Geheimnis ist weg, die Spur sagt es.
+    let (_, c) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "einstellungen": { "adresse": "https://anderer.example/b" } })),
+    )
+    .await;
+    assert_eq!(c["geheimnisse"][0]["is_gesetzt"], false);
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM adapter_geheimnis")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+    let aktionen: Vec<String> = spur(&pool).await.into_iter().map(|z| z.0).collect();
+    assert_eq!(
+        &aktionen[aktionen.len() - 2..],
+        ["adapter_geaendert", "adapter_geheimnis_entfernt"]
+    );
+}

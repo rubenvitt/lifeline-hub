@@ -18,7 +18,9 @@ use serde_json::{Map, Value};
 use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
-use crate::adapter::art::{check_einstellungen, AdapterArt, AdapterArtAnzeige, FeldTyp};
+use crate::adapter::art::{
+    check_einstellungen, has_neues_ziel, AdapterArt, AdapterArtAnzeige, FeldTyp,
+};
 use crate::adapter::geheimnis::GEHEIMNIS_MAX;
 use crate::adapter::repo::{self, Adapter, Eingabe, Versuch};
 use crate::adapter::zustand::{zustand_von, AdapterFehler, AdapterZustand, ZustandAngaben};
@@ -513,7 +515,8 @@ pub async fn create(
 
 /// PATCH /api/admin/adapter/{id} — Name, Einstellungen, Intervall, LAN-Ausnahme. Konflikt über
 /// `basis_geaendert_at` (409 `veraltet`). Ein wegen eines Fehlers angehaltener Adapter läuft nach
-/// geänderten Einstellungen oder geänderter LAN-Ausnahme wieder.
+/// geänderten Einstellungen oder geänderter LAN-Ausnahme wieder. Trägt die Änderung ein neues Ziel
+/// ein (anderer Host einer URL), werden die Geheimnisse entfernt, je Platz mit Admin-Spur.
 pub async fn update(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -529,7 +532,7 @@ pub async fn update(
         .transpose()?;
     let jetzt = crate::zeit::jetzt();
     let org_id = admin.org_id;
-    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher, entfernt) = crate::write_retry!(&state.pool, |conn| {
         let vorher = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
         let art = art_von(rahmen, &vorher)?;
         let lan_erlaubt = body.lan_erlaubt.unwrap_or(vorher.lan_erlaubt);
@@ -547,7 +550,8 @@ pub async fn update(
             intervall_s: check_intervall(art, body.intervall_s.unwrap_or(vorher.intervall_s))?,
             lan_erlaubt,
         };
-        repo::update(
+        let neues_ziel = has_neues_ziel(art, &vorher.einstellungen(), &eingabe.einstellungen);
+        let (vorher, nachher) = repo::update(
             &mut *conn,
             org_id,
             &id,
@@ -556,7 +560,14 @@ pub async fn update(
             &jetzt,
         )
         .await?
-        .ok_or(AppError::NotFound)
+        .ok_or(AppError::NotFound)?;
+        // Ein neues Ziel bekommt die gespeicherten Geheimnisse nicht: sie werden neu gesetzt.
+        let entfernt = if neues_ziel {
+            repo::delete_geheimnisse(&mut *conn, &id).await?
+        } else {
+            Vec::new()
+        };
+        Ok((vorher, nachher, entfernt))
     })?;
     if vorher.name != nachher.name
         || vorher.einstellungen_json != nachher.einstellungen_json
@@ -568,6 +579,17 @@ pub async fn update(
             AdminAktion::AdapterGeaendert,
             &nachher,
             None,
+            peer_ip,
+        )
+        .await;
+    }
+    for platz in &entfernt {
+        spur(
+            &state,
+            &admin,
+            AdminAktion::AdapterGeheimnisEntfernt,
+            &nachher,
+            Some(platz),
             peer_ip,
         )
         .await;

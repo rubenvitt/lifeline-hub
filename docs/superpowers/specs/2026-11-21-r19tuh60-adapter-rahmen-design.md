@@ -294,3 +294,7 @@ stehen Adapter-ID, Art, Platzname und Host, nie Wert, Pfad oder Token.
   im Rahmen ein Geheimnis nennt.
 - **Gekoppelter ELW:** der Lauf schiebt den nächsten Abruf um das Intervall auf, statt in jedem
   Takt nachzusehen.
+- **Neues Ziel leert die Geheimnisse** (Entscheidung Ruben, 21.11.2026, nach dem Review): ändert
+  ein PATCH den Host einer URL-Einstellung (oder trägt eine erste URL ein), entfernt der Server
+  die Geheimnisse des Adapters, je Platz mit Admin-Spur. Sonst ginge über „Verbindung prüfen“ ein
+  Geheimnis, das ein anderer Admin gesetzt hat, an einen frei gewählten Server.

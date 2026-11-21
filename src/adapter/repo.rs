@@ -387,6 +387,25 @@ pub async fn delete_geheimnis(
     Ok(weg)
 }
 
+/// Entfernt alle Geheimnisse eines Adapters; liefert die Namen der entfernten Plätze.
+pub async fn delete_geheimnisse(
+    conn: &mut SqliteConnection,
+    adapter_id: &str,
+) -> Result<Vec<String>, sqlx::Error> {
+    let namen: Vec<String> =
+        sqlx::query_scalar("DELETE FROM adapter_geheimnis WHERE adapter_id = ? RETURNING name")
+            .bind(adapter_id)
+            .fetch_all(&mut *conn)
+            .await?;
+    if !namen.is_empty() {
+        sqlx::query("UPDATE adapter SET stand = stand + 1 WHERE id = ?")
+            .bind(adapter_id)
+            .execute(conn)
+            .await?;
+    }
+    Ok(namen)
+}
+
 /// Ob der Adapter noch aktiv ist und seit dem Beginn eines Abrufs (`stand`) niemand etwas
 /// geändert hat. Nur dann gilt dessen Ergebnis für Übernahme und Zustand (in der Transaktion des
 /// Laufs gelesen).

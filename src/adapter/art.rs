@@ -195,6 +195,30 @@ pub fn check_einstellungen(
     Ok(sauber)
 }
 
+/// Ob eine Änderung der Einstellungen ein neues Ziel einträgt: eine URL, deren Host vorher ein
+/// anderer war oder fehlte. Dann gehen die gespeicherten Geheimnisse nicht mehr mit, sie werden
+/// entfernt (Entscheidung Ruben, 21.11.2026): sonst schickte „Verbindung prüfen“ ein Geheimnis,
+/// das jemand anderes gesetzt hat, an einen frei gewählten Server.
+pub fn has_neues_ziel(
+    art: &dyn AdapterArt,
+    vorher: &Map<String, Value>,
+    nachher: &Map<String, Value>,
+) -> bool {
+    let host = |m: &Map<String, Value>, name: &str| {
+        m.get(name)
+            .and_then(Value::as_str)
+            .and_then(crate::public_api::webhook::ziel::host_von)
+            .map(|h| h.to_ascii_lowercase())
+    };
+    art.felder()
+        .iter()
+        .filter(|f| f.typ == FeldTyp::Url)
+        .any(|f| {
+            let neu = host(nachher, f.name);
+            neu.is_some() && neu != host(vorher, f.name)
+        })
+}
+
 /// Die Arten, die dieser Server kennt. In Produktion leer, bis die erste Art kommt (LLH-1193);
 /// Tests bringen ihre eigene mit.
 #[derive(Clone, Default)]
@@ -362,6 +386,30 @@ mod tests {
         assert!(pruefe(json!({ "adresse": "https://192.168.1.5/" }), false).is_err());
         assert!(pruefe(json!({ "adresse": "https://192.168.1.5/" }), true).is_ok());
         assert!(pruefe(json!({ "adresse": "https://127.0.0.1/" }), true).is_err());
+    }
+
+    #[test]
+    fn neues_ziel_nur_bei_anderem_oder_neuem_host() {
+        let m = |v: Value| v.as_object().unwrap().clone();
+        let alt = m(json!({ "adresse": "https://api.example.org/a" }));
+        assert!(!has_neues_ziel(&Probe, &alt, &alt));
+        assert!(!has_neues_ziel(
+            &Probe,
+            &alt,
+            &m(json!({ "adresse": "https://API.example.org/b?x=1", "gruppe": "x" }))
+        ));
+        assert!(has_neues_ziel(
+            &Probe,
+            &alt,
+            &m(json!({ "adresse": "https://boese.example/a" }))
+        ));
+        assert!(has_neues_ziel(
+            &Probe,
+            &m(json!({})),
+            &m(json!({ "adresse": "https://api.example.org/a" }))
+        ));
+        // Eine entfernte URL schickt nichts mehr irgendwohin.
+        assert!(!has_neues_ziel(&Probe, &alt, &m(json!({}))));
     }
 
     #[test]
