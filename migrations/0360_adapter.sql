@@ -7,7 +7,9 @@
 -- `einstellungen` ist ein JSON-Objekt ohne Geheimes. „Gestört“ ist kein eigener Zustand, sondern
 -- `aktiv` mit `fehler_seit`; `angehalten_grund` ist leer, wenn ein Admin angehalten hat, sonst der
 -- Fehlercode (`AdapterFehler`), der einen Menschen braucht. Fehler stehen als Code, nie als Text
--- des Ziels.
+-- des Ziels. `stand` zählt jede Änderung durch einen Admin (Einstellungen, Geheimnisse, Anhalten,
+-- Fortsetzen); ein Abruf, der mit einem älteren Stand begann, schreibt weder Übernahme noch
+-- Zustand, nur seinen Versuch.
 CREATE TABLE adapter (
     id                    TEXT    PRIMARY KEY,
     org_id                INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,
@@ -27,6 +29,7 @@ CREATE TABLE adapter (
     letzter_fehler_art    TEXT,
     letzter_erfolg_at     TEXT,
     letzte_anzahl         INTEGER,
+    stand                 INTEGER NOT NULL DEFAULT 0,
     angelegt_at           TEXT    NOT NULL DEFAULT (datetime('now')),
     angelegt_von          INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     geaendert_at          TEXT    NOT NULL DEFAULT (datetime('now'))

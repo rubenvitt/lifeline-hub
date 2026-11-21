@@ -342,12 +342,29 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         ),
         lifeline_hub::adapter::art::Verzeichnis::produktiv(),
     );
-    match adapter_rahmen.speicher.fingerabdruck() {
+    // Ohne Schlüssel warnt der Start nur, wenn Geheimnisse liegen; mit Schlüssel, wenn welche
+    // nicht zu ihm passen (Wiederherstellung auf einem anderen Rechner). Nie ein Wert im Log.
+    let fp = adapter_rahmen.speicher.fingerabdruck();
+    let fremde = lifeline_hub::adapter::repo::count_fremde_chiffrate(&pool, fp)
+        .await
+        .unwrap_or(0);
+    match fp {
+        Some(fp) if fremde > 0 => tracing::warn!(
+            fingerabdruck = fp,
+            anzahl = fremde,
+            "Geheimnisse von Adapter-Anbindungen passen nicht zum Schlüssel \
+             (LIFELINE_GEHEIMNIS_SCHLUESSEL): in der Verwaltung neu setzen"
+        ),
         Some(fp) => tracing::info!(fingerabdruck = fp, "Geheimnisspeicher der Adapter bereit"),
-        None => tracing::warn!(
+        None if fremde > 0 => tracing::warn!(
+            anzahl = fremde,
             "Kein Schlüssel für den Geheimnisspeicher der Adapter \
-             (--geheimnis-schluessel / LIFELINE_GEHEIMNIS_SCHLUESSEL): Geheimnisse von \
-             Anbindungen lassen sich nicht speichern"
+             (--geheimnis-schluessel / LIFELINE_GEHEIMNIS_SCHLUESSEL): Adapter mit Geheimnis \
+             halten an"
+        ),
+        None => tracing::info!(
+            "Geheimnisspeicher der Adapter ohne Schlüssel (LIFELINE_GEHEIMNIS_SCHLUESSEL): \
+             Geheimnisse lassen sich nicht speichern"
         ),
     }
     let adapter_task =
@@ -648,7 +665,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .await
     };
 
-    herunterfahren(&stopp, backup_task, webhook_task, adapter_task, pool_fuer_ende).await;
+    herunterfahren(
+        &stopp,
+        backup_task,
+        webhook_task,
+        adapter_task,
+        pool_fuer_ende,
+    )
+    .await;
     ergebnis?;
     Ok(())
 }

@@ -290,7 +290,10 @@ async fn anzeige(
 }
 
 /// Host der ersten URL in den Einstellungen, für die Admin-Spur.
-fn host_der_einstellungen(art: Option<&dyn AdapterArt>, einstellungen: &Map<String, Value>) -> Option<String> {
+fn host_der_einstellungen(
+    art: Option<&dyn AdapterArt>,
+    einstellungen: &Map<String, Value>,
+) -> Option<String> {
     art?.felder()
         .iter()
         .filter(|f| f.typ == FeldTyp::Url)
@@ -365,10 +368,7 @@ fn check_einstellungen_von(
 /// Die Art eines vorhandenen Adapters; kennt der Server sie nicht mehr, ist Ändern sinnlos (422).
 fn art_von<'r>(rahmen: &'r Rahmen, a: &Adapter) -> Result<&'r dyn AdapterArt, AppError> {
     rahmen.arten.find(&a.art).map(|a| &**a).ok_or_else(|| {
-        AppError::UnprocessableEntity(format!(
-            "Die Art „{}“ kennt dieser Server nicht.",
-            a.art
-        ))
+        AppError::UnprocessableEntity(format!("Die Art „{}“ kennt dieser Server nicht.", a.art))
     })
 }
 
@@ -466,10 +466,15 @@ pub async fn create(
         .ok_or_else(|| AppError::Validation(format!("art: unbekannte Art „{}“", body.art)))?;
     let eingabe = Eingabe {
         name: crate::routes::support::pflicht_max(&body.name, "name", NAME_MAX)?,
-        einstellungen: check_einstellungen_von(&**art, body.einstellungen.as_ref(), body.lan_erlaubt)?,
+        einstellungen: check_einstellungen_von(
+            &**art,
+            body.einstellungen.as_ref(),
+            body.lan_erlaubt,
+        )?,
         intervall_s: check_intervall(
             &**art,
-            body.intervall_s.unwrap_or_else(|| art.intervall_vorschlag_s()),
+            body.intervall_s
+                .unwrap_or_else(|| art.intervall_vorschlag_s()),
         )?,
         lan_erlaubt: body.lan_erlaubt,
     };
@@ -479,9 +484,25 @@ pub async fn create(
         check_nicht_gesperrt(&mut *conn, org_id).await?;
         repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
     })?;
-    spur(&state, &admin, AdminAktion::AdapterAngelegt, &a, None, peer_ip).await;
+    spur(
+        &state,
+        &admin,
+        AdminAktion::AdapterAngelegt,
+        &a,
+        None,
+        peer_ip,
+    )
+    .await;
     if a.lan_erlaubt {
-        spur(&state, &admin, AdminAktion::AdapterLanErlaubt, &a, None, peer_ip).await;
+        spur(
+            &state,
+            &admin,
+            AdminAktion::AdapterLanErlaubt,
+            &a,
+            None,
+            peer_ip,
+        )
+        .await;
     }
     let mut conn = state.pool.acquire().await?;
     Ok((
@@ -541,7 +562,15 @@ pub async fn update(
         || vorher.einstellungen_json != nachher.einstellungen_json
         || vorher.intervall_s != nachher.intervall_s
     {
-        spur(&state, &admin, AdminAktion::AdapterGeaendert, &nachher, None, peer_ip).await;
+        spur(
+            &state,
+            &admin,
+            AdminAktion::AdapterGeaendert,
+            &nachher,
+            None,
+            peer_ip,
+        )
+        .await;
     }
     if vorher.lan_erlaubt != nachher.lan_erlaubt {
         let aktion = if nachher.lan_erlaubt {
@@ -569,7 +598,15 @@ pub async fn delete(
             .await?
             .ok_or(AppError::NotFound)
     })?;
-    spur(&state, &admin, AdminAktion::AdapterGeloescht, &a, None, peer_ip).await;
+    spur(
+        &state,
+        &admin,
+        AdminAktion::AdapterGeloescht,
+        &a,
+        None,
+        peer_ip,
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -582,11 +619,13 @@ pub async fn set_geheimnis(
     PfadParam((id, platz)): PfadParam<(String, String)>,
     JsonBody(body): JsonBody<AdapterGeheimnisEingabe>,
 ) -> Result<StatusCode, AppError> {
-    let wert = body.wert.trim();
-    if wert.is_empty() {
+    // Nur Zeilenumbrüche am Rand fallen weg (Einfügen aus der Zwischenablage); Leerzeichen
+    // gehören womöglich zum Passwort und bleiben.
+    let wert = body.wert.trim_matches(|c| c == '\r' || c == '\n');
+    if wert.trim().is_empty() {
         return Err(AppError::Validation("wert: Pflichtfeld".into()));
     }
-    if wert.len() > GEHEIMNIS_MAX {
+    if wert.chars().count() > GEHEIMNIS_MAX {
         return Err(AppError::Validation(format!(
             "wert darf höchstens {GEHEIMNIS_MAX} Zeichen lang sein"
         )));
@@ -702,9 +741,19 @@ pub async fn halt(
         load_fuer_schreiben(&mut *conn, org_id, &id).await?;
         repo::halt(&mut *conn, org_id, &id, &jetzt)
             .await?
-            .ok_or_else(|| AppError::UnprocessableEntity("Der Adapter ist schon angehalten.".into()))
+            .ok_or_else(|| {
+                AppError::UnprocessableEntity("Der Adapter ist schon angehalten.".into())
+            })
     })?;
-    spur(&state, &admin, AdminAktion::AdapterAngehalten, &a, None, peer_ip).await;
+    spur(
+        &state,
+        &admin,
+        AdminAktion::AdapterAngehalten,
+        &a,
+        None,
+        peer_ip,
+    )
+    .await;
     let mut conn = state.pool.acquire().await?;
     Ok(Json(anzeige(&mut conn, &state.adapter, &a, true).await?))
 }
@@ -723,7 +772,15 @@ pub async fn resume(
             .await?
             .ok_or_else(|| AppError::UnprocessableEntity("Der Adapter läuft schon.".into()))
     })?;
-    spur(&state, &admin, AdminAktion::AdapterFortgesetzt, &a, None, peer_ip).await;
+    spur(
+        &state,
+        &admin,
+        AdminAktion::AdapterFortgesetzt,
+        &a,
+        None,
+        peer_ip,
+    )
+    .await;
     let mut conn = state.pool.acquire().await?;
     Ok(Json(anzeige(&mut conn, &state.adapter, &a, true).await?))
 }

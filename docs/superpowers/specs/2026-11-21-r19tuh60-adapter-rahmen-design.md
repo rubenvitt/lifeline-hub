@@ -276,3 +276,21 @@ stehen Adapter-ID, Art, Platzname und Host, nie Wert, Pfad oder Token.
 - Form der IDs (wie `maschinenzugang`), genaue Namen der Rust-Typen nach LFH-1312.
 - Ob `letzte_anzahl` und `anzahl` im Versuch nötig sind oder der erste echte Adapter sie bringt.
 - Feinschnitt der Migrationen (eine für die Tabellen, eine für den Audit-Umbau).
+
+## Nachtrag aus Umsetzung und Review (21.11.2026)
+
+- **Stand je Adapter:** `adapter.stand` zählt jede Änderung durch einen Admin (Einstellungen,
+  Geheimnisse, Anhalten, Fortsetzen). Ein Abruf, der mit einem älteren Stand begann, schreibt
+  weder Übernahme noch Zustand, nur seinen Versuch. Sonst hielte ein 401 mit dem alten Token einen
+  Adapter an, dessen Token der Admin währenddessen ersetzt hat.
+- **Start mit Schlüssel:** Adapter, die nur wegen `geheimnisspeicher_gesperrt` oder
+  `geheimnis_unlesbar` angehalten sind, laufen nach einem Start mit Schlüssel wieder; passt ein
+  Geheimnis weiter nicht, halten sie beim ersten Abruf ohne Netzanfrage erneut an.
+- **Speicher:** Schreiben lehnt nur ab, wenn kein Schlüssel da ist (422, Text statt Code; die
+  Verwaltung kennt den Grund aus `speicher` der Liste). Bei „passt nicht“ ist Neusetzen der Weg.
+- **Verlauf** über `GET /api/admin/adapter/{id}/versuche`, nicht in der Ansicht.
+- **Geheimnis:** nur Zeilenumbrüche am Rand fallen weg, Leerzeichen bleiben; Länge in Zeichen.
+- **Log:** statt eines Fang-Tests sichert die Prüfung von ADR-0076 ab, dass keine `tracing`-Zeile
+  im Rahmen ein Geheimnis nennt.
+- **Gekoppelter ELW:** der Lauf schiebt den nächsten Abruf um das Intervall auf, statt in jedem
+  Takt nachzusehen.

@@ -15,7 +15,7 @@ pub const VERSUCHE_MAX: i64 = 50;
 const SPALTEN: &str = "id, org_id, art, name, einstellungen, intervall_s, lan_erlaubt, zustand, \
      angehalten_grund, angehalten_at, fehler_seit, fehlversuche, naechster_abruf_at, \
      letzter_fehler_at, letzter_fehler_status, letzter_fehler_art, letzter_erfolg_at, \
-     letzte_anzahl, angelegt_at, geaendert_at";
+     letzte_anzahl, stand, angelegt_at, geaendert_at";
 
 /// Eine Zeile von `adapter`.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -39,6 +39,8 @@ pub struct Adapter {
     pub letzter_fehler_art: Option<String>,
     pub letzter_erfolg_at: Option<String>,
     pub letzte_anzahl: Option<i64>,
+    /// Zählt Änderungen durch einen Admin; ein Abruf mit älterem Stand schreibt nur seinen Versuch.
+    pub stand: i64,
     pub angelegt_at: String,
     pub geaendert_at: String,
 }
@@ -61,7 +63,9 @@ impl Adapter {
     }
 
     pub fn angehalten_grund(&self) -> Option<AdapterFehler> {
-        self.angehalten_grund.as_deref().and_then(AdapterFehler::parse)
+        self.angehalten_grund
+            .as_deref()
+            .and_then(AdapterFehler::parse)
     }
 
     pub fn letzter_fehler(&self) -> Option<AdapterFehler> {
@@ -178,7 +182,7 @@ pub async fn update(
     let stand = neuer_stand(&vorher.geaendert_at, jetzt);
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE adapter SET name = ?, einstellungen = ?, intervall_s = ?, lan_erlaubt = ?, \
-                geaendert_at = ?{} \
+                geaendert_at = ?, stand = stand + 1{} \
          WHERE id = ? AND org_id = ?",
         if wirksam {
             format!(", {WIEDER_FAELLIG}")
@@ -226,7 +230,8 @@ pub async fn halt(
     jetzt: &str,
 ) -> Result<Option<Adapter>, sqlx::Error> {
     let n = sqlx::query(
-        "UPDATE adapter SET zustand = 'angehalten', angehalten_grund = NULL, angehalten_at = ? \
+        "UPDATE adapter SET zustand = 'angehalten', angehalten_grund = NULL, angehalten_at = ?, \
+                stand = stand + 1 \
          WHERE id = ? AND org_id = ? AND zustand = 'aktiv'",
     )
     .bind(jetzt)
@@ -249,7 +254,7 @@ pub async fn resume(
 ) -> Result<Option<Adapter>, sqlx::Error> {
     let n = sqlx::query(
         "UPDATE adapter SET zustand = 'aktiv', angehalten_grund = NULL, angehalten_at = NULL, \
-                naechster_abruf_at = NULL \
+                naechster_abruf_at = NULL, stand = stand + 1 \
          WHERE id = ? AND org_id = ? AND zustand = 'angehalten'",
     )
     .bind(id)
@@ -306,8 +311,8 @@ pub async fn load_chiffrate(
     .await
 }
 
-/// Ob irgendein Geheimnis eines anderen Schlüssels als `fingerabdruck` gespeichert ist (`None`:
-/// überhaupt eines). Serverweit, für den Zustand des Speichers in der Verwaltung.
+/// Ob ein Geheimnis der Org an einen anderen Schlüssel als `fingerabdruck` gespeichert ist
+/// (`None`: überhaupt eines). Für den Zustand des Speichers in der Verwaltung.
 pub async fn has_fremde_chiffrate(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -352,7 +357,7 @@ pub async fn save_geheimnis(
     .execute(&mut *conn)
     .await?;
     sqlx::query(sqlx::AssertSqlSafe(format!(
-        "UPDATE adapter SET {WIEDER_FAELLIG} WHERE id = ?"
+        "UPDATE adapter SET {WIEDER_FAELLIG}, stand = stand + 1 WHERE id = ?"
     )))
     .bind(adapter_id)
     .execute(conn)
@@ -366,15 +371,77 @@ pub async fn delete_geheimnis(
     adapter_id: &str,
     name: &str,
 ) -> Result<bool, sqlx::Error> {
-    Ok(
-        sqlx::query("DELETE FROM adapter_geheimnis WHERE adapter_id = ? AND name = ?")
+    let weg = sqlx::query("DELETE FROM adapter_geheimnis WHERE adapter_id = ? AND name = ?")
+        .bind(adapter_id)
+        .bind(name)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected()
+        > 0;
+    if weg {
+        sqlx::query("UPDATE adapter SET stand = stand + 1 WHERE id = ?")
             .bind(adapter_id)
-            .bind(name)
             .execute(conn)
-            .await?
-            .rows_affected()
-            > 0,
+            .await?;
+    }
+    Ok(weg)
+}
+
+/// Ob der Adapter noch aktiv ist und seit dem Beginn eines Abrufs (`stand`) niemand etwas
+/// geändert hat. Nur dann gilt dessen Ergebnis für Übernahme und Zustand (in der Transaktion des
+/// Laufs gelesen).
+pub async fn is_unveraendert(
+    conn: &mut SqliteConnection,
+    id: &str,
+    stand: i64,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM adapter WHERE id = ? AND stand = ? AND zustand = 'aktiv')",
     )
+    .bind(id)
+    .bind(stand)
+    .fetch_one(conn)
+    .await
+}
+
+/// Schiebt den nächsten Abruf auf, ohne Zustand oder Stand zu ändern (Org meldet sich bei einem
+/// Hub: kein Abruf, aber auch kein Abfragen alle paar Sekunden).
+pub async fn postpone(pool: &SqlitePool, id: &str, naechster: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE adapter SET naechster_abruf_at = ? WHERE id = ?")
+        .bind(naechster)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Nach einem Start mit Schlüssel: Adapter, die nur wegen des Speichers angehalten sind, laufen
+/// wieder. Passt ein Geheimnis weiterhin nicht, halten sie beim ersten Abruf erneut an, ohne
+/// das Netz zu fragen. Liefert, wie viele es waren.
+pub async fn rearm_nach_schluessel(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE adapter SET zustand = 'aktiv', angehalten_grund = NULL, angehalten_at = NULL, \
+                naechster_abruf_at = NULL, stand = stand + 1 \
+         WHERE zustand = 'angehalten' \
+           AND angehalten_grund IN ('geheimnisspeicher_gesperrt', 'geheimnis_unlesbar')",
+    )
+    .execute(pool)
+    .await?
+    .rows_affected())
+}
+
+/// Wie viele Geheimnisse gespeichert sind, die nicht zu `fingerabdruck` passen (`None`: alle).
+pub async fn count_fremde_chiffrate(
+    pool: &SqlitePool,
+    fingerabdruck: Option<&str>,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM adapter_geheimnis WHERE ? IS NULL OR schluessel_fp <> ?",
+    )
+    .bind(fingerabdruck)
+    .bind(fingerabdruck)
+    .fetch_one(pool)
+    .await
 }
 
 /// Die fälligen Adapter aller Orgs.

@@ -2,15 +2,19 @@
 //! Ergebnissen ab und merkt sich, was sie gesehen hat.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use futures::future::BoxFuture;
 use lifeline_hub::adapter::art::{
-    AdapterArt, Feld, FeldTyp, Fehlschlag, OhneUebernahme, Platz, Uebernahme, Verzeichnis,
+    AdapterArt, Fehlschlag, Feld, FeldTyp, Platz, Uebernahme, Verzeichnis,
 };
 use lifeline_hub::adapter::geheimnis::{GeheimnisSchluessel, Geheimnisspeicher};
+use lifeline_hub::adapter::repo::Adapter;
 use lifeline_hub::adapter::ziel::AbrufKontext;
 use lifeline_hub::adapter::Rahmen;
+use lifeline_hub::error::AppError;
+use sqlx::SqliteConnection;
 
 use age::secrecy::ExposeSecret;
 
@@ -26,6 +30,39 @@ pub struct TestArt {
     /// Ergebnisse der nächsten Abrufe; leer heißt Erfolg mit einem Eintrag.
     pub skript: Mutex<VecDeque<Result<i64, Fehlschlag>>>,
     pub gesehen: Mutex<Vec<Gesehen>>,
+    /// Wie oft die zweite Phase (Übernahme) lief.
+    pub uebernommen: Arc<AtomicUsize>,
+    /// Die nächste Übernahme scheitert in der Datenbank.
+    pub uebernahme_scheitert: Arc<AtomicBool>,
+    /// SQL, das während des nächsten Abrufs läuft (ein Admin ändert inzwischen etwas).
+    pub waehrenddessen: Mutex<Option<(sqlx::SqlitePool, String)>>,
+}
+
+/// Übernahme der Test-Art: zählt nur, oder scheitert auf Wunsch.
+struct ZaehlendeUebernahme {
+    anzahl: i64,
+    zaehler: Arc<AtomicUsize>,
+    scheitert: bool,
+}
+
+impl Uebernahme for ZaehlendeUebernahme {
+    fn anzahl(&self) -> i64 {
+        self.anzahl
+    }
+
+    fn uebernehmen<'a>(
+        &'a self,
+        _conn: &'a mut SqliteConnection,
+        _adapter: &'a Adapter,
+    ) -> BoxFuture<'a, Result<i64, AppError>> {
+        Box::pin(async move {
+            if self.scheitert {
+                return Err(AppError::Internal("Übernahme gescheitert (Test)".into()));
+            }
+            self.zaehler.fetch_add(1, Ordering::SeqCst);
+            Ok(self.anzahl)
+        })
+    }
 }
 
 impl TestArt {
@@ -35,6 +72,10 @@ impl TestArt {
 
     pub fn gesehen(&self) -> Vec<Gesehen> {
         self.gesehen.lock().unwrap().clone()
+    }
+
+    pub fn uebernommen(&self) -> usize {
+        self.uebernommen.load(Ordering::SeqCst)
     }
 }
 
@@ -87,8 +128,21 @@ impl AdapterArt for TestArt {
                     .map(|t| t.expose_secret().to_string()),
                 is_probe: kontext.is_probe,
             });
+            let waehrend = self.waehrenddessen.lock().unwrap().take();
+            if let Some((pool, sql)) = waehrend {
+                sqlx::query(sqlx::AssertSqlSafe(sql))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
             let ergebnis = self.skript.lock().unwrap().pop_front().unwrap_or(Ok(1));
-            ergebnis.map(|n| Box::new(OhneUebernahme(n)) as Box<dyn Uebernahme>)
+            ergebnis.map(|n| {
+                Box::new(ZaehlendeUebernahme {
+                    anzahl: n,
+                    zaehler: self.uebernommen.clone(),
+                    scheitert: self.uebernahme_scheitert.swap(false, Ordering::SeqCst),
+                }) as Box<dyn Uebernahme>
+            })
         })
     }
 }

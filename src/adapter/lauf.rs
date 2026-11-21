@@ -23,8 +23,8 @@ use tokio::task::JoinHandle;
 
 use super::art::{check_einstellungen, AdapterArt, Fehlschlag, Uebernahme};
 use super::repo::{self, Adapter, Versuch};
-use super::zustand::{nach_fehlschlag, AdapterFehler};
 use super::ziel::AbrufKontext;
+use super::zustand::{nach_fehlschlag, AdapterFehler};
 use super::Rahmen;
 use crate::error::AppError;
 use crate::zeit;
@@ -44,6 +44,9 @@ pub fn start(pool: SqlitePool, rahmen: Rahmen, mut stopp: watch::Receiver<bool>)
     let laufend: Laufend = Arc::default();
     let plaetze = Arc::new(Semaphore::new(PARALLEL));
     tokio::spawn(async move {
+        if let Err(e) = beim_start(&pool, &rahmen).await {
+            tracing::error!("Adapter beim Start nicht wieder aufgenommen: {e}");
+        }
         let mut ticker = tokio::time::interval(TAKT);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut laufende: Vec<JoinHandle<()>> = Vec::new();
@@ -70,6 +73,23 @@ pub fn start(pool: SqlitePool, rahmen: Rahmen, mut stopp: watch::Receiver<bool>)
         }
         tracing::info!("Adapter-Lauf beendet");
     })
+}
+
+/// Beim Start mit Schlüssel: Adapter, die nur wegen des Speichers angehalten sind (Start ohne
+/// oder mit anderem Schlüssel), laufen wieder; passt ein Geheimnis weiter nicht, halten sie beim
+/// ersten Abruf erneut an, ohne das Netz zu fragen.
+pub async fn beim_start(pool: &SqlitePool, rahmen: &Rahmen) -> Result<(), AppError> {
+    if !rahmen.speicher.has_schluessel() {
+        return Ok(());
+    }
+    let n = repo::rearm_nach_schluessel(pool).await?;
+    if n > 0 {
+        tracing::info!(
+            anzahl = n,
+            "Adapter nach dem Start mit Schlüssel wieder aufgenommen"
+        );
+    }
+    Ok(())
 }
 
 /// Ein Durchgang zum Zeitpunkt `jetzt`, der auf jeden gestarteten Abruf wartet (für Tests).
@@ -117,7 +137,9 @@ async fn takt(
                 let lauf = run_one(&pool, &rahmen, &*art, adapter, jetzt_echt);
                 match AssertUnwindSafe(lauf).catch_unwind().await {
                     Ok(Ok(())) => {}
-                    Ok(Err(e)) => tracing::error!(adapter = %id, "Adapter-Abruf fehlgeschlagen: {e}"),
+                    Ok(Err(e)) => {
+                        tracing::error!(adapter = %id, "Adapter-Abruf fehlgeschlagen: {e}")
+                    }
                     Err(_) => tracing::error!(adapter = %id, "Adapter-Abruf abgestürzt"),
                 }
             }
@@ -235,6 +257,9 @@ async fn run_one(
         }
     };
     if is_org_am_hub(pool, a.org_id).await? {
+        // Kein Abruf; nach dem Intervall wieder nachsehen statt in jedem Takt.
+        let spaeter = beginn + chrono::Duration::seconds(a.intervall_s);
+        repo::postpone(pool, &a.id, &zeit::formatiere_utc(spaeter)).await?;
         return Ok(());
     }
     let gestartet = Instant::now();
@@ -247,8 +272,15 @@ async fn run_one(
         Ok(uebernahme) => {
             let geliefert = uebernahme.anzahl();
             let uebernommen = crate::write_retry!(pool, |conn| {
-                let n = uebernahme.uebernehmen(&mut *conn, &a).await?;
-                repo::save_erfolg(&mut *conn, &a, geliefert, &jetzt).await?;
+                // Hat ein Admin inzwischen angehalten oder etwas geändert, gilt das Ergebnis nicht:
+                // nur der Versuch bleibt stehen.
+                let n = if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
+                    let n = uebernahme.uebernehmen(&mut *conn, &a).await?;
+                    repo::save_erfolg(&mut *conn, &a, geliefert, &jetzt).await?;
+                    n
+                } else {
+                    0
+                };
                 repo::save_versuch(
                     &mut *conn,
                     &a.id,
@@ -270,8 +302,14 @@ async fn run_one(
                 // nicht still verlieren; der nächste Versuch kommt mit Wartezeit.
                 Err(e) => {
                     tracing::error!(adapter = %a.id, "Übernahme fehlgeschlagen: {e}");
-                    record_failure(pool, &a, Fehlschlag::new(AdapterFehler::Intern), &jetzt, dauer)
-                        .await
+                    record_failure(
+                        pool,
+                        &a,
+                        Fehlschlag::new(AdapterFehler::Intern),
+                        &jetzt,
+                        dauer,
+                    )
+                    .await
                 }
             }
         }
@@ -294,7 +332,9 @@ async fn record_failure(
         jetzt,
     );
     crate::write_retry!(pool, |conn| {
-        repo::save_fehlschlag(&mut *conn, a, f.art, f.status, &nach, jetzt).await?;
+        if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
+            repo::save_fehlschlag(&mut *conn, a, f.art, f.status, &nach, jetzt).await?;
+        }
         repo::save_versuch(
             &mut *conn,
             &a.id,

@@ -15,8 +15,8 @@ use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
 use super::repo::Adapter;
-use super::zustand::AdapterFehler;
 use super::ziel::AbrufKontext;
+use super::zustand::AdapterFehler;
 use crate::error::AppError;
 use crate::public_api::webhook::ziel::check_url;
 use crate::wire_enum::wire_enum;
@@ -138,7 +138,10 @@ pub fn check_einstellungen(
     lan_erlaubt: bool,
 ) -> Result<Map<String, Value>, String> {
     let felder = art.felder();
-    if let Some(unbekannt) = roh.keys().find(|k| !felder.iter().any(|f| f.name == k.as_str())) {
+    if let Some(unbekannt) = roh
+        .keys()
+        .find(|k| !felder.iter().any(|f| f.name == k.as_str()))
+    {
         return Err(format!("einstellungen: unbekanntes Feld „{unbekannt}“"));
     }
     let mut sauber = Map::new();
@@ -324,21 +327,31 @@ mod tests {
             json!({ "adresse": "https://api.example.org/x", "anzahl": 3 })
         );
 
-        assert!(pruefe(json!({}), false).unwrap_err().contains("Pflichtfeld"));
-        assert!(pruefe(json!({ "adresse": "https://a.example", "x": 1 }), false)
+        assert!(pruefe(json!({}), false)
             .unwrap_err()
-            .contains("unbekanntes Feld"));
+            .contains("Pflichtfeld"));
         assert!(
-            pruefe(json!({ "adresse": "https://a.example", "gruppe": "zulang" }), false).is_ok()
-        );
-        assert!(
-            pruefe(json!({ "adresse": "https://a.example", "gruppe": "zu lang" }), false)
+            pruefe(json!({ "adresse": "https://a.example", "x": 1 }), false)
                 .unwrap_err()
-                .contains("höchstens 5")
+                .contains("unbekanntes Feld")
         );
-        assert!(pruefe(json!({ "adresse": "https://a.example", "anzahl": "3" }), false)
-            .unwrap_err()
-            .contains("ganze Zahl"));
+        assert!(pruefe(
+            json!({ "adresse": "https://a.example", "gruppe": "zulang" }),
+            false
+        )
+        .is_ok());
+        assert!(pruefe(
+            json!({ "adresse": "https://a.example", "gruppe": "zu lang" }),
+            false
+        )
+        .unwrap_err()
+        .contains("höchstens 5"));
+        assert!(pruefe(
+            json!({ "adresse": "https://a.example", "anzahl": "3" }),
+            false
+        )
+        .unwrap_err()
+        .contains("ganze Zahl"));
         assert!(pruefe(json!({ "adresse": "http://a.example" }), false)
             .unwrap_err()
             .contains("https://"));

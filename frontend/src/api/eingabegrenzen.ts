@@ -273,7 +273,7 @@ export const ANBINDUNG_NAME_MAX = 80;
 export const WEBHOOK_URL_MAX = 2048;
 /** Name eines Adapters (LLH-2017), `routes::adapter::NAME_MAX`. */
 export const ADAPTER_NAME_MAX = 80;
-/** Geheimnis eines Adapters in Bytes (LLH-2017), `adapter::geheimnis::GEHEIMNIS_MAX`. */
+/** Geheimnis eines Adapters in Zeichen (LLH-2017), `adapter::geheimnis::GEHEIMNIS_MAX`. */
 export const ADAPTER_GEHEIMNIS_MAX = 4096;
 /** Anzeigename eines Kontos (LLH-1702); steht als Unterzeichner in der Erklärung einer Notübernahme. */
 export const ANZEIGENAME_MAX = 200;

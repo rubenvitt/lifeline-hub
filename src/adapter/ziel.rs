@@ -147,7 +147,10 @@ impl<'a> AbrufKontext<'a> {
 
     /// Sendet und ordnet ein: Netzfehler, 3xx, 401/403 und andere Status außerhalb von 2xx werden
     /// zum [`Fehlschlag`]. Der Rumpf einer Fehlantwort wird nicht gelesen.
-    pub async fn send(&self, anfrage: reqwest::RequestBuilder) -> Result<reqwest::Response, Fehlschlag> {
+    pub async fn send(
+        &self,
+        anfrage: reqwest::RequestBuilder,
+    ) -> Result<reqwest::Response, Fehlschlag> {
         let antwort = anfrage
             .send()
             .await

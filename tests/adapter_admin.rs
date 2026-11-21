@@ -83,7 +83,10 @@ async fn anlegen_zeigt_den_adapter_mit_vorschlag_und_ohne_gesetztes_geheimnis() 
     assert_eq!(ziel, "Leitstelle Nord");
     let detail = detail.unwrap();
     assert!(detail.contains("api.example.org"), "{detail}");
-    assert!(!detail.contains("/alarme"), "kein Pfad in der Spur: {detail}");
+    assert!(
+        !detail.contains("/alarme"),
+        "kein Pfad in der Spur: {detail}"
+    );
 }
 
 #[tokio::test]
@@ -92,14 +95,38 @@ async fn eingaben_werden_geprueft() {
     for (body, grund) in [
         (json!({ "art": "divera", "name": "x" }), "unbekannte Art"),
         (json!({ "art": "test", "name": "  " }), "leerer Name"),
-        (json!({ "art": "test", "name": "x".repeat(81) }), "Name zu lang"),
-        (json!({ "art": "test", "name": "x", "intervall_s": 10 }), "Intervall unter Minimum"),
-        (json!({ "art": "test", "name": "x", "intervall_s": 100000 }), "Intervall zu lang"),
-        (json!({ "art": "test", "name": "x", "einstellungen": { "unbekannt": 1 } }), "unbekanntes Feld"),
-        (json!({ "art": "test", "name": "x", "einstellungen": [] }), "kein Objekt"),
-        (json!({ "art": "test", "name": "x", "einstellungen": { "adresse": "http://a.example" } }), "kein https"),
-        (json!({ "art": "test", "name": "x", "einstellungen": { "adresse": "https://192.168.0.10/" } }), "LAN ohne Ausnahme"),
-        (json!({ "art": "test", "name": "x", "lan_erlaubt": true, "einstellungen": { "adresse": "https://127.0.0.1/" } }), "Loopback nie"),
+        (
+            json!({ "art": "test", "name": "x".repeat(81) }),
+            "Name zu lang",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "intervall_s": 10 }),
+            "Intervall unter Minimum",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "intervall_s": 100000 }),
+            "Intervall zu lang",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "einstellungen": { "unbekannt": 1 } }),
+            "unbekanntes Feld",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "einstellungen": [] }),
+            "kein Objekt",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "einstellungen": { "adresse": "http://a.example" } }),
+            "kein https",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "einstellungen": { "adresse": "https://192.168.0.10/" } }),
+            "LAN ohne Ausnahme",
+        ),
+        (
+            json!({ "art": "test", "name": "x", "lan_erlaubt": true, "einstellungen": { "adresse": "https://127.0.0.1/" } }),
+            "Loopback nie",
+        ),
     ] {
         let (s, v) = anlegen(&app, &admin, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{grund}: {v}");
@@ -124,7 +151,7 @@ async fn geheimnis_wird_nur_geschrieben_nie_gezeigt() {
         "PUT",
         &geheimnis_pfad(&id),
         &admin,
-        Some(&json!({ "wert": format!("  {TOKEN}  ") })),
+        Some(&json!({ "wert": format!("{TOKEN}\r\n") })),
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
@@ -144,9 +171,7 @@ async fn geheimnis_wird_nur_geschrieben_nie_gezeigt() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert!(!chiffrat
-        .windows(TOKEN.len())
-        .any(|w| w == TOKEN.as_bytes()));
+    assert!(!chiffrat.windows(TOKEN.len()).any(|w| w == TOKEN.as_bytes()));
     assert_eq!(fp.len(), 16);
 
     let (aktion, _, detail) = spur(&pool).await.pop().unwrap();
@@ -165,7 +190,14 @@ async fn geheimnis_wird_nur_geschrieben_nie_gezeigt() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
-    let (s, _) = anfrage_json(&app, "PUT", &geheimnis_pfad(&id), &admin, Some(&json!({ "wert": " " }))).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": " " })),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let (s, _) = anfrage_json(
         &app,
@@ -182,7 +214,10 @@ async fn geheimnis_wird_nur_geschrieben_nie_gezeigt() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage_json(&app, "DELETE", &geheimnis_pfad(&id), &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
-    assert_eq!(spur(&pool).await.pop().unwrap().0, "adapter_geheimnis_entfernt");
+    assert_eq!(
+        spur(&pool).await.pop().unwrap().0,
+        "adapter_geheimnis_entfernt"
+    );
 }
 
 #[tokio::test]
@@ -192,7 +227,14 @@ async fn ohne_schluessel_wird_kein_geheimnis_gespeichert() {
     let (app, pool) = setup_mit_state(|s| s.adapter = rahmen).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = adapter(&app, &admin).await;
-    let (s, v) = anfrage_json(&app, "PUT", &geheimnis_pfad(&id), &admin, Some(&json!({ "wert": TOKEN }))).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM adapter_geheimnis")
         .fetch_one(&pool)
@@ -210,7 +252,14 @@ async fn anderer_schluessel_zeigt_passt_nicht_und_neu_setzen_hilft() {
     let (app, pool) = setup_mit_state(|s| s.adapter = rahmen).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = adapter(&app, &admin).await;
-    anfrage_json(&app, "PUT", &geheimnis_pfad(&id), &admin, Some(&json!({ "wert": TOKEN }))).await;
+    anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
 
     // Derselbe Datenbestand, ein anderer Schlüssel (Wiederherstellung auf anderem Rechner).
     let anderer = adapter_testart::rahmen_mit(
@@ -226,7 +275,14 @@ async fn anderer_schluessel_zeigt_passt_nicht_und_neu_setzen_hilft() {
     assert_eq!(liste["speicher"], "passt_nicht");
     assert_eq!(liste["adapter"][0]["geheimnisse"][0]["is_unlesbar"], true);
 
-    let (s, _) = anfrage_json(&app2, "PUT", &geheimnis_pfad(&id), &admin2, Some(&json!({ "wert": TOKEN }))).await;
+    let (s, _) = anfrage_json(
+        &app2,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin2,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (_, liste) = anfrage_json(&app2, "GET", LISTE, &admin2, None).await;
     assert_eq!(liste["speicher"], "bereit");
@@ -267,19 +323,51 @@ async fn aendern_mit_konflikt_und_spur() {
     assert_eq!(v["grund"], "veraltet", "{v}");
 
     // LAN-Ausnahme an und aus: je eine eigene Zeile.
-    let (s, _) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({ "lan_erlaubt": true }))).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "lan_erlaubt": true })),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({ "lan_erlaubt": false }))).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "lan_erlaubt": false })),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     let aktionen: Vec<String> = spur(&pool).await.into_iter().map(|z| z.0).collect();
     assert_eq!(
         &aktionen[aktionen.len() - 3..],
-        ["adapter_geaendert", "adapter_lan_erlaubt", "adapter_lan_entzogen"]
+        [
+            "adapter_geaendert",
+            "adapter_lan_erlaubt",
+            "adapter_lan_entzogen"
+        ]
     );
 
     // Ein LAN-Ziel bleibt ohne Ausnahme nicht stehen.
-    anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({ "lan_erlaubt": true, "einstellungen": { "adresse": "https://10.1.1.1/" } }))).await;
-    let (s, _) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({ "lan_erlaubt": false }))).await;
+    anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "lan_erlaubt": true, "einstellungen": { "adresse": "https://10.1.1.1/" } })),
+    )
+    .await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "lan_erlaubt": false })),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
@@ -297,8 +385,16 @@ async fn fuehrungskraft_liest_ohne_einstellungen_und_schreibt_nicht() {
     assert_eq!(s, StatusCode::OK);
 
     for (methode, pfad, body) in [
-        ("POST", LISTE.to_string(), Some(json!({ "art": "test", "name": "x" }))),
-        ("PATCH", format!("{LISTE}/{id}"), Some(json!({ "name": "x" }))),
+        (
+            "POST",
+            LISTE.to_string(),
+            Some(json!({ "art": "test", "name": "x" })),
+        ),
+        (
+            "PATCH",
+            format!("{LISTE}/{id}"),
+            Some(json!({ "name": "x" })),
+        ),
         ("DELETE", format!("{LISTE}/{id}"), None),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
         ("POST", format!("{LISTE}/{id}/pruefen"), None),
@@ -314,7 +410,8 @@ async fn fremde_org_sieht_und_trifft_nichts() {
     let (app, pool, _art, admin) = setup().await;
     let id = adapter(&app, &admin).await;
     // Ein System-Admin der fremden Org: nur die Org trennt.
-    let (_org, fremd_id) = fremde_org_anlegen(&pool, "Fremde Orga", "fremd", "fremdpw123", "keine").await;
+    let (_org, fremd_id) =
+        fremde_org_anlegen(&pool, "Fremde Orga", "fremd", "fremdpw123", "keine").await;
     sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
         .bind(fremd_id)
         .execute(&pool)
@@ -327,7 +424,11 @@ async fn fremde_org_sieht_und_trifft_nichts() {
     for (methode, pfad, body) in [
         ("GET", format!("{LISTE}/{id}"), None),
         ("GET", format!("{LISTE}/{id}/versuche"), None),
-        ("PATCH", format!("{LISTE}/{id}"), Some(json!({ "name": "x" }))),
+        (
+            "PATCH",
+            format!("{LISTE}/{id}"),
+            Some(json!({ "name": "x" })),
+        ),
         ("DELETE", format!("{LISTE}/{id}"), None),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
         ("POST", format!("{LISTE}/{id}/pruefen"), None),
@@ -365,10 +466,21 @@ async fn gekoppelter_elw_schreibt_nicht() {
     .unwrap();
 
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
-    assert!(liste["gesperrt_grund"].as_str().unwrap().contains("Hub Kreis"));
+    assert!(liste["gesperrt_grund"]
+        .as_str()
+        .unwrap()
+        .contains("Hub Kreis"));
     for (methode, pfad, body) in [
-        ("POST", LISTE.to_string(), Some(json!({ "art": "test", "name": "x" }))),
-        ("PATCH", format!("{LISTE}/{id}"), Some(json!({ "name": "x" }))),
+        (
+            "POST",
+            LISTE.to_string(),
+            Some(json!({ "art": "test", "name": "x" })),
+        ),
+        (
+            "PATCH",
+            format!("{LISTE}/{id}"),
+            Some(json!({ "name": "x" })),
+        ),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
         ("POST", format!("{LISTE}/{id}/pruefen"), None),
         ("DELETE", format!("{LISTE}/{id}"), None),
@@ -391,7 +503,14 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
     assert_eq!(e["fehler_art"], "geheimnis_fehlt");
     assert!(art.gesehen().is_empty());
 
-    anfrage_json(&app, "PUT", &geheimnis_pfad(&id), &admin, Some(&json!({ "wert": TOKEN }))).await;
+    anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
     art.plane(Ok(3));
     let (_, e) = anfrage_json(&app, "POST", &format!("{pfad}/pruefen"), &admin, None).await;
     assert_eq!(e["erfolg"], true);
@@ -409,6 +528,8 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
     assert_eq!(e["fehler_art"], "abgelehnt");
     assert_eq!(e["status"], 401);
 
+    // Keine Probe hat übernommen.
+    assert_eq!(art.uebernommen(), 0);
     // Der Zustand bleibt „wartet“; der Verlauf zeigt die Proben.
     let (_, a) = anfrage_json(&app, "GET", &pfad, &admin, None).await;
     assert_eq!(a["zustand"], "wartet");
@@ -438,7 +559,14 @@ async fn anhalten_fortsetzen_loeschen() {
     let (s, _) = anfrage_json(&app, "POST", &format!("{pfad}/fortsetzen"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
-    anfrage_json(&app, "PUT", &geheimnis_pfad(&id), &admin, Some(&json!({ "wert": TOKEN }))).await;
+    anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
     let (s, _) = anfrage_json(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage_json(&app, "GET", &pfad, &admin, None).await;

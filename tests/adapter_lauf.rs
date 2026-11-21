@@ -69,8 +69,14 @@ impl Umgebung {
     }
 
     async fn ansicht(&self, id: &str) -> Value {
-        let (s, v) =
-            anfrage_json(&self.app, "GET", &format!("{LISTE}/{id}"), &self.admin, None).await;
+        let (s, v) = anfrage_json(
+            &self.app,
+            "GET",
+            &format!("{LISTE}/{id}"),
+            &self.admin,
+            None,
+        )
+        .await;
         assert_eq!(s, StatusCode::OK, "{v}");
         v
     }
@@ -142,8 +148,14 @@ async fn voruebergehender_fehler_wartet_und_erholt_sich() {
     // Der letzte Fehler bleibt zur Ansicht stehen.
     assert_eq!(a["letzter_fehler"]["art"], "verbindung");
 
-    let (_, versuche) =
-        anfrage_json(&u.app, "GET", &format!("{LISTE}/{id}/versuche"), &u.admin, None).await;
+    let (_, versuche) = anfrage_json(
+        &u.app,
+        "GET",
+        &format!("{LISTE}/{id}/versuche"),
+        &u.admin,
+        None,
+    )
+    .await;
     let erfolge: Vec<bool> = versuche
         .as_array()
         .unwrap()
@@ -187,7 +199,14 @@ async fn abgelehnt_haelt_an_bis_das_geheimnis_ersetzt_ist() {
 async fn von_admin_angehalten_bleibt_aus_auch_nach_neuem_geheimnis() {
     let u = umgebung().await;
     let id = u.adapter(true).await;
-    anfrage_json(&u.app, "POST", &format!("{LISTE}/{id}/anhalten"), &u.admin, None).await;
+    anfrage_json(
+        &u.app,
+        "POST",
+        &format!("{LISTE}/{id}/anhalten"),
+        &u.admin,
+        None,
+    )
+    .await;
     u.set_token(&id, "anderes").await;
     u.lauf(Utc::now()).await;
     assert!(u.art.gesehen().is_empty());
@@ -199,7 +218,10 @@ async fn fehlendes_geheimnis_und_fehlender_schluessel_brauchen_eingriff() {
     let u = umgebung().await;
     let id = u.adapter(false).await;
     u.lauf(Utc::now()).await;
-    assert!(u.art.gesehen().is_empty(), "ohne Pflicht-Geheimnis kein Abruf");
+    assert!(
+        u.art.gesehen().is_empty(),
+        "ohne Pflicht-Geheimnis kein Abruf"
+    );
     let a = u.ansicht(&id).await;
     assert_eq!(a["zustand"], "braucht_eingriff");
     assert_eq!(a["angehalten_grund"], "geheimnis_fehlt");
@@ -317,4 +339,97 @@ async fn verlauf_bleibt_bei_fuenfzig() {
         .await
         .unwrap();
     assert_eq!(n, 50);
+}
+
+#[tokio::test]
+async fn erfolg_uebernimmt_und_fehlgeschlagene_uebernahme_ist_ein_fehler() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    assert_eq!(u.art.uebernommen(), 1);
+
+    u.art
+        .uebernahme_scheitert
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    u.lauf(t0 + Duration::seconds(61)).await;
+    assert_eq!(u.art.uebernommen(), 1);
+    let a = u.ansicht(&id).await;
+    assert_eq!(a["zustand"], "gestoert");
+    assert_eq!(a["letzter_fehler"]["art"], "intern");
+}
+
+#[tokio::test]
+async fn aenderung_waehrend_des_abrufs_gewinnt() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    // Der Abruf läuft noch mit dem alten Token und scheitert mit 401; währenddessen setzt ein
+    // Admin ein neues (Stand steigt). Das alte Ergebnis darf den Adapter nicht anhalten.
+    u.art.plane(Err(Fehlschlag {
+        art: AdapterFehler::Abgelehnt,
+        status: Some(401),
+    }));
+    *u.art.waehrenddessen.lock().unwrap() = Some((
+        u.pool.clone(),
+        format!("UPDATE adapter SET stand = stand + 1 WHERE id = '{id}'"),
+    ));
+    u.lauf(Utc::now()).await;
+    let a = u.ansicht(&id).await;
+    assert_eq!(a["zustand"], "wartet", "{a}");
+    // Der Versuch steht trotzdem im Verlauf.
+    let (_, versuche) = anfrage_json(
+        &u.app,
+        "GET",
+        &format!("{LISTE}/{id}/versuche"),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(versuche[0]["fehler_art"], "abgelehnt");
+
+    // Ebenso ein Erfolg nach einem Anhalten: keine Übernahme, Zustand bleibt „aus“.
+    *u.art.waehrenddessen.lock().unwrap() = Some((
+        u.pool.clone(),
+        format!("UPDATE adapter SET zustand = 'angehalten', stand = stand + 1 WHERE id = '{id}'"),
+    ));
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.art.uebernommen(), 0);
+    assert_eq!(u.ansicht(&id).await["zustand"], "aus");
+}
+
+#[tokio::test]
+async fn start_mit_schluessel_nimmt_wegen_des_speichers_angehaltene_wieder_auf() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    let ohne = adapter_testart::rahmen_mit(&u.art, None);
+    durchgang(&u.pool, &ohne, Utc::now()).await.unwrap();
+    assert_eq!(
+        u.ansicht(&id).await["angehalten_grund"],
+        "geheimnisspeicher_gesperrt"
+    );
+
+    // Ein Start ohne Schlüssel ändert nichts, einer mit Schlüssel nimmt wieder auf.
+    lifeline_hub::adapter::lauf::beim_start(&u.pool, &ohne)
+        .await
+        .unwrap();
+    assert_eq!(u.ansicht(&id).await["zustand"], "braucht_eingriff");
+    lifeline_hub::adapter::lauf::beim_start(&u.pool, &u.rahmen)
+        .await
+        .unwrap();
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+
+    // Ein vom Admin angehaltener bleibt aus.
+    anfrage_json(
+        &u.app,
+        "POST",
+        &format!("{LISTE}/{id}/anhalten"),
+        &u.admin,
+        None,
+    )
+    .await;
+    lifeline_hub::adapter::lauf::beim_start(&u.pool, &u.rahmen)
+        .await
+        .unwrap();
+    assert_eq!(u.ansicht(&id).await["zustand"], "aus");
 }

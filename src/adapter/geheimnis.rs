@@ -16,7 +16,7 @@ use std::sync::Arc;
 use age::secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 
-/// Höchstlänge eines Geheimnisses in Byte (gespiegelt in `frontend/src/api/eingabegrenzen.ts`).
+/// Höchstlänge eines Geheimnisses in Zeichen (gespiegelt in `frontend/src/api/eingabegrenzen.ts`).
 pub const GEHEIMNIS_MAX: usize = 4096;
 
 /// Der private Schlüssel des Speichers, wie er aus der Umgebung kommt. `Debug` zeigt ihn nie.
@@ -221,7 +221,9 @@ mod tests {
         assert!(f.0.contains("öffentlicher"), "{f}");
         assert!(!f.to_string().contains(&oeffentlich));
 
-        let f = "AGE-SECRET-KEY-1kaputt".parse::<GeheimnisSchluessel>().unwrap_err();
+        let f = "AGE-SECRET-KEY-1kaputt"
+            .parse::<GeheimnisSchluessel>()
+            .unwrap_err();
         assert!(!f.to_string().contains("kaputt"));
         assert!("".parse::<GeheimnisSchluessel>().is_err());
     }

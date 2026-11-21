@@ -39,7 +39,7 @@ herleitung:
 ```sh
 verlange 'age::encrypt\(' src/adapter/geheimnis.rs
 verbiete 'load_chiffrate|\.decrypt\(' 'src/routes/**/*.rs'
-verbiete 'Zweck::Adapter' 'src/routes/**/*.rs' src/adapter/lauf.rs src/adapter/art.rs src/adapter/repo.rs
+verbiete 'Zweck::Adapter' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclude)src/ausgehend.rs'
 verlange 'redirect::Policy::none\(\)' src/adapter/ziel.rs
 verlange '\.no_proxy\(\)' src/adapter/ziel.rs
 verlange 'dns_resolver\(Arc::new\(WebhookResolver' src/adapter/ziel.rs

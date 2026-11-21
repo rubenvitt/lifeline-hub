@@ -81,8 +81,14 @@ wire_enum! {
 pub fn braucht_eingriff(fehler: AdapterFehler) -> bool {
     use AdapterFehler::*;
     match fehler {
-        Abgelehnt | Weiterleitung | ZielIntern | ZielUngueltig | GeheimnisFehlt
-        | GeheimnisUnlesbar | GeheimnisspeicherGesperrt | EinstellungUngueltig => true,
+        Abgelehnt
+        | Weiterleitung
+        | ZielIntern
+        | ZielUngueltig
+        | GeheimnisFehlt
+        | GeheimnisUnlesbar
+        | GeheimnisspeicherGesperrt
+        | EinstellungUngueltig => true,
         Status | Zeitueberschreitung | Verbindung | Tls | Dns | ZuGross | AntwortUngueltig
         | Intern => false,
     }
@@ -249,13 +255,7 @@ mod tests {
 
     #[test]
     fn eingriff_haelt_an() {
-        let n = nach_fehlschlag(
-            AdapterFehler::Abgelehnt,
-            60,
-            None,
-            0,
-            "2026-11-21 10:00:00",
-        );
+        let n = nach_fehlschlag(AdapterFehler::Abgelehnt, 60, None, 0, "2026-11-21 10:00:00");
         assert_eq!(
             n,
             NachFehlschlag::Anhalten {
