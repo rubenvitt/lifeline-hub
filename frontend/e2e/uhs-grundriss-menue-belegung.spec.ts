@@ -41,7 +41,10 @@ async function grundrissMitZweiPlaetzen(page: Page): Promise<string> {
   const personName = `MenuePat${Date.now()}`;
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName).first()).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);

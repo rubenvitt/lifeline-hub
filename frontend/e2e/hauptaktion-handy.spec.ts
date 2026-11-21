@@ -46,9 +46,9 @@ test('Meldung erfassen: der Absendeknopf steht ohne Rollen im Bild', async ({ pa
   const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Meldung ${Date.now()}`);
   await ladeInDichte(page, `/einsaetze/${einsatzId}/meldungen`, 'komfortabel');
   await page.getByRole('button', { name: 'Meldung erfassen', exact: true }).click();
-  // Der Kopfknopf heißt jetzt „Formular schließen“; „Meldung erfassen“ ist der Absendeknopf.
+  // Der Kopfknopf heißt jetzt „Formular schließen“; „Erfassen“ ist der Absendeknopf (LLH-1766).
   await expect(page.getByRole('button', { name: 'Formular schließen' }).first()).toBeVisible();
-  await ganzImBild(page, 'Meldung erfassen');
+  await ganzImBild(page, 'Erfassen');
 });
 
 test('Auftrag antippen holt „Quittieren“ ins Bild', async ({ page }) => {

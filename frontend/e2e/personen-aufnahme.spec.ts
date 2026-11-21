@@ -52,7 +52,10 @@ test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel
   await skFlaeche(page, 'SK II').click();
   interaktionen += 1;
 
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   interaktionen += 1;
 
   // Die Quittung trägt Registriernummer UND Kategorie — die Sichtung kam in derselben Anlage an.
