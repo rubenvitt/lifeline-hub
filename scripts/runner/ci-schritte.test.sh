@@ -34,7 +34,10 @@ DATEI="$1"
 JOBS="$2"
 MINDESTENS="$3"
 # Was nur auf einem gehosteten Runner geht oder nur dort Sinn hat.
-GEHOSTET='sudo |apt-pakete\.sh|install-deps|apt-get|Swatinem/rust-cache|ms-playwright|apt-playwright|AGENT_TOOLSDIRECTORY'
+# `rustup toolchain install` aktualisiert eine vorhandene Toolchain an Ort und Stelle; im Container
+# liegt sie in einer Image-Schicht, und overlayfs verweigert das Umbenennen ihrer Verzeichnisse
+# (EXDEV, LLH-2015). Auf dem eigenen Runner gilt die Toolchain des Images.
+GEHOSTET='sudo |apt-pakete\.sh|install-deps|apt-get|Swatinem/rust-cache|ms-playwright|apt-playwright|AGENT_TOOLSDIRECTORY|rustup toolchain install'
 BEDINGUNG="runner.environment == 'github-hosted'"
 
 # Zerlegt die Datei in Schritte: Job-Name, Kopfzeile und ganzer Block je Schritt, getrennt durch

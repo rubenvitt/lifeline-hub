@@ -139,7 +139,20 @@ jobs:
             exit 1
           }
       - name: Rust-Toolchain (stable)
+        if: runner.environment == 'github-hosted'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Auf dem eigenen Runner die Toolchain des Images, ohne Update (LLH-2015): sie liegt in einer
+      # Image-Schicht, und ein Update an Ort und Stelle scheitert an overlayfs („Invalid
+      # cross-device link“). Ist ein neueres Stable erschienen, warnt der Schritt; der wöchentliche
+      # Neubau oder ein Neubau von Hand holt es (scripts/runner/README.md).
+      - name: Rust-Toolchain (eigener Runner)
+        if: runner.environment != 'github-hosted'
+        run: |
+          rustup default stable
+          rustc --version
+          if rustup check 2> /dev/null | grep -E '^stable-.*Update available'; then
+            echo "::warning::Neueres Rust-Stable erschienen; der Job nimmt das ältere aus dem Runner-Image. Image auf dem Server neu bauen (scripts/runner/README.md)."
+          fi
       # Nur gehostet: auf dem eigenen Server hält `sccache` den Build warm (Volume). Läuft dieser
       # Job dort, pflegen die Schnellprüfungen den geteilten Eintrag (`save-if` in ci.yml).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
