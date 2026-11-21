@@ -21,9 +21,9 @@
 # `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
 # nicht.
 #
-# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Anteile laufen auf dem eigenen
-# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
-# Fork stammt. Die Jobs und die Runner-Wahl stehen in `e2e.yml` (Kopf dort).
+# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075): Ein PR-Lauf läuft immer auf GitHub, auch mit
+# `voll`; auf den eigenen Server gehen nur Push-Läufe der Kanal-Branches. Die Wahl steht im Job
+# `runner` von `suiten.yml` (Kopf dort).
 #
 # Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
@@ -145,7 +145,7 @@ jobs:
     name: Suiten (voll)
     if: ${{ contains(github.event.pull_request.labels.*.name, 'voll') }}
     uses: ./.github/workflows/suiten.yml
-    # `checks: read` braucht `e2e.yml` (Runner-Wahl).
+    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter.
     permissions:
       contents: read
       checks: read

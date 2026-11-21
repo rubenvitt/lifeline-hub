@@ -161,8 +161,9 @@ pruefe "env in ci.yml und pr.yml gleich" \
 pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$PR" "$SUITEN" "$E2E")" "ci-auswahl.sh"
 
 echo "==> ci-stufen: suiten.yml"
-pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, berichte" gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios berichte"
-for id in rust frontend e2e ios; do
+pruefe "suiten.yml: Jobs runner, rust, frontend, e2e, ios, berichte" \
+  gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "runner rust frontend e2e ios berichte"
+for id in runner rust frontend e2e ios; do
   pruefe "$id: kein if (der Aufrufer entscheidet)" test -z "$(job_if "$SUITEN" "$id")"
 done
 pruefe "berichte nur ohne Abbruch" gleich "$(job_if "$SUITEN" berichte)" "\${{ !cancelled() }}"
@@ -183,6 +184,24 @@ pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLIC
 pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" 'image: swift@sha256:'
 pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
+# Eigener Server (LLH-2014, ADR-0075): EINE Wahl in `suiten.yml`, jeder schwere Job liest sie mit
+# GitHub als Rückfall. iOS-Kern (Container-Job) und Bericht bleiben gehostet.
+AUF_WAHL="runs-on: \${{ needs.runner.outputs.runner || 'ubuntu-latest' }}"
+for id in rust frontend; do
+  pruefe "$id: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" "$id")"
+  pruefe "$id: läuft auf der Wahl, Rückfall GitHub" enthaelt "$(job "$SUITEN" "$id")" "$AUF_WAHL"
+done
+pruefe "e2e: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" e2e)"
+pruefe "e2e: reicht die Wahl an e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "runner: \${{ needs.runner.outputs.runner }}"
+for id in ios berichte; do
+  pruefe "$id: bleibt auf GitHub" enthaelt "$(job "$SUITEN" "$id")" "    runs-on: ubuntu-latest"
+done
+pruefe "runner: wählt mit select-runner.sh" enthaelt "$(job "$SUITEN" runner)" 'runner="$("$weiche" "$EREIGNIS" "$LABEL")"'
+pruefe "runner: bei einem PR die Weiche aus dem Ziel-Branch" \
+  enthaelt "$(job "$SUITEN" runner)" "git show HEAD^1:scripts/runner/select-runner.sh"
+pruefe "runner: eine gescheiterte Wahl fällt auf GitHub zurück" \
+  enthaelt "$(job "$SUITEN" runner)" "continue-on-error: true"
+pruefe "runner: selbst auf GitHub" enthaelt "$(job "$SUITEN" runner)" "    runs-on: ubuntu-latest"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do
   pruefe "$(basename "$datei"): Aufruf der Suiten darf checks lesen (e2e.yml)" enthaelt "$(job "$datei" suiten)" "checks: read"
@@ -206,6 +225,12 @@ pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(code_ohne_kommentar "$E
 pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
 pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"
 pruefe "Anteile nur nach grünem Binary" enthaelt "$(job_if "$E2E" e2e)" "needs.binaer.result == 'success'"
+pruefe "e2e.yml: Runner als Eingabe" enthaelt "$(kopf_code "$E2E")" "      runner:"
+pruefe "e2e.yml: keine eigene Runner-Wahl mehr" test -z "$(job "$E2E" aenderungen)"
+for id in binaer e2e; do
+  pruefe "e2e.yml: $id läuft auf der Eingabe, Rückfall GitHub" \
+    enthaelt "$(job "$E2E" "$id")" "runs-on: \${{ inputs.runner || 'ubuntu-latest' }}"
+done
 
 echo "==> ci-stufen: ios-pruefung.yml"
 # Der macOS-Lauf der iOS-Hülle (LLH-1978): nur am PR, nur bei Änderungen an der Hülle oder den
