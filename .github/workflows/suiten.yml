@@ -15,8 +15,8 @@
 # im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
 # eigene Gruppe und bricht nie ab.
 #
-# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075): Rust-Suite, Frontend-Anteile und die e2e-Jobs
-# (`e2e.yml`) laufen auf dem eigenen Server, wenn der Job `runner` ihn wählt: nur bei Push auf
+# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075, ADR-0076): Rust-Suite und die e2e-Jobs (`e2e.yml`)
+# laufen auf dem eigenen Server, wenn der Job `runner` ihn wählt: nur bei Push auf
 # einen Kanal-Branch und nur, wenn die Repo-Variable `E2E_RUNNER` ein Label nennt. Jeder PR-Lauf,
 # auch mit `voll`, bleibt auf GitHub. Schritte, die `sudo` oder Caches der gehosteten Runner
 # brauchen, tragen `runner.environment == 'github-hosted'` (Wächter:
@@ -52,7 +52,7 @@ env:
 
 jobs:
   # ── Wo laufen die schweren Suiten? ─────────────────────────────────────────────────────
-  # Die eine Wahl für Rust, Frontend und e2e (ADR-0075). Scheitert sie, bleibt die Ausgabe leer,
+  # Die eine Wahl für Rust und e2e (ADR-0075, ADR-0076). Scheitert sie, bleibt die Ausgabe leer,
   # und alle Jobs fallen auf `ubuntu-latest` zurück.
   runner:
     name: Suiten-Runner
@@ -86,7 +86,7 @@ jobs:
           fi
           runner="$("$weiche" "$EREIGNIS" "$LABEL")"
           echo "runner=$runner" >> "$GITHUB_OUTPUT"
-          echo "Rust-, Frontend- und e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rust- und e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Rust-Suite ──────────────────────────────────────────────────────────────────────
   # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Läuft er gehostet, pflegt
@@ -139,7 +139,20 @@ jobs:
             exit 1
           }
       - name: Rust-Toolchain (stable)
+        if: runner.environment == 'github-hosted'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Auf dem eigenen Runner die Toolchain des Images, ohne Update (LLH-2015): sie liegt in einer
+      # Image-Schicht, und ein Update an Ort und Stelle scheitert an overlayfs („Invalid
+      # cross-device link“). Ist ein neueres Stable erschienen, warnt der Schritt; der wöchentliche
+      # Neubau oder ein Neubau von Hand holt es (scripts/runner/README.md).
+      - name: Rust-Toolchain (eigener Runner)
+        if: runner.environment != 'github-hosted'
+        run: |
+          rustup default stable
+          rustc --version
+          if rustup check 2> /dev/null | grep -E '^stable-.*Update available'; then
+            echo "::warning::Neueres Rust-Stable erschienen; der Job nimmt das ältere aus dem Runner-Image. Image auf dem Server neu bauen (scripts/runner/README.md)."
+          fi
       # Nur gehostet: auf dem eigenen Server hält `sccache` den Build warm (Volume). Läuft dieser
       # Job dort, pflegen die Schnellprüfungen den geteilten Eintrag (`save-if` in ci.yml).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -161,9 +174,9 @@ jobs:
     concurrency:
       group: ci-frontend-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true
-    needs: runner
-    # Eigener Server oder GitHub (Kopf). Kein Schritt braucht `sudo`.
-    runs-on: ${{ needs.runner.outputs.runner || 'ubuntu-latest' }}
+    # Immer auf GitHub (LLH-2016, ADR-0076): ohne Rust-Build gewinnt dieser Job auf dem eigenen
+    # Server wenig, und vier Anteile belegten dort die Plätze, die Rust-Suite und e2e brauchen.
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.

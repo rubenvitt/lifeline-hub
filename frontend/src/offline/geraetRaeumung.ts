@@ -40,6 +40,9 @@ export interface GeraeteSpeicherort {
   datei: string;
   entscheidung: GeraeteEntscheidung;
   grund: string;
+  /** Nur bei `jeder-ausgang`: der Räumschritt in `PLATTE` oder `TAB`, der den Ort leert
+   *  (LLH-2012, gehalten vom Guard). */
+  schritt?: string;
 }
 
 /** Vollständig gehalten von `geraetRaeumung.guard.test.ts`. */
@@ -61,6 +64,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'IndexedDB lifeline-offline: personErfassungsQuittungen',
     datei: 'offline/queue.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'personErfassungsQuittungen',
     grund:
       'Nur Kennung und R-Nr der Person (LFH-941); die Person liegt nach dem Replay auf dem Server, die Quittung ist nur der Hinweis darauf.',
   },
@@ -68,6 +72,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'localStorage lfh:queue-zaehler',
     datei: 'offline/queueZaehlerMerker.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'queueZaehlerMerker',
     grund:
       'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „n NICHT GESENDET“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
   },
@@ -88,6 +93,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'IndexedDB lifeline-ortcache',
     datei: 'anzeige/ortCache.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'ortCache',
     grund:
       'Verrät, welche Orte im Einsatz nachgeschlagen wurden; die Ortsvorschau des Servers füllt ihn wieder.',
   },
@@ -95,6 +101,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'sessionStorage lfh:erfassung:<einsatz>:<maske>:<feld>, lfh:erfassung:besitzer',
     datei: 'components/erfassungsSitzung.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'erfassungsSitzung',
     grund:
       'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
   },
@@ -102,6 +109,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'sessionStorage lfh:alarm:ausgeblendet',
     datei: 'alarm/benachrichtigungGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'alarmAusgeblendet',
     grund:
       'Kennungen der Benachrichtigungen, die der Nutzer in diesem Tab mit ✕ ausgeblendet hat (LLH-1736); der Server liefert sie unquittiert wieder, ein zweiter Benutzer im Tab braucht sie nicht.',
   },
@@ -109,6 +117,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'sessionStorage lfh:liste:<seite>:<einsatz>, lfh:liste:@besitzer',
     datei: 'components/listenGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'listenGedaechtnis',
     grund:
       'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LLH-1428).',
   },
@@ -116,6 +125,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'sessionStorage lfh:verlauf',
     datei: 'routing/verlaufGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'verlaufGedaechtnis',
     grund:
       'Vorige Adresse je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997); die Adressen tragen Filter- und Suchtexte, auch Namen, die nächste Person im Tab braucht sie nicht.',
   },
@@ -123,6 +133,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'sessionStorage lfh:rolle',
     datei: 'routing/rollGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'rollGedaechtnis',
     grund:
       'Rollposition je Verlaufseintrag für das Zurück (LLH-1826): nur Schlüssel und Pixelwerte, ohne Einsatzinhalt; ein Ausgang braucht sie nicht.',
   },
@@ -144,6 +155,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'localStorage startliste-ausgeblendet:<einsatz>',
     datei: 'pages/fuehrung/startlisteSpeicher.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'startlisteAusgeblendet',
     grund:
       'Ob die Startliste „Einsatz starten“ des Überblicks in diesem Browser ausgeblendet ist, je Einsatz (LLH-1815); kein Personenbezug, aber Einsatzkennungen. Die nächste Person sieht die Liste wieder, solange Punkte offen sind.',
   },
@@ -151,6 +163,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'localStorage lfh:verpflegung:stelle:<einsatz>',
     datei: 'verpflegung/stellenGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'verpflegungsstelle',
     grund:
       'Nur die Kennung der Verpflegungsstelle, an der am Desktop gezählt wird (LLH-1040); der Server liefert die Stellen wieder, eine nächste Person soll nicht an fremder Stelle buchen.',
   },
@@ -158,6 +171,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'localStorage lfh:stammdatenfeld:zuletzt:<kontext>',
     datei: 'stammdaten/zuletztVerwendet.ts',
     entscheidung: 'jeder-ausgang',
+    schritt: 'stammdatenfeldZuletzt',
     grund:
       'Zuletzt übernommene Werte des Vorschlagsfelds (LLH-1144), etwa Absender und Empfänger; Freitext kann einen Personennamen tragen, und die Kataloge liefert der Server wieder.',
   },
@@ -337,6 +351,13 @@ const TAB: Record<string, () => unknown> = {
   verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
   rollGedaechtnis: rollGedaechtnisRaeumen,
 };
+
+/** Die Namen der Räumschritte, für den Guard (LLH-2012): jeder Ort `jeder-ausgang` nennt genau
+ *  einen davon als `schritt`. */
+export const RAEUMSCHRITTE: {
+  readonly platte: readonly string[];
+  readonly tab: readonly string[];
+} = { platte: Object.keys(PLATTE), tab: Object.keys(TAB) };
 
 /**
  * Der Weg hinaus (LFH-767, design.md D2): läuft nach `lagebildLoeschen` in `abmeldenLokal`.

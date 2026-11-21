@@ -50,7 +50,9 @@ Herleitung: `docs/superpowers/specs/2026-11-20-fwmtnftn-sitzung-beendet-dialog-d
   der Dialog ist nicht schließbar.
 - **Leseanfragen warten** an der Sitzungssperre (`auth/sitzungsSperre.ts`, gelesen von `apiGet`)
   statt mit 401 zu scheitern, und wiederholen nach der Auflösung höchstens einmal. Anmeldewege
-  unter `/api/auth/` warten nie.
+  unter `/api/auth/` warten nie. Antwortet die Wiederholung wieder mit 401, ist die Sitzung
+  erneut weg: Der QueryClient meldet sie, und eine neue Unterbrechung beginnt (entschieden in
+  LLH-2012). Eine Schleife ohne Zutun gibt es nicht, jede Runde braucht eine Anmeldung.
 - **Auflösung:** dieselbe Person (Dialog, Passkey, anderer Tab) → Lagebild wieder vorhalten,
   Abfragen invalidieren, `SITZUNG_WIEDERHERGESTELLT` (Live-Ströme verbinden neu), Web Push
   abgleichen. Eine **andere** Person → Seite neu laden, nie im laufenden Baum übernehmen; im

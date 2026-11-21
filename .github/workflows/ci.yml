@@ -21,8 +21,8 @@
 # `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
 # nicht.
 #
-# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075): Rust-Suite, Frontend-Anteile und die e2e-Jobs
-# laufen bei diesem Push auf dem eigenen Server, wenn die Repo-Variable `E2E_RUNNER` ein
+# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075, ADR-0076): Rust-Suite und die e2e-Jobs laufen bei
+# diesem Push auf dem eigenen Server, wenn die Repo-Variable `E2E_RUNNER` ein
 # Runner-Label nennt. Die Wahl steht im Job `runner` von `suiten.yml` (Kopf dort).
 #
 # Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".

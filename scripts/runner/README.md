@@ -2,8 +2,8 @@
 
 Bei einem Push auf `alpha`, `beta` oder `main` laufen die schweren Suiten der CI auf einem
 eigenen Server statt auf GitHub-Runnern, sobald die Repo-Variable `E2E_RUNNER` gesetzt ist:
-Rust-Suite, die vier Frontend-Anteile, `e2e-Binary` und die vier e2e-Anteile (LLH-1666,
-LLH-2014, ADR-0075). Die Wahl trifft der Job `runner` in `.github/workflows/suiten.yml`. Jeder
+Rust-Suite, `e2e-Binary` und die vier e2e-Anteile (LLH-1666, LLH-2014, ADR-0075). Die vier
+Frontend-Anteile laufen immer bei GitHub (LLH-2016, ADR-0076). Die Wahl trifft der Job `runner` in `.github/workflows/suiten.yml`. Jeder
 Job bekommt einen frischen Container, der nach dem Job gelöscht wird. **PR-Läufe laufen nie
 hier**, auch nicht mit dem Label `voll`. iOS-Kern, Schnellprüfungen, Berichte und Release bleiben
 bei GitHub.
@@ -28,11 +28,11 @@ starten.
 
 ## Einrichten
 
-Voraussetzungen: Linux mit systemd, Docker Engine, `git` und `curl`; für vier Plätze mindestens
-8 Kerne, deutlich mehr als 16 GB Speicher (die Rust-Suite allein bis 14 GB, dazu die übrigen
-Jobs) und rund 110 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, die Rust-Suite rund
-60 GB, jeder andere laufende Job einige GB). Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job,
-der die Platte füllt, trifft dann nur die Runner, nicht den Host.
+Voraussetzungen: Linux mit systemd, Docker Engine, `git` und `curl`; für vier Plätze 12 Kerne,
+rund 62 GB Speicher und rund 110 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, die
+Rust-Suite rund 60 GB, jeder andere laufende Job einige GB); Größenregel unter „Plätze und
+Größe“. Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job, der die Platte
+füllt, trifft dann nur die Runner, nicht den Host.
 
 1. **Dienstnutzer.** Mitglied der Gruppe `docker` heißt auf diesem Host root-gleich; deshalb ein
    eigener Systemnutzer, der sonst nichts tut. Die Jobs selbst sehen den Docker-Socket nie.
@@ -134,20 +134,33 @@ sudo systemctl restart 'lifeline-runner@*'
 Fehlen dem Image die GTK/WebKit-Pakete, bricht die Rust-Suite auf dem Server früh mit einem
 Hinweis auf diesen Abschnitt ab.
 
+Die Rust-Toolchain kommt auf dem Server aus dem Image und wird im Job nicht aktualisiert: ein
+Update an Ort und Stelle scheitert im Container an overlayfs („Invalid cross-device link“,
+LLH-2015). Ist ein neues Rust-Stable erschienen, warnt der Schritt „Rust-Toolchain (eigener
+Runner)“, und die Jobs laufen bis zum nächsten Neubau mit dem älteren weiter. Wer das neue sofort
+will, baut das Image wie oben neu.
+
 ## Plätze und Größe
 
-Ein Push bringt bis zu zehn Jobs auf den Server (Rust, vier Frontend-Anteile, Binary, vier
-e2e-Anteile); mehr als Plätze da sind, warten. Je Platz rechnet man `RUNNER_CPUS` Kerne und
-`RUNNER_MEMORY` Speicher als Deckel, nicht als Reservierung. Den Speicher bestimmt die Rust-Suite:
-rustc übersetzt das Crate `lifeline_hub` als Bibliothek (gemessen rund 6 GB Spitze) und zugleich
-als Testbibliothek (rund 10 GB), zusammen rund 13 GB. Ohne Debuginfo und mit einem Job sind es
-immer noch 9,8 GB; mit `RUNNER_MEMORY=6g` bricht sie deshalb immer mit „Compiler killed by
-signal 9“ ab (alpha, 21.11.2026). Vorgabe ist `14g`; wer den Wert in
-`/etc/lifeline-runner/runner.env` setzt, startet danach die Plätze neu. Der Host braucht den
-Speicher wirklich: die Grenze ist ein Deckel, und reicht der Host nicht, beendet der Kernel
-denselben Compiler. Platte: die Testbinaries der Rust-Suite belegen im Container rund 50 GB, der
-Inkrementalcache weitere 8 GB. Einen Platz mehr: `sudo systemctl enable --now
-lifeline-runner@5`.
+Ein Push bringt bis zu sechs Jobs auf den Server: Rust-Suite und `e2e-Binary` zuerst, danach die
+vier e2e-Anteile. Mehr Jobs als Plätze warten. Je Platz gelten `RUNNER_CPUS` Kerne und
+`RUNNER_MEMORY` Speicher als Deckel, keine Reservierung.
+
+- **Kerne nicht überbuchen:** Plätze × `RUNNER_CPUS` höchstens so viele wie `nproc`. Überbucht
+  bremsen sich die e2e-Anteile gegenseitig aus und reißen das Zeitlimit von 75 min.
+- **Speicher:** den Bedarf setzt die Rust-Suite. rustc übersetzt das Crate `lifeline_hub` als
+  Bibliothek (gemessen rund 6 GB Spitze) und zugleich als Testbibliothek (rund 10 GB), zusammen
+  rund 13 GB; ohne Debuginfo und mit einem Job sind es immer noch 9,8 GB. Mit 6 GB brach sie mit
+  „Compiler killed by signal 9“ ab (alpha, 21.11.2026). Vorgabe ist deshalb `14g`. Plätze ×
+  `RUNNER_MEMORY` plus einige GB für den Host: die Grenze ist ein Deckel, und reicht der Host
+  nicht, beendet der Kernel denselben Compiler.
+- **Platte:** die Testbinaries der Rust-Suite belegen im Container rund 50 GB, der
+  Inkrementalcache weitere 8 GB.
+- **Beispiel** (12 Kerne, 62 GB): vier Plätze, `RUNNER_CPUS=3`, `RUNNER_MEMORY=14g`.
+
+Einen Platz abschalten: `sudo systemctl disable --now lifeline-runner@5`; einen dazu:
+`sudo systemctl enable --now lifeline-runner@5`. Nach einer Änderung an `runner.env` die Plätze
+neu starten.
 
 ## Betrieb
 
