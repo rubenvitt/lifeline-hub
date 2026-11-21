@@ -185,15 +185,14 @@ pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" '
 pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 # Eigener Server (LLH-2014, ADR-0075): EINE Wahl in `suiten.yml`, jeder schwere Job liest sie mit
-# GitHub als Rückfall. iOS-Kern (Container-Job) und Bericht bleiben gehostet.
+# GitHub als Rückfall. iOS-Kern (Container-Job), Frontend-Anteile (LLH-2016, ADR-0076) und Bericht
+# bleiben gehostet.
 AUF_WAHL="runs-on: \${{ needs.runner.outputs.runner || 'ubuntu-latest' }}"
-for id in rust frontend; do
-  pruefe "$id: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" "$id")"
-  pruefe "$id: läuft auf der Wahl, Rückfall GitHub" enthaelt "$(job "$SUITEN" "$id")" "$AUF_WAHL"
-done
+pruefe "rust: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" rust)"
+pruefe "rust: läuft auf der Wahl, Rückfall GitHub" enthaelt "$(job "$SUITEN" rust)" "$AUF_WAHL"
 pruefe "e2e: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" e2e)"
 pruefe "e2e: reicht die Wahl an e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "runner: \${{ needs.runner.outputs.runner }}"
-for id in ios berichte; do
+for id in frontend ios berichte; do
   pruefe "$id: bleibt auf GitHub" enthaelt "$(job "$SUITEN" "$id")" "    runs-on: ubuntu-latest"
 done
 pruefe "runner: wählt mit select-runner.sh" enthaelt "$(job "$SUITEN" runner)" 'runner="$("$weiche" "$EREIGNIS" "$LABEL")"'
@@ -201,6 +200,7 @@ pruefe "runner: bei einem PR die Weiche aus dem Ziel-Branch" \
   enthaelt "$(job "$SUITEN" runner)" "git show HEAD^1:scripts/runner/select-runner.sh"
 pruefe "runner: eine gescheiterte Wahl fällt auf GitHub zurück" \
   enthaelt "$(job "$SUITEN" runner)" "continue-on-error: true"
+pruefe "frontend: wartet nicht auf die Runner-Wahl" fehlt "$(job "$SUITEN" frontend)" "needs.runner"
 pruefe "runner: selbst auf GitHub" enthaelt "$(job "$SUITEN" runner)" "    runs-on: ubuntu-latest"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do

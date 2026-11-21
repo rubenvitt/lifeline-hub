@@ -2,8 +2,8 @@
 
 Bei einem Push auf `alpha`, `beta` oder `main` laufen die schweren Suiten der CI auf einem
 eigenen Server statt auf GitHub-Runnern, sobald die Repo-Variable `E2E_RUNNER` gesetzt ist:
-Rust-Suite, die vier Frontend-Anteile, `e2e-Binary` und die vier e2e-Anteile (LLH-1666,
-LLH-2014, ADR-0075). Die Wahl trifft der Job `runner` in `.github/workflows/suiten.yml`. Jeder
+Rust-Suite, `e2e-Binary` und die vier e2e-Anteile (LLH-1666, LLH-2014, ADR-0075). Die vier
+Frontend-Anteile laufen immer bei GitHub (LLH-2016, ADR-0076). Die Wahl trifft der Job `runner` in `.github/workflows/suiten.yml`. Jeder
 Job bekommt einen frischen Container, der nach dem Job gelöscht wird. **PR-Läufe laufen nie
 hier**, auch nicht mit dem Label `voll`. iOS-Kern, Schnellprüfungen, Berichte und Release bleiben
 bei GitHub.
@@ -141,12 +141,19 @@ will, baut das Image wie oben neu.
 
 ## Plätze und Größe
 
-Ein Push bringt bis zu zehn Jobs auf den Server (Rust, vier Frontend-Anteile, Binary, vier
-e2e-Anteile); mehr als Plätze da sind, warten. Je Platz rechnet man `RUNNER_CPUS` Kerne und
-`RUNNER_MEMORY` Speicher als Deckel, nicht als Reservierung. Die Rust-Suite linkt große
-Test-Binaries: reicht `RUNNER_MEMORY=6g` nicht (Abbruch mit „killed“ oder Signal 9), den Wert in
-`/etc/lifeline-runner/runner.env` heben. Einen Platz mehr: `sudo systemctl enable --now
-lifeline-runner@5`.
+Ein Push bringt bis zu sechs Jobs auf den Server: Rust-Suite und `e2e-Binary` zuerst, danach die
+vier e2e-Anteile. Mehr Jobs als Plätze warten. Je Platz gelten `RUNNER_CPUS` Kerne und
+`RUNNER_MEMORY` Speicher als Deckel, keine Reservierung.
+
+- **Kerne nicht überbuchen:** Plätze × `RUNNER_CPUS` höchstens so viele wie `nproc`. Überbucht
+  bremsen sich die e2e-Anteile gegenseitig aus und reißen das Zeitlimit von 75 min.
+- **Speicher:** die Rust-Suite linkt große Test-Binaries und braucht rund 10 GB; mit 6 GB brach
+  sie mit „killed by signal 9“ ab. Plätze × `RUNNER_MEMORY` plus einige GB für den Host.
+- **Beispiel** (12 Kerne, 62 GB): vier Plätze, `RUNNER_CPUS=3`, `RUNNER_MEMORY=11g`.
+
+Einen Platz abschalten: `sudo systemctl disable --now lifeline-runner@5`; einen dazu:
+`sudo systemctl enable --now lifeline-runner@5`. Nach einer Änderung an `runner.env` die Plätze
+neu starten.
 
 ## Betrieb
 
