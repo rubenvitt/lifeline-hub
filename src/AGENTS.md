@@ -224,7 +224,7 @@ Spec `webhook-zustellung`, Herleitung
 ## Backend — Adapter (LLH-2017)
 
 Anbindungen, die Lifeline Hub selbst abruft (Divera, HiOrg, Postfach …): `src/adapter/`
-([ADR-0076](../docs/architektur/entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
+([ADR-0077](../docs/architektur/entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
 Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`):
 - **Eine neue Anbindung ist eine Art** (`adapter::art::AdapterArt`) im Verzeichnis
   `art::Verzeichnis::produktiv()`: Code, Plätze für Geheimnisse, Einstellungsfelder, Intervall,

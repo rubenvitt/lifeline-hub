@@ -394,7 +394,7 @@ pub struct Config {
     pub backup_empfaenger: Vec<age::x25519::Recipient>,
 
     /// Privater `age`-Schlüssel (`AGE-SECRET-KEY-1…`, aus `age-keygen`) des Geheimnisspeichers
-    /// der Adapter (LLH-2017, ADR-0076): Accesskeys und Passwörter von Anbindungen liegen nur
+    /// der Adapter (LLH-2017, ADR-0077): Accesskeys und Passwörter von Anbindungen liegen nur
     /// verschlüsselt an diesen Schlüssel in der Datenbank. Getrennt von der Datenbank sichern;
     /// ohne ihn sind die gespeicherten Geheimnisse wertlos und müssen neu gesetzt werden.
     ///

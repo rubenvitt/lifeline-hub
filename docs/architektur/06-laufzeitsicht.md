@@ -616,7 +616,7 @@ sequenceDiagram
 ## 6.6g Adapter ruft ab
 
 Ein Adapter holt im Hintergrund bei einem Fremdsystem ab (LLH-2017,
-[ADR-0076](entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md)).
+[ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md)).
 
 ```mermaid
 sequenceDiagram

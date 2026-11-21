@@ -1,4 +1,4 @@
-//! Geheimnisspeicher der Adapter (LLH-2017, ADR-0076, Design-Doc „Geheimnisspeicher“).
+//! Geheimnisspeicher der Adapter (LLH-2017, ADR-0077, Design-Doc „Geheimnisspeicher“).
 //!
 //! Ein Geheimnis (Accesskey, API-Key, Passwort) liegt nur als age-Chiffrat in
 //! `adapter_geheimnis`, verschlüsselt an den Empfänger des privaten Schlüssels aus
@@ -176,10 +176,10 @@ mod tests {
         let a = Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate()));
         let b = Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate()));
         let (chiffrat, fp) = a.encrypt(&wert("x")).unwrap();
-        assert_eq!(b.decrypt(&chiffrat, &fp), Err(Unlesbar));
+        assert_eq!(b.decrypt(&chiffrat, &fp).unwrap_err(), Unlesbar);
         // Auch mit „passendem“ Fingerabdruck öffnet ein fremder Schlüssel nichts.
         let fp_b = b.fingerabdruck().unwrap().to_string();
-        assert_eq!(b.decrypt(&chiffrat, &fp_b), Err(Unlesbar));
+        assert_eq!(b.decrypt(&chiffrat, &fp_b).unwrap_err(), Unlesbar);
     }
 
     #[test]
@@ -187,7 +187,10 @@ mod tests {
         let leer = Geheimnisspeicher::default();
         assert!(!leer.has_schluessel());
         assert_eq!(leer.encrypt(&wert("x")), Err(KeinSchluessel));
-        assert_eq!(leer.decrypt(b"egal", "0000000000000000"), Err(Unlesbar));
+        assert_eq!(
+            leer.decrypt(b"egal", "0000000000000000").unwrap_err(),
+            Unlesbar
+        );
     }
 
     #[test]

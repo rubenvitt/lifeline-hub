@@ -464,7 +464,7 @@ gemeinsamen Fällen unter `src-tauri/faelle/`, die beide Suiten prüfen. Regeln:
 ## 8.32 Geheimnisse und Abrufe der Adapter
 
 Was Lifeline Hub selbst bei einem Fremdsystem abruft (Divera, HiOrg, Postfach …), ist ein Adapter
-einer Art im Rahmen `src/adapter/` ([ADR-0076](entscheidungen/ADR-0076-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
+einer Art im Rahmen `src/adapter/` ([ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
 Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md)).
 
 - **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`, mit

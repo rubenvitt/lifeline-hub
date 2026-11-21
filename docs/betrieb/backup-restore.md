@@ -174,7 +174,7 @@ besser per Pipe übergeben: am Terminal getippt, erscheint sie im Klartext.
 
 ### Geheimnisse der Adapter (LLH-2017)
 
-Accesskeys und Passwörter von Anbindungen (Adapter, ADR-0076) liegen in der Datenbank nur
+Accesskeys und Passwörter von Anbindungen (Adapter, ADR-0077) liegen in der Datenbank nur
 verschlüsselt an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`. Eine Sicherung enthält die
 Chiffrate, **nie den Schlüssel**. Ihn deshalb getrennt aufbewahren, wie die Identität der
 Sicherungen, und beim Wiederherstellen auf einem anderen Rechner wieder setzen:

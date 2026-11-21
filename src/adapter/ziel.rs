@@ -1,4 +1,4 @@
-//! Der Weg nach draußen für Adapter (LLH-2017, ADR-0076, Design-Doc „Weg nach draußen“).
+//! Der Weg nach draußen für Adapter (LLH-2017, ADR-0077, Design-Doc „Weg nach draußen“).
 //!
 //! Ein Adapter erreicht das Netz nur über den [`AbrufKontext`]: jede URL besteht vor jeder Anfrage
 //! den Zielschutz der Webhooks (`webhook::ziel::check_url`, IP-Literale umgehen den Resolver),

@@ -1,4 +1,4 @@
-//! Adapter-Rahmen (LLH-1632/LLH-2017, ADR-0076, Design-Doc
+//! Adapter-Rahmen (LLH-1632/LLH-2017, ADR-0077, Design-Doc
 //! `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`).
 //!
 //! Eine Anbindung an ein Fremdsystem, die Lifeline Hub selbst abruft (Divera, HiOrg, Postfach …),

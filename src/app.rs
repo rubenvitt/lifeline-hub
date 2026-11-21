@@ -2018,7 +2018,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/anbindungen/{id}/webhook/versuche",
             get(routes::anbindungen_webhook::versuche),
         )
-        // LLH-2017: Adapter verwalten (ADR-0076). Abgerufen wird im Hintergrund (`adapter::lauf`).
+        // LLH-2017: Adapter verwalten (ADR-0077). Abgerufen wird im Hintergrund (`adapter::lauf`).
         .route(
             "/api/admin/adapter",
             get(routes::adapter::list).post(routes::adapter::create),

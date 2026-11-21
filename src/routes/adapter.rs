@@ -1,4 +1,4 @@
-//! Adapter verwalten (LLH-2017, ADR-0076, Design-Doc „Admin-API“).
+//! Adapter verwalten (LLH-2017, ADR-0077, Design-Doc „Admin-API“).
 //!
 //! Lesen darf, wer den Admin-Bereich sieht; die Einstellungen sieht nur der System-Admin, weil
 //! eine URL darin einen Hinweis auf den Zugang tragen kann. Anlegen, ändern, löschen, Geheimnisse

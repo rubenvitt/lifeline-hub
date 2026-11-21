@@ -1,5 +1,5 @@
 ---
-id: ADR-0076
+id: ADR-0077
 titel: Geheimnisse der Adapter liegen nur verschlüsselt, Adapter rufen nur über den Rahmen ab
 status: vorgeschlagen
 datum: 2026-11-21
@@ -12,7 +12,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/r19tuh60j02y0c7o547p5d7z
 ---
 
-# ADR-0076: Geheimnisse der Adapter liegen nur verschlüsselt, Adapter rufen nur über den Rahmen ab
+# ADR-0077: Geheimnisse der Adapter liegen nur verschlüsselt, Adapter rufen nur über den Rahmen ab
 
 ## Regeln
 

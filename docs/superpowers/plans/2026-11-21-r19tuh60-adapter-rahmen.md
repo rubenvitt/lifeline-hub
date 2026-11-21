@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Geheimnisspeicher (age, Schlüssel aus der Umgebung), Adapter mit persistiertem Zustand, Hintergrundlauf mit Backoff und Zielschutz, Admin-API, ADR-0076 und Architektur — ohne produktive Adapterart.
+**Goal:** Geheimnisspeicher (age, Schlüssel aus der Umgebung), Adapter mit persistiertem Zustand, Hintergrundlauf mit Backoff und Zielschutz, Admin-API, ADR-0077 und Architektur — ohne produktive Adapterart.
 
 **Architecture:** Neues Modul `src/adapter/` (`geheimnis`, `zustand`, `art`, `ziel`, `repo`, `lauf`), Routen `src/routes/adapter.rs`, ein Feld `adapter: adapter::Rahmen` im `AppState` (Geheimnisspeicher + Arten-Verzeichnis, Vorgabe: kein Schlüssel, leeres Verzeichnis). Tests bringen eine eigene Art mit, statt `#[cfg(test)]` im Verzeichnis.
 
@@ -101,9 +101,9 @@
 
 ### Task 8: Regeln und Doku
 
-**Files:** Create `docs/architektur/entscheidungen/ADR-0076-…md`; Modify `src/AGENTS.md`, `docs/architektur/05-…`, `06-…`, `07-…`, `08-…`, `11-…`, `docs/betrieb/backup-restore.md`
+**Files:** Create `docs/architektur/entscheidungen/ADR-0077-…md`; Modify `src/AGENTS.md`, `docs/architektur/05-…`, `06-…`, `07-…`, `08-…`, `11-…`, `docs/betrieb/backup-restore.md`
 
-- [x] **Step 1:** ADR-0076 (`vorgeschlagen`) mit Prüfung; `scripts/check-architektur.sh` grün.
+- [x] **Step 1:** ADR-0077 (`vorgeschlagen`) mit Prüfung; `scripts/check-architektur.sh` grün.
 - [x] **Step 2:** `src/AGENTS.md` Abschnitt „Adapter (LLH-1632)“; Kapitel 5/6/7/8/11 (R47); Backup-Doku.
 
 ### Task 9: Abschluss

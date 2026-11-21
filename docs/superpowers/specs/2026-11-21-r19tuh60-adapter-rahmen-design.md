@@ -229,7 +229,7 @@ stehen Adapter-ID, Art, Platzname und Host, nie Wert, Pfad oder Token.
 
 ### Regeln und Doku
 
-- **ADR-0076 „Geheimnisse und Abrufe der Adapter“** (`vorgeschlagen`): Geheimnisse nur
+- **ADR-0077 „Geheimnisse und Abrufe der Adapter“** (`vorgeschlagen`): Geheimnisse nur
   verschlüsselt mit dem Schlüssel aus der Umgebung, nie über die API lesbar, nie im Log; Adapter
   rufen nur über den Rahmen ab (Client, Zielschutz, `http_begrenzt`); keine DB-Verbindung
   während eines Abrufs. Prüfung per `verbiete`/`verlange` (z. B. kein `chiffrat` außerhalb von
@@ -290,7 +290,7 @@ stehen Adapter-ID, Art, Platzname und Host, nie Wert, Pfad oder Token.
   Verwaltung kennt den Grund aus `speicher` der Liste). Bei „passt nicht“ ist Neusetzen der Weg.
 - **Verlauf** über `GET /api/admin/adapter/{id}/versuche`, nicht in der Ansicht.
 - **Geheimnis:** nur Zeilenumbrüche am Rand fallen weg, Leerzeichen bleiben; Länge in Zeichen.
-- **Log:** statt eines Fang-Tests sichert die Prüfung von ADR-0076 ab, dass keine `tracing`-Zeile
+- **Log:** statt eines Fang-Tests sichert die Prüfung von ADR-0077 ab, dass keine `tracing`-Zeile
   im Rahmen ein Geheimnis nennt.
 - **Gekoppelter ELW:** der Lauf schiebt den nächsten Abruf um das Intervall auf, statt in jedem
   Takt nachzusehen.

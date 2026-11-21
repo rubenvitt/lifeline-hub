@@ -1,6 +1,6 @@
 -- LLH-2017 (Adapter-Rahmen Teil A, docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md):
 -- Adapter einer Org mit Einstellung und Zustand, ihre Geheimnisse (age-verschlüsselt mit dem
--- Schlüssel aus der Umgebung, ADR-0076) und die letzten Versuche.
+-- Schlüssel aus der Umgebung, ADR-0077) und die letzten Versuche.
 
 -- `art` ist der Code einer Adapterart im Verzeichnis des Codes, bewusst ohne CHECK: eine neue Art
 -- käme sonst nur mit Tabellenumbau. Eine unbekannte Art zeigt der Zustand, der Lauf lässt sie aus.
