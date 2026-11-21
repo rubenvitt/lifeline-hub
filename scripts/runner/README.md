@@ -133,6 +133,12 @@ sudo systemctl restart 'lifeline-runner@*'
 Fehlen dem Image die GTK/WebKit-Pakete, bricht die Rust-Suite auf dem Server früh mit einem
 Hinweis auf diesen Abschnitt ab.
 
+Die Rust-Toolchain kommt auf dem Server aus dem Image und wird im Job nicht aktualisiert: ein
+Update an Ort und Stelle scheitert im Container an overlayfs („Invalid cross-device link“,
+LLH-2015). Ist ein neues Rust-Stable erschienen, warnt der Schritt „Rust-Toolchain (eigener
+Runner)“, und die Jobs laufen bis zum nächsten Neubau mit dem älteren weiter. Wer das neue sofort
+will, baut das Image wie oben neu.
+
 ## Plätze und Größe
 
 Ein Push bringt bis zu zehn Jobs auf den Server (Rust, vier Frontend-Anteile, Binary, vier
