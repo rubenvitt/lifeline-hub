@@ -2,6 +2,8 @@ import { Col, Input, InputNumber, Form, Row, theme } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
+import { VORGABE_FRIST_MINUTEN } from '../anzeige/zeitSchnellwahl';
+import { zahlRegel } from '../components/zahlRegel';
 import { Feld, Paneel } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
@@ -28,8 +30,8 @@ interface FormWerte {
 
 /**
  * Obergrenze des Intervalls: 7 Tage, wie der Server (`INTERVALL_MAX_MINUTEN`, LFH-924). Ein
- * zwölfstelliges Intervall legte vorher den Erinnerungs-Planer still. Bewusst eine Regel statt
- * `max` am Feld: `max` kappte die Eingabe beim Verlassen still auf 7 Tage.
+ * zwölfstelliges Intervall legte vorher den Erinnerungs-Planer still. Eine Regel statt `max` am
+ * Feld (`frontend/AGENTS.md`, „Zahlenfelder prüfen statt kappen“).
  */
 const INTERVALL_MAX_MINUTEN = 7 * 24 * 60;
 
@@ -87,7 +89,7 @@ export default function ErinnerungFormular({
       initialValues={{
         titel: '',
         beschreibung: '',
-        faellig: serverJetzt(),
+        faellig: serverJetzt().add(VORGABE_FRIST_MINUTEN, 'minute'),
         intervall: null,
         empfaenger: [],
       }}
@@ -118,15 +120,9 @@ export default function ErinnerungFormular({
           <Feld
             name="intervall"
             label="Intervall (Min, optional)"
-            rules={[
-              {
-                type: 'number',
-                max: INTERVALL_MAX_MINUTEN,
-                message: `Höchstens ${INTERVALL_MAX_MINUTEN} Min (7 Tage)`,
-              },
-            ]}
+            rules={[zahlRegel({ min: 1, max: INTERVALL_MAX_MINUTEN, ganz: true, einheit: 'Min' })]}
           >
-            <InputNumber aria-label="Intervall" min={1} placeholder="30" />
+            <InputNumber aria-label="Intervall" placeholder="30" />
           </Feld>
         </Col>
       </Row>

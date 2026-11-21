@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import type { ReactNode } from 'react';
 import { mitProzessZone } from '../test/prozessZone';
 import { setzeZeit, tippeZeit, zeitFeld } from '../test/zeitEingabe';
+import { Feld } from '../components/instrument';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
 import {
   ZEIT_BLATT,
@@ -272,16 +273,16 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(onFinish).not.toHaveBeenCalled();
   });
 
-  it('Unlesbares und Verlassen: geltender Wert zurück, Grund bleibt, gesendet wird der alte Wert', async () => {
+  it('Unlesbares und Verlassen: Text bleibt stehen, Grund bleibt, das Formular sendet nicht (LLH-1768)', async () => {
     const onFinish = vi.fn();
     const user = userEvent.setup();
     render(
       mitZone(
         BERLIN,
         <Form onFinish={onFinish} initialValues={{ t: alsZeitpunkt('2026-10-16 12:30:00') }}>
-          <Form.Item name="t" label="Zeit">
+          <Feld name="t" label="Zeit">
             <ZeitpunktEingabe />
-          </Form.Item>
+          </Feld>
           <button type="submit">Speichern</button>
         </Form>,
       ),
@@ -289,10 +290,9 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     await user.clear(zeitFeld('Zeit'));
     await user.type(zeitFeld('Zeit'), '14:3x');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onFinish).toHaveBeenCalled());
-    expect(zeitFeld('Zeit')).toHaveValue('161430okt26');
-    expect(screen.getByText('nicht lesbar')).toBeInTheDocument();
-    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-16 12:30:00');
+    await waitFor(() => expect(screen.getAllByText('nicht lesbar')).toHaveLength(1));
+    expect(zeitFeld('Zeit')).toHaveValue('14:3x');
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it('meldet eine beim Verlassen verworfene Eingabe über onDiscard, bis erneut getippt wird (LLH-1866)', async () => {
@@ -316,34 +316,34 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(onDiscard).toHaveBeenLastCalledWith(null);
   });
 
-  it.each([
-    ['Enter auf den gezeigten Wert', '{Enter}', false],
-    ['Escape ohne Tippen', '{Escape}', true],
-  ])('%s nimmt den gemeldeten Grund zurück (LLH-1866)', async (_name, taste, verbraucht) => {
-    const onDiscard = vi.fn();
-    const onKeyDown = vi.fn();
-    const user = userEvent.setup();
-    render(
-      mitZone(
-        BERLIN,
-        <>
-          <ZeitpunktEingabe aria-label="Zeit" onDiscard={onDiscard} onKeyDown={onKeyDown} />
-          <button type="button">daneben</button>
-        </>,
-      ),
-    );
-    await user.type(zeitFeld('Zeit'), '14:3x');
-    await user.click(screen.getByRole('button', { name: 'daneben' }));
-    expect(onDiscard).toHaveBeenLastCalledWith('nicht lesbar');
-    await user.click(zeitFeld('Zeit'));
-    onKeyDown.mockClear();
-    await user.keyboard(taste);
-    expect(onDiscard).toHaveBeenLastCalledWith(null);
-    expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
-    expect(zeitFeld('Zeit')).toHaveValue('');
-    // Escape gehört dann dem Feld: ein Dialog drumherum bleibt offen.
-    expect(onKeyDown.mock.lastCall![0].defaultPrevented).toBe(verbraucht);
-  });
+  it.each([['Escape auf den stehenden Text', '{Escape}', true]])(
+    '%s nimmt den gemeldeten Grund zurück (LLH-1866, LLH-1768)',
+    async (_name, taste, verbraucht) => {
+      const onDiscard = vi.fn();
+      const onKeyDown = vi.fn();
+      const user = userEvent.setup();
+      render(
+        mitZone(
+          BERLIN,
+          <>
+            <ZeitpunktEingabe aria-label="Zeit" onDiscard={onDiscard} onKeyDown={onKeyDown} />
+            <button type="button">daneben</button>
+          </>,
+        ),
+      );
+      await user.type(zeitFeld('Zeit'), '14:3x');
+      await user.click(screen.getByRole('button', { name: 'daneben' }));
+      expect(onDiscard).toHaveBeenLastCalledWith('nicht lesbar');
+      await user.click(zeitFeld('Zeit'));
+      onKeyDown.mockClear();
+      await user.keyboard(taste);
+      expect(onDiscard).toHaveBeenLastCalledWith(null);
+      expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
+      expect(zeitFeld('Zeit')).toHaveValue('');
+      // Escape gehört dann dem Feld: ein Dialog drumherum bleibt offen.
+      expect(onKeyDown.mock.lastCall![0].defaultPrevented).toBe(verbraucht);
+    },
+  );
 
   it('ein neuer Wert von außen nimmt den gemeldeten Grund zurück (Review B2)', async () => {
     const onDiscard = vi.fn();
@@ -937,5 +937,128 @@ describe('ZeitpunktEingabe — Blatt, wo der Kalender nicht neben das Feld passt
       new RegExp(`\\.${ZEIT_BLATT}\\.ant-popover \\{[^}]*position: fixed !important;`),
     );
     expect(css).toMatch(/max-height: 85dvh;/);
+  });
+});
+
+describe('ZeitpunktEingabe — nichts still korrigieren (LLH-1768)', () => {
+  mitProzessZone('UTC');
+  // 12.11.2026, 17:59 in Berlin.
+  uhrSteht('2026-11-12T16:59:00Z');
+
+  it('„1700“ im Fristfeld nennt nach Enter weiter „morgen“', async () => {
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Fällig" art="frist" />));
+    await tippeZeit(user, zeitFeld('Fällig'), '1700');
+    expect(zeitFeld('Fällig')).toHaveValue('131700nov26');
+    expect(screen.getByText('morgen')).toBeInTheDocument();
+  });
+
+  it('nennt „gestern“ an einem Wert vom Vortag, an einem von heute nichts', () => {
+    const { rerender } = render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe aria-label="Zeit" value={alsZeitpunkt('2026-11-11 10:00:00')} />,
+      ),
+    );
+    expect(screen.getByText('gestern')).toBeInTheDocument();
+    rerender(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe aria-label="Zeit" value={alsZeitpunkt('2026-11-12 10:00:00')} />,
+      ),
+    );
+    expect(screen.queryByText('gestern')).not.toBeInTheDocument();
+  });
+
+  it('ein leeres optionales Feld mit unlesbarem Text sendet nicht, auch nicht leer', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Feld name="t" label="Zeit">
+            <ZeitpunktEingabe art="frist" />
+          </Feld>
+          <button type="submit">Anlegen</button>
+        </Form>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), 'morgen');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await screen.findByText('nicht lesbar');
+    expect(zeitFeld('Zeit')).toHaveValue('morgen');
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('nach der Korrektur weicht der Grund, und das Formular sendet', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Feld name="t" label="Zeit">
+            <ZeitpunktEingabe art="frist" />
+          </Feld>
+          <button type="submit">Anlegen</button>
+        </Form>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), 'morgen');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await screen.findByText('nicht lesbar');
+    await tippeZeit(user, zeitFeld('Zeit'), '1900');
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-11-12 18:00:00');
+    // antd blendet die Fehlerzeile mit einer Animation aus.
+    await waitFor(() => expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument());
+  });
+
+  it('Enter auf stehendem unlesbarem Text sendet nicht und behält den Grund', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Feld name="t" label="Zeit">
+            <ZeitpunktEingabe />
+          </Feld>
+          <button type="button">daneben</button>
+        </Form>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    await user.click(screen.getByRole('button', { name: 'daneben' }));
+    await user.click(zeitFeld('Zeit'));
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('nicht lesbar')).toBeInTheDocument();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('ein Zeitraum bleibt gesperrt, solange ein Ende unlesbar ist', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Feld name="r" label="Zeitraum">
+            <ZeitraumEingabe />
+          </Feld>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await user.type(zeitFeld('Beginn'), '14:3x');
+    await user.click(zeitFeld('Ende'));
+    await user.type(zeitFeld('Ende'), '2000');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('nicht lesbar');
+    expect(onFinish).not.toHaveBeenCalled();
+    await tippeZeit(user, zeitFeld('Beginn'), '1900');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
   });
 });

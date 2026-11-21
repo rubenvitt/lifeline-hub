@@ -2,7 +2,10 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { Button, Form } from 'antd';
+import { fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import Feld from '../components/instrument/Feld';
 import { QUALI_SOLL_MAX } from '../api/eingabegrenzen';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -61,5 +64,43 @@ describe('QualiSollFeld', () => {
   it('mehr als die Grenze lässt der Knopf nicht zu', () => {
     render(Array.from({ length: QUALI_SOLL_MAX }, (_, i) => ({ qualifikation_id: i, anzahl: 1 })));
     expect(screen.getByRole('button', { name: 'Qualifikation fordern' })).toBeDisabled();
+  });
+});
+
+describe('QualiSollFeld prüft die Anzahl (LLH-1768)', () => {
+  it('eine entfernte ungültige Zeile sperrt nicht mehr', async () => {
+    server.use(http.get('/api/qualifikationen', () => HttpResponse.json([])));
+    const onFinish = vi.fn();
+    renderMitProviders(
+      <Form
+        onFinish={onFinish}
+        initialValues={{
+          q: [
+            { qualifikation_id: 2, anzahl: 3 },
+            { qualifikation_id: 1, anzahl: 1 },
+          ],
+        }}
+      >
+        <Feld name="q" label="Soll">
+          <QualiSollFeld />
+        </Feld>
+        <Button htmlType="submit">Senden</Button>
+      </Form>,
+    );
+    const anzahl2 = screen.getByRole('spinbutton', { name: 'Anzahl 2' });
+    fireEvent.change(anzahl2, { target: { value: '0' } });
+    fireEvent.blur(anzahl2);
+    expect(anzahl2).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Qualifikation 2 entfernen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+  });
+
+  it('ein gespeicherter Altwert über der Grenze steht nicht rot da', () => {
+    render([{ qualifikation_id: 2, anzahl: 100000 }]);
+    expect(screen.getByRole('spinbutton', { name: 'Anzahl 1' })).not.toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
   });
 });

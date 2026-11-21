@@ -9,7 +9,11 @@
  *   („161430okt26“, Entscheidung E1), beim Tippen daneben die Deutung oder den Grund.
  * - Enter übernimmt (und das Formular sendet wie gewohnt), Verlassen übernimmt eine lesbare
  *   Eingabe, Escape verwirft. Unlesbares wird nie übernommen und nie still korrigiert: Enter sendet
- *   dann nicht, Verlassen zeigt wieder den geltenden Wert und nennt den Grund (D3).
+ *   dann nicht, und beim Verlassen bleibt der Text samt Grund stehen (LLH-1768, löst D3 ab). Der
+ *   Grund geht an die Eingabesperre darüber (`components/instrument/eingabeSperre.tsx`): ein
+ *   Formular mit `Feld` sendet dann nicht, statt still den alten Wert zu senden.
+ * - Liegt der geltende Wert gestern oder morgen, steht das am Feld, auch nach der Übernahme
+ *   (LLH-1768): „1700“ um 17:59 in einem Fristfeld ist morgen.
  * - `value`/`onChange` tauschen ABSOLUTE Zeitpunkte; `onChange` feuert nur bei einem anderen
  *   Zeitpunkt, ein unberührtes Feld behält den gelesenen (Spec: „Unverändertes Speichern
  *   verschiebt nichts“).
@@ -33,7 +37,13 @@ import {
   type RefObject,
   type Ref,
 } from 'react';
-import { monoStil, Stapel, useRollen } from '../components/instrument';
+import {
+  monoStil,
+  Stapel,
+  useEingabeSperre,
+  useRollen,
+  useSperrStelleZeigtGrund,
+} from '../components/instrument';
 import { useViewport, type AbBreitePunkt } from '../components/useViewport';
 import { IconKalender } from '../icons';
 import { serverJetzt } from '../offline/serveruhr';
@@ -115,6 +125,18 @@ function useKalenderLage(): {
 /** Liegt der Zeitpunkt am heutigen Tag der Anzeigezone (nach der Serveruhr)? */
 function istHeute(zeitpunkt: Dayjs, zone: string | null): boolean {
   return zuWanduhr(zeitpunkt, zone).isSame(zuWanduhr(serverJetzt(), zone), 'day');
+}
+
+/** „gestern“ oder „morgen“, wenn der Zeitpunkt am Vortag bzw. Folgetag der Anzeigezone liegt. */
+function tagNachbar(
+  zeitpunkt: Dayjs,
+  zone: string | null,
+  jetzt: Dayjs,
+): 'gestern' | 'morgen' | null {
+  const tage = zuWanduhr(zeitpunkt, zone)
+    .startOf('day')
+    .diff(zuWanduhr(jetzt, zone).startOf('day'), 'day');
+  return tage === -1 ? 'gestern' : tage === 1 ? 'morgen' : null;
 }
 
 /** Gleicher Zeitpunkt (am Instant) oder beide leer. */
@@ -233,12 +255,17 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   // Gemeldet wird im Ereignis selbst, nicht in einem Effekt: das Verwerfen geschieht beim Verlassen
   // (`mousedown` auf einen Knopf), und dessen `click` muss den Grund schon kennen (LLH-1866).
   const discardReported = useRef<string | null>(null);
+  const meldeSperre = useEingabeSperre();
   function setDiscarded(grund: string | null) {
     setDiscardedState(grund);
     if (discardReported.current === grund) return;
     discardReported.current = grund;
     onDiscard?.(grund);
+    meldeSperre(grund);
   }
+  // Nennt die Stelle darüber (Fehlerzeile des Formularfelds) den gemeldeten Grund, nennt das Feld
+  // ihn nicht noch einmal.
+  const stelleZeigtGrund = useSperrStelleZeigtGrund();
   const [offenIntern, setOffenIntern] = useState(false);
   const offen = open ?? offenIntern;
   const hinweisId = useId();
@@ -252,7 +279,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   useEffect(() => {
     if (prevWert.current === wertKey) return;
     prevWert.current = wertKey;
-    if (discardReported.current != null) setDiscarded(null);
+    if (discardReported.current != null) {
+      // Der stehende, unlesbare Text weicht dem neuen Wert (LLH-1768).
+      setText(null);
+      setDiscarded(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `setDiscarded` meldet nur weiter
   }, [wertKey]);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
@@ -331,13 +362,19 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     onOk?.(neu);
   }
 
+  /** „gestern“/„morgen“ am geltenden Wert, solange nicht getippt wird (LLH-1768). */
+  const tagHinweis =
+    wert && !nurTag && deutung === null ? tagNachbar(wert, z.zone, serverJetzt()) : null;
+  const grundImFormular = stelleZeigtGrund && discarded !== null && grund === discarded;
   const hinweisText = grund
-    ? grund
+    ? grundImFormular
+      ? ''
+      : grund
     : deutung?.ok && deutung.zeitpunkt
       ? `= ${nurTag ? formatTag(deutung.zeitpunkt, z.zone) : formatDtg(deutung.zeitpunkt, z.zone)}${
           deutung.hinweis ? ` · ${deutung.hinweis}` : ''
         }`
-      : '';
+      : (tagHinweis ?? '');
   // Das Suffix steht IMMER im DOM: antds `Input` baut sein Gerüst um, sobald ein Suffix kommt oder
   // geht, und das Feld verlöre mitten im Tippen den Fokus.
   const suffix = (
@@ -437,10 +474,8 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
           onKeyDown?.(e);
         }}
         onBlur={(e) => {
-          if (text !== null && uebernimmText() === false) {
-            setDiscarded(grund);
-            setText(null);
-          }
+          // Unlesbares bleibt stehen und sperrt (LLH-1768); der Formularwert bleibt der geltende.
+          if (text !== null && uebernimmText() === false) setDiscarded(grund);
           onBlur?.(e);
         }}
       />

@@ -2193,7 +2193,8 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     });
     await unlesbarDirektErfasst(p);
     expect(p.erfassen).not.toHaveBeenCalled();
-    expect(feldWert('Zeit')).toBe('1420');
+    // Der unlesbare Text bleibt stehen (LLH-1768), statt wieder 1420 zu zeigen.
+    expect(feldWert('Zeit')).toBe('14:3x');
     await userEvent.clear(zeitFeld());
     await userEvent.click(erfassenKnopf());
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
@@ -2203,8 +2204,17 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     );
   });
 
-  it.each(['{Enter}', '{Escape}'])(
-    'war das Feld leer, bestätigt %s im Feld „jetzt“ (D1a)',
+  it('Enter auf dem stehenden unlesbaren Text hält weiter an (LLH-1768)', async () => {
+    const p = props();
+    await unlesbarDirektErfasst(p);
+    await waitFor(() => expect(zeitFeld()).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    expect(feldWert('Zeit')).toBe('14:3x');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it.each(['{Escape}'])(
+    'war das Feld leer, verwirft %s den Text und bestätigt „jetzt“ (D1a, LLH-1768)',
     async (taste) => {
       const p = props();
       await unlesbarDirektErfasst(p);
@@ -2222,6 +2232,7 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
   it('eine lesbare Zeit gibt das Senden frei', async () => {
     const p = props();
     await unlesbarDirektErfasst(p);
+    await userEvent.clear(zeitFeld());
     await userEvent.type(zeitFeld(), '1430');
     await userEvent.click(erfassenKnopf());
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));

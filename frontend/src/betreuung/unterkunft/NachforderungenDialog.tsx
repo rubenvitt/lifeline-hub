@@ -9,7 +9,7 @@ import type {
 } from '../../api/types';
 import { MengenFeld } from '../../components/MengenFeld';
 import { Select } from '../../components/Select';
-import { Stapel, useRollen } from '../../components/instrument';
+import { SperrStelle, Stapel, useRollen, useSperrSammler } from '../../components/instrument';
 import { useVerwerfenSchutz } from '../../components/VerlassenRueckfrage';
 import { neueClientId } from '../../offline/clientId';
 import {
@@ -118,6 +118,9 @@ export default function NachforderungenDialog({
   const titel = `Nachforderungen für ${stelleName}`;
   const schutz = useVerwerfenSchutz({ geaendert, gesperrt: laeuft, titel, onSchliessen });
 
+  // Eine Anzahl außerhalb der Grenzen sperrt „Anlegen“ und steht als Grund darunter (LLH-1768).
+  const [sperrGrund, setSperrGrund] = useState<string | null>(null);
+  const sperre = useSperrSammler(setSperrGrund);
   const gewaehlt = zeilen.filter((z) => z.an && !z.angelegt && z.anzahl > 0);
   const n = gewaehlt.length;
   const knopf = n === 1 ? '1 Nachforderung anlegen' : `${n} Nachforderungen anlegen`;
@@ -176,7 +179,7 @@ export default function NachforderungenDialog({
         title={titel}
         okText={knopf}
         cancelText="Schließen"
-        okButtonProps={{ disabled: n === 0 }}
+        okButtonProps={{ disabled: n === 0 || sperrGrund !== null }}
         confirmLoading={laeuft}
         onOk={() => void anlegen()}
         closable={!laeuft}
@@ -185,57 +188,60 @@ export default function NachforderungenDialog({
         destroyOnHidden
       >
         <Stapel abstand="md">
-          <div role="group" aria-label="Posten">
-            {zeilen.map((z) => (
-              <div key={z.schluessel} style={zeile}>
-                <Checkbox
-                  checked={z.an}
-                  disabled={z.angelegt || laeuft}
-                  onChange={(ev) =>
-                    setZeilen((alt) =>
-                      alt.map((x) =>
-                        x.schluessel === z.schluessel ? { ...x, an: ev.target.checked } : x,
-                      ),
-                    )
-                  }
-                >
-                  <span style={{ display: 'grid' }}>
-                    <span>{z.art}</span>
-                    {z.bezeichnung && (
-                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                        {z.bezeichnung}
-                      </Typography.Text>
-                    )}
-                    {z.angelegt && (
-                      <Typography.Text type="success" style={{ fontSize: token.fontSizeSM }}>
-                        angelegt
-                      </Typography.Text>
-                    )}
-                    {z.fehler && (
-                      <Typography.Text type="danger" style={{ fontSize: token.fontSizeSM }}>
-                        {z.fehler}
-                      </Typography.Text>
-                    )}
-                  </span>
-                </Checkbox>
-                <MengenFeld
-                  beschriftung={`Anzahl ${z.art}`}
-                  min={1}
-                  max={1_000_000}
-                  value={z.anzahl}
-                  disabled={z.angelegt || laeuft}
-                  onChange={(v) =>
-                    setZeilen((alt) =>
-                      alt.map((x) =>
-                        x.schluessel === z.schluessel ? { ...x, anzahl: v ?? 0 } : x,
-                      ),
-                    )
-                  }
-                  style={{ width: '100%' }}
-                />
-              </div>
-            ))}
-          </div>
+          <SperrStelle melden={sperre.melden}>
+            <div role="group" aria-label="Posten">
+              {zeilen.map((z) => (
+                <div key={z.schluessel} style={zeile}>
+                  <Checkbox
+                    checked={z.an}
+                    disabled={z.angelegt || laeuft}
+                    onChange={(ev) =>
+                      setZeilen((alt) =>
+                        alt.map((x) =>
+                          x.schluessel === z.schluessel ? { ...x, an: ev.target.checked } : x,
+                        ),
+                      )
+                    }
+                  >
+                    <span style={{ display: 'grid' }}>
+                      <span>{z.art}</span>
+                      {z.bezeichnung && (
+                        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                          {z.bezeichnung}
+                        </Typography.Text>
+                      )}
+                      {z.angelegt && (
+                        <Typography.Text type="success" style={{ fontSize: token.fontSizeSM }}>
+                          angelegt
+                        </Typography.Text>
+                      )}
+                      {z.fehler && (
+                        <Typography.Text type="danger" style={{ fontSize: token.fontSizeSM }}>
+                          {z.fehler}
+                        </Typography.Text>
+                      )}
+                    </span>
+                  </Checkbox>
+                  <MengenFeld
+                    beschriftung={`Anzahl ${z.art}`}
+                    min={1}
+                    max={1_000_000}
+                    value={z.anzahl}
+                    disabled={z.angelegt || laeuft}
+                    onChange={(v) =>
+                      setZeilen((alt) =>
+                        alt.map((x) =>
+                          x.schluessel === z.schluessel ? { ...x, anzahl: v ?? 0 } : x,
+                        ),
+                      )
+                    }
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </SperrStelle>
+          {sperrGrund && <Typography.Text type="danger">{sperrGrund}</Typography.Text>}
           <div
             style={{
               display: 'grid',

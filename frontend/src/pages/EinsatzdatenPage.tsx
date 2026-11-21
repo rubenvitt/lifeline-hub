@@ -1,4 +1,4 @@
-import { App, AutoComplete, Breadcrumb, Button, Collapse, Input, InputNumber, Space } from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, Collapse, Input, Space } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -123,6 +123,7 @@ import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import AblaufPaneel from '../programmpunkt/AblaufPaneel';
 import EinsatzAbschlussPaneel from './einsatzdaten/EinsatzAbschlussPaneel';
+import { ZahlFeld } from '../components/ZahlFeld';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -1901,10 +1902,10 @@ export default function EinsatzdatenPage() {
                     eingabe={({ feld, value, onChange }) => (
                       // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`).
                       <div className={FELD_KLASSE} style={{ maxWidth: 'var(--lfh-feld-schmal)' }}>
-                        <InputNumber<number>
+                        <ZahlFeld
                           {...feld}
                           min={0}
-                          precision={0}
+                          ganz
                           value={value}
                           onChange={(n) => onChange(n ?? null)}
                         />

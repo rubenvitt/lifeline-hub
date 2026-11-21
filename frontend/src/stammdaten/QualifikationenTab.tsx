@@ -1,4 +1,4 @@
-import { Input, InputNumber, type TableColumnsType } from 'antd';
+import { Input, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { useQuery } from '@tanstack/react-query';
 import { Feld, monoStil } from '../components/instrument';
@@ -13,6 +13,7 @@ import type { Qualifikation } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { einschlussKandidaten, einschluesseAus } from '../kraefte/qualiDeckung';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 
 interface FormWerte {
@@ -72,7 +73,7 @@ const felder = (bearbeite: Qualifikation | null, katalog: readonly Qualifikation
       <Input />
     </Feld>
     <Feld label="Sortierung" name="sortier" breite="kurz">
-      <InputNumber min={0} />
+      <ZahlFeld min={0} />
     </Feld>
     <Feld label="Schließt ein" name="schliesst_ein_id">
       <Select<number | null>

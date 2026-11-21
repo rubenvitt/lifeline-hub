@@ -1,4 +1,4 @@
-import { App, Input, InputNumber } from 'antd';
+import { App, Input } from 'antd';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { isVeraltet } from '../../api/client';
@@ -13,6 +13,7 @@ import BearbeitbaresPaneel, {
 import QualiSollFeld from '../../kraefte/QualiSollFeld';
 import { qualiSollText } from '../../kraefte/qualiSoll';
 import { uhsAngabenWerte, uhsPatch, type UhsAngabenWerte } from './uhsPatch';
+import { ZahlFeld } from '../../components/ZahlFeld';
 import { pflicht } from '../../components/pflichtRegel';
 
 /**
@@ -58,7 +59,7 @@ export default function UhsAngaben({
       name: 'soll_anzahl',
       label: 'Soll-Anzahl',
       anzeige: uhs.soll_anzahl ?? '—',
-      eingabe: <InputNumber min={1} max={UHS_SOLL_ANZAHL_MAX} precision={0} />,
+      eingabe: <ZahlFeld min={1} max={UHS_SOLL_ANZAHL_MAX} ganz />,
       breite: 'kurz',
       mono: true,
     },

@@ -1,6 +1,8 @@
 import { Button, InputNumber } from 'antd';
+import { useState } from 'react';
 import { monoStil, useRollen } from './instrument';
 import { KREIS_RADIUS_M_MAX } from '../api/eingabegrenzen';
+import { useZahlSperre } from './zahlRegel';
 
 /** Schnellwahl des Radius in Metern (LLH-1043): Erstabsperrung bis Evakuierungsradius. */
 export const KREIS_SCHNELLWAHL = [50, 100, 300, 500, 1000] as const;
@@ -36,23 +38,33 @@ export default function RadiusEingabe({
 }: RadiusEingabeProps) {
   const { token } = useRollen();
   const radius = value ?? null;
+  // Geprüft statt gekappt (LLH-1768): ein Radius außerhalb bleibt stehen und geht nicht hinaus.
+  const { grund, pruefe } = useZahlSperre();
+  // Die abgelehnte Eingabe bleibt sichtbar stehen, statt still dem alten Radius zu weichen.
+  const [abgelehnt, setAbgelehnt] = useState<number | null>(null);
   return (
     <>
       <InputNumber<number>
         id={id}
         aria-label="Radius in Metern"
         aria-describedby={ariaDescribedby}
-        aria-invalid={ariaInvalid}
+        aria-invalid={grund ? true : ariaInvalid}
+        status={grund ? 'error' : undefined}
+        title={grund ?? undefined}
         aria-required={ariaRequired}
-        value={radius}
-        min={1}
-        max={KREIS_RADIUS_M_MAX}
-        precision={0}
+        value={grund ? abgelehnt : radius}
         disabled={disabled}
         suffix="m"
         inputMode="numeric"
         style={{ width: 132, ...monoStil(token.fontSize) }}
-        onChange={(v) => onChange?.(typeof v === 'number' ? v : null)}
+        onChange={(v) => {
+          const wert = typeof v === 'number' ? v : null;
+          if (pruefe(wert, { min: 1, max: KREIS_RADIUS_M_MAX, ganz: true, einheit: 'm' })) {
+            setAbgelehnt(wert);
+            return;
+          }
+          onChange?.(wert);
+        }}
         onPressEnter={onPressEnter}
       />
       {KREIS_SCHNELLWAHL.map((r) => (
@@ -62,7 +74,10 @@ export default function RadiusEingabe({
           aria-pressed={radius === r}
           type={radius === r ? 'primary' : 'default'}
           ghost={radius === r}
-          onClick={() => onChange?.(r)}
+          onClick={() => {
+            pruefe(r, {});
+            onChange?.(r);
+          }}
         >
           {r} m
         </Button>

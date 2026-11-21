@@ -9,11 +9,12 @@ describe('MengenFeld (LFH-983)', () => {
     expect(container.innerHTML).not.toMatch(/Increase Value|Decrease Value/);
   });
 
-  it('beginnt bei 1 und nimmt nur ganze Zahlen', () => {
+  it('kappt nicht an einer Untergrenze und öffnet die Ziffernstatur (LLH-1768)', () => {
     const onChange = vi.fn();
     render(<MengenFeld beschriftung="Menge" onChange={onChange} />);
     const feld = screen.getByRole('spinbutton', { name: 'Menge' });
-    expect(feld).toHaveAttribute('aria-valuemin', '1');
+    // Die Grenze prüft `useZahlSperre`, nicht antds `min`: kein stilles Kappen beim Verlassen.
+    expect(feld).not.toHaveAttribute('aria-valuemin');
     expect(feld).toHaveAttribute('inputmode', 'numeric');
   });
 

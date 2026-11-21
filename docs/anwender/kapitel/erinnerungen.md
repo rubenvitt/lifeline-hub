@@ -29,7 +29,9 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Formular „Neue Erinnerung“ mit Titel, Beschreibung, Fälligkeit, Intervall 30 und leerem Empfängerfeld](../bilder/erinnerungen/erinnerung-anlegen.png)
 
-3. Unter „Fällig“ den Zeitpunkt setzen; vorbelegt ist jetzt.
+3. Unter „Fällig“ den Zeitpunkt setzen; vorbelegt ist jetzt plus 30 Minuten. Liegt der Zeitpunkt
+   morgen oder gestern, steht das am Feld. Eine unlesbare Eingabe bleibt stehen, und „Anlegen“
+   legt erst an, wenn sie lesbar ist.
 4. Für eine wiederkehrende Erinnerung unter „Intervall (Min, optional)“ den Abstand in Minuten
    eintragen, höchstens 10 080 (sieben Tage).
 5. Bei Bedarf unter „Empfänger/Funktion (optional)“ eine Funktion wählen (zum Beispiel S2) oder

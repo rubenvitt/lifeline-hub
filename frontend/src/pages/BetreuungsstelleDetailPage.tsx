@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Typography } from 'antd';
+import { App, Breadcrumb, Button, Form, Input, Space, Typography } from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -100,6 +100,7 @@ import { betreuungsstelleStatus } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
 
@@ -601,7 +602,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       {zelle(
         'kapazitaet_personen',
         'Kapazität (Personen)',
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" />,
+        <ZahlFeld min={1} ganz placeholder="keine Angabe" />,
         s.kapazitaet_personen != null ? personenZahl(s.kapazitaet_personen) : leer,
         { mono: true, rules: [hoechstensRegel] },
       )}

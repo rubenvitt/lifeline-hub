@@ -7,6 +7,7 @@ import { FELD_GRENZE, FELD_KLASSE } from './Feld';
 import GeaendertPunkt from './GeaendertPunkt';
 import { useRollen } from './rollenwerte';
 import { datenfeldStil } from './datenrasterStil';
+import { SperrStelle, useSperrStelle } from './eingabeSperre';
 
 /**
  * DatenfeldEingabe — ein `Datenfeld` im Bearbeiten-Modus einer Detailseite (LLH-1101): dieselbe
@@ -63,6 +64,8 @@ export default function DatenfeldEingabe({
   const erzeugt = useId();
   const eingabeId = children.props.id ?? erzeugt;
   const grenze = breite === undefined ? undefined : FELDBREITE[breite];
+  // Eingabesperre wie in `Feld` (LLH-1768).
+  const sperre = useSperrStelle(name);
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
       <Augenbraue als="dt">
@@ -72,20 +75,22 @@ export default function DatenfeldEingabe({
         </label>
       </Augenbraue>
       <dd style={{ margin: 0, minWidth: 0 }}>
-        <Form.Item
-          name={name}
-          rules={rules}
-          extra={hilfe}
-          className={FELD_KLASSE}
-          style={
-            {
-              marginBottom: 0,
-              ...(grenze === undefined ? {} : { [FELD_GRENZE]: `${grenze}px` }),
-            } as CSSProperties
-          }
-        >
-          {cloneElement(children, { id: eingabeId })}
-        </Form.Item>
+        <SperrStelle melden={sperre.melden}>
+          <Form.Item
+            name={name}
+            rules={[...(rules ?? []), sperre.regel]}
+            extra={hilfe}
+            className={FELD_KLASSE}
+            style={
+              {
+                marginBottom: 0,
+                ...(grenze === undefined ? {} : { [FELD_GRENZE]: `${grenze}px` }),
+              } as CSSProperties
+            }
+          >
+            {cloneElement(children, { id: eingabeId })}
+          </Form.Item>
+        </SperrStelle>
       </dd>
     </div>
   );
