@@ -685,6 +685,15 @@ fn serde_wire_gleich_as_str() {
         MaschinenzugangWebhookWiederAufgenommen,
         MaschinenzugangWebhookLanErlaubt,
         MaschinenzugangWebhookLanEntzogen,
+        AdapterAngelegt,
+        AdapterGeaendert,
+        AdapterGeloescht,
+        AdapterGeheimnisGesetzt,
+        AdapterGeheimnisEntfernt,
+        AdapterLanErlaubt,
+        AdapterLanEntzogen,
+        AdapterAngehalten,
+        AdapterFortgesetzt,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {

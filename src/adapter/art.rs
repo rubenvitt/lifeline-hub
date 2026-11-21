@@ -360,7 +360,7 @@ mod tests {
                 .contains("unbekanntes Feld")
         );
         assert!(pruefe(
-            json!({ "adresse": "https://a.example", "gruppe": "zulang" }),
+            json!({ "adresse": "https://a.example", "gruppe": "genau" }),
             false
         )
         .is_ok());
