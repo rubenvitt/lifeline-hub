@@ -1,0 +1,408 @@
+{
+ "count": 1,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "code": "EMSR728",
+   "name": "Flood in Germany",
+   "reason": "Starting in the early morning of 31st May 2024, continuous rain (about 50 to 150 l/m2 in 48 hours) is expected in wide areas of Southern and Eastern Germany (potentially affected states: Bavaria, Bade",
+   "category": "Flood",
+   "subCategory": "Coastal flood",
+   "sensitive": false,
+   "reportLink": "https://storymaps.arcgis.com/stories/1a0e9e05eefc48008a95c673c96cf371",
+   "activator": "Germany|Gemeinsames Melde- und Lagezentrum von Bund und Landern (GMLZ)",
+   "eventTime": "2024-05-31T12:00:00",
+   "activationTime": "2024-05-30T20:09:00",
+   "closed": true,
+   "gdacsId": "FL1102602",
+   "continent": "Europe",
+   "countries": [
+    {
+     "name": "Germany"
+    }
+   ],
+   "aois": [
+    {
+     "name": "Stuttgart",
+     "extent": "POLYGON ((9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558, 9.568879 48.978159))",
+     "number": 1,
+     "activationCode": "EMSR728",
+     "products": [
+      {
+       "id": 826,
+       "type": "DEL",
+       "monitoring": false,
+       "monitoringNumber": 0,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "29c81f9e-a55c-4be3-879d-dac5274155ca",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "COSMO-SkyMed",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-01T05:06:00",
+         "fileName": "EMSR728_AOI01_DEL_PRODUCT_COSMOSKYMED_20240601_0506_ORTHO.tif"
+        },
+        {
+         "uuid": "40aa2cf7-8b05-4e37-b3d7-5d0d652dc9a8",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "COSMO-SkyMed",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-01T05:06:00",
+         "fileName": "EMSR728_AOI01_DEL_PRODUCT_COSMOSKYMED_20240601_0506_ORTHO.tif"
+        },
+        {
+         "uuid": "c263bda9-814f-4522-9f0b-9e810188bec7",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "PAZ",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-01T05:43:00",
+         "fileName": "EMSR728_AOI01_DEL_PRODUCT_PAZ_20240601_0543_ORTHO.tif"
+        },
+        {
+         "uuid": "bb0bcbc9-739b-4cfb-986d-ad99fb7990b9",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "PAZ",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-01T05:43:00",
+         "fileName": "EMSR728_AOI01_DEL_PRODUCT_PAZ_20240601_0543_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 4,
+       "activationCode": "EMSR728",
+       "aoiName": "Stuttgart",
+       "aoiNumber": 1,
+       "extent": "POLYGON ((8.941529 48.977558, 9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558))",
+       "expectedDelivery": "2024-06-01T14:55:00",
+       "layers": [
+        {
+         "name": "EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_floodDepthA_v2_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_floodDepthA_v2.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_floodDepthA_v2.json"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_observedEventA_v2_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_observedEventA_v2.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_observedEventA_v2.json"
+        }
+       ],
+       "downloadPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI01/DEL_PRODUCT/EMSR728_AOI01_DEL_PRODUCT_v2.zip",
+       "version": {
+        "uuid": "46398596-910f-4f68-b7e7-a58a0b7114c1",
+        "number": 2,
+        "reason": "Correction of the legend (in the map)",
+        "deliveryTime": "2024-06-04T15:06:21.277943",
+        "lastUpdateTime": null,
+        "statusCode": "F"
+       }
+      },
+      {
+       "id": 876,
+       "type": "DEL",
+       "monitoring": true,
+       "monitoringNumber": 4,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "34e476c7-95cf-4e65-b78a-5bcc6e7997a4",
+         "new": true,
+         "sensorType": "optical",
+         "sensorName": "GeoEye-1",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-08T10:53:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT04_GEOEYE1_20240608_1053_ORTHO.tif"
+        },
+        {
+         "uuid": "b8a1d744-3ea0-4808-a413-f014a17a87db",
+         "new": true,
+         "sensorType": "optical",
+         "sensorName": "Pleiades",
+         "resolutionClass": "VHR2",
+         "acquisitionTime": "2024-06-08T10:29:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT04_PLEIADES_20240608_1029_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 0,
+       "activationCode": "EMSR728",
+       "aoiName": "Stuttgart",
+       "aoiNumber": 1,
+       "extent": "POLYGON ((8.941529 48.977558, 9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558))",
+       "expectedDelivery": null,
+       "layers": [
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT04/EMSR728_AOI01_DEL_MONIT04_GEOEYE1_20240608_1053_ORTHO.tif",
+         "format": "cog"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT04/EMSR728_AOI01_DEL_MONIT04_PLEIADES_20240608_1029_ORTHO.tif",
+         "format": "cog"
+        }
+       ],
+       "downloadPath": "",
+       "version": {
+        "uuid": "42c0fca5-fa5e-4943-8c7f-128eec85cfc8",
+        "number": 1,
+        "reason": "Not produced because of no change of impact detected",
+        "deliveryTime": "2024-06-08T13:39:00",
+        "lastUpdateTime": null,
+        "statusCode": "N"
+       }
+      },
+      {
+       "id": 838,
+       "type": "DEL",
+       "monitoring": true,
+       "monitoringNumber": 1,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "d429da7e-e87a-42b1-ae5e-30ab6d29fad1",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "COSMO-SkyMed Second Generation",
+         "resolutionClass": "HR+",
+         "acquisitionTime": "2024-06-02T05:12:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT01_CSG_20240602_0512_ORTHO.tif"
+        },
+        {
+         "uuid": "5ad2c4d0-edab-4271-8c2f-d1d77420c633",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "COSMO-SkyMed Second Generation",
+         "resolutionClass": "HR+",
+         "acquisitionTime": "2024-06-02T05:12:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT01_CSG_20240602_0512_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 4,
+       "activationCode": "EMSR728",
+       "aoiName": "Stuttgart",
+       "aoiNumber": 1,
+       "extent": "POLYGON ((8.941529 48.977558, 9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558))",
+       "expectedDelivery": "2024-06-02T13:45:00",
+       "layers": [
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_floodDepthA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_floodDepthA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_floodDepthA_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_maximumFloodExtentA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_maximumFloodExtentA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_maximumFloodExtentA_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_observedEventA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_observedEventA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_observedEventA_v1.json"
+        }
+       ],
+       "downloadPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI01/DEL_MONIT01/EMSR728_AOI01_DEL_MONIT01_v1.zip",
+       "version": {
+        "uuid": "64b9bdd8-d423-481c-a047-6698daf31d51",
+        "number": 1,
+        "reason": "",
+        "deliveryTime": "2024-06-02T22:51:26.847467",
+        "lastUpdateTime": null,
+        "statusCode": "F"
+       }
+      },
+      {
+       "id": 870,
+       "type": "DEL",
+       "monitoring": true,
+       "monitoringNumber": 3,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "c26d38c6-0a50-4b20-8f49-2488afee3ebb",
+         "new": true,
+         "sensorType": "optical",
+         "sensorName": "SPOT-6-7",
+         "resolutionClass": "HR+",
+         "acquisitionTime": "2024-06-07T10:08:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT03_SPOT6_20240607_1008_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 0,
+       "activationCode": "EMSR728",
+       "aoiName": "Stuttgart",
+       "aoiNumber": 1,
+       "extent": "POLYGON ((8.941529 48.977558, 9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558))",
+       "expectedDelivery": null,
+       "layers": [
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT03/EMSR728_AOI01_DEL_MONIT03_SPOT6_20240607_1008_ORTHO.tif",
+         "format": "cog"
+        }
+       ],
+       "downloadPath": "",
+       "version": {
+        "uuid": "45f0bcca-a7fa-41ab-b596-63b2c1f08dc3",
+        "number": 1,
+        "reason": "Not produced because of remote sensing limitations",
+        "deliveryTime": "2024-06-07T14:16:00",
+        "lastUpdateTime": null,
+        "statusCode": "N"
+       }
+      },
+      {
+       "id": 843,
+       "type": "DEL",
+       "monitoring": true,
+       "monitoringNumber": 2,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "5029f7c8-95eb-47c7-ba85-d453b345953b",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "Sentinel-1",
+         "resolutionClass": "HR+",
+         "acquisitionTime": "2024-06-03T17:16:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT02_SENTINEL1_20240603_1716_ORTHO.tif"
+        },
+        {
+         "uuid": "80ed51bd-87be-4501-9e35-a9cb98acf69d",
+         "new": true,
+         "sensorType": "sar",
+         "sensorName": "Sentinel-1",
+         "resolutionClass": "HR+",
+         "acquisitionTime": "2024-06-03T17:16:00",
+         "fileName": "EMSR728_AOI01_DEL_MONIT02_SENTINEL1_20240603_1716_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 4,
+       "activationCode": "EMSR728",
+       "aoiName": "Stuttgart",
+       "aoiNumber": 1,
+       "extent": "POLYGON ((8.941529 48.977558, 9.568879 48.978159, 9.569764 48.578605, 8.942414 48.577999, 8.941529 48.977558))",
+       "expectedDelivery": "2024-06-04T01:28:00",
+       "layers": [
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_floodDepthA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_floodDepthA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_floodDepthA_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_maximumFloodExtentA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_maximumFloodExtentA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_maximumFloodExtentA_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_observedEventA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_observedEventA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_observedEventA_v1.json"
+        }
+       ],
+       "downloadPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI01/DEL_MONIT02/EMSR728_AOI01_DEL_MONIT02_v1.zip",
+       "version": {
+        "uuid": "7eee94e4-a64a-4b14-93a8-894cb5a025f5",
+        "number": 1,
+        "reason": "",
+        "deliveryTime": "2024-06-04T03:05:08.935888",
+        "lastUpdateTime": null,
+        "statusCode": "F"
+       }
+      }
+     ],
+     "blpPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI01/EMSR728_AOI01_BLP.zip"
+    },
+    {
+     "name": "Bogen",
+     "extent": "POLYGON ((12.570379 48.854341, 12.570379 48.949079, 12.739616 48.949079, 12.739616 48.854341, 12.570379 48.854341))",
+     "number": 9,
+     "activationCode": "EMSR728",
+     "products": [
+      {
+       "id": 880,
+       "type": "GRA",
+       "monitoring": false,
+       "monitoringNumber": 0,
+       "feasible": true,
+       "images": [
+        {
+         "uuid": "2a4d6420-d968-4de5-854d-f83ceb130f8c",
+         "new": true,
+         "sensorType": "optical",
+         "sensorName": "Pleiades",
+         "resolutionClass": "VHR1",
+         "acquisitionTime": "2024-06-10T10:13:00",
+         "fileName": "EMSR728_AOI09_GRA_PRODUCT_PLEIADES_20240610_1013_ORTHO.tif"
+        }
+       ],
+       "stats": null,
+       "mapsCount": 1,
+       "activationCode": "EMSR728",
+       "aoiName": "Bogen",
+       "aoiNumber": 9,
+       "extent": "POLYGON ((12.570379 48.854341, 12.739616 48.854341, 12.739616 48.949079, 12.570379 48.949079, 12.570379 48.854341))",
+       "expectedDelivery": "2024-06-10T22:15:00",
+       "layers": [
+        {
+         "name": "EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_PLEIADES_20240610_1013_ORTHO.tif",
+         "format": "cog"
+        },
+        {
+         "name": "EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_builtUpP_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_builtUpP_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_builtUpP_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_observedEventA_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_observedEventA_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_observedEventA_v1.json"
+        },
+        {
+         "name": "EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_transportationL_v1_VT",
+         "format": "vt",
+         "sld": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_transportationL_v1.sld",
+         "json": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_transportationL_v1.json"
+        }
+       ],
+       "downloadPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI09/GRA_PRODUCT/EMSR728_AOI09_GRA_PRODUCT_v1.zip",
+       "version": {
+        "uuid": "a734f260-8c86-49b9-9a20-052b75d7c676",
+        "number": 1,
+        "reason": "",
+        "deliveryTime": "2024-06-11T01:28:45.335421",
+        "lastUpdateTime": null,
+        "statusCode": "F"
+       }
+      }
+     ],
+     "blpPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/AOI09/EMSR728_AOI09_BLP.zip"
+    }
+   ],
+   "centroid": "POINT (10.890198 48.973487)",
+   "infobulletins": [],
+   "stats": {},
+   "charterNumber": null,
+   "charterUrl": null,
+   "extent": "POLYGON ((8.941529 47.681185, 8.941529 49.853404, 13.78735 49.853404, 13.78735 47.681185, 8.941529 47.681185))",
+   "aws_bucket": "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com",
+   "productsPath": "https://rapidmapping.emergency.copernicus.eu/backend/EMSR728/EMSR728_products.zip",
+   "relatedevents": []
+  }
+ ]
+}
