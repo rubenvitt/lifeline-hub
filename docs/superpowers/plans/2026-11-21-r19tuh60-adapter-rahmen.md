@@ -108,6 +108,6 @@
 
 ### Task 9: Abschluss
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] **Step 2:** Review nach Ermessen (Anlass: Geheimnisse, Eingaben von außen, > 600 Zeilen) als ein Agent.
-- [ ] **Step 3:** PR gegen `alpha` mit Design-Doc, Plan und Umsetzung.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] **Step 2:** Review nach Ermessen (Anlass: Geheimnisse, Eingaben von außen, > 600 Zeilen) als ein Agent.
+- [x] **Step 3:** PR gegen `alpha` mit Design-Doc, Plan und Umsetzung.
