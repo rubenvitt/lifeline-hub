@@ -14,9 +14,18 @@ use axum::extract::{FromRequest, Request};
 use axum::http::header::AUTHORIZATION;
 use chrono::{TimeZone, Utc};
 
-/// Größter Body einer Anfrage zwischen Instanzen. Melden trägt wenige hundert Byte; der Rahmen
-/// lässt Platz für spätere Nutzdaten ohne Protokollbruch (LLH-1492 bringt eigene Grenzen).
+/// Größter Body einer Anfrage zwischen Instanzen, soweit der Pfad keine eigene Grenze hat
+/// ([`body_max`]).
 pub const BODY_MAX: usize = 64 * 1024;
+
+/// Größter Body einer Meldung (LLH-1877). Die größte zulässige Meldung trägt
+/// `melden::ORGS_MAX` Orgs und ebenso viele Widerrufe, volle Führungsakten
+/// (`fuehrung_austausch::MELDUNG_BYTES`) und volles Schlüsselbudget
+/// (`melden::UNTERSCHRIFT_ANFRAGE_BYTES`), zusammen rund 140 KiB; das passte nicht in
+/// [`BODY_MAX`], und die erreichte Seite lehnte jede Meldung einer Instanz mit vielen Orgs ab.
+/// Eine eigene Grenze statt gekürzter Budgets, weil schon die Org-Einträge allein über 64 KiB
+/// kommen können. Beleg: Test `melden::tests::groesste_anfrage_passt_in_die_grenze`.
+pub const MELDEN_MAX: usize = 192 * 1024;
 
 /// Pfad, der auch bei zu großem Abstand der Protokollversionen geht (design.md D5).
 pub const MELDEN_PFAD: &str = "/api/instanz/melden";
@@ -24,12 +33,13 @@ pub const MELDEN_PFAD: &str = "/api/instanz/melden";
 /// Pfad des Abgleichs der Einsätze (LLH-1492, design.md D6); er trägt größere Pakete.
 pub const SPIEGEL_PFAD: &str = "/api/instanz/spiegel";
 
-/// Körpergrenze je Pfad: der Abgleich trägt Lieferungen, alles andere bleibt bei [`BODY_MAX`].
+/// Körpergrenze je Pfad: der Abgleich trägt Lieferungen, Melden die Liste aller Orgs, alles
+/// andere bleibt bei [`BODY_MAX`].
 pub fn body_max(pfad: &str) -> usize {
-    if pfad == SPIEGEL_PFAD {
-        super::spiegel::paket::SPIEGEL_MAX
-    } else {
-        BODY_MAX
+    match pfad {
+        SPIEGEL_PFAD => super::spiegel::paket::SPIEGEL_MAX,
+        MELDEN_PFAD => MELDEN_MAX,
+        _ => BODY_MAX,
     }
 }
 
@@ -207,11 +217,13 @@ mod tests {
     }
 
     #[test]
-    fn nur_der_abgleich_traegt_grosse_pakete() {
+    fn abgleich_und_melden_haben_eigene_grenzen() {
         assert_eq!(
             body_max(SPIEGEL_PFAD),
             crate::instanz::spiegel::paket::SPIEGEL_MAX
         );
-        assert_eq!(body_max(MELDEN_PFAD), BODY_MAX);
+        assert_eq!(body_max(MELDEN_PFAD), MELDEN_MAX);
+        assert_eq!(body_max(super::super::melden::ZERTIFIKAT_PFAD), BODY_MAX);
+        assert_eq!(body_max("/api/instanz/etwas"), BODY_MAX);
     }
 }

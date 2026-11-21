@@ -21,7 +21,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// Länge der Prüfsumme in Zeichen (hex, die ersten 128 Bit von SHA-256): genug, um eine
-/// Abweichung zu erkennen, und klein genug für die Meldung (`extractor::BODY_MAX`).
+/// Abweichung zu erkennen, und klein genug für die Meldung (`extractor::MELDEN_MAX`).
 pub const CHECKSUM_LEN: usize = 32;
 /// Höchstzahl Schlüssel des Bestands je Antwort (`src/AGENTS.md`, Listen von außen).
 pub const BESTAND_STAMMDATEN_MAX: usize = 100_000;
