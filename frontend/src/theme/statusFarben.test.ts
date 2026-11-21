@@ -56,6 +56,7 @@ describe('Statusfarb-Vertrag', () => {
       'betreuungsstelleStatus',
       'brStatus',
       'capSchwere',
+      'copernicusKlasse',
       'dienststatus',
       'dringlichkeit',
       'dwdWarnstufe',
@@ -274,7 +275,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(37);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(38);
   });
 });
 
@@ -686,6 +687,48 @@ describe('odlStufe (LFH-78)', () => {
   });
 });
 
+describe('copernicusKlasse (LLH-1200)', () => {
+  it('deckt die Klassen der Copernicus-Ebene ab', () => {
+    // LITERAL: dieselben Wire-Wörter pinnt Rust in
+    // `karte::copernicus::tests::bildet_die_copernicus_klassen_ab`.
+    expect(Object.keys(sf.copernicusKlasse).sort()).toEqual([
+      'beobachtet',
+      'beschaedigt',
+      'gebiet',
+      'kein_schaden',
+      'max_ausdehnung',
+      'nicht_ausgewertet',
+      'schaden_moeglich',
+      'tiefe_gering',
+      'tiefe_hoch',
+      'tiefe_mittel',
+      'unbekannt',
+      'zerstoert',
+    ]);
+  });
+
+  it('staffelt Wassertiefe und Schaden über achtung und alarm', () => {
+    expect(sf.copernicusKlasse.tiefe_gering.rolle).toBe('achtung');
+    expect(sf.copernicusKlasse.tiefe_mittel.rolle).toBe('alarm');
+    expect(sf.copernicusKlasse.tiefe_hoch.rolle).toBe('alarm');
+    expect(sf.copernicusKlasse.schaden_moeglich.rolle).toBe('achtung');
+    expect(sf.copernicusKlasse.beschaedigt.rolle).toBe('alarm');
+    expect(sf.copernicusKlasse.zerstoert.rolle).toBe('alarm');
+    expect(sf.copernicusKlasse.kein_schaden.rolle).toBe('normal');
+  });
+
+  it('sagt mit neutral „keine Aussage“: Gebiet, nicht ausgewertet, unbekannt', () => {
+    expect(sf.copernicusKlasse.gebiet.rolle).toBe('neutral');
+    expect(sf.copernicusKlasse.nicht_ausgewertet.rolle).toBe('neutral');
+    expect(sf.copernicusKlasse.unbekannt.rolle).toBe('neutral');
+  });
+
+  it('trennt gleiche Rollen im Wort', () => {
+    const labels = Object.values(sf.copernicusKlasse).map((d) => d.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+});
+
 describe('hochwasserKlasse (LFH-77)', () => {
   it('deckt die sieben Klassen des LHP ab', () => {
     // LITERAL, nicht aus `HOCHWASSER_KLASSEN` abgeleitet: sonst prüfte die Liste sich selbst.
@@ -842,6 +885,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
     'autobahn',
     'kritis',
     'energie',
+    'copernicus',
   ];
 
   it('hält am Tag die bisherigen Töne — keine Umfärbung (Literale)', () => {
@@ -855,6 +899,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#c41d7f',
       '#531dab',
       '#d4b106',
+      '#873800',
     ]);
   });
 
@@ -869,6 +914,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#f759ab',
       '#9254de',
       '#fadb14',
+      '#c48a5a',
     ]);
   });
 

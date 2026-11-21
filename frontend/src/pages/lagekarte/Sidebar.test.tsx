@@ -84,6 +84,7 @@ const basisProps: SidebarProps = {
     kritis: false,
     energie: false,
     autobahn: false,
+    copernicus: false,
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -144,6 +145,7 @@ function paneeleOffen() {
       wasser: true,
       umwelt: true,
       verkehr: true,
+      satellit: true,
       hintergrund: true,
       grundlage: true,
       bilder: true,
@@ -1647,6 +1649,7 @@ describe('Sidebar: Ebenenbaum', () => {
       'Wasser: alle Ebenen',
       'Umwelt: alle Ebenen',
       'Verkehr & Infrastruktur: alle Ebenen',
+      'Satellitenauswertung: alle Ebenen',
     ]);
   });
 

@@ -18,6 +18,8 @@ import {
   mergeEnergieFeatures,
   energieNennung,
   fachebeneAlter,
+  copernicusAktivierungen,
+  copernicusAusschnittPasst,
 } from './fachebenen';
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
@@ -32,10 +34,11 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität, KRITIS/Energie und die BAB-Lage', () => {
+  it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität, KRITIS/Energie, die BAB-Lage und Copernicus', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline` (roher
     // Wasserstand vs. amtliche Bewertung), `odl` und `luftqualitaet` folgen als weitere Messnetze,
-    // `energie` steht neben `kritis` (beides Infrastruktur), `autobahn` hinten.
+    // `energie` steht neben `kritis` (beides Infrastruktur), `autobahn` und die
+    // Satellitenauswertung (`copernicus`, LLH-1200) hinten.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
@@ -46,6 +49,7 @@ describe('Fachebenen-Registry', () => {
       'kritis',
       'energie',
       'autobahn',
+      'copernicus',
     ]);
   });
   it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
@@ -90,13 +94,14 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.odl.geltung).toMatch(/ortsfeste/);
     expect(FACHEBENEN.odl.geltung).toMatch(/keine Einsatzmessungen/);
   });
-  it('führt genau Hochwasser, ODL und Luftqualität als klassenabhängig gefärbt (LFH-592)', () => {
+  it('führt genau Hochwasser, ODL, Luftqualität und Copernicus als klassenabhängig gefärbt (LFH-592)', () => {
     // Handgeschrieben: eine neue Ebene mit eigener Einfärbung soll hier auffallen, nicht still
     // einen Panel-Punkt tragen, den die Karte nicht zeichnet.
     expect(fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben)).toEqual([
       'hochwasser',
       'odl',
       'luftqualitaet',
+      'copernicus',
     ]);
   });
   it('liest die Legende einer klassenabhängigen Ebene aus dem Vertrag (LFH-592)', () => {
@@ -123,11 +128,11 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.odl.klassenfarben?.faerbe).toBe(faerbeOdl);
     expect(FACHEBENEN.luftqualitaet.klassenfarben?.faerbe).toBe(faerbeLuftqualitaet);
   });
-  it('markiert genau kritis und energie als bbox-abhängig', () => {
+  it('markiert genau kritis, energie und copernicus als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
     expect(istBboxAbhaengig('energie')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
-    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie']);
+    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie', 'copernicus']);
     // Die Autobahn-Ebene aggregiert serverseitig — im bbox-Zweig bliebe sie ohne Viewport-Meldung
     // leer.
     expect(istBboxAbhaengig('autobahn')).toBe(false);
@@ -178,21 +183,22 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
-  it('nur ODL, Luftqualität, KRITIS und Autobahn nennen einen einschränkenden Geltungsbereich', () => {
+  it('nur ODL, Luftqualität, KRITIS, Autobahn und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn']);
+    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn', 'copernicus']);
   });
   it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
     // Seit LFH-594 kostet ein Poll ohne neuen Stand nur ein 304. Mit `pollMs == TTL` verschenkte
     // der Takt bis zu eine TTL, bevor der Abruf nach Ablauf die Erneuerung anstößt, und eine
     // weitere, bis der neue Stand ankommt. Die TTL steht im Backend; gelesen wird die Quelle,
     // damit eine dort geänderte Zahl hier rot wird statt still auseinanderzulaufen.
-    const quellen = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte/quellen.rs'),
-      'utf8',
-    );
+    // Copernicus (LLH-1200) hat ein eigenes Modul neben `quellen.rs`.
+    const karte = join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte');
+    const quellen = ['quellen.rs', 'copernicus.rs']
+      .map((datei) => readFileSync(join(karte, datei), 'utf8'))
+      .join('\n');
     const ttlKonstante: Partial<Record<FachebeneQuelle, string>> = {
       nina: 'NINA_TTL',
       dwd: 'DWD_TTL',
@@ -201,6 +207,7 @@ describe('Fachebenen-Registry', () => {
       odl: 'ODL_TTL',
       luftqualitaet: 'LUFTQUALITAET_TTL',
       autobahn: 'AUTOBAHN_TTL',
+      copernicus: 'COPERNICUS_TTL',
     };
     // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL.
     const pollend = fachebeneKeys().filter((k) => FACHEBENEN[k].pollMs > 0);
@@ -210,7 +217,7 @@ describe('Fachebenen-Registry', () => {
       const treffer = quellen.match(
         new RegExp(`const ${name}: Duration = Duration::from_secs\\(([\\d_]+)\\);`),
       );
-      expect(treffer, `${name} in src/karte/quellen.rs`).not.toBeNull();
+      expect(treffer, `${name} in src/karte/quellen.rs oder copernicus.rs`).not.toBeNull();
       const ttlMs = Number(treffer![1].replace(/_/g, '')) * 1000;
       expect(FACHEBENEN[k].pollMs, k).toBeLessThan(ttlMs);
     }
@@ -504,6 +511,7 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
+      copernicus: 120,
     });
   });
 
@@ -535,5 +543,56 @@ describe('fachebeneAlter (LFH-591)', () => {
     expect(fachebeneAlter('dwd', undefined, jetzt)).toBeNull();
     expect(fachebeneAlter('dwd', '', jetzt)).toBeNull();
     expect(fachebeneAlter('dwd', 'gestern', jetzt)).toBeNull();
+  });
+});
+
+describe('Copernicus (LLH-1200)', () => {
+  const gebiet = (emsr: string, aufnahme?: string) => ({
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: { klasse: 'gebiet', emsr, ...(aufnahme ? { aufnahme } : {}) },
+  });
+
+  it('nennt je Aktivierung die jüngste Aufnahme, die jüngste zuerst', () => {
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        gebiet('EMSR728', '2024-06-03 17:16:00'),
+        gebiet('EMSR728', '2024-06-10 10:13:00'),
+        gebiet('EMSR712', '2023-12-24 06:00:00'),
+        // Ein Schadensobjekt ist kein Gebiet und zählt nicht.
+        { type: 'Feature', properties: { klasse: 'zerstoert', emsr: 'EMSR999' } },
+        gebiet('EMSR900'),
+      ],
+    } as never;
+    expect(copernicusAktivierungen(fc)).toEqual([
+      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00' },
+      { emsr: 'EMSR712', aufnahme: '2023-12-24 06:00:00' },
+      { emsr: 'EMSR900', aufnahme: undefined },
+    ]);
+  });
+
+  it('bremst große Ausschnitte wie das Backend (3° je Achse)', () => {
+    expect(copernicusAusschnittPasst('9,48,12,51')).toBe(true);
+    expect(copernicusAusschnittPasst('9,48,12.1,51')).toBe(false);
+    expect(copernicusAusschnittPasst('9,48,12,51.1')).toBe(false);
+    expect(copernicusAusschnittPasst('kaputt')).toBe(true);
+  });
+
+  it('färbt je Klasse und zeichnet Linien und Punkte mit', () => {
+    expect(FACHEBENEN.copernicus.klassenfarben).toBeDefined();
+    expect(FACHEBENEN.copernicus.gemischteGeometrie).toBe(true);
+    expect(FACHEBENEN.copernicus.bboxAbhaengig).toBe(true);
+    // Keine andere Ebene zeichnet gemischt: ihre Layer bleiben unverändert.
+    const gemischt = fachebeneKeys().filter((k) => FACHEBENEN[k].gemischteGeometrie);
+    expect(gemischt).toEqual(['copernicus']);
+  });
+
+  it('pinnt die Spanne gegen das Backend', () => {
+    const rs = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte/copernicus.rs'),
+      'utf8',
+    );
+    expect(rs).toMatch(/const COPERNICUS_MAX_SPANNE_GRAD: f64 = 3\.0;/);
   });
 });

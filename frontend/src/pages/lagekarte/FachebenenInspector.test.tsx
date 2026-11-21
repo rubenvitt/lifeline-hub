@@ -1174,3 +1174,62 @@ describe('FachebenenInspector — Zeiten in der Anzeigezone (LFH-913)', () => {
     expect(screen.getByText('241000jul26')).toBeInTheDocument();
   });
 });
+
+describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
+  // Wire-Vertrag aus `karte::copernicus::normalisiere_ebene`.
+  const tiefe = {
+    art: 'wassertiefe',
+    klasse: 'tiefe_hoch',
+    emsr: 'EMSR728',
+    aktivierung: 'Flood in Germany',
+    kategorie: 'Flood',
+    gebiet: 'Stuttgart',
+    produkt: 'DEL',
+    monitoring: 2,
+    version: 1,
+    aufnahme: '2024-06-03 17:16:00',
+    sensor: 'Sentinel-1',
+    geliefert: '2024-06-04 15:06:21',
+    beschreibung: 'Estimated Flood Depth',
+  };
+
+  it('zeigt Klasse, Aktivierung, Produkt, Aufnahme und den Link zur Aktivierung', () => {
+    render(<FachebenenInspector quelle="copernicus" properties={tiefe} onSchliessen={() => {}} />);
+    expect(screen.getAllByText('Wassertiefe über 1 m').length).toBeGreaterThan(0);
+    expect(screen.getByText('EMSR728 · Flood in Germany')).toBeInTheDocument();
+    expect(screen.getByText('Stuttgart')).toBeInTheDocument();
+    expect(screen.getByText('Abgrenzung · Monitoring 2 · Version 1')).toBeInTheDocument();
+    expect(screen.getByText(/Sentinel-1/)).toBeInTheDocument();
+    expect(screen.getByText('Estimated Flood Depth')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Aktivierung bei Copernicus/ })).toHaveAttribute(
+      'href',
+      'https://mapping.emergency.copernicus.eu/activations/EMSR728/',
+    );
+    // Rohwerte erscheinen nie.
+    expect(screen.queryByText('tiefe_hoch')).not.toBeInTheDocument();
+  });
+
+  it('warnt vor einer Aufnahme, die älter als 24 h ist', () => {
+    render(<FachebenenInspector quelle="copernicus" properties={tiefe} onSchliessen={() => {}} />);
+    expect(screen.getByText(/Aufnahme älter als 24 h/)).toBeInTheDocument();
+  });
+
+  it('nennt unvollständige und gekürzte Gebiete', () => {
+    render(
+      <FachebenenInspector
+        quelle="copernicus"
+        properties={{
+          ...tiefe,
+          art: 'gebiet',
+          klasse: 'gebiet',
+          unvollstaendig: true,
+          gekuerzt: true,
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Auswertungsgebiet Stuttgart')).toBeInTheDocument();
+    expect(screen.getByText(/Nicht alle Ebenen dieses Gebiets/)).toBeInTheDocument();
+    expect(screen.getByText(/weiter hineinzoomen/)).toBeInTheDocument();
+  });
+});

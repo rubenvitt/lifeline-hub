@@ -87,6 +87,10 @@ export function sorgeFuerFachebeneLayer(
           { type: 'geojson', data: daten as never, generateId: true },
     );
   }
+  if (def.gemischteGeometrie) {
+    sorgeFuerGemischteLayer(map, def.key, src, treffer);
+    return;
+  }
   if (def.geometrieTyp === 'polygon') {
     if (!map.getLayer(`fachebene-${def.key}-fill`)) {
       map.addLayer({
@@ -218,6 +222,100 @@ export function sorgeFuerFachebeneLayer(
   zieheEbenenfarbeNach(map, def.key, farbe);
 }
 
+/** Geometrietyp, auch in der Multi-Form (je nach MapLibre-Version liefert `geometry-type` beide). */
+const istTyp = (typ: 'Polygon' | 'LineString' | 'Point') => [
+  'any',
+  ['==', ['geometry-type'], typ],
+  ['==', ['geometry-type'], `Multi${typ}`],
+];
+
+/** Umriss des Auswertungsgebiets (Copernicus, LLH-1200): nur gestrichelte Kontur, keine Fläche. */
+const IST_GEBIET = ['==', ['get', 'klasse'], 'gebiet'];
+
+/** Nicht ausgewertete Flächen treten zurück: sie sind keine Aussage über die Lage. */
+const GEMISCHT_DECKKRAFT = ['case', ['==', ['get', 'klasse'], 'nicht_ausgewertet'], 0.1, 0.3];
+
+/**
+ * Layer einer Ebene mit gemischter Geometrie (heute Copernicus, LLH-1200): Flächen, Linien und
+ * Punkte, jedes Feature in seiner eingebackenen Farbe (`copernicusStil.ts`), dazu der Umriss des
+ * Auswertungsgebiets als gestrichelte Kontur. Der Umriss ist kein Klickziel: sonst stünde bei
+ * jedem Klick auf eine Fläche im Gebiet die Auswahl zwischen beiden an (LFH-812).
+ *
+ * Keine Ebenenfarbe zum Nachziehen: jedes Feature bringt seine Farbe mit, ein Moduswechsel färbt
+ * über die Daten um (`useFachebenen`).
+ */
+function sorgeFuerGemischteLayer(
+  map: MapLibreMap,
+  key: FachebeneQuelle,
+  src: string,
+  treffer: number,
+) {
+  const farbe = ['get', 'farbe'];
+  const anlegen = (spec: Parameters<MapLibreMap['addLayer']>[0]) => {
+    if (!map.getLayer(spec.id)) map.addLayer(spec);
+  };
+  anlegen({
+    id: `fachebene-${key}-fill`,
+    type: 'fill',
+    source: src,
+    filter: ['all', istTyp('Polygon'), ['!', IST_GEBIET]] as never,
+    paint: { 'fill-color': farbe as never, 'fill-opacity': GEMISCHT_DECKKRAFT as never },
+  });
+  anlegen({
+    id: `fachebene-${key}-line`,
+    type: 'line',
+    source: src,
+    filter: ['all', istTyp('Polygon'), ['!', IST_GEBIET]] as never,
+    paint: { 'line-color': farbe as never, 'line-width': 1 },
+  });
+  anlegen({
+    id: `fachebene-${key}-gebiet`,
+    type: 'line',
+    source: src,
+    filter: ['all', istTyp('Polygon'), IST_GEBIET] as never,
+    paint: { 'line-color': farbe as never, 'line-width': 1.5, 'line-dasharray': [3, 2] },
+  });
+  anlegen({
+    id: `fachebene-${key}-linie`,
+    type: 'line',
+    source: src,
+    filter: istTyp('LineString') as never,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': farbe as never,
+      'line-width': ['coalesce', ['get', 'breite'], 2] as never,
+    },
+  });
+  // Punkte wie bei den Punkt-Ebenen: Trefferzone, Kante, Kreis (LFH-600).
+  anlegen({
+    id: `fachebene-${key}-treffer`,
+    type: 'circle',
+    source: src,
+    filter: istTyp('Point') as never,
+    paint: { 'circle-radius': treffer / 2, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+  });
+  anlegen({
+    id: `fachebene-${key}-kante`,
+    type: 'circle',
+    source: src,
+    filter: istTyp('Point') as never,
+    paint: { 'circle-radius': mitKante(PUNKT_RADIUS) as never, 'circle-color': KANTE_FARBE },
+  });
+  anlegen({
+    id: `fachebene-${key}-circle`,
+    type: 'circle',
+    source: src,
+    filter: istTyp('Point') as never,
+    paint: {
+      'circle-radius': PUNKT_RADIUS as never,
+      'circle-color': farbe as never,
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': RAND_BREITE,
+    },
+  });
+  map.setPaintProperty(`fachebene-${key}-treffer`, 'circle-radius', treffer / 2);
+}
+
 /**
  * Setzt die Ebenenfarbe an jedem vorhandenen Layer der Ebene. Frisch angelegte tragen sie schon;
  * MapLibre verwirft einen unveränderten Wert selbst, der Aufruf ist also billig.
@@ -241,6 +339,8 @@ const layerIds = (key: FachebeneQuelle) => [
   `fachebene-${key}-fill`,
   `fachebene-${key}-line`,
   `fachebene-${key}-line-angekuendigt`,
+  `fachebene-${key}-gebiet`,
+  `fachebene-${key}-linie`,
   `fachebene-${key}-circle`,
   `fachebene-${key}-kante`,
   `fachebene-${key}-treffer`,
@@ -274,6 +374,9 @@ export function setzeFachebeneDaten(
  * ist Kontur.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
+  if (def.gemischteGeometrie) {
+    return ['fill', 'linie', 'circle', 'treffer'].map((t) => `fachebene-${def.key}-${t}`);
+  }
   if (def.geometrieTyp === 'polygon') return [`fachebene-${def.key}-fill`];
   const kreis = `fachebene-${def.key}-circle`;
   const treffer = `fachebene-${def.key}-treffer`;

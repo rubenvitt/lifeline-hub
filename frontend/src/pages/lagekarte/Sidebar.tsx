@@ -288,6 +288,8 @@ export interface SidebarProps {
       import('../../api/fachebenen').FachebeneStatus
     >
   >;
+  /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
+  copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */

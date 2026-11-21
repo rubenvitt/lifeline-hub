@@ -4,6 +4,7 @@
  * kein Icon; der Inspector setzt sein Wetterzeichen selbst davor.
  */
 import type { FachebeneQuelle } from '../../api/fachebenen';
+import { copernicusDarstellung } from './copernicusStil';
 import { FACHEBENEN } from './fachebenen';
 
 /** Wert als getrimmter String oder null (akzeptiert auch Zahlen). */
@@ -36,5 +37,12 @@ export function fachebeneTitel(quelle: FachebeneQuelle, p: Record<string, unknow
     return event ? titelCase(event) : 'Wetterwarnung';
   }
   if (quelle === 'nina') return 'Amtliche Warnung';
+  if (quelle === 'copernicus') {
+    // LLH-1200: die Klasse als Wort; ein Gebiet mit seinem Namen.
+    const gebiet = pick(p, 'gebiet');
+    if (p.klasse === 'gebiet') return gebiet ? `Auswertungsgebiet ${gebiet}` : 'Auswertungsgebiet';
+    const wort = copernicusDarstellung(p.klasse).label;
+    return wort.charAt(0).toLocaleUpperCase('de-DE') + wort.slice(1);
+  }
   return pick(p, 'titel', 'name') ?? FACHEBENEN[quelle].label;
 }

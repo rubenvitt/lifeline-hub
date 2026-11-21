@@ -34,6 +34,7 @@ import { istAngekuendigt } from './dwdGueltigkeit';
 import { alsText as s, fachebeneTitel, pick } from './fachebeneTitel';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
+import { copernicusAufnahmeAlt, copernicusDarstellung } from './copernicusStil';
 import { hochwasserDarstellung } from './hochwasserStil';
 import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
@@ -42,7 +43,7 @@ import FachebeneStand from './FachebeneStand';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
-import { Stapel, Textstufe, schriftStil } from '../../components/instrument';
+import { Stapel, Textstufe, schriftStil, useRollen } from '../../components/instrument';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -725,6 +726,113 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/** Produktarten von Copernicus Rapid Mapping. */
+const COPERNICUS_PRODUKT: Record<string, string> = {
+  DEL: 'Abgrenzung',
+  GRA: 'Schadensklassen',
+  FEP: 'Erste Abschätzung',
+};
+
+/** Ebenenarten (Wire-Wort `art`, `karte::copernicus::EbenenArt`). */
+const COPERNICUS_EBENE: Record<string, string> = {
+  gebiet: 'Auswertungsgebiet',
+  beobachtet: 'Betroffene Fläche',
+  max_ausdehnung: 'Größte Ausdehnung',
+  wassertiefe: 'Wassertiefe',
+  nicht_ausgewertet: 'Nicht ausgewertet',
+  schaden_gebaeude: 'Gebäude',
+  schaden_verkehr: 'Verkehrsweg',
+};
+
+/**
+ * Copernicus EMS (LLH-1200): Klasse als Wort, Herkunft (Aktivierung, Gebiet, Produkt, Version),
+ * Aufnahme mit Sensor und Lieferung. Eine Aufnahme über 24 h steht als Warnung oben: das Bild ist
+ * der Stand, nicht der Abruf. Die Beschreibung der Quelle bleibt englisch und unverändert.
+ */
+function CopernicusInhalt({ p }: { p: Record<string, unknown> }) {
+  const fmtZeit = useFmtZeit();
+  const jetzt = useMinutenTakt();
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  const emsr = s(p.emsr);
+  const aufnahme = s(p.aufnahme);
+  const sensor = s(p.sensor);
+  const produkt = s(p.produkt);
+  const monitoring = typeof p.monitoring === 'number' ? p.monitoring : 0;
+  const version = typeof p.version === 'number' ? p.version : null;
+  const produktText = produkt
+    ? [
+        COPERNICUS_PRODUKT[produkt] ?? produkt,
+        monitoring > 0 ? `Monitoring ${monitoring}` : null,
+        version !== null ? `Version ${version}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
+  const ebene = s(p.art);
+  return (
+    <>
+      <div style={{ marginBottom: token.marginSM }}>
+        <Status darstellung={copernicusDarstellung(p.klasse)} />
+      </div>
+      {copernicusAufnahmeAlt(aufnahme, jetzt) && (
+        <div
+          data-lfh="copernicus-aufnahme-alt"
+          style={{ marginBottom: token.marginSM, color: rollen.achtungText }}
+        >
+          <span aria-hidden="true">⧖ </span>Aufnahme älter als 24 h
+        </div>
+      )}
+      <Descriptions column={1}>
+        {emsr && (
+          <Descriptions.Item label="Aktivierung">
+            {[emsr, s(p.aktivierung)].filter(Boolean).join(' · ')}
+          </Descriptions.Item>
+        )}
+        {s(p.gebiet) && <Descriptions.Item label="Gebiet">{s(p.gebiet)}</Descriptions.Item>}
+        {ebene && (
+          <Descriptions.Item label="Ebene">{COPERNICUS_EBENE[ebene] ?? ebene}</Descriptions.Item>
+        )}
+        {produktText && <Descriptions.Item label="Produkt">{produktText}</Descriptions.Item>}
+        {aufnahme && (
+          <Descriptions.Item label="Aufnahme">
+            {[fmtZeit(aufnahme), sensor].filter(Boolean).join(' · ')}
+          </Descriptions.Item>
+        )}
+        {s(p.geliefert) && (
+          <Descriptions.Item label="Geliefert">{fmtZeit(s(p.geliefert))}</Descriptions.Item>
+        )}
+        {s(p.beschreibung) && (
+          <Descriptions.Item label="Angabe der Quelle">{s(p.beschreibung)}</Descriptions.Item>
+        )}
+      </Descriptions>
+      {p.unvollstaendig === true && (
+        <Typography.Paragraph style={{ marginTop: token.marginSM, marginBottom: 0 }}>
+          Nicht alle Ebenen dieses Gebiets konnten geladen werden.
+        </Typography.Paragraph>
+      )}
+      {p.gekuerzt === true && (
+        <Typography.Paragraph style={{ marginTop: token.marginSM, marginBottom: 0 }}>
+          Zu viele Ebenen im Ausschnitt – weiter hineinzoomen, um alle zu sehen.
+        </Typography.Paragraph>
+      )}
+      {emsr && (
+        <div style={{ marginTop: token.marginSM }}>
+          <Button
+            type="link"
+            href={`https://mapping.emergency.copernicus.eu/activations/${encodeURIComponent(emsr)}/`}
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{ paddingInline: 0 }}
+          >
+            Aktivierung bei Copernicus öffnen
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
 export default function FachebenenInspector({
   quelle,
@@ -765,7 +873,9 @@ export default function FachebenenInspector({
         // eine Farbe zwei Bedeutungen.
         quelle === 'luftqualitaet'
           ? rollenFarbe(luftqualitaetDarstellung(p.klasse).rolle, token)
-          : fachebeneFarbe(quelle, token)
+          : quelle === 'copernicus'
+            ? rollenFarbe(copernicusDarstellung(p.klasse).rolle, token)
+            : fachebeneFarbe(quelle, token)
       }
       onSchliessen={onSchliessen}
     >
@@ -781,6 +891,8 @@ export default function FachebenenInspector({
         <AutobahnInhalt p={p} />
       ) : quelle === 'luftqualitaet' ? (
         <LuftqualitaetInhalt p={p} />
+      ) : quelle === 'copernicus' ? (
+        <CopernicusInhalt p={p} />
       ) : quelle === 'energie' ? (
         // Vor dem Rückfall: jede unbekannte Quelle fiele sonst still in den KRITIS-Inhalt.
         <EnergieInhalt p={p} />

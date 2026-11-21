@@ -24,7 +24,8 @@ export type FachebeneQuelle =
   | 'autobahn'
   | 'odl'
   | 'luftqualitaet'
-  | 'energie';
+  | 'energie'
+  | 'copernicus';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), Feature-Property `klasse` der
@@ -45,6 +46,27 @@ export type HochwasserKlasse =
   | 'gross'
   | 'sehr_gross'
   | 'unklassifiziert';
+
+/**
+ * Klasse eines Objekts der Copernicus-Ebene (LLH-1200), Feature-Property `klasse`: Umriss des
+ * Auswertungsgebiets, beobachtete Fläche, Wassertiefe oder Schadensgrad.
+ *
+ * FE-LOKAL wie {@link HochwasserKlasse}; die Wire-Wörter sind auf beiden Seiten gepinnt
+ * (`theme/statusFarben.test.ts` und `karte::copernicus::tests::bildet_die_copernicus_klassen_ab`).
+ */
+export type CopernicusKlasse =
+  | 'gebiet'
+  | 'nicht_ausgewertet'
+  | 'beobachtet'
+  | 'max_ausdehnung'
+  | 'tiefe_gering'
+  | 'tiefe_mittel'
+  | 'tiefe_hoch'
+  | 'schaden_moeglich'
+  | 'beschaedigt'
+  | 'zerstoert'
+  | 'kein_schaden'
+  | 'unbekannt';
 
 /**
  * Stufe des UBA-Luftqualitätsindex einer Messstation (LFH-79), Feature-Property `klasse` der
@@ -96,9 +118,18 @@ export type EnergieAnlagenart =
 
 /**
  * Lädt eine Fachebene. `bbox` (west,sued,ost,nord) brauchen die bbox-abhängigen Ebenen
- * (`kritis`, `energie` — siehe `istBboxAbhaengig`); das Backend lehnt sie dort ohne ab.
+ * (`kritis`, `energie`, `copernicus` — siehe `istBboxAbhaengig`); das Backend lehnt sie dort ohne
+ * ab. `archiv` gilt nur für `copernicus`: auch abgeschlossene Aktivierungen, die älter als 30 Tage
+ * sind (LLH-1200).
  */
-export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {
-  const q = bbox ? `?bbox=${encodeURIComponent(bbox)}` : '';
+export function ladeFachebene(
+  quelle: FachebeneQuelle,
+  bbox?: string,
+  archiv = false,
+): Promise<FachebeneAntwort> {
+  const teile: string[] = [];
+  if (bbox) teile.push(`bbox=${encodeURIComponent(bbox)}`);
+  if (archiv) teile.push('archiv=1');
+  const q = teile.length ? `?${teile.join('&')}` : '';
   return apiGet<FachebeneAntwort>(`/api/karte/fachebenen/${quelle}${q}`);
 }

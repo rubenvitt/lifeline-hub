@@ -360,6 +360,9 @@ describe('ordneKlickebene', () => {
     expect(ordneKlickebene('fachebene-dwd-fill')).toBe('fachebeneFlaeche');
     expect(ordneKlickebene('fachebene-pegelonline-treffer')).toBe('fachebeneTreffer');
     expect(ordneKlickebene('fachebene-kritis-treffer')).toBe('fachebeneTreffer');
+    // Linie der Copernicus-Ebene (LLH-1200): ein schmales Ziel wie ein Punkt.
+    expect(ordneKlickebene('fachebene-copernicus-linie')).toBe('fachebene');
+    expect(ordneKlickebene('fachebene-copernicus-gebiet')).toBeNull();
     // Die Doppelkante (LFH-600) ist Kontur, kein Ziel — die Trefferzone deckt sie ab.
     expect(ordneKlickebene('fachebene-pegelonline-kante')).toBeNull();
     expect(ordneKlickebene('fachebene-kritis-buendel-kante')).toBeNull();

@@ -288,7 +288,7 @@ export const EBENEN_GRUPPEN: readonly {
 ];
 
 /** Kennungen der Fachebenen-Untergruppen. */
-export type FachebenenGruppeKennung = 'warnungen' | 'wasser' | 'umwelt' | 'verkehr';
+export type FachebenenGruppeKennung = 'warnungen' | 'wasser' | 'umwelt' | 'verkehr' | 'satellit';
 
 /** Untergruppen der Fachebenen — jede Quelle in genau einer (Vitest-Wächter). */
 export const FACHEBENEN_GRUPPEN: readonly {
@@ -304,6 +304,8 @@ export const FACHEBENEN_GRUPPEN: readonly {
     name: 'Verkehr & Infrastruktur',
     ebenen: ['autobahn', 'kritis', 'energie'],
   },
+  // LLH-1200: Auswertungen von Satellitenbildern, später auch deren Rasterbilder.
+  { kennung: 'satellit', name: 'Satellitenauswertung', ebenen: ['copernicus'] },
 ];
 
 export interface EbenenGruppe {
@@ -392,6 +394,7 @@ export const BAUM_KLAPP_VORGABE: Record<BaumKnoten, boolean> = {
   wasser: false,
   umwelt: false,
   verkehr: false,
+  satellit: false,
   hintergrund: false,
   grundlage: true,
   bilder: true,

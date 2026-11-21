@@ -330,6 +330,7 @@ export default function LagekartePage() {
     fachebenenAbgerufen,
     fachebenenAttribution,
     zoomZuKlein,
+    copernicus,
     setViewportBbox,
     setKartenZoom,
   } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
@@ -2038,6 +2039,7 @@ export default function LagekartePage() {
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
+        copernicus={copernicus}
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}
