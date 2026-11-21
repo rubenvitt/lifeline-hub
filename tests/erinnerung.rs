@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie, setup};
+use common::{anfrage, einsatz_anlegen, login_cookie, setup, setup_mit_optionen_auf};
 
 #[tokio::test]
 async fn anlegen_listen_und_erledigen() {
@@ -452,4 +452,229 @@ async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     )
     .await;
     assert_eq!(liste.as_array().unwrap().len(), 1);
+}
+
+/// Datei-Pool mit WAL und mehreren Verbindungen (wie `tests/benachrichtigung_auftrag.rs`): erst
+/// damit kann ein Test die Schreibsperre halten, während eine Anfrage den letzten festgeschriebenen
+/// Stand liest.
+async fn welt_concurrent() -> (
+    tempfile::TempDir,
+    axum::Router,
+    sqlx::SqlitePool,
+    String,
+    i64,
+    i64,
+) {
+    let (dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    let (app, pool, _live) =
+        setup_mit_optionen_auf(pool, lifeline_hub::app::RouterOptionen::default()).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen"),
+        &admin,
+        Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let eid = json["id"].as_i64().unwrap();
+    (dir, app, pool, admin, e, eid)
+}
+
+/// Triage-Status, Vollzug-Achse und Quittung einer Erinnerung, wie sie festgeschrieben sind.
+async fn achsen(pool: &sqlx::SqlitePool, eid: i64) -> (String, Option<String>, Option<String>) {
+    sqlx::query_as(
+        "SELECT e.status, ks.vollzug_status, ks.quittiert_at FROM erinnerung e \
+         LEFT JOIN kommunikation_status ks \
+           ON ks.objekt_typ = 'erinnerung' AND ks.objekt_id = e.id \
+         WHERE e.id = ?",
+    )
+    .bind(eid)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Schreibt auf einer fremden Verbindung, was ein Erledigen schreibt (Status und Vollzug-Achse),
+/// ohne festzuschreiben: die Transaktion hält die Schreibsperre, bis der Test sie committet.
+async fn erledigen_ohne_commit<'a>(
+    pool: &'a sqlx::SqlitePool,
+    e: i64,
+    eid: i64,
+) -> sqlx::Transaction<'a, sqlx::Sqlite> {
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    sqlx::query(
+        "UPDATE erinnerung SET status = 'erledigt', erledigt_at = '2026-11-21 10:00:00' WHERE id = ?",
+    )
+    .bind(eid)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO kommunikation_status \
+           (org_id, einsatz_id, objekt_typ, objekt_id, vollzug_status, vollzogen_at, vollzogen_von_id) \
+         SELECT org_id, id, 'erinnerung', ?, 'vollzogen', '2026-11-21 10:00:00', \
+                (SELECT id FROM benutzer WHERE benutzername = 'admin') \
+         FROM einsatz WHERE id = ? \
+         ON CONFLICT(objekt_typ, objekt_id) DO UPDATE SET \
+           vollzug_status = excluded.vollzug_status, \
+           vollzogen_at = excluded.vollzogen_at, vollzogen_von_id = excluded.vollzogen_von_id",
+    )
+    .bind(eid)
+    .bind(e)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx
+}
+
+/// LLH-1874: Zwei Stellen schließen dieselbe Erinnerung zugleich ab. Die erste hat „Erledigt“
+/// geschrieben, aber noch nicht festgeschrieben; „Erledigt“ und „Erübrigt“ der zweiten Stelle
+/// warten an der Sperre und treffen danach auf eine abgeschlossene Erinnerung: 422, nichts wird
+/// überschrieben. Vorher stand danach Status „quittiert“ neben Vollzug „vollzogen“.
+#[tokio::test]
+async fn abschliessen_ueberschreibt_keine_gleichzeitige_erledigung() {
+    let (_dir, app, pool, admin, e, eid) = welt_concurrent().await;
+    let erledigen = format!("/api/einsaetze/{e}/erinnerungen/{eid}/erledigen");
+    let quittieren = format!("/api/einsaetze/{e}/erinnerungen/{eid}/quittieren");
+
+    let erste = erledigen_ohne_commit(&pool, e, eid).await;
+    let beide = async {
+        tokio::join!(
+            anfrage(&app, "POST", &erledigen, &admin, None),
+            anfrage(&app, "POST", &quittieren, &admin, None),
+        )
+    };
+    tokio::pin!(beide);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut beide)
+            .await
+            .is_err(),
+        "beide Anfragen warten an der Schreibsperre"
+    );
+    erste.commit().await.unwrap();
+    let ((s_erledigen, _), (s_quittieren, _)) = beide.await;
+    assert_eq!(s_erledigen, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(s_quittieren, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (status, vollzug, quittiert_at) = achsen(&pool, eid).await;
+    assert_eq!(status, "erledigt");
+    assert_eq!(vollzug.as_deref(), Some("vollzogen"));
+    assert!(quittiert_at.is_none(), "keine Quittung neben dem Vollzug");
+    let vollzogen_at: Option<String> = sqlx::query_scalar(
+        "SELECT vollzogen_at FROM kommunikation_status \
+         WHERE objekt_typ = 'erinnerung' AND objekt_id = ?",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        vollzogen_at.as_deref(),
+        Some("2026-11-21 10:00:00"),
+        "die erste Erledigung bleibt stehen"
+    );
+}
+
+/// LLH-1874: Zwei Stellen nehmen dieselbe Erledigung zugleich zurück („Rückgängig“ im Toast und
+/// „Wieder öffnen“). Die erste hat Status und Vollzug-Achse schon auf „offen“ geschrieben, aber
+/// noch nicht festgeschrieben. Die zweite liest nichts mehr vorab über den Pool, sondern prüft in
+/// ihrer Schreibtransaktion: sie wartet an der Sperre und trifft danach auf eine offene
+/// Erinnerung, 422 statt einer gemeldeten Rücknahme, die keine war. Vorher las sie „erledigt“ aus
+/// dem festgeschriebenen Stand und meldete 200.
+#[tokio::test]
+async fn wieder_oeffnen_gegen_gleichzeitige_ruecknahme_ist_422() {
+    let (_dir, app, pool, admin, e, eid) = welt_concurrent().await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen/{eid}/erledigen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let oeffnen = format!("/api/einsaetze/{e}/erinnerungen/{eid}/oeffnen");
+
+    let mut andere = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    sqlx::query("UPDATE erinnerung SET status = 'offen', erledigt_at = NULL WHERE id = ?")
+        .bind(eid)
+        .execute(&mut *andere)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE kommunikation_status \
+         SET vollzug_status = 'offen', vollzogen_at = NULL, vollzogen_von_id = NULL \
+         WHERE objekt_typ = 'erinnerung' AND objekt_id = ?",
+    )
+    .bind(eid)
+    .execute(&mut *andere)
+    .await
+    .unwrap();
+
+    let ruecknahme = anfrage(&app, "POST", &oeffnen, &admin, None);
+    tokio::pin!(ruecknahme);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut ruecknahme)
+            .await
+            .is_err(),
+        "die Rücknahme wartet an der Schreibsperre"
+    );
+    andere.commit().await.unwrap();
+    let (s, _) = ruecknahme.await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (status, vollzug, _) = achsen(&pool, eid).await;
+    assert_eq!(status, "offen");
+    assert_eq!(vollzug.as_deref(), Some("offen"));
+}
+
+/// LLH-1874: „Erledigt“ und „Erübrigt“ gibt es nur an einer offenen Erinnerung. Ein zweiter Klick
+/// auf einer schon abgeschlossenen ist 422 und überschreibt weder Zeitpunkt noch Achse.
+#[tokio::test]
+async fn abschliessen_nur_aus_offen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen"),
+        &admin,
+        Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
+    )
+    .await;
+    let eid = json["id"].as_i64().unwrap();
+    let erledigen = format!("/api/einsaetze/{e}/erinnerungen/{eid}/erledigen");
+    let quittieren = format!("/api/einsaetze/{e}/erinnerungen/{eid}/quittieren");
+
+    let (s, erledigt) = anfrage(&app, "POST", &erledigen, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(erledigt["status"], "erledigt");
+    assert_eq!(erledigt["vollzug_status"], "vollzogen");
+
+    let (s, _) = anfrage(&app, "POST", &erledigen, &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = anfrage(&app, "POST", &quittieren, &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/erinnerungen?nur_offen=false"),
+        &admin,
+        None,
+    )
+    .await;
+    let nachher = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == eid)
+        .unwrap();
+    assert_eq!(nachher["status"], "erledigt");
+    assert_eq!(nachher["erledigt_at"], erledigt["erledigt_at"]);
+    assert!(nachher["quittiert_at"].is_null());
 }
