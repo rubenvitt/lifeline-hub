@@ -13,7 +13,7 @@
     "build": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
-    "gen:types": "openapi-typescript src/api/openapi.json -o src/api/types.generated.ts",
+    "gen:types": "node --import ./scripts/ts6-fuer-codegen.mjs node_modules/openapi-typescript/bin/cli.js src/api/openapi.json -o src/api/types.generated.ts",
     "lint": "oxlint --deny-warnings --report-unused-disable-directives",
     "test": "vitest run",
     "test:watch": "vitest",
