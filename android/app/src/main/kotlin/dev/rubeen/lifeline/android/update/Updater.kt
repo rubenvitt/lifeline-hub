@@ -196,6 +196,14 @@ class Updater internal constructor(
         }
     }
 
+    /**
+     * Die App gibt eine Installation auf, auf die kein Ergebnis kam (`Startinstallation` im Kern):
+     * das Update bleibt bereit, der Hinweis bleibt. Kommt das Ergebnis später doch, gilt es.
+     */
+    fun abandonInstallation() {
+        if (stand.value == Updatestand.INSTALLIERT_GLEICH) aktuellerStand.value = bereitStand()
+    }
+
     /** Nach der Rückkehr aus der Systemeinstellung: hat die Person die Erlaubnis erteilt? */
     fun aktualisiereStand() {
         if (!isBereit) return

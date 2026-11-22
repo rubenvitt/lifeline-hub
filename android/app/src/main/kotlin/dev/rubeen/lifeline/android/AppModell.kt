@@ -3,6 +3,7 @@ package dev.rubeen.lifeline.android
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
 import android.util.Log
 import android.webkit.WebView
 import androidx.compose.runtime.getValue
@@ -39,6 +40,7 @@ import dev.rubeen.lifeline.kern.Serverablage
 import dev.rubeen.lifeline.kern.Serverentfernung
 import dev.rubeen.lifeline.kern.Serverliste
 import dev.rubeen.lifeline.kern.ShellAbruf
+import dev.rubeen.lifeline.kern.Startinstallation
 import dev.rubeen.lifeline.kern.Statusseite
 import dev.rubeen.lifeline.kern.Testzustand
 import dev.rubeen.lifeline.kern.Updatestand
@@ -156,6 +158,10 @@ class AppModell(
     /** `Ablauf.Event.Start` ist gesendet; ein Update beim Start schiebt ihn auf. */
     private var ablaufGestartet = false
 
+    /** Läuft eine Installation mit der Seite „Lifeline wird aktualisiert“: ihre Fristen. */
+    private var startinstallation: Startinstallation.State? = null
+    private var startinstallationFrist: Job? = null
+
     private val client = HuellenClient(
         aktiverServer = { liste.aktiv?.adresse },
         melde = ::melde,
@@ -189,8 +195,7 @@ class AppModell(
                     updatestand = stand
                     // Die Installation kam nicht zustande (abgelehnt, gesperrt, Fehler): weiter wie sonst.
                     if (zeigtUpdate && stand != Updatestand.INSTALLIERT_GLEICH) {
-                        zeigtUpdate = false
-                        starteAblauf()
+                        endeUpdateSeite()
                     }
                 }
             }
@@ -211,16 +216,51 @@ class AppModell(
         // Ein bereites Update installiert die App vor der Oberfläche (Entwurf D9, Fall a), sichtbar
         // als „Lifeline wird aktualisiert“; ob, entscheidet `Installzeitpunkt` im Updater.
         if (updater != null && updater.stand.value == Updatestand.BEREIT) {
-            zeigtUpdate = true
+            zeigeUpdateSeite()
             scope.launch {
                 if (updater.installieren(Installzeitpunkt.Lage.START_VOR_OBERFLAECHE) != Installzeitpunkt.Weg.INSTALLIEREN) {
-                    zeigtUpdate = false
-                    starteAblauf()
+                    endeUpdateSeite()
                 }
             }
             return
         }
         starteAblauf()
+    }
+
+    /** „Lifeline wird aktualisiert“ mit den Fristen aus `Startinstallation`. */
+    private fun zeigeUpdateSeite() {
+        zeigtUpdate = true
+        startinstallation = Startinstallation.begin(SystemClock.elapsedRealtime())
+        planeStartinstallationFrist()
+    }
+
+    /** Die Installation ist zu Ende oder aufgegeben: weiter wie sonst (der Ablauf startet höchstens einmal). */
+    private fun endeUpdateSeite() {
+        startinstallation = null
+        startinstallationFrist?.cancel()
+        startinstallationFrist = null
+        zeigtUpdate = false
+        starteAblauf()
+    }
+
+    private fun meldeStartinstallation(event: Startinstallation.Event) {
+        val state = startinstallation ?: return
+        startinstallation = Startinstallation.next(state, event)
+        planeStartinstallationFrist()
+    }
+
+    /** Ohne Ergebnis bis zur Frist gibt die App auf: das Update bleibt bereit, die Oberfläche lädt. */
+    private fun planeStartinstallationFrist() {
+        val state = startinstallation ?: return
+        startinstallationFrist?.cancel()
+        startinstallationFrist = scope.launch {
+            delay((Startinstallation.frist(state) - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+            if (startinstallation == state && Startinstallation.isAufgegeben(state, SystemClock.elapsedRealtime())) {
+                Log.w(TAG, "Kein Ergebnis der Installation, die Oberfläche lädt")
+                updater?.abandonInstallation()
+                endeUpdateSeite()
+            }
+        }
     }
 
     private fun starteAblauf() {
@@ -402,6 +442,12 @@ class AppModell(
      * antwortet, und meldet `Vordergrund`; `Ablauf` entscheidet, ob neu geprüft oder gebaut wird.
      */
     fun phase(phase: Rueckkehr.Phase) {
+        // Die Rückfrage des Systems verdeckt die Update-Seite; zurück ohne Ergebnis läuft die Frist.
+        when (phase) {
+            Rueckkehr.Phase.INACTIVE -> meldeStartinstallation(Startinstallation.Event.Verdeckt)
+            Rueckkehr.Phase.ACTIVE -> meldeStartinstallation(Startinstallation.Event.Zurueck(SystemClock.elapsedRealtime()))
+            else -> Unit
+        }
         if (!rueckkehr.melde(phase) || testzustand != null) return
         val gefragt = webView
         // Jetzt, nicht nach der Antwortfrist: ein abgebrochener Custom Tab endet in ihr.
@@ -545,7 +591,7 @@ class AppModell(
                 Log.w(TAG, "Keine Systemeinstellung für unbekannte Apps", e)
             }
             Updatestand.BEREIT -> {
-                zeigtUpdate = true
+                zeigeUpdateSeite()
                 scope.launch { updater.installierenAufWunsch() }
             }
             else -> Unit

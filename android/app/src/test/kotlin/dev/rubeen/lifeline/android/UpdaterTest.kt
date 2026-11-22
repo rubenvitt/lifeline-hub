@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
@@ -36,6 +37,7 @@ import dev.rubeen.lifeline.kern.Serverablage
 import dev.rubeen.lifeline.kern.ShellAbruf
 import dev.rubeen.lifeline.kern.Updatestand
 import java.io.File
+import java.time.Duration
 import java.net.URI
 import java.security.MessageDigest
 import java.util.UUID
@@ -504,6 +506,50 @@ class UpdaterTest {
                 assertSame(Ablauf.Seite.Onboarding, activity.modell.seite)
             }
             compose.onNodeWithText("Lifeline wird aktualisiert").assertDoesNotExist()
+        }
+    }
+
+    private fun warte(sekunden: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(sekunden))
+
+    @Test
+    fun `zurück aus der Rückfrage ohne Ergebnis lädt nach 3 Sekunden die Oberfläche`() {
+        workManager()
+        app.updater = bereit()
+        app.webviewFabrik = AttrappenFabrik()
+
+        ActivityScenario.launch(MainActivity::class.java).use { szenario ->
+            compose.onNodeWithText("Lifeline wird aktualisiert").assertExists()
+            // Die Rückfrage des Systems verdeckt die App und geht ohne Ergebnis weg.
+            status(PackageInstaller.STATUS_PENDING_USER_ACTION, vordergrund = true, Intent("android.content.pm.action.CONFIRM_INSTALL"))
+            szenario.moveToState(Lifecycle.State.STARTED)
+            szenario.moveToState(Lifecycle.State.RESUMED)
+
+            warte(2)
+            szenario.onActivity { assertTrue("noch in der Frist", it.modell.zeigtUpdate) }
+            warte(1)
+
+            szenario.onActivity { activity ->
+                assertFalse(activity.modell.zeigtUpdate)
+                assertSame(Ablauf.Seite.Onboarding, activity.modell.seite)
+            }
+            assertEquals("der Hinweis bleibt", Updatestand.BEREIT, app.updater.stand.value)
+            compose.onNodeWithText("Lifeline wird aktualisiert").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `ohne Ergebnis lädt die Oberfläche spätestens nach 60 Sekunden`() {
+        workManager()
+        app.updater = bereit()
+        app.webviewFabrik = AttrappenFabrik()
+
+        ActivityScenario.launch(MainActivity::class.java).use { szenario ->
+            warte(59)
+            szenario.onActivity { assertTrue(it.modell.zeigtUpdate) }
+            warte(1)
+
+            szenario.onActivity { assertFalse(it.modell.zeigtUpdate) }
+            assertEquals(Updatestand.BEREIT, app.updater.stand.value)
         }
     }
 

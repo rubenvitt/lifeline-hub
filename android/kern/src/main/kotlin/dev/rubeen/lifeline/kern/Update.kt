@@ -173,6 +173,43 @@ object Installzeitpunkt {
     private const val ANDROID_12 = 31
 }
 
+/**
+ * Installation mit der Seite „Lifeline wird aktualisiert“ (Entwurf D9, Fall a): ein Tablet darf
+ * im Einsatz nie auf dieser Seite hängen. Kommt kein Ergebnis des Systems, gibt die App die
+ * Installation auf (das Update bleibt bereit) und lädt die Oberfläche: [GESAMT_FRIST_MS] nach dem
+ * Beginn oder [RUECKKEHR_FRIST_MS] nach der Rückkehr, wenn etwas die App verdeckt hatte (die
+ * Rückfrage des Systems, ein Wechsel der App). Zeiten monoton in Millisekunden.
+ */
+object Startinstallation {
+    const val RUECKKEHR_FRIST_MS = 3_000L
+    const val GESAMT_FRIST_MS = 60_000L
+
+    /** @param zurueckSeit Rückkehr nach einer Verdeckung, solange noch kein Ergebnis da ist */
+    data class State(val begonnen: Long, val verdeckt: Boolean = false, val zurueckSeit: Long? = null)
+
+    sealed interface Event {
+        /** `ON_PAUSE`: etwas liegt über der App, etwa die Rückfrage des Systems. */
+        data object Verdeckt : Event
+
+        /** `ON_RESUME`. */
+        data class Zurueck(val jetzt: Long) : Event
+    }
+
+    fun begin(jetzt: Long): State = State(begonnen = jetzt)
+
+    fun next(state: State, event: Event): State = when (event) {
+        Event.Verdeckt -> state.copy(verdeckt = true, zurueckSeit = null)
+        // Ein ON_RESUME ohne vorherige Verdeckung (der Start selbst) ändert nichts.
+        is Event.Zurueck -> if (state.verdeckt) state.copy(verdeckt = false, zurueckSeit = event.jetzt) else state
+    }
+
+    /** Zeitpunkt, zu dem die App ohne Ergebnis aufgibt. */
+    fun frist(state: State): Long =
+        minOf(state.begonnen + GESAMT_FRIST_MS, state.zurueckSeit?.plus(RUECKKEHR_FRIST_MS) ?: Long.MAX_VALUE)
+
+    fun isAufgegeben(state: State, jetzt: Long): Boolean = jetzt >= frist(state)
+}
+
 /** Stand des Updaters für Einstellungen und Hinweis. */
 enum class Updatestand {
     KEINS,

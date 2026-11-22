@@ -161,6 +161,48 @@ class UpdateTest {
         )
     }
 
+    // Startinstallation
+
+    private val sekunde = 1000L
+
+    @Test
+    fun `ohne Ergebnis gibt die Installation beim Start nach 60 Sekunden auf`() {
+        val s = Startinstallation.begin(jetzt)
+        assertEquals(jetzt + 60 * sekunde, Startinstallation.frist(s))
+        assertFalse(Startinstallation.isAufgegeben(s, jetzt + 59 * sekunde))
+        assertTrue(Startinstallation.isAufgegeben(s, jetzt + 60 * sekunde))
+    }
+
+    @Test
+    fun `zurück aus der Rückfrage des Systems gibt sie nach 3 Sekunden ohne Ergebnis auf`() {
+        val verdeckt = Startinstallation.next(Startinstallation.begin(jetzt), Startinstallation.Event.Verdeckt)
+        // Solange die Rückfrage vorn steht, gilt nur die Gesamtfrist.
+        assertEquals(jetzt + 60 * sekunde, Startinstallation.frist(verdeckt))
+
+        val zurueck = Startinstallation.next(verdeckt, Startinstallation.Event.Zurueck(jetzt + 20 * sekunde))
+        assertEquals(jetzt + 23 * sekunde, Startinstallation.frist(zurueck))
+        assertFalse(Startinstallation.isAufgegeben(zurueck, jetzt + 22 * sekunde))
+        assertTrue(Startinstallation.isAufgegeben(zurueck, jetzt + 23 * sekunde))
+    }
+
+    @Test
+    fun `die Rückkehr zählt nur nach einer Verdeckung, die Gesamtfrist bleibt`() {
+        val start = Startinstallation.begin(jetzt)
+        // Das erste ON_RESUME nach dem Start: die App war nie verdeckt.
+        assertEquals(start, Startinstallation.next(start, Startinstallation.Event.Zurueck(jetzt + sekunde)))
+
+        // Spät zurück: die Gesamtfrist endet vor der Rückkehrfrist.
+        val spaet = Startinstallation.next(
+            Startinstallation.next(start, Startinstallation.Event.Verdeckt),
+            Startinstallation.Event.Zurueck(jetzt + 59 * sekunde),
+        )
+        assertEquals(jetzt + 60 * sekunde, Startinstallation.frist(spaet))
+
+        // Erneut verdeckt: die Rückkehrfrist ruht wieder.
+        val wieder = Startinstallation.next(spaet, Startinstallation.Event.Verdeckt)
+        assertNull(wieder.zurueckSeit)
+    }
+
     @Test
     fun `die Updatestände sind benannt`() {
         assertEquals(
