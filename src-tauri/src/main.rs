@@ -79,6 +79,19 @@ const NICHT_ERREICHBAR: &str = "tauri://localhost/nicht-erreichbar.html";
 #[cfg(target_os = "macos")]
 const DRUCK_SKRIPT: &str = include_str!("druck.js");
 
+/// Kennung mit Plattform und Version (LLH-1982), in jeder Hülle zuerst; Werte aus
+/// [`kennung_skript`].
+const KENNUNG_SKRIPT: &str = include_str!("kennung.js");
+
+/// Das Kennungs-Skript mit den Werten dieser Hülle: Plattform aus `std::env::consts::OS`
+/// (`macos`, `windows`; `linux` nur in der Entwicklung) und die Version des Workspace.
+fn kennung_skript() -> String {
+    let wert = |text: &str| serde_json::to_string(text).expect("Zeichenkette als JSON");
+    KENNUNG_SKRIPT
+        .replace("__PLATFORM__", &wert(std::env::consts::OS))
+        .replace("__VERSION__", &wert(env!("CARGO_PKG_VERSION")))
+}
+
 /// Native Meldung über den Command `benachrichtigung_zeigen` (D7 des Benachrichtigungskonzepts):
 /// in jeder Hülle, denn das Notification-Plugin ersetzt die Web-Notification-API jeder Seite.
 const BENACHRICHTIGUNG_SKRIPT: &str = include_str!("benachrichtigung.js");
@@ -457,7 +470,9 @@ fn baue_fenster(
             NewWindowResponse::Deny
         })
         .on_navigation(move |ziel| navigation(&fuer_navigation, &label_navigation, ziel))
-        // Vor `faehigkeiten.js`: beide ergänzen dieselbe Kennung `__LIFELINE_HUELLE__`.
+        // Die Kennung zuerst, dann die Meldung, auf macOS danach `faehigkeiten.js`: alle ergänzen
+        // dieselbe Kennung `__LIFELINE_HUELLE__`.
+        .initialization_script(kennung_skript())
         .initialization_script(BENACHRICHTIGUNG_SKRIPT);
     let builder = match platz {
         Some(platz) => builder
@@ -1196,11 +1211,31 @@ mod tests {
         assert_eq!(klick_fenster(&aktion(andere)), None);
     }
 
+    /// Jede Desktop-Hülle nennt der Seite ihre Plattform und volle Version (LLH-1982, Spec
+    /// `huellen-vertrag`); die Rückmeldung liest daraus die Oberfläche.
+    #[test]
+    fn kennung_nennt_plattform_und_version() {
+        let skript = kennung_skript();
+        assert!(
+            skript.contains(&format!("platform: \"{}\"", std::env::consts::OS)),
+            "{skript}"
+        );
+        assert!(
+            skript.contains(&format!("version: \"{}\"", env!("CARGO_PKG_VERSION"))),
+            "{skript}"
+        );
+        assert!(!skript.contains("__PLATFORM__") && !skript.contains("__VERSION__"));
+    }
+
     /// Das Skript der Meldung läuft in jeder Hülle und ergänzt die Kennung, die
     /// `faehigkeiten.js` auf macOS ebenfalls ergänzt — keines darf das andere überschreiben.
     #[test]
     fn init_skripte_ergaenzen_dieselbe_kennung() {
-        for skript in [BENACHRICHTIGUNG_SKRIPT, include_str!("faehigkeiten.js")] {
+        for skript in [
+            include_str!("kennung.js"),
+            BENACHRICHTIGUNG_SKRIPT,
+            include_str!("faehigkeiten.js"),
+        ] {
             assert!(
                 skript.contains("...window.__LIFELINE_HUELLE__,"),
                 "{skript}"
