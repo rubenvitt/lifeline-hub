@@ -60,8 +60,9 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   Keystore im Repo; die vier Geheimnisse `ANDROID_KEY*` und ihre Sicherung beschreibt
   `docs/betrieb/android-app.md`.
 - **Versionen an einer Stelle:** Bibliotheken und Plugins nur in `android/gradle/libs.versions.toml`,
-  Gradle im Wrapper, JDK, SDK-Plattform und Build-Tools nur in `scripts/android/sdk-version.sh`
-  (Selbsttest gegen `compileSdk`). App-Version und `versionCode` schreibt
+  Gradle im Wrapper (mit `distributionSha256Sum`, bei jedem Wechsel mitziehen), JDK,
+  SDK-Plattform und Build-Tools nur in `scripts/android/sdk-version.sh` (Selbsttest gegen
+  `compileSdk`). App-Version und `versionCode` schreibt
   `scripts/android/version.sh` aus `[workspace.package]`; `android/` hat keine eigene.
   `compileSdk` ist 37.1 (die Compose-BOM verlangt es), `targetSdk` 36, `minSdk` 29.
 - **Lokal bauen:** immer mit `LC_ALL=C.UTF-8` (unter Locale `C` scheitert der Kotlin-Compiler an
