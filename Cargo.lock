@@ -4131,6 +4131,8 @@ dependencies = [
  "objc2",
  "objc2-authentication-services",
  "objc2-foundation",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.11.1",

@@ -23,6 +23,7 @@ mod menue;
 mod pkce;
 mod update;
 mod verbindung;
+mod vertrag;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
