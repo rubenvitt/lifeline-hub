@@ -1,57 +1,40 @@
-import { SEITENGROESSE } from '../api/etb';
+import { SEITENGROESSE, type EtbAbfrage } from '../api/etb';
+import {
+  seitenLimit,
+  type CursorAdapter,
+  type FensterParam,
+} from '../components/fensterBeideRichtungen';
 
 /**
  * Seitenfenster der ETB-Zeitachse (LFH-947, Spec `etb-zeitachse-fenster`, D1/D4 in
  * `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`).
  *
- * Die Liste hält höchstens {@link ETB_MAX_SEITEN} Seiten. TanStack lädt bei einer Invalidierung
- * so viele Seiten nach, wie im Cache liegen, nacheinander — ohne Deckel kostete jeder neue Eintrag
- * nach tiefem Blättern eine Kette über alle Seiten. Damit der Weg zurück nach oben bleibt, trägt
- * jeder Seitenparameter seine Richtung:
- *
- * - `undefined`: der Kopf (neueste Seite).
- * - `{ aelter: n }`: die Seite unter `n` (`before_lfd_nr`).
- * - `{ neuer: n }`: die Seite direkt über `n` (`after_lfd_nr`), absteigend geliefert.
- *
- * Jeder Folgeparameter stammt aus einer gelesenen Nummer, deshalb entsteht keine Lücke.
+ * Seit LLH-2036 blättert das ETB über den gemeinsamen Helfer `components/fensterBeideRichtungen.ts`
+ * wie Chat und Infotelefon: höchstens `FENSTER_MAX_SEITEN` Seiten, Seitenparameter mit Richtung,
+ * nach oben einer mehr (`seitenLimit`), und eine nicht volle `neuer`-Seite vorn gilt als Kopf
+ * (`useKopfAnnehmen`). Hier steht nur, was am ETB hängt: der Cursor (die laufende Nummer), ihre
+ * Abfrageparameter und die Sprungrichtung eines Deeplinks.
  */
-export type EtbSeitenParam = { aelter: number } | { neuer: number } | undefined;
-
-/** Höchstzahl gehaltener Seiten — Startwert aus dem Ticket, gemessen im Branch. */
-export const ETB_MAX_SEITEN = 5;
-
 interface Nummeriert {
   id: number;
   lfd_nr: number;
 }
 
-/** Parameter der nächsten (älteren) Seite nach `letzte`, oder `undefined` am unteren Ende. */
-export function naechsterSeitenParam(
-  letzte: readonly Nummeriert[],
-  param: EtbSeitenParam,
-): EtbSeitenParam {
-  if (param && 'neuer' in param) {
-    // Eine `neuer`-Seite sagt nichts über Älteres: darunter liegt mindestens der Cursor selbst.
-    const unten = letzte[letzte.length - 1]?.lfd_nr ?? param.neuer + 1;
-    return { aelter: unten };
-  }
-  if (letzte.length < SEITENGROESSE) return undefined;
-  return { aelter: letzte[letzte.length - 1].lfd_nr };
-}
+/** Cursor der Zeitachse: die laufende Nummer (`before_lfd_nr`/`after_lfd_nr`). */
+export const ETB_CURSOR: CursorAdapter<Nummeriert, number> = {
+  cursor: (e) => e.lfd_nr,
+  einschliessendAelter: (n) => n + 1,
+  einschliessendNeuer: (n) => n - 1,
+};
 
-/** Parameter der vorigen (neueren) Seite vor `erste`, oder `undefined`, wenn sie die neueste ist. */
-export function vorigerSeitenParam(
-  erste: readonly Nummeriert[],
-  param: EtbSeitenParam,
-): EtbSeitenParam {
-  if (param == null) return undefined;
-  if ('neuer' in param) {
-    // Kurz heißt: über dem Cursor lag nichts mehr. Ein späterer Neuabruf derselben Seite füllt
-    // sie mit neuen Einträgen auf; ist sie dann voll, gibt es wieder eine vorige.
-    if (erste.length < SEITENGROESSE) return undefined;
-    return { neuer: erste[0].lfd_nr };
-  }
-  return { neuer: erste[0]?.lfd_nr ?? param.aelter - 1 };
+/** Die Seitenmerkmale eines Fensterparameters: Richtung als Cursor und Größe (`seitenLimit`). */
+export function etbSeitenAbfrage(
+  param: FensterParam<number>,
+): Pick<EtbAbfrage, 'before_lfd_nr' | 'after_lfd_nr' | 'limit'> {
+  const limit = seitenLimit(SEITENGROESSE, param);
+  if (param == null) return { limit };
+  if ('aelter' in param) return { before_lfd_nr: param.aelter, limit };
+  return { after_lfd_nr: param.neuer, limit };
 }
 
 /**
