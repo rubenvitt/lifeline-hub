@@ -12,7 +12,11 @@ import kotlinx.serialization.json.Json
 /** Adressprüfung gegen die gemeinsamen Fälle (`src-tauri/faelle/adresse.json`). */
 class AdresseTest {
     @Serializable
-    private class Datei(val meldungen: Map<String, String>, val faelle: List<Fall>)
+    private class Datei(
+        val meldungen: Map<String, String>,
+        @Suppress("PropertyName") val gesperrte_ports: List<Int>,
+        val faelle: List<Fall>,
+    )
 
     @Serializable
     private class Fall(
@@ -27,7 +31,7 @@ class AdresseTest {
     @Test
     fun `jeder gemeinsame Fall der Adressprüfung gilt`() {
         val datei = datei()
-        assertTrue(datei.faelle.size >= 11)
+        assertTrue(datei.faelle.size >= 16)
         for (fall in datei.faelle) {
             val adresse = fall.adresse
             val fehler = fall.fehler
@@ -42,6 +46,18 @@ class AdresseTest {
                 }
                 else -> error("${fall.beschreibung}: genau eins von „adresse“ und „fehler“")
             }
+        }
+    }
+
+    @Test
+    fun `gesperrte Ports gleichen den gemeinsamen Fällen`() {
+        val datei = datei()
+        assertEquals(datei.gesperrte_ports, ServerAdresse.GESPERRTE_PORTS.sorted())
+        for (port in datei.gesperrte_ports) {
+            val ausnahme = assertFailsWith<AdressException>("Port $port") {
+                ServerAdresse.parse("https://elw.local:$port")
+            }
+            assertEquals(AdressError.GESPERRTER_PORT, ausnahme.error, "Port $port")
         }
     }
 

@@ -19,7 +19,8 @@ enum class AdressError(val kennwort: String) {
     UNLESBAR("unlesbar"),
     KEIN_HTTPS("kein_https"),
     OHNE_HOST("ohne_host"),
-    MIT_ZUGANGSDATEN("mit_zugangsdaten");
+    MIT_ZUGANGSDATEN("mit_zugangsdaten"),
+    GESPERRTER_PORT("gesperrter_port");
 
     val meldung: String
         get() = when (this) {
@@ -29,6 +30,8 @@ enum class AdressError(val kennwort: String) {
                 "Nur https-Adressen sind möglich: Offline-Betrieb und Passkey brauchen eine gesicherte Verbindung."
             OHNE_HOST -> "Der Adresse fehlt der Hostname, z. B. elw.local."
             MIT_ZUGANGSDATEN -> "Die Adresse darf keinen Namen und kein Passwort vor „@“ enthalten."
+            GESPERRTER_PORT ->
+                "Diesen Port sperrt der Webview. Bitte den Server auf einem anderen Port betreiben, z. B. 8443."
         }
 }
 
@@ -58,6 +61,20 @@ data class ServerAdresse private constructor(val text: String, val host: String)
         private val schemataMitHost = setOf("http", "https", "ws", "wss", "ftp")
         private val schemaRegel = Regex("^([A-Za-z][A-Za-z0-9+.-]*):")
         private val ungueltigImHost = Regex("[\\s<>^|\\\\%\\u0000-\\u001f]")
+
+        /**
+         * Ports, auf die der Webview nicht navigiert (die „bad ports“ der Fetch-Spezifikation und
+         * Port 0); die Seite bliebe leer (LLH-1987). Dieselbe Liste wie `GESPERRTE_PORTS` in
+         * `src-tauri/src/adresse.rs` und `ServerAdresse.gesperrtePorts` im iOS-Kern; der Test
+         * prüft sie gegen `gesperrte_ports` der gemeinsamen Fälle.
+         */
+        val GESPERRTE_PORTS: Set<Int> = setOf(
+            0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101,
+            102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389,
+            427, 465, 512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636,
+            989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665,
+            6666, 6667, 6668, 6669, 6679, 6697, 10080,
+        )
 
         /**
          * Prüft eine eingegebene Adresse Regel für Regel wie `pruefe_adresse` der Desktop-Hülle.
@@ -114,6 +131,9 @@ data class ServerAdresse private constructor(val text: String, val host: String)
                 val zahl = portText.toIntOrNull() ?: throw AdressException(AdressError.UNLESBAR)
                 if (zahl > 65535) throw AdressException(AdressError.UNLESBAR)
                 port = zahl
+            }
+            if (port != null && port != 443 && port in GESPERRTE_PORTS) {
+                throw AdressException(AdressError.GESPERRTER_PORT)
             }
 
             val fragmentAt = rest.indexOf('#')
