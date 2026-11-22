@@ -184,16 +184,16 @@ Köpfe (Bereichskopf, Paneel, Kennzahl) und bleiben unberührt.
   `rollen.gedaempft`, `margin: 0`, keine Versalien, keine Sperrung.
 - `AugenbraueElement` ohne `'dt'`.
 
-- [ ] **Step 1: Tests** `Feldetikett.test.tsx`: `it('benennt ein Feld: 12 px, gemischt, ohne Sperrung, gedämpft')`
+- [x] **Step 1: Tests** `Feldetikett.test.tsx`: `it('benennt ein Feld: 12 px, gemischt, ohne Sperrung, gedämpft')`
   (fontSize `12px`, textTransform leer, letterSpacing leer, color = `gedaempft` des hellen Modus,
   Text im DOM unverändert); `it('als label trägt es htmlFor')` (`getByLabelText` findet das Feld);
   `it('als dt steht es im dl')` (tagName `DT`). In `Augenbraue.test.tsx`:
   `// @ts-expect-error — ein Feld benennt das Feldetikett (LLH-2045)` vor `<Augenbraue als="dt">`.
-- [ ] **Step 2: rot sehen** — `mise exec -- pnpm -C frontend exec vitest run src/components/instrument/Feldetikett.test.tsx src/components/instrument/Augenbraue.test.tsx`
+- [x] **Step 2: rot sehen** — `mise exec -- pnpm -C frontend exec vitest run src/components/instrument/Feldetikett.test.tsx src/components/instrument/Augenbraue.test.tsx`
   → FAIL (Modul fehlt) und Typecheck `mise exec -- pnpm -C frontend exec tsc -b --noEmit` meldet die
   unbenutzte `@ts-expect-error`.
-- [ ] **Step 3: umsetzen**; Kopfkommentar der Augenbraue: Köpfe, nicht Felder.
-- [ ] **Step 4: grün sehen** — beide Läufe; Typecheck ist erst nach Task 5 grün (die vier `als="dt"`
+- [x] **Step 3: umsetzen**; Kopfkommentar der Augenbraue: Köpfe, nicht Felder.
+- [x] **Step 4: grün sehen** — beide Läufe; Typecheck ist erst nach Task 5 grün (die vier `als="dt"`
   kompilieren nicht mehr), deshalb Task 4 und 5 in einem Commit.
 
 ### Task 5: Träger auf `Feldetikett`
@@ -201,29 +201,29 @@ Köpfe (Bereichskopf, Paneel, Kennzahl) und bleiben unberührt.
 **Files:** die neun Stellen oben; Tests `components/FeldLabel.test.tsx`,
 `instrument/Datenraster.test.tsx`, `instrument/DatenfeldEingabe.test.tsx`.
 
-- [ ] **Step 1: Tests** — `FeldLabel.test.tsx`: Etikett gemischt (textTransform leer, fontSize `12px`,
+- [x] **Step 1: Tests** — `FeldLabel.test.tsx`: Etikett gemischt (textTransform leer, fontSize `12px`,
   `data-lfh="feldetikett"`), Name des Felds exakt der Text. `Datenraster.test.tsx`: das `dt` eines
   `Datenfeld` trägt `data-lfh="feldetikett"`, keine Klasse `lfh-augenbraue`.
   `DatenfeldEingabe.test.tsx`: dasselbe, und `getByLabelText(label)` findet die Eingabe.
-- [ ] **Step 2: rot sehen** — die drei Dateien → FAIL.
-- [ ] **Step 3: umstellen.** Abstand, den vorher `style` an der Augenbraue trug (`display: block`,
+- [x] **Step 2: rot sehen** — die drei Dateien → FAIL.
+- [x] **Step 3: umstellen.** Abstand, den vorher `style` an der Augenbraue trug (`display: block`,
   `marginBottom`), trägt ein umgebendes `div` bzw. `als="div"`. Kommentare, die „Augenbraue“ für
   das Feld nennen, ziehen mit (Datenraster-Prop-Doku, Datensicht, Einsatzdaten).
-- [ ] **Step 4: grün sehen** — die drei Dateien, dann `vitest run src/components src/pages/lagekarte src/pages/EinsatzdatenPage src/lageberichte`
+- [x] **Step 4: grün sehen** — die drei Dateien, dann `vitest run src/components src/pages/lagekarte src/pages/EinsatzdatenPage src/lageberichte`
   und Typecheck → PASS.
-- [ ] **Step 5: Commit** `feat(frontend): Feldetikett benennt Felder, Augenbraue bleibt Köpfen (LLH-2045)`.
+- [x] **Step 5: Commit** `feat(frontend): Feldetikett benennt Felder, Augenbraue bleibt Köpfen (LLH-2045)`.
 
 ### Task 6: Regel, Design System, Doku-Bilder, Gate, PR
 
-- [ ] **Step 1: Regel** in `frontend/AGENTS.md`, „Bausteine“: `Feldetikett` (Feldname, gemischt,
+- [x] **Step 1: Regel** in `frontend/AGENTS.md`, „Bausteine“: `Feldetikett` (Feldname, gemischt,
   `textKlein`/`gedaempft`, `als="dt"|"label"`) neben `Augenbraue` (nur Köpfe; benennt kein Feld).
-- [ ] **Step 2: Design System** neu erzeugen (`mise exec -- pnpm -C frontend design-system`).
-- [ ] **Step 3: Anwender-Bilder** alle neu (`mise exec -- pnpm doku:bilder` in `frontend/`, nach
+- [x] **Step 2: Design System** neu erzeugen (`mise exec -- pnpm -C frontend design-system`).
+- [x] **Step 3: Anwender-Bilder** alle neu (`mise exec -- pnpm doku:bilder` in `frontend/`, nach
   `cargo build`), nur geänderte Bilder committen; Abweichungen ohne Bezug zum Etikett prüfen.
-- [ ] **Step 4: Gate** `VITEST_WORKERS=4 ./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 5: Risiko-Specs lokal:** `betroffene-handy`, `dialoge-handy`, `leisten-flaeche`,
+- [x] **Step 4: Gate** `VITEST_WORKERS=4 ./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] **Step 5: Risiko-Specs lokal:** `betroffene-handy`, `dialoge-handy`, `leisten-flaeche`,
   `datensicht-schmal`, `hellmodus-kontrast`, `pegel-pruefliste`, `kopfzeile-schmal`,
   `meldebild-tabelle`, `gate1-ueberlauf` sowie jede Spec, die `Einsatzdaten` oder den
   Lagekarten-Inspector misst (Grep nach `datenfeld`, `einsatzdaten`, `auswahl-`) → grün.
-- [ ] **Step 6: Bilder** vorher/nachher (Einsatzdaten-Datenraster, Bearbeiten-Modus,
+- [x] **Step 6: Bilder** vorher/nachher (Einsatzdaten-Datenraster, Bearbeiten-Modus,
   Lagekarten-Inspector), Commit, Push, PR gegen `alpha` mit Label `voll`.
