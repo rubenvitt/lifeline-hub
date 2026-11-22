@@ -373,8 +373,8 @@ const alsZustand = (z: string): string | null => (z.trim() === '' ? null : z);
 export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
-  // Ohne Verbindung gesperrt mit Grund, im Kopf wie in der Liste (LLH-1103, design.md D8): die
-  // Mutation pausierte sonst und überschriebe nach der Rückkehr still einen ungesehenen Wert.
+  // Ohne Verbindung gesperrt mit Grund, im Kopf wie in der Liste (LLH-1103, design.md D8). Bis
+  // LLH-1950 pausierte die Mutation sonst und überschrieb nach der Rückkehr still einen Wert.
   // `useOhneVerbindung`, nie `navigator.onLine` allein (WLAN ohne Server).
   const ohneVerbindung = useOhneVerbindung();
   const konflikt = useFeldKonflikt();

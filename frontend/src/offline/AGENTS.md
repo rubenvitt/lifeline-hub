@@ -185,6 +185,13 @@ draußen gelassen werden.
 
 ## Schreiben ohne Netz (LFH-705)
 
+- **Mutationen pausieren nie** (LLH-1950): `erzeugeQueryClient` (`api/queryClient.ts`) legt
+  `networkMode: 'always'` unter die Mutations-Vorgaben, für Produktion und jeden Testclient.
+  Ohne Netz scheitert eine Mutation sofort mit `NetzFehler`; die Erfassungshülle zeigt den Grund
+  im Dialog, Abbrechen bleibt möglich, und nach der Rückkehr des Netzes geht nichts still hinaus.
+  Was ohne Netz gelten soll, geht über die Offline-Queue (`offline/schreiben.ts`), nie über den
+  Mutations-Cache. Wer `'online'` ausdrücklich an eine Mutation setzt, begründet es dort. Herleitung:
+  `docs/superpowers/specs/2026-11-22-guuku50j-mutationen-ohne-netz-design.md`.
 - **Eine Mutation, die eine `erfasse…OfflineFaehig`-Funktion aus `offline/schreiben.ts` ruft,
   läuft mit `networkMode: 'always'`.** Die Funktion entscheidet selbst, ob sie sendet oder
   vormerkt. TanStacks Vorgabe `'online'` hielte die Mutation ohne Netz an: Dann erschiene

@@ -64,7 +64,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/guuku50jetu1zqkmbruioj69
 - Modify: `frontend/src/offline/AGENTS.md` (Abschnitt „Schreiben ohne Netz“, erster Punkt)
 - Modify: Kommentare, die das Pausieren als Vorgabe nennen: `frontend/src/offline/lagebildFilter.ts:124`, `frontend/src/api/lagebildOffline.guard.test.ts:231`, `frontend/src/command-palette/VorschauZustand.tsx:18` (nur wenn er Mutationen meint; bei Queries stehen lassen); grep `networkMode` nach weiteren.
 
-- [ ] **Step 1:** Regel in `offline/AGENTS.md`: Mutationen pausieren nie — `erzeugeQueryClient` setzt `networkMode: 'always'` als Vorgabe; ohne Netz scheitern sie mit `NetzFehler`, die Erfassungshülle zeigt den Grund; was ohne Netz gelten soll, geht über die Offline-Queue. Herleitung: Spec-Pfad.
-- [ ] **Step 2:** Kommentare anpassen.
+- [x] **Step 1:** Regel in `offline/AGENTS.md`: Mutationen pausieren nie — `erzeugeQueryClient` setzt `networkMode: 'always'` als Vorgabe; ohne Netz scheitern sie mit `NetzFehler`, die Erfassungshülle zeigt den Grund; was ohne Netz gelten soll, geht über die Offline-Queue. Herleitung: Spec-Pfad.
+- [x] **Step 2:** Kommentare anpassen.
 - [ ] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
 - [ ] **Step 4:** Commit `docs(frontend): Regel „Mutationen pausieren nie“ (LLH-1950)`.
