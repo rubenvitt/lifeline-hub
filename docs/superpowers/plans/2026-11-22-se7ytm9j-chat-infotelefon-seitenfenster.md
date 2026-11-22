@@ -38,18 +38,18 @@ Ausführung: `executing-plans` im Main-Loop (Plan kurz, Aufgaben eng verzahnt), 
 
 ## Aufgabe 5 — Infotelefon (D4)
 
-- [ ] API: `loadAnrufe` mit `nach`.
-- [ ] Schleuse über Seitenparameter: `infotelefon/zufluss.ts` bekommt die Buchführung je
-      Seitenschlüssel (`seitenSchluessel`, `nachgeladeneIds`), Tests für „vorn fällt eine Seite
-      weg“ und „Neuere laden bei eingefrorener Schleuse“.
-- [ ] `InfotelefonPage`: Fenster-Optionen, „Neuere laden“, `kopfImFenster` an
-      `useFunkprotokollLauf`, Erfassen und „anzeigen“ → `zumKopf`, `useKopfBeimVerlassen`.
+- [x] API: `loadAnrufe` mit `nach`.
+- [x] Schleuse: `ladeWeiter` nimmt die selbst geholte Seite per Referenz auf (Design-Doc D4,
+      statt Seitenschlüsseln), Tests für „vorn fällt eine Seite weg“ und „Neuere laden bei
+      eingefrorener Schleuse“.
+- [x] `InfotelefonPage`: Fenster-Optionen, „Neuere laden“, `kopfImFenster` an
+      `useFunkprotokollLauf`, Erfassen → `zumKopf`, `useKopfBeimVerlassen`.
 
 ## Aufgabe 6 — Regeln und Doku (D5)
 
-- [ ] `frontend/src/infotelefon/AGENTS.md` „Fenster und Zählung“, Kommentar in
+- [x] `frontend/src/infotelefon/AGENTS.md` „Fenster und Zählung“, Kommentar in
       `components/listenFenster.ts`.
-- [ ] `docs/anwender/kapitel/chat.md`, `docs/anwender/kapitel/infotelefon.md`.
+- [x] `docs/anwender/kapitel/chat.md`, `docs/anwender/kapitel/infotelefon.md`.
 
 ## Aufgabe 7 — Abschluss
 

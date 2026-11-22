@@ -145,18 +145,19 @@ Kommentar dort („Chat und Infotelefon tragen das Fenster bewusst nicht“) wir
   bekommt `nach` neben `vor`.
 - **„Neuere laden“** steht unter der Liste, über dem Sammelbanner, solange der Kopf fehlt;
   `useFunkprotokollLauf` bekommt `kopfImFenster` (wie im ETB, kein Mitlaufen ohne Kopf).
-- **Eigenes Erfassen** und **„anzeigen“ im Sammelbanner** ersetzen das Fenster durch den Kopf,
-  bevor sie ans Ende springen.
-- **Schleuse:** Heute merkt sich die Seite `frozenPageCount` (Seitenzahl beim Einfrieren) und
+- **Eigenes Erfassen** ersetzt das Fenster durch den Kopf, bevor es ans Ende springt. **„anzeigen“
+  im Sammelbanner** taut nur auf (beim Bauen geändert): ohne Kopf kann es nur einen Nachtrag im
+  Fenster zurückhalten, und der Kopf ließe gerade ihn verschwinden.
+- **Schleuse:** Bisher merkte sich die Seite `frozenPageCount` (Seitenzahl beim Einfrieren) und
   `appendedPageIds` je Seitenindex. Mit `maxPages` fällt beim Weiterblättern vorn eine Seite weg,
   die Indizes verrutschen, und eine Seite aus dem eingefrorenen Stand gälte als „angehängt“ oder
   umgekehrt: das ist die Lücke, durch die ein fremder Nachtrag ohne Kopf durchrutschte. Neu
-  verfolgt die Seite die beim Einfrieren gehaltenen und die danach geholten Seiten über ihren
-  **Seitenparameter** (als Text, `JSON.stringify`): Seiten, die beim Einfrieren da waren, liefern
-  den Stand wie bisher (`einfrieren`); jede danach geholte Seite, gleich welcher Richtung, wird
-  mit den Kennungen aufgenommen, mit denen sie **zuerst** erschien (`extendEinfrierstand`). Ein
-  Live-Nachladen derselben Seite bringt so weiter keinen fremden Nachtrag in den Stand. Die
-  Wassermarke bleibt die höchste beim Einfrieren gezeigte Kennung.
+  (beim Bauen statt Seitenschlüsseln gewählt, die ein Live-Neuladen mit verschobenen
+  Seitengrenzen ebenfalls umschreibt) nimmt `ladeWeiter` genau die Seite auf, die „Ältere
+  laden“ oder „Neuere laden“ zurückgibt, erkannt an der Referenz (vorher nicht im Fenster), mit
+  den Kennungen, mit denen sie kam (`extendEinfrierstand`). Eine Buchführung je Seite entfällt.
+  Ein Live-Nachladen bringt so weiter keinen fremden Nachtrag in den Stand. Die Wassermarke
+  bleibt die höchste beim Einfrieren gezeigte Kennung.
 - **Deeplink** außerhalb des Fensters: wie bisher einzeln holen und oben anstellen.
 - **Verlassen** mit Fenster ohne Kopf: `useKopfBeimVerlassen` je Sicht.
 

@@ -1,5 +1,10 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type { AbschlussCursor } from './meldungen';
+import {
+  seitenLimit,
+  type CursorAdapter,
+  type FensterParam,
+} from '../components/fensterBeideRichtungen';
 import type {
   InfotelefonAnliegen,
   InfotelefonAnruf,
@@ -25,21 +30,50 @@ export function anrufCursor(a: Pick<InfotelefonAnruf, 'id' | 'eingang_at'>): Abs
   return { zeit: a.eingang_at, id: a.id };
 }
 
+/**
+ * Cursor des Seitenfensters (LLH-1886, `components/fensterBeideRichtungen.ts`): Eingang und
+ * Kennung, lexikografisch geordnet — `(zeit, id ± 1)` schließt den Anruf `(zeit, id)` ein.
+ */
+export const ANRUF_CURSOR: CursorAdapter<InfotelefonAnruf, AbschlussCursor> = {
+  cursor: anrufCursor,
+  einschliessendAelter: (c) => ({ zeit: c.zeit, id: c.id + 1 }),
+  einschliessendNeuer: (c) => ({ zeit: c.zeit, id: c.id - 1 }),
+};
+
 interface AnrufPageOptions {
   /** Fehlt = alle Anrufe. */
   status?: InfotelefonStatus;
+  /** Die Seite unter dem Cursor (älter). */
   vor?: AbschlussCursor;
+  /** Die Seite direkt über dem Cursor (neuer, LLH-1886); nie zusammen mit `vor`. */
+  nach?: AbschlussCursor;
   limit?: number;
 }
 
 /** Eine Seite des Protokolls, jüngster Eingang zuerst (Ordnung vom Server). */
 export function loadAnrufe(
   einsatzId: number,
-  { status, vor, limit = ANRUFE_PAGE_SIZE }: AnrufPageOptions = {},
+  { status, vor, nach, limit = ANRUFE_PAGE_SIZE }: AnrufPageOptions = {},
 ): Promise<InfotelefonAnruf[]> {
   return apiGet<InfotelefonAnruf[]>(
-    mitParametern(pfad(einsatzId), { status, vor_zeit: vor?.zeit, vor_id: vor?.id, limit }),
+    mitParametern(pfad(einsatzId), {
+      status,
+      vor_zeit: vor?.zeit,
+      vor_id: vor?.id,
+      nach_zeit: nach?.zeit,
+      nach_id: nach?.id,
+      limit,
+    }),
   );
+}
+
+/** Die Seitenoptionen eines Fensterparameters: Richtung und Größe (`seitenLimit`). */
+export function anrufSeite(
+  param: FensterParam<AbschlussCursor>,
+): Pick<AnrufPageOptions, 'vor' | 'nach' | 'limit'> {
+  const limit = seitenLimit(ANRUFE_PAGE_SIZE, param);
+  if (param == null) return { limit };
+  return 'aelter' in param ? { vor: param.aelter, limit } : { nach: param.neuer, limit };
 }
 
 /** Zahlen über den ganzen Bestand: gesamt, offene Rückrufe, je Anliegen (LLH-732). */

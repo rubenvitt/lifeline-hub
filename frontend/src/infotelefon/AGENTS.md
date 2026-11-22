@@ -14,13 +14,21 @@ eigenes Live-Ereignis `infotelefon`, kein Modulzähler. Die API bleibt unter
 `LAGEBILD_OFFLINE` (LFH-767).
 
 **Fenster und Zählung** (LLH-732,
-`openspec/changes/archive/2026-10-13-w6hgfndx-infotelefon-zaehler/design.md`): die Liste lädt
-immer seitenweise (`ANRUFE_PAGE_SIZE`, Cursor Eingang + Kennung, „Ältere laden“), „offene Rückrufe“
+`openspec/changes/archive/2026-10-13-w6hgfndx-infotelefon-zaehler/design.md`; Fenster in beide
+Richtungen LLH-1886, `docs/superpowers/specs/2026-11-22-se7ytm9j-chat-infotelefon-seitenfenster-design.md`):
+die Liste lädt immer seitenweise (`ANRUFE_PAGE_SIZE`, Cursor Eingang + Kennung) und hält höchstens
+fünf Seiten (`components/fensterBeideRichtungen.ts`): „Ältere laden“ oben (`vor_…`), „Neuere laden“
+unten (`nach_…`, eine mehr angefragt), solange die neueste Seite fehlt. Eigenes Erfassen aus
+tiefem Fenster holt erst den Kopf (`zumKopf`); wer die Ansicht ohne Kopf verlässt, verwirft das
+Fenster (`useKopfBeimVerlassen`). „offene Rückrufe“
 filtert am Server; Kennzahlen, Meta und „Nach Anliegen“ lesen nur `…/infotelefon/zaehler`, nie
 das geladene Fenster. Ein Deeplink außerhalb des Fensters holt den Anruf einzeln
 (`…/infotelefon/{aid}`) und stellt ihn als ältesten oben dazu. Die Zufluss-Schleuse
-(`infotelefon/zufluss.ts`) nimmt Seiten, die nach dem Einfrieren nachgeladen wurden, über
-`extendEinfrierstand` auf, damit ein Nachtrag aus einer älteren Seite nicht als „neuer Anruf“ gilt.
+(`infotelefon/zufluss.ts`) nimmt die Seite, die „Ältere laden“ oder „Neuere laden“ nach dem
+Einfrieren holt, mit den Kennungen auf, mit denen sie kam (`extendEinfrierstand`, `ladeWeiter`):
+erkannt an der Referenz, nie an der Position, denn mit dem Deckel fällt am anderen Ende eine Seite
+heraus. Ein Nachtrag aus einer selbst geholten Seite gilt so nicht als „neuer Anruf“, ein fremder
+Nachtrag beim Live-Neuladen schon.
 
 **Funkprotokoll-Ordnung** (LLH-1149, Spec `stab-infotelefon`, Herleitung
 `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D10): dieselbe
