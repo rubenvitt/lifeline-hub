@@ -2310,7 +2310,8 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     expect(herkunft?.closest('strong')).not.toBeNull();
     expect(herkunft?.tagName).toBe('SPAN');
     expect(herkunft?.querySelector('div')).toBeNull();
-    expect(herkunft).toHaveStyle({ fontWeight: 'normal', display: 'block' });
+    // Berechnet steht `normal` wie im Browser als 400.
+    expect(herkunft).toHaveStyle({ fontWeight: '400', display: 'block' });
   });
 
   /**

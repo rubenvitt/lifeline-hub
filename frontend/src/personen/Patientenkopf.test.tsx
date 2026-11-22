@@ -25,6 +25,7 @@ import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
 import { EINHEIT_OHNE_NETZ } from './VersorgtVon';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
+import { cssForm } from '../test/cssForm';
 
 /**
  * Der Patientenkopf (LLH-1094, Spec `personen-detail`): die Patientenfragen auf einen Blick, Sichten,
@@ -572,14 +573,18 @@ describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md 
       ['Maßnahmen', 'Verletzungen', 'Letzte Notiz'],
     ]);
     const huelle = spalten[0].parentElement!;
-    expect(huelle.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+    expect(huelle.style.gridTemplateColumns).toBe(
+      cssForm('grid-template-columns', 'repeat(2, minmax(0, 1fr))'),
+    );
   });
 
   it('stapelt die Spalten unter lg, die Lage zuerst', () => {
     setzeViewportBreite(800);
     const { kopf } = zeige(vollerKern, { darfSchreiben: false });
     const spalten = kopf.querySelectorAll<HTMLElement>('dl[data-lfh="datenraster"]');
-    expect(spalten[0].parentElement!.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
+    expect(spalten[0].parentElement!.style.gridTemplateColumns).toBe(
+      cssForm('grid-template-columns', 'minmax(0, 1fr)'),
+    );
     expect(spalten[0].querySelector('dt')?.textContent).toBe('Sichtung');
   });
 

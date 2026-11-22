@@ -29,6 +29,7 @@ import { rahmenFarben } from '../theme/tokens';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 import { seitenfussKante } from '../components/Erfassung';
+import { cssForm } from '../test/cssForm';
 
 // Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -274,7 +275,9 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
     // Ortsmarke des aktiven Reiters in der Bedienfarbe, nicht rot (Spec `farbrollen-kontrast`,
     // „Die Ortsmarke im Rahmen trägt die Bedienfarbe“, eon26eat D7); die übrigen ohne Marke.
     const aktiv = within(nav).getByRole('link', { name: 'Abschnitt' });
-    expect(aktiv.style.boxShadow).toBe(`inset 0 3px 0 ${rahmenFarben.bedien}`);
+    expect(aktiv.style.boxShadow).toBe(
+      cssForm('box-shadow', `inset 0 3px 0 ${rahmenFarben.bedien}`),
+    );
     expect(within(nav).getByRole('link', { name: 'Karte' }).style.boxShadow).toBe('none');
   });
 

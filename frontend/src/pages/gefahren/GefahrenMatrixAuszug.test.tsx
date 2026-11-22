@@ -125,7 +125,7 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
       const marke = mit.querySelector<HTMLElement>('[data-lfh="erlaeuterung-marke"]');
       expect(marke, 'die Zelle trägt die Marke der Matrix').not.toBeNull();
       expect(marke).toHaveAttribute('aria-hidden', 'true');
-      expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+      expect(marke!.style.borderBlockStartColor).toMatch(/currentcolor/i);
       // Die Marke sitzt in der Ecke der Zelle: die Zelle ist ihr Bezug.
       expect(mit.style.position).toBe('relative');
 

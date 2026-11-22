@@ -442,7 +442,7 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
     const { container } = rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })] });
     const bewertet = container.querySelector<HTMLElement>('td[data-warnstufe="hoch"]');
     expect(bewertet, 'die bewertete Zelle trägt ihre Stufe').not.toBeNull();
-    expect(bewertet!.style.boxShadow).toMatch(/^inset 0(px)? -3px 0(px)? 0(px)? /);
+    expect(bewertet!.style.boxShadow).toMatch(/^rgba?\([^)]*\) 0px -3px inset$/);
     // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit einem
     // unbedingten Schatten wahr.
     const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
@@ -551,7 +551,7 @@ describe('GefahrenMatrix — Erläuterungen sichtbar (LLH-1110)', () => {
     expect(marke, 'die Zelle trägt die Marke').not.toBeNull();
     expect(marke).toHaveAttribute('aria-hidden', 'true');
     // Zweiter Kanal ist die Form (Dreieck aus Rändern), nicht eine Fläche.
-    expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+    expect(marke!.style.borderBlockStartColor).toMatch(/currentcolor/i);
     // Auch zu „keine“: die Erläuterung ist die Aussage.
     expect(
       screen.getByRole('button', {
@@ -626,7 +626,9 @@ describe('GefahrenMatrix — Erläuterungen sichtbar (LLH-1110)', () => {
       .closest('td')!;
     expect(zelleTd).toHaveAttribute('data-hervorgehoben', 'true');
     // Der Ring kommt zum Stufenbalken hinzu, die Stufe bleibt lesbar.
-    expect(zelleTd.style.boxShadow).toMatch(/inset 0(px)? 0(px)? 0(px)? 2px .+, inset 0(px)? -3px/);
+    expect(zelleTd.style.boxShadow).toMatch(
+      / 0px 0px 0px 2px inset, rgba?\([^)]*\) 0px -3px inset$/,
+    );
     expect(container.querySelectorAll('[data-hervorgehoben]')).toHaveLength(1);
     expect(screen.queryByLabelText('Erläuterung')).toBeNull();
   });

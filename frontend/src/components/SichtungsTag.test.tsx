@@ -22,7 +22,8 @@ describe('SichtungsTag', () => {
       expect(tag).toHaveStyle({
         // Literale der Textrolle je Modus.
         color: modus === 'dark' ? '#e8ebee' : '#111418',
-        background: 'transparent',
+        // Durchsichtig; berechnet steht `transparent` wie im Browser als rgba(0, 0, 0, 0).
+        backgroundColor: 'rgba(0, 0, 0, 0)',
       });
       const farbfeld = tag.querySelector('[aria-hidden="true"]');
       expect(farbfeld).toHaveStyle({

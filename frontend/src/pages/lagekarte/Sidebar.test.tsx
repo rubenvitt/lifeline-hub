@@ -1209,7 +1209,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     const feldAn = screen
       .getByRole('switch', { name: 'UHS' })
       .querySelector('[data-lfh="ebenen-farbfeld"]') as HTMLElement;
-    expect(feldAus.style.background).toBe('transparent');
+    expect(feldAus.style.backgroundColor).toBe('transparent');
     // Die Füllung „an" ist ein `color-mix(…)`, den jsdom still verwirft. Der Rahmen trägt in jsdom:
     // an in der Ebenenfarbe, aus in der Steuerrahmen-Rolle.
     expect(feldAn.style.borderColor).not.toBe('');

@@ -241,7 +241,7 @@ describe('Kennzahl — Abstand zwischen Zielen (LFH-630, Bedien-Leitlinie Kriter
     const kante = zelle.querySelector<HTMLElement>('[data-lfh="kennzahl-kante"]')!;
     expect(kante).toHaveAttribute('aria-hidden', 'true');
     expect(kante.previousElementSibling).toBe(link);
-    expect(kante.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+    expect(kante.style.boxShadow).toMatch(/^rgba?\([^)]*\) 3px 0px inset$/);
   });
 
   it('ohne Eskalationston keine Kantenauflage', () => {

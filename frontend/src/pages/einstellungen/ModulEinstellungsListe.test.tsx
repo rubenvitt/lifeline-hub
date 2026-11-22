@@ -219,7 +219,7 @@ describe('modulRasterSpalten (LFH-474)', () => {
 
     const zeile = document.querySelector<HTMLElement>('[data-modul-zeile="etb"]')!;
     const kopf = screen.getByText('Modul').parentElement!;
-    expect(zeile.style.gridTemplateColumns).toMatch(/^minmax\(0, 1fr\) \d+px$/);
+    expect(zeile.style.gridTemplateColumns).toMatch(/^minmax\(0px, 1fr\) \d+px$/);
     expect(kopf.style.gridTemplateColumns).toBe(zeile.style.gridTemplateColumns);
   });
 });

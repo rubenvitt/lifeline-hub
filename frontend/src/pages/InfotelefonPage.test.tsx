@@ -238,8 +238,8 @@ describe('InfotelefonPage (LFH-554)', () => {
     });
     const nachbar = document.querySelector<HTMLElement>('[data-anruf="2"]')!;
     expect(nachbar).not.toHaveClass('zeile-hervorgehoben');
-    expect(nachbar.style.background).toBe('transparent');
-    expect(ziel.style.background).not.toBe('transparent');
+    expect(nachbar.style.backgroundColor).toBe('transparent');
+    expect(ziel.style.backgroundColor).not.toBe('transparent');
     expect(ziel.style.background).not.toBe('');
   });
 

@@ -76,7 +76,7 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
     ).toBeInTheDocument();
     expect(hinweis()).toHaveTextContent('1 von 3 Quellen sichtbar');
     const kopf = screen.getByRole('button', { name: /^Aktiv filtern/ }).closest('th')!;
-    expect(kopf.style.boxShadow).toMatch(/inset 0 -2px 0/);
+    expect(kopf.style.boxShadow).toMatch(/ 0px -2px inset$/);
   });
 
   it('der Chip nimmt den Wert heraus, „Filter zurücksetzen“ leert Suche und Filter', async () => {

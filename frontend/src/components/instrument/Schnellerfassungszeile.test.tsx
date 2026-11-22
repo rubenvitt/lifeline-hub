@@ -163,7 +163,7 @@ describe('Schnellerfassungszeile', () => {
     const zeile = () => document.querySelector<HTMLElement>('.lfh-schnellerfassung')!;
     expect(zeile().style.borderTop).toBe('1px solid rgb(212, 107, 8)');
     expect(zeile().style.borderBottom).toBe('1px solid rgb(212, 107, 8)');
-    expect(zeile().style.borderInlineStart).toBe('2px solid #d46b08');
+    expect(zeile().style.borderInlineStart).toBe('2px solid rgb(212, 107, 8)');
     expect(zeile().style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe('#d46b08');
     expect(zeile()).toHaveAttribute('data-rahmen-farbe', 'true');
     unmount();

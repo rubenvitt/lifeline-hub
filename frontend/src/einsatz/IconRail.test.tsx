@@ -6,6 +6,7 @@ import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import IconRail, { railZielStil } from './IconRail';
 import { kategorien } from './modulRegistry';
+import { cssForm } from '../test/cssForm';
 
 /**
  * Legt die Token-Werte des UMGEBENDEN Providers als data-Attribute ab, nicht über
@@ -80,9 +81,10 @@ describe('IconRail', () => {
     const alarm = screen.getByTestId('token').getAttribute('data-alarm')!;
     const aktiv = screen.getByRole('button', { name: 'Lage' });
     // Die Marke ist die Bedienrolle des Rahmens, nicht die Alarm- und nicht die Markenrolle.
-    expect(aktiv.style.boxShadow).toContain('2px 0 0');
-    // Die Farbe am Element, nicht nur an der Konstante: die Bedienrolle des Rahmens.
-    expect(aktiv.style.boxShadow).toContain(rahmenFarben.bedien);
+    expect(aktiv.style.boxShadow).toBe(
+      cssForm('box-shadow', `inset 2px 0 0 ${rahmenFarben.bedien}`),
+    );
+    // Die Farbe am Element (Zeile oben), nicht nur an der Konstante: die Bedienrolle des Rahmens.
     expect(rahmenFarben.bedien).toBe(farbenDunkel.bedien);
     expect(rahmenFarben.bedien).not.toBe(alarm);
     expect(rahmenFarben.bedien).not.toBe(farbenDunkel.marke);
