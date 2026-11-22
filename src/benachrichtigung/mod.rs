@@ -21,6 +21,7 @@
 //! .await;
 //! ```
 
+pub mod adapter;
 pub mod aufloesung;
 pub mod repo;
 pub mod text;
@@ -350,12 +351,24 @@ pub enum Adressat {
     Fuehrungskraefte,
     /// Die Mitglieder mit der Rolle Einsatzleitung (LLH-1491: Führung je Einsatz).
     Einsatzleitung,
+    /// Die aktiven System-Admins der Org eines Adapters (LLH-2026): nur sie können ihn ändern.
+    /// Gilt nur am Ort [`Ort::Adapter`].
+    OrgAdmins,
+}
+
+/// Woran eine Benachrichtigung hängt (LLH-2026): an einem Einsatz oder, für die Störung einer
+/// Anbindung, an einem Adapter der Org. Ein Adapter-Ort reist nie zum Hub.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ort {
+    Einsatz(i64),
+    Adapter { org_id: i64, adapter_id: String },
 }
 
 /// Was geschah: die eine Eingabe von [`melden`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Anlass {
-    pub einsatz_id: i64,
+    /// Einsatz oder Adapter (LLH-2026).
+    pub ort: Ort,
     pub art: BenachrichtigungArt,
     pub bezug: Bezug,
     /// Wer das Ereignis ausgelöst hat; `None` beim Scheduler. Der Auslöser bekommt nie eine
@@ -376,13 +389,45 @@ impl Anlass {
     /// Ein Anlass ohne Auslöser und ohne Adressaten; [`Self::von`] und [`Self::an`] ergänzen.
     pub fn neu(einsatz_id: i64, art: BenachrichtigungArt, bezug: Bezug) -> Self {
         Self {
-            einsatz_id,
+            ort: Ort::Einsatz(einsatz_id),
             art,
             bezug,
             ausloeser: None,
             adressaten: Vec::new(),
             einheit_id: None,
             durch_einheit_id: None,
+        }
+    }
+
+    /// Die Störung einer Anbindung (LLH-2026): an die Admins der Org des Adapters, ohne Auslöser.
+    pub fn adapter(org_id: i64, adapter_id: &str, art: BenachrichtigungArt, bezug: Bezug) -> Self {
+        Self {
+            ort: Ort::Adapter {
+                org_id,
+                adapter_id: adapter_id.to_string(),
+            },
+            art,
+            bezug,
+            ausloeser: None,
+            adressaten: vec![Adressat::OrgAdmins],
+            einheit_id: None,
+            durch_einheit_id: None,
+        }
+    }
+
+    /// Der Einsatz des Anlasses; `None` am Adapter.
+    pub fn einsatz_id(&self) -> Option<i64> {
+        match self.ort {
+            Ort::Einsatz(id) => Some(id),
+            Ort::Adapter { .. } => None,
+        }
+    }
+
+    /// Der Adapter des Anlasses; `None` am Einsatz.
+    pub fn adapter_id(&self) -> Option<&str> {
+        match &self.ort {
+            Ort::Einsatz(_) => None,
+            Ort::Adapter { adapter_id, .. } => Some(adapter_id),
         }
     }
 
@@ -416,7 +461,9 @@ impl Anlass {
 /// Client über `GET /api/benachrichtigungen/{id}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenachrichtigungEreignis {
-    pub einsatz_id: i64,
+    /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit
+    /// Client und Service Worker denselben Tag bilden.
+    pub einsatz_id: Option<i64>,
     pub benachrichtigung_id: i64,
     pub art: BenachrichtigungArt,
     pub stufe: BenachrichtigungStufe,
@@ -449,7 +496,8 @@ pub struct BenachrichtigungVerlauf {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenachrichtigungAnzeige {
     pub id: i64,
-    pub einsatz_id: i64,
+    /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026).
+    pub einsatz_id: Option<i64>,
     pub art: BenachrichtigungArt,
     pub stufe: BenachrichtigungStufe,
     pub bezug_typ: BenachrichtigungBezugTyp,
@@ -476,7 +524,7 @@ pub async fn melden(pool: &SqlitePool, live: &LiveHub, anlass: Anlass) -> Vec<i6
         Ok(empfaenger) => empfaenger,
         Err(e) => {
             tracing::warn!(
-                einsatz_id = anlass.einsatz_id,
+                ort = ?anlass.ort,
                 art = anlass.art.as_str(),
                 fehler = %e,
                 "Benachrichtigung nicht gemeldet"
@@ -498,14 +546,29 @@ async fn melden_mit_fehler(
         );
         return Ok(Vec::new());
     }
+    // Am Adapter (LLH-2026): kein Einsatz, also kein Hub; diese Instanz stellt selbst zu.
+    let Some(einsatz_id) = anlass.einsatz_id() else {
+        let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
+        let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
+        ausliefern(
+            pool,
+            live,
+            anlass,
+            aufgeloest.org_id,
+            &mit_stufe,
+            &HashSet::new(),
+        )
+        .await?;
+        return Ok(aufgeloest.benutzer_ids);
+    };
     // Über den Hub (LLH-1495, design.md D2, D4): der Anlass reist zum Hub, unabhängig davon, ob
     // hier jemand gemeint ist; bietet der Hub Push an, pusht diese Instanz nicht selbst.
     // Ist der Anlass nicht vorgemerkt, erfährt der Hub nichts: dann pusht diese Instanz selbst.
-    let ziele = hub_ziele(pool, anlass.einsatz_id).await;
+    let ziele = hub_ziele(pool, einsatz_id).await;
     let vorgemerkt = match vormerken_fuer_hub(pool, &ziele, anlass).await {
         Ok(()) => true,
         Err(e) => {
-            tracing::warn!(einsatz_id = anlass.einsatz_id, fehler = %e, "Hinweis für den Hub nicht vorgemerkt");
+            tracing::warn!(einsatz_id, fehler = %e, "Hinweis für den Hub nicht vorgemerkt");
             false
         }
     };
@@ -619,7 +682,7 @@ async fn ausliefern(
             (
                 benutzer_id,
                 BenachrichtigungEreignis {
-                    einsatz_id: anlass.einsatz_id,
+                    einsatz_id: anlass.einsatz_id(),
                     benachrichtigung_id: id,
                     art: anlass.art,
                     stufe,
@@ -631,7 +694,7 @@ async fn ausliefern(
             )
         })
         .collect();
-    zustellen(live, org_id, anlass.einsatz_id, anlass.art, &ereignisse);
+    zustellen(live, org_id, anlass.einsatz_id(), anlass.art, &ereignisse);
     // Web Push an die Geräte der Empfänger (LLH-1223, Spec `web-push`): dieselbe Nutzlast wie
     // das Live-Ereignis, in einem eigenen Task; ohne `--web-push` nichts.
     if let Some(web_push) = live.web_push() {
@@ -716,26 +779,65 @@ async fn quittiert_zustellen(
         .await
         .unwrap_or(None);
     if let Some(org_id) = org_id {
-        let ereignisse: Vec<(i64, BenachrichtigungEreignis)> = zeilen
-            .iter()
-            .map(|z| {
-                (
-                    z.benutzer_id,
-                    BenachrichtigungEreignis {
-                        einsatz_id: z.einsatz_id,
-                        benachrichtigung_id: z.id,
-                        art: z.art,
-                        stufe: z.stufe,
-                        bezug_typ: z.bezug_typ,
-                        bezug_id: z.bezug_id,
-                        quittiert: true,
-                        gelesen_bis: None,
-                    },
-                )
-            })
-            .collect();
-        zustellen(live, org_id, einsatz_id, art, &ereignisse);
+        zustellen(
+            live,
+            org_id,
+            Some(einsatz_id),
+            art,
+            &quittier_ereignisse(zeilen),
+        );
     }
+}
+
+/// Das Quittier-Ereignis je Zeile, an ihren Empfänger.
+fn quittier_ereignisse(zeilen: &[repo::Zeile]) -> Vec<(i64, BenachrichtigungEreignis)> {
+    zeilen
+        .iter()
+        .map(|z| {
+            (
+                z.benutzer_id,
+                BenachrichtigungEreignis {
+                    einsatz_id: z.einsatz_id,
+                    benachrichtigung_id: z.id,
+                    art: z.art,
+                    stufe: z.stufe,
+                    bezug_typ: z.bezug_typ,
+                    bezug_id: z.bezug_id,
+                    quittiert: true,
+                    gelesen_bis: None,
+                },
+            )
+        })
+        .collect()
+}
+
+/// Erledigt die offenen Störungsmeldungen eines Adapters für ALLE Empfänger (LLH-2026): er läuft
+/// wieder, oder ein Admin hat eingegriffen. Jeder Empfänger bekommt sein Quittier-Ereignis über
+/// den Org-Kanal. Die Entwarnung bleibt stehen. Wie [`melden`] lässt ein Fehler nichts scheitern.
+/// Liefert die Zahl der erledigten Zeilen.
+pub async fn erledigen_adapter(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    org_id: i64,
+    adapter_id: &str,
+) -> usize {
+    let zeilen = match repo::quittieren_fuer_adapter(pool, adapter_id).await {
+        Ok(z) => z,
+        Err(e) => {
+            tracing::warn!(adapter = adapter_id, fehler = %e, "Störungsmeldungen nicht erledigt");
+            return 0;
+        }
+    };
+    for z in &zeilen {
+        zustellen(
+            live,
+            org_id,
+            None,
+            z.art,
+            &quittier_ereignisse(std::slice::from_ref(z)),
+        );
+    }
+    zeilen.len()
 }
 
 /// Richtet die Benachrichtigungen eines Bezugs neu aus, wenn sich sein Adressat ändert (LLH-1381:
@@ -769,7 +871,7 @@ async fn umadressieren_mit_fehler(
 ) -> Result<(), crate::error::AppError> {
     debug_assert!(neu
         .as_ref()
-        .is_none_or(|a| a.einsatz_id == einsatz_id && a.art == art && a.bezug == bezug));
+        .is_none_or(|a| a.einsatz_id() == Some(einsatz_id) && a.art == art && a.bezug == bezug));
     let aufgeloest = match &neu {
         Some(anlass) => Some(aufloesung::empfaenger(pool, anlass).await?),
         None => None,
@@ -820,7 +922,7 @@ pub async fn gelesen_bis(
     let zeilen = repo::gelesen_bis(pool, benutzer_id, einsatz_id, bis_id).await?;
     if let Some(j) = zeilen.iter().max_by_key(|z| z.id) {
         let ereignis = BenachrichtigungEreignis {
-            einsatz_id,
+            einsatz_id: Some(einsatz_id),
             benachrichtigung_id: j.id,
             art: j.art,
             stufe: j.stufe,
@@ -829,7 +931,13 @@ pub async fn gelesen_bis(
             quittiert: true,
             gelesen_bis: Some(bis_id),
         };
-        zustellen(live, org_id, einsatz_id, j.art, &[(benutzer_id, ereignis)]);
+        zustellen(
+            live,
+            org_id,
+            Some(einsatz_id),
+            j.art,
+            &[(benutzer_id, ereignis)],
+        );
     }
     Ok(zeilen.len())
 }
@@ -838,11 +946,12 @@ pub async fn gelesen_bis(
 /// an diesen Nutzer. Einsatz-Arten gehen als EINE Nachricht in den Einsatz-Strom (ein Platz im
 /// Ring, gleich wie viele Empfänger), jede Verbindung bekommt nur die Nutzlast ihres Nutzers;
 /// Org-Arten gehen einzeln über den Org-Kanal (ohne Ring). Auch das Quittier-Ereignis geht
-/// diesen Weg, dann mit einem einzigen Eintrag.
+/// diesen Weg, dann mit einem einzigen Eintrag. `einsatz_id` ist `None` nur bei einer Org-Art am
+/// Adapter (LLH-2026).
 pub fn zustellen(
     live: &LiveHub,
     org_id: i64,
-    einsatz_id: i64,
+    einsatz_id: Option<i64>,
     art: BenachrichtigungArt,
     ereignisse: &[(i64, BenachrichtigungEreignis)],
 ) {
@@ -854,7 +963,7 @@ pub fn zustellen(
         for (benutzer_id, e) in ereignisse {
             live.publiziere_org_benachrichtigung(org_id, nutzlast(e), vec![*benutzer_id]);
         }
-    } else {
+    } else if let Some(einsatz_id) = einsatz_id {
         live.publiziere_an(
             einsatz_id,
             LiveEvent::Benachrichtigung,

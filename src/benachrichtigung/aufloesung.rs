@@ -18,7 +18,7 @@
 //! Dieselbe Rechteprüfung ([`Leserecht`]) gilt erneut beim Lesen einer Benachrichtigung.
 
 use super::vorgabe::{self, VorgabeFunktion};
-use super::{Adressat, Anlass, BenachrichtigungArt, BenachrichtigungStufe};
+use super::{Adressat, Anlass, BenachrichtigungArt, BenachrichtigungStufe, Ort};
 use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{darf_lesen, lade_modul_regeln, modul_freigabe};
 use crate::einsatz::modul_override::EinsatzModulOverride;
@@ -110,7 +110,14 @@ impl Leserecht {
 
 /// Löst die Empfänger eines Anlasses auf (Regeln im Modulkopf).
 pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest, AppError> {
-    let recht = Leserecht::laden(pool, anlass.einsatz_id).await?;
+    let einsatz_id = match &anlass.ort {
+        Ort::Einsatz(id) => *id,
+        // Ohne Einsatz (LLH-2026): eigene Regeln in `super::adapter`.
+        Ort::Adapter { org_id, .. } => {
+            return super::adapter::empfaenger(pool, *org_id, anlass).await
+        }
+    };
+    let recht = Leserecht::laden(pool, einsatz_id).await?;
     let einsatz_id = recht.einsatz.id;
 
     // Je Kandidat die Wege, auf denen er adressiert ist: `None` = ohne eigenes Modul (Funktion,
@@ -140,6 +147,8 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
                     .collect(),
                 None,
             ),
+            // Nur am Adapter-Ort gemeint; im Einsatz erreicht er niemanden.
+            Adressat::OrgAdmins => (Vec::new(), None),
             Adressat::Fuehrungskraefte => (
                 org_nutzer(pool, recht.einsatz.org_id)
                     .await?
@@ -298,7 +307,7 @@ const BENUTZER_SPALTEN: &str = "b.id, b.org_id, b.anzeigename, b.benutzername, b
      b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at";
 
 /// Aktive Konten einer Organisation ohne Gerätekonten.
-async fn org_nutzer(pool: &SqlitePool, org_id: i64) -> Result<Vec<Benutzer>, AppError> {
+pub(super) async fn org_nutzer(pool: &SqlitePool, org_id: i64) -> Result<Vec<Benutzer>, AppError> {
     let sql = format!(
         "SELECT {BENUTZER_SPALTEN} FROM benutzer b WHERE b.org_id = ? AND b.aktiv = 1 \
          AND NOT EXISTS (SELECT 1 FROM geraet_kopplung g WHERE g.benutzer_id = b.id) \
@@ -327,7 +336,7 @@ async fn personen_konten(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Benutzer>
 
 /// Wer von `ids` die Art `art` abgeschaltet hat (Schlüssel `benachrichtigungen_aus`, D6). Ein
 /// unlesbarer Wert schaltet nichts ab: lieber eine Benachrichtigung zu viel als eine verlorene.
-async fn abgeschaltet_fuer(
+pub(super) async fn abgeschaltet_fuer(
     pool: &SqlitePool,
     ids: &[i64],
     art: BenachrichtigungArt,

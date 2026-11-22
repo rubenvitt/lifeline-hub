@@ -1,7 +1,8 @@
 //! Speicher der Benachrichtigungen (design.md D1): eine Zeile je Empfänger, ohne Text.
 //!
 //! Jede Lese- und Schreibfunktion außer [`anlegen`], [`quittieren_fuer_bezug`],
-//! [`empfaenger_des_bezugs`], [`quittieren_fuer_bezug_ausser`] und [`aufraeumen`] ist an EINEN
+//! [`quittieren_fuer_adapter`], [`empfaenger_des_bezugs`], [`quittieren_fuer_bezug_ausser`] und
+//! [`aufraeumen`] ist an EINEN
 //! Empfänger gebunden, dessen Kennung die Route aus der Sitzung nimmt: eine fremde Zeile ist so
 //! unerreichbar (404), nicht nur verboten.
 
@@ -29,7 +30,10 @@ pub const LISTE_MAX: i64 = 200;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Zeile {
     pub id: i64,
-    pub einsatz_id: i64,
+    /// Der Einsatz; `None` bei einer Zeile am Adapter (LLH-2026).
+    pub einsatz_id: Option<i64>,
+    /// Der Adapter einer Störungsmeldung (LLH-2026); sonst `None`.
+    pub adapter_id: Option<String>,
     pub benutzer_id: i64,
     pub art: BenachrichtigungArt,
     pub stufe: BenachrichtigungStufe,
@@ -46,7 +50,8 @@ pub struct Zeile {
 
 type RohZeile = (
     i64,
-    i64,
+    Option<i64>,
+    Option<String>,
     i64,
     String,
     String,
@@ -58,7 +63,7 @@ type RohZeile = (
     Option<i64>,
 );
 
-const SPALTEN: &str = "id, einsatz_id, benutzer_id, art, stufe, bezug_typ, bezug_id, \
+const SPALTEN: &str = "id, einsatz_id, adapter_id, benutzer_id, art, stufe, bezug_typ, bezug_id, \
      erstellt_at, quittiert_at, einheit_id, durch_einheit_id";
 
 /// Eine Zeile mit unbekanntem Katalogwert (Datenbank neuer als der Code) fällt weg, statt die
@@ -67,15 +72,16 @@ fn aus_roh(r: RohZeile) -> Option<Zeile> {
     Some(Zeile {
         id: r.0,
         einsatz_id: r.1,
-        benutzer_id: r.2,
-        art: BenachrichtigungArt::parse(&r.3)?,
-        stufe: BenachrichtigungStufe::parse(&r.4)?,
-        bezug_typ: BenachrichtigungBezugTyp::parse(&r.5)?,
-        bezug_id: r.6,
-        erstellt_at: r.7,
-        quittiert_at: r.8,
-        einheit_id: r.9,
-        durch_einheit_id: r.10,
+        adapter_id: r.2,
+        benutzer_id: r.3,
+        art: BenachrichtigungArt::parse(&r.4)?,
+        stufe: BenachrichtigungStufe::parse(&r.5)?,
+        bezug_typ: BenachrichtigungBezugTyp::parse(&r.6)?,
+        bezug_id: r.7,
+        erstellt_at: r.8,
+        quittiert_at: r.9,
+        einheit_id: r.10,
+        durch_einheit_id: r.11,
     })
 }
 
@@ -93,12 +99,13 @@ pub async fn anlegen(
     for &(benutzer_id, stufe) in empfaenger {
         let quittiert = (stufe == BenachrichtigungStufe::Still).then_some(&jetzt);
         let id: i64 = sqlx::query_scalar(
-            "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
-                 bezug_id, ausloeser_id, erstellt_at, quittiert_at, einheit_id, \
+            "INSERT INTO benachrichtigung (einsatz_id, adapter_id, benutzer_id, art, stufe, \
+                 bezug_typ, bezug_id, ausloeser_id, erstellt_at, quittiert_at, einheit_id, \
                  durch_einheit_id) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
-        .bind(anlass.einsatz_id)
+        .bind(anlass.einsatz_id())
+        .bind(anlass.adapter_id())
         .bind(benutzer_id)
         .bind(anlass.art.as_str())
         .bind(stufe.as_str())
@@ -258,6 +265,29 @@ pub async fn quittieren_fuer_bezug(
         .bind(art.as_str())
         .bind(typ.as_str())
         .bind(serde_json::to_string(ids).expect("ID-Liste serialisierbar"))
+        .fetch_all(pool)
+        .await?;
+    let mut zeilen: Vec<Zeile> = roh.into_iter().filter_map(aus_roh).collect();
+    zeilen.sort_by_key(|z| z.id);
+    Ok(zeilen)
+}
+
+/// Quittiert die offenen Störungsmeldungen eines Adapters für ALLE Empfänger (LLH-2026): der
+/// Adapter läuft wieder, oder ein Admin hat eingegriffen. Wie [`quittieren_fuer_bezug`] nicht an
+/// einen Empfänger gebunden. Liefert die jetzt quittierten Zeilen.
+pub async fn quittieren_fuer_adapter(
+    pool: &SqlitePool,
+    adapter_id: &str,
+) -> Result<Vec<Zeile>, AppError> {
+    let sql = format!(
+        "UPDATE benachrichtigung SET quittiert_at = ? \
+         WHERE adapter_id = ? AND quittiert_at IS NULL \
+           AND art IN ('adapter_eingriff', 'adapter_gestoert') \
+         RETURNING {SPALTEN}"
+    );
+    let roh = sqlx::query_as::<_, RohZeile>(sqlx::AssertSqlSafe(sql))
+        .bind(crate::zeit::jetzt())
+        .bind(adapter_id)
         .fetch_all(pool)
         .await?;
     let mut zeilen: Vec<Zeile> = roh.into_iter().filter_map(aus_roh).collect();

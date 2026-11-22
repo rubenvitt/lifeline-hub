@@ -119,6 +119,9 @@ fn adressat_lokal(a: &Adressat) -> AdressatLokal {
         Adressat::ModulSchreiber(m) => ("modul_schreiber", Some((*m).to_string())),
         Adressat::Fuehrungskraefte => ("fuehrungskraefte", None),
         Adressat::Einsatzleitung => ("einsatzleitung", None),
+        // Reist nie: ein Anlass am Adapter hat keinen Einsatz und keine Hub-Ziele (LLH-2026).
+        // Die erreichte Seite kennt die Textform nicht und verwirft ihn.
+        Adressat::OrgAdmins => ("org_admins", None),
     };
     AdressatLokal {
         art: art.into(),
@@ -246,6 +249,10 @@ pub async fn vormerken(
     ziele: &[Ziel],
     anlass: &Anlass,
 ) -> Result<(), sqlx::Error> {
+    // Ohne Einsatz (Adapter, LLH-2026) reist nichts.
+    let Some(einsatz_id) = anlass.einsatz_id() else {
+        return Ok(());
+    };
     if ziele.is_empty() {
         return Ok(());
     }
@@ -264,7 +271,7 @@ pub async fn vormerken(
         einheit_id: anlass.einheit_id,
         durch_einheit_id: anlass.durch_einheit_id,
     };
-    schreiben(conn, ziele, anlass.einsatz_id, &daten).await
+    schreiben(conn, ziele, einsatz_id, &daten).await
 }
 
 /// Merkt „für alle erledigt“ für die erreichte Seite vor (D5); Transaktion und Wecken wie bei
