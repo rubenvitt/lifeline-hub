@@ -110,6 +110,17 @@ macro_rules! vollzug_join_sql {
     };
 }
 
+/// Der Auftrag, auf den eine Erinnerung (`e`) zeigt, ist offen: Bearbeitungsstatus aus
+/// [`bearbeitungsstatus_sql`], offen nach [`super::AuftragBearbeitungsstatus::ist_offen`] (Test
+/// unten), ohne Platzhalter. Für `erinnerung::AM_BEZUG_GETRAGEN` (LLH-1908).
+pub(crate) const BEZUG_OFFEN_SQL: &str = concat!(
+    "EXISTS (SELECT 1 FROM auftrag a",
+    vollzug_join_sql!(),
+    " WHERE a.id = e.bezug_id AND ",
+    bearbeitungsstatus_sql!(),
+    " IN ('offen', 'in_arbeit'))"
+);
+
 /// SELECT-Projektion inkl. Vollzugs-Achse (LEFT JOIN kommunikation_status),
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
@@ -1684,6 +1695,17 @@ mod tests {
     use crate::kommunikation::{
         repo as krepo, AdressatKategorie, Richtung, OBJEKT_AUFTRAG, VOLLZUG_VOLLZOGEN,
     };
+
+    /// `BEZUG_OFFEN_SQL` nennt genau die offenen Bearbeitungsstatus; ein neuer Status zieht die
+    /// Liste dort nach (LLH-1908).
+    #[test]
+    fn bezug_offen_sql_nennt_die_offenen_status() {
+        let liste = &BEZUG_OFFEN_SQL[BEZUG_OFFEN_SQL.rfind(" IN (").unwrap()..];
+        for s in AuftragBearbeitungsstatus::ALLE {
+            let genannt = liste.contains(&format!("'{}'", s.as_str()));
+            assert_eq!(genannt, s.ist_offen(), "{}", s.as_str());
+        }
+    }
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")

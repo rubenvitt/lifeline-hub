@@ -54,35 +54,40 @@ const ANZEIGE_SELECT: &str = concat!(
 
 /// Modulzähler der Erinnerungen (LFH-935): offen und fällig, per `COUNT(*)` über
 /// `idx_erinnerung_einsatz_status`. Dasselbe Fälligkeits-Fragment wie [`ANZEIGE_SELECT`].
-/// Automatische Fristen mit einem Bezugstyp aus `am_bezug` zählen nicht: Sie stehen am Bezug
-/// (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“; die Menge bildet
-/// [`super::am_bezug_getragen`]). Bind-Reihenfolge: `einsatz_id`, Status, `jetzt`, dann
-/// `am_bezug`.
+/// Automatische Fristen mit einem Bezugstyp aus `am_bezug` zählen nicht, solange ihr Bezug offen
+/// ist: Sie stehen am Bezug (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“;
+/// die Menge bildet [`super::am_bezug_getragen`]). Bind-Reihenfolge: `einsatz_id`, Status,
+/// `jetzt`, Quelle, dann die Typen aus `am_bezug`.
 pub async fn faellige_offene(
     pool: &SqlitePool,
     einsatz_id: i64,
     jetzt: &str,
-    am_bezug: &[&str],
+    am_bezug: &[&super::AmBezug],
 ) -> Result<i64, AppError> {
     let mut sql = String::from(concat!(
         "SELECT COUNT(*) FROM erinnerung e WHERE e.einsatz_id = ? AND e.status = ? AND ",
         ist_faellig_sql!()
     ));
     if !am_bezug.is_empty() {
-        let platzhalter = vec!["?"; am_bezug.len()].join(", ");
+        let je_typ: Vec<String> = am_bezug
+            .iter()
+            .map(|b| format!("(e.bezug_typ = ? AND {})", b.offen_sql))
+            .collect();
         sql.push_str(&format!(
-            " AND NOT (e.quelle = ? AND e.bezug_typ IN ({platzhalter}))"
+            " AND NOT (e.quelle = ? AND ({}))",
+            je_typ.join(" OR ")
         ));
     }
-    // Eingesetzt werden nur Platzhalter „?“; alle Werte gehen als Bind.
+    // Eingesetzt werden nur Platzhalter „?“ und die festen Bedingungen aus
+    // `AM_BEZUG_GETRAGEN`; alle Werte gehen als Bind.
     let mut q = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
         .bind(einsatz_id)
         .bind(STATUS_OFFEN)
         .bind(jetzt);
     if !am_bezug.is_empty() {
         q = q.bind(super::QUELLE_AUTO_FRIST);
-        for typ in am_bezug {
-            q = q.bind(*typ);
+        for b in am_bezug {
+            q = q.bind(b.typ);
         }
     }
     q.fetch_one(pool).await.map_err(Into::into)
@@ -979,8 +984,8 @@ mod tests {
 
     /// Eine automatische Frist mit Bezug auf Meldung, Auftrag oder Ablösung zählt am Bezug, nicht
     /// als fällige Erinnerung (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am
-    /// Bezug“); aber nur, wenn das Modul des Bezugs frei ist. Planungshinweis und selbst angelegte
-    /// Erinnerungen mit Bezug zählen weiter.
+    /// Bezug“); aber nur, wenn das Modul des Bezugs frei und der Bezug offen ist. Planungshinweis
+    /// und selbst angelegte Erinnerungen mit Bezug zählen weiter.
     #[tokio::test]
     async fn faellige_offene_laesst_am_bezug_getragene_aus() {
         let pool = crate::db::test_pool().await;
@@ -1009,18 +1014,20 @@ mod tests {
         let jetzt = "2026-06-11 10:05:00";
         assert_eq!(faellige_offene(&pool, e, jetzt, &[]).await.unwrap(), 6);
         let alle_frei = crate::erinnerung::am_bezug_getragen(|_| true);
+        // Meldung 3 und Auftrag 4 gibt es nicht, ihr Bezug ist also nicht offen: Ihre Fristen
+        // zählen weiter. Offene Bezüge prüft `tests/modul_zaehler.rs` mit echten Zeilen.
         assert_eq!(
             faellige_offene(&pool, e, jetzt, &alle_frei).await.unwrap(),
-            2,
-            "Planungshinweis und selbst angelegte bleiben"
+            4,
+            "Planungshinweis, selbst angelegte und Fristen ohne offenen Bezug bleiben"
         );
-        let ohne_meldungen = crate::erinnerung::am_bezug_getragen(|m| m != "meldungen");
+        let ohne_abloesung = crate::erinnerung::am_bezug_getragen(|m| m != "abloesung");
         assert_eq!(
-            faellige_offene(&pool, e, jetzt, &ohne_meldungen)
+            faellige_offene(&pool, e, jetzt, &ohne_abloesung)
                 .await
                 .unwrap(),
-            3,
-            "ohne Modul Meldungen zählt die Bestätigungsfrist als Erinnerung"
+            6,
+            "ohne Modul Ablösung zählen ihre Fristen als Erinnerung"
         );
     }
 

@@ -346,11 +346,14 @@ async fn menge(
 }
 
 /// Berechnet die Zähler aller Module in `erlaubt`; alle anderen Felder bleiben `None`.
+/// `sichtbar` sind die Module, die die Person in der Navigation sieht: Nur dort steht eine
+/// automatische Frist am Bezug (LLH-1908); ein System-Admin erreicht auch ausgeblendete Module.
 pub async fn berechne(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer: &Benutzer,
     erlaubt: &HashSet<&'static str>,
+    sichtbar: &HashSet<&'static str>,
     jetzt: &str,
 ) -> Result<ModulZaehlerAnzeige, AppError> {
     let mut z = ModulZaehlerAnzeige::default();
@@ -405,13 +408,15 @@ pub async fn berechne(
     }
     if erlaubt.contains("erinnerungen") {
         z.erinnerungen = Some(ErinnerungsZaehler {
-            // Automatische Fristen zählen am Bezug, wenn dessen Modul erlaubt ist (LLH-1908,
-            // `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“).
+            // Automatische Fristen zählen am offenen Bezug, wenn die Person dessen Modul sieht
+            // (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“).
             faellig: crate::erinnerung::repo::faellige_offene(
                 pool,
                 einsatz_id,
                 jetzt,
-                &crate::erinnerung::am_bezug_getragen(|m| erlaubt.contains(m)),
+                &crate::erinnerung::am_bezug_getragen(|m| {
+                    erlaubt.contains(m) && sichtbar.contains(m)
+                }),
             )
             .await?,
         });

@@ -2,7 +2,7 @@
 //! [`crate::einsatz::zaehler`].
 
 use crate::app::AppState;
-use crate::einsatz::berechtigung::erlaubte_module;
+use crate::einsatz::berechtigung::modul_freigaben;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::einsatz::zaehler::{self, ModulZaehlerAnzeige};
 use crate::error::AppError;
@@ -19,7 +19,7 @@ pub async fn liste(
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<ModulZaehlerAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let mut erlaubt = erlaubte_module(
+    let freigaben = modul_freigaben(
         &state.pool,
         einsatz_id,
         ctx.einsatz.org_id,
@@ -27,6 +27,17 @@ pub async fn liste(
         ctx.modul_rolle(),
     )
     .await?;
+    // Wie `erlaubte_module`; dazu, was die Person sieht (LLH-1908, `zaehler::berechne`).
+    let mut erlaubt: std::collections::HashSet<&'static str> = freigaben
+        .iter()
+        .filter(|(_, f)| f.zugriff)
+        .map(|(key, _)| *key)
+        .collect();
+    let sichtbar: std::collections::HashSet<&'static str> = freigaben
+        .iter()
+        .filter(|(_, f)| f.sichtbar)
+        .map(|(key, _)| *key)
+        .collect();
     // Ein Gerät (LFH-892) zählt nur die Module seiner Ansicht.
     if let Some(g) = &ctx.geraet {
         erlaubt = g.schneide_module(erlaubt);
@@ -50,6 +61,14 @@ pub async fn liste(
     }
     let jetzt = crate::zeit::jetzt();
     Ok(Json(
-        zaehler::berechne(&state.pool, einsatz_id, &ctx.benutzer, &erlaubt, &jetzt).await?,
+        zaehler::berechne(
+            &state.pool,
+            einsatz_id,
+            &ctx.benutzer,
+            &erlaubt,
+            &sichtbar,
+            &jetzt,
+        )
+        .await?,
     ))
 }

@@ -128,26 +128,49 @@ pub const INTERVALL_MAX_MINUTEN: i64 = 7 * 24 * 60;
 pub const QUELLE_MANUELL: &str = "manuell";
 pub const QUELLE_AUTO_FRIST: &str = "auto_frist";
 
-/// Automatische Fristen, die ihr Bezug selbst trägt (LLH-1908, `src/AGENTS.md`, „Automatische
-/// Fristen stehen am Bezug“): Bezugstyp und das Modul, in dem die Frist schon steht. Gegenstück
-/// zu `AM_BEZUG_GETRAGEN` in `frontend/src/erinnerung/amBezug.ts`; eine neue Auto-Frist-Art zieht
-/// beide nach. Der Planungshinweis der Ablösung fehlt bewusst: ihn zeigt sonst nichts.
-pub const AM_BEZUG_GETRAGEN: &[(&str, &str)] = &[
-    (crate::kommunikation::OBJEKT_MELDUNG, "meldungen"),
-    (crate::kommunikation::OBJEKT_AUFTRAG, "auftraege"),
-    (crate::kommunikation::OBJEKT_ABLOESUNG, "abloesung"),
-    (
-        crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG,
-        "abloesung",
-    ),
+/// Eine automatische Frist, die ihr Bezug selbst trägt (LLH-1908, `src/AGENTS.md`,
+/// „Automatische Fristen stehen am Bezug“).
+#[derive(Debug, PartialEq, Eq)]
+pub struct AmBezug {
+    /// `bezug_typ` der Frist.
+    pub typ: &'static str,
+    /// Modul, in dem die Frist schon steht.
+    pub modul: &'static str,
+    /// SQL-Bedingung über die Erinnerung `e`, die gilt, solange der Bezug in den Listen offener
+    /// Vorgänge steht; ohne Platzhalter.
+    pub offen_sql: &'static str,
+}
+
+/// Die automatischen Fristen, die ihr Bezug trägt. Gegenstück zu `AM_BEZUG_GETRAGEN` in
+/// `frontend/src/erinnerung/amBezug.ts`; eine neue Auto-Frist-Art zieht beide nach. Der
+/// Planungshinweis der Ablösung fehlt bewusst: ihn zeigt sonst nichts. Ablösungsfristen brauchen
+/// keine Bedingung: die Ablösung schließt sie, wenn sie endet (`close_fristen_tx`).
+pub const AM_BEZUG_GETRAGEN: &[AmBezug] = &[
+    AmBezug {
+        typ: crate::kommunikation::OBJEKT_MELDUNG,
+        modul: "meldungen",
+        offen_sql: crate::meldung::repo::BEZUG_OFFEN_SQL,
+    },
+    AmBezug {
+        typ: crate::kommunikation::OBJEKT_AUFTRAG,
+        modul: "auftraege",
+        offen_sql: crate::auftrag::repo::BEZUG_OFFEN_SQL,
+    },
+    AmBezug {
+        typ: crate::kommunikation::OBJEKT_ABLOESUNG,
+        modul: "abloesung",
+        offen_sql: "1",
+    },
+    AmBezug {
+        typ: crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG,
+        modul: "abloesung",
+        offen_sql: "1",
+    },
 ];
 
-/// Die Bezugstypen aus [`AM_BEZUG_GETRAGEN`], deren Modul `frei` ist: Ihre automatischen Fristen
-/// zählen am Bezug, nicht als fällige Erinnerung ([`repo::faellige_offene`]).
-pub fn am_bezug_getragen(frei: impl Fn(&str) -> bool) -> Vec<&'static str> {
-    AM_BEZUG_GETRAGEN
-        .iter()
-        .filter(|(_, modul)| frei(modul))
-        .map(|(typ, _)| *typ)
-        .collect()
+/// Die Einträge aus [`AM_BEZUG_GETRAGEN`], deren Modul die Person sieht (`frei`): Ihre
+/// automatischen Fristen zählen am offenen Bezug, nicht als fällige Erinnerung
+/// ([`repo::faellige_offene`]).
+pub fn am_bezug_getragen(frei: impl Fn(&str) -> bool) -> Vec<&'static AmBezug> {
+    AM_BEZUG_GETRAGEN.iter().filter(|b| frei(b.modul)).collect()
 }
