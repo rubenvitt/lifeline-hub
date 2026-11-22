@@ -184,3 +184,24 @@ Spike ist; Asset-Liste als neues Feld in `/api/shell`; automatischer Test im Sim
 Namen der neuen Seite, Wirkungen und Typen; Ablage-Format der gespeicherten Oberfläche; die
 genaue Wartezeit der Startprüfung; das Test-Vertrauen für das selbst signierte Zertifikat; wie
 das Ergebnis des Vorwärmens in den Kern zurückkommt.
+
+## Messung auf dem Gerät (Ruben, TestFlight)
+
+Der Build ist zugleich der Spike. Gemessen wird mit dem Protokoll der App (Konsole auf dem Mac,
+Gerät verbunden, Subsystem `dev.rubeen.lifeline.ios`, Kategorie `ohne-server`): Vorwärmen (Zahl,
+Dauer), Laden ohne Server, Startprüfung (Dauer, Ergebnis). Jeder Fall beginnt mit einem Laden
+vom Server, danach mindestens 30 s warten, bis das Protokoll „Vorgewärmt“ meldet.
+
+| Fall | Erwartung | Ergebnis |
+| --- | --- | --- |
+| Flugmodus an, App beenden, kalt starten | Oberfläche mit Lagebild und „OFFLINE“, Erfassen landet in der Queue | steht aus |
+| Server anhalten (Netz da), kalt starten | wie oben | steht aus |
+| Danach Server mit derselben Version starten | binnen 5 s wieder online, kein Neuladen, offene Eingabe bleibt | steht aus |
+| Server mit neuer Version starten | App lädt einmal neu, danach neue Version | steht aus |
+| Ohne Server eine nie geöffnete Seite öffnen (etwa Lagekarte, Fernmeldewesen) | Seite erscheint | steht aus |
+| Speicherdruck: viele Apps und Kamera öffnen, dann zurück | Oberfläche steht wieder (Web-Prozess neu geladen) | steht aus |
+| Gerät neu starten, Flugmodus, App starten | wie Fall 1 | steht aus |
+| Rund 20 h nicht öffnen, dann Flugmodus-Start | wie Fall 1 (nach mehr als 24 h endet die Offline-Identität, dann ist die Anmeldemaske richtig) | steht aus |
+
+Scheitert ein Fall am Cache (Startprüfung `nicht gestartet` im Protokoll), folgt Kandidat 2 als
+eigene Aufgabe mit diesem Protokoll als Herleitung.
