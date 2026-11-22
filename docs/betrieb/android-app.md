@@ -295,9 +295,21 @@ Jeder Punkt mit Ergebnis an die Aufgabe LLH-1989.
   Server getrennt, auch nach mehrfachem Wechsel und Neustart der App.
 - [ ] Start-Skript und Brücke: Haptik, Meldung und Drucken wirken auf dem aktiven Server; auf
   einer fremden Seite (Identitätsanbieter) und in einem eingebetteten Frame nicht.
+- [ ] Origin-Regeln am echten WebView: Server mit Port (`:8443`) und mit IPv6-Adresse
+  (`https://[fd00::1]:8443`): Brücke und Start-Skript wirken. Auf der Seite des
+  Identitätsanbieters ist `window.lifeline` undefiniert (Konsole über `chrome://inspect`).
+- [ ] Unterframes: in einem `<iframe>` derselben Origin gibt es weder `__LIFELINE_HUELLE__` noch
+  ein ersetztes `window.print` (das Start-Skript steigt dort aus).
+- [ ] Späte Antwort der Brücke: einen Druck anstoßen, im Dialog die Seite derselben Origin neu
+  laden (Wischen oder `location.reload()` aus der Konsole), dann drucken oder abbrechen. Die
+  Antwort darf kein Versprechen der neu geladenen Seite erfüllen (deren IDs beginnen wieder
+  bei 1).
 - [ ] Einen nicht aktiven Server entfernen: verschwindet, Profil gelöscht (erneut hinzufügen
   verlangt neue Anmeldung). Den eben noch aktiven Server direkt nach einem Wechsel entfernen
-  (`deleteProfile` kurz nach dem Zerstören des WebViews).
+  (`deleteProfile` kurz nach dem Zerstören des WebViews): wirft es „in use“, kommt die Meldung,
+  und ein zweiter Versuch gelingt.
+- [ ] „Server hinzufügen“ mit einer erreichbaren Adresse, „Verbinden“ und sofort Zurück-Geste:
+  auch nach 10 Sekunden wechselt die App nicht auf den neuen Server, die Liste bleibt.
 - [ ] Ein schneller zweiter Tipp auf einen Link während des Ladens zeigt nicht „Server nicht
   erreichbar“ (`net::ERR_ABORTED`).
 - [ ] Zurück-Geste: im WebView zurück, dann App in den Hintergrund; nie ins Onboarding.
@@ -309,19 +321,42 @@ Jeder Punkt mit Ergebnis an die Aufgabe LLH-1989.
   erreichbar: Warteschlange überträgt sich, ohne dass die App neu lädt.
 - [ ] Ein nie geladener Server im Flugmodus: „Server nicht erreichbar“, lädt von selbst, sobald
   er antwortet.
+- [ ] Erste Sitzung ohne Neustart: Server neu verbinden, Oberfläche laden, App in den
+  Hintergrund, Flugmodus an, warten, bis das System den Render-Prozess beendet (viele andere
+  Apps öffnen; im Logcat steht `onRenderProcessGone`), zurück: die Oberfläche kommt offline,
+  nicht „Server nicht erreichbar“.
+- [ ] Service Worker je Profil: nach einem Server-Update löst der neue Service Worker den alten
+  ab (neue Version in „Über“ der Oberfläche), ohne dass die App neu installiert wird.
 
 **Anmeldung, Druck, Meldung, Dateien**
 
 - [ ] „Im Browser anmelden“ mit Chrome als Standardbrowser (Auth Tab) und mit Samsung Internet
   (Custom Tab): Anmeldung kommt in der App an; Tab ohne Anmeldung schließen lässt die
   Anmeldeseite stehen; `lifeline://anmeldung` von außen (Link in einer Notiz) bewirkt nichts.
-- [ ] Drucken (Liste, ETB) über den Druckdialog, auch abbrechen.
+  Kommt der Rücksprung vor `onResume` an? Beendet das System während der Anmeldung den
+  Render-Prozess (siehe „Ohne Netz“), kommt die Anmeldung trotzdem an.
+- [ ] Drucken (Liste, ETB) über den Druckdialog, auch abbrechen. Löst der Druck
+  `beforeprint`/`afterprint` aus (`useDruckModus`)? Bleibt der Live-Strom nach dem Druck
+  verbunden?
+- [ ] Neue Fenster: `target=_blank` und `window.open` (auch mit `noopener` und aus asynchronem
+  Code, das bei `javaScriptCanOpenWindowsAutomatically = false` still blockiert wird) landen
+  über die Linkweiche im selben WebView oder im System; eine Dateiroute im neuen Fenster wird
+  nur einmal geladen (Server-Log: kein doppelter GET).
 - [ ] Erste Meldung fragt nach der Erlaubnis (Android 13+); abgelehnt kommt keine, erlaubt
   erscheint sie im Kanal „Lifeline“.
 - [ ] CSV-Export und Anhang vom Server: Download mit Sitzung (keine Anmeldeseite in der Datei),
   Dateiname stimmt, Teilen-Blatt bietet „Eigene Dateien“, Mail usw.; ein `blob:`-Download
-  ebenso.
-- [ ] Haptik auf dem Tablet (ohne Vibrationsmotor: kein Fehler) und auf einem Handy.
+  ebenso. Mit Nutzer-CA (mkcert): Vertragsabruf und Downloads folgen ihr wie der WebView.
+- [ ] Große `blob:`-Downloads (am Spiegel, Anhang 25 MB, Archiv um 50 MB): kommt die Nachricht
+  über die Brücke an (Grenze der WebMessage?), wie lange dauert es, friert die Oberfläche, und
+  bleibt die App ohne `OutOfMemoryError`?
+- [ ] Dateiwahl: „Anhang“ in der ETB-Schnellerfassung und ein Dokument hochladen öffnen die
+  Dateiwahl mit den passenden Typen (PDF, Bilder); Mehrfachwahl, wo die Oberfläche sie erlaubt;
+  Abbrechen lässt das Feld leer, ein zweiter Versuch öffnet wieder. Fragt eine Seite nach der
+  Kamera (`getUserMedia`), fragt Android einmal nach der Kamera, und nur der aktive Server
+  bekommt sie.
+- [ ] Haptik auf dem Tablet (ohne Vibrationsmotor: kein Fehler) und auf einem Handy; spürt man
+  `CONFIRM` und `REJECT` unter One UI?
 
 **Updates** (braucht zwei aufeinanderfolgende Alphas)
 
@@ -330,13 +365,24 @@ Jeder Punkt mit Ergebnis an die Aufgabe LLH-1989.
   tippen“. Rückfrage ablehnen: die Oberfläche lädt nach höchstens wenigen Sekunden.
   Gibt die App nach 3 bzw. 60 Sekunden ohne Ergebnis auf, verwirft sie die Sitzung beim System
   (`PackageInstaller.abandonSession`); das Update bleibt bereit.
+- [ ] Dauer der Installation messen, mit und ohne Rückfrage: kehrt die Rückfrage nach
+  „Aktualisieren“ sofort zur App zurück oder zeigt sie „Wird installiert …“? Bleibt die
+  Installation unter 3 Sekunden nach der Rückkehr bzw. unter 60 Sekunden ohne Rückfrage? Gibt
+  die App auf, darf danach keine Installation mehr unter der Oberfläche kommen.
 - [ ] Ab dem zweiten Update ohne Rückfrage: App 15 Minuten in den Hintergrund, Update kommt ohne
   Zutun (Zeitpunkt notieren; unter Doze kann WorkManager später laufen).
+- [ ] Bildschirm aus gilt als Hintergrund: Tablet mit bereitem Update 15 Minuten mit
+  ausgeschaltetem Bildschirm liegen lassen; das Update kommt, beim Aufwecken lädt die
+  Oberfläche neu, die Warteschlange ist erhalten.
 - [ ] Nie im Vordergrund: bei offener Oberfläche nur der Hinweis, keine Installation.
 - [ ] Update-Hoheit (Android 14+): dieselbe Alpha erneut über den QR-Code installieren, fragt
   Android nach?
 - [ ] Mit Auto Blocker an: „Installation blockiert“ in den Einstellungen, kein stiller neuer
-  Versuch; nach dem Abschalten „Jetzt prüfen“.
+  Versuch; nach dem Abschalten „Jetzt prüfen“. Meldet das System dabei wirklich
+  `STATUS_FAILURE_BLOCKED` (Logcat)? Sonst verwirft die App die APK und lädt sie alle 4 Stunden
+  neu.
+- [ ] Nutzer-CA eines Proxys (Firmen-WLAN mit TLS-Aufbruch): der Updater lädt nicht über die
+  Nutzer-CA (nur System-CAs für GitHub), die Oberfläche bleibt ungestört.
 - [ ] Download-Host der echten Releases: Das Update lädt (GitHub leitet heute auf
   `release-assets.githubusercontent.com` bzw. `objects.githubusercontent.com` um; ein anderer
   Host scheitert mit „Prüfung fehlgeschlagen“ und gehört in `Updateentscheidung.ERLAUBTE_HOSTS`).
