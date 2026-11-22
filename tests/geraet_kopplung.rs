@@ -8968,14 +8968,15 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     assert_eq!(a["sofort_aelteste_at"], json!(sofort_eingang), "{v}");
     assert_eq!(a["dringend_offen"], json!(1), "{v}");
     assert_eq!(a["auftraege_ueberfaellig"], json!(1), "{v}");
-    // Der überfällige Auftrag legt selbst eine Erinnerung an die Quittierfrist an; die Zahl ist
-    // die des Modulzählers.
+    // Der überfällige Auftrag legt selbst eine Erinnerung an die Quittierfrist an; sie zählt am
+    // Auftrag, nicht als Erinnerung (LLH-1908). Es bleibt die selbst angelegte „Frau Notiz
+    // anrufen“. Die Zahl ist die des Modulzählers.
     let (_, z) = anfrage(&app, "GET", &format!("{basis}/modul-zaehler"), &admin, None).await;
     assert_eq!(
         a["erinnerungen_faellig"], z["erinnerungen"]["faellig"],
         "{z}"
     );
-    assert!(a["erinnerungen_faellig"].as_i64().unwrap() >= 1, "{v}");
+    assert_eq!(a["erinnerungen_faellig"], json!(1), "{v}");
     assert_eq!(a["abschnitte_kritisch"], json!(["UHS Turnhalle"]), "{v}");
     let rueck = a["rueckmeldung_ueberfaellig"].as_array().unwrap();
     assert_eq!(rueck.len(), 1, "{v}");

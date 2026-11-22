@@ -54,23 +54,38 @@ const ANZEIGE_SELECT: &str = concat!(
 
 /// Modulzähler der Erinnerungen (LFH-935): offen und fällig, per `COUNT(*)` über
 /// `idx_erinnerung_einsatz_status`. Dasselbe Fälligkeits-Fragment wie [`ANZEIGE_SELECT`].
-/// Bind-Reihenfolge: `einsatz_id`, Status, dann `jetzt`.
+/// Automatische Fristen mit einem Bezugstyp aus `am_bezug` zählen nicht: Sie stehen am Bezug
+/// (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“; die Menge bildet
+/// [`super::am_bezug_getragen`]). Bind-Reihenfolge: `einsatz_id`, Status, `jetzt`, dann
+/// `am_bezug`.
 pub async fn faellige_offene(
     pool: &SqlitePool,
     einsatz_id: i64,
     jetzt: &str,
+    am_bezug: &[&str],
 ) -> Result<i64, AppError> {
-    const SQL: &str = concat!(
+    let mut sql = String::from(concat!(
         "SELECT COUNT(*) FROM erinnerung e WHERE e.einsatz_id = ? AND e.status = ? AND ",
         ist_faellig_sql!()
-    );
-    sqlx::query_scalar(SQL)
+    ));
+    if !am_bezug.is_empty() {
+        let platzhalter = vec!["?"; am_bezug.len()].join(", ");
+        sql.push_str(&format!(
+            " AND NOT (e.quelle = ? AND e.bezug_typ IN ({platzhalter}))"
+        ));
+    }
+    // Eingesetzt werden nur Platzhalter „?“; alle Werte gehen als Bind.
+    let mut q = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
         .bind(einsatz_id)
         .bind(STATUS_OFFEN)
-        .bind(jetzt)
-        .fetch_one(pool)
-        .await
-        .map_err(Into::into)
+        .bind(jetzt);
+    if !am_bezug.is_empty() {
+        q = q.bind(super::QUELLE_AUTO_FRIST);
+        for typ in am_bezug {
+            q = q.bind(*typ);
+        }
+    }
+    q.fetch_one(pool).await.map_err(Into::into)
 }
 
 /// Lädt eine Erinnerung als Anzeige; `NotFound`, wenn sie nicht existiert. Bind-Reihenfolge:
@@ -960,6 +975,53 @@ mod tests {
 
         let alle = liste(&pool, e, false, "2026-06-11 10:05:00").await.unwrap();
         assert_eq!(alle.len(), 1, "nur eine Auto-Erinnerung je Bezug");
+    }
+
+    /// Eine automatische Frist mit Bezug auf Meldung, Auftrag oder Ablösung zählt am Bezug, nicht
+    /// als fällige Erinnerung (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am
+    /// Bezug“); aber nur, wenn das Modul des Bezugs frei ist. Planungshinweis und selbst angelegte
+    /// Erinnerungen mit Bezug zählen weiter.
+    #[tokio::test]
+    async fn faellige_offene_laesst_am_bezug_getragene_aus() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let faellig = "2026-06-11 10:00:00";
+        let mut conn = pool.acquire().await.unwrap();
+        for (typ, id) in [
+            ("meldung", 3),
+            ("auftrag", 4),
+            ("abloesung", 7),
+            ("abloesung_vorwarnung", 7),
+            ("abloesung_planung", 7),
+        ] {
+            setze_auto_frist_tx(&mut conn, e, b, typ, id, "Frist", faellig)
+                .await
+                .unwrap();
+        }
+        drop(conn);
+        let mut selbst = daten("Rückfrage", faellig, None);
+        selbst.bezug_typ = Some("meldung");
+        selbst.bezug_id = Some(3);
+        anlegen(&pool, e, b, selbst, "2026-06-11 09:00:00")
+            .await
+            .unwrap();
+
+        let jetzt = "2026-06-11 10:05:00";
+        assert_eq!(faellige_offene(&pool, e, jetzt, &[]).await.unwrap(), 6);
+        let alle_frei = crate::erinnerung::am_bezug_getragen(|_| true);
+        assert_eq!(
+            faellige_offene(&pool, e, jetzt, &alle_frei).await.unwrap(),
+            2,
+            "Planungshinweis und selbst angelegte bleiben"
+        );
+        let ohne_meldungen = crate::erinnerung::am_bezug_getragen(|m| m != "meldungen");
+        assert_eq!(
+            faellige_offene(&pool, e, jetzt, &ohne_meldungen)
+                .await
+                .unwrap(),
+            3,
+            "ohne Modul Meldungen zählt die Bestätigungsfrist als Erinnerung"
+        );
     }
 
     /// Eine verschobene Auto-Frist löst zum neuen Zeitpunkt erneut aus; sonst bliebe eine schon

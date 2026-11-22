@@ -275,8 +275,19 @@ pub async fn alarm(
 ) -> Result<LagemonitorAlarm, AppError> {
     let meldungen = crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
     let auftraege = crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt).await?;
-    let erinnerungen_faellig =
-        crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?;
+    // Bestätigungs- und Quittierfristen zählen schon in `bestaetigung_ueberfaellig` und
+    // `auftraege_ueberfaellig` (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen am
+    // Bezug“). Ablösungen zeigt die Alarmzeile nicht; ihre Fristen bleiben Erinnerungen.
+    let erinnerungen_faellig = crate::erinnerung::repo::faellige_offene(
+        pool,
+        einsatz_id,
+        jetzt,
+        &[
+            crate::kommunikation::OBJEKT_MELDUNG,
+            crate::kommunikation::OBJEKT_AUFTRAG,
+        ],
+    )
+    .await?;
     let nachforderungen = crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
 
     // Rückmeldung je Einheit wie der Hinweis „Rückmeldung überfällig“ und das Meldebild

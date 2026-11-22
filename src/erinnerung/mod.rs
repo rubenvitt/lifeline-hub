@@ -127,3 +127,27 @@ pub const INTERVALL_MAX_MINUTEN: i64 = 7 * 24 * 60;
 
 pub const QUELLE_MANUELL: &str = "manuell";
 pub const QUELLE_AUTO_FRIST: &str = "auto_frist";
+
+/// Automatische Fristen, die ihr Bezug selbst trägt (LLH-1908, `src/AGENTS.md`, „Automatische
+/// Fristen stehen am Bezug“): Bezugstyp und das Modul, in dem die Frist schon steht. Gegenstück
+/// zu `AM_BEZUG_GETRAGEN` in `frontend/src/erinnerung/amBezug.ts`; eine neue Auto-Frist-Art zieht
+/// beide nach. Der Planungshinweis der Ablösung fehlt bewusst: ihn zeigt sonst nichts.
+pub const AM_BEZUG_GETRAGEN: &[(&str, &str)] = &[
+    (crate::kommunikation::OBJEKT_MELDUNG, "meldungen"),
+    (crate::kommunikation::OBJEKT_AUFTRAG, "auftraege"),
+    (crate::kommunikation::OBJEKT_ABLOESUNG, "abloesung"),
+    (
+        crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG,
+        "abloesung",
+    ),
+];
+
+/// Die Bezugstypen aus [`AM_BEZUG_GETRAGEN`], deren Modul `frei` ist: Ihre automatischen Fristen
+/// zählen am Bezug, nicht als fällige Erinnerung ([`repo::faellige_offene`]).
+pub fn am_bezug_getragen(frei: impl Fn(&str) -> bool) -> Vec<&'static str> {
+    AM_BEZUG_GETRAGEN
+        .iter()
+        .filter(|(_, modul)| frei(modul))
+        .map(|(typ, _)| *typ)
+        .collect()
+}

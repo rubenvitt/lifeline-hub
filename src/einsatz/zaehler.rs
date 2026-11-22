@@ -405,7 +405,15 @@ pub async fn berechne(
     }
     if erlaubt.contains("erinnerungen") {
         z.erinnerungen = Some(ErinnerungsZaehler {
-            faellig: crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?,
+            // Automatische Fristen zählen am Bezug, wenn dessen Modul erlaubt ist (LLH-1908,
+            // `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“).
+            faellig: crate::erinnerung::repo::faellige_offene(
+                pool,
+                einsatz_id,
+                jetzt,
+                &crate::erinnerung::am_bezug_getragen(|m| erlaubt.contains(m)),
+            )
+            .await?,
         });
     }
     if erlaubt.contains("chat") {
