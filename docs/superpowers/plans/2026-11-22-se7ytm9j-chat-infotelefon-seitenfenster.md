@@ -55,4 +55,4 @@ Ausführung: `executing-plans` im Main-Loop (Plan kurz, Aufgaben eng verzahnt), 
 
 - [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
 - [x] Review nach Ermessen (Anlass: Backend und Frontend mit geänderter Schnittstelle).
-- [ ] Bilder, PR gegen `alpha`, Folgeaufgabe „ETB auf den Helfer umstellen“.
+- [x] Bilder, PR gegen `alpha`, Folgeaufgabe „ETB auf den Helfer umstellen“.
