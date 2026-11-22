@@ -920,6 +920,9 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
   App und `token_ungueltig`. Der Ablauf einer Sitzung und ein Passwortwechsel lassen sie stehen
   (`session_token_hash` ist `ON DELETE SET NULL`). Ein neuer Weg, der Konten sperrt oder alle
   Sitzungen beendet, entscheidet über die Anmeldungen mit.
+- **Keine Sicherung trägt iOS-Push:** `backup::scrub_sessions` leert mit `session` auch
+  `ios_push_anmeldung` und `ios_push_relais` (Token, Geräteschlüssel, Relais-Geheimnis). Eine neue
+  Tabelle mit solchen Werten kommt dort dazu.
 - **`POST /api/ios-push/abmelden` ohne Sitzung:** Nachweis
   `HMAC-SHA256(schluessel, "abmelden:" + kennung)`; die Antwort ist immer 204, auch bei falschem
   Nachweis oder unbekannter Kennung. Gerätekonten erreichen die übrigen Routen nicht (403).
