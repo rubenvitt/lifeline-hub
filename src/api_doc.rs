@@ -326,6 +326,8 @@ use utoipa::OpenApi;
         crate::fahrzeug::FahrzeugPatchAntwort,
         crate::status_ruecknahme::HandStatusRuecknahmeBeleg,
         crate::personal::PersonalPatchAntwort,
+        crate::material::MaterialStatusRuecknahmeBeleg,
+        crate::material::MaterialPatchAntwort,
         crate::fahrzeug::EntlassungVorzustand,
         crate::entlassung::RuecknahmeAusgelassen,
         crate::fahrzeug::FahrzeugAnzeige,

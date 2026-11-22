@@ -1235,6 +1235,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/material/{em_id}/nachforderung",
             post(routes::einsatz_material::verknuepfen).delete(routes::einsatz_material::loesen),
         )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen",
+            post(routes::einsatz_material::status_zuruecknehmen),
+        )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
             "/api/einsaetze/{id}/material/{em_id}/aufteilen",
