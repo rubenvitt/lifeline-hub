@@ -23,7 +23,6 @@ import {
 } from '../einsatz/schreibrecht';
 import {
   entscheideAbgleich,
-  ladePerson,
   ladePersonAudit,
   loadPersonStand,
   registrierAnzeige,
@@ -52,6 +51,7 @@ import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { istAngetroffen } from '../personen/personenBilanz';
 import { verortenLinkStil } from '../personen/personBearbeiten';
+import { personDetailQueryOptions } from '../personen/personDetailQuery';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { StornoBanner } from '../components/StornoBanner';
 import {
@@ -167,14 +167,11 @@ export default function PersonenDetailPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  // Dieser GET schreibt serverseitig einen Zugriffsaudit: kein Retry, kein Neuladen beim
+  // Fensterwechsel (LLH-1832, `personDetailQueryOptions`).
   const detailQuery = useQuery({
-    queryKey: einsatzKeys.person(einsatzId, personId),
-    queryFn: () => ladePerson(einsatzId, personId),
+    ...personDetailQueryOptions(einsatzId, personId),
     enabled: idGueltig,
-    // Dieser GET schreibt serverseitig einen Zugriffsaudit. Ein automatischer Retry erzeugte für
-    // dieselbe Öffnung mehrere Auditzeilen, ebenso ein Neuladen beim Fensterwechsel (LLH-1832).
-    retry: false,
-    refetchOnWindowFocus: false,
   });
   /**
    * Storno-Stand ohne Zugriffsprotokoll (LLH-1832, Spec `storno-sperre`): live über das

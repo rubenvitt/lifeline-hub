@@ -5,11 +5,13 @@
 #
 #   scripts/ios/simulator-pruefung.sh [<ausgabe-verzeichnis>]   (Vorgabe: ios/build/pruefung)
 #
-# Ablauf: Version schreiben (scripts/ios/version.sh) → Projekt erzeugen (`xcodegen`, gepinnt über
+# Ablauf: Version schreiben (scripts/ios/version.sh) → Wegwerf-Zertifikate des https-Testservers
+# (scripts/ios/testserver-zertifikat.sh, LLH-1980) → Projekt erzeugen (`xcodegen`, gepinnt über
 # scripts/ios/xcodegen-installieren.sh, muss im PATH stehen) → je ein iPhone und ein iPad der
-# neuesten iOS-Laufzeit wählen → `xcodebuild test` mit dem Schema `LifelineHub`: App-Tests
-# (ios/AppTests), UI-Tests (ios/AppUITests) und die Suite des Swift-Kerns auf iOS → die
-# Bildschirmbilder der UI-Tests (XCTAttachment) aus dem Ergebnisbündel nach <ausgabe>/bilder
+# neuesten iOS-Laufzeit wählen und ihnen die Test-CA als Wurzel geben → `xcodebuild test` mit
+# dem Schema `LifelineHub`: App-Tests (ios/AppTests), UI-Tests (ios/AppUITests) und die Suite des
+# Swift-Kerns auf iOS → die Bildschirmbilder der UI-Tests (XCTAttachment) aus dem Ergebnisbündel
+# nach <ausgabe>/bilder
 # (scripts/ios/bilder-ablegen.sh: nur Bilder, Namen ohne Zeichen, die das Artefakt abweist). Nach
 # roten Tests stehen sie mit Grund und Gerät im Protokoll (scripts/ios/fehlgruende.sh).
 #
@@ -30,6 +32,10 @@ rm -rf "$AUSGABE"
 mkdir -p "$AUSGABE/bilder"
 
 "$WURZEL/scripts/ios/version.sh"
+# Wegwerf-CA und Zertifikat des https-Testservers (LLH-1980); vor `xcodegen`, damit
+# testserver.p12 als Ressource ins Test-Target kommt.
+TESTSERVER="$WURZEL/ios/AppTests/Testserver"
+"$WURZEL/scripts/ios/testserver-zertifikat.sh" "$TESTSERVER"
 xcodegen generate --spec "$WURZEL/ios/project.yml"
 
 # Das erste verfügbare Gerät einer Art (`iPhone`, `iPad`) auf der neuesten iOS-Laufzeit.
@@ -49,6 +55,17 @@ if [ -n "$ipad" ]; then
   ziele+=(-destination "id=$ipad")
 fi
 echo "Simulatoren: iPhone $iphone${ipad:+, iPad $ipad}"
+
+# Die Test-CA als Wurzel in jeden Simulator: dann vertraut die App dem Testserver wie einem
+# echten Server (ios/AppTests/OhneServerTests.swift). `simctl keychain` braucht ein gestartetes
+# Gerät; danach wieder aus, die Tests starten es selbst.
+for udid in "$iphone" ${ipad:+"$ipad"}; do
+  xcrun simctl boot "$udid" 2> /dev/null || true
+  # `-b` startet das Gerät, falls `boot` scheiterte; ohne wartete `bootstatus` unbegrenzt.
+  xcrun simctl bootstatus "$udid" -b > /dev/null
+  xcrun simctl keychain "$udid" add-root-cert "$TESTSERVER/ca.pem"
+  xcrun simctl shutdown "$udid" 2> /dev/null || true
+done
 
 # Die Geräte nacheinander: nebeneinander auf dem Runner (eine VM mit 7 GB) brauchte der Start der
 # App auf dem iPhone 34 bis 56 s und der erste Webinhalt über 80 s, rote Tests aus reiner Last;
