@@ -28,6 +28,58 @@ final class PushNutzlastTests: XCTestCase {
         }
     }
 
+    private struct Erwartet: Decodable {
+        let titel: String
+        let untertitel: String?
+        let text: String?
+        let thread: String
+        let pfad: String
+        let einsatz_id: Int
+    }
+
+    private struct InhaltFall: Decodable {
+        let beschreibung: String
+        let klartext: [String: JSONWert]
+        let server_anzahl: Int
+        let kennung: String
+        let erwartet: Erwartet
+    }
+
+    private struct InhaltFaelle: Decodable { let faelle: [InhaltFall] }
+
+    /// Der Klartext, wie Rust ihn serialisiert (`push-inhalt.json`, geprüft in `src/ios_push`).
+    private enum JSONWert: Codable {
+        case text(String), zahl(Int)
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let z = try? c.decode(Int.self) { self = .zahl(z) } else { self = .text(try c.decode(String.self)) }
+        }
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.singleValueContainer()
+            switch self {
+            case .text(let t): try c.encode(t)
+            case .zahl(let z): try c.encode(z)
+            }
+        }
+    }
+
+    func testMeldungPasstZuDenGemeinsamenFaellenDesKlartexts() throws {
+        let faelle = try GemeinsameFaelle.load("push-inhalt.json", as: InhaltFaelle.self).faelle
+        XCTAssertEqual(faelle.count, 3)
+        for fall in faelle {
+            let daten = try JSONEncoder().encode(fall.klartext)
+            let m = try XCTUnwrap(
+                PushNutzlast.meldung(aus: daten, serverAnzahl: fall.server_anzahl, kennung: fall.kennung),
+                fall.beschreibung)
+            XCTAssertEqual(m.titel, fall.erwartet.titel, fall.beschreibung)
+            XCTAssertEqual(m.untertitel, fall.erwartet.untertitel, fall.beschreibung)
+            XCTAssertEqual(m.text, fall.erwartet.text, fall.beschreibung)
+            XCTAssertEqual(m.thread, fall.erwartet.thread, fall.beschreibung)
+            XCTAssertEqual(m.pfad, fall.erwartet.pfad, fall.beschreibung)
+            XCTAssertEqual(m.einsatzId, fall.erwartet.einsatz_id, fall.beschreibung)
+        }
+    }
+
     func testKaputterUmschlagGibtNil() {
         for l in ["", "!!!", "e30", "eyJrIjoiYSJ9", Base64URL.encode(Data("kein json".utf8))] {
             XCTAssertNil(PushNutzlast.umschlag(l), l)

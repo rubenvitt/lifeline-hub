@@ -1,0 +1,75 @@
+{
+  "faelle": [
+    {
+      "beschreibung": "mit Absender und Wortlaut, zwei Server",
+      "klartext": {
+        "v": 1,
+        "s": "Kreis Nord",
+        "e": 42,
+        "b": 7,
+        "stufe": "alarm",
+        "titel": "Sofortmeldung",
+        "detail": "Detail zur Meldung",
+        "pfad": "/einsaetze/42/meldungen/9",
+        "absender": "Funk 3",
+        "wortlaut": "Person vermisst"
+      },
+      "server_anzahl": 2,
+      "kennung": "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90",
+      "erwartet": {
+        "titel": "Sofortmeldung · Funk 3",
+        "untertitel": "Kreis Nord",
+        "text": "Person vermisst",
+        "thread": "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90-42",
+        "pfad": "/einsaetze/42/meldungen/9",
+        "einsatz_id": 42
+      }
+    },
+    {
+      "beschreibung": "ohne Absender und Wortlaut, mit Detail, ein Server",
+      "klartext": {
+        "v": 1,
+        "s": "Kreis Nord",
+        "e": 42,
+        "b": 8,
+        "stufe": "hinweis",
+        "titel": "Neue Benachrichtigung",
+        "detail": "ELW 1 ist eingetroffen",
+        "pfad": "/einsaetze/42"
+      },
+      "server_anzahl": 1,
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "erwartet": {
+        "titel": "Neue Benachrichtigung",
+        "untertitel": null,
+        "text": "ELW 1 ist eingetroffen",
+        "thread": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07-42",
+        "pfad": "/einsaetze/42",
+        "einsatz_id": 42
+      }
+    },
+    {
+      "beschreibung": "ohne Detail, Absender und Wortlaut",
+      "klartext": {
+        "v": 1,
+        "s": "Kreis Nord",
+        "e": 5,
+        "b": 9,
+        "stufe": "alarm",
+        "titel": "Alarm",
+        "pfad": "/einsaetze/5"
+      },
+      "server_anzahl": 1,
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "erwartet": {
+        "titel": "Alarm",
+        "untertitel": null,
+        "text": null,
+        "thread": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07-5",
+        "pfad": "/einsaetze/5",
+        "einsatz_id": 5
+      }
+    }
+  ],
+  "zweck": "Gemeinsamer Fall des Klartexts der iOS-Push-Nutzlast: Rust serialisiert `klartext` (src/ios_push/inhalt.rs, Test klartext_passt_zu_den_gemeinsamen_faellen), Swift baut daraus die Meldung (PushNutzlast.meldung) und erwartet `erwartet`."
+}

@@ -563,3 +563,42 @@ mod nutzlast {
         assert_eq!(k, voll[..32]);
     }
 }
+
+/// Der Klartext, wie Rust ihn serialisiert, gegen die gemeinsamen Fälle mit der iOS-Seite
+/// (`src-tauri/faelle/push-inhalt.json`, Swift: `PushNutzlastTests`).
+#[test]
+fn klartext_passt_zu_den_gemeinsamen_faellen() {
+    use super::inhalt::Klartext;
+    use crate::benachrichtigung::BenachrichtigungStufe;
+
+    let datei: serde_json::Value =
+        serde_json::from_str(include_str!("../../src-tauri/faelle/push-inhalt.json")).unwrap();
+    let faelle = datei["faelle"].as_array().unwrap();
+    assert_eq!(faelle.len(), 3);
+    for fall in faelle {
+        let k = &fall["klartext"];
+        let text = |f: &str| k.get(f).map(|v| v.as_str().unwrap().to_owned());
+        let klartext = Klartext {
+            v: k["v"].as_u64().unwrap() as u8,
+            s: text("s").unwrap(),
+            e: k["e"].as_i64().unwrap(),
+            b: k["b"].as_i64().unwrap(),
+            stufe: match k["stufe"].as_str().unwrap() {
+                "alarm" => BenachrichtigungStufe::Alarm,
+                "hinweis" => BenachrichtigungStufe::Hinweis,
+                _ => BenachrichtigungStufe::Still,
+            },
+            titel: text("titel").unwrap(),
+            detail: text("detail"),
+            pfad: text("pfad").unwrap(),
+            absender: text("absender"),
+            wortlaut: text("wortlaut"),
+        };
+        assert_eq!(
+            &serde_json::to_value(&klartext).unwrap(),
+            k,
+            "{}",
+            fall["beschreibung"]
+        );
+    }
+}
