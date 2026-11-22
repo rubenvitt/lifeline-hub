@@ -19,9 +19,9 @@ Change `t39ltxxi-ios-huelle`.
 - **Wire-Format im Init-Skript:** Kennung `__LIFELINE_HUELLE__` und Befehle der Brücke stehen im
   Kopf von `ios/App/Huelle/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest führt das
   Skript aus (`frontend/src/test/huelle.ts`), eine Änderung zieht die Tests dort mit.
-- **Gemeinsame Fälle:** Adressprüfung, Deeplink und Linkregeln prüft der Kern gegen
-  `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
-  JSON, nie nur in einen Swift-Test.
+- **Gemeinsame Fälle:** Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung prüft der Kern
+  gegen `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in
+  die JSON, nie nur in einen Swift-Test.
 - **Bauen nur auf macOS:** keine `.xcodeproj` und keine Versionsangabe im Repo. Ablauf:
   `scripts/ios/version.sh` (Version aus `[workspace.package]`) → `xcodegen generate --spec
   ios/project.yml` → Xcode. Die XcodeGen-Version steht nur in

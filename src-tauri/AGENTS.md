@@ -52,12 +52,14 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`). `verbindung.json`
   trägt neben `server` die Liste `bekannt` (LLH-1282, neuester zuerst, höchstens
   `MAX_BEKANNT`); der verbundene Server lässt sich nicht vergessen.
-- **Gemeinsame Fälle** (LLH-1978): die Fälle von Adressprüfung (samt Meldungstexten),
-  Deeplink (`deute`, `entscheide`) und Linkregeln stehen als JSON unter `src-tauri/faelle/`
-  und sind die gemeinsame Quelle beider Hüllen: die Rust-Tests lesen sie per `include_str!`,
-  der Swift-Kern der iOS-Hülle (`ios/LifelineKern`) dieselben Dateien. Ein neuer Fall oder eine
-  geänderte Regel kommt in die JSON, nicht in einen einzelnen Test; die Regel selbst bleibt in
-  `adresse.rs`, `deeplink.rs` und `links.rs`. `scripts/bereiche.sh` ordnet `src-tauri/faelle/*`
+- **Gemeinsame Fälle** (LLH-1978, LLH-2062): die Fälle von Adressprüfung (samt
+  Meldungstexten), Deeplink (`deute`, `entscheide`), Linkregeln und Vertragsprüfung
+  (`bewerte`, `weiterleitung`; `bekannt` gibt die Verträge der Fälle vor, nicht die der Hülle)
+  stehen als JSON unter `src-tauri/faelle/` und sind die gemeinsame Quelle beider Hüllen: die
+  Rust-Tests lesen sie per `include_str!`, der Swift-Kern der iOS-Hülle (`ios/LifelineKern`)
+  dieselben Dateien. Ein neuer Fall oder eine geänderte Regel kommt in die JSON, nicht in einen
+  einzelnen Test; die Regel selbst bleibt in `adresse.rs`, `deeplink.rs`, `links.rs` und
+  `vertrag.rs`. Nur eine Hülle kennt Zertifikatsfehler (iOS); sie stehen in deren Tests. `scripts/bereiche.sh` ordnet `src-tauri/faelle/*`
   beiden Prüfungen zu.
 - **Fenster sind gleichrangig** (LLH-1281): Schließen des Hauptfensters schließt nichts mit;
   Maske und Serverwechsel bauen `main` bei Bedarf neu (`zeige_maske`, `lade_server`), alles

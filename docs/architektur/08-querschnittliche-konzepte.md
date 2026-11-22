@@ -455,8 +455,8 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   jeder Server hat einen eigenen Datenspeicher. Die Anmeldung im Systembrowser
   (`POST /api/auth/app-code[/einloesen]`) nutzen beide Hüllen gleich.
 
-Adressprüfung, Deeplink und Linkregeln stehen einmal in Rust (`src-tauri/src/adresse.rs`,
-`deeplink.rs`, `links.rs`) und einmal im Swift-Kern; zusammengehalten werden sie von den
+Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung stehen einmal in Rust
+(`src-tauri/src/adresse.rs`, `deeplink.rs`, `links.rs`, `vertrag.rs`) und einmal im Swift-Kern; zusammengehalten werden sie von den
 gemeinsamen Fällen unter `src-tauri/faelle/`, die beide Suiten prüfen. Regeln:
 [`ios/AGENTS.md`](../../ios/AGENTS.md), [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md),
 „Gemeinsame Fälle“; Betrieb: [`ios-app.md`](../betrieb/ios-app.md),
