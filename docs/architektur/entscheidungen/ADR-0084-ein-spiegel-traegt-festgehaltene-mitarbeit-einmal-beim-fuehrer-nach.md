@@ -1,5 +1,5 @@
 ---
-id: ADR-0082
+id: ADR-0084
 titel: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
 status: akzeptiert
 datum: 2026-11-22
@@ -10,7 +10,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-s110uic4-mitarbeit-nachtrag-fuehrer-design.md
 ---
 
-# ADR-0082: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
+# ADR-0084: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
 
 ## Regeln
 

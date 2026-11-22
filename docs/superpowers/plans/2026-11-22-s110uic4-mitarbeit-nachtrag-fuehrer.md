@@ -250,7 +250,7 @@ additive Paketfelder in beide Richtungen.
 - Modify: `docs/architektur/08-querschnittliche-konzepte.md` (8.2, ein Satz nach dem Mitarbeit-Absatz)
 - Modify: `src/AGENTS.md:680-684` (Satz zum Nachtrag an den Absatz „Fähigkeit `rolle_mitarbeit`“;
   Nachweis-Zeile um `tests/instanz_mitarbeit_nachtrag.rs` ergänzen)
-- Create: `docs/architektur/entscheidungen/ADR-0082-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md`
+- Create: `docs/architektur/entscheidungen/ADR-0084-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md`
   (Nummer vorher mit `git fetch origin alpha` und `scripts/adr-fuer.sh --alle` prüfen)
 
 - [x] **Step 1: ADR** nach `VORLAGE.md`, `status: akzeptiert`, `gilt_fuer: src/instanz/spiegel/nachtrag.rs`,
@@ -263,9 +263,9 @@ additive Paketfelder in beide Richtungen.
   Prüfung: `verlange 'mitarbeit_grenze_stand' 'src/instanz/spiegel/nachtrag.rs'` und
   `verlange 'herkunft_kopplung_id' 'src/instanz/spiegel/nachtrag.rs'`.
 - [x] **Step 2:** `src/AGENTS.md` ergänzen: „Hat ein Spiegel `mitarbeit` gegen einen alten Führer
-  festgehalten, meldet er sie beim Wechsel 0 → 1 einmal nach (`spiegel::nachtrag`, ADR-0082).“
+  festgehalten, meldet er sie beim Wechsel 0 → 1 einmal nach (`spiegel::nachtrag`, ADR-0084).“
 - [x] **Step 2b:** arc42 8.2: „Ein Spiegel, der `mitarbeit` gegen einen älteren Führer
-  festgehalten hat, trägt sie nach dessen Aufrüsten einmal nach (ADR-0082).“
+  festgehalten hat, trägt sie nach dessen Aufrüsten einmal nach (ADR-0084).“
 - [x] **Step 3:** `cargo fmt`, dann `./scripts/check-all.sh --geaendert --ohne-e2e` (ein Aufruf,
   ggf. im Hintergrund) → grün. `scripts/check-migrationen.sh` → grün.
 - [x] **Step 4: Commit** `docs(instanz): Regel und ADR zum Mitarbeit-Nachtrag`
