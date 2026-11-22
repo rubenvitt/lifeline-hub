@@ -26,10 +26,12 @@ const manifest = (version, version_code = 1000) => ({
 });
 const entscheide = (e) => entscheideIn({ kanal: 'android-alpha', ...e });
 
-test('Kanäle je Version: Alpha nur Alpha, Beta nur Beta, stabil beide, fremde Vorabkennung keinen', () => {
+test('Kanäle je Version: Alpha nur Alpha, Beta nur Beta, stabil alle drei, fremde Vorabkennung keinen', () => {
   assert.deepEqual(kanaeleFuer('1.0.0-alpha.180'), ['android-alpha']);
   assert.deepEqual(kanaeleFuer('1.0.0-beta.3'), ['android-beta']);
-  assert.deepEqual(kanaeleFuer('1.0.0'), ['android-alpha', 'android-beta']);
+  // Stabil hat ein eigenes Kanal-Release statt `releases/latest/download/`: zwischen Freigabe und
+  // fertigem Bau (oder bei rotem Bau) bliebe dort sonst nichts, hier der letzte stabile Stand.
+  assert.deepEqual(kanaeleFuer('1.0.0'), ['android-alpha', 'android-beta', 'android-stabil']);
   assert.deepEqual(kanaeleFuer('1.0.0-rc.1'), []);
   assert.throws(() => kanaeleFuer('v1.0.0'), /Keine zulässige Version/);
 });
@@ -40,6 +42,10 @@ test('die APK im Kanal ersetzt nur ein Tag desselben Kanals', () => {
   assert.equal(apkErsetzen('android-alpha', '1.0.0-beta.4'), false);
   assert.equal(apkErsetzen('android-beta', '1.0.0-alpha.181'), false);
   assert.equal(apkErsetzen('android-beta', '1.0.0-rc.1'), false);
+  assert.equal(apkErsetzen('android-stabil', '1.0.0'), true);
+  assert.equal(apkErsetzen('android-stabil', '1.0.0-alpha.181'), false);
+  assert.equal(apkErsetzen('android-stabil', '1.0.0-beta.4'), false);
+  assert.equal(apkErsetzen('android-stabil', '1.0.0-rc.1'), false);
 });
 
 test('stabil ersetzt die APK im Alpha-Kanal nicht', () => {
@@ -62,6 +68,12 @@ test('feste APK nur vorwärts: ein Tag des Kanals, der den Kanal fortschreibt', 
   // Stabil schreibt das Manifest fort, die APK bleibt die des Kanals.
   assert.equal(apk('android-alpha', '1.0.0', '1.0.0-alpha.140'), false);
   assert.equal(apk('android-beta', '1.0.0-alpha.141', null), false);
+  // Im stabilen Kanal ersetzt nur ein neueres stabiles Release die APK.
+  assert.equal(apk('android-stabil', '1.0.0', null), true);
+  assert.equal(apk('android-stabil', '1.0.1', '1.0.0'), true);
+  assert.equal(apk('android-stabil', '1.0.1', '1.1.0'), false);
+  assert.equal(apk('android-stabil', '1.1.0', '1.1.0'), false);
+  assert.equal(apk('android-stabil', '1.1.0-alpha.1', '1.0.0'), false);
 });
 
 test('Handstart eines älteren Tags ersetzt die feste APK nicht', () => {
@@ -105,6 +117,30 @@ test('stabiles Release schreibt beide Kanäle fort, ältere Vorabversion danach 
     'hochladen',
   );
   assert.equal(entscheide({ neu: manifest('1.0.0-alpha.141'), alt: manifest('1.0.0') }).entscheidung, 'behalten');
+  assert.equal(entscheide({ neu: manifest('1.1.0-alpha.1'), alt: manifest('1.0.0') }).entscheidung, 'hochladen');
+});
+
+test('stabiler Kanal: nur stabile Releases, nur vorwärts', () => {
+  const inStabil = (neu, alt) => entscheideIn({ kanal: 'android-stabil', neu: manifest(neu), alt: alt && manifest(alt) });
+  assert.equal(inStabil('1.0.0', null).entscheidung, 'hochladen');
+  assert.equal(inStabil('1.1.0', '1.0.0').entscheidung, 'hochladen');
+  // Hotfix eines älteren Kerns nach einem neueren Release, Nachbau, Handstart eines älteren Tags.
+  assert.equal(inStabil('1.0.1', '1.1.0').entscheidung, 'behalten');
+  assert.equal(inStabil('1.1.0', '1.1.0').entscheidung, 'behalten');
+  const alpha = inStabil('1.2.0-alpha.1', '1.1.0');
+  assert.equal(alpha.entscheidung, 'behalten');
+  assert.match(alpha.grund, /gehört nicht in android-stabil/);
+  assert.equal(inStabil('1.2.0-beta.1', null).entscheidung, 'behalten');
+});
+
+test('Alpha nach stabilem Release desselben Kerns bleibt draußen, bis ein höherer Kern kommt', () => {
+  // ADR-0019: alpha zählt nach 1.0.0 als 1.0.0-alpha.N weiter. Diese Alphas sind nach SemVer
+  // älter als 1.0.0; Manifest und feste APK im Alpha-Kanal bleiben stehen (wie desktop-kanal).
+  assert.equal(entscheide({ neu: manifest('1.0.0-alpha.201'), alt: manifest('1.0.0') }).entscheidung, 'behalten');
+  assert.equal(
+    apkEntscheidung({ kanal: 'android-alpha', neu: manifest('1.0.0-alpha.201'), alt: manifest('1.0.0') }).ersetzen,
+    false,
+  );
   assert.equal(entscheide({ neu: manifest('1.1.0-alpha.1'), alt: manifest('1.0.0') }).entscheidung, 'hochladen');
 });
 

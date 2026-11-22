@@ -55,7 +55,10 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   der Hinweis „Update bereit“, die Person entscheidet), sondern beim Start vor der Oberfläche
   oder nach 15 Minuten im Hintergrund ohne Rückfrage des Systems; lädt nur von GitHub
   (`Updateentscheidung.ERLAUBTE_HOSTS`) und prüft `sha256`. Der Kanal entsteht beim ersten Start
-  aus der Version und ändert sich nie.
+  aus der Version und ändert sich nie. Jeder Kanal, auch stabil, liest aus seinem eigenen
+  Kanal-Release (`Kanal.manifestUrl`: `android-alpha`, `android-beta`, `android-stabil`), nie aus
+  `releases/latest/download/`; ein Kanal ohne Manifest (404) ist kein Update und kein Fehler
+  (`Updateentscheidung.isKanalLeer`).
 - **Signierschlüssel wechselt nie:** ein anderer Schlüssel kann die App nicht ersetzen. Kein
   Keystore im Repo; die vier Geheimnisse `ANDROID_KEY*` und ihre Sicherung beschreibt
   `docs/betrieb/android-app.md`.

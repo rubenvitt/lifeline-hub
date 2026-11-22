@@ -10,12 +10,17 @@ enum class Kanal(val kennwort: String) {
     BETA("beta"),
     STABIL("stabil");
 
-    /** Adresse des Manifests `android.json` des Kanals (Release `android-alpha`/`android-beta`, sonst das neueste). */
+    /**
+     * Adresse des Manifests `android.json` des Kanals: je Kanal ein eigenes Release
+     * (`android-alpha`, `android-beta`, `android-stabil`), auch für stabil nicht
+     * `releases/latest/download/` (dort stünde nach jeder Freigabe bis zum fertigen Bau nichts;
+     * `scripts/release/android-kanal.mjs`).
+     */
     val manifestUrl: String
         get() = when (this) {
             ALPHA -> "$REPO/releases/download/android-alpha/android.json"
             BETA -> "$REPO/releases/download/android-beta/android.json"
-            STABIL -> "$REPO/releases/latest/download/android.json"
+            STABIL -> "$REPO/releases/download/android-stabil/android.json"
         }
 
     companion object {

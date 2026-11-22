@@ -42,7 +42,7 @@ class KanalTest {
             Kanal.BETA.manifestUrl,
         )
         assertEquals(
-            "https://github.com/rubenvitt/lifeline-hub/releases/latest/download/android.json",
+            "https://github.com/rubenvitt/lifeline-hub/releases/download/android-stabil/android.json",
             Kanal.STABIL.manifestUrl,
         )
     }
