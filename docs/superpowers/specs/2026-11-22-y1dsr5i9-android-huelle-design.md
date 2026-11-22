@@ -192,9 +192,12 @@ CA-Zertifikat; Menüpfad je Hersteller leicht verschieden), getrennt von „nich
 - **Version:** `versionName` = volle Workspace-Version (Android erlaubt das Vorab-Suffix);
   `versionCode` = Minuten seit 2026-01-01 00:00 UTC zum Bauzeitpunkt der CI (steigt immer, passt
   in `Int`). Geschrieben aus `[workspace.package]` und dem Tag, keine eigene Versionsquelle in
-  `android/`. Der **Kanal** (`alpha`, `beta`, `stabil`) kommt aus dem Tag in die App
-  (`BuildConfig`), wie `src-tauri/src/kanal.rs`; ein lokaler Bau gilt als Kanal `alpha`
-  (Builder darf „ohne Kanal, kein Update“ wählen, wenn das einfacher ist).
+  `android/`. Ein lokaler Bau (Entwicklung) prüft keine Updates.
+- **Kanal** (`alpha`, `beta`, `stabil`) wie `src-tauri/src/kanal.rs`: beim ersten Start aus der
+  eigenen Version abgeleitet (`-alpha.` → `alpha`, `-beta.` → `beta`, ohne Vorab-Suffix →
+  `stabil`) und gespeichert; ein Update ändert ihn nie. Eine Alpha-App bleibt also Alpha, auch
+  wenn ihr Kanal sie auf ein stabiles Release hebt. Die APK trägt keinen Kanal, je Tag gibt es
+  genau einen Bau.
 
 ### D5 Start ohne Server (V)
 
@@ -268,8 +271,13 @@ mit dem Druckadapter des WebViews.
   - für Alpha und Beta im Kanal-Release `android-alpha` bzw. `android-beta` (Vorabversion, nie
     „latest“), fortgeschrieben nach denselben Regeln wie `scripts/release/desktop-kanal.mjs`
     (jeder Vorabkanal nur seine eigenen, stabile schreiben beide fort, nur vorwärts). Dort liegt
-    zusätzlich die APK unter festem Namen, damit ein QR-Code an der Wand immer zur aktuellen
-    Fassung führt.
+    zusätzlich die APK unter festem Namen (`lifeline-hub-android.apk`), damit ein QR-Code an
+    der Wand immer zu einer Fassung dieses Kanals führt. **Diese Datei ersetzen nur Tags des
+    eigenen Kanals**, ein stabiles Release schreibt nur das Manifest fort: Wer nach einem
+    stabilen Release über den Alpha-Code installiert, bekommt die letzte Alpha, legt damit den
+    Kanal `alpha` fest und wird danach über das Manifest auf das stabile Release gehoben.
+  - Für stabile Tags liegt die APK zusätzlich unter festem Namen am Release, also unter
+    `…/releases/latest/download/lifeline-hub-android.apk`.
 - **Signieren:** ein Schlüssel für immer (Fakt: ein anderer Schlüssel kann die App nicht
   ersetzen). Keystore und Passwörter als GitHub-Geheimnisse; ohne Geheimnisse scheitert der
   Job sichtbar, das Release bleibt. Ruben legt den Schlüssel einmal an; die Anleitung steht in
@@ -284,11 +292,21 @@ mit dem Druckadapter des WebViews.
   `sha256`; das System prüft die Signatur.
 - **Installiert nie mitten in der Arbeit:** automatisch nur (a) beim Start, bevor die
   Oberfläche lädt, oder (b) wenn die App länger im Hintergrund liegt (Richtwert 15 Minuten,
-  Builder). Sonst zeigt sie einen kleinen nativen Hinweis „Update bereit“ (am Knopf zur
-  Serverliste und in den Einstellungen), über den die Person sofort installieren kann.
-- Ab Android 12 ohne Rückfrage, sobald die Bedingungen aus Fakt 6 erfüllt sind; vorher und
-  unter Android 12 mit der Rückfrage des Systems. Fehlt die Erlaubnis „Unbekannte Apps
-  installieren“, führt der Hinweis in die Systemeinstellung.
+  Builder; Hintergrundarbeit z. B. über WorkManager). Sonst zeigt sie einen kleinen nativen
+  Hinweis „Update bereit“ (am Knopf zur Serverliste und in den Einstellungen), über den die
+  Person sofort installieren kann.
+- **Fall (a) sichtbar machen:** Die App kann sich nach dem Update nicht verlässlich selbst
+  starten (Android sperrt Starts aus dem Hintergrund). Sie zeigt deshalb vor dem Installieren
+  eine native Seite „Lifeline wird aktualisiert“; nach dem Update meldet sie sich
+  (`ACTION_MY_PACKAGE_REPLACED`) mit einer Benachrichtigung „Lifeline aktualisiert – zum Öffnen
+  tippen“, sofern Meldungen erlaubt sind.
+- **Fall (b) nur ohne Rückfrage:** Im Hintergrund installiert die App nur, wenn das System
+  keine Rückfrage braucht (Fakt 6). Braucht es eine (erstes Update, Android unter 12), bleibt
+  es beim Hinweis „Update bereit“ und bei Fall (a) mit der Rückfrage des Systems.
+- Fehlt die Erlaubnis „Unbekannte Apps installieren“, führt der Hinweis in die
+  Systemeinstellung. Blockiert das Gerät die Installation (etwa Samsungs „Auto Blocker“, der
+  Apps außerhalb der Stores sperrt), zeigt der Updater „Installation blockiert“ mit Verweis auf
+  die Anleitung in `docs/betrieb/android-app.md`, statt es still erneut zu versuchen.
 - Ohne Internet (Einsatz-LAN) bleibt alles, wie es ist; Fehler des Updaters stören die
   Oberfläche nie.
 - Einstellungen zeigen Version, Kanal, Stand des Updaters und „Jetzt prüfen“.
@@ -329,7 +347,7 @@ mit dem Druckadapter des WebViews.
 - Architektur-Wächter (`scripts/check-architektur.sh`) lernt das Teilprojekt `android`; arc42
   Kapitel 5, 7, 8 und 11 nachziehen.
 - `docs/betrieb/android-app.md`: Installation (APK-Link und QR-Code je Kanal, „Unbekannte Apps
-  installieren“), Updates und ihr Verhalten, CA-Zertifikat installieren, Signierschlüssel
+  installieren“, Samsung „Auto Blocker“), Prüfliste für die erste Alpha am Gerät, Updates und ihr Verhalten, CA-Zertifikat installieren, Signierschlüssel
   anlegen und sichern, Grenzen (kein Alarm bei geschlossener App, kein Passkey im WebView,
   System-WebView muss aktuell sein). `docs/betrieb/endgeraete.md` nennt die Android-App neben
   der iOS-App. Anwenderdoku nur mit Ist-Stand.
@@ -346,6 +364,13 @@ Arbeit. Alles mit Tests im Kern, wo es eine Entscheidung ist.
 - [Selbst-Update ohne Rückfrage hängt an Installateur-Status und Android-Version] → Hinweis
   „Update bereit“ als Rückfall; das erste Update fragt immer; Doku sagt es ehrlich.
 - [Alter System-WebView ohne Profile] → eigene Seite statt Datenmischung; Doku nennt das.
+  Der System-WebView aktualisiert sich über Google Play, sobald ein Gerät ab und zu online ist;
+  ein Tablet, das nur im Einsatz-LAN lebt, muss vor dem ersten Einsatz einmal online
+  aktualisiert werden (Prüfliste in der Betriebsdoku). Der genaue Stand der Galaxy Tabs ist
+  unbekannt (R: „nicht uralt“); die Prüfliste der ersten Alpha erfasst Android-, One-UI- und
+  WebView-Version und ob Auto Blocker an ist.
+- [Samsung Auto Blocker sperrt Installation und Selbst-Update] → Anleitung zum Abschalten für
+  die Erstinstallation, Zustand „Installation blockiert“ im Updater.
 - [Verlust des Signierschlüssels] → keine Updates mehr möglich, nur Neuinstallation (Daten
   weg); Sicherung außerhalb von GitHub ist Teil der Anleitung.
 - [Doppelte Regeln in Rust, Swift und Kotlin] → gemeinsame JSON-Fälle in allen drei Suiten.
