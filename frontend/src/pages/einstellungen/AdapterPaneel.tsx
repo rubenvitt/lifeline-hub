@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Form, Input, InputNumber } from 'antd';
+import { Button, Checkbox, Form, Input, InputNumber } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
@@ -42,7 +42,12 @@ interface AnlegenWerte {
   name?: string;
   intervall_s?: number | null;
   einstellungen?: Record<string, unknown>;
+  lan_erlaubt?: boolean;
 }
+
+/** Warnung an der LAN-Ausnahme; steht beim Anlegen und in der Ansicht gleich. */
+export const ADAPTER_LAN_WARNUNG =
+  'Nur für einen Server im lokalen Netz, etwa der Wache. Der Rechner selbst und Link-Local-Adressen bleiben gesperrt. Steht im Zugangsprotokoll.';
 
 /** Ein Einstellungsfeld der Art als Formularfeld; Name und Regeln aus dem Verzeichnis. */
 export function EinstellungsFeld({ feld, pfad }: { feld: AdapterFeld; pfad: (string | number)[] }) {
@@ -115,6 +120,13 @@ export default function AdapterPaneel() {
 
   const liste = listeQ.data;
   if (!liste) {
+    if (listeQ.fetchStatus === 'paused') {
+      return (
+        <Paneel titel="Adapter" koerperPolster>
+          <span data-lfh="adapter-ohne-netz">Ohne Verbindung nicht geladen.</span>
+        </Paneel>
+      );
+    }
     return listeQ.isError ? (
       <Paneel titel="Adapter" koerperPolster>
         <SeitenFehler
@@ -141,6 +153,7 @@ export default function AdapterPaneel() {
       name: (w.name ?? '').trim(),
       einstellungen: einstellungenVon(gewaehlteArt.felder, w.einstellungen ?? {}),
       ...(w.intervall_s != null ? { intervall_s: w.intervall_s } : {}),
+      ...(w.lan_erlaubt ? { lan_erlaubt: true } : {}),
     };
   };
 
@@ -286,6 +299,12 @@ export default function AdapterPaneel() {
             />
           </Feld>
         )}
+        <Feld name="lan_erlaubt" valuePropName="checked">
+          <Checkbox>
+            Ziel im eigenen Netz erlauben
+            <div style={{ color: rollen.achtungText }}>{ADAPTER_LAN_WARNUNG}</div>
+          </Checkbox>
+        </Feld>
       </ErfassungsModal>
     </Paneel>
   );

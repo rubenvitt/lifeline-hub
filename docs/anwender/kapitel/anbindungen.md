@@ -169,7 +169,8 @@ Für den System-Admin:
    eintragen, etwa „Alarmquelle Leitstelle“.
 3. Die Felder der Art ausfüllen, etwa die Adresse, und das „Intervall“ in Sekunden prüfen. Die Art
    schlägt ein Intervall vor und nennt das kleinste erlaubte.
-4. „Anlegen“ wählen. Danach steht die Ansicht des neuen Adapters.
+4. Nur für einen Server im lokalen Netz: „Ziel im eigenen Netz erlauben“ ankreuzen.
+5. „Anlegen“ wählen. Danach steht die Ansicht des neuen Adapters.
 
 Ein neuer Adapter ruft sofort ab. Fehlt ihm ein Geheimnis, das seine Art verlangt, hält er mit
 „Geheimnis fehlt“ an, bis es gesetzt ist.
@@ -190,8 +191,8 @@ ab. „Entfernen …“ neben „Ersetzen“ löscht ein Geheimnis nach einer R�
 ### Verbindung prüfen
 
 1. In der Ansicht des Adapters „Verbindung prüfen“ wählen.
-2. Das Ergebnis steht im Paneel „Zustand“, etwa „Verbindung prüfen: erreichbar (200) ·
-   4 Einträge“ oder der Grund des Fehlschlags, und als „Prüfung“ unter „Letzte Versuche“.
+2. Das Ergebnis steht im Paneel „Zustand“, etwa „Verbindung prüfen: erreichbar · 4 Einträge“
+   oder der Grund des Fehlschlags, und als „Prüfung“ unter „Letzte Versuche“.
 
    ![Paneel „Zustand“ eines gestörten Adapters mit dem Ergebnis der Prüfung](../bilder/anbindungen/adapter-pruefung.png)
 
@@ -223,8 +224,10 @@ einer Korrektur am Fremdsystem.
    einschalten.
 2. Die Rückfrage mit „Erlauben“ bestätigen.
 
-Ausschalten geht ohne Rückfrage. Steht dann noch eine Adresse im eigenen Netz in den
-Einstellungen, lehnt der Server das ab.
+Ausschalten geht ohne Rückfrage. Steht dann noch eine Adresse mit einer IP-Adresse im eigenen Netz
+in den Einstellungen, lehnt der Server das ab. Zeigt nur ein Name ins eigene Netz, scheitert der
+nächste Abruf mit „Ziel liegt in einem gesperrten Netz“, und der Adapter steht auf „braucht
+Eingriff“.
 
 ### Adapter löschen
 
@@ -402,8 +405,8 @@ der Adresse.
 - **„noch nie abgerufen“**: Der Adapter ist neu und hat noch nicht abgerufen.
 - **„gestört“**: Der letzte Abruf scheiterte an etwas Vorübergehendem (keine Verbindung, keine
   Antwort in 20 s, Fehler des Servers). Der Adapter versucht es von selbst wieder, zuerst nach
-  einer Minute, dann nach jeweils doppelt so langer Pause, höchstens alle 15 Minuten, nie öfter als
-  sein Intervall. Eine Alarmquelle kommt so nach einer Störung von selbst wieder.
+  einer Minute, dann nach jeweils doppelt so langer Pause, bis die Pause 15 Minuten erreicht. Kürzer
+  als sein Intervall wird die Pause nie. Eine Alarmquelle kommt so nach einer Störung von selbst wieder.
 - **„braucht Eingriff“**: Der Abruf scheiterte an etwas, das nur ein Mensch beheben kann: Zugang
   abgelehnt, Geheimnis fehlt oder ist unlesbar, Einstellung ungültig, Ziel in einem gesperrten Netz
   oder Weiterleitung. Der Adapter hält an, statt es endlos zu wiederholen. Er läuft wieder, sobald

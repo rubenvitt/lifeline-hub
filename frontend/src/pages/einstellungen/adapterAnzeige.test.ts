@@ -111,8 +111,8 @@ describe('adapterFehlerText', () => {
   });
 
   it('beschreibt einen Versuch in einer Zeile', () => {
-    expect(adapterVersuchText({ erfolg: true, status: 200, anzahl: 4, probe: false })).toBe(
-      'abgerufen (200) · 4 Einträge',
+    expect(adapterVersuchText({ erfolg: true, anzahl: 4, probe: false })).toBe(
+      'abgerufen · 4 Einträge',
     );
     expect(adapterVersuchText({ erfolg: true, status: 200, anzahl: 1, probe: true })).toBe(
       'erreichbar (200) · 1 Eintrag · Prüfung',

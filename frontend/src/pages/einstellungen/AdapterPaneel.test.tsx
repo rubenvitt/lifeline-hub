@@ -154,6 +154,34 @@ describe('AdapterPaneel', () => {
     expect(await screen.findByText('Ansicht des Adapters')).toBeInTheDocument();
   });
 
+  it('legt mit der LAN-Ausnahme an, wenn sie angekreuzt ist', async () => {
+    const aufrufe = stelleBereit(adapterListeFixture({ adapter: [] }));
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adapter anlegen' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Wache');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Adresse' }),
+      'https://192.168.1.5/api',
+    );
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /Ziel im eigenen Netz erlauben/ }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          art: 'beispiel',
+          name: 'Wache',
+          einstellungen: { url: 'https://192.168.1.5/api' },
+          intervall_s: 60,
+          lan_erlaubt: true,
+        },
+      ]),
+    );
+  });
+
   it('verlangt die Pflichtfelder der Art', async () => {
     const aufrufe = stelleBereit(adapterListeFixture({ adapter: [] }));
     const user = userEvent.setup();

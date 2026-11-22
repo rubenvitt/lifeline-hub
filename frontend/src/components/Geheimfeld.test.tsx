@@ -132,6 +132,16 @@ describe('Geheimfeld', () => {
     await waitFor(() => expect(onEntfernen).toHaveBeenCalledTimes(1));
   });
 
+  it('nennt den Grund, wenn das Entfernen scheitert', async () => {
+    const user = userEvent.setup();
+    const onEntfernen = vi.fn(() => Promise.reject(new ApiError(404, 'Nicht gefunden')));
+    rendere({ platz: gesetzt, onEntfernen });
+    await user.click(screen.getByRole('button', { name: 'Entfernen …' }));
+    await user.click(await screen.findByRole('button', { name: 'Entfernen' }));
+    expect(await screen.findByText('Nicht gefunden')).toBeInTheDocument();
+    expect(screen.getByText('Nicht entfernt')).toBeInTheDocument();
+  });
+
   it('nennt einen unlesbaren Wert und bietet „Neu setzen“', () => {
     rendere({ platz: { ...gesetzt, is_unlesbar: true } });
     expect(

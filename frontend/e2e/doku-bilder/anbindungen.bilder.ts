@@ -147,12 +147,12 @@ async function stelle(page: Page, jetzt: Date) {
           fehler_art: 'verbindung',
           dauer_ms: 5003,
         },
-        { at: wire(jetzt, 19), probe: false, erfolg: true, status: 200, dauer_ms: 388, anzahl: 4 },
+        { at: wire(jetzt, 19), probe: false, erfolg: true, dauer_ms: 388, anzahl: 4 },
       ],
     }),
   );
   await page.route('**/api/admin/adapter/a1/pruefen', (route) =>
-    route.fulfill({ json: { erfolg: true, status: 200, dauer_ms: 412, anzahl: 4 } }),
+    route.fulfill({ json: { erfolg: true, dauer_ms: 412, anzahl: 4 } }),
   );
 }
 

@@ -52,6 +52,16 @@ export default function Geheimfeld({
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<unknown>(null);
 
+  const entfernen = async () => {
+    setFehler(null);
+    try {
+      await onEntfernen();
+    } catch (e) {
+      // Die Rückfrage schließt; der Grund steht an der Zeile (antd fängt eine Ablehnung nicht).
+      setFehler(e);
+    }
+  };
+
   const schliessen = () => {
     setWert('');
     setFehler(null);
@@ -66,6 +76,7 @@ export default function Geheimfeld({
     setFehler(null);
     try {
       await onSetzen(gesendet);
+      setWert('');
       setOffen(false);
     } catch (e) {
       setFehler(e);
@@ -77,7 +88,7 @@ export default function Geheimfeld({
   const tasten = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      schliessen();
+      if (!laeuft) schliessen();
     } else if (e.key === 'Enter' && wert.trim() !== '' && !laeuft) {
       e.preventDefault();
       void speichern();
@@ -150,6 +161,7 @@ export default function Geheimfeld({
                 visibilityToggle={false}
                 maxLength={maxLaenge}
                 value={wert}
+                disabled={laeuft}
                 autoFocus
                 onChange={(e) => setWert(e.target.value)}
                 onKeyDown={tasten}
@@ -172,29 +184,38 @@ export default function Geheimfeld({
         </div>
       ) : (
         darfSchreiben && (
-          <Knopfreihe>
-            <span title={gesperrt}>
-              <Button disabled={gesperrt != null} onClick={() => setOffen(true)}>
-                {setzenWort}
-              </Button>
-            </span>
-            {platz.is_gesetzt && (
-              <Popconfirm
-                title={`${platz.bezeichnung} entfernen?`}
-                description={
-                  platz.pflicht
-                    ? 'Der Wert ist danach weg. Ohne ihn hält der Adapter beim nächsten Abruf an.'
-                    : 'Der Wert ist danach weg und lässt sich nicht wiederherstellen.'
-                }
-                okText="Entfernen"
-                cancelText="Abbrechen"
-                okButtonProps={{ danger: true }}
-                onConfirm={onEntfernen}
-              >
-                <Button type="text">Entfernen …</Button>
-              </Popconfirm>
-            )}
-          </Knopfreihe>
+          <Stapel abstand="xs">
+            <Knopfreihe>
+              <span title={gesperrt}>
+                <Button
+                  disabled={gesperrt != null}
+                  onClick={() => {
+                    setFehler(null);
+                    setOffen(true);
+                  }}
+                >
+                  {setzenWort}
+                </Button>
+              </span>
+              {platz.is_gesetzt && (
+                <Popconfirm
+                  title={`${platz.bezeichnung} entfernen?`}
+                  description={
+                    platz.pflicht
+                      ? 'Der Wert ist danach weg. Ohne ihn hält der Adapter beim nächsten Abruf an.'
+                      : 'Der Wert ist danach weg und lässt sich nicht wiederherstellen.'
+                  }
+                  okText="Entfernen"
+                  cancelText="Abbrechen"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={entfernen}
+                >
+                  <Button type="text">Entfernen …</Button>
+                </Popconfirm>
+              )}
+            </Knopfreihe>
+            <SpeicherFehler fehler={fehler} titel="Nicht entfernt" />
+          </Stapel>
         )
       )}
     </div>

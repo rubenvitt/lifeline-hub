@@ -25,7 +25,7 @@ import { pflicht } from '../../components/pflichtRegel';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
-import { ApiError } from '../../api/client';
+import { ApiError, isVeraltet } from '../../api/client';
 import {
   SOFORT_ODER_NIE,
   adapterFehlerText,
@@ -56,7 +56,7 @@ import {
   uebernimmAdapter,
   type HostWechsel,
 } from './adapterAnzeige';
-import { INTERVALL_MAX_S } from './AdapterPaneel';
+import { ADAPTER_LAN_WARNUNG, INTERVALL_MAX_S } from './AdapterPaneel';
 
 /** Formularwerte: Name, Intervall und je Einstellungsfeld `e_<name>` (flach für das Paneel). */
 type Werte = Record<string, unknown> & { name: string; intervall_s: number };
@@ -117,7 +117,11 @@ export default function AdapterAnsicht() {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
-  const [pruefung, setPruefung] = useState<AdapterPruefErgebnis | null>(null);
+  /** Ergebnis von „Verbindung prüfen“ samt Stand, für den es galt; ein neuer Stand verwirft es. */
+  const [pruefung, setPruefung] = useState<{
+    ergebnis: AdapterPruefErgebnis;
+    stand: string;
+  } | null>(null);
   const [lanFrage, setLanFrage] = useState(false);
   const [loeschFrage, setLoeschFrage] = useState(false);
   const [zielFrage, setZielFrage] = useState<HostWechsel[] | null>(null);
@@ -139,9 +143,9 @@ export default function AdapterAnsicht() {
 
   const pruefen = useMutation({
     ...SOFORT_ODER_NIE,
-    mutationFn: (id: string) => checkAdapter(id),
-    onSuccess: (e) => {
-      setPruefung(e);
+    mutationFn: ({ id }: { id: string; stand: string }) => checkAdapter(id),
+    onSuccess: (ergebnis, { stand }) => {
+      setPruefung({ ergebnis, stand });
       versucheNeu();
     },
   });
@@ -173,6 +177,16 @@ export default function AdapterAnsicht() {
   const adapter = liste?.adapter.find((a) => a.id === adapterId);
 
   if (!liste) {
+    if (listeQ.fetchStatus === 'paused') {
+      return (
+        <AdminPage titel="Adapter">
+          <SeitenLeer
+            titel="Ohne Verbindung nicht geladen"
+            hinweis="Die Adapter lädt die Seite, sobald der Server wieder erreichbar ist."
+          />
+        </AdminPage>
+      );
+    }
     return listeQ.isError ? (
       <AdminPage titel="Adapter">
         <SeitenFehler
@@ -204,7 +218,12 @@ export default function AdapterAnsicht() {
   const grund = !istAdmin ? NUR_ADMIN : gesperrt != null ? 'am Hub anbinden' : undefined;
   const zeit = (w: string) => zeitKurz(w, konv);
   const zustand = adapterZustandAnzeige(adapter);
-  const angehalten = adapter.zustand === 'aus' || adapter.zustand === 'braucht_eingriff';
+  // „Art unbekannt“ überdeckt „angehalten“ im Zustand; der Zeitpunkt sagt es trotzdem.
+  const angehalten =
+    adapter.angehalten_at != null ||
+    adapter.zustand === 'aus' ||
+    adapter.zustand === 'braucht_eingriff';
+  const pruefErgebnis = pruefung?.stand === adapter.geaendert_at ? pruefung.ergebnis : null;
   const speicherText = speicherHinweisText(liste.speicher);
   const geheimnisseGesperrt =
     liste.speicher === 'fehlt' ? 'Geheimnisspeicher ohne Schlüssel' : undefined;
@@ -223,8 +242,18 @@ export default function AdapterAnsicht() {
   };
 
   const speichern = async (patch: AdapterPatch, basis: string | undefined) => {
-    if (patch.einstellungen && art && adapter.geheimnisse.some((g) => g.is_gesetzt)) {
-      const wechsel = hostWechsel(art.felder, einstellungen, patch.einstellungen);
+    if (patch.einstellungen && art) {
+      // Gegen den Stand des Servers, nicht den Cache: nach einem Konflikt oder einem eben gesetzten
+      // Geheimnis wäre der bis zu 30 s alt, und die Rückfrage fehlte, wo der Server löscht.
+      const frisch = await qc.fetchQuery({
+        queryKey: globalKeys.adapter(),
+        queryFn: loadAdapterListe,
+        staleTime: 0,
+      });
+      const jetzt = frisch.adapter.find((a) => a.id === adapter.id) ?? adapter;
+      const wechsel = jetzt.geheimnisse.some((g) => g.is_gesetzt)
+        ? hostWechsel(art.felder, einstellungenVonAdapter(jetzt), patch.einstellungen)
+        : [];
       if (wechsel.length > 0 && !(await fragZiel(wechsel))) {
         throw new ApiError(0, ZIEL_NICHT_BESTAETIGT);
       }
@@ -307,7 +336,7 @@ export default function AdapterAnsicht() {
             <Button
               disabled={gesperrt != null || art == null}
               loading={pruefen.isPending}
-              onClick={() => pruefen.mutate(adapter.id)}
+              onClick={() => pruefen.mutate({ id: adapter.id, stand: adapter.geaendert_at })}
             >
               Verbindung prüfen
             </Button>
@@ -359,16 +388,16 @@ export default function AdapterAnsicht() {
         <Paneel
           titel="Zustand"
           fuss={
-            pruefung && (
+            pruefErgebnis && (
               <div data-lfh="adapter-pruefung" role="status">
                 <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
                   <Status
                     groesse="klein"
-                    ton={pruefung.erfolg ? 'normal' : 'achtung'}
-                    wort={`Verbindung prüfen: ${adapterVersuchText({ ...pruefung, probe: false }).replace(/^abgerufen/, 'erreichbar')}`}
+                    ton={pruefErgebnis.erfolg ? 'normal' : 'achtung'}
+                    wort={`Verbindung prüfen: ${adapterVersuchText({ ...pruefErgebnis, probe: false }).replace(/^abgerufen/, 'erreichbar')}`}
                   />
                   <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
-                    {`${pruefung.dauer_ms} ms · nichts übernommen`}
+                    {`${pruefErgebnis.dauer_ms} ms · nichts übernommen`}
                   </span>
                 </Stapel>
               </div>
@@ -421,7 +450,9 @@ export default function AdapterAnsicht() {
               )}
             </Datenfeld>
             <Datenfeld label="Nächster Versuch">
-              {angehalten ? (
+              {art == null ? (
+                'ruft nicht ab'
+              ) : angehalten ? (
                 'angehalten'
               ) : adapter.naechster_abruf_at ? (
                 <span style={monoStil('mono')}>{zeit(adapter.naechster_abruf_at)}</span>
@@ -448,6 +479,7 @@ export default function AdapterAnsicht() {
           onNeuLaden={() => void listeQ.refetch()}
           darfSchreiben={darfSchreiben && art != null}
           grund={grund ?? (art == null ? 'Art unbekannt' : undefined)}
+          isSperrkonflikt={isVeraltet}
           modus="paneel"
           spalten={2}
         />
@@ -470,7 +502,11 @@ export default function AdapterAnsicht() {
               </div>
             )}
             {adapter.geheimnisse.length === 0 ? (
-              <span style={{ color: rollen.gedaempft }}>Diese Art braucht keine Geheimnisse.</span>
+              <span style={{ color: rollen.gedaempft }}>
+                {art == null
+                  ? 'Die Art kennt dieser Server nicht; ihre Plätze sind unbekannt.'
+                  : 'Diese Art braucht keine Geheimnisse.'}
+              </span>
             ) : (
               adapter.geheimnisse.map((platz) => (
                 <Geheimfeld
@@ -498,7 +534,7 @@ export default function AdapterAnsicht() {
             <Switch
               id="adapter-lan"
               checked={adapter.lan_erlaubt}
-              disabled={!darfSchreiben}
+              disabled={!darfSchreiben || art == null}
               loading={lan.isPending}
               aria-label="Ziel im eigenen Netz erlauben"
               onChange={(an) => {
@@ -509,9 +545,7 @@ export default function AdapterAnsicht() {
             />
             <Stapel abstand="xxs">
               <label htmlFor="adapter-lan">Ziel im eigenen Netz erlauben</label>
-              <span style={{ color: rollen.gedaempft }}>
-                Nur für einen Server im lokalen Netz der Wache. Steht im Zugangsprotokoll.
-              </span>
+              <span style={{ color: rollen.gedaempft }}>{ADAPTER_LAN_WARNUNG}</span>
             </Stapel>
           </Stapel>
         </Paneel>

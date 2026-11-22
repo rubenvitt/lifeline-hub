@@ -51,7 +51,6 @@ function stelleBereit(start: AdapterAnzeige, extra: Partial<AdapterListe> = {}) 
           at: '2026-11-22 08:50:02',
           probe: true,
           erfolg: true,
-          status: 200,
           dauer_ms: 412,
           anzahl: 4,
         },
@@ -79,7 +78,7 @@ function stelleBereit(start: AdapterAnzeige, extra: Partial<AdapterListe> = {}) 
     }),
     http.post('/api/admin/adapter/a1/pruefen', async ({ request }) => {
       await merke('POST', request, 'pruefen');
-      return HttpResponse.json({ erfolg: true, status: 200, dauer_ms: 412, anzahl: 4 });
+      return HttpResponse.json({ erfolg: true, dauer_ms: 412, anzahl: 4 });
     }),
     http.post('/api/admin/adapter/a1/anhalten', async ({ request }) => {
       await merke('POST', request, 'anhalten');
@@ -141,7 +140,7 @@ describe('AdapterAnsicht', () => {
     expect(zustand).toHaveTextContent('4 Einträge');
     const verlauf = paneel('Letzte Versuche');
     expect(
-      await within(verlauf).findByText('erreichbar (200) · 4 Einträge · Prüfung'),
+      await within(verlauf).findByText('erreichbar · 4 Einträge · Prüfung'),
     ).toBeInTheDocument();
     expect(within(verlauf).getByText('Keine Antwort in 20 s')).toBeInTheDocument();
   });
@@ -151,7 +150,7 @@ describe('AdapterAnsicht', () => {
     const user = userEvent.setup();
     rendere();
     await user.click(await screen.findByRole('button', { name: 'Verbindung prüfen' }));
-    await screen.findByText(/Verbindung prüfen: erreichbar \(200\) · 4 Einträge/);
+    await screen.findByText(/Verbindung prüfen: erreichbar · 4 Einträge/);
     expect(document.querySelector('[data-lfh="adapter-pruefung"]')).toHaveTextContent(
       '412 ms · nichts übernommen',
     );
@@ -229,6 +228,83 @@ describe('AdapterAnsicht', () => {
         },
       ]),
     );
+  });
+
+  it('fragt nach dem Stand des Servers, nicht nach einem veralteten Cache', async () => {
+    const ohneGeheimnis = adapterFixture('a1', {
+      geheimnisse: adapterFixture('a1').geheimnisse.map((g) => ({ ...g, is_gesetzt: false })),
+    });
+    const aufrufe = stelleBereit(ohneGeheimnis);
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Einstellungen bearbeiten' }));
+    // Inzwischen setzt jemand ein Geheimnis; die Seite hat es noch nicht neu geladen.
+    server.use(
+      http.get('/api/admin/adapter', () =>
+        HttpResponse.json(adapterListeFixture({ adapter: [adapterFixture('a1')] })),
+      ),
+    );
+    const url = screen.getByRole('textbox', { name: 'Adresse' });
+    await user.clear(url);
+    await user.type(url, 'https://alarm2.example/api');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Neues Ziel: Geheimnisse werden entfernt' }),
+    ).toBeInTheDocument();
+    expect(aufrufe).toEqual([]);
+  });
+
+  it('fragt ohne gesetztes Geheimnis nicht nach dem neuen Ziel', async () => {
+    const ohneGeheimnis = adapterFixture('a1', {
+      geheimnisse: adapterFixture('a1').geheimnisse.map((g) => ({ ...g, is_gesetzt: false })),
+    });
+    const aufrufe = stelleBereit(ohneGeheimnis);
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Einstellungen bearbeiten' }));
+    const url = screen.getByRole('textbox', { name: 'Adresse' });
+    await user.clear(url);
+    await user.type(url, 'https://alarm2.example/api');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(aufrufe.map((a) => a.methode)).toEqual(['PATCH']));
+    expect(
+      screen.queryByRole('dialog', { name: 'Neues Ziel: Geheimnisse werden entfernt' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('nennt einen anderen Konflikt als „veraltet“ am Paneel, ohne Rückfrage', async () => {
+    stelleBereit(adapterFixture('a1'));
+    server.use(
+      http.patch('/api/admin/adapter/a1', () =>
+        HttpResponse.json({ error: 'Diese Instanz meldet sich beim Hub.' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Einstellungen bearbeiten' }));
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    await user.type(name, ' 2');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Diese Instanz meldet sich beim Hub.')).toBeInTheDocument();
+    expect(screen.queryByText('Zwischenzeitlich geändert')).not.toBeInTheDocument();
+  });
+
+  it('zeigt einen angehaltenen Adapter unbekannter Art mit „Fortsetzen“ und ohne Schreibwege', async () => {
+    stelleBereit(
+      adapterFixture('a1', {
+        art: 'weg',
+        art_bezeichnung: undefined,
+        zustand: 'art_unbekannt',
+        angehalten_at: '2026-11-22 08:00:00',
+        geheimnisse: [],
+      }),
+    );
+    rendere();
+    expect(await screen.findByRole('button', { name: 'Fortsetzen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Verbindung prüfen' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'Ziel im eigenen Netz erlauben' })).toBeDisabled();
+    expect(screen.getByText(/ihre Plätze sind unbekannt/)).toBeInTheDocument();
+    expect(screen.getByText('ruft nicht ab')).toBeInTheDocument();
   });
 
   it('setzt ein Geheimnis, ohne den Wert irgendwo zu behalten', async () => {
