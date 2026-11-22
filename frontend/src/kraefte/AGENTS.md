@@ -61,8 +61,8 @@ die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131
 `routes::abloesung::publish_kopplung`. Ein Weg, der ein Ereignis der ablösenden Einheit ohne
 Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
 in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
-Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige im
-Meldebild/Personal/Einheit-Detail. Bewusster Bruch von LFH-46 E17 (Feldbefund)
+Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige in
+Kräfteübersicht/Personal/Einheit-Detail. Bewusster Bruch von LFH-46 E17 (Feldbefund)
 auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
 **Einstufung** (LLH-730, `openspec/changes/archive/2026-11-08-u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
 nur `zeitachse.ts:stufeEin` gegen die wirksamen `SchichtplanGrenzwerte` (Vorgaben 12 h/8 h
@@ -70,7 +70,7 @@ eingeschlossen, keine zweite Einstellung), mit derselben Trennregel wie der Plan
 (`src/abloesung/schichtplan/pruefung.rs`, `dienststrecken`; wer eine ändert, ändert beide). Gelesen
 werden die Werte über `…/{einheiten,personal}/zeitachse/grenzwerte` (Key
 `kraefteZeitachseGrenzwerte`), nie über den Schichtplan-GET (Modul Ablösung). Angezeigt nur über
-`DauerMitEinstufung` in Meldebild „Im Einsatz“ und Personal „Einsatzdauer“, Rolle `achtung` mit
+`DauerMitEinstufung` in der Kräfteübersicht „Im Einsatz“ und Personal „Einsatzdauer“, Rolle `achtung` mit
 Wort; „Ruhe“, Einheit-Detail, Personenkopf, Überblick und Druck des Berichts bleiben neutral. Kein
 Hinweis in der AlarmZentrale, kein Modulzähler, keine Benachrichtigung (Alarmbudget).
 

@@ -84,6 +84,40 @@ test(`Erstaufruf mit langsamem Server, ${FUEKW.width}×${FUEKW.height}: CLS < ${
   test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
 });
 
+/**
+ * Die meistgenutzten weiteren Module (LLH-2005): sie gaben bis dahin im Frühausstieg ein nacktes
+ * Gerippe zurück, und der Kopf kam erst mit dem Einsatz.
+ */
+const WEITERE_MODULE = [
+  'einsatzdaten',
+  'auftraege',
+  'einheiten',
+  'personal',
+  'fahrzeuge',
+  'lageberichte',
+] as const;
+
+for (const groesse of [FUEKW, SCHMAL]) {
+  test(`Weitere Module beim Erstaufruf, ${groesse.width}×${groesse.height}: CLS < ${CLS_GUT}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(groesse);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await createEinsatzMitDaten(page);
+    await beobachteShifts(page);
+    await verzoegere(page, einsatzId);
+
+    const werte: string[] = [];
+    for (const seite of WEITERE_MODULE) {
+      const m = await measure(page, `/einsaetze/${einsatzId}/${seite}`);
+      werte.push(`${seite}: ${bericht(m)}`);
+      expect.soft(m.summe, `${seite}: ${bericht(m)}`).toBeLessThan(CLS_GUT);
+    }
+    test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+  });
+}
+
 test(`Betroffene beim Erstaufruf, schmal ${SCHMAL.width}×${SCHMAL.height}: CLS < ${CLS_GUT}`, async ({
   page,
 }) => {

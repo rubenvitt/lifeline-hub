@@ -145,6 +145,11 @@ test.describe(KAPITEL, () => {
       await dialog.getByPlaceholder('Rückmeldung zur Erledigung').blur();
       await fotografiere(dialog, KAPITEL, 'vollzug');
       await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+      // Mit Text fragt der Dialog vor dem Verwerfen nach (LLH-2010).
+      await geraet
+        .getByRole('dialog', { name: 'Eingaben verwerfen?' })
+        .getByRole('button', { name: 'Verwerfen' })
+        .click();
       await expect(dialog).toHaveCount(0);
 
       // Nachgeklickt: quittieren, Bearbeitung beginnen, Vollzug melden.

@@ -126,6 +126,7 @@ describe('baumZielStil', () => {
 // ── Zufluss-Schleuse (LFH-867) ──────────────────────────────────────────────────────
 
 let setzeStand: (wurzeln: K[], kopf?: ReactNode, kopfLaedt?: boolean) => void = () => {};
+let setzeVeraltet: (veraltet: { onWiederholen: () => void } | undefined) => void = () => {};
 
 /** Das Gerüst mit einem Stand, den der Test von außen „live“ ändert. */
 function Buehne({
@@ -137,6 +138,8 @@ function Buehne({
   kopf?: ReactNode;
   kopfLaedt?: boolean;
 }) {
+  const [veraltet, setVeraltet] = useState<{ onWiederholen: () => void } | undefined>();
+  setzeVeraltet = setVeraltet;
   const [stand, setStand] = useState<{ wurzeln: K[]; kopf: ReactNode; kopfLaedt: boolean }>({
     wurzeln: start,
     kopf,
@@ -155,6 +158,7 @@ function Buehne({
         bezeichnung="Testbaum"
         kopf={stand.kopf}
         kopfLaedt={stand.kopfLaedt}
+        veraltet={veraltet}
         wurzeln={stand.wurzeln}
         zugeklappt={new Set()}
         onUmschalten={() => {}}
@@ -349,5 +353,50 @@ describe('HaengenderBaum — Zufluss-Schleuse', () => {
     // Der Fokus steht wieder auf einem Ziel des Bereichs: ein späteres Verlassen öffnet.
     act(() => screen.getByRole('button', { name: 'draußen' }).focus());
     expect(screen.getByTestId('inhalt-d')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Eine gescheiterte Aktualisierung steht in der Standzeile (LLH-1927): die Zeile hält ihre Höhe,
+ * also schiebt ihr Erscheinen und Verschwinden den Baum unter dem Zeiger nicht, und „Live“ steht
+ * nicht mehr da, wo der Stand alt ist.
+ */
+describe('HaengenderBaum — veralteter Stand in der Standzeile (LLH-1927)', () => {
+  const hinweis = () => document.querySelector('[data-lfh="stand-veraltet"]') as HTMLElement | null;
+
+  it('ersetzt „Live“ in der Standzeile und nimmt ihr keine feste Höhe', () => {
+    renderMitProviders(<Buehne start={START} />);
+    const hoehe = stand().style.height;
+    expect(hoehe).not.toBe('');
+    act(() => setzeVeraltet({ onWiederholen: () => {} }));
+    expect(stand().contains(hinweis())).toBe(true);
+    expect(hinweis()).toHaveTextContent('Stand womöglich veraltet');
+    expect(within(stand()).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(stand()).not.toHaveTextContent('Live');
+    expect(stand().style.height).toBe(hoehe);
+    // Über dem Baum steht nichts Neues: die erste Ebene folgt direkt auf die Standzeile.
+    expect(stand().nextElementSibling?.getAttribute('data-lfh')).toBe('org-ebene1');
+    act(() => setzeVeraltet(undefined));
+    expect(hinweis()).toBeNull();
+    expect(stand()).toHaveTextContent('Live');
+  });
+
+  it('steht neben dem Sammelbanner, wenn zugleich etwas wartet', () => {
+    renderMitProviders(<Buehne start={START} />);
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    act(() => setzeVeraltet({ onWiederholen: () => {} }));
+    live([...START, k('c')]);
+    expect(within(stand()).getByRole('button', { name: 'anzeigen' })).toBeInTheDocument();
+    expect(stand().contains(hinweis())).toBe(true);
+  });
+
+  it('„Erneut abrufen“ ruft ab und lässt den Fokus im Bereich, auch wenn der Hinweis geht', async () => {
+    const wiederholen = vi.fn();
+    renderMitProviders(<Buehne start={START} />);
+    act(() => setzeVeraltet({ onWiederholen: wiederholen }));
+    await userEvent.click(within(stand()).getByRole('button', { name: 'Erneut abrufen' }));
+    expect(wiederholen).toHaveBeenCalledTimes(1);
+    act(() => setzeVeraltet(undefined));
+    expect(stand()).toHaveFocus();
   });
 });

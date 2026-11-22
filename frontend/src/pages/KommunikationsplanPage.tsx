@@ -48,7 +48,7 @@ import {
 } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -80,6 +80,7 @@ import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './kommunikationsplanPrint.css';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Kommunikationsplan des Sachgebiets S6 (LFH-848): wer über welche Verbindung außerhalb des
@@ -613,7 +614,7 @@ export default function KommunikationsplanPage() {
   // Drucken im Seitenkopf (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“).
   const druckWege = useDruckNebenwege();
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="fernmeldewesen" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

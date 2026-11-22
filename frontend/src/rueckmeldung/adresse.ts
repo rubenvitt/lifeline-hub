@@ -50,9 +50,20 @@ export function gemerktesRoutenMuster(pfad: string): string {
   return routenMuster(gemerkteRouten, pfad.split(/[?#]/)[0]);
 }
 
-/** Oberfläche im Formular: iOS-Hülle nach ihrer Plattform (t39ltxxi), Desktop-Hülle ohne. */
+/** Oberfläche je Plattform der Hülle (iOS: t39ltxxi, Desktop: LLH-1982). */
+const OBERFLAECHE_JE_PLATTFORM: Readonly<Record<string, string>> = {
+  ios: 'iOS-App',
+  macos: 'Desktop-App (macOS)',
+  windows: 'Desktop-App (Windows)',
+};
+
+/**
+ * Oberfläche im Formular nach der Plattform der Hülle. Eine Hülle ohne oder mit unbekannter
+ * Plattform (Desktop-Hülle vor LLH-1982) heißt „Desktop-App“.
+ */
 function oberflaecheText(huelle: boolean, platform: string | null): string {
-  if (platform === 'ios') return 'iOS-App';
+  const bekannt = platform ? OBERFLAECHE_JE_PLATTFORM[platform] : undefined;
+  if (bekannt) return bekannt;
   return huelle ? 'Desktop-App' : 'Browser';
 }
 

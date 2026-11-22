@@ -107,7 +107,7 @@ Regeln dazu:
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
-  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  über die Gründe der Tönung der Kräfteübersicht (`toenungsGruende`, gelesen über
   `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
   Einheiten in der Folge der Einheitenliste (`einheitenMitAusfall`). Für den Lagemonitor zählt der
   Server dieselbe Regel nach (`einsatz::ausfall`); `tests/fixtures/verdichtung/regeln.json`,

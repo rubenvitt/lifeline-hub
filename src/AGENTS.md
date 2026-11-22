@@ -810,8 +810,12 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2): `Adressat::Funktion` erreicht jedes
   Mitglied, dessen `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt; für EL zuerst den
   verknüpften Nutzer des Einsatzleiters der Führungsstelle, nur ohne ihn die Mitgliedschaft.
-  Dieselbe Quelle liest die Anzeige (`fuehrung::aufloesung`, Regeln in
-  `frontend/src/fuehrung/AGENTS.md`); eine zweite Zuordnung „Funktion → Person“ gibt es nicht.
+  Dabei zählt nur, wer im Einsatz schreiben darf (`darf_schreiben`, LLH-2008): Mitarbeit,
+  Beobachter und Nicht-Mitglieder (auch der Admin, LFH-1118) erreicht die Funktion nicht, ein
+  solcher Einsatzleiter gilt als nicht da. Dieselbe Quelle liest die Anzeige
+  (`fuehrung::aufloesung`, Regeln in `frontend/src/fuehrung/AGENTS.md`), aber ohne diesen Filter:
+  bis LLH-2064 (Funktion für Rollen ohne Schreibrecht sperren) nennt sie auch Mitarbeit und
+  Beobachter. Eine zweite Zuordnung „Funktion → Person“ gibt es nicht.
 - **Kein Text in der Tabelle:** eine Zeile je Empfänger mit Art, Stufe und Bezug. Titel,
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
   (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein

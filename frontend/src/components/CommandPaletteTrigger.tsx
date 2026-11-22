@@ -96,7 +96,7 @@ export default function CommandPaletteTrigger() {
         aria-label="Suchen"
         aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
         icon={<IconLupe size={20} />}
-        onClick={toggle}
+        onClick={(e) => toggle(e.currentTarget)}
         style={{
           color: rahmenFarben.text,
           flexShrink: 0,
@@ -115,7 +115,7 @@ export default function CommandPaletteTrigger() {
       data-lfh="suche-ausloeser"
       aria-label="Suchen"
       aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
-      onClick={toggle}
+      onClick={(e) => toggle(e.currentTarget)}
       className="kopf-suchfeld"
       // Die Trefffläche als Boden: wird die Suchzelle schmal, bleibt die Lupe (LLH-1726).
       style={{ ...suchfeldStil(token), minWidth: trefflaeche }}

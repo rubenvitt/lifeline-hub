@@ -39,7 +39,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   Kräfte-Seiten (LLH-1270): Gate 3 und `fokus-verdeckung` messen die Einheit-Ansicht mit
   gesperrtem Personal („Ohne Besatzung“, `seedEinheitPersonalGesperrt` in `e2e/einheit-fixture.ts`),
   dort zusätzlich als Führungspersonal, weil die Sperre auch Schreibziele ändert. Ebenso den
-  Sperrzweig von Meldebild, Fahrzeugen, FMS-Tableau, Bereitstellungsräumen und Ablösung
+  Sperrzweig von Kräfteübersicht, Fahrzeugen, FMS-Tableau, Bereitstellungsräumen und Ablösung
   (LLH-1462, `SPERR_SZENARIEN` in `e2e/kraefte-sperre-fixture.ts`): Vorbedingung je Seite ist
   der sichtbare Grund und keine 403 beim Laden.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz

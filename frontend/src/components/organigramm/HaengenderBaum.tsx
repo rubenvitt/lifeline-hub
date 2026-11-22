@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Sammelbanner, useRollen } from '../instrument';
 import { useDruckModus } from '../druck/useDruckModus';
+import { StandVeraltetHinweis } from '../SeitenZustand';
 import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import type { BaumKnoten } from './baum';
 import { schleuse, wartendText } from './baumSchleuse';
@@ -70,6 +71,12 @@ interface Props<K extends BaumKnoten<K>> {
    * Ist die Quelle fertig, hält sie den dann gezeigten Kopf wie bisher.
    */
   kopfLaedt?: boolean;
+  /**
+   * Die Aktualisierung der Quelle ist gescheitert, gezeigt wird ein alter Stand (LLH-1927). Der
+   * Hinweis steht in der Standzeile statt „Live“, neben einem wartenden Sammelbanner: die Zeile
+   * hält ihre Höhe, sein Erscheinen schiebt den Baum unter dem Zeiger nicht.
+   */
+  veraltet?: { onWiederholen: () => void };
   wurzeln: readonly K[];
   /** Gemerkt werden die ZUGEklappten Schlüssel: alles startet offen, Neues steht offen da. */
   zugeklappt: ReadonlySet<string>;
@@ -83,7 +90,7 @@ interface Props<K extends BaumKnoten<K>> {
 }
 
 export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>) {
-  const { bezeichnung, lfh, kopf, kopfLaedt = false, wurzeln } = props;
+  const { bezeichnung, lfh, kopf, kopfLaedt = false, veraltet, wurzeln } = props;
   const { token, rollen } = useRollen();
   const druckt = useDruckModus();
   const bereichRef = useRef<HTMLElement>(null);
@@ -206,8 +213,28 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
           </span>
         </Sammelbanner>
       ) : (
-        <span style={{ alignSelf: 'center', fontSize: token.fontSizeSM, color: rollen.gedaempft }}>
-          {offen ? 'Live' : 'Live pausiert'}
+        veraltet == null && (
+          <span
+            style={{ alignSelf: 'center', fontSize: token.fontSizeSM, color: rollen.gedaempft }}
+          >
+            {offen ? 'Live' : 'Live pausiert'}
+          </span>
+        )
+      )}
+      {veraltet != null && (
+        <span
+          style={{
+            alignSelf: 'center',
+            marginInlineStart: wartet !== null ? token.marginXS : 0,
+          }}
+        >
+          <StandVeraltetHinweis
+            onWiederholen={() => {
+              // Glückt der Abruf, geht der Knopf; der Fokus bleibt im Bereich (WCAG 2.4.3).
+              standRef.current?.focus({ preventScroll: true });
+              veraltet.onWiederholen();
+            }}
+          />
         </span>
       )}
     </div>

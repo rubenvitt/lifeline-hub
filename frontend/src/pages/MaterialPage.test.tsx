@@ -348,6 +348,7 @@ describe('MaterialPage', () => {
 
   it('Einsatzleitung sieht Disponier- und Ad-hoc-Aktionen', async () => {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /^Material/ });
     expect(screen.getByRole('button', { name: 'Material disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Material' })).toBeInTheDocument();
@@ -938,6 +939,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
 
   async function openAdhoc() {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /^Material/ });
     await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
     return await screen.findByRole('dialog');
@@ -2238,6 +2240,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   it('die Maske „Ad-hoc-Material“ begrenzt die Angaben aus dem Spiegel', async () => {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /^Material/ });
     await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
     const dialog = await screen.findByRole('dialog');
