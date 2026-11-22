@@ -55,15 +55,15 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
   `pub fn am_bezug_getragen(frei: impl Fn(&str) -> bool) -> Vec<&'static str>` in
   `crate::erinnerung`; `pub async fn faellige_offene(pool: &SqlitePool, einsatz_id: i64, jetzt: &str, am_bezug: &[&str]) -> Result<i64, AppError>`.
 
-- [ ] **Step 1: Failing test** `faellige_offene_laesst_am_bezug_getragene_aus` in
+- [x] **Step 1: Failing test** `faellige_offene_laesst_am_bezug_getragene_aus` in
   `src/erinnerung/repo.rs` `mod tests`. Fällig sind: eine Auto-Frist `meldung`, eine `auftrag`,
   eine `abloesung`, eine `abloesung_vorwarnung`, eine `abloesung_planung` und eine manuelle mit
   Bezug `meldung`. Anlegen per `setze_auto_frist_tx` bzw. `anlegen` mit `bezug_typ`.
   - `faellige_offene(.., &[])` == 6
   - `faellige_offene(.., &am_bezug_getragen(|_| true))` == 2 (Planung und manuell)
   - `faellige_offene(.., &am_bezug_getragen(|m| m != "meldungen"))` == 3
-- [ ] **Step 2:** `cargo test --lib erinnerung::repo::tests::faellige_offene_laesst` → FAIL (Signatur).
-- [ ] **Step 3: Implement** Die Konstante und `am_bezug_getragen` gehören nach `src/erinnerung/mod.rs`
+- [x] **Step 2:** `cargo test --lib erinnerung::repo::tests::faellige_offene_laesst` → FAIL (Signatur).
+- [x] **Step 3: Implement** Die Konstante und `am_bezug_getragen` gehören nach `src/erinnerung/mod.rs`
   und nehmen die `OBJEKT_*`-Konstanten aus `crate::kommunikation`. `faellige_offene` hängt
   bei nicht leerem `am_bezug` dieses SQL an:
   `AND NOT (e.quelle = 'auto_frist' AND e.bezug_typ IN (?,…))`. Die Platzhalter werden
@@ -72,12 +72,12 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
   `zaehler::berechne` ruft `am_bezug_getragen(|m| erlaubt.contains(m))` auf. `lagemonitor::alarm`
   ruft `&[OBJEKT_MELDUNG, OBJEKT_AUFTRAG]` auf, denn seine Alarmzeile zeigt keine Ablösungen. Dazu
   kommt ein Kommentar.
-- [ ] **Step 4:** Den Test in `tests/geraet_kopplung.rs` anpassen. Die Quittierfrist des
+- [x] **Step 4:** Den Test in `tests/geraet_kopplung.rs` anpassen. Die Quittierfrist des
   überfälligen Auftrags zählt jetzt am Auftrag: `erinnerungen_faellig` == 0 und weiter gleich dem
   Modulzähler. Der Kommentar wird angepasst.
-- [ ] **Step 5:** `cargo test --lib erinnerung:: einsatz::zaehler` und
+- [x] **Step 5:** `cargo test --lib erinnerung:: einsatz::zaehler` und
   `cargo test --test geraet_kopplung lagemonitor` → PASS.
-- [ ] **Step 6: Commit** `feat(erinnerung): Zähler „fällig“ lässt am Bezug getragene Fristen aus (LLH-1908)`
+- [x] **Step 6: Commit** `feat(erinnerung): Zähler „fällig“ lässt am Bezug getragene Fristen aus (LLH-1908)`
 
 ### Task 2: Offene Vorgänge → Erinnerungen ohne am Bezug getragene Fristen
 
@@ -93,20 +93,20 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
   `export function amBezugGetragen(e: Pick<Erinnerung, 'quelle' | 'bezug_typ'>, frei: (modul: BezugModul) => boolean): boolean`.
   Außerdem `vorgangsErinnerungen(liste, jetzt, frei: (modul: BezugModul) => boolean = () => false)`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `amBezug.test.ts`: je Bezugstyp `true`, wenn das Modul frei ist. `false` gilt für
     `abloesung_planung`, für `quelle: 'manuell'` mit Bezug `meldung` und für `meldung`, wenn
     `meldungen` nicht frei ist.
   - `offeneVorgaenge.test.ts`, neuer Fall „Erinnerungen: automatische Frist steht am Bezug“: Die
     sechs Erinnerungen aus Task 1, Step 1, alle fällig. Mit `() => true` bleiben ids Planung und
     manuell, mit `(m) => m !== 'meldungen'` zusätzlich die Meldungsfrist.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/erinnerung/amBezug.test.ts src/pages/fuehrung/offeneVorgaenge.test.ts` → FAIL.
-- [ ] **Step 3: Implement** `amBezug.ts`. `vorgangsErinnerungen` filtert zusätzlich
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/erinnerung/amBezug.test.ts src/pages/fuehrung/offeneVorgaenge.test.ts` → FAIL.
+- [x] **Step 3: Implement** `amBezug.ts`. `vorgangsErinnerungen` filtert zusätzlich
   `!amBezugGetragen(e, frei)`. Das Paneel übergibt
   `(m) => ({ meldungen: meldungen.frei, auftraege: auftraege.frei, abloesung: abloesungen.frei })[m] ?? false`
   und trägt einen Kommentarverweis auf `src/AGENTS.md`.
-- [ ] **Step 4:** derselbe Lauf → PASS.
-- [ ] **Step 5: Commit** `feat(ueberblick): Offene Vorgänge zeigen automatische Frist nur am Bezug (LLH-1908)`
+- [x] **Step 4:** derselbe Lauf → PASS.
+- [x] **Step 5: Commit** `feat(ueberblick): Offene Vorgänge zeigen automatische Frist nur am Bezug (LLH-1908)`
 
 ### Task 3: Nächste Marken — Auftragsfrist einmal, Bestätigungsfrist als eigene Marke
 
@@ -121,7 +121,7 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
 - Produces: `MarkenArt` um `'bestaetigung'` erweitert (`id` = Meldung). `naechsteMarken` bekommt
   als neunten Parameter `optionen: { meldungenFrei?: boolean } = {}`.
 
-- [ ] **Step 1: Failing tests** in `ueberblickDaten.test.ts`, `describe naechsteMarken`:
+- [x] **Step 1: Failing tests** in `ueberblickDaten.test.ts`, `describe naechsteMarken`:
   - „Auftrag mit Frist steht einmal“: Auftrag 7 mit `frist_at: nach(30)` plus Auto-Frist
     `bezug_typ: 'auftrag', bezug_id: 7` zur selben Zeit → eine Marke, `art: 'auftrag'`.
   - „Quittierfrist ohne Auftragsmarke bleibt“: Auftragsliste leer, dieselbe Auto-Frist → eine
@@ -133,8 +133,8 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
     Kommend (`nach(20)`) → wie jede Frist (kein „fällig“).
   - „Bestätigungsfrist ohne Modul Meldungen bleibt Erinnerung“: ohne Optionen → `art: 'erinnerung'`,
     `wort: 'fällig'` bei `vor(5)`.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/fuehrung/ueberblickDaten.test.ts` → FAIL.
-- [ ] **Step 3: Implement.** Die Auto-Frist mit `bezug_typ: 'auftrag'` wird übersprungen, wenn
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/fuehrung/ueberblickDaten.test.ts` → FAIL.
+- [x] **Step 3: Implement.** Die Auto-Frist mit `bezug_typ: 'auftrag'` wird übersprungen, wenn
   `a-<bezug_id>` schon in `roh` steht. Die Aufträge kommen zuerst in die Liste, so wie heute. Die
   Auto-Frist mit `bezug_typ: 'meldung'` wird bei `meldungenFrei` zu `art: 'bestaetigung'`,
   `id: bezug_id`, `key: b-<bezug_id>`. `markenBewertung` behandelt `'bestaetigung'` mit `faellig`
@@ -142,9 +142,9 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
   `naechsteMarken` ergänzen, mit Verweis auf `src/AGENTS.md`. In `UeberblickPage` gibt es
   `{ meldungenFrei: rueckmeldungenFrei }`, und `markenZiel` führt `'bestaetigung'` →
   `meldungenPfad(einsatzId, { meldung: m.id ?? undefined })`.
-- [ ] **Step 4:** derselbe Lauf plus `src/pages/fuehrung/UeberblickPage.test.tsx` → PASS;
+- [x] **Step 4:** derselbe Lauf plus `src/pages/fuehrung/UeberblickPage.test.tsx` → PASS;
   `mise exec -- pnpm -C frontend exec tsc --noEmit -p .` ohne Fehler.
-- [ ] **Step 5: Commit** `feat(ueberblick): Nächste Marken zeigen jede Frist einmal (LLH-1908)`
+- [x] **Step 5: Commit** `feat(ueberblick): Nächste Marken zeigen jede Frist einmal (LLH-1908)`
 
 ### Task 4: Regel und Anwenderdoku
 
@@ -157,14 +157,14 @@ filtert Offene Vorgänge → Erinnerungen und Nächste Marken mit derselben Rege
 - Modify: `docs/anwender/kapitel/erinnerungen.md` (automatische Erinnerungen: stehen im Modul,
   im Überblick und in der Zahl am Bezug)
 
-- [ ] **Step 1:** Texte schreiben, dabei `docs/anwender/AGENTS.md` (Kapitelform, Wächter) beachten.
-- [ ] **Step 2:** `./scripts/check-all.sh --nur schnell` (Doku-Wächter, Prettier) → grün.
-- [ ] **Step 3: Commit** `docs(erinnerung): Regel „automatische Frist steht am Bezug“ (LLH-1908)`
+- [x] **Step 1:** Texte schreiben, dabei `docs/anwender/AGENTS.md` (Kapitelform, Wächter) beachten.
+- [x] **Step 2:** `./scripts/check-all.sh --nur schnell` (Doku-Wächter, Prettier) → grün.
+- [x] **Step 3: Commit** `docs(erinnerung): Regel „automatische Frist steht am Bezug“ (LLH-1908)`
 
 ### Task 5: Gate, Bilder, PR
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ergebnis für „Geprüft“ im PR).
-- [ ] **Step 2:** Bilder vorher/nachher des Überblicks (unbestätigte Sofortmeldung, Auftrag mit
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ergebnis für „Geprüft“ im PR).
+- [x] **Step 2:** Bilder vorher/nachher des Überblicks (unbestätigte Sofortmeldung, Auftrag mit
   Frist) per Wegwerf-Spec `frontend/e2e/doku-bilder/zz-ndd6jaby.bilder.ts`
   (`dev-zunder-ausfuehren`, „Bilder der Änderung“).
-- [ ] **Step 3:** Push, PR gegen `alpha`, Board `review` mit `pr_url`.
+- [x] **Step 3:** Push, PR gegen `alpha`, Board `review` mit `pr_url`.
