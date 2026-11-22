@@ -15,13 +15,8 @@
 # im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
 # eigene Gruppe und bricht nie ab.
 #
-# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075, ADR-0076): Rust-Suite und die e2e-Jobs (`e2e.yml`)
-# laufen auf dem eigenen Server, wenn der Job `runner` ihn wählt: nur bei Push auf
-# einen Kanal-Branch und nur, wenn die Repo-Variable `E2E_RUNNER` ein Label nennt. Jeder PR-Lauf,
-# auch mit `voll`, bleibt auf GitHub. Schritte, die `sudo` oder Caches der gehosteten Runner
-# brauchen, tragen `runner.environment == 'github-hosted'` (Wächter:
-# `scripts/runner/ci-schritte.test.sh`). Der Server fällt aus → `E2E_RUNNER` leeren
-# (`scripts/runner/README.md`).
+# NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`. Der eigene Server für Rust und e2e
+# (LLH-1666, LLH-2014, ADR-0075/0076) ist zurückgebaut.
 #
 # Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
@@ -51,63 +46,21 @@ env:
   TZ: Europe/Berlin
 
 jobs:
-  # ── Wo laufen die schweren Suiten? ─────────────────────────────────────────────────────
-  # Die eine Wahl für Rust und e2e (ADR-0075, ADR-0076). Scheitert sie, bleibt die Ausgabe leer,
-  # und alle Jobs fallen auf `ubuntu-latest` zurück.
-  runner:
-    name: Suiten-Runner
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      runner: ${{ steps.runner.outputs.runner }}
-    steps:
-      # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 2
-      - name: Runner für die Suiten
-        id: runner
-        continue-on-error: true
-        env:
-          EREIGNIS: ${{ github.event_name }}
-          LABEL: ${{ vars.E2E_RUNNER }}
-        # Bei einem PR die Weiche aus dem ZIEL-Branch (HEAD^1 des Merge-Commits), nie aus dem PR:
-        # sonst stellte ein PR sie mit einer Zeile in `select-runner.sh` für sich selbst auf den
-        # eigenen Server. Eine Weiche mit anderem Aufruf bricht ab: dann GitHub.
-        run: |
-          set -euo pipefail
-          weiche=./scripts/runner/select-runner.sh
-          if [ "$EREIGNIS" = pull_request ]; then
-            weiche="$RUNNER_TEMP/select-runner.sh"
-            git show HEAD^1:scripts/runner/select-runner.sh > "$weiche"
-            chmod +x "$weiche"
-          fi
-          runner="$("$weiche" "$EREIGNIS" "$LABEL")"
-          echo "runner=$runner" >> "$GITHUB_OUTPUT"
-          echo "Rust- und e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
-
   # ── Rust-Suite ──────────────────────────────────────────────────────────────────────
-  # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Läuft er gehostet, pflegt
-  # er den geteilten Cargo-Cache (save-if: true, die Vorgabe); auf dem eigenen Server übernehmen das
-  # die Schnellprüfungen (ci.yml).
+  # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Er pflegt den geteilten
+  # Cargo-Cache (save-if: true, die Vorgabe).
   rust:
     name: Rust-Suite
     # Auf einem Kanal-Branch bricht ein neuer Push diesen Job ab (s. Kopf); im PR je Lauf.
     concurrency:
       group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true
-    needs: runner
-    # Eigener Server oder GitHub (Kopf).
-    runs-on: ${{ needs.runner.outputs.runner || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf aufräumen (s. Schnellprüfungen). Nur gehostet: auf dem eigenen Server gibt
-      # es kein `sudo`, und der Container beginnt leer.
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
-        if: runner.environment == 'github-hosted'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -119,10 +72,7 @@ jobs:
           df -h /
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
-      # Auf dem eigenen Server bringt das Image dieselben Pakete mit (`scripts/runner/Dockerfile`,
-      # Liste dort gleich halten); der nächste Schritt prüft das.
       - name: System-Werkzeuge für die nativen Crates
-        if: runner.environment == 'github-hosted'
         # Die WebKit-Pakete sind groß: bei tröpfelndem Spiegel reichen 300 s je Versuch nicht
         # (LLH-1420). Was ein abgebrochener Versuch schon geladen hat, bleibt im apt-Cache liegen.
         env:
@@ -131,36 +81,13 @@ jobs:
           ./scripts/apt-pakete.sh nasm
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
           librsvg2-dev libayatana-appindicator3-dev
-      - name: Desktop-Pakete im Image (eigener Runner)
-        if: runner.environment != 'github-hosted'
-        run: |
-          pkg-config --exists webkit2gtk-4.1 gtk+-3.0 libsoup-3.0 javascriptcoregtk-4.1 librsvg-2.0 ayatana-appindicator3-0.1 || {
-            echo "::error::Dem Runner-Image fehlen die GTK/WebKit-Pakete der Desktop-Hülle. Image auf dem Server neu bauen (scripts/runner/README.md, „Nach einem Merge“)."
-            exit 1
-          }
       - name: Rust-Toolchain (stable)
-        if: runner.environment == 'github-hosted'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-      # Auf dem eigenen Runner die Toolchain des Images, ohne Update (LLH-2015): sie liegt in einer
-      # Image-Schicht, und ein Update an Ort und Stelle scheitert an overlayfs („Invalid
-      # cross-device link“). Ist ein neueres Stable erschienen, warnt der Schritt; der wöchentliche
-      # Neubau oder ein Neubau von Hand holt es (scripts/runner/README.md).
-      - name: Rust-Toolchain (eigener Runner)
-        if: runner.environment != 'github-hosted'
-        run: |
-          rustup default stable
-          rustc --version
-          if rustup check 2> /dev/null | grep -E '^stable-.*Update available'; then
-            echo "::warning::Neueres Rust-Stable erschienen; der Job nimmt das ältere aus dem Runner-Image. Image auf dem Server neu bauen (scripts/runner/README.md)."
-          fi
-      # Nur gehostet: auf dem eigenen Server hält `sccache` den Build warm (Volume). Läuft dieser
-      # Job dort, pflegen die Schnellprüfungen den geteilten Eintrag (`save-if` in ci.yml).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: runner.environment == 'github-hosted'
         with:
           shared-key: rust-openssl-vendored
           cache-on-failure: true
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
@@ -174,8 +101,6 @@ jobs:
     concurrency:
       group: ci-frontend-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true
-    # Immer auf GitHub (LLH-2016, ADR-0076): ohne Rust-Build gewinnt dieser Job auf dem eigenen
-    # Server wenig, und vier Anteile belegten dort die Plätze, die Rust-Suite und e2e brauchen.
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -187,7 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Kein Rust, kein Chromium, kein Plattenplatz-Schritt — dieser Job braucht nur Node.
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
@@ -218,16 +143,13 @@ jobs:
           retention-days: 1
 
   # ── e2e-Suite ───────────────────────────────────────────────────────────────────────
-  # Jobs und Runner-Wahl in `e2e.yml`.
+  # Jobs in `e2e.yml`.
   e2e:
     name: e2e
     concurrency:
       group: ci-e2e-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true
-    needs: runner
     uses: ./.github/workflows/e2e.yml
-    with:
-      runner: ${{ needs.runner.outputs.runner }}
     permissions:
       contents: read
       checks: read
@@ -274,7 +196,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
