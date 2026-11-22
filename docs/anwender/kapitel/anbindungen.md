@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
 ---
 
 ## Überblick
@@ -93,6 +93,20 @@ Danach stehen die Paneele „Webhook“, „Zustellung“ und „Zustellungen“
 Server sind die Aktionen gesperrt. Die „Webhook-Kennung (aud)“
 braucht der Betreiber des Fremdsystems, um die Zustellungen zu prüfen. Ziel, Arten und die
 Ausnahme ändert „Bearbeiten“ im Paneel „Webhook“.
+
+### Fingerabdruck des Ziels hinterlegen
+
+Für den System-Admin, wenn das Ziel ein selbst ausgestelltes Zertifikat zeigt, etwa im ELW:
+
+1. Im Dialog „Webhook einrichten“ oder nach „Bearbeiten“ im Paneel „Webhook“ die Ziel-URL
+   eintragen und, für ein Ziel im eigenen Netz, „Ziel im lokalen Netz erlauben“ ankreuzen.
+2. Neben „Zertifikat“ „Vom Ziel holen“ wählen.
+3. Den Fingerabdruck im Dialog „Zertifikat des Ziels“ mit dem am Zielgerät vergleichen und nur
+   bei Gleichheit „Übernehmen“ wählen.
+4. „Einrichten“ bzw. „Speichern“ wählen.
+
+Statt Schritt 2 und 3 lässt sich der Fingerabdruck auch einfügen, mit oder ohne Doppelpunkte.
+Ein leeres Feld entfernt ihn beim Speichern.
 
 ### Testereignis senden
 
@@ -315,7 +329,17 @@ Die Ziel-URL muss mit `https://` beginnen und darf keinen Benutzernamen und kein
 enthalten. Ein Ziel in einem internen Netz lehnt der Server ab, auch wenn ein Name dorthin zeigt.
 „Ziel im lokalen Netz erlauben“ öffnet private Netze, etwa das Netz eines ELW; der Rechner selbst
 und Adressen wie `169.254.169.254` bleiben gesperrt. Das Ziel braucht ein Zertifikat, dem der
-Server vertraut; ein selbst ausgestelltes scheitert mit „Zertifikat des Ziels nicht anerkannt“.
+Server vertraut, oder einen hinterlegten Fingerabdruck; sonst scheitert ein selbst ausgestelltes
+mit „Zertifikat des Ziels nicht anerkannt“.
+
+Mit Fingerabdruck zählt nur dieses eine Zertifikat, auch wenn eine vertraute Stelle ein anderes
+ausgestellt hat. Wechselt das Ziel sein Zertifikat, scheitert die Zustellung mit „Zertifikat des
+Ziels nicht anerkannt“, und unter „Letzter Fehler“ steht „Hat das Ziel sein Zertifikat
+gewechselt? Fingerabdruck neu holen.“ Zeigt die Ziel-URL auf einen anderen Server, gilt der
+alte Fingerabdruck nicht mehr: Das Feld sagt das, und beim Speichern fällt er weg, wenn kein
+neuer eingetragen ist. Ändert sich nur der Pfad, bleibt er. „Vom Ziel holen“ baut nur die
+verschlüsselte Verbindung auf und bricht sie ab, sobald das Zertifikat gelesen ist; das Ziel
+bekommt keine Anfrage.
 
 Unter „Zustellungen“ stehen die letzten 50 Versuche mit Zeit, Nummer des Ereignisses oder
 „Test“, Ergebnis und Dauer. Was das Fremdsystem geantwortet hat, speichert der Server nicht.
@@ -461,7 +485,8 @@ Anlegen, neuer Code, Einlösen, Ändern und Widerruf stehen im
 [Zugangsprotokoll](zugangsprotokoll.md), mit Rechten und Fingerabdruck. Ebenso Einrichten,
 Ändern, Entfernen und Wiederaufnehmen eines Webhooks und, als eigener Eintrag, das Erlauben und
 Zurücknehmen eines Ziels im lokalen Netz; genannt wird der Server des Ziels, nie die ganze
-Adresse. Ein Testereignis steht nicht darin. Jede angenommene Anfrage
+Adresse. Hinterlegen, Wechseln und Entfernen des Fingerabdrucks und jedes „Vom Ziel holen“
+stehen ebenfalls darin, mit dem Fingerabdruck. Ein Testereignis steht nicht darin. Jede angenommene Anfrage
 zählt je Anbindung, Route und Tag; „zuletzt genutzt“ nennt die letzte, auf die Minute genau. Die
 Zählung wird nach 365 Tagen gelöscht.
 
