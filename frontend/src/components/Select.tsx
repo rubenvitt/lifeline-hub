@@ -1,6 +1,6 @@
 // DIES ist der zentrale Wrapper; hier ist der direkte antd-Select-Import erwünscht — überall sonst
 // sperrt no-restricted-imports ihn (LFH-288), damit neue Selects den Wrapper nutzen.
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import { Select as AntSelect } from 'antd';
 import type { RefSelectProps, SelectProps } from 'antd';
 import type { BaseOptionType, DefaultOptionType } from 'antd/es/select';

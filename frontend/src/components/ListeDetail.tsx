@@ -274,7 +274,7 @@ export default function ListeDetail<T>({
   useEffect(() => {
     if (vorauswahl && breit && gewaehlt == null && erster != null) onWahl(erster);
     // `onWahl` ist meist eine Inline-Closure; getaktet wird über Breite, Wahl und Folge.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [vorauswahl, breit, gewaehlt, erster]);
 
   /**

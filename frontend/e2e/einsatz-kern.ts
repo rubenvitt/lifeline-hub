@@ -14,7 +14,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Öffnet „Neuen Einsatz anlegen“ und liefert den Dialog, sobald er eingeblendet ist. */
 export async function einsatzDialogOeffnen(page: Page): Promise<Locator> {
-  // eslint-disable-next-line no-restricted-syntax -- die eine Stelle, die den Dialog öffnet
+  // oxlint-disable-next-line lfh/e2e-riegel -- die eine Stelle, die den Dialog öffnet
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   const dialog = page.getByRole('dialog', { name: 'Neuen Einsatz anlegen' });
   await expect(dialog).toBeVisible();
