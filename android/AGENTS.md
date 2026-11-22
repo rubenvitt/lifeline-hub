@@ -25,9 +25,10 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   erst den WebView zerstören, dann das Profil löschen.
 - **Brücke und Start-Skript nur für den aktiven Server:** `addDocumentStartJavaScript` und
   `addWebMessageListener` bekommen nur die Origin-Regel des aktiven Servers
-  (`Bruecke.allowedOriginRule`); Nachrichten zählen nur aus dem Hauptframe
-  (`Bruecke.accepts`), Antworten nur, solange derselbe WebView noch auf dieser Origin steht
-  (`web/Brueckenempfang.kt`). Ebenso bekommt nur diese Origin die Kamera der Oberfläche
+  (`Bruecke.allowedOriginRule`); die Start-Skripte steigen in Unterframes selbst aus
+  (`window.top !== window`, der WebView spielt sie dort trotzdem ein); Nachrichten zählen nur
+  aus dem Hauptframe (`Bruecke.accepts`), Antworten nur, solange derselbe WebView noch auf dieser
+  Origin steht (`web/Brueckenempfang.kt`). Ebenso bekommt nur diese Origin die Kamera der Oberfläche
   (`getUserMedia`, nur Video, `Seitenzugriff.kamera`); die Dateiwahl (`<input type="file">`) geht
   über `web/HuellenChromeClient.kt` und `dienste/Activityzugriffe.kt`.
 - **Vertrauen wie das System:** System- und Nutzer-CAs (`res/xml/network_security_config.xml`),

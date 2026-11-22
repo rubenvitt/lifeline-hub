@@ -1,7 +1,9 @@
 // Init-Skript der Android-Hülle (LLH-1989, Entwurf D4; Vorbild ist das Skript der iOS-Hülle
 // `ios/App/Huelle/huelle.js`). Die Hülle spielt es über `WebViewCompat.addDocumentStartJavaScript`
-// vor dem ersten Skript der Seite ein, nur für die Origin des aktiven Servers und nur im
-// Hauptframe; vorher ersetzt sie den Platzhalter __LIFELINE_VERSION__ durch ihre volle Version
+// vor dem ersten Skript der Seite ein, nur für die Origin des aktiven Servers. Der WebView spielt
+// es auch in Unterframes dieser Origin ein (anders als `forMainFrameOnly` auf iOS); dort steigt es
+// sofort aus, denn die Hülle nimmt nur Nachrichten des Hauptframes an und ihre Versprechen blieben
+// offen. Vorher ersetzt die Hülle den Platzhalter __LIFELINE_VERSION__ durch ihre volle Version
 // (`Initskript`). Gelesen wird die Kennung im Frontend nur in `frontend/src/huelle/faehigkeiten.ts`;
 // die Tests führen dieses Skript dort aus (`frontend/src/test/huelle.ts`).
 //
@@ -16,6 +18,7 @@
 //
 // Ohne `window.lifeline` (Browser, andere Hüllen) tut das Skript nichts.
 (() => {
+  if (window.top !== window) return;
   const bruecke = window.lifeline;
   if (!bruecke || typeof bruecke.postMessage !== 'function') return;
 

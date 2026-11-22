@@ -17,7 +17,7 @@ object GemeinsameFaelle {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun wurzel(): File {
+    fun wurzel(): File {
         var ordner: File? = File("").absoluteFile
         while (ordner != null) {
             if (File(ordner, VERZEICHNIS).isDirectory) return ordner

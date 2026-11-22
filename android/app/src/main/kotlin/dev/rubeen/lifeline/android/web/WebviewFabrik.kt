@@ -71,8 +71,9 @@ object SystemWebviewFabrik : WebviewFabrik {
         ProfileStore.getInstance().getOrCreateProfile(eintrag.id)
         WebViewCompat.setProfile(webView, eintrag.id)
         configureWebview(webView, begleitung)
-        // Start-Skripte und Brücke nur für die Origin des Servers; Start-Skripte laufen nur im
-        // Hauptframe, der Listener prüft das bei jeder Nachricht selbst (`Brueckenempfang`).
+        // Start-Skripte und Brücke nur für die Origin des Servers. Der WebView spielt die
+        // Start-Skripte auch in Unterframes dieser Origin ein; dort steigen sie selbst aus, und der
+        // Listener nimmt nur Nachrichten des Hauptframes an (`Brueckenempfang`).
         val regel = setOf(Bruecke.allowedOriginRule(eintrag.adresse))
         WebViewCompat.addDocumentStartJavaScript(webView, begleitung.initskript, regel)
         WebViewCompat.addDocumentStartJavaScript(webView, Huellenstil.skript, regel)

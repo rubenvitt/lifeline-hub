@@ -20,13 +20,14 @@ object Huellenstil {
     """.trimIndent()
 
     /**
-     * Läuft zu Dokumentbeginn im Hauptframe. Fehlt `<html>` noch, hängt es den Stil bei
-     * `DOMContentLoaded` an; ein zweiter Lauf fügt nichts doppelt ein.
+     * Läuft zu Dokumentbeginn. Der WebView spielt es auch in Unterframes der Origin ein; dort
+     * steigt es aus (nur der Hauptframe ist die Oberfläche). Fehlt `<html>` noch, hängt es den Stil
+     * bei `DOMContentLoaded` an; ein zweiter Lauf fügt nichts doppelt ein.
      */
     val skript: String
         get() {
             val kennung = jsLiteral(KENNUNG)
-            return "(() => { const einfuegen = () => { if (document.getElementById($kennung)) return; " +
+            return "(() => { if (window.top !== window) return; const einfuegen = () => { if (document.getElementById($kennung)) return; " +
                 "const stil = document.createElement('style'); stil.id = $kennung; " +
                 "stil.textContent = ${jsLiteral(CSS)}; " +
                 "(document.head || document.documentElement).appendChild(stil); }; " +

@@ -31,6 +31,17 @@ class HuellenstilTest {
         assertFalse("`" in skript, skript)
     }
 
+    /**
+     * Review K3: `addDocumentStartJavaScript` spielt Skripte auch in Unterframes der Origin ein.
+     * Stil und Init-Skript steigen dort aus; nur der Hauptframe ist die Oberfläche.
+     */
+    @Test
+    fun `Stil und Init-Skript wirken nur im Hauptframe`() {
+        assertTrue(Huellenstil.skript.startsWith("(() => { if (window.top !== window) return;"), Huellenstil.skript)
+        val initskript = java.io.File(GemeinsameFaelle.wurzel(), "android/app/src/main/assets/huelle.js").readText()
+        assertTrue("(() => {\n  if (window.top !== window) return;" in initskript)
+    }
+
     @Test
     fun `die Beispielseite der Oberflächentests hat Text und Eingabe`() {
         assertTrue("id=\"text\"" in Testzustand.BEISPIELSEITE)
