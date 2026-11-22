@@ -400,14 +400,7 @@ async fn alle_anderen_beenden_schreibt_je_sitzung_einen_eintrag() {
         anmelden(&app, "marlene", "marlenepw1", FIREFOX).await,
     ];
 
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sessions/end-others",
-        &ich,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &ich, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["beendet"], 3);
     for c in &andere {
@@ -423,14 +416,7 @@ async fn alle_anderen_beenden_schreibt_je_sitzung_einen_eintrag() {
     assert_eq!(liste(&app, &ich, "/api/auth/sessions").await.len(), 1);
 
     // Nichts mehr zu beenden: 200 mit 0, kein Eintrag.
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sessions/end-others",
-        &ich,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &ich, None).await;
     assert_eq!((s, v["beendet"].as_u64()), (StatusCode::OK, Some(0)));
     assert_eq!(anmeldespur(&pool).await.len(), 3);
 }
@@ -663,14 +649,7 @@ async fn geraetesitzungen_bleiben_aussen_vor() {
         assert_eq!(s, StatusCode::NOT_FOUND, "{m} {u}");
     }
     // Alle anderen Sitzungen des Admins beenden lässt das Gerät gekoppelt.
-    let (s, _) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sessions/end-others",
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(me(&app, &geraet).await, StatusCode::OK);
 }
