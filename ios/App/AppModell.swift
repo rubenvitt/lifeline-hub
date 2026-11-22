@@ -41,6 +41,8 @@ final class AppModell {
     @ObservationIgnored private var gestartet = false
     @ObservationIgnored private var anmelder: Anmelder!
     @ObservationIgnored private var dienste: Systemdienste!
+    /// Kennungen, deren Abmeldung gerade läuft (`abmeldenAusstehende`): kein zweiter Aufruf.
+    @ObservationIgnored private var abmeldungenLaufend: Set<String> = []
     @ObservationIgnored private var empfang: Brueckenempfang!
     @ObservationIgnored private var navigation: Navigationsbegleiter!
     @ObservationIgnored private let protokoll = Logger(
@@ -97,6 +99,7 @@ final class AppModell {
             // Erst jetzt: ein Tippen auf eine Meldung beim Kaltstart wartete bis hierher und folgt
             // dem Start, statt von ihm überschrieben zu werden.
             Meldungsweg.verbinde(self)
+            abmeldenAusstehende()
         }
     }
 
@@ -189,6 +192,7 @@ final class AppModell {
         default: gemeldet = .inactive
         }
         guard rueckkehr.melde(gemeldet), testzustand == nil else { return }
+        abmeldenAusstehende()
         Task {
             let antwortet = (await webView?.isResponsive()) ?? false
             send(
@@ -316,26 +320,49 @@ final class AppModell {
         return anmeldungen.server(zu: kennung)
     }
 
-    /// Entfernter Server: jede Kennung einmal beim Server abmelden, dann ihren Schlüssel löschen.
-    /// Kein Wiederholen; ist der Server nicht erreichbar, löscht er die Anmeldung, sobald Apple das
-    /// Token ablehnt.
+    /// Entfernter Server: seine Kennungen kommen zu den ausstehenden Abmeldungen
+    /// (`PushAnmeldungen.entfernen(server:abmeldenBei:)`) und werden gleich einmal versucht.
     private func meldePushAb(server id: UUID, adresse: ServerAdresse) {
         guard let pushablage, var anmeldungen = try? pushablage.load() else { return }
-        let kennungen = anmeldungen.entfernen(server: id)
-        guard !kennungen.isEmpty else { return }
+        guard !anmeldungen.entfernen(server: id, abmeldenBei: adresse).isEmpty else { return }
         do {
             try pushablage.save(anmeldungen)
         } catch {
             protokoll.error("Push-Anmeldungen nicht gespeichert: \(error.localizedDescription)")
         }
-        Task {
-            for kennung in kennungen {
-                if let schluessel = Schluesselbund.lesen(kennung: kennung) {
-                    await Vertragsabruf.meldePushAb(
-                        adresse, kennung: kennung,
-                        nachweis: Entschluesseler.nachweis(kennung: kennung, schluessel: schluessel))
+        abmeldenAusstehende()
+    }
+
+    /// Jede ausstehende Abmeldung einmal beim Server versuchen: nach dem Entfernen, beim Start
+    /// und bei jeder Rückkehr in den Vordergrund, nie in einer Schleife. Erst eine erledigte
+    /// (`AusstehendeAbmeldung.isErledigt`) löscht den Schlüssel; ohne Netz bleibt sie liegen,
+    /// sonst pushte der Server weiter und die Meldungen ließen sich nicht mehr abstellen. Ohne
+    /// Schlüssel gibt es keinen Nachweis, auch später nicht: dann ist sie erledigt.
+    private func abmeldenAusstehende() {
+        guard testzustand == nil, let pushablage, let offen = try? pushablage.load().ausstehend
+        else { return }
+        for abmeldung in offen where !abmeldungenLaufend.contains(abmeldung.kennung) {
+            abmeldungenLaufend.insert(abmeldung.kennung)
+            Task {
+                defer { abmeldungenLaufend.remove(abmeldung.kennung) }
+                var erledigt = true
+                if let schluessel = Schluesselbund.lesen(kennung: abmeldung.kennung) {
+                    let status = await Vertragsabruf.meldePushAb(
+                        abmeldung.adresse, kennung: abmeldung.kennung,
+                        nachweis: Entschluesseler.nachweis(
+                            kennung: abmeldung.kennung, schluessel: schluessel))
+                    erledigt = AusstehendeAbmeldung.isErledigt(status: status)
                 }
-                Schluesselbund.loeschen(kennung: kennung)
+                guard erledigt else { return }
+                Schluesselbund.loeschen(kennung: abmeldung.kennung)
+                guard var anmeldungen = try? pushablage.load() else { return }
+                anmeldungen.abgemeldet(kennung: abmeldung.kennung)
+                do {
+                    try pushablage.save(anmeldungen)
+                } catch {
+                    protokoll.error(
+                        "Push-Anmeldungen nicht gespeichert: \(error.localizedDescription)")
+                }
             }
         }
     }
