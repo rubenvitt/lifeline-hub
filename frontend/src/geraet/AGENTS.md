@@ -172,7 +172,10 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Antwort: Zahlen aus den Zählfunktionen des Modulzählers, überfällige Rückmeldungen nur mit dem
   Namen der Einheit, kritische Abschnitte nur mit ihrer Bezeichnung, nie Meldungs-, Auftrags- oder
   Erinnerungstexte; den Ausfall nur mit den Namen der Einheiten (`einsatz::ausfall`, LLH-1929;
-  Bindung an den Browser: `frontend/AGENTS.md`, „Eine Heimat je Zahl“). Nur der
+  Bindung an den Browser: `frontend/AGENTS.md`, „Eine Heimat je Zahl“). Quellen aus Modulen, die
+  im Einsatz ausgeblendet sind (wirksame Sichtbarkeit, keine Rollenschranke), liest der Server
+  nicht; er nennt sie in `alarm.ausgeblendet`, und `alarmAusMonitor` meldet sie als `gesperrt`,
+  damit Monitor und Überblick dasselbe zeigen (LLH-1964, Zuordnung in `AlarmQuelle`). Nur der
   Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Eine
   Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
   (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse
