@@ -5714,6 +5714,94 @@ async fn gegen_hinaus_nennt_fuer_die_neue_zeile_keinen_fremden_schluessel() {
     assert_eq!(gegen, None);
 }
 
+/// Der ELW zeichnet Z und übergibt an den Hub; der ELW spiegelt danach und ordnet die Zeile des
+/// Hubs seinem Z zu. Der Hub löscht Z und zeichnet N unter derselben ID: (Hub, ELW, Einsatz am
+/// ELW, Einsatz am Hub).
+async fn neue_zeile_unter_alter_id_nach_uebergabe() -> (Instanz, Instanz, i64, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    zeichen_anlegen(&elw, e, "Z vom ELW").await;
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await, "der ELW spiegelt");
+    let h = einsatz_der_akte(&hub, akte).await;
+    mitglied_werden(&hub, h).await;
+    let z: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen WHERE einsatz_id = ?")
+        .bind(h)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    zeichen_loeschen(&hub, h, z).await;
+    assert_eq!(zeichen_anlegen(&hub, h, "N vom Hub").await, z);
+    (hub, elw, e, h)
+}
+
+/// Merker der Neuvergabe eines Einsatzes.
+async fn merker(i: &Instanz, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM spiegel_neu_vergeben WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// LLH-1893, `kennt: true`: Der ELW hält die ID des Hubs noch für sein Z und übernimmt per
+/// Notübernahme, bevor er N bekommt. N steht danach als entfernt in der Bruchstelle, Z ist am Hub,
+/// einmal.
+#[tokio::test]
+async fn nach_notuebernahme_durch_den_elw_steht_die_neue_zeile_unter_alter_id_in_der_bruchstelle() {
+    let (hub, elw, _, h) = neue_zeile_unter_alter_id_nach_uebergabe().await;
+    assert_eq!(merker(&hub, h).await, 1);
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        json!({"grund": "Hub nicht erreichbar"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None);
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    assert_geklaert(&hub, h).await;
+    assert_eq!(zeichen_labels(&hub, h).await, ["Z vom ELW"]);
+    assert!(zeichen_entfernt(&hub, h, "N vom Hub").await);
+}
+
+/// LLH-1893: Kennt der ELW die Neuvergabe schon, räumt die reguläre Rückgabe den Merker, und N
+/// bleibt am Hub, einmal und ohne Eintrag in der Bruchstelle.
+#[tokio::test]
+async fn abgeglichene_rueckgabe_raeumt_den_merker() {
+    let (hub, elw, e, h) = neue_zeile_unter_alter_id_nach_uebergabe().await;
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &hub,
+        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        json!({"an": elw.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+    }
+    assert!(!ist_spiegel(&elw, e).await, "der ELW führt wieder");
+    assert!(ist_spiegel(&hub, h).await);
+    assert_eq!(merker(&hub, h).await, 0);
+    assert_eq!(zeichen_labels(&hub, h).await, ["N vom Hub"]);
+    assert_eq!(zeichen_labels(&elw, e).await, ["N vom Hub"]);
+    assert!(!zeichen_entfernt(&hub, h, "N vom Hub").await);
+}
+
 // ── Größe der Erklärung (LLH-1702) ───────────────────────────────────────────────────────────
 
 /// Größte Erklärung, die das Gegenüber an einer Akte annimmt (`austausch::ERKLAERUNG_MAX`, dort

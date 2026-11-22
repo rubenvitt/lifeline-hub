@@ -144,8 +144,8 @@ Schlüssel ohnehin nur den jüngsten Stand. Die Unterscheidung trägt der Merker
 Wird eine ID in einem **anderen** Einsatz neu vergeben, behält das Gegenüber eine Zuordnung in den
 alten Einsatz. Nach einem Rückfall mit `kennt: true` kann ein `gegen` dann auf den Schlüssel
 zeigen, der jetzt im anderen Einsatz steht. `zeile_schreiben_innen` ändert über `id` ohne
-Einsatzbezug und schöbe die Zeile hinüber. A räumt die Herkunft hier schon. Für das `gegen` wird
-eine eigene Aufgabe angelegt (Prüfung des Einsatzes in `uebernimm_gegen` und beim Ändern).
+Einsatzbezug und schöbe die Zeile hinüber. A räumt die Herkunft hier schon. Das `gegen` behandelt
+LLH-2029 (Prüfung des Einsatzes in `uebernimm_gegen` und beim Ändern).
 
 ## Tests
 
