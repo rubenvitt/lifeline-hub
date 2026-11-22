@@ -94,6 +94,7 @@ import {
   OffeneBearbeitungProvider,
 } from '../components/offeneBearbeitung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
+import { useMaterialStatusQuittung } from '../kraefte/useStatusQuittung';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -484,12 +485,22 @@ function MaterialInhalt() {
       return invalidate();
     },
   });
+  const quittiereStatus = useMaterialStatusQuittung(einsatzId);
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzMaterial,
     { emId: number; status: MaterialStatus }
   >({
     queryKey: einsatzKeys.material(einsatzId),
-    mutationFn: (v) => setzeMaterialStatus(einsatzId, v.emId, v.status),
+    // Den Beleg merken, die Zeile ohne ihn in den Cache; die Quittung mit Rückweg (LLH-1986).
+    mutationFn: async (v) => {
+      const { status_ruecknahme, ...posten } = await setzeMaterialStatus(
+        einsatzId,
+        v.emId,
+        v.status,
+      );
+      if (status_ruecknahme) quittiereStatus({ ...posten, status_ruecknahme });
+      return posten;
+    },
     zeilenId: (v) => v.emId,
     anwenden: (em, v) => ({ ...em, status: v.status }),
     nochOptimistisch: (em, v) => em.status === v.status,

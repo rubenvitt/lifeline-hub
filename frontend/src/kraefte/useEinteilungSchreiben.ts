@@ -122,7 +122,13 @@ export function useEinteilungSchreiben(einsatzId: number) {
           etikett: alt?.etikett ?? 'Angabe',
           erwartet: alt?.erwartet,
           speichern: async (erwartet) => {
-            const neu = await updateDisposition(einsatzId, epId, felder, erwartet);
+            // Ohne Beleg in den Cache: die Einteilung quittiert keinen Statuswechsel (LLH-1986).
+            const { status_ruecknahme: _beleg, ...neu } = await updateDisposition(
+              einsatzId,
+              epId,
+              felder,
+              erwartet,
+            );
             qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (liste) =>
               liste?.map((ep) => (ep.id === neu.id ? neu : ep)),
             );
