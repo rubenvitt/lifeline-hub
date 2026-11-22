@@ -78,6 +78,14 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
 
+// Keine Leinwand in der Suite (LLH-2023). jsdom 31 zeichnet über `@napi-rs/canvas`, sobald das Paket
+// installiert ist (hier über pdfjs-dist), und `textBreite` mäße dann mit den Schriften der Maschine:
+// dieselbe Spaltenbreite wäre in CI und lokal eine andere Zahl. Ohne Kontext schätzt `textBreite`
+// wie unter jsdom 30 (`components/textBreite.ts`); echte Messung prüfen e2e und Browser.
+HTMLCanvasElement.prototype.getContext = function getContext() {
+  return null;
+} as typeof HTMLCanvasElement.prototype.getContext;
+
 // antds Breakpoint-Beobachter braucht `matchMedia`. Der Stub in ./viewport ist
 // BREITENBEWUSST (min-/max-width gegen eine steuerbare Breite, Default 1024 px).
 installiereMatchMedia();
