@@ -74,6 +74,21 @@ const NICHT_ERREICHBAR: &str = "http://tauri.localhost/nicht-erreichbar.html";
 #[cfg(not(windows))]
 const NICHT_ERREICHBAR: &str = "tauri://localhost/nicht-erreichbar.html";
 
+/// Lokale Seite „nicht verträglich“ (LLH-1982), in jedem Fenster möglich.
+#[cfg(windows)]
+const NICHT_VERTRAEGLICH: &str = "http://tauri.localhost/nicht-vertraeglich.html";
+#[cfg(not(windows))]
+const NICHT_VERTRAEGLICH: &str = "tauri://localhost/nicht-vertraeglich.html";
+
+/// Pfad der lokalen Startseite „Verbinde…“ (LLH-1982) für `WebviewUrl::App`: sie nennt nur die
+/// Origin des Servers, nie Pfad oder Query (dort steht Freitext).
+fn verbinde_pfad(server: &Url) -> String {
+    let origin: String =
+        url::form_urlencoded::byte_serialize(server.origin().ascii_serialization().as_bytes())
+            .collect();
+    format!("verbinde.html?server={origin}")
+}
+
 /// `window.print()` erreicht in WKWebView keinen Dialog (LFH-720, Befund 17) — auf macOS
 /// leitet die Hülle den Aufruf auf den nativen Druck um.
 #[cfg(target_os = "macos")]
@@ -145,6 +160,15 @@ struct Ausfall {
     grund: Grund,
 }
 
+/// Ein Fenster zeigt die Seite „nicht verträglich“ (LLH-1982): was es laden wollte und warum
+/// nicht.
+#[derive(Clone)]
+struct Unvertraeglich {
+    ziel: Url,
+    richtung: vertrag::Richtung,
+    server_version: Option<String>,
+}
+
 #[derive(Default)]
 struct Zustand {
     vorbelegung: Mutex<Vorbelegung>,
@@ -164,6 +188,8 @@ struct Zustand {
     watch_nummer: AtomicU32,
     /// Je Fenster, das die Anzeige „nicht erreichbar“ zeigt, Ziel und Grund.
     ausfaelle: Mutex<HashMap<String, Ausfall>>,
+    /// Je Fenster, das die Seite „nicht verträglich“ zeigt (LLH-1982), Ziel und Urteil.
+    unvertraeglich: Mutex<HashMap<String, Unvertraeglich>>,
     /// Zuletzt gezeigte native Meldungen: mehrere Fenster desselben Einsatzes melden dasselbe
     /// Ereignis je einmal (LLH-1281).
     meldungen: Mutex<Vec<(String, Instant)>>,
@@ -376,6 +402,7 @@ fn seite_angekommen(app: &AppHandle, label: &str, seite: &Url) {
     let zustand = app.state::<Zustand>();
     zustand.watches.lock().unwrap().remove(label);
     zustand.ausfaelle.lock().unwrap().remove(label);
+    zustand.unvertraeglich.lock().unwrap().remove(label);
 }
 
 fn show_nicht_erreichbar(app: &AppHandle, label: &str, ziel: Url, grund: Grund) {
@@ -392,6 +419,29 @@ fn show_nicht_erreichbar(app: &AppHandle, label: &str, ziel: Url, grund: Grund) 
         .unwrap()
         .insert(label.to_string(), Ausfall { ziel, grund });
     let _ = fenster.navigate(NICHT_ERREICHBAR.parse().expect("Adresse der Anzeige"));
+}
+
+/// Setzt die Seite „nicht verträglich“ ins Fenster (LLH-1982): keine Wache, keine Anzeige „nicht
+/// erreichbar“ mehr — die Oberfläche des Servers lädt hier nicht.
+fn show_nicht_vertraeglich(app: &AppHandle, label: &str, ausfall: Unvertraeglich) {
+    let Some(fenster) = app.get_webview_window(label) else {
+        return;
+    };
+    log::warn!(
+        "Server nicht verträglich ({:?}, Server {}): {}",
+        ausfall.richtung,
+        ausfall.server_version.as_deref().unwrap_or("ohne Version"),
+        fuers_protokoll(&ausfall.ziel)
+    );
+    let zustand = app.state::<Zustand>();
+    zustand.watches.lock().unwrap().remove(label);
+    zustand.ausfaelle.lock().unwrap().remove(label);
+    zustand
+        .unvertraeglich
+        .lock()
+        .unwrap()
+        .insert(label.to_string(), ausfall);
+    let _ = fenster.navigate(NICHT_VERTRAEGLICH.parse().expect("Adresse der Seite"));
 }
 
 // ── Fenster und Links ────────────────────────────────────────────────────────────────
@@ -686,19 +736,72 @@ async fn check_server(app: AppHandle, fenster: WebviewWindow) -> Result<bool, St
     .map_err(|e| e.to_string())
 }
 
-/// Nur Anzeige „nicht erreichbar“: lädt erneut, was das Fenster laden wollte. Wurde inzwischen auf
-/// einen anderen Server gewechselt, dessen Startseite.
+/// Was das Fenster laden wollte, als es die Anzeige „nicht erreichbar“ oder die Seite „nicht
+/// verträglich“ bekam.
+fn gewolltes_ziel(app: &AppHandle, fenster: &WebviewWindow) -> Option<Url> {
+    ausfall(app, fenster)
+        .map(|ausfall| ausfall.ziel)
+        .or_else(|| {
+            app.state::<Zustand>()
+                .unvertraeglich
+                .lock()
+                .unwrap()
+                .get(fenster.label())
+                .map(|ausfall| ausfall.ziel.clone())
+        })
+}
+
+/// Nur Anzeige „nicht erreichbar“ und Seite „nicht verträglich“: lädt erneut, was das Fenster
+/// laden wollte. Wurde inzwischen auf einen anderen Server gewechselt, dessen Startseite.
 #[tauri::command]
 fn erneut_versuchen(app: AppHandle, fenster: WebviewWindow) -> Result<(), String> {
     let Some(server) = verbundener_server(&app) else {
         zeige_maske(&app, None);
         return Ok(());
     };
-    let ziel = ausfall(&app, &fenster)
-        .map(|ausfall| ausfall.ziel)
+    let ziel = gewolltes_ziel(&app, &fenster)
         .filter(|ziel| links::gehoert_zum_server(&server, ziel))
         .unwrap_or(server);
     load_in_fenster(&app, &fenster, ziel)
+}
+
+/// Was die Seite „nicht verträglich“ zeigt (LLH-1982).
+#[derive(Serialize)]
+struct NichtVertraeglichAnzeige {
+    /// Origin des Servers, den das Fenster laden wollte.
+    adresse: String,
+    richtung: vertrag::Richtung,
+    /// Version des Servers; fehlt, wenn er keine nannte oder nur der gemerkte Vertrag galt.
+    server_version: Option<String>,
+    app_version: &'static str,
+}
+
+/// Nur Seite „nicht verträglich“: was sie zeigt.
+#[tauri::command]
+fn nicht_vertraeglich(
+    app: AppHandle,
+    fenster: WebviewWindow,
+) -> Result<NichtVertraeglichAnzeige, String> {
+    let ausfall = app
+        .state::<Zustand>()
+        .unvertraeglich
+        .lock()
+        .unwrap()
+        .get(fenster.label())
+        .cloned()
+        .ok_or("Diese Seite zeigt keinen unverträglichen Server.")?;
+    Ok(NichtVertraeglichAnzeige {
+        adresse: ausfall.ziel.origin().ascii_serialization(),
+        richtung: ausfall.richtung,
+        server_version: ausfall.server_version,
+        app_version: env!("CARGO_PKG_VERSION"),
+    })
+}
+
+/// Nur Seite „nicht verträglich“: sucht ein Update der App, wie das Menü (Dialoge des Updaters).
+#[tauri::command]
+fn update_suchen(app: AppHandle) {
+    update::auf_wunsch_pruefen(app);
 }
 
 /// Nur Anzeige „nicht erreichbar“: zur Maske (im Hauptfenster).
@@ -1022,6 +1125,8 @@ fn main() {
             check_server,
             erneut_versuchen,
             server_wechseln,
+            nicht_vertraeglich,
+            update_suchen,
             drucken,
             anmeldung_im_browser,
             benachrichtigung_zeigen,
@@ -1037,6 +1142,11 @@ fn main() {
                 let zustand = fenster.app_handle().state::<Zustand>();
                 zustand.watches.lock().unwrap().remove(fenster.label());
                 zustand.ausfaelle.lock().unwrap().remove(fenster.label());
+                zustand
+                    .unvertraeglich
+                    .lock()
+                    .unwrap()
+                    .remove(fenster.label());
                 apply_badge(fenster.app_handle(), fenster.label(), 0);
             }
         })
@@ -1310,6 +1420,49 @@ mod tests {
         let lokal = include_str!("../capabilities/lokal.json");
         assert!(lokal.contains("\"allow-vergessen\""), "{lokal}");
         assert!(!lokal.contains("remote"), "{lokal}");
+    }
+
+    /// Die Seite „nicht verträglich“ gilt nur lokal und darf keine Adresse setzen; die Serverseite
+    /// bekommt keinen ihrer Commands, die Maske nicht die Update-Suche (LLH-1982).
+    #[test]
+    fn anzeige_nicht_vertraeglich_ist_lokal_und_setzt_keine_adresse() {
+        let anzeige: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/nicht-vertraeglich.json")).unwrap();
+        assert!(anzeige.get("remote").is_none(), "{anzeige}");
+        let mut rechte: Vec<&str> = anzeige["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|recht| recht.as_str().unwrap())
+            .collect();
+        rechte.sort_unstable();
+        assert_eq!(
+            rechte,
+            [
+                "allow-erneut-versuchen",
+                "allow-nicht-vertraeglich",
+                "allow-server-wechseln",
+                "allow-update-suchen",
+                "core:default",
+            ]
+        );
+        let fenster = anzeige["windows"].as_array().unwrap();
+        let [haupt, neben] = freigabe_fenster();
+        assert!(fenster.contains(&haupt.into()) && fenster.contains(&neben.into()));
+        for recht in &rechte {
+            assert!(!SERVER_RECHTE.contains(recht), "{recht}");
+        }
+        assert!(!include_str!("../capabilities/lokal.json").contains("allow-update-suchen"));
+    }
+
+    /// Die Startseite „Verbinde…“ nennt nur die Origin, nie Pfad oder Query der Adresse.
+    #[test]
+    fn verbinde_seite_traegt_nur_die_origin() {
+        let server = Url::parse("https://elw.local:8443/einsatz/1?q=x").unwrap();
+        assert_eq!(
+            verbinde_pfad(&server),
+            "verbinde.html?server=https%3A%2F%2Felw.local%3A8443"
+        );
     }
 
     /// Ein neues Fenster aus dem Menü beginnt auf der Seite des vorderen Fensters, wenn sie zum
