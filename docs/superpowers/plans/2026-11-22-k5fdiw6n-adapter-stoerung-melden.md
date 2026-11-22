@@ -47,12 +47,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
 **Interfaces:**
 - Produces: `BenachrichtigungArt::{AdapterEingriff => "adapter_eingriff", AdapterGestoert => "adapter_gestoert", AdapterWiederOk => "adapter_wieder_ok"}`; `BenachrichtigungBezugTyp::Adapter => "adapter"` (`modul() == None`); `adapter::zustand::AdapterGemeldet { Gestoert => "gestoert", Eingriff => "eingriff" }` (`wire_enum!`); Spalten `benachrichtigung.adapter_id TEXT`, `adapter.gemeldet TEXT`.
 
-- [ ] **Step 1: Tests anpassen.** In `src/benachrichtigung/tests.rs`: `org_arten_sind_…` erwartet zusätzlich die drei Adapter-Arten als Org-Arten der Stufe `Hinweis`; neuer Test `adapter_arten_sind_eingang_und_nicht_am_einsatz_einstellbar` (`stufe() == Hinweis`, `ist_org()`, `!vorgabe_einstellbar()`); neuer Test `benachrichtigung_hat_genau_einen_ort` (INSERT mit beiden Orten und mit keinem scheitert am CHECK, mit genau einem gelingt). Im Enum-Kontrakt die neuen Wire-Werte und `AdapterGemeldet`.
-- [ ] **Step 2: Rot sehen:** `cargo test --lib benachrichtigung::tests` → Kompilier- bzw. Assertionsfehler.
-- [ ] **Step 3: Migration.** Neubau von `benachrichtigung` nach Muster 0352 (Blatt-Umbau, ohne Marker): `einsatz_id` ohne `NOT NULL`, neu `adapter_id TEXT REFERENCES adapter(id) ON DELETE CASCADE`, `CHECK ((einsatz_id IS NULL) <> (adapter_id IS NULL))`, Art-CHECK um die drei Arten ergänzt, Indizes wie 0352 plus `idx_benachrichtigung_adapter ON benachrichtigung(adapter_id)`. Dazu `ALTER TABLE adapter ADD COLUMN gemeldet TEXT CHECK (gemeldet IN ('gestoert', 'eingriff'))`. Kopfkommentar mit LLH-2026 und Begründung. Doc-Kommentar von `BenachrichtigungArt` auf die neue Migration zeigen lassen.
-- [ ] **Step 4: Enums und Matches** in den oben genannten Dateien ergänzen; `bezug_tabelle` für `Adapter` → `None` (bleibt lokal, reist nie); Registry: `adapter_id` als Kennung `Retain` wie `einheit_id`.
-- [ ] **Step 5: Grün:** `cargo test --lib benachrichtigung::tests && cargo test --test enum_wire_kontrakt && cargo test --lib db::tests && cargo test --lib einsatz::schwaerzung` → PASS.
-- [ ] **Step 6: Commit** `feat: Benachrichtigungsarten und Schema für Adapter-Störungen (LLH-2026)`.
+- [x] **Step 1: Tests anpassen.** In `src/benachrichtigung/tests.rs`: `org_arten_sind_…` erwartet zusätzlich die drei Adapter-Arten als Org-Arten der Stufe `Hinweis`; neuer Test `adapter_arten_sind_eingang_und_nicht_am_einsatz_einstellbar` (`stufe() == Hinweis`, `ist_org()`, `!vorgabe_einstellbar()`); neuer Test `benachrichtigung_hat_genau_einen_ort` (INSERT mit beiden Orten und mit keinem scheitert am CHECK, mit genau einem gelingt). Im Enum-Kontrakt die neuen Wire-Werte und `AdapterGemeldet`.
+- [x] **Step 2: Rot sehen:** `cargo test --lib benachrichtigung::tests` → Kompilier- bzw. Assertionsfehler.
+- [x] **Step 3: Migration.** Neubau von `benachrichtigung` nach Muster 0352 (Blatt-Umbau, ohne Marker): `einsatz_id` ohne `NOT NULL`, neu `adapter_id TEXT REFERENCES adapter(id) ON DELETE CASCADE`, `CHECK ((einsatz_id IS NULL) <> (adapter_id IS NULL))`, Art-CHECK um die drei Arten ergänzt, Indizes wie 0352 plus `idx_benachrichtigung_adapter ON benachrichtigung(adapter_id)`. Dazu `ALTER TABLE adapter ADD COLUMN gemeldet TEXT CHECK (gemeldet IN ('gestoert', 'eingriff'))`. Kopfkommentar mit LLH-2026 und Begründung. Doc-Kommentar von `BenachrichtigungArt` auf die neue Migration zeigen lassen.
+- [x] **Step 4: Enums und Matches** in den oben genannten Dateien ergänzen; `bezug_tabelle` für `Adapter` → `None` (bleibt lokal, reist nie); Registry: `adapter_id` als Kennung `Retain` wie `einheit_id`.
+- [x] **Step 5: Grün:** `cargo test --lib benachrichtigung::tests && cargo test --test enum_wire_kontrakt && cargo test --lib db::tests && cargo test --lib einsatz::schwaerzung` → PASS.
+- [x] **Step 6: Commit** `feat: Benachrichtigungsarten und Schema für Adapter-Störungen (LLH-2026)`.
 
 ### Task 2: Ort „Adapter“ in der Benachrichtigung
 
@@ -72,7 +72,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
   - `benachrichtigung::erledigen_adapter(pool, live, org_id: i64, adapter_id: &str) -> usize`: quittiert alle offenen Zeilen der drei Adapter-Arten mit dieser `adapter_id` und stellt jedem Empfänger sein Quittier-Ereignis über den Org-Kanal zu.
   - In `adapter.rs`: `empfaenger(pool, org_id) -> Result<Aufgeloest, AppError>` (still: wer die Art abgeschaltet hat), `darf_lesen(pool, benutzer, adapter_id) -> Result<bool, AppError>`, `text(pool, art, adapter_id) -> Result<Option<text::Text>, AppError>`, `DETAIL_ADAPTER_SPALTEN: &[(&str, &str)]`, `fehler_text(AdapterFehler, Option<i64>) -> String`.
 
-- [ ] **Step 1: Tests schreiben** in `src/benachrichtigung/tests.rs` (Pool mit Org, Adapter-Zeile per SQL, zweitem Admin, Führungskraft, Admin fremder Org, Gerätekonto):
+- [x] **Step 1: Tests schreiben** in `src/benachrichtigung/tests.rs` (Pool mit Org, Adapter-Zeile per SQL, zweitem Admin, Führungskraft, Admin fremder Org, Gerätekonto):
   - `adapter_anlass_erreicht_nur_admins_der_org`: `melden(Anlass::adapter(org, id, AdapterEingriff, Bezug::neu(Adapter, 1)))` liefert genau die beiden aktiven Admins der Org; Führungskraft, fremder Admin, inaktiver Admin und Gerätekonto fehlen; Zeilen haben `einsatz_id IS NULL`, `adapter_id = id`.
   - `adapter_art_abgeschaltet_ist_still`: Admin mit `benachrichtigungen_aus = ["adapter_gestoert"]` bekommt eine stille Zeile.
   - `adapter_zeile_nur_fuer_admin_der_org_lesbar`: nach Herabstufen des Admins (`system_rolle = 'keiner'`) ist die Zeile über `adapter::darf_lesen` nicht lesbar; nach Löschen des Adapters gibt es keine Zeile mehr.
@@ -80,15 +80,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
   - `erledigen_adapter_quittiert_offene`: zwei offene Zeilen → `erledigen_adapter` liefert 2, beide `quittiert_at IS NOT NULL`.
   - `detail_adapter_liest_nur_adapterspalten`: jede Spalte in `DETAIL_ADAPTER_SPALTEN` gehört zu Tabelle `adapter` und ist per `SELECT … LIMIT 0` lesbar; keine heißt `einstellungen`.
   - Bestehende Tests bleiben unverändert grün (Einsatz-Weg).
-- [ ] **Step 2: Rot sehen:** `cargo test --lib benachrichtigung` → FAIL.
-- [ ] **Step 3: Umsetzen.**
+- [x] **Step 2: Rot sehen:** `cargo test --lib benachrichtigung` → FAIL.
+- [x] **Step 3: Umsetzen.**
   - `melden_mit_fehler`: bei `Ort::Adapter` kein `hub_ziele`/Vormerken, keine `konten_am_hub`; Auflösung über `adapter::empfaenger`; sonst unverändert. `aufloesung::empfaenger` bleibt für den Einsatz-Ort und gibt bei `Ort::Adapter` an `adapter::empfaenger` ab.
   - `repo::anlegen` schreibt `einsatz_id`/`adapter_id` aus dem Ort; `aus_roh` liest beide.
   - Routen `liste`/`lesen`: Zeilen mit `adapter_id` über `adapter::darf_lesen` und `adapter::text`, sonst wie bisher (`Leserecht`). `quittieren`: Org aus `adapter.org_id` bei Adapter-Zeilen.
   - Hub (`instanz/spiegel/hinweis.rs`): `vormerken` nimmt die Einsatzkennung aus `anlass.einsatz_id()` (dort immer gesetzt, sonst `Ok(())`); `Adressat::OrgAdmins` hat keine Textform und wird beim Vormerken übersprungen; `adressaten_gehen_als_text` nimmt ihn ausdrücklich aus.
   - `fehler_text`: kurze deutsche Bezeichnung je `AdapterFehler` (Wortlaut aus `frontend/src/pages/einstellungen/adapterAnzeige.ts`, falls dort vorhanden), bei `Status` „Antwort {status}“.
-- [ ] **Step 4: Grün:** `cargo test --lib benachrichtigung && cargo test --lib instanz::spiegel::hinweis && cargo test --test benachrichtigung && cargo test --test instanz_hinweise` → PASS.
-- [ ] **Step 5: Commit** `feat: Benachrichtigung am Ort Adapter (LLH-2026)`.
+- [x] **Step 4: Grün:** `cargo test --lib benachrichtigung && cargo test --lib instanz::spiegel::hinweis && cargo test --test benachrichtigung && cargo test --test instanz_hinweise` → PASS.
+- [x] **Step 5: Commit** `feat: Benachrichtigung am Ort Adapter (LLH-2026)`.
 
 ### Task 3: Entscheidung, wann gemeldet wird
 
@@ -100,14 +100,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
 - Consumes: `AdapterGemeldet` (Task 1).
 - Produces: `pub const MELDESCHWELLE_GESTOERT_S: i64 = 30 * 60;` und `pub fn meldung_nach_fehlschlag(fehler: AdapterFehler, nach: &NachFehlschlag, gemeldet: Option<AdapterGemeldet>, jetzt: &str) -> Option<AdapterGemeldet>` — die Stufe, die jetzt zu melden ist.
 
-- [ ] **Step 1: Tests:**
+- [x] **Step 1: Tests:**
   - `anhalten_meldet_eingriff_einmal`: `Anhalten` + `None` → `Some(Eingriff)`; + `Some(Gestoert)` → `Some(Eingriff)`; + `Some(Eingriff)` → `None`.
   - `gestoert_erst_ab_dreissig_minuten`: `Wiederholen{fehler_seit: "…10:00:00"}` mit `jetzt` 10:29:59 → `None`; 10:30:00 → `Some(Gestoert)`; mit `gemeldet = Some(Gestoert)` oder `Some(Eingriff)` → `None`.
   - `gesperrter_speicher_meldet_nie`: `GeheimnisspeicherGesperrt` + `Anhalten` + `None` → `None`.
-- [ ] **Step 2: Rot:** `cargo test --lib adapter::zustand` → FAIL.
-- [ ] **Step 3: Implementieren** (Regeln aus dem Spec, Abschnitt „Wann gemeldet wird“).
-- [ ] **Step 4: Grün:** derselbe Befehl → PASS.
-- [ ] **Step 5: Commit** `feat: Entscheidung über die Störungsmeldung eines Adapters (LLH-2026)`.
+- [x] **Step 2: Rot:** `cargo test --lib adapter::zustand` → FAIL.
+- [x] **Step 3: Implementieren** (Regeln aus dem Spec, Abschnitt „Wann gemeldet wird“).
+- [x] **Step 4: Grün:** derselbe Befehl → PASS.
+- [x] **Step 5: Commit** `feat: Entscheidung über die Störungsmeldung eines Adapters (LLH-2026)`.
 
 ### Task 4: Lauf meldet
 
@@ -124,7 +124,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
   - `repo::mark_gemeldet(conn, id: &str, stufe: AdapterGemeldet) -> Result<bool, sqlx::Error>`: bedingtes UPDATE (`Eingriff`: wo `gemeldet IS NOT 'eingriff'`; `Gestoert`: wo `gemeldet IS NULL`), `true` bei einer geänderten Zeile.
   - `repo::clear_gemeldet(conn, id: &str) -> Result<bool, sqlx::Error>`: `gemeldet = NULL` wo gesetzt, `true` wenn es gesetzt war.
 
-- [ ] **Step 1: Tests** in `tests/adapter_lauf.rs`. `Umgebung` hält den `LiveHub` aus `setup_mit_state` und legt einen zweiten System-Admin (`benutzer_anlegen` + `UPDATE benutzer SET system_rolle = 'admin'`) und eine Führungskraft an; Hilfsfunktion `meldungen(&self, cookie) -> Vec<Value>` über `GET /api/benachrichtigungen`.
+- [x] **Step 1: Tests** in `tests/adapter_lauf.rs`. `Umgebung` hält den `LiveHub` aus `setup_mit_state` und legt einen zweiten System-Admin (`benutzer_anlegen` + `UPDATE benutzer SET system_rolle = 'admin'`) und eine Führungskraft an; Hilfsfunktion `meldungen(&self, cookie) -> Vec<Value>` über `GET /api/benachrichtigungen`.
   - `anhalten_meldet_genau_einmal_an_die_admins`: `Abgelehnt` 401 → beide Admins je genau eine `adapter_eingriff` mit `einsatz_id == null`, Pfad zur Adapteransicht; Führungskraft und Admin von `fremde_org_anlegen` keine; weitere Durchgänge (auch 3 h später) keine zweite.
   - `kurze_stoerung_meldet_nicht`: `Verbindung` bei t0, t0+61 s, t0+200 s, t0+500 s, t0+1000 s (jeweils vor 30 min) → keine Meldung.
   - `lange_stoerung_meldet_einmal_ab_dreissig_minuten`: Fehler bei t0 und dann je fälligem Durchgang bis t0+31 min → genau eine `adapter_gestoert`; weiterer Fehler bei t0+50 min → keine zweite.
@@ -134,10 +134,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
   - `gesperrter_speicher_meldet_nicht`: Rahmen ohne Schlüssel (`adapter_testart::rahmen_mit(&art, None)`) und Adapter mit Pflichtgeheimnis → angehalten mit `geheimnisspeicher_gesperrt`, keine Meldung; Neustart mit Schlüssel (`lauf::beim_start`) und Erfolg → keine Entwarnung.
   - `veralteter_abruf_meldet_nicht`: Abruf mit älterem `stand` (Admin ändert den Namen zwischen Laden und Schreiben, Muster der bestehenden Tests zum Stand) → kein Merker, keine Meldung.
   - `meldung_enthaelt_keine_einstellung_und_kein_geheimnis`: Adapter mit Einstellung, die eine URL mit Zugangsdaten trägt (falls die Test-Art kein URL-Feld hat: Token-Wert prüfen), Meldung anhalten lassen → serialisierte Liste enthält weder `TOKEN` noch die Einstellungswerte.
-- [ ] **Step 2: Rot:** `cargo test --test adapter_lauf` → FAIL (Kompilierfehler `durchgang`).
-- [ ] **Step 3: Umsetzen.** `record_failure`: in der Transaktion nach `save_fehlschlag` (nur wenn `is_unveraendert`) `meldung_nach_fehlschlag(f.art, &nach, a.gemeldet(), jetzt)`; bei `Some(stufe)` `mark_gemeldet`; die Kennung aus `save_versuch` ist `bezug_id`. Nach dem Commit: bei `Eingriff` zuerst `erledigen_adapter`, dann `melden(Anlass::adapter(a.org_id, &a.id, art, Bezug::neu(Adapter, versuch_id)))`. Erfolgszweig von `run_one`: in der Transaktion `clear_gemeldet` nach `save_erfolg`; war gesetzt → nach dem Commit `erledigen_adapter` und `melden(… AdapterWiederOk …)`. Bestehende Tests rufen `durchgang` mit dem `LiveHub` der Umgebung.
-- [ ] **Step 4: Grün:** `cargo test --test adapter_lauf && cargo test --test adapter && cargo test --lib adapter` → PASS (Name der Routen-Testdatei per `ls tests/adapter*.rs` prüfen).
-- [ ] **Step 5: Commit** `feat: Adapter-Lauf meldet Störungen an die Admins (LLH-2026)`.
+- [x] **Step 2: Rot:** `cargo test --test adapter_lauf` → FAIL (Kompilierfehler `durchgang`).
+- [x] **Step 3: Umsetzen.** `record_failure`: in der Transaktion nach `save_fehlschlag` (nur wenn `is_unveraendert`) `meldung_nach_fehlschlag(f.art, &nach, a.gemeldet(), jetzt)`; bei `Some(stufe)` `mark_gemeldet`; die Kennung aus `save_versuch` ist `bezug_id`. Nach dem Commit: bei `Eingriff` zuerst `erledigen_adapter`, dann `melden(Anlass::adapter(a.org_id, &a.id, art, Bezug::neu(Adapter, versuch_id)))`. Erfolgszweig von `run_one`: in der Transaktion `clear_gemeldet` nach `save_erfolg`; war gesetzt → nach dem Commit `erledigen_adapter` und `melden(… AdapterWiederOk …)`. Bestehende Tests rufen `durchgang` mit dem `LiveHub` der Umgebung.
+- [x] **Step 4: Grün:** `cargo test --test adapter_lauf && cargo test --test adapter && cargo test --lib adapter` → PASS (Name der Routen-Testdatei per `ls tests/adapter*.rs` prüfen).
+- [x] **Step 5: Commit** `feat: Adapter-Lauf meldet Störungen an die Admins (LLH-2026)`.
 
 ### Task 5: Admin greift ein
 
@@ -148,16 +148,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
 **Interfaces:**
 - Consumes: `repo::clear_gemeldet`, `benachrichtigung::erledigen_adapter`.
 
-- [ ] **Step 1: Tests:**
+- [x] **Step 1: Tests:**
   - `fortsetzen_erledigt_ohne_entwarnung`: angehalten und gemeldet, Admin `POST …/fortsetzen` (Route per `grep` in `src/app.rs` prüfen) → Meldung quittiert, Merker leer, keine `adapter_wieder_ok`, auch nicht nach dem nächsten Erfolg.
   - `neues_geheimnis_erledigt`: angehalten gemeldet, `PUT …/geheimnisse/token` → quittiert, Merker leer.
   - `anhalten_durch_admin_erledigt_stoerung`: gestört gemeldet, Admin hält an → quittiert.
   - `loeschen_erledigt_und_raeumt`: gemeldet, `DELETE` → keine Zeile mit dieser `adapter_id` mehr.
   - `umbenennen_laesst_merker_stehen`: gestört gemeldet, nicht wirksame Änderung → Meldung offen, Merker steht.
-- [ ] **Step 2: Rot:** `cargo test --test adapter_lauf` → FAIL.
-- [ ] **Step 3: Umsetzen.** `resume`, `halt`: `clear_gemeldet` in der Transaktion der Route. `update` (nur wenn wirksam und `vorher.angehalten_grund` gesetzt) und `set_geheimnis` (wenn der Adapter vorher einen `angehalten_grund` hatte): ebenso. Nach dem Commit bei `true`: `erledigen_adapter`. `delete`: vor der Transaktion `erledigen_adapter`.
-- [ ] **Step 4: Grün:** `cargo test --test adapter_lauf` → PASS.
-- [ ] **Step 5: Commit** `feat: Eingriff eines Admins erledigt die Störungsmeldung (LLH-2026)`.
+- [x] **Step 2: Rot:** `cargo test --test adapter_lauf` → FAIL.
+- [x] **Step 3: Umsetzen.** `resume`, `halt`: `clear_gemeldet` in der Transaktion der Route. `update` (nur wenn wirksam und `vorher.angehalten_grund` gesetzt) und `set_geheimnis` (wenn der Adapter vorher einen `angehalten_grund` hatte): ebenso. Nach dem Commit bei `true`: `erledigen_adapter`. `delete`: vor der Transaktion `erledigen_adapter`.
+- [x] **Step 4: Grün:** `cargo test --test adapter_lauf` → PASS.
+- [x] **Step 5: Commit** `feat: Eingriff eines Admins erledigt die Störungsmeldung (LLH-2026)`.
 
 ### Task 6: Wire und Frontend
 
@@ -169,24 +169,33 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
 - Consumes: Wire aus Task 2 (`einsatz_id: number | null`, Arten, Bezug `adapter`).
 - Produces: `AlarmZiel` `'anbindungen'`; Katalogeinträge der drei Arten (`org: true`, `stufe: 'hinweis'`, Namen wie Global Constraints).
 
-- [ ] **Step 1: Codegen:** `scripts/check-typ-codegen.sh` (Schreibmodus laut Skriptkopf) → beide Dateien aktualisiert.
-- [ ] **Step 2: Tests:** Katalog-Test: Org-Arten sind Aufnahme, neuer Einsatz und die drei Adapter-Arten; `zielVon` der Adapter-Arten ist `'anbindungen'`; `ersatzPfad` eines Ereignisses mit `einsatz_id: null` ist `/admin/einstellungen/anbindungen` und enthält nie `null`. SW-Test: Ereignis mit `einsatz_id: null` → Rückfallziel ohne `/einsaetze/null`, Tag `null-b-<id>` wie `eintragVon`. Einstellungsseite: die drei Schalter nur für Admins.
-- [ ] **Step 3: Rot:** in `frontend/`: `mise exec -- pnpm exec vitest run src/alarm` → FAIL; `mise exec -- pnpm exec tsc --noEmit` zeigt die Stellen mit `number | null`.
-- [ ] **Step 4: Umsetzen** nach Spec, Abschnitt „Frontend“; Pfade über `adapterPath`/`anbindungenPath`.
-- [ ] **Step 5: Grün:** `mise exec -- pnpm exec tsc --noEmit && mise exec -- pnpm exec vitest run src/alarm src/pages` und `mise exec -- pnpm exec prettier --check .` → PASS.
-- [ ] **Step 6: Commit** `feat: Adapter-Störungen im Frontend (LLH-2026)`.
+- [x] **Step 1: Codegen:** `scripts/check-typ-codegen.sh` (Schreibmodus laut Skriptkopf) → beide Dateien aktualisiert.
+- [x] **Step 2: Tests:** Katalog-Test: Org-Arten sind Aufnahme, neuer Einsatz und die drei Adapter-Arten; `zielVon` der Adapter-Arten ist `'anbindungen'`; `ersatzPfad` eines Ereignisses mit `einsatz_id: null` ist `/admin/einstellungen/anbindungen` und enthält nie `null`. SW-Test: Ereignis mit `einsatz_id: null` → Rückfallziel ohne `/einsaetze/null`, Tag `null-b-<id>` wie `eintragVon`. Einstellungsseite: die drei Schalter nur für Admins.
+- [x] **Step 3: Rot:** in `frontend/`: `mise exec -- pnpm exec vitest run src/alarm` → FAIL; `mise exec -- pnpm exec tsc --noEmit` zeigt die Stellen mit `number | null`.
+- [x] **Step 4: Umsetzen** nach Spec, Abschnitt „Frontend“; Pfade über `adapterPath`/`anbindungenPath`.
+- [x] **Step 5: Grün:** `mise exec -- pnpm exec tsc --noEmit && mise exec -- pnpm exec vitest run src/alarm src/pages` und `mise exec -- pnpm exec prettier --check .` → PASS.
+- [x] **Step 6: Commit** `feat: Adapter-Störungen im Frontend (LLH-2026)`.
 
 ### Task 7: Regeln und Doku
 
 **Files:**
 - Modify: `src/AGENTS.md` („Benachrichtigungen“: zweiter Ort, `OrgAdmins`, Leserecht ohne Einsatz, reist nicht zum Hub, Detailspalten des Adapters neben der Schwärzung, `erledigen_adapter`; „Adapter“: Meldung über den Merker, Schwelle, gesperrter Speicher), `docs/anwender/kapitel/anbindungen.md`, ggf. arc42 laut `docs/architektur/AGENTS.md`
 
-- [ ] **Step 1:** Regeln und Anwenderabschnitt schreiben (Kapitelform und Wächter: `docs/anwender/AGENTS.md`).
-- [ ] **Step 2:** `./scripts/check-all.sh --nur schnell` → grün.
-- [ ] **Step 3: Commit** `docs: Regeln und Anwenderdoku zur Störungsmeldung (LLH-2026)`.
+- [x] **Step 1:** Regeln und Anwenderabschnitt schreiben (Kapitelform und Wächter: `docs/anwender/AGENTS.md`).
+- [x] **Step 2:** `./scripts/check-all.sh --nur schnell` → grün.
+- [x] **Step 3: Commit** `docs: Regeln und Anwenderdoku zur Störungsmeldung (LLH-2026)`.
 
 ### Task 8: Gesamtprüfung
 
-- [ ] **Step 1:** `git fetch origin alpha && scripts/check-migrationen.sh` → keine Konflikte.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ergebnis für „Geprüft“ im PR festhalten).
-- [ ] **Step 3:** Review nach Ermessen (Anlass: mehrere Schreibvorgänge, Backend und Frontend mit geänderter Schnittstelle).
+- [x] **Step 1:** `git fetch origin alpha && scripts/check-migrationen.sh` → keine Konflikte.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ergebnis für „Geprüft“ im PR festhalten).
+- [x] **Step 3:** Review nach Ermessen (Anlass: mehrere Schreibvorgänge, Backend und Frontend mit geänderter Schnittstelle).
+
+## Abschluss (22.11.2026)
+
+Alle Aufgaben umgesetzt. „`check-all.sh --geaendert --ohne-e2e` grün“ (Task 8) ist belegt durch:
+`--nur schnell` grün, `--nur frontend` grün (1421 Dateien, 22 787 Tests), `cargo check -p
+lifeline-hub --tests`, `cargo test --lib` (4633) und die 38 Integrationsdateien zu
+Benachrichtigung und Adapter grün. Die volle Rust-Suite lief lokal nicht (Plattenkontingent der
+Cloud-Sitzung); sie läuft auf `alpha`. Review: ein Agent, 6 Befunde, 4 behoben, 2 begründet
+offen (PR-Beschreibung).
