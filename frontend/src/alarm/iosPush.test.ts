@@ -51,6 +51,7 @@ function huelle(
 type Stand = {
   eingeschaltet: true;
   angemeldet: boolean;
+  an_dieser_sitzung: boolean;
   inhalt: boolean;
   stumm: string[];
   ueber_hub?: { name: string; adresse: string };
@@ -67,6 +68,7 @@ function server_(stand: Partial<Stand> = {}) {
       return HttpResponse.json({
         eingeschaltet: true,
         angemeldet: false,
+        an_dieser_sitzung: false,
         inhalt: false,
         stumm: [],
         relais_gesperrt: false,
@@ -142,17 +144,16 @@ describe('iOS-Push in der Seite', () => {
     const s = server_();
     await iosPushKanal.einschalten(BENUTZER);
     s.anmeldungen.length = 0;
-    // Der Server kennt die Anmeldung; das Token ist unverändert: nichts zu tun.
+    // Der Server kennt die Anmeldung an dieser Sitzung; das Token ist unverändert: nichts zu tun.
     beendeHuelle();
     huelle({ permission: 'granted' });
-    server_({ angemeldet: true });
-    const still = server_({ angemeldet: true });
+    const still = server_({ angemeldet: true, an_dieser_sitzung: true });
     await iosPushKanal.abgleichen(BENUTZER, { nurBeiBedarf: true });
     expect(still.anmeldungen).toEqual([]);
     // Neues Token (Neuinstallation): meldet neu, mit derselben Kennung und demselben Schlüssel.
     beendeHuelle();
     huelle({ permission: 'granted', token: 'cd'.repeat(32) });
-    const neu = server_({ angemeldet: true });
+    const neu = server_({ angemeldet: true, an_dieser_sitzung: true });
     await iosPushKanal.abgleichen(BENUTZER, { nurBeiBedarf: true });
     expect(neu.anmeldungen).toHaveLength(1);
     expect(neu.anmeldungen[0]).toMatchObject({
@@ -162,6 +163,22 @@ describe('iOS-Push in der Seite', () => {
     });
     expect(h.nachrichten).toContain('push_register');
     expect(localStorage.getItem(IOS_PUSH_TOKEN_MERKER)).not.toBeNull();
+  });
+
+  it('abgleichen_bindet_eine_anmeldung_aus_einer_anderen_sitzung_neu', async () => {
+    huelle();
+    const s = server_();
+    await iosPushKanal.einschalten(BENUTZER);
+    s.anmeldungen.length = 0;
+    // Sitzung A ist abgelaufen, die Person hat sich neu angemeldet (Sitzung B): der Server kennt
+    // das Gerät mit derselben Wahl und demselben Token, aber nicht an dieser Sitzung. Ohne neues
+    // `PUT` nähme ein Logout in B die Anmeldung nicht mit.
+    beendeHuelle();
+    huelle({ permission: 'granted' });
+    const neu = server_({ angemeldet: true, an_dieser_sitzung: false });
+    await iosPushKanal.abgleichen(BENUTZER, { nurBeiBedarf: true });
+    expect(neu.anmeldungen).toHaveLength(1);
+    expect(neu.anmeldungen[0]).toMatchObject({ kennung: KENNUNG, token: TOKEN });
   });
 
   it('abgleichen tut ohne Wahl, ohne Berechtigung und bei Fehlern nichts und wirft nie', async () => {

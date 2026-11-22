@@ -13,9 +13,11 @@ import { MERKER_MIT_INHALT, type PushStand, type PushZustand } from './webPush';
  *
  * Wie bei Web Push merkt sich der Browser je Person, dass Push gewählt ist ({@link iosPushMerker},
  * Wert `'1'` oder {@link MERKER_MIT_INHALT}); die nächste Sitzung meldet das Gerät still wieder an.
- * Die Anmeldung hängt am Server an Konto und Gerät, nicht an der Sitzung, ändert sich aber das
- * Token (Neuinstallation, Gerätewechsel), meldet {@link abgleichen} es neu; die Kennung und der
- * Schlüssel bleiben, solange die App sie behält.
+ * Die Anmeldung hängt am Server an Konto und Gerät und ist an die Sitzung gebunden, die sie zuletzt
+ * gemeldet hat: nur deren Logout nimmt sie mit. {@link abgleichen} meldet deshalb neu, wenn sie an
+ * einer anderen Sitzung hängt (`an_dieser_sitzung`) oder das Token sich geändert hat
+ * (Neuinstallation, Gerätewechsel); die Kennung und der Schlüssel bleiben, solange die App sie
+ * behält.
  *
  * Token und Schlüssel stehen in keinem Log und nie im Browserspeicher (dort nur ein Hash).
  */
@@ -171,7 +173,9 @@ async function ausschalten(benutzerId: number): Promise<PushZustand> {
  * Nach jeder bestätigten Anmeldung und jedem Umschalten von „Stumm auf diesem Gerät“: Hat diese
  * Person Push auf diesem Gerät gewählt, meldet es das Gerät mit der aktuellen Wahl an. Fragt nie
  * nach der Berechtigung und wirft nie. `nurBeiBedarf` (Seitenstart): kennt der Server das Gerät
- * schon mit derselben Wahl und demselben Token, bleibt es stehen.
+ * schon an dieser Sitzung mit derselben Wahl und demselben Token, bleibt es stehen. Hängt es an
+ * einer anderen (abgelaufen, neu angemeldet), bindet das `PUT` es an diese; sonst bliebe es nach
+ * einem Logout hier angemeldet.
  */
 async function abgleichen(
   benutzerId: number,
@@ -190,6 +194,7 @@ async function abgleichen(
     if (
       nurBeiBedarf &&
       stand.angemeldet &&
+      stand.an_dieser_sitzung &&
       stand.inhalt === inhalt &&
       gleicheArten(stand.stumm, stummeArten()) &&
       sicherLesen(IOS_PUSH_TOKEN_MERKER) === (await tokenKennung(r.registration_id, r.token))

@@ -3,7 +3,8 @@ import type { BenachrichtigungArt, IosPushStand } from './types';
 
 /**
  * iOS-Push (Spec `ios-push`, `src/routes/ios_push.rs`). Ohne `--ios-push` am Server antworten alle
- * Routen mit 404, ein Gerätekonto mit 403. Die Anmeldung hängt an Konto und Gerät (`kennung`).
+ * Routen mit 404, ein Gerätekonto mit 403. Die Anmeldung hängt an Konto und Gerät (`kennung`) und an
+ * der Sitzung, die sie zuletzt gemeldet hat (`an_dieser_sitzung`).
  */
 
 /** Kennung, nach der der Server fragt, wenn das Gerät noch nie angemeldet war: nirgends bekannt. */

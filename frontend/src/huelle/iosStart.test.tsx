@@ -137,6 +137,7 @@ describe('Start in der iOS-Hülle ohne Service Worker', () => {
         HttpResponse.json({
           eingeschaltet: true,
           angemeldet: false,
+          an_dieser_sitzung: false,
           inhalt: false,
           stumm: [],
           relais_gesperrt: false,
