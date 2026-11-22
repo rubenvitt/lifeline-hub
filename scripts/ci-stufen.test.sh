@@ -177,12 +177,12 @@ pruefe "berichte nur ohne Abbruch" gleich "$(job_if "$SUITEN" berichte)" "\${{ !
 # darf ihn nicht verhindern (design.md, D2).
 pruefe "berichte scheitert, ohne den Aufruf rot zu machen (Job-Ebene, nicht nur ein Schritt)" \
   grep -qx '    continue-on-error: true' <<< "$(job "$SUITEN" berichte)"
-pruefe "rust: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" rust)" "ci-rust-$JE_BRANCH|true"
-pruefe "frontend: Gruppe je Anteil und Branch mit Abbruch" \
-  gleich "$(job_gruppe "$SUITEN" frontend)" "ci-frontend-\${{ matrix.shard }}-$JE_BRANCH|true"
-pruefe "e2e: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" e2e)" "ci-e2e-$JE_BRANCH|true"
-pruefe "berichte: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" berichte)" "ci-berichte-$JE_BRANCH|true"
-pruefe "ios: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" ios)" "ci-ios-$JE_BRANCH|true"
+pruefe "rust: Gruppe je Branch ohne Abbruch (läuft zu Ende)" gleich "$(job_gruppe "$SUITEN" rust)" "ci-rust-$JE_BRANCH|false"
+pruefe "frontend: Gruppe je Anteil und Branch ohne Abbruch (läuft zu Ende)" \
+  gleich "$(job_gruppe "$SUITEN" frontend)" "ci-frontend-\${{ matrix.shard }}-$JE_BRANCH|false"
+pruefe "e2e: Gruppe je Branch ohne Abbruch (läuft zu Ende)" gleich "$(job_gruppe "$SUITEN" e2e)" "ci-e2e-$JE_BRANCH|false"
+pruefe "berichte: Gruppe je Branch ohne Abbruch (läuft zu Ende)" gleich "$(job_gruppe "$SUITEN" berichte)" "ci-berichte-$JE_BRANCH|false"
+pruefe "ios: Gruppe je Branch ohne Abbruch (läuft zu Ende)" gleich "$(job_gruppe "$SUITEN" ios)" "ci-ios-$JE_BRANCH|false"
 # Der Swift-Kern der iOS-Hülle (LLH-1978): in der CI ist eine fehlende Toolchain rot, nie eine
 # Lücke, und die Swift-Version ist dieselbe wie lokal.
 pruefe "ios: Swift-Kern über check-all.sh" enthaelt "$(job "$SUITEN" ios)" "run: ./scripts/check-all.sh --nur ios"

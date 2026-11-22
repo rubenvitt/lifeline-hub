@@ -9,11 +9,13 @@
 # Die Jobs heißen am Commit `<Aufrufer> / <Job>` (etwa `Suiten / Rust-Suite`). Ein Pflicht-Check
 # darf deshalb nicht hier stehen: die Schnellprüfungen stehen in `ci.yml` und `pr.yml` selbst.
 #
-# ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
-# ab, über Concurrency AUF JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`). Im
+# ZU ENDE AUF KANAL-BRANCHES (LLH-2035, ADR-0082; vorher Abbruch nach LLH-1889): Concurrency AUF
+# JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`) ohne Abbruch. Ein gestarteter
+# Job läuft zu Ende; je Gruppe wartet höchstens ein Lauf, und ein neuer Push ersetzt nur diesen
+# wartenden. Sonst käme die ~68-min-Rust-Suite bei mehreren Merges pro Stunde nie durch. Im
 # aufgerufenen Workflow ist `github.event_name` der des Aufrufers: bei Push eine Gruppe je Branch,
 # im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
-# eigene Gruppe und bricht nie ab.
+# eigene Gruppe, bricht nie ab und tritt bei einem neueren Commit zurück (Ruhefenster).
 #
 # NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`. Der eigene Server für Rust und e2e
 # (LLH-1666, LLH-2014, ADR-0075/0076) ist zurückgebaut.
@@ -51,10 +53,10 @@ jobs:
   # Cargo-Cache (save-if: true, die Vorgabe).
   rust:
     name: Rust-Suite
-    # Auf einem Kanal-Branch bricht ein neuer Push diesen Job ab (s. Kopf); im PR je Lauf.
+    # Auf einem Kanal-Branch läuft dieser Job zu Ende, ein neuer Push wartet (s. Kopf); im PR je Lauf.
     concurrency:
       group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -100,7 +102,7 @@ jobs:
     # Je Anteil eine Gruppe, sonst liefen die vier Anteile nacheinander.
     concurrency:
       group: ci-frontend-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -148,7 +150,7 @@ jobs:
     name: e2e
     concurrency:
       group: ci-e2e-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     uses: ./.github/workflows/e2e.yml
     permissions:
       contents: read
@@ -165,7 +167,7 @@ jobs:
     name: iOS-Kern
     concurrency:
       group: ci-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -191,7 +193,7 @@ jobs:
     continue-on-error: true
     concurrency:
       group: ci-berichte-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
