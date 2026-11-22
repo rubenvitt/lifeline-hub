@@ -575,9 +575,13 @@ async fn berichtigungen_nachladen(
 
 /// Welche der Einträge `ids` zu einer Meldung in der Lage gehören (LLH-2008): der Eintrag selbst
 /// oder ein Glied seiner Kette `berichtigt_eintrag_id` hängt an einer Meldung desselben Einsatzes,
-/// die lagerelevant oder eine Lagemeldung ist. Die Meldung hängt in beiden Richtungen am Eintrag
-/// (`etb_eintrag.meldung_id`, `meldung.etb_meldung_id`). Eine Abfrage für alle; die IN-Liste ist
-/// durch [`MAX_LIMIT`] begrenzt.
+/// die lagerelevant oder eine Lagemeldung ist. Gelesen wird nur `etb_eintrag.meldung_id`
+/// (Primärschlüssel der Meldung): `meldung::repo::verlinke_tx` setzt beide Richtungen zugleich,
+/// und auf `meldung.etb_meldung_id` liegt kein Index (ein OR über beide las je Glied alle
+/// Meldungen des Einsatzes, LLH-2008: 500 Einträge bei 10.000 Meldungen über 800 ms). `CROSS JOIN`
+/// hält die Reihenfolge Kette → Eintrag → Meldung, jeder Schritt über den Primärschlüssel; ohne
+/// las SQLite je nach Statistik `etb_eintrag` ganz. Eine Abfrage für alle; die IN-Liste ist durch
+/// [`MAX_LIMIT`] begrenzt.
 pub async fn meldung_in_lage(pool: &SqlitePool, ids: &[i64]) -> Result<HashSet<i64>, AppError> {
     if ids.is_empty() {
         return Ok(HashSet::new());
@@ -597,14 +601,12 @@ pub async fn meldung_in_lage(pool: &SqlitePool, ids: &[i64]) -> Result<HashSet<i
            WHERE e.berichtigt_eintrag_id IS NOT NULL \
          ) \
          SELECT DISTINCT k.start FROM kette k \
-         JOIN meldung m ON m.einsatz_id = k.einsatz_id \
+         CROSS JOIN etb_eintrag e ON e.id = k.id \
+         CROSS JOIN meldung m ON m.id = e.meldung_id AND m.einsatz_id = k.einsatz_id \
           AND (m.lagerelevant = 1 OR m.meldungsart = ",
     );
     qb.push_bind(crate::meldung::ART_LAGEMELDUNG);
-    qb.push(
-        ") AND (m.etb_meldung_id = k.id \
-               OR m.id = (SELECT e.meldung_id FROM etb_eintrag e WHERE e.id = k.id))",
-    );
+    qb.push(")");
     let treffer: Vec<i64> = qb.build_query_scalar().fetch_all(pool).await?;
     Ok(treffer.into_iter().collect())
 }
