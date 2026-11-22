@@ -1,6 +1,15 @@
 package dev.rubeen.lifeline.kern
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Ein gespeicherter Server der Android-App. Die [id] (UUID als Text) benennt auch sein
@@ -31,9 +40,9 @@ class ListException(val error: ListError) : Exception(error.name)
 
 /**
  * Die Server der App und welcher davon aktiv ist. Reiner, unveränderlicher Wert: speichern und
- * Profil löschen übernimmt die App.
+ * Profil löschen übernimmt die App. Gelesen wird über [ServerlisteSerializer].
  */
-@Serializable
+@Serializable(with = ServerlisteSerializer::class)
 data class Serverliste(
     val eintraege: List<ServerEintrag> = emptyList(),
     val aktivId: String? = null,
@@ -92,4 +101,55 @@ data class Serverliste(
         val sauber = name?.trim { it.isWhitespace() } ?: ""
         return sauber.ifEmpty { adresse.host }
     }
+}
+
+/** Die Felder der Datei, wie sie gespeichert werden. */
+@Serializable
+private class ServerlisteDaten(
+    val eintraege: List<ServerEintrag> = emptyList(),
+    val aktivId: String? = null,
+)
+
+/**
+ * Liest und schreibt die Serverliste. Ein Eintrag, dessen Adresse die Prüfung heute ablehnt
+ * (etwa ein gesperrter Port, LLH-1987), fällt beim Lesen heraus, statt die ganze Liste unlesbar zu
+ * machen; wie `Serverliste.swift` und `verbindung::bekannte` der Desktop-Hülle (`0c270c9f`). Jeder
+ * andere Fehler bleibt einer, damit `Serverablage.loadOrRecover` die Datei beiseitelegt statt sie
+ * still zu kürzen. Fehlt der aktive Server danach, wird der erste übrige aktiv, wie bei `add`.
+ */
+object ServerlisteSerializer : KSerializer<Serverliste> {
+    override val descriptor: SerialDescriptor = ServerlisteDaten.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: Serverliste) =
+        encoder.encodeSerializableValue(ServerlisteDaten.serializer(), ServerlisteDaten(value.eintraege, value.aktivId))
+
+    override fun deserialize(decoder: Decoder): Serverliste {
+        val daten = if (decoder is JsonDecoder) {
+            decoder.json.decodeFromJsonElement(ServerlisteDaten.serializer(), ohneAbgelehnte(decoder.decodeJsonElement()))
+        } else {
+            decoder.decodeSerializableValue(ServerlisteDaten.serializer())
+        }
+        val aktiv = daten.aktivId
+        val aktivFehlt = aktiv != null && daten.eintraege.none { it.id == aktiv }
+        return Serverliste(daten.eintraege, if (aktivFehlt) daten.eintraege.firstOrNull()?.id else aktiv)
+    }
+
+    /** Nimmt die Einträge heraus, deren `adresse` ein Text ist, den [ServerAdresse.parse] ablehnt. */
+    private fun ohneAbgelehnte(element: JsonElement): JsonElement {
+        val objekt = element as? JsonObject ?: return element
+        val eintraege = objekt["eintraege"] as? JsonArray ?: return element
+        val gueltig = eintraege.filterNot { eintrag ->
+            val adresse = ((eintrag as? JsonObject)?.get("adresse") as? JsonPrimitive)?.takeIf { it.isString }
+            adresse != null && isAbgelehnt(adresse.content)
+        }
+        return JsonObject(objekt + ("eintraege" to JsonArray(gueltig)))
+    }
+
+    private fun isAbgelehnt(adresse: String): Boolean =
+        try {
+            ServerAdresse.parse(adresse)
+            false
+        } catch (_: AdressException) {
+            true
+        }
 }

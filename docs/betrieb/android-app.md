@@ -158,8 +158,10 @@ Link von außen bewirkt nichts. Wer den Tab schließt, landet wieder auf der Anm
 
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im WebView-Profil des
 jeweiligen Servers (Lagebild, Warteschlange, ETB-Entwürfe, wie im Browser). Die Serverliste liegt
-als `lifeline/server.json` im privaten Speicher der App; ist sie unlesbar, legt die App sie als
-`server.defekt.json` beiseite und beginnt leer. Schalter, Kanal und Stand des Updaters liegen in
+als `lifeline/server.json` im privaten Speicher der App. Ein Eintrag, dessen Adresse die Prüfung
+inzwischen ablehnt (etwa auf einem gesperrten Port), fällt beim Laden heraus, die übrigen bleiben;
+war er aktiv, wird der erste übrige aktiv. Ist die Datei aus einem anderen Grund unlesbar, legt
+die App sie als `server.defekt.json` beiseite und beginnt leer. Schalter, Kanal und Stand des Updaters liegen in
 den Einstellungen der App. Die App nimmt an keiner Cloud-Sicherung teil (`allowBackup="false"` in
 `android/app/src/main/AndroidManifest.xml`); nach einer Neuinstallation sind Server und
 Anmeldungen weg. Vorgaben für Bildschirmsperre, Gemeinschaftsgeräte und Verlust:
