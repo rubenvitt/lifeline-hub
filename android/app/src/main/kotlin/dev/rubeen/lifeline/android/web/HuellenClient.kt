@@ -1,5 +1,6 @@
 package dev.rubeen.lifeline.android.web
 
+import android.net.Uri
 import android.net.http.SslError
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
@@ -81,10 +82,15 @@ class HuellenClient(
         }
     }
 
-    /** Vertrauen nur nach dem System (Entwurf D2a): ein Zertifikatsfehler bricht immer ab. */
+    /**
+     * Vertrauen nur nach dem System (Entwurf D2a): ein Zertifikatsfehler bricht immer ab. Der
+     * Rückruf kommt auch für Bilder und Kacheln fremder Hosts; gemeldet wird nur, was sich einer
+     * Origin zuordnen lässt, `Ablauf` übergeht dann fremde (Review K6).
+     */
     override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
         handler.cancel()
-        melde(view, Ablauf.Event.NavigationFehlgeschlagen(Netzfehler.ZERTIFIKAT, error.url?.let(::uri)))
+        val adresse = fehleradresse(error.url) ?: return
+        melde(view, Ablauf.Event.NavigationFehlgeschlagen(Netzfehler.ZERTIFIKAT, adresse))
     }
 
     /** Nur die Hauptnavigation; Fehler einzelner Bilder oder Skripte zeigt die Seite selbst. */
@@ -94,7 +100,7 @@ class HuellenClient(
             view,
             Ablauf.Event.NavigationFehlgeschlagen(
                 Fehlerzuordnung.netzfehler(error.errorCode, error.description),
-                uri(request.url.toString()),
+                fehleradresse(request.url.toString()),
             ),
         )
     }
@@ -111,6 +117,24 @@ class HuellenClient(
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
         melde(view, Ablauf.Event.WebProzessBeendet)
         return true
+    }
+}
+
+/**
+ * Die Adresse eines Ladefehlers: wie [uri], und wo `java.net.URI` scheitert (`|`, `{` in Kachel-
+ * oder Bildadressen), wenigstens ihre Origin über `android.net.Uri`. Nur zum Zuordnen eines
+ * Fehlers, nie zum Laden.
+ */
+internal fun fehleradresse(text: String?): URI? {
+    if (text == null) return null
+    uri(text)?.let { return it }
+    val roh = Uri.parse(text)
+    val schema = roh.scheme ?: return null
+    val host = roh.host ?: return null
+    return try {
+        URI(schema, null, host, roh.port, "/", null, null)
+    } catch (_: Exception) {
+        null
     }
 }
 

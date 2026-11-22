@@ -159,10 +159,25 @@ class AnmelderTest {
         assertEquals(43, ziel.substringAfter("challenge=").length)
     }
 
+    /** Review K9: der Render-Prozess endete, während der Browser vorn war; neuer WebView, selbes Profil. */
+    @Test
+    fun `nach einem Neubau des WebViews im selben Server wird der Code eingelöst`() {
+        anmelder.start()
+        val alt = skripte
+        webView = MitschnittWebView(context).apply { loadUrl("https://elw.local:8443/login") }
+
+        anmelder.ruecksprung(ruecksprung)
+
+        assertTrue(alt.isEmpty())
+        assertEquals(1, skripte.size)
+        assertTrue(skripte.single().contains(code))
+    }
+
     @Test
     fun `nach einem Serverwechsel geht das Ergebnis an keinen WebView`() {
         anmelder.start()
         val alt = skripte
+        server = ServerAdresse.parse("https://lifeline.kv.example")
         webView = MitschnittWebView(context).apply { loadUrl("https://lifeline.kv.example/login") }
 
         anmelder.ruecksprung(ruecksprung)

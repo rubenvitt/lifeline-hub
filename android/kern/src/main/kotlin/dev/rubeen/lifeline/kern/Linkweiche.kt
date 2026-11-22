@@ -53,11 +53,47 @@ object Linkweiche {
 
 /** Wohin ein Download geht: nur der Name ist Logik des Kerns, das Verzeichnis wählt die App. */
 object Downloadablage {
-    /** Nur der letzte Pfadteil, ohne Steuerzeichen, `:` und `\`, ohne führende Punkte. */
+    /** Längster Dateiname in UTF-8-Bytes; Dateisysteme erlauben 255, etwas Luft bleibt. */
+    const val MAX_NAME_BYTES = 200
+
+    /** Größte Datei, die die App ablegt (Anhänge, Exporte, Archive); mehr ist keine Antwort des Servers. */
+    const val MAX_BYTES = 1024L * 1024 * 1024
+
+    /** Längste Endung, die beim Kürzen erhalten bleibt (`.xlsx`, `.tar.gz` nicht). */
+    private const val MAX_ENDUNG = 16
+
+    /**
+     * Nur der letzte Pfadteil, ohne Steuerzeichen, `:` und `\`, ohne führende Punkte, höchstens
+     * [MAX_NAME_BYTES] lang; gekürzt wird vor der Endung (Review K5).
+     */
     fun dateiname(vorschlag: String): String {
         val letzter = vorschlag.split('/').lastOrNull { it.isNotEmpty() } ?: ""
         val sauber = letzter.map { if (it == ':' || it == '\\' || Character.isISOControl(it)) '_' else it }.joinToString("")
         val ohnePunkte = sauber.dropWhile { it == '.' }.trim { it.isWhitespace() }
-        return ohnePunkte.ifEmpty { "Download" }
+        return kuerze(ohnePunkte.ifEmpty { "Download" })
     }
+
+    private fun kuerze(name: String): String {
+        if (bytes(name) <= MAX_NAME_BYTES) return name
+        val punkt = name.lastIndexOf('.')
+        val endung = if (punkt > 0 && name.length - punkt <= MAX_ENDUNG) name.substring(punkt) else ""
+        val stamm = name.removeSuffix(endung)
+        return passend(stamm, MAX_NAME_BYTES - bytes(endung)).trimEnd() + endung
+    }
+
+    /** Der längste Anfang von [text] mit höchstens [grenze] Bytes, ohne ein Zeichen zu zerteilen. */
+    private fun passend(text: String, grenze: Int): String {
+        var laenge = 0
+        var ende = 0
+        while (ende < text.length) {
+            val zeichen = text.codePointAt(ende)
+            val breite = bytes(String(Character.toChars(zeichen)))
+            if (laenge + breite > grenze) break
+            laenge += breite
+            ende += Character.charCount(zeichen)
+        }
+        return text.substring(0, ende)
+    }
+
+    private fun bytes(text: String): Int = text.toByteArray(Charsets.UTF_8).size
 }

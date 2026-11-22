@@ -30,6 +30,7 @@ class ServerentfernungTest {
         val schritte = mutableListOf<String>()
         var profilFehler: List<String> = emptyList()
         var waehrendDesLoeschens: ((Dienste) -> Unit)? = null
+        var speicherFehler: String? = null
 
         override val serverliste: Serverliste get() = liste
 
@@ -46,6 +47,7 @@ class ServerentfernungTest {
         override fun removeEintrag(id: String) {
             liste = liste.remove(id)
             schritte += "removeEintrag:$id"
+            speicherFehler?.let { throw java.io.IOException(it) }
         }
     }
 
@@ -61,6 +63,19 @@ class ServerentfernungTest {
             dienste.schritte,
         )
         assertEquals(listOf(elwEintrag.id), dienste.liste.eintraege.map { it.id })
+    }
+
+    /** Review K10: scheitert das Speichern, sagt die App es, statt still weiterzumachen. */
+    @Test
+    fun `scheitert das Speichern der Liste, meldet die App es`() {
+        val dienste = Dienste(liste).apply { speicherFehler = "Kein Speicherplatz" }
+        val fehler = fehler(dienste, lagerEintrag.id)
+        assertEquals(Serverentfernung.Fehler.Speichern("Lager", "Kein Speicherplatz"), fehler)
+        assertEquals(
+            "Die Serverliste ließ sich nicht speichern (Kein Speicherplatz). Nach einem Neustart kann " +
+                "„Lager“ wieder in der Liste stehen; dann bitte erneut entfernen.",
+            fehler.meldung,
+        )
     }
 
     @Test

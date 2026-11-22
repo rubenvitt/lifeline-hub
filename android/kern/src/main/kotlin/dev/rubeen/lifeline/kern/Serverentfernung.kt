@@ -16,7 +16,10 @@ interface Entfernungsdienste {
     /** Löscht das WebView-Profil (`ProfileStore.deleteProfile`). */
     suspend fun removeProfil(profil: String)
 
-    /** Nimmt den Eintrag aus der Liste und speichert sie; wirft [ListException]. */
+    /**
+     * Nimmt den Eintrag aus der Liste und speichert sie; wirft [ListException], oder eine andere
+     * Ausnahme, wenn das Speichern scheitert (der Eintrag ist dann aus der Liste im Speicher).
+     */
     fun removeEintrag(id: String)
 }
 
@@ -38,6 +41,9 @@ object Serverentfernung {
 
         data class Profil(val name: String, val grund: String) : Fehler
 
+        /** Profil gelöscht, aber die Liste ließ sich nicht speichern (Review K10). */
+        data class Speichern(val name: String, val grund: String) : Fehler
+
         val meldung: String
             get() = when (this) {
                 Unbekannt -> "Der Server steht nicht mehr in der Liste."
@@ -45,6 +51,9 @@ object Serverentfernung {
                 is Profil ->
                     "Die Daten von „$name“ ließen sich nicht löschen ($grund). Der Server bleibt in " +
                         "der Liste; bitte später erneut entfernen."
+                is Speichern ->
+                    "Die Serverliste ließ sich nicht speichern ($grund). Nach einem Neustart kann " +
+                        "„$name“ wieder in der Liste stehen; dann bitte erneut entfernen."
             }
     }
 
@@ -78,6 +87,10 @@ object Serverentfernung {
             dienste.removeEintrag(id)
         } catch (e: ListException) {
             throw EntfernungException(if (e.error == ListError.AKTIV_NICHT_ENTFERNBAR) Fehler.Aktiv else Fehler.Unbekannt)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw EntfernungException(Fehler.Speichern(eintrag.name, e.message ?: e.toString()))
         }
     }
 }

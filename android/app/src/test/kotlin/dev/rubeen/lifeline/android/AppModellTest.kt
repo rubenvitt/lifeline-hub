@@ -3,7 +3,10 @@ package dev.rubeen.lifeline.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.net.http.SslCertificate
+import android.net.http.SslError
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -18,6 +21,7 @@ import dev.rubeen.lifeline.kern.ServerEintrag
 import dev.rubeen.lifeline.kern.Serverablage
 import dev.rubeen.lifeline.kern.Serverliste
 import dev.rubeen.lifeline.kern.ShellAbruf
+import dev.rubeen.lifeline.kern.Statusseite
 import dev.rubeen.lifeline.kern.Testzustand
 import java.net.URI
 import org.junit.After
@@ -36,6 +40,8 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
+import org.robolectric.util.ReflectionHelpers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -184,6 +190,24 @@ class AppModellTest {
         assertEquals("https://elw.local:8443/", shadowOf(modell.webView!!).lastLoadedUrl)
     }
 
+    /** Review K6: ein Zertifikatsfehler einer Kachel mit für `java.net.URI` unlesbarer Adresse. */
+    @Test
+    fun `ein Zertifikatsfehler eines fremden Bildes lässt die Oberfläche stehen`() {
+        val modell = modell(AttrappenFabrik())
+        modell.start()
+        val webView = modell.webView!!
+        val client = shadowOf(webView).webViewClient
+        val handler = ReflectionHelpers.callConstructor(SslErrorHandler::class.java)
+        @Suppress("DEPRECATION")
+        val zertifikat = SslCertificate("kacheln.example", "Unbekannte CA", java.util.Date(), java.util.Date())
+
+        client.onReceivedSslError(webView, handler, SslError(SslError.SSL_UNTRUSTED, zertifikat, "https://kacheln.example/{z}|1.png"))
+        assertTrue(modell.seite is Ablauf.Seite.Web)
+
+        client.onReceivedSslError(webView, handler, SslError(SslError.SSL_UNTRUSTED, zertifikat, "https://elw.local:8443/{z}|1.png"))
+        assertEquals(Ablauf.Seite.Status(elw.copy(bestaetigterVertrag = 1), Statusseite.Zertifikat), modell.seite)
+    }
+
     @Test
     fun `die erste geladene Seite des Servers wird in der Ablage vermerkt`() {
         val modell = modell(AttrappenFabrik())
@@ -207,6 +231,45 @@ class AppModellTest {
         assertFalse(modell.liste.eintraege.any { it.id == lager.id })
         assertFalse(ablage.load().eintraege.any { it.id == lager.id })
         assertNull(modell.entfernenFehler)
+    }
+
+    /** Review K10: ein Modell, dessen Ablage nicht schreiben kann (Speicher voll). */
+    private fun modellOhneSpeicher(fabrik: AttrappenFabrik, gespeichert: Serverliste): AppModell {
+        val verzeichnis = ordner.newFolder("liste")
+        val kaputt = Serverablage(verzeichnis).also { it.save(gespeichert) }
+        return AppModell(
+            testzustand = null, version = "1.0.0", build = 1, einstellungen = null, scope = scope,
+            context = context, fabrik = fabrik, ablage = kaputt,
+            abrufen = { _: ServerAdresse -> vertraeglich to null }, dienste = Dienstattrappe(),
+        ).also {
+            // Gelesen ist die Liste; ab jetzt ist das Verzeichnis eine Datei und Schreiben scheitert.
+            verzeichnis.deleteRecursively()
+            verzeichnis.writeText("kein Verzeichnis")
+        }
+    }
+
+    @Test
+    fun `scheitert das Speichern beim Entfernen, zeigt die App den Fehler`() {
+        val fabrik = AttrappenFabrik()
+        val modell = modellOhneSpeicher(fabrik, liste)
+        modell.start()
+
+        modell.entfernen(lager)
+
+        assertEquals(listOf(lager.id), fabrik.geloescht)
+        assertTrue(modell.entfernenFehler!!.startsWith("Die Serverliste ließ sich nicht speichern"))
+    }
+
+    @Test
+    fun `scheitert das Speichern beim Hinzufügen, sagt die App es`() {
+        val modell = modellOhneSpeicher(AttrappenFabrik(), Serverliste())
+        modell.start()
+
+        modell.send(Onboarding.Event.TextChanged("https://elw.local:8443"))
+        modell.send(Onboarding.Event.Verbinden)
+
+        assertTrue("der Server wirkt bis zum Neustart", modell.seite is Ablauf.Seite.Web)
+        assertEquals(AppModell.SPEICHERN_FEHLGESCHLAGEN, ShadowToast.getTextOfLatestToast())
     }
 
     @Test

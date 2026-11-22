@@ -16,6 +16,7 @@ import dev.rubeen.lifeline.kern.Linkregeln
 import dev.rubeen.lifeline.kern.ServerAdresse
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -160,9 +161,13 @@ class Downloads internal constructor(
         /**
          * Lädt [anfrage] und legt die Antwort ab; (Datei, Typ der Antwort). Umleitungen folgt es
          * selbst, damit die Sitzung nur an die Origin des Servers geht. Wirft bei einer
-         * Fehlerantwort, ohne etwas abzulegen.
+         * Fehlerantwort oder einer Antwort über [grenze] Bytes, ohne etwas abzulegen.
          */
-        internal suspend fun abrufen(anfrage: Downloadanfrage, ablegen: Ablegen): Pair<File, String?> {
+        internal suspend fun abrufen(
+            anfrage: Downloadanfrage,
+            ablegen: Ablegen,
+            grenze: Long = Downloadablage.MAX_BYTES,
+        ): Pair<File, String?> {
             var adresse = anfrage.ziel
             repeat(MAX_UMLEITUNGEN + 1) {
                 val verbindung = adresse.toURL().openConnection() as HttpURLConnection
@@ -186,13 +191,26 @@ class Downloads internal constructor(
                     val disposition = verbindung.getHeaderField("Content-Disposition") ?: anfrage.contentDisposition
                     // Ohne Parameter (`; charset=…`), sonst verwirft `guessFileName` die Endung.
                     val name = URLUtil.guessFileName(adresse.toString(), disposition, typ?.substringBefore(';')?.trim())
-                    val datei = verbindung.inputStream.use { eingang -> ablegen(name) { eingang.copyTo(it) } }
+                    val datei = verbindung.inputStream.use { eingang -> ablegen(name) { kopiere(eingang, it, grenze) } }
                     return datei to typ
                 } finally {
                     verbindung.disconnect()
                 }
             }
             throw IOException("Zu viele Umleitungen")
+        }
+
+        /** Kopiert höchstens [grenze] Bytes; eine Antwort ohne Ende füllt nicht den Speicher (Review K5). */
+        private fun kopiere(ein: InputStream, aus: OutputStream, grenze: Long) {
+            val block = ByteArray(64 * 1024)
+            var gesamt = 0L
+            while (true) {
+                val gelesen = ein.read(block)
+                if (gelesen < 0) return
+                gesamt += gelesen
+                if (gesamt > grenze) throw IOException("Download größer als $grenze Bytes")
+                aus.write(block, 0, gelesen)
+            }
         }
     }
 }

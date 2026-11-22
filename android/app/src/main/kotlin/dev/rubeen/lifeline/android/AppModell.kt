@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.SystemClock
 import android.util.Log
+import android.widget.Toast
 import android.webkit.WebView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -343,7 +344,7 @@ class AppModell(
                 } catch (_: ListException) {
                     mitNeuem
                 }
-                save()
+                if (!save()) zeigeSpeicherfehler()
                 zeigtOnboarding = false
                 zeigtServerliste = false
                 onboarding = Onboarding.State.START
@@ -563,13 +564,21 @@ class AppModell(
         save()
     }
 
-    private fun save() {
-        val ablage = ablage ?: return
-        try {
+    /** Speichert die Liste; `false`, wenn es scheiterte (Speicher voll), der Fehler steht im Log. */
+    private fun save(): Boolean {
+        val ablage = ablage ?: return true
+        return try {
             ablage.save(liste)
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Serverliste nicht gespeichert", e)
+            false
         }
+    }
+
+    /** Ein neuer Server ließ sich nicht speichern: er wirkt bis zum Neustart (Review K10). */
+    private fun zeigeSpeicherfehler() {
+        Toast.makeText(context, SPEICHERN_FEHLGESCHLAGEN, Toast.LENGTH_LONG).show()
     }
 
     // Einstellungen
@@ -639,9 +648,10 @@ class AppModell(
         fabrik.deleteProfil(profil)
     }
 
+    /** Scheitert das Speichern, wirft es; `Serverentfernung` meldet den Fehler (Review K10). */
     override fun removeEintrag(id: String) {
         liste = liste.remove(id)
-        save()
+        ablage?.save(liste)
     }
 
     // Deeplink
@@ -744,6 +754,8 @@ class AppModell(
     companion object {
         private const val TAG = "Lifeline"
         private const val INITSKRIPT = "huelle.js"
+        internal const val SPEICHERN_FEHLGESCHLAGEN =
+            "Die Serverliste ließ sich nicht speichern. Nach einem Neustart fehlt dieser Server."
 
         /** Frist, in der eine Seite nach der Rückkehr auf `evaluateJavascript` antworten muss. */
         const val ANTWORT_FRIST_MS = 2_000L

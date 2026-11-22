@@ -197,6 +197,21 @@ class DownloadsTest {
         assertNull(fremd.takeRequest(1, TimeUnit.SECONDS)!!.getHeader("Cookie"))
     }
 
+    /** Review K5: eine Antwort über der Grenze legt nichts ab und füllt nicht den Speicher. */
+    @Test
+    fun `eine zu große Antwort legt keine Datei ab`() {
+        val server = testserver()
+        server.enqueue(MockResponse().setBody("inhalt"))
+        val ziel = server.url("/api/gross").toUri()
+
+        val fehler = runCatching {
+            runBlocking { Downloads.abrufen(Downloadanfrage(ziel, server = ziel.resolve("/"), cookie = null, null, null), downloads::ablegen, grenze = 4) }
+        }
+
+        assertTrue(fehler.isFailure)
+        assertFalse(ablage.exists() && ablage.listFiles()!!.any { it.listFiles()!!.isNotEmpty() })
+    }
+
     @Test
     fun `eine Fehlerantwort legt keine Datei ab`() {
         val server = testserver()

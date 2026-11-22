@@ -16,7 +16,6 @@ import dev.rubeen.lifeline.kern.Anmeldung
 import dev.rubeen.lifeline.kern.Deeplink
 import dev.rubeen.lifeline.kern.PKCE
 import dev.rubeen.lifeline.kern.ServerAdresse
-import java.lang.ref.WeakReference
 import java.net.URI
 
 /** Wie der Browser die Anmeldung zurückgibt. */
@@ -46,7 +45,6 @@ class Anmelder(
         val generation: Long,
         val verifier: String,
         val server: ServerAdresse,
-        val webView: WeakReference<WebView>,
         val weg: Anmeldeweg,
     ) {
         /** Die App lag im Hintergrund, während der Custom Tab offen war. */
@@ -66,7 +64,7 @@ class Anmelder(
     /** Startet eine Sitzung; eine laufende wird vorher abgebrochen. Wirft, wenn keine beginnt. */
     fun start() {
         val server = aktiverServer() ?: throw IllegalStateException(KEIN_SERVER)
-        val webView = webView() ?: throw IllegalStateException(KEIN_SERVER)
+        webView() ?: throw IllegalStateException(KEIN_SERVER)
         abbrechen()
         val verifier = PKCE.neuerVerifier()
         val ziel = Anmeldung.bestaetigungUrl(server, PKCE.challenge(verifier))
@@ -76,7 +74,7 @@ class Anmelder(
         } catch (e: ActivityNotFoundException) {
             throw IllegalStateException("Die Anmeldung im Browser ließ sich nicht starten.", e)
         }
-        val laufend = Laufend(generation, verifier, server, WeakReference(webView), weg)
+        val laufend = Laufend(generation, verifier, server, weg)
         zuletzt = laufend
         lauf.merke(generation, laufend)
     }
@@ -137,14 +135,16 @@ class Anmelder(
     }
 
     /**
-     * Nur die eigene Sitzung, nur im WebView, in dem sie begann, und nur, solange er noch der
-     * WebView der App ist (nach einem Serverwechsel ist er es nicht mehr).
+     * Nur die eigene Sitzung und nur im WebView des Servers, bei dem sie begann (nach einem
+     * Serverwechsel geht sie ins Leere). Hat die App den WebView inzwischen im selben Profil neu
+     * gebaut (Render-Prozess beendet, während der Browser vorn war), gilt der neue (Review K9);
+     * ob er auf der Anmeldeseite steht, prüft `Anmeldung.folge`.
      */
     private fun beende(generation: Long, ende: Anmeldung.Ende) {
         val laufend = lauf.beende(generation) ?: return
         abbruch?.let(handler::removeCallbacks)
         abbruch = null
-        val webView = laufend.webView.get()?.takeIf { it === webView() }
+        val webView = webView()?.takeIf { aktiverServer() == laufend.server }
         val skript = when (val folge = Anmeldung.folge(ende, webView?.url?.let(::uri), laufend.server)) {
             is Anmeldung.Folge.Einloesen -> Anmeldung.einloeseSkript(laufend.server, folge.code, laufend.verifier)
             is Anmeldung.Folge.Melden -> Anmeldung.meldungSkript(folge.ergebnis)

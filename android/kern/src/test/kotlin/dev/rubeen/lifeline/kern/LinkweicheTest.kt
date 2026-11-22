@@ -3,6 +3,8 @@ package dev.rubeen.lifeline.kern
 import java.net.URI
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Was der WebView mit einer Navigation tut. Die Regeln selbst prüft [LinkregelnTest]; hier steht,
@@ -81,5 +83,23 @@ class LinkweicheTest {
         )) {
             assertEquals(erwartet, Downloadablage.dateiname(vorschlag), vorschlag)
         }
+    }
+
+    /** Review K5: Dateisysteme erlauben 255 Byte je Name; die Endung bleibt, Umlaute bleiben ganz. */
+    @Test
+    fun `ein langer Dateiname wird gekürzt, die Endung bleibt`() {
+        val lang = Downloadablage.dateiname("Übergabeprotokoll Abschnitt Süd ".repeat(10) + ".pdf")
+        assertTrue(lang.toByteArray(Charsets.UTF_8).size <= Downloadablage.MAX_NAME_BYTES, lang)
+        assertTrue(lang.endsWith(".pdf"), lang)
+        assertTrue(lang.startsWith("Übergabeprotokoll Abschnitt Süd"), lang)
+        assertFalse('\uFFFD' in lang, lang)
+
+        val ohneEndung = Downloadablage.dateiname("ä".repeat(300))
+        assertEquals("ä".repeat(Downloadablage.MAX_NAME_BYTES / 2), ohneEndung)
+
+        // Eine überlange „Endung“ ist keine: dann wird einfach gekürzt.
+        val komisch = Downloadablage.dateiname("a." + "b".repeat(300))
+        assertEquals(Downloadablage.MAX_NAME_BYTES, komisch.toByteArray(Charsets.UTF_8).size)
+        assertEquals("kurz.pdf", Downloadablage.dateiname("kurz.pdf"))
     }
 }
