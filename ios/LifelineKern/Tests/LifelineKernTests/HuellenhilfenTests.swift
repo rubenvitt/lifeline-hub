@@ -78,6 +78,25 @@ final class HuellenhilfenTests: XCTestCase {
         XCTAssertEqual(gelesen.aktiv?.id, lager.id)
     }
 
+    /// Ein Eintrag, den die Adressprüfung heute ablehnt (etwa ein gesperrter Port, LLH-1987),
+    /// fällt beim Laden heraus; die übrigen Server bleiben, die Datei wird nicht beiseitegelegt.
+    func testEinUngueltigerEintragFaelltHerausDieUebrigenBleiben() throws {
+        let ablage = Serverablage(verzeichnis: try temporaeresVerzeichnis())
+        var liste = Serverliste()
+        let elw = liste.add(try ServerAdresse.parse("https://elw.local:8443"))
+        let lager = liste.add(try ServerAdresse.parse("https://lager.example:6001"))
+        try liste.activate(lager.id)
+        try ablage.save(liste)
+        let text = try String(contentsOf: ablage.datei, encoding: .utf8)
+        try text.replacingOccurrences(of: "lager.example:6001", with: "lager.example:6000")
+            .write(to: ablage.datei, atomically: true, encoding: .utf8)
+
+        let gelesen = ablage.loadOrRecover()
+        XCTAssertEqual(gelesen.eintraege.map(\.id), [elw.id])
+        XCTAssertNil(gelesen.aktiv)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: ablage.datei.path))
+    }
+
     func testEineKaputteDateiWirdBeiseitegelegtStattUeberschrieben() throws {
         let verzeichnis = try temporaeresVerzeichnis()
         let ablage = Serverablage(verzeichnis: verzeichnis)

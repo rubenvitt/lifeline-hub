@@ -49,8 +49,9 @@ Ohne gespeicherten Server zeigt die App nur das Onboarding („Kein Server einge
 Wege:
 
 - **Adresse eingeben**, zum Beispiel `https://elw.local:8443`. Angenommen wird nur `https` mit
-  Hostnamen und ohne Name/Passwort vor „@“; die Regeln und Meldungen sind dieselben wie in der
-  Desktop-App (gemeinsame Fälle unter `src-tauri/faelle/`).
+  Hostnamen und ohne Name/Passwort vor „@“, auf keinem Port, den der Webview sperrt (etwa 6000);
+  die Regeln und Meldungen sind dieselben wie in der Desktop-App (gemeinsame Fälle unter
+  `src-tauri/faelle/`).
 - **QR-Code scannen**: mit der Adresse oder mit dem Deeplink aus „Geräte verbinden“. Die App
   fragt dafür einmal nach der Kamera.
 - **Deeplink** `lifeline://verbinden?server=<https-Adresse, URL-kodiert>` (Vertrag wie in der
@@ -175,7 +176,9 @@ im Browser ein, nicht in der App.
 
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Datenspeicher des
 Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Die
-Serverliste liegt als `server.json` in Application Support der App, der Schalter „Haptik“ in den
+Serverliste liegt als `server.json` in Application Support der App; ein Eintrag, den die
+Adressprüfung inzwischen ablehnt (etwa auf einem gesperrten Port), fällt beim Laden heraus, die
+übrigen bleiben. Der Schalter „Haptik“ liegt in den
 Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Das
 Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit Grund CA92.1,
 kein Tracking und keine erhobenen Daten. Vorgaben für

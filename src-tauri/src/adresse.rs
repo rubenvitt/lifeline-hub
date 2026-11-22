@@ -3,6 +3,9 @@
 //! Nur `https` mit Hostnamen: Service Worker, Cache Storage und WebAuthn setzen einen Secure
 //! Context voraus. Dieselbe Prüfung gilt für die Erststart-Maske und den Deeplink — die Maske
 //! hat keine eigene Prüflogik in JS, sie zeigt die Meldung von hier.
+//!
+//! Ports, die der Webview sperrt, lehnt sie ebenfalls ab (LLH-1987): WebKit lädt dorthin nichts
+//! und meldet keinen Ladefehler, das Fenster bliebe leer.
 
 use std::fmt;
 
@@ -15,7 +18,20 @@ pub enum AdressFehler {
     KeinHttps,
     OhneHost,
     MitZugangsdaten,
+    GesperrterPort,
 }
+
+/// Ports, auf die WebKit nicht navigiert (`Source/WTF/wtf/URL.cpp`, `portAllowed`): die „bad
+/// ports“ der Fetch-Spezifikation und Port 0. WebView2 (Chromium) und WebKitGTK sperren dieselben.
+/// Aufsteigend sortiert; die gemeinsamen Fälle (`faelle/adresse.json`, `gesperrte_ports`) tragen
+/// dieselbe Liste für die iOS-Hülle.
+pub const GESPERRTE_PORTS: [u16; 83] = [
+    0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102,
+    103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465,
+    512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993,
+    995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668,
+    6669, 6679, 6697, 10080,
+];
 
 impl fmt::Display for AdressFehler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -30,6 +46,9 @@ impl fmt::Display for AdressFehler {
             AdressFehler::OhneHost => "Der Adresse fehlt der Hostname, z. B. elw.local.",
             AdressFehler::MitZugangsdaten => {
                 "Die Adresse darf keinen Namen und kein Passwort vor „@“ enthalten."
+            }
+            AdressFehler::GesperrterPort => {
+                "Diesen Port sperrt der Webview. Bitte den Server auf einem anderen Port betreiben, z. B. 8443."
             }
         })
     }
@@ -59,6 +78,13 @@ pub fn pruefe_adresse(eingabe: &str) -> Result<Url, AdressFehler> {
     if !url.username().is_empty() || url.password().is_some() {
         return Err(AdressFehler::MitZugangsdaten);
     }
+    // Der Standardport 443 fehlt in `port()`, er ist nie gesperrt.
+    if url
+        .port()
+        .is_some_and(|port| GESPERRTE_PORTS.binary_search(&port).is_ok())
+    {
+        return Err(AdressFehler::GesperrterPort);
+    }
     Ok(url)
 }
 
@@ -80,6 +106,9 @@ mod tests {
         #[allow(dead_code)]
         zweck: String,
         meldungen: BTreeMap<String, String>,
+        #[allow(dead_code)]
+        gesperrte_ports_quelle: String,
+        gesperrte_ports: Vec<u16>,
         faelle: Vec<Fall>,
     }
 
@@ -94,12 +123,13 @@ mod tests {
         fehler: Option<String>,
     }
 
-    const ALLE_FEHLER: [AdressFehler; 5] = [
+    const ALLE_FEHLER: [AdressFehler; 6] = [
         AdressFehler::Leer,
         AdressFehler::Unlesbar,
         AdressFehler::KeinHttps,
         AdressFehler::OhneHost,
         AdressFehler::MitZugangsdaten,
+        AdressFehler::GesperrterPort,
     ];
 
     /// Kennwort eines Fehlers in den gemeinsamen Fällen.
@@ -110,6 +140,7 @@ mod tests {
             AdressFehler::KeinHttps => "kein_https",
             AdressFehler::OhneHost => "ohne_host",
             AdressFehler::MitZugangsdaten => "mit_zugangsdaten",
+            AdressFehler::GesperrterPort => "gesperrter_port",
         }
     }
 
@@ -120,7 +151,7 @@ mod tests {
     #[test]
     fn jeder_gemeinsame_fall_gilt() {
         let faelle = datei().faelle;
-        assert!(faelle.len() >= 11, "nur {} Fälle gelesen", faelle.len());
+        assert!(faelle.len() >= 16, "nur {} Fälle gelesen", faelle.len());
         for fall in faelle {
             let ist = pruefe_adresse(&fall.eingabe);
             match (&fall.adresse, &fall.fehler) {
@@ -167,6 +198,25 @@ mod tests {
                     .iter()
                     .any(|fall| fall.fehler.as_deref() == Some(kennwort(&fehler))),
                 "kein Fall für {fehler:?}"
+            );
+        }
+    }
+
+    /// Die iOS-Hülle prüft gegen die Liste der gemeinsamen Fälle; `binary_search` braucht sie
+    /// aufsteigend.
+    #[test]
+    fn gesperrte_ports_gleichen_den_faellen_und_sind_sortiert() {
+        assert_eq!(datei().gesperrte_ports, GESPERRTE_PORTS.to_vec());
+        assert!(GESPERRTE_PORTS.windows(2).all(|paar| paar[0] < paar[1]));
+    }
+
+    #[test]
+    fn jeder_gesperrte_port_wird_abgelehnt() {
+        for port in GESPERRTE_PORTS {
+            assert_eq!(
+                pruefe_adresse(&format!("https://elw.local:{port}")),
+                Err(AdressFehler::GesperrterPort),
+                "Port {port}"
             );
         }
     }

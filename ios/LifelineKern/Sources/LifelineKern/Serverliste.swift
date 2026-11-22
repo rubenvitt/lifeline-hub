@@ -68,6 +68,27 @@ public struct Serverliste: Codable, Equatable, Sendable {
         eintraege[index].bestaetigterVertrag = vertrag
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case eintraege, aktivID
+    }
+
+    /// Ein Eintrag, den die Adressprüfung heute ablehnt (etwa ein gesperrter Port, LLH-1987),
+    /// fällt heraus, statt die ganze Liste unlesbar zu machen; wie `verbindung::bereinigt` der
+    /// Desktop-Hülle. War er aktiv, gilt kein Server als aktiv.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        eintraege = try container.decode([LossyEntry].self, forKey: .eintraege).compactMap(\.value)
+        aktivID = try container.decodeIfPresent(UUID.self, forKey: .aktivID)
+    }
+
+    private struct LossyEntry: Decodable {
+        let value: ServerEintrag?
+
+        init(from decoder: Decoder) throws {
+            value = try? ServerEintrag(from: decoder)
+        }
+    }
+
     private func eintrag(id: UUID) -> ServerEintrag? { eintraege.first { $0.id == id } }
 
     private func index(_ id: UUID) throws(ListError) -> Int {
