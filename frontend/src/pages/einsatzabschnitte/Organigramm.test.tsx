@@ -523,7 +523,10 @@ describe('Organigramm — Klappzustand im Container', () => {
         einheiten={{ zustand: 'fehler', daten: [] }}
       />,
     );
-    expect(screen.getByText('Einheiten: nicht geladen')).toBeInTheDocument();
+    // In der festen Sammelzeile, nicht als eigene Zeile über dem Baum (LLH-1927).
+    expect(
+      screen.getByText('Einheiten: nicht geladen').closest('[data-lfh="org-ohne-leitung"]'),
+    ).not.toBeNull();
     const knoten = screen
       .getByRole('link', { name: 'EA Nord' })
       .closest('[data-lfh="org-knoten"]') as HTMLElement;
@@ -593,7 +596,8 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
         einheiten={{ zustand: 'fehler', daten: [] }}
       />,
     );
-    expect(zeile(container)!.textContent).toBe('1 Abschnitt ohne Leitung');
+    // Vorne der Grund der fehlenden Einheiten (LLH-1927), dann nur die Abschnitte.
+    expect(zeile(container)!.textContent).toBe('Einheiten: nicht geladen1 Abschnitt ohne Leitung');
     // Alle Abschnitte besetzt, Einheiten unbekannt: kein „überall“.
     rerender(
       <Organigramm
@@ -602,7 +606,9 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
         einheiten={{ zustand: 'fehler', daten: [] }}
       />,
     );
-    expect(zeile(container)!.textContent).toBe('Alle Abschnitte mit Leitung');
+    expect(zeile(container)!.textContent).toBe(
+      'Einheiten: nicht geladenAlle Abschnitte mit Leitung',
+    );
   });
 
   it('folgt live, auch während die Schleuse hält, und behält ihre Höhe', () => {
@@ -634,6 +640,58 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     expect(zeile(container)!.style.height).toBe(hoehe);
   });
 
+  it('nennt fehlende Einheiten vorne in der Zeile, leise vor den Lücken (LLH-1927)', () => {
+    const { container, rerender } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={{ zustand: 'laden', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe('Einheiten: lädt1 Abschnitt ohne Leitung');
+    rerender(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })]}
+        einheiten={{ zustand: 'gesperrt', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe(
+      'Einheiten: nicht freigegebenAlle Abschnitte mit Leitung',
+    );
+  });
+
+  /**
+   * Akzeptanzkriterium LLH-1927: laden die Einheiten fertig, während der Zeiger über dem
+   * Organigramm ruht, bleibt die erste Ebene auf derselben Höhe. jsdom misst nicht; belegt wird,
+   * dass über dem Baum kein Element erscheint oder verschwindet und die Sammelzeile ihre Höhe hält.
+   */
+  it('hält die erste Ebene, wenn die Einheiten unter ruhendem Zeiger fertig laden (LLH-1927)', () => {
+    const { container, rerender } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={{ zustand: 'laden', daten: [] }}
+      />,
+    );
+    const baum = screen.getByRole('region', { name: 'Organigramm' });
+    const wurzel = container.querySelector('[data-lfh="druckwurzel"]') as HTMLElement;
+    const ueberDemBaum = () => {
+      const kinder = [...wurzel.children];
+      return kinder.slice(0, kinder.indexOf(baum));
+    };
+    const vorher = ueberDemBaum();
+    const hoehe = zeile(container)!.style.height;
+    fireEvent.pointerEnter(baum, { pointerType: 'mouse' });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    rerender(
+      <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
+    );
+    expect(screen.queryByText(/^Einheiten:/)).toBeNull();
+    expect(ueberDemBaum()).toEqual(vorher);
+    expect(zeile(container)!.style.height).toBe(hoehe);
+  });
+
   it('zeigt einen neuen Lagezustand sofort, auch wenn die Schleuse hält', () => {
     const { rerender } = renderMitProviders(
       <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
@@ -654,6 +712,31 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
       .closest('[data-lfh="org-knoten"]') as HTMLElement;
     expect(deich.querySelector('[data-lfh="org-lagezustand"]')).toHaveTextContent('kritisch');
     expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
+  });
+});
+
+describe('Organigramm — veralteter Stand (LLH-1927)', () => {
+  beforeEach(() => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
+  });
+
+  it('steht in der Standzeile des Organigramms und ruft von dort erneut ab', async () => {
+    const wiederholen = vi.fn();
+    renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={daten(EINHEITEN)}
+        veraltet={{ onWiederholen: wiederholen }}
+      />,
+    );
+    const stand = document.querySelector('[data-lfh="org-stand"]') as HTMLElement;
+    expect(within(stand).getByText('Stand womöglich veraltet')).toBeInTheDocument();
+    await userEvent.click(within(stand).getByRole('button', { name: 'Erneut abrufen' }));
+    expect(wiederholen).toHaveBeenCalledTimes(1);
   });
 });
 

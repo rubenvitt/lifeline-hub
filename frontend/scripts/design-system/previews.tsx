@@ -104,6 +104,7 @@ import {
   SeitenLeer,
   SeitenSkeleton,
   SeitenStandVeraltet,
+  StandVeraltetHinweis,
 } from '../../src/components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../../src/components/SpeicherHinweis';
 import { StornoBanner } from '../../src/components/StornoBanner';
@@ -1394,6 +1395,8 @@ function HinweisBeispiel() {
       <Alert type="info" showIcon title="Zeitachse: kein Status trägt ein Ereignis" />
       <Alert type="success" showIcon title="Lagebericht 3 freigegeben" />
       <SeitenStandVeraltet onWiederholen={nichts} />
+      {/* Kompakt für die Standzeile eines Baums mit Schleuse (LLH-1927). */}
+      <StandVeraltetHinweis onWiederholen={nichts} />
       <SpeicherFehler fehler={new NetzFehler()} />
     </div>
   );
