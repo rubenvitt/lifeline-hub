@@ -21,13 +21,15 @@ import dev.rubeen.lifeline.kern.ServerEintrag
 
 /**
  * Was ein WebView der App mitbekommt: das Init-Skript (mit eingesetzter Version), die Rückrufe der
- * Navigation und des Browsers und den Listener der Brücke.
+ * Navigation und des Browsers, den Listener der Brücke und den Empfang der Downloads
+ * (WebView, Adresse, `Content-Disposition`, Typ).
  */
 class Webviewbegleitung(
     val initskript: String,
     val client: WebViewClient,
     val chromeClient: WebChromeClient,
     val empfang: WebViewCompat.WebMessageListener,
+    val download: ((WebView, String, String?, String?) -> Unit)? = null,
 )
 
 /**
@@ -50,6 +52,9 @@ interface WebviewFabrik {
 
     /** Löscht das Profil [name] (Entwurf D3); wirft, solange ein WebView es benutzt. */
     fun deleteProfil(name: String)
+
+    /** Cookies aus dem Profil von [webView] für [url] (Downloads mit der Sitzung); im Hauptfaden. */
+    fun cookie(webView: WebView, url: String): String?
 }
 
 /** Die Fabrik des System-WebViews (`androidx.webkit`). */
@@ -87,6 +92,12 @@ object SystemWebviewFabrik : WebviewFabrik {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) return
         ProfileStore.getInstance().deleteProfile(name)
     }
+
+    override fun cookie(webView: WebView, url: String): String? {
+        // Ohne Profile baut die App keinen WebView; ein gemeinsamer Cookie-Speicher gilt nie.
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) return null
+        return WebViewCompat.getProfile(webView).cookieManager.getCookie(url)
+    }
 }
 
 /**
@@ -94,7 +105,8 @@ object SystemWebviewFabrik : WebviewFabrik {
  * Inhaltsanbieter, keine gemischten Inhalte, kein Nachfedern, Hintergrund in Kopf-Schwarz, damit
  * vor dem ersten Bild nichts weiß aufblitzt. Die Systemränder hält der Rahmen des WebViews frei
  * (`Wurzel`); der WebView selbst bekommt keine Insets, damit die Seite sie nicht noch einmal
- * abzieht. Neue Fenster laufen über `onCreateWindow` (`HuellenChromeClient`).
+ * abzieht. Neue Fenster laufen über `onCreateWindow` (`HuellenChromeClient`), Downloads ohne
+ * Darstellung über den `DownloadListener` (Entwurf D8).
  */
 @SuppressLint("SetJavaScriptEnabled")
 fun configureWebview(webView: WebView, begleitung: Webviewbegleitung) {
@@ -110,5 +122,10 @@ fun configureWebview(webView: WebView, begleitung: Webviewbegleitung) {
     webView.setBackgroundColor(Farben.kopfSchwarz.toArgb())
     webView.webViewClient = begleitung.client
     webView.webChromeClient = begleitung.chromeClient
+    begleitung.download?.let { download ->
+        webView.setDownloadListener { url, _, contentDisposition, mimetype, _ ->
+            download(webView, url, contentDisposition, mimetype)
+        }
+    }
     ViewCompat.setOnApplyWindowInsetsListener(webView) { _, _ -> WindowInsetsCompat.CONSUMED }
 }

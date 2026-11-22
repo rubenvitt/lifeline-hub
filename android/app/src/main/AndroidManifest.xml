@@ -16,6 +16,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="market" />
         </intent>
+        <!-- „Im Browser anmelden“ sucht einen Browser mit Custom Tabs bzw. Auth Tab (Entwurf D7). -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <!-- Kamera ist kein Muss: ohne sie bleibt die Eingabe der Adresse. -->
@@ -60,6 +64,17 @@
                 <data android:scheme="lifeline" android:host="anmeldung" />
             </intent-filter>
         </activity>
+
+        <!-- Downloads zum Teilen, nur aus `cacheDir/downloads/` (Entwurf D8). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.dateien"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/dateien" />
+        </provider>
 
         <!-- Nach einem Update der App (Entwurf D9). -->
         <receiver

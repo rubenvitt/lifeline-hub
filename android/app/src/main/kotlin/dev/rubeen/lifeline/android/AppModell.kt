@@ -7,7 +7,8 @@ import android.webkit.WebView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import dev.rubeen.lifeline.android.dienste.Platzhalterdienste
+import dev.rubeen.lifeline.android.dienste.Anmelder
+import dev.rubeen.lifeline.android.dienste.Downloads
 import dev.rubeen.lifeline.android.web.Brueckenempfang
 import dev.rubeen.lifeline.android.web.HuellenChromeClient
 import dev.rubeen.lifeline.android.web.HuellenClient
@@ -16,6 +17,8 @@ import dev.rubeen.lifeline.android.web.WebviewFabrik
 import dev.rubeen.lifeline.android.web.Webviewbegleitung
 import dev.rubeen.lifeline.android.web.uri
 import dev.rubeen.lifeline.kern.Ablauf
+import dev.rubeen.lifeline.kern.Anmeldung
+import dev.rubeen.lifeline.kern.Deeplink
 import dev.rubeen.lifeline.kern.EntfernungException
 import dev.rubeen.lifeline.kern.Entfernungsdienste
 import dev.rubeen.lifeline.kern.Fehlerklasse
@@ -62,7 +65,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param abrufen `GET /api/shell` (bei 404 dazu `/api/health`), [Vertragsabruf]
  * @param dienste Systemdienste der Brücke
  * @param oeffne öffnet eine Adresse im System
- * @param herunterladen lädt eine Dateiroute des Servers (Downloads)
+ * @param downloads lädt Dateirouten und Downloads des WebViews mit der Sitzung des Profils
+ * @param anmelder „Im Browser anmelden“; nimmt den Rücksprung `lifeline://anmeldung` an
  */
 class AppModell(
     val testzustand: Testzustand?,
@@ -74,9 +78,10 @@ class AppModell(
     private val fabrik: WebviewFabrik,
     private val ablage: Serverablage? = null,
     private val abrufen: suspend (ServerAdresse) -> Pair<ShellAbruf, String?> = Vertragsabruf()::abrufen,
-    dienste: Huellendienste = Platzhalterdienste,
+    dienste: Huellendienste,
     private val oeffne: (URI) -> Unit = {},
-    herunterladen: (WebView, URI) -> Unit = { _, _ -> },
+    private val downloads: Downloads? = null,
+    private val anmelder: Anmelder? = null,
 ) : Entfernungsdienste {
     val appVersion: String = if (testzustand != null) BEISPIEL_VERSION else version
     val build: String = (if (testzustand != null) BEISPIEL_BUILD else build).toString()
@@ -125,8 +130,12 @@ class AppModell(
     var onboardingHealthVersion: String? by mutableStateOf(null)
         private set
 
+    /** Ein Deeplink nennt einen gespeicherten, nicht aktiven Server: wechseln erst nach Rückfrage. */
+    var wechselRueckfrage: ServerEintrag? by mutableStateOf(null)
+
     /** Läuft „Im Browser anmelden“? Dann bleibt eine fremde Seite ohne Hinweis stehen. */
-    var anmeldungLaeuft: () -> Boolean = { false }
+    private val anmeldungLaeuft: Boolean
+        get() = anmelder?.isLaufend == true
 
     /** Profil des [webView] (die Id seines Eintrags). */
     private var webViewProfil: String? = null
@@ -142,7 +151,7 @@ class AppModell(
         aktiverServer = { liste.aktiv?.adresse },
         melde = ::melde,
         oeffne = { oeffne(it) },
-        herunterladen = herunterladen,
+        herunterladen = { view, ziel -> downloads?.herunterladen(view, ziel.toString(), null, null) },
     )
     private val chromeClient = HuellenChromeClient(client::neuesFenster)
     private val empfang = Brueckenempfang(
@@ -324,7 +333,8 @@ class AppModell(
     }
 
     private fun build(eintrag: ServerEintrag): WebView {
-        val neu = fabrik.build(context, eintrag, Webviewbegleitung(initskript, client, chromeClient, empfang))
+        val begleitung = Webviewbegleitung(initskript, client, chromeClient, empfang, downloads?.let { it::herunterladen })
+        val neu = fabrik.build(context, eintrag, begleitung)
         webView = neu
         webViewProfil = eintrag.id
         webViewBeendet = false
@@ -355,9 +365,11 @@ class AppModell(
     fun phase(phase: Rueckkehr.Phase) {
         if (!rueckkehr.melde(phase) || testzustand != null) return
         val gefragt = webView
+        // Jetzt, nicht nach der Antwortfrist: ein abgebrochener Custom Tab endet in ihr.
+        val laeuft = anmeldungLaeuft
         scope.launch {
             val antwortet = gefragt?.let { isResponsive(it) } ?: false
-            send(Ablauf.Event.Vordergrund(antwortet, gefragt?.url?.let(::uri), anmeldungLaeuft()))
+            send(Ablauf.Event.Vordergrund(antwortet, gefragt?.url?.let(::uri), laeuft))
         }
     }
 
@@ -397,6 +409,7 @@ class AppModell(
     }
 
     fun wechseln(eintrag: ServerEintrag) {
+        wechselRueckfrage = null
         if (eintrag.id == inEntfernung) return
         zeigtServerliste = false
         liste = try {
@@ -499,6 +512,43 @@ class AppModell(
     override fun removeEintrag(id: String) {
         liste = liste.remove(id)
         save()
+    }
+
+    // Deeplink
+
+    /**
+     * Links von außen (Intent `ACTION_VIEW`, Entwurf D2). `lifeline://verbinden` geht in die
+     * Entscheidung des Kerns: ein unbekannter Server wird im Onboarding vorbelegt, ein
+     * gespeicherter erst nach Rückfrage gewechselt, der aktive bleibt. Den Rücksprung
+     * `lifeline://anmeldung` nimmt nur eine laufende Anmeldung an ([Anmelder.ruecksprung]); sonst
+     * bleibt er wirkungslos, wie jeder andere Link.
+     */
+    fun open(link: String) {
+        if (isRuecksprung(link)) {
+            anmelder?.ruecksprung(link)
+            return
+        }
+        val adresse = Deeplink.parse(link) ?: return
+        when (val aktion = Deeplink.decide(liste.aktiv?.adresse, liste.eintraege.map { it.adresse }, adresse)) {
+            is Deeplink.Aktion.Vorbelegen -> {
+                val alsBlatt = seite != Ablauf.Seite.Onboarding
+                // Ein Blatt beginnt von vorn wie „Server hinzufügen“; offene Einstellungen verdecken es nicht.
+                if (alsBlatt && !zeigtOnboarding) onboarding = Onboarding.State.START
+                send(Onboarding.Event.Vorbelegen(aktion.adresse))
+                if (alsBlatt) {
+                    zeigtEinstellungen = false
+                    zeigtOnboarding = true
+                }
+            }
+            is Deeplink.Aktion.Bestaetigen -> wechselRueckfrage = liste.eintragFuer(aktion.adresse)
+            Deeplink.Aktion.Nichts -> Unit
+        }
+    }
+
+    /** `lifeline://anmeldung…`: Schema und Host des Rücksprungs, ob gültig oder nicht. */
+    private fun isRuecksprung(link: String): Boolean {
+        val uri = uri(link) ?: return false
+        return uri.scheme.equals(Deeplink.SCHEMA, ignoreCase = true) && uri.rawAuthority == Anmeldung.RUECKSPRUNG_HOST
     }
 
     // Testzustände der Bilder

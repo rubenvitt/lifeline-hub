@@ -29,12 +29,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -66,7 +68,8 @@ import dev.rubeen.lifeline.kern.text
 /**
  * Wurzel der Hülle (wie `RootView`): die Seite, die `Ablauf` festlegt, und darüber die nativen
  * Seiten Serverliste, Onboarding für einen weiteren Server und Einstellungen. Zurück schließt die
- * oberste native Seite (Entwurf D6; `MainActivity` mit `AppModell.zurueckTaste`).
+ * oberste native Seite (Entwurf D6; `MainActivity` mit `AppModell.zurueckTaste`). Nennt ein
+ * Deeplink einen gespeicherten Server, fragt sie vor dem Wechsel.
  */
 @Composable
 fun Wurzel(modell: AppModell) {
@@ -113,7 +116,33 @@ fun Wurzel(modell: AppModell) {
             )
             else -> AblaufSeite(modell)
         }
+        modell.wechselRueckfrage?.let { eintrag ->
+            WechselRueckfrage(
+                name = modell.aktuell(eintrag).name,
+                adresse = eintrag.adresse.text,
+                onWechseln = { modell.wechseln(modell.aktuell(eintrag)) },
+                onAbbrechen = { modell.wechselRueckfrage = null },
+            )
+        }
     }
+}
+
+/** Rückfrage vor dem Wechsel per Deeplink (wie `confirmationDialog` in `RootView`). */
+@Composable
+private fun WechselRueckfrage(name: String, adresse: String, onWechseln: () -> Unit, onAbbrechen: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onAbbrechen,
+        title = { Text("Server wechseln?") },
+        text = { Text("Ein Link möchte die App mit $adresse verbinden.") },
+        confirmButton = {
+            TextButton(onClick = onWechseln, modifier = Modifier.testTag("wechsel-bestaetigen")) {
+                Text("Zu „$name“ wechseln")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onAbbrechen) { Text("Abbrechen") }
+        },
+    )
 }
 
 @Composable

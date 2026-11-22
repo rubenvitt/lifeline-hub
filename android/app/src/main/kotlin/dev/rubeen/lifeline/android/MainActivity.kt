@@ -14,6 +14,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import dev.rubeen.lifeline.android.dienste.Anmeldebrowser
+import dev.rubeen.lifeline.android.dienste.Anmelder
+import dev.rubeen.lifeline.android.dienste.Downloads
+import dev.rubeen.lifeline.android.dienste.Systemdienste
 import dev.rubeen.lifeline.android.ui.LifelineThema
 import dev.rubeen.lifeline.kern.Rueckkehr
 import dev.rubeen.lifeline.kern.Serverablage
@@ -24,11 +28,13 @@ import java.net.URI
 /**
  * Einzige Activity der Hülle: randlos auf Kopf-Schwarz mit hellen Symbolen in den Systemleisten
  * (Entwurf D6); der Inhalt hält sich an die Insets. Ein Testzustand im Intent
- * ([Testzustand.EXTRA]) zeigt seine Seite mit Beispieldaten.
+ * ([Testzustand.EXTRA]) zeigt seine Seite mit Beispieldaten. `singleTask`: Deeplinks und der
+ * Rücksprung der Anmeldung kommen als neues Intent in dieselbe Activity ([AppModell.open]).
  */
 class MainActivity : ComponentActivity() {
     internal lateinit var modell: AppModell
         private set
+    private lateinit var anmelder: Anmelder
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dunkle Leisten: helle Symbole, unabhängig vom Systemmodus.
@@ -38,17 +44,32 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         val testzustand = Testzustand.from(intent.getStringExtra(Testzustand.EXTRA))
+        val fabrik = (application as LifelineApp).webviewFabrik
+        val einstellungen = getSharedPreferences("lifeline", MODE_PRIVATE)
+        // Die Dienste lesen das Modell erst beim Aufruf; ihre Activity-Ergebnisse melden sie hier
+        // an, vor dem Start der Activity.
+        val browser = Anmeldebrowser(this) { code, adresse -> anmelder.authTabErgebnis(code, adresse) }
+        anmelder = Anmelder(
+            webView = { modell.webView },
+            aktiverServer = { modell.liste.aktiv?.adresse },
+            oeffne = browser::open,
+        )
+        val downloads = Downloads(this, lifecycleScope, aktiverServer = { modell.liste.aktiv?.adresse }, cookie = fabrik::cookie)
+        val dienste = Systemdienste(this, webView = { modell.webView }, anmelder, downloads, einstellungen)
         modell = AppModell(
             testzustand = testzustand,
             version = BuildConfig.VERSION_NAME,
             build = BuildConfig.VERSION_CODE,
             // Im Testzustand speichert die App nichts.
-            einstellungen = if (testzustand == null) getSharedPreferences("lifeline", MODE_PRIVATE) else null,
+            einstellungen = if (testzustand == null) einstellungen else null,
             scope = lifecycleScope,
             context = this,
-            fabrik = (application as LifelineApp).webviewFabrik,
+            fabrik = fabrik,
             ablage = if (testzustand == null) Serverablage(File(filesDir, "lifeline")) else null,
+            dienste = dienste,
             oeffne = ::oeffne,
+            downloads = downloads,
+            anmelder = anmelder,
         )
         // Zurück (Entwurf D6): native Seite schließen, im WebView zurück, sonst in den Hintergrund;
         // die App endet nicht und führt nicht ins Onboarding. Der QR-Scanner hängt sich davor.
@@ -58,9 +79,15 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(
             LifecycleEventObserver { _, ereignis ->
                 when (ereignis) {
-                    Lifecycle.Event.ON_RESUME -> modell.phase(Rueckkehr.Phase.ACTIVE)
+                    Lifecycle.Event.ON_RESUME -> {
+                        modell.phase(Rueckkehr.Phase.ACTIVE)
+                        anmelder.rueckkehr()
+                    }
                     Lifecycle.Event.ON_PAUSE -> modell.phase(Rueckkehr.Phase.INACTIVE)
-                    Lifecycle.Event.ON_STOP -> modell.phase(Rueckkehr.Phase.BACKGROUND)
+                    Lifecycle.Event.ON_STOP -> {
+                        modell.phase(Rueckkehr.Phase.BACKGROUND)
+                        anmelder.verlassen()
+                    }
                     else -> Unit
                 }
             },
@@ -71,9 +98,24 @@ class MainActivity : ComponentActivity() {
             }
         }
         modell.start()
+        // Nach einem Neubau der Activity ist das Intent schon ausgewertet.
+        if (savedInstanceState == null) open(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        open(intent)
+    }
+
+    /** Ein Link von außen (`lifeline://verbinden`, `lifeline://anmeldung`). */
+    private fun open(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        intent.dataString?.let(modell::open)
     }
 
     override fun onDestroy() {
+        anmelder.abbrechen()
         modell.beenden()
         super.onDestroy()
     }

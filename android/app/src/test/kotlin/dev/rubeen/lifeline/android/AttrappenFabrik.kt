@@ -36,4 +36,6 @@ class AttrappenFabrik(private val tauglich: Boolean = true) : WebviewFabrik {
     override fun deleteProfil(name: String) {
         geloescht += name
     }
+
+    override fun cookie(webView: WebView, url: String): String? = null
 }
