@@ -144,3 +144,86 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/qy62952x1hckdlfqz5scij6n
 - [x] **Step 5: Bilder** — Anmeldeseite 390 px Touch vorher/nachher (Wegwerf-Spec unter
   `e2e/doku-bilder/zz-qy62952x.bilder.ts`, nicht committen) und in PR und Meldung.
 - [x] **Step 6: Commit, Push, PR** gegen `alpha`, Label `voll`, mit Design-Doc, Plan und Teil 1.
+
+---
+
+## Teil 2 — LLH-2045 Feldetikett
+
+Zunder: https://zunder.rubeen.dev/#/aufgabe/vwulh266sj8l1alikldyhqra
+
+Stand `alpha` 58d281fd. Sichtung der 67 Augenbrauen-Aufrufe: neun benennen ein Feld und werden
+`Feldetikett`, der Rest sind Köpfe (Paneel, Kennzahl, Bereich, Gruppe, Abschnitt) und bleibt.
+Umgestellt werden: `Datenraster.tsx:61` (`Datenfeld`), `DatenfeldEingabe.tsx:71`,
+`components/FeldLabel.tsx` (Versalien in `token.fontSizeSM`), `EinsatzdatenPage.tsx:416` (Angabe im
+Fugenraster) und `:464`, `lagekarte/Inspector.tsx:141` und `:273` („Koordinate“),
+`components/Datensicht.tsx:2715` (Feld der Kartenansicht), `lageberichte/LageberichtUebersicht.tsx:148`
+(Kernfeld über dem Auszug, steht unter einem `Datenraster`). Bleiben: u. a. „Letzte Meldung“
+(Inspector, Block), Kennzahl-Titel der Ausgabe („Soll“ …), Gruppenköpfe der Kräfte, Feldgruppe
+„davon Sonderkost“. Die Kontrast-e2e (`hellmodus-kontrast`) und `pegel-pruefliste` messen nur
+Köpfe (Bereichskopf, Paneel, Kennzahl) und bleiben unberührt.
+
+**Review Focus (Teil 2):**
+1. Ein `label` im `dt` verliert seine Assoziation (`htmlFor`) → Task 5 prüft `getByLabelText`.
+2. `FeldLabel` ändert den Accessible Name, weil das Etikett das Feld umschließt → bleibt über dem
+   Feld, `htmlFor`, Test prüft Name exakt.
+3. Höhe pro Datenfeld +2,6 px (12 × 1,3 statt 10 × 1,3): Handy-Specs mit „erste Karte im Bild“
+   → Risiko-Specs in Task 6.
+
+### Task 4: Baustein `Feldetikett`, Augenbraue ohne `dt`
+
+**Files:**
+- Create: `frontend/src/components/instrument/Feldetikett.tsx`, `Feldetikett.test.tsx`
+- Modify: `components/instrument/index.ts`, `Augenbraue.tsx`, `Augenbraue.test.tsx`
+
+**Interfaces:**
+- Produces: `export default function Feldetikett(props: FeldetikettProps)`,
+  `export function feldetikettStil(rollen: Pick<Farbrollen, 'gedaempft'>): CSSProperties`,
+  `export type FeldetikettElement = 'span' | 'div' | 'dt' | 'label'`; Props `children`, `als?`
+  (Vorgabe `span`), `htmlFor?` (nur bei `label`), `id?`, `className?` — **kein `style`**. Rendert
+  `data-lfh="feldetikett"`, Stil `schriftStil('textKlein')`, `lineHeight: 1.3`, Farbe
+  `rollen.gedaempft`, `margin: 0`, keine Versalien, keine Sperrung.
+- `AugenbraueElement` ohne `'dt'`.
+
+- [ ] **Step 1: Tests** `Feldetikett.test.tsx`: `it('benennt ein Feld: 12 px, gemischt, ohne Sperrung, gedämpft')`
+  (fontSize `12px`, textTransform leer, letterSpacing leer, color = `gedaempft` des hellen Modus,
+  Text im DOM unverändert); `it('als label trägt es htmlFor')` (`getByLabelText` findet das Feld);
+  `it('als dt steht es im dl')` (tagName `DT`). In `Augenbraue.test.tsx`:
+  `// @ts-expect-error — ein Feld benennt das Feldetikett (LLH-2045)` vor `<Augenbraue als="dt">`.
+- [ ] **Step 2: rot sehen** — `mise exec -- pnpm -C frontend exec vitest run src/components/instrument/Feldetikett.test.tsx src/components/instrument/Augenbraue.test.tsx`
+  → FAIL (Modul fehlt) und Typecheck `mise exec -- pnpm -C frontend exec tsc -b --noEmit` meldet die
+  unbenutzte `@ts-expect-error`.
+- [ ] **Step 3: umsetzen**; Kopfkommentar der Augenbraue: Köpfe, nicht Felder.
+- [ ] **Step 4: grün sehen** — beide Läufe; Typecheck ist erst nach Task 5 grün (die vier `als="dt"`
+  kompilieren nicht mehr), deshalb Task 4 und 5 in einem Commit.
+
+### Task 5: Träger auf `Feldetikett`
+
+**Files:** die neun Stellen oben; Tests `components/FeldLabel.test.tsx`,
+`instrument/Datenraster.test.tsx`, `instrument/DatenfeldEingabe.test.tsx`.
+
+- [ ] **Step 1: Tests** — `FeldLabel.test.tsx`: Etikett gemischt (textTransform leer, fontSize `12px`,
+  `data-lfh="feldetikett"`), Name des Felds exakt der Text. `Datenraster.test.tsx`: das `dt` eines
+  `Datenfeld` trägt `data-lfh="feldetikett"`, keine Klasse `lfh-augenbraue`.
+  `DatenfeldEingabe.test.tsx`: dasselbe, und `getByLabelText(label)` findet die Eingabe.
+- [ ] **Step 2: rot sehen** — die drei Dateien → FAIL.
+- [ ] **Step 3: umstellen.** Abstand, den vorher `style` an der Augenbraue trug (`display: block`,
+  `marginBottom`), trägt ein umgebendes `div` bzw. `als="div"`. Kommentare, die „Augenbraue“ für
+  das Feld nennen, ziehen mit (Datenraster-Prop-Doku, Datensicht, Einsatzdaten).
+- [ ] **Step 4: grün sehen** — die drei Dateien, dann `vitest run src/components src/pages/lagekarte src/pages/EinsatzdatenPage src/lageberichte`
+  und Typecheck → PASS.
+- [ ] **Step 5: Commit** `feat(frontend): Feldetikett benennt Felder, Augenbraue bleibt Köpfen (LLH-2045)`.
+
+### Task 6: Regel, Design System, Doku-Bilder, Gate, PR
+
+- [ ] **Step 1: Regel** in `frontend/AGENTS.md`, „Bausteine“: `Feldetikett` (Feldname, gemischt,
+  `textKlein`/`gedaempft`, `als="dt"|"label"`) neben `Augenbraue` (nur Köpfe; benennt kein Feld).
+- [ ] **Step 2: Design System** neu erzeugen (`mise exec -- pnpm -C frontend design-system`).
+- [ ] **Step 3: Anwender-Bilder** alle neu (`mise exec -- pnpm doku:bilder` in `frontend/`, nach
+  `cargo build`), nur geänderte Bilder committen; Abweichungen ohne Bezug zum Etikett prüfen.
+- [ ] **Step 4: Gate** `VITEST_WORKERS=4 ./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [ ] **Step 5: Risiko-Specs lokal:** `betroffene-handy`, `dialoge-handy`, `leisten-flaeche`,
+  `datensicht-schmal`, `hellmodus-kontrast`, `pegel-pruefliste`, `kopfzeile-schmal`,
+  `meldebild-tabelle`, `gate1-ueberlauf` sowie jede Spec, die `Einsatzdaten` oder den
+  Lagekarten-Inspector misst (Grep nach `datenfeld`, `einsatzdaten`, `auswahl-`) → grün.
+- [ ] **Step 6: Bilder** vorher/nachher (Einsatzdaten-Datenraster, Bearbeiten-Modus,
+  Lagekarten-Inspector), Commit, Push, PR gegen `alpha` mit Label `voll`.
