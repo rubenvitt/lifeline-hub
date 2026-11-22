@@ -12056,6 +12056,53 @@
           "gegenstelle_kennt_aelteres"
         ]
       },
+      "IosPushStand": {
+        "type": "object",
+        "description": "Stand von iOS-Push für dieses Gerät.",
+        "required": [
+          "eingeschaltet",
+          "angemeldet",
+          "inhalt",
+          "stumm",
+          "relais_gesperrt"
+        ],
+        "properties": {
+          "angemeldet": {
+            "type": "boolean",
+            "description": "Dieses Gerät ist für den angemeldeten Nutzer angemeldet."
+          },
+          "eingeschaltet": {
+            "type": "boolean",
+            "description": "Die Instanz verschickt iOS-Push (`--ios-push`); sonst antworten die Routen 404, das Feld\nist also in einer Antwort stets `true`."
+          },
+          "inhalt": {
+            "type": "boolean",
+            "description": "Die Anmeldung zeigt Absender und Wortlaut; ohne Anmeldung `false`."
+          },
+          "relais_gesperrt": {
+            "type": "boolean",
+            "description": "Das Relais hat diese Instanz gesperrt; Anmeldungen bleiben, es geht aber nichts hinaus."
+          },
+          "stumm": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungArt"
+            },
+            "description": "Die stummen Eingangsarten dieses Geräts, in Katalogreihenfolge; ohne Anmeldung leer."
+          },
+          "ueber_hub": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PushUeberHub",
+                "description": "Push für diesen Nutzer läuft über einen gekoppelten Hub; ein neues Gerät lehnt der Server\ndann mit 422 ab."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "JetztAktualisierenAntwort": {
         "type": "object",
         "required": [

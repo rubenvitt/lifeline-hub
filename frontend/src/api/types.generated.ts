@@ -4809,6 +4809,23 @@ export interface components {
          * @enum {string}
          */
         InstanzZertifikatZustand: "bestaetigt" | "passt_nicht" | "gegenstelle_kennt_aelteres";
+        /** @description Stand von iOS-Push für dieses Gerät. */
+        IosPushStand: {
+            /** @description Dieses Gerät ist für den angemeldeten Nutzer angemeldet. */
+            angemeldet: boolean;
+            /**
+             * @description Die Instanz verschickt iOS-Push (`--ios-push`); sonst antworten die Routen 404, das Feld
+             *     ist also in einer Antwort stets `true`.
+             */
+            eingeschaltet: boolean;
+            /** @description Die Anmeldung zeigt Absender und Wortlaut; ohne Anmeldung `false`. */
+            inhalt: boolean;
+            /** @description Das Relais hat diese Instanz gesperrt; Anmeldungen bleiben, es geht aber nichts hinaus. */
+            relais_gesperrt: boolean;
+            /** @description Die stummen Eingangsarten dieses Geräts, in Katalogreihenfolge; ohne Anmeldung leer. */
+            stumm: components["schemas"]["BenachrichtigungArt"][];
+            ueber_hub?: components["schemas"]["PushUeberHub"] | null;
+        };
         JetztAktualisierenAntwort: {
             phase: components["schemas"]["JetztPhase"];
         };

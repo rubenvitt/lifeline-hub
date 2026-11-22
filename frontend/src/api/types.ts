@@ -170,6 +170,7 @@ export type BenachrichtigungVorgabeArt = S['BenachrichtigungVorgabeArt'];
 export type VorgabeFunktion = S['VorgabeFunktion'];
 /** Antwort von `GET /api/web-push` (LLH-1223): Schlüssel der Instanz, Abo dieser Sitzung. */
 export type WebPushStand = S['WebPushStand'];
+export type IosPushStand = S['IosPushStand'];
 
 // ============================== Karten-/Anzeige-Defaults ==============================
 export type BasemapModus = S['BasemapModus'];

@@ -306,6 +306,8 @@ pub async fn deaktivieren(
         .execute(&mut *tx)
         .await?;
     let beendet = session::alle_loeschen(&mut tx, id).await?;
+    // Mit dem Konto gehen die iOS-Anmeldungen (LLH-2040).
+    crate::ios_push::repo::loeschen_fuer_benutzer(&mut tx, id).await?;
     // Unterschriftsschlüssel gehen mit dem Konto (LLH-1490, Spec `org-admin-unterschrift`).
     let schluessel = crate::auth::unterschrift::repo::alle_des_benutzers_widerrufen(
         &mut tx,
