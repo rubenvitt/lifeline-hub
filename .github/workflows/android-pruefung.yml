@@ -1,0 +1,91 @@
+# Android-Prüfung (LLH-1989, Entwurf D10): an einem PR, der die Android-Hülle, ihre Skripte oder
+# die gemeinsamen Fälle der Hüllen ändert, und nach jedem solchen Push auf `alpha`: auf
+# `ubuntu-latest` die App-Tests unter Robolectric fahren, die Release-APK ohne Signatur bauen, den
+# Kotlin-Kern testen und die Bildschirmbilder jeder nativen Seite als Artefakt `android-bilder`
+# ablegen (Bilder der Änderung für den PR). Ohne grünen Lauf ist App-Code nicht fertig.
+#
+# KEIN PFLICHT-CHECK: Pflicht sind nur die Checks in `scripts/ruleset-pruefen.sh` (ADR-0048). Ein
+# PR ohne solche Änderungen startet keinen Lauf (Pfadfilter). Der Kern läuft zusätzlich in
+# `suiten.yml` (Job `android`).
+#
+# EIN WORKFLOW JE EREIGNIS (ADR-0048): hier nur `pull_request` und der Aufruf; den Push auf `alpha`
+# fängt `android-pruefung-alpha.yml` und ruft diesen Workflow mit denselben Jobs, ohne `if`. Dort
+# belegt der Lauf den Stand nach dem Merge, den `android.yml` beim nächsten Release signiert.
+#
+# Versionen: JDK, SDK-Plattform und Build-Tools aus `scripts/android/sdk-version.sh`; das SDK
+# bringt der Runner mit, fehlende Pakete lädt `scripts/android/sdk-installieren.sh`. Signiert wird
+# hier nie, die Geheimnisse bekommt nur `android.yml`.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
+name: Android-Prüfung
+
+on:
+  pull_request:
+    paths:
+      - "android/**"
+      - "src-tauri/faelle/**"
+      - "scripts/android/**"
+      - ".github/workflows/android-pruefung.yml"
+  workflow_call:
+
+# Least privilege: der Lauf liest nur und legt Artefakte ab.
+permissions:
+  contents: read
+
+env:
+  # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an (Testnamen als Satz); unter der
+  # Locale C scheitert das.
+  LC_ALL: C.UTF-8
+
+jobs:
+  app:
+    name: Android-App
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Ein neuer Push auf den PR (oder auf `alpha`) ersetzt den laufenden Lauf; der jüngste Stand
+    # deckt die früheren ab. Auf Job-Ebene, weil der Workflow auch aufgerufen wird; `github.ref`
+    # ist dann die des Aufrufers.
+    concurrency:
+      group: android-pruefung-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Werkzeugversionen
+        id: versionen
+        run: ./scripts/android/sdk-version.sh | tee -a "$GITHUB_OUTPUT" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/libs.versions.toml
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Android-SDK ergänzen
+        run: ./scripts/android/sdk-installieren.sh
+      - name: App-Tests und Release-APK (ohne Signatur)
+        run: ./android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease --console=plain
+      - name: Kotlin-Kern
+        run: ./android/gradlew -p android/kern test --console=plain
+      - name: Bildschirmbilder
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-bilder
+          path: android/app/build/bilder/
+          if-no-files-found: warn
+          retention-days: 14
+      # Zur Diagnose nur bei Rot.
+      - name: Testberichte
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-testberichte
+          path: |
+            android/app/build/reports/tests/
+            android/kern/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 3

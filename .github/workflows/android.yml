@@ -1,0 +1,260 @@
+# Android-App (LLH-1989, Entwurf D9): den Tag auschecken, die Release-APK bauen und signieren
+# (`scripts/android/release-apk.sh`, lokal genauso), ans versionierte Release hängen und die
+# Update-Kanäle fortschreiben (`scripts/release/android-kanal.mjs`). Betrieb, Schlüssel und
+# Geheimnisse: docs/betrieb/android-app.md.
+#
+# Zwei Auslöser, kein PR und kein Push (ADR-0048; dieselbe Form wie ios.yml):
+#
+# - `workflow_call` aus artefakte.yml (Job `android`), NACH der Freigabe jedes Tags der Kanäle
+#   `alpha`, `beta` und `main`. Der Job steht in keinem `needs` von `freigeben`: ein roter Bau
+#   oder fehlende Geheimnisse halten weder Release noch Deployment auf, es fehlt nur die APK
+#   dieses Tags (wie `ios`).
+# - `workflow_dispatch` als Handstart, etwa nachdem die Geheimnisse angelegt sind.
+#
+# Was wohin kommt (Entwurf D9):
+#
+# - Ans versionierte Release: `lifeline-hub-android-<version>.apk` und `.sha256`; bei stabilen
+#   Tags dazu `android.json` und `lifeline-hub-android.apk`, also unter
+#   `…/releases/latest/download/` (dort liest die stabile App).
+# - In die Kanal-Releases `android-alpha` und `android-beta` (Vorabversion, nie „latest“, Tag ohne
+#   `v`, damit semantic-release und pr-kommentare.mjs sie übergehen; beim ersten Mal angelegt):
+#   `android.json` nur vorwärts, jeder Vorabkanal nur seine eigenen, stabile beide; die feste
+#   `lifeline-hub-android.apk` (QR-Code an der Wand) ersetzen nur Tags des eigenen Kanals. Ein
+#   Job je Kanal mit eigener Nebenläufigkeitsgruppe, damit zwei Releases einen Kanal nie
+#   gleichzeitig schreiben. Ein Entwurf (Handstart vor der Freigabe) schreibt keinen Kanal: seine
+#   Download-URLs erreichten nur Berechtigte.
+#
+# Signiert wird mit EINEM Schlüssel für immer (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD); fehlt eins, wird der Job rot, es entsteht nie eine
+# unsignierte APK am Release. Ohne Cache: der Release-Bau übernimmt nichts aus anderen Läufen.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
+name: Android-App (APK)
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Freigegebener Release-Tag der Kanäle alpha, beta oder main (vorbereiten in artefakte.yml)'
+        required: true
+        type: string
+      version:
+        description: 'Version ohne v'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release-Tag, dessen APK gebaut und abgelegt werden soll, z. B. v1.0.0-alpha.196, v1.0.0-beta.3 oder v1.0.0'
+        required: true
+        type: string
+
+# Least privilege: nur die Jobs, die ans Release schreiben, bekommen `contents: write`.
+permissions:
+  contents: read
+
+env:
+  # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an; unter der Locale C scheitert das.
+  LC_ALL: C.UTF-8
+
+jobs:
+  bauen:
+    name: APK bauen und signieren
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.pruefen.outputs.version }}
+      version_code: ${{ steps.apk.outputs.version_code }}
+      sha256: ${{ steps.apk.outputs.sha256 }}
+    # Je Tag ein Bau zur Zeit; ein zweiter wartet.
+    concurrency:
+      group: android-apk-${{ inputs.tag }}
+      cancel-in-progress: false
+    steps:
+      # Bei einem Handstart ist der Tag freie Eingabe: erst gegen das Muster prüfen, dann an
+      # `actions/checkout` geben. Den Kanal prüft danach das Skript.
+      - name: Tag prüfen
+        id: pruefen
+        env:
+          ROH_TAG: ${{ inputs.tag }}
+          ROH_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "FEHLER: '$ROH_TAG' ist kein zulässiger Release-Tag (erwartet: vX.Y.Z[-vorab])." >&2
+            exit 1
+          fi
+          if [ -n "$ROH_VERSION" ] && [ "$ROH_VERSION" != "${ROH_TAG#v}" ]; then
+            echo "FEHLER: Version '$ROH_VERSION' passt nicht zum Tag '$ROH_TAG'." >&2
+            exit 1
+          fi
+          echo "version=${ROH_TAG#v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Werkzeugversionen
+        id: versionen
+        run: ./scripts/android/sdk-version.sh | tee -a "$GITHUB_OUTPUT" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
+      - name: Android-SDK ergänzen
+        run: ./scripts/android/sdk-installieren.sh
+      - name: Bauen, signieren, prüfen
+        id: apk
+        env:
+          TAG: ${{ inputs.tag }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./scripts/android/release-apk.sh --tag "$TAG" --ausgabe "$RUNNER_TEMP/versand"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-apk
+          path: ${{ runner.temp }}/versand/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Versioniertes Release: erst die APK, dann das Manifest, das auf sie zeigt. Danach die Kanäle,
+  # die dieses Release fortschreibt, als Liste für den Job `kanal`.
+  ablegen:
+    name: APK ans Release hängen
+    needs: bauen
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      kanaele: ${{ steps.kanaele.outputs.kanaele }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          version: 2026.9.1
+          cache: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: android-apk
+          path: versand
+      - name: Manifest erzeugen, ans Release hängen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ needs.bauen.outputs.version }}
+          VERSION_CODE: ${{ needs.bauen.outputs.version_code }}
+          SHA256: ${{ needs.bauen.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          apk="lifeline-hub-android-$VERSION.apk"
+          ( cd versand && sha256sum -c "$apk.sha256" )
+          mise exec -- node scripts/release/android-kanal.mjs --manifest --version "$VERSION" \
+            --version-code "$VERSION_CODE" --sha256 "$SHA256" --repo "$GH_REPO" > versand/android.json
+          cat versand/android.json
+          gh release upload "$TAG" "versand/$apk" "versand/$apk.sha256" --clobber
+          # Stabile App liest `releases/latest/download/android.json`; der QR-Code für stabil zeigt
+          # auf `releases/latest/download/lifeline-hub-android.apk`.
+          if [ "${VERSION#*-}" = "$VERSION" ]; then
+            cp "versand/$apk" versand/lifeline-hub-android.apk
+            gh release upload "$TAG" versand/lifeline-hub-android.apk --clobber
+            gh release upload "$TAG" versand/android.json --clobber
+          fi
+          echo "::notice::$apk liegt am Release $TAG."
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-manifest
+          path: versand/android.json
+          if-no-files-found: error
+          retention-days: 7
+      # Welche Kanäle: Alpha → android-alpha, Beta → android-beta, stabil → beide. Ein Entwurf
+      # schreibt keinen. Erst die Ausgabe holen, dann umformen: in einer Pipe ginge ein Fehler des
+      # Skripts verloren, und der Job meldete still „kein Kanal“.
+      - name: Kanäle bestimmen
+        id: kanaele
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ needs.bauen.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "false" ]; then
+            echo "::notice::$TAG ist nicht veröffentlicht, die Android-Kanäle bleiben."
+            echo "kanaele=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          ausgabe="$(mise exec -- node scripts/release/android-kanal.mjs --kanaele-fuer "$VERSION")"
+          kanaele="$(jq -Rnc '[inputs | select(length > 0)]' <<< "$ausgabe")"
+          echo "kanaele=$kanaele" >> "$GITHUB_OUTPUT"
+          echo "Kanäle: $kanaele"
+
+  kanal:
+    name: Kanal ${{ matrix.kanal }} fortschreiben
+    needs: [bauen, ablegen]
+    if: ${{ needs.ablegen.outputs.kanaele != '' && needs.ablegen.outputs.kanaele != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        kanal: ${{ fromJSON(needs.ablegen.outputs.kanaele) }}
+    # Je Kanal eine Gruppe für alle Läufe: zwei Releases schreiben einen Kanal nie gleichzeitig.
+    concurrency:
+      group: android-kanal-${{ matrix.kanal }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          version: 2026.9.1
+          cache: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: android-*
+          merge-multiple: true
+          path: neu
+      - name: Fortschreiben
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          KANAL: ${{ matrix.kanal }}
+          VERSION: ${{ needs.bauen.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf alt && mkdir -p alt
+          if gh release view "$KANAL" > /dev/null 2>&1; then
+            # Kein `|| true` ums Laden: ein Netzfehler hieße sonst „Kanal leer“ und könnte ihn
+            # zurückdrehen.
+            namen="$(gh release view "$KANAL" --json assets --jq '.assets[].name')"
+            if grep -qx android.json <<< "$namen"; then
+              gh release download "$KANAL" --pattern android.json --dir alt
+            fi
+          else
+            titel="Alpha"; [ "$KANAL" = android-beta ] && titel="Beta"
+            gh release create "$KANAL" --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Android-App: $titel-Kanal" \
+              --notes "Update-Manifest und APK für Android-Apps im $titel-Kanal (LLH-1989). android.json wird bei jeder Freigabe fortgeschrieben und zeigt auf die APK am versionierten Release; lifeline-hub-android.apk ersetzen nur $titel-Tags."
+          fi
+          # Die feste APK: nur ein Tag desselben Kanals, nie ein stabiles.
+          if [ "$(mise exec -- node scripts/release/android-kanal.mjs --apk-ersetzen "$KANAL" "$VERSION")" = "ja" ]; then
+            cp "neu/lifeline-hub-android-$VERSION.apk" neu/lifeline-hub-android.apk
+            gh release upload "$KANAL" neu/lifeline-hub-android.apk --clobber
+            echo "::notice::$KANAL: lifeline-hub-android.apk ist $VERSION."
+          fi
+          entscheidung="$(mise exec -- node scripts/release/android-kanal.mjs --kanal "$KANAL" --neu neu/android.json --alt alt/android.json)"
+          if [ "$entscheidung" = "hochladen" ]; then
+            gh release upload "$KANAL" neu/android.json --clobber
+            echo "::notice::$KANAL zeigt auf $TAG."
+          fi

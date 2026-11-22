@@ -12,6 +12,17 @@ plugins {
 val lifelineVersion: String = providers.environmentVariable("LIFELINE_VERSION").orElse("0.0.0-dev").get()
 val lifelineVersionCode: Int = providers.environmentVariable("LIFELINE_VERSION_CODE").orElse("1").get().toInt()
 
+// Signatur der Release-APK (Entwurf D9): ein Schlüssel für immer. `android.yml` legt den Keystore
+// aus dem Geheimnis ANDROID_KEYSTORE_BASE64 ab und setzt die vier Variablen; fehlt eine, entsteht
+// eine unsignierte APK (lokal und in `android-pruefung.yml`). Dass der Release-Bau signiert,
+// prüft `scripts/android/release-apk.sh`: vor dem Bau die Geheimnisse, danach `apksigner verify`.
+val keystorePath: String? = providers.environmentVariable("ANDROID_KEYSTORE_PATH").orNull
+val keystorePassword: String? = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
+val signingKeyAlias: String? = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val signingKeyPassword: String? = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val isReleaseSigned: Boolean =
+    listOf(keystorePath, keystorePassword, signingKeyAlias, signingKeyPassword).all { !it.isNullOrEmpty() }
+
 android {
     namespace = "dev.rubeen.lifeline.android"
     // Übersetzt gegen 37.1, weil Compose ab BOM 2026.11 es verlangt (Robolectric 4.18 kennt 37);
@@ -26,6 +37,34 @@ android {
         targetSdk = 36
         versionName = lifelineVersion
         versionCode = lifelineVersionCode
+
+        // Nur die ABIs echter Geräte ab Android 10: ML Kit (QR-Code beim Onboarding) bringt
+        // native Bibliotheken je ABI mit; x86 und x86_64 gäbe es nur für Emulatoren.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    signingConfigs {
+        if (isReleaseSigned) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = keystorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Ohne R8 (Entscheidung zu Task 15): die App ist dünn, und eine Regel, die einen
+            // Brücken- oder Serialisierungsnamen wegoptimiert, fiele erst am Gerät auf.
+            isMinifyEnabled = false
+            if (isReleaseSigned) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     buildFeatures {

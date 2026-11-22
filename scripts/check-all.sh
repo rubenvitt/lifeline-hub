@@ -305,7 +305,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung, Bildablage und Android-Version (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung, Bildablage, Android-Version, -Werkzeuge, -APK und -Kanäle (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -319,6 +319,10 @@ schritt_8() {
   # nur seine eigenen — ein Rückschritt, eine fehlende Plattform oder eine Beta im Alpha-Kanal
   # bliebe an jeder Vorab-Hülle still hängen.
   mise exec -- node --test "$ROOT/scripts/release/desktop-kanal.test.mjs"
+  # Die Update-Kanäle der Android-App (LLH-1989): dieselben Regeln wie die Desktop-Kanäle, dazu
+  # die feste APK, die nur der eigene Kanal ersetzt — ein Fehler bliebe an jeder App still hängen
+  # oder legte unter den Alpha-QR-Code eine stabile App.
+  mise exec -- node --test "$ROOT/scripts/release/android-kanal.test.mjs"
   # Das Nachziehen eines Alpha-Tags nach `beta` (LLH-1545): ein still aufgelöster Konflikt oder
   # eine Alpha-Version auf `beta` fiele erst beim nächsten Beta-Release auf. Ohne Netz.
   "$ROOT/scripts/release/kanal-nachziehen.test.sh"
@@ -356,6 +360,12 @@ schritt_8() {
   # Die Version der Android-App aus [workspace.package] (LLH-1989): ein `versionCode`, der nicht
   # steigt, installiert Android nicht über die vorhandene App — das fiele erst am Gerät auf.
   "$ROOT/scripts/android/version.test.sh"
+  # Die SDK-Plattform der CI passt zu compileSdk der App (LLH-1989): sonst scheitert der App-Bau erst
+  # auf dem Runner. Ohne SDK.
+  "$ROOT/scripts/android/sdk-version.test.sh"
+  # Die signierte Release-APK (LLH-1989): eine unsignierte APK am Release, eine fremde Version in
+  # der APK oder ein liegengebliebener Keystore fiele erst am Release auf. Attrappen, ohne SDK.
+  "$ROOT/scripts/android/release-apk.test.sh"
 }
 
 schritt_9() {

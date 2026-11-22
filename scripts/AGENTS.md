@@ -6,7 +6,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 `./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` + `ios/testflight.test.sh` + `ios/testflight-verteilen.test.mjs` + `ios/bilder-ablegen.test.sh` + `ios/fehlgruende.test.sh` + `android/version.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `android-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` + `ios/testflight.test.sh` + `ios/testflight-verteilen.test.mjs` + `ios/bilder-ablegen.test.sh` + `ios/fehlgruende.test.sh` + `android/version.test.sh` + `android/sdk-version.test.sh` + `android/release-apk.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-eingefroren.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
@@ -38,7 +38,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   - **Im PR** laufen `schnell` und daneben `binaer` (Pflicht-Check `Server-Binary`, Schritt 19; eigener
     Job, damit der Bau die Schnellprüfungen nicht verlängert) aus `pr.yml`. Ein fremdes Label startet an einem PR ohne `voll` nur diese beiden neu, in
     eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
-    Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend-, e2e-Suite und der Swift-Kern (`ios`) laufen im PR nur mit dem **Label `voll`**, dann ganz
+    Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend-, e2e-Suite, der Swift-Kern (`ios`) und der Kotlin-Kern (`android`) laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
     `e2e` bedeutet nichts mehr.
   - **Wann `voll`** (LLH-1898, ADR-0050), selten und nur, wenn mindestens eines zutrifft:
@@ -58,7 +58,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     nicht mehr nach Bereichen.
   - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Ein neuer Push bricht die
     **Testjobs** des laufenden Laufs ab (Concurrency je Job: `rust`, `frontend` je Anteil, `e2e`,
-    `ios`, `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
+    `ios`, `android`, `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
     Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
     Lauf mit abgebrochenen oder roten Tests released nicht (`needs`). Nie
     `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den
@@ -81,6 +81,22 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Archiv, Signierung und Upload stehen in `scripts/ios/testflight.sh`, das Alpha-Tags und eine
     vom Tag abweichende Workspace-Version selbst abweist (Selbsttest in Schritt 8). Betrieb und
     Secrets: `docs/betrieb/ios-app.md`.
+  - **Android-Prüfung** (LLH-1989): `android-pruefung.yml` fährt an PRs und nach Pushes auf
+    `alpha`, die `android/`, `scripts/android/` oder `src-tauri/faelle/` ändern, die App-Tests
+    (Robolectric, Bilder als Artefakt `android-bilder`), die Release-APK ohne Signatur und den
+    Kern; kein Pflicht-Check. Den Push fängt `android-pruefung-alpha.yml` und ruft dieselben Jobs
+    (ein Workflow je Ereignis, ADR-0048). JDK, SDK-Plattform
+    und Build-Tools stehen nur in `scripts/android/sdk-version.sh` (Selbsttest gegen `compileSdk`
+    in Schritt 8), fehlende SDK-Pakete lädt `scripts/android/sdk-installieren.sh`.
+  - **APK** (LLH-1989, Entwurf D9): `android.yml` baut und signiert die APK
+    (`scripts/android/release-apk.sh`: fehlt ein Geheimnis `ANDROID_KEY*`, rot statt unsigniert;
+    Version gegen den Tag; Selbsttest in Schritt 8), aufgerufen aus `artefakte.yml` (Job
+    `android`, nach `freigeben`, jeder Kanal, in keinem `needs` davor) oder per Handstart. Manifest
+    `android.json` und feste APK in den Kanal-Releases `android-alpha`/`android-beta` nach
+    `scripts/release/android-kanal.mjs` (nur vorwärts, jeder Vorabkanal nur seine eigenen, die
+    feste APK nur aus dem eigenen Kanal), ein Job je Kanal mit eigener Gruppe; stabile Tags legen
+    beides ans versionierte Release (`releases/latest/download/`). Betrieb und Secrets:
+    `docs/betrieb/android-app.md`.
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
   - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`,
     `openspec/changes/archive/2026-11-15-czjhc4qq-ci-pr-schlank/design.md`.

@@ -1,5 +1,5 @@
 # Suiten (LLH-1896): Rust-, Frontend- und e2e-Suite samt Bericht, dazu der Swift-Kern der iOS-Hülle
-# (LLH-1978), als wiederverwendbarer Workflow.
+# (LLH-1978) und der Kotlin-Kern der Android-Hülle (LLH-1989), als wiederverwendbarer Workflow.
 #
 # WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: `ci.yml` ruft ihn bei jedem Push auf einen Kanal-Branch
 # (der Release wartet darauf), `pr.yml` nur an einem PR mit dem Label `voll` (ohne Pflicht).
@@ -10,10 +10,10 @@
 # darf deshalb nicht hier stehen: die Schnellprüfungen stehen in `ci.yml` und `pr.yml` selbst.
 #
 # ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
-# ab, über Concurrency AUF JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`). Im
-# aufgerufenen Workflow ist `github.event_name` der des Aufrufers: bei Push eine Gruppe je Branch,
-# im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
-# eigene Gruppe und bricht nie ab.
+# ab, über Concurrency AUF JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `android`,
+# `berichte`). Im aufgerufenen Workflow ist `github.event_name` der des Aufrufers: bei Push eine
+# Gruppe je Branch, im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in
+# `ci.yml` hat eine eigene Gruppe und bricht nie ab.
 #
 # NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`. Der eigene Server für Rust und e2e
 # (LLH-1666, LLH-2014, ADR-0075/0076) ist zurückgebaut.
@@ -177,6 +177,36 @@ jobs:
         env:
           IOS_SWIFT_PFLICHT: "1"
         run: ./scripts/check-all.sh --nur ios
+
+  # ── Kotlin-Kern der Android-Hülle (LLH-1989) ───────────────────────────────────────
+  # `gradlew -p android/kern test` über Schritt 20 von check-all.sh, nur JDK, kein Android-SDK. Die
+  # App baut und testet nur `android-pruefung.yml`. ANDROID_KERN_PFLICHT=1 macht ein fehlendes
+  # JDK rot statt zur Lücke. JDK aus scripts/android/sdk-version.sh, wie beim App-Bau.
+  android:
+    name: Android-Kern
+    concurrency:
+      group: ci-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Werkzeugversionen
+        id: versionen
+        run: ./scripts/android/sdk-version.sh >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
+          cache: gradle
+          cache-dependency-path: |
+            android/kern/**/*.gradle.kts
+            android/gradle/libs.versions.toml
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Kotlin-Kern
+        env:
+          ANDROID_KERN_PFLICHT: "1"
+        run: ./scripts/check-all.sh --nur android
 
   # ── Ein Bericht aus den Vitest-Teilläufen ───────────────────────────────────────────
   # Die Merge-Werkzeuge scheitern nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen
