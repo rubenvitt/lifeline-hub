@@ -942,16 +942,19 @@ pub async fn uebernimm_gegen(
     if !eigen {
         return Ok(false);
     }
-    let hier: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT EXISTS (SELECT 1 FROM {} WHERE {} AND {} = ?)",
-        t.name,
-        t.schluessel.gleich(t.name),
-        super::art::einsatz_ausdruck(t.scoping, t.name)
-    )))
-    .bind(gegen)
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
+    // Ein mehrspaltiger Schlüssel ist natürlich: dieselben Werte sind dieselbe Zeile, eine
+    // Neuvergabe gibt es nicht. Sein `json_array` läse zudem die ganze Tabelle (Review vor dem PR).
+    let hier = matches!(t.schluessel, super::art::Schluessel::Spalten(_))
+        || sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT EXISTS (SELECT 1 FROM {} WHERE {} AND {} = ?)",
+            t.name,
+            t.schluessel.gleich(t.name),
+            super::art::einsatz_ausdruck(t.scoping, t.name)
+        )))
+        .bind(gegen)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
     if !hier {
         return Ok(false);
     }

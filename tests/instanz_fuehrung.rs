@@ -6055,6 +6055,33 @@ async fn veraltete_herkunft_aendert_keine_zeile_eines_anderen_einsatzes() {
         .contains(&"Z geändert".to_string()));
 }
 
+/// LLH-2029 (Review vor dem PR): Auch eine Löschung über eine veraltete Herkunft trifft keine Zeile
+/// eines anderen Einsatzes.
+#[tokio::test]
+async fn veraltete_herkunft_loescht_keine_zeile_eines_anderen_einsatzes() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let z = zeichen_anlegen(&elw, e, "Z vom ELW").await;
+    elw_meldet(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    let b = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let n = zeichen_anlegen(&hub, b, "N in B").await;
+    sqlx::query(
+        "UPDATE spiegel_herkunft SET lokaler_schluessel = ? WHERE einsatz_id = ? \
+         AND art = 'freies_zeichen' AND fremder_schluessel = ?",
+    )
+    .bind(n.to_string())
+    .bind(h)
+    .bind(z.to_string())
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    zeichen_loeschen(&elw, e, z).await;
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None);
+    assert_eq!(zeichen_labels(&hub, b).await, ["N in B"]);
+}
+
 // ── Größe der Erklärung (LLH-1702) ───────────────────────────────────────────────────────────
 
 /// Größte Erklärung, die das Gegenüber an einer Akte annimmt (`austausch::ERKLAERUNG_MAX`, dort

@@ -482,15 +482,19 @@ async fn loeschen(
             .push((z.art.clone(), z.schluessel.clone()));
         return Ok(());
     };
-    sqlx::query(sqlx::AssertSqlSafe(format!(
-        "DELETE FROM {} WHERE {}",
+    // Nur die Zeile dieses Einsatzes: Eine veraltete Herkunft kann auf eine ID zeigen, die SQLite
+    // in einem anderen Einsatz neu vergeben hat (LLH-2029).
+    let geloescht = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM {} WHERE {} AND {} = ?",
         t.name,
-        t.schluessel.gleich(t.name)
+        t.schluessel.gleich(t.name),
+        art::einsatz_ausdruck(t.scoping, t.name)
     )))
     .bind(&lokal)
+    .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    if t.blob.is_some() {
+    if t.blob.is_some() && geloescht.rows_affected() > 0 {
         super::anhang::vergiss(conn, t.name, &lokal).await?;
     }
     sqlx::query(
