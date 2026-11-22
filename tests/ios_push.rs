@@ -212,6 +212,50 @@ async fn anmelden_stand_abmelden() {
     assert_eq!(zahl(&pool).await, 0);
 }
 
+/// F-I2: `an_dieser_sitzung` sagt dem Client, ob die Anmeldung an der Sitzung dieser Anfrage
+/// hängt. Nach einem Sitzungsablauf und neuem Login ist sie zwar angemeldet, aber an keiner
+/// Sitzung; ein Logout nähme sie dann nicht mit. Der Client bindet sie dann per `PUT` neu.
+#[tokio::test]
+async fn stand_nennt_ob_die_anmeldung_an_dieser_sitzung_haengt() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let erste = login_cookie(&app, "marlene", "marlenepw1").await;
+    let uri = format!("/api/ios-push?kennung={KENNUNG}");
+    let stand = |cookie: String| {
+        let app = app.clone();
+        let uri = uri.clone();
+        async move {
+            let (s, v) = anfrage(&app, "GET", &uri, &cookie, None).await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+            (v["angemeldet"].clone(), v["an_dieser_sitzung"].clone())
+        }
+    };
+    assert_eq!(stand(erste.clone()).await, (json!(false), json!(false)));
+    assert_eq!(
+        anmelden(&app, &erste, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(stand(erste.clone()).await, (json!(true), json!(true)));
+
+    // Eine zweite Sitzung desselben Kontos sieht die Anmeldung, aber nicht an sich.
+    let zweite = login_cookie(&app, "marlene", "marlenepw1").await;
+    assert_eq!(stand(zweite.clone()).await, (json!(true), json!(false)));
+
+    // Sitzung abgelaufen: die Anmeldung hängt an keiner; neu binden per PUT.
+    sqlx::query("UPDATE ios_push_anmeldung SET session_token_hash = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(stand(erste.clone()).await, (json!(true), json!(false)));
+    assert_eq!(
+        anmelden(&app, &zweite, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(stand(zweite).await, (json!(true), json!(true)));
+    assert_eq!(stand(erste).await, (json!(true), json!(false)));
+}
+
 #[tokio::test]
 async fn validierung_400_je_feld() {
     let (app, pool) = mit_ios_push().await;

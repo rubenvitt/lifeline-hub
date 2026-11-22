@@ -919,7 +919,9 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
   setzt, über `session::konto_deaktiviert`) und Löschen des Kontos,
   `POST /api/ios-push/abmelden` der
   App und `token_ungueltig`. Der Ablauf einer Sitzung und ein Passwortwechsel lassen sie stehen
-  (`session_token_hash` ist `ON DELETE SET NULL`). Ein neuer Weg, der Konten sperrt oder alle
+  (`session_token_hash` ist `ON DELETE SET NULL`); `GET /api/ios-push` nennt dann
+  `an_dieser_sitzung: false`, und der Client bindet sie per `PUT` an die neue Sitzung, damit ein
+  Logout sie wieder mitnimmt. Ein neuer Weg, der Konten sperrt oder alle
   Sitzungen beendet, entscheidet über die Anmeldungen mit.
 - **Keine Sicherung trägt iOS-Push:** `backup::scrub_sessions` leert mit `session` auch
   `ios_push_anmeldung` und `ios_push_relais` (Token, Geräteschlüssel, Relais-Geheimnis). Eine neue

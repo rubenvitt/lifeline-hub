@@ -12073,11 +12073,16 @@
         "required": [
           "eingeschaltet",
           "angemeldet",
+          "an_dieser_sitzung",
           "inhalt",
           "stumm",
           "relais_gesperrt"
         ],
         "properties": {
+          "an_dieser_sitzung": {
+            "type": "boolean",
+            "description": "Die Anmeldung hängt an der Sitzung dieser Anfrage; nur dann nimmt ein Logout sie mit.\nNach einem Sitzungsablauf und neuem Login ist sie `angemeldet`, hier aber `false`: der\nClient bindet sie dann per `PUT` neu. Ohne Anmeldung `false`."
+          },
           "angemeldet": {
             "type": "boolean",
             "description": "Dieses Gerät ist für den angemeldeten Nutzer angemeldet."

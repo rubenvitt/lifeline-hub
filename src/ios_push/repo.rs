@@ -138,6 +138,26 @@ pub async fn anmeldung(
     .await?)
 }
 
+/// Ob die Anmeldung dieses Nutzers mit dieser Kennung an der Sitzung `token_hash` hängt. Nach
+/// einem Sitzungsablauf hängt sie an keiner (`ON DELETE SET NULL`), und ein Logout nähme sie
+/// nicht mit; der Client bindet sie dann per `PUT` neu.
+pub async fn an_sitzung(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    kennung: &str,
+    token_hash: &str,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM ios_push_anmeldung \
+         WHERE benutzer_id = ? AND kennung = ? AND session_token_hash = ?)",
+    )
+    .bind(benutzer_id)
+    .bind(kennung)
+    .bind(token_hash)
+    .fetch_one(pool)
+    .await?)
+}
+
 /// Alle Anmeldungen dieser Nutzer, in einer Abfrage.
 pub async fn anmeldungen_von(
     pool: &SqlitePool,

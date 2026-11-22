@@ -1,6 +1,7 @@
 //! HTTP-Routen von iOS-Push (LLH-2040; Spec `ios-push`).
 //!
-//! GET    /api/ios-push?kennung=…   — Stand dieses Geräts (Schalter, Anmeldung, Wahl, Relais)
+//! GET    /api/ios-push?kennung=…   — Stand dieses Geräts (Schalter, Anmeldung samt Bindung an
+//!                                    diese Sitzung, Wahl, Relais)
 //! PUT    /api/ios-push/anmeldung   — Gerät für diese Sitzung anmelden, samt der Wahl „Mit
 //!                                    Absender und Wortlaut“ und der stummen Arten (204)
 //! DELETE /api/ios-push/anmeldung   — eigene Anmeldung abmelden (idempotent, 204)
@@ -44,6 +45,10 @@ pub struct IosPushStand {
     pub eingeschaltet: bool,
     /// Dieses Gerät ist für den angemeldeten Nutzer angemeldet.
     pub angemeldet: bool,
+    /// Die Anmeldung hängt an der Sitzung dieser Anfrage; nur dann nimmt ein Logout sie mit.
+    /// Nach einem Sitzungsablauf und neuem Login ist sie `angemeldet`, hier aber `false`: der
+    /// Client bindet sie dann per `PUT` neu. Ohne Anmeldung `false`.
+    pub an_dieser_sitzung: bool,
     /// Die Anmeldung zeigt Absender und Wortlaut; ohne Anmeldung `false`.
     pub inhalt: bool,
     /// Die stummen Eingangsarten dieses Geräts, in Katalogreihenfolge; ohne Anmeldung leer.
@@ -112,11 +117,14 @@ fn kennung_pruefen(kennung: &str) -> Result<(), AppError> {
 pub async fn stand(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    jar: CookieJar,
     Query(abfrage): Query<KennungAbfrage>,
 ) -> Result<Json<IosPushStand>, AppError> {
     ios_push(&state)?;
     kennung_pruefen(&abfrage.kennung)?;
     let anmeldung = repo::anmeldung(&state.pool, benutzer.id, &abfrage.kennung).await?;
+    let an_dieser_sitzung = anmeldung.is_some()
+        && repo::an_sitzung(&state.pool, benutzer.id, &abfrage.kennung, &sitzung(&jar)?).await?;
     let relais_gesperrt = repo::relais_zugang(&state.pool)
         .await?
         .is_some_and(|z| z.gesperrt);
@@ -138,6 +146,7 @@ pub async fn stand(
     Ok(Json(IosPushStand {
         eingeschaltet: true,
         angemeldet,
+        an_dieser_sitzung,
         inhalt,
         stumm,
         // Nur wenn der Hub selbst iOS-Push anbietet; sonst pusht diese Instanz (je Kanal).

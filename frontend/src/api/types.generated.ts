@@ -4823,6 +4823,12 @@ export interface components {
         InstanzZertifikatZustand: "bestaetigt" | "passt_nicht" | "gegenstelle_kennt_aelteres";
         /** @description Stand von iOS-Push für dieses Gerät. */
         IosPushStand: {
+            /**
+             * @description Die Anmeldung hängt an der Sitzung dieser Anfrage; nur dann nimmt ein Logout sie mit.
+             *     Nach einem Sitzungsablauf und neuem Login ist sie `angemeldet`, hier aber `false`: der
+             *     Client bindet sie dann per `PUT` neu. Ohne Anmeldung `false`.
+             */
+            an_dieser_sitzung: boolean;
             /** @description Dieses Gerät ist für den angemeldeten Nutzer angemeldet. */
             angemeldet: boolean;
             /**
