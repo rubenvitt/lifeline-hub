@@ -187,6 +187,11 @@ export interface KreisGriff {
    * Randgriff geht dabei in den Osten, außer er steht bei gleicher Mitte schon auf diesem Radius.
    */
   set(mitte: GeoPunkt | null, radiusM: number | null): void;
+  /**
+   * Einen laufenden oder anstehenden Zug an Rand- und Mittengriff beenden, ohne ihn zu melden
+   * (Esc verwirft, LLH-1891). Der Griff geht auf die zuletzt gesetzte Lage; ohne Zug bleibt alles.
+   */
+  zugBeenden(): void;
   zerstoeren(): void;
 }
 
@@ -219,6 +224,12 @@ function detach(m: maplibregl.Marker): void {
   m._isDragging = false;
   m._state = 'inactive';
 }
+
+/**
+ * Steht an diesem Griff ein Zug? Auch ein Druck ohne Bewegung (`pending`): die nächste Bewegung
+ * machte ihn zum Zug.
+ */
+const zugSteht = (m: maplibregl.Marker): boolean => m._isDragging || m._state !== 'inactive';
 
 /**
  * Der Radius-Griff (D6): ein ziehbarer `maplibregl.Marker` wie die Bild-Griffe (`bildHandles.ts`),
@@ -317,6 +328,21 @@ export function erzeugeKreisGriff(
       if (!isAttached) {
         marker.addTo(map);
         isAttached = true;
+      }
+    },
+    zugBeenden() {
+      // Abnehmen meldet maplibres Zug-Hörer ab, ohne `dragend` (LLH-1857); neu angehängt ist der
+      // Griff wieder greifbar. Die Lage kommt aus dem zuletzt gesetzten Stand, nicht vom Zeiger.
+      if (isMitteAttached && (isMitteDragging || zugSteht(mittenMarker)) && mitte) {
+        detach(mittenMarker);
+        isMitteDragging = false;
+        mittenMarker.setLngLat([mitte.lon, mitte.lat]).addTo(map);
+      }
+      if (isAttached && (isDragging || zugSteht(marker)) && mitte) {
+        detach(marker);
+        isDragging = false;
+        const p = griffLage(mitte, radius);
+        marker.setLngLat([p.lon, p.lat]).addTo(map);
       }
     },
     zerstoeren() {
