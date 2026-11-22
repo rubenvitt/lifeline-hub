@@ -6594,6 +6594,29 @@
           }
         }
       },
+      "EinheitStatusAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinheitAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/HandStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für\n„Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986)."
+      },
       "EinheitStatusQuelle": {
         "type": "string",
         "description": "Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.\n\nMit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er\n(`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand\ngesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand\nnoch einen Fahrzeugstatus.",
@@ -11151,6 +11174,35 @@
           "unbekannt"
         ]
       },
+      "HandStatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der gesetzte Status (`null` = gelöscht); die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "vorher_status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Status vor dem Wechsel, nur für die Quittung („S2 → S3“)."
+          }
+        }
+      },
       "HaushaltAnzeige": {
         "type": "object",
         "description": "Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind.",
@@ -14673,6 +14725,29 @@
           }
         }
       },
+      "MaterialPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzMaterialAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/MaterialStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des PATCH einer Materialzeile: die Zeile wie bisher, dazu der Beleg für „Rückgängig“,\nwenn der Status gewechselt hat (LLH-1986)."
+      },
       "MaterialRuecknahmeAntwort": {
         "type": "object",
         "description": "Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
@@ -14702,6 +14777,35 @@
           "verbraucht",
           "desinfektion_noetig"
         ]
+      },
+      "MaterialStatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status\n([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.\nBeleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "status",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "status": {
+            "$ref": "#/components/schemas/MaterialStatus",
+            "description": "Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "vorher_status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MaterialStatus",
+                "description": "Status vor dem Wechsel, nur für die Quittung."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "MeAntwort": {
         "allOf": [
@@ -17587,6 +17691,29 @@
             "format": "int64"
           }
         }
+      },
+      "PersonalPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzPersonalAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/HandStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu\nder Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986)."
       },
       "PersonalStatus": {
         "type": "object",

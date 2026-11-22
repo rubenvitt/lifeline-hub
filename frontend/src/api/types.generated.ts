@@ -2618,6 +2618,13 @@ export interface components {
             verteilung: components["schemas"]["StatusAnteil"][];
         };
         /**
+         * @description Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
+         *     „Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986).
+         */
+        EinheitStatusAntwort: components["schemas"]["EinheitAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["HandStatusRuecknahmeBeleg"] | null;
+        };
+        /**
          * @description Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
          *
          *     Mit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er
@@ -4450,6 +4457,26 @@ export interface components {
          * @enum {string}
          */
         Geschlecht: "maennlich" | "weiblich" | "divers" | "unbekannt";
+        /**
+         * @description Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
+         *     „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
+         *     und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+         *     wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+         */
+        HandStatusRuecknahmeBeleg: {
+            /** @description Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            gesetzt_at: string;
+            /**
+             * Format: int64
+             * @description Der gesetzte Status (`null` = gelöscht); die Rücknahme gelingt nur, solange er noch steht.
+             */
+            status_id?: number | null;
+            /**
+             * Format: int64
+             * @description Status vor dem Wechsel, nur für die Quittung („S2 → S3“).
+             */
+            vorher_status_id?: number | null;
+        };
         /** @description Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind. */
         HaushaltAnzeige: {
             /** Format: int64 */
@@ -5850,6 +5877,13 @@ export interface components {
             uhs_id?: number | null;
         };
         /**
+         * @description Antwort des PATCH einer Materialzeile: die Zeile wie bisher, dazu der Beleg für „Rückgängig“,
+         *     wenn der Status gewechselt hat (LLH-1986).
+         */
+        MaterialPatchAntwort: components["schemas"]["EinsatzMaterialAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["MaterialStatusRuecknahmeBeleg"] | null;
+        };
+        /**
          * @description Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
          *     zurückkam, steht in `ausgelassen`.
          */
@@ -5863,6 +5897,20 @@ export interface components {
          * @enum {string}
          */
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
+        /**
+         * @description System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
+         *     ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
+         *     Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
+         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         *     Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+         */
+        MaterialStatusRuecknahmeBeleg: {
+            /** @description Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            gesetzt_at: string;
+            /** @description Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht. */
+            status: components["schemas"]["MaterialStatus"];
+            vorher_status?: components["schemas"]["MaterialStatus"] | null;
+        };
         /**
          * @description Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich
          *     die Kopplung. Eine Person bekommt `geraet: null`.
@@ -7071,6 +7119,13 @@ export interface components {
             geleitete_abschnitte?: number[];
             /** Format: int64 */
             uhs_id?: number | null;
+        };
+        /**
+         * @description Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu
+         *     der Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986).
+         */
+        PersonalPatchAntwort: components["schemas"]["EinsatzPersonalAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["HandStatusRuecknahmeBeleg"] | null;
         };
         /** @description Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`. */
         PersonalStatus: {
