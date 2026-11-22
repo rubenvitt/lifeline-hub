@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 22.11.2026 (Testjobs auf Kanal-Branches laufen zu Ende, ADR-0082; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 22.11.2026 (Testjobs auf Kanal-Branches laufen zu Ende, ADR-0084; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App oder iOS-App darauf zu. Einen
@@ -186,7 +186,7 @@ Schnellprüfungen. Pflicht sind daneben nur `Migrationsnummern` und `ADR-Nummern
 höchstens ein Lauf, und ein laufender Release bricht nie ab (`concurrency` der Jobs in
 `suiten.yml` und `ci.yml`,
 [ADR-0048](entscheidungen/ADR-0048-ein-workflow-je-ereignis-ein-pr-prueft-leicht-und-das-ruleset-wird-geprueft.md),
-[ADR-0082](entscheidungen/ADR-0082-testjobs-auf-kanal-branches-laufen-zu-ende.md)).
+[ADR-0084](entscheidungen/ADR-0084-testjobs-auf-kanal-branches-laufen-zu-ende.md)).
 Nach dem Push bewertet `migrationen-kanal.yml` die Nummern der offenen PRs neu; einen Kompilierlauf
 je offenem PR gibt es nicht mehr
 ([ADR-0049](entscheidungen/ADR-0049-kein-pflicht-check-baut-mit-ziel-branch-bei-rotem-alpha-ist-genau-ein-pr-zustaendig.md)).
