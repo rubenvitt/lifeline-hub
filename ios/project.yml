@@ -44,6 +44,10 @@ targets:
       # App liest es als Ressource und spielt es als WKUserScript ein.
       - path: App/Huelle/huelle.js
         buildPhase: resources
+      # Vorwärmen der Assets für den Start ohne Server (LLH-1980); Vitest führt es aus
+      # (frontend/src/huelle/iosVorwaermen.test.ts), die App per `callAsyncJavaScript`.
+      - path: App/Huelle/vorwaermen.js
+        buildPhase: resources
       # Privacy-Manifest (Required-Reason-APIs) liegt an der Wurzel des App-Bündels.
       - path: App/PrivacyInfo.xcprivacy
         buildPhase: resources
