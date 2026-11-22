@@ -85,11 +85,20 @@ laufenden Störung schon gemeldet ist. Sie ist die eine Quelle für „einmal je
 | Abruf erfolgreich (`save_erfolg`) | `gemeldet IS NOT NULL` | `NULL` | offene Störungsmeldungen erledigen, `adapter_wieder_ok` melden |
 | Admin: Fortsetzen, Anhalten, wirksame Änderung oder Geheimnis, das einen Lauf-Stopp aufhebt (`WIEDER_FAELLIG`) | `gemeldet IS NOT NULL` | `NULL` | offene Störungsmeldungen erledigen, keine Entwarnung |
 | Admin löscht den Adapter | — | (Zeile weg) | vor dem Löschen erledigen; die Zeilen fallen per CASCADE |
-| Serverstart nimmt Adapter wieder auf (`rearm_nach_schluessel`) | — | unverändert | keine; der nächste Erfolg entwarnt |
+| Lauf hält an mit `geheimnisspeicher_gesperrt` | — | unverändert | keine (s. u.) |
+| Serverstart nimmt Adapter wieder auf (`rearm_nach_schluessel`) | — | unverändert | keine; der nächste Erfolg entwarnt nur, wenn vorher gemeldet war |
+
+- **`geheimnisspeicher_gesperrt` wird nie gemeldet** (Entscheidung 22.11.2026): Der Server lief
+  ohne `LIFELINE_GEHEIMNIS_SCHLUESSEL`; das behebt nur, wer den Server betreibt, kein Org-Admin,
+  und es träfe jeden Adapter mit Geheimnis zugleich. Sichtbar bleibt es auf der Seite
+  „Anbindungen“ und im Log. Weil der Merker dabei nicht gesetzt wird, folgt nach dem Neustart
+  mit Schlüssel auch keine Entwarnung. `geheimnis_unlesbar` wird dagegen je Adapter gemeldet:
+  ein Admin kann das Geheimnis neu setzen.
 
 - Die Schwelle ist `zustand::MELDESCHWELLE_GESTOERT = 30 min` und wird in einer reinen Funktion
-  neben `nach_fehlschlag` entschieden (Vorschlag: `zustand::meldung_nach_fehlschlag(nach, gemeldet,
-  jetzt) -> Option<Meldung>`), damit Schwelle und Eskalation ohne Datenbank testbar sind.
+  neben `nach_fehlschlag` entschieden (Vorschlag: `zustand::meldung_nach_fehlschlag(fehler, nach,
+  gemeldet, jetzt) -> Option<Meldung>`; den Fehlercode braucht sie wegen
+  `geheimnisspeicher_gesperrt`), damit Schwelle und Eskalation ohne Datenbank testbar sind.
 - Der Merker wird **in derselben Transaktion** wie `save_fehlschlag`/`save_erfolg` gesetzt, und
   zwar bedingt (`… WHERE id = ? AND gemeldet IS NOT 'eingriff'` bzw. `IS NULL`); nur wer die Zeile
   ändert (`rows_affected == 1`), meldet danach. Ein Abruf, dessen Stand veraltet ist
@@ -161,8 +170,21 @@ Nummern und Ablauf: `migrations/AGENTS.md`.
   der Adapterzeile (`angehalten_grund` bzw. `letzter_fehler_art` und `letzter_fehler_status`);
   bei der Entwarnung nur „{Name}“. Den Fehler zeigt eine kurze deutsche Bezeichnung je
   `AdapterFehler` (dieselben Wörter wie die Seite „Anbindungen“), bei `status` mit der Zahl
-  („Antwort 503“). Pfad `/admin/einstellungen/anbindungen/adapter/{adapter_id}`. Der Guard
-  `detail_liest_nur_retain_spalten` muss die Adapterspalten kennen.
+  („Antwort 503“). Pfad `/admin/einstellungen/anbindungen/adapter/{adapter_id}`.
+- **Schwärzung und Detailzeile** (Entscheidung des Entwurfs): Die Regel „Detailzeile liest nur
+  Retain-Spalten“ schützt Einsatzdaten vor der Schwärzung; die Registry
+  (`einsatz::schwaerzung_registry`) kennt nur einsatzgebundene Tabellen, und GUARD 3 verbietet
+  andere. `adapter` ist Org-Stammdatum ohne Schwärzung. Deshalb führt `text` die gelesenen
+  Adapterspalten in einer eigenen Liste (`DETAIL_ADAPTER_SPALTEN`: `adapter.name`,
+  `angehalten_grund`, `letzter_fehler_art`, `letzter_fehler_status`), und ein eigener Guard prüft,
+  dass sie nur aus `adapter` stammen und bestehen. `src/AGENTS.md` nennt diese Ausnahme. In der
+  Registry bekommt `benachrichtigung.adapter_id` seine Einstufung (Kennung, `Retain`), sonst
+  scheitert GUARD 1; dass `einsatz_id` leer sein darf, prüft der Plan an den Schwärzungs- und
+  Löschwegen nach Einsatz (`WHERE einsatz_id = ?` trifft Adapterzeilen nie).
+- `Adressat::OrgAdmins` reist nie zum Hub; der Test `adressaten_gehen_als_text` nimmt ihn
+  ausdrücklich aus.
+- Das Aufräumen (24 h) darf Adapterzeilen löschen, während der Merker steht: „einmal je
+  Störung“ hängt am Merker, nicht an der Zeile.
 
 ### Lauf
 
@@ -225,6 +247,7 @@ In `tests/adapter_lauf.rs` mit der Test-Art und `durchgang` zu gesetzten Zeitpun
 - Erfolg nach Meldung: offene erledigt, eine `adapter_wieder_ok`; Erfolg ohne Meldung: nichts.
 - Fortsetzen durch einen Admin: offene erledigt, keine Entwarnung; Löschen: keine Zeilen mehr.
 - Ein veralteter Abruf (Admin hat währenddessen geändert) meldet nichts.
+- `geheimnisspeicher_gesperrt` meldet nichts, und der Erfolg nach dem Neustart entwarnt nicht.
 - Die Meldung (Liste und `GET /api/benachrichtigungen/{id}`) enthält kein Geheimnis und keine URL
   der Einstellungen.
 
