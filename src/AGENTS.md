@@ -223,7 +223,7 @@ Spec `webhook-zustellung`, Herleitung
 - **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
   Sekunden-Auflösung.
 - **Fingerabdruck** (LLH-1872,
-  [ADR-0082](../docs/architektur/entscheidungen/ADR-0082-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md)):
+  [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md)):
   ein Client je `(lan, pin)` aus `ziel::client`, TLS nur über
   `instanz::zertifikat::tls_config`, das Abrufen vom Ziel nur über `ziel::hole_fingerabdruck`
   mit dem `Erfasser`. Ein geänderter Fingerabdruck zählt im Repo wie ein neues Ziel.

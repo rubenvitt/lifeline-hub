@@ -193,7 +193,7 @@ fn config_mit(verifier: Arc<dyn ServerCertVerifier>) -> Result<rustls::ClientCon
 
 /// TLS-Konfiguration mit dem [`Verifier`]: mit `erwartet` zählt nur dieses Zertifikat (weder
 /// Kette noch Name noch Vertrauensanker). Genutzt von der Direktkopplung und vom Webhook mit
-/// Fingerabdruck (LLH-1872, ADR-0082).
+/// Fingerabdruck (LLH-1872, ADR-0084).
 pub fn tls_config(erwartet: Option<String>) -> Result<rustls::ClientConfig, String> {
     config_mit(Arc::new(Verifier::new(erwartet)))
 }
