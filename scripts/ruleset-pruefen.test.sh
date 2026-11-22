@@ -36,6 +36,8 @@ antwort() { printf '%s\n' "$@" '{"type":"non_fast_forward","ruleset_id":17017911
 
 # Der Stand vom 15.11.2026 nach dem Fix: in Ordnung.
 GUT_SCHNELL="$(eintrag Schnellprüfungen 15368)"
+# Seit LLH-2033: das Server-Binary ohne Dev-Abhängigkeiten, ein Check wie `Schnellprüfungen`.
+GUT_BINAER="$(eintrag Server-Binary 15368)"
 GUT_MIGR="$(eintrag Migrationsnummern)"
 GUT_ADR="$(eintrag ADR-Nummern)"
 
@@ -72,29 +74,32 @@ fehlt_text() { # <name> <text>
 }
 
 echo "==> ruleset-pruefen: in Ordnung"
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR")")"
 pruefe_code "Stand nach dem Fix vom 15.11." 0
-lauf "$(antwort "$(regel false "$(eintrag Schnellprüfungen)" "$GUT_MIGR" "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$(eintrag Schnellprüfungen)" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR")")"
 pruefe_code "Check ohne Quelle" 0
 
 echo "==> ruleset-pruefen: der Fall vom 14.11. (Quelle an einem Status)"
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$(eintrag Migrationsnummern 15368)" "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$(eintrag Migrationsnummern 15368)" "$GUT_ADR")")"
 pruefe_code "Quelle an Migrationsnummern ist rot" 1
 enthaelt "nennt den Status" "Migrationsnummern"
 enthaelt "nennt die Abhilfe" "Any source"
 fehlt_text "nennt die übrigen nicht" "ADR-Nummern"
 
 echo "==> ruleset-pruefen: fremde App an einem Check"
-lauf "$(antwort "$(regel false "$(eintrag Schnellprüfungen 99999)" "$GUT_MIGR" "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$(eintrag Schnellprüfungen 99999)" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR")")"
 pruefe_code "fremde App an Schnellprüfungen ist rot" 1
 enthaelt "nennt den Check" "Schnellprüfungen"
 enthaelt "nennt die App" "99999"
 
 echo "==> ruleset-pruefen: Liste weicht ab"
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR")")"
 pruefe_code "fehlende Pflicht ist rot" 1
 enthaelt "nennt die fehlende" "ADR-Nummern"
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR" "$(eintrag 'e2e 1/4' 15368)")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR")")"
+pruefe_code "fehlendes Server-Binary ist rot (LLH-2033)" 1
+enthaelt "nennt das fehlende Server-Binary" "Server-Binary"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR" "$(eintrag 'e2e 1/4' 15368)")")"
 pruefe_code "überzählige alte Suite ist rot" 1
 enthaelt "nennt die überzählige" "e2e 1/4"
 lauf "$(antwort '{"type":"deletion","ruleset_id":1}')"
@@ -103,23 +108,23 @@ enthaelt "nennt die erste als fehlend" "Schnellprüfungen"
 enthaelt "nennt auch die letzte als fehlend" "ADR-Nummern"
 
 # Seit LLH-1899 ist `Baut mit Ziel-Branch` abgeschafft: steht er noch im Ruleset, hinge jeder PR.
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR" "$(eintrag 'Baut mit Ziel-Branch')")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR" "$(eintrag 'Baut mit Ziel-Branch')")")"
 pruefe_code "abgeschaffter Check noch Pflicht ist rot" 1
 enthaelt "nennt den abgeschafften Check" "Baut mit Ziel-Branch"
 
 echo "==> ruleset-pruefen: up to date"
-lauf "$(antwort "$(regel true "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR")")"
+lauf "$(antwort "$(regel true "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR")")"
 pruefe_code "strict ist rot" 1
 enthaelt "nennt die Einstellung" "up to date"
 
 echo "==> ruleset-pruefen: zwei Rulesets"
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR")" "$(regel false "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR")" "$(regel false "$GUT_ADR")")"
 pruefe_code "Pflichten aus zwei Rulesets ergeben zusammen die Liste" 0
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR")" "$(regel false "$(eintrag ADR-Nummern 15368)")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR" "$GUT_ADR")" "$(regel false "$(eintrag ADR-Nummern 15368)")")"
 pruefe_code "Quelle in einem zweiten Ruleset ist rot" 1
 enthaelt "nennt den Status aus dem zweiten" "ADR-Nummern"
 
-lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR")" "$(regel true "$GUT_ADR")")"
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_BINAER" "$GUT_MIGR")" "$(regel true "$GUT_ADR")")"
 pruefe_code "strict nur im zweiten Ruleset ist rot" 1
 enthaelt "nennt die Einstellung aus dem zweiten" "up to date"
 
@@ -141,8 +146,9 @@ code=0
 pruefe_code "--liste" 0
 enthaelt "Liste trägt Migrationsnummern als Status" "$(printf 'Migrationsnummern\tstatus')"
 enthaelt "Liste trägt Schnellprüfungen als Check" "$(printf 'Schnellprüfungen\tcheck')"
-[ "$(wc -l < "$ARBEIT/ausgabe" | tr -d ' ')" = 3 ] && echo "  ok   genau drei Pflicht-Checks" \
-  || { echo "  FEHL Liste hat nicht genau drei Einträge" >&2; fehler=$((fehler + 1)); }
+enthaelt "Liste trägt Server-Binary als Check" "$(printf 'Server-Binary\tcheck')"
+[ "$(wc -l < "$ARBEIT/ausgabe" | tr -d ' ')" = 4 ] && echo "  ok   genau vier Pflicht-Checks" \
+  || { echo "  FEHL Liste hat nicht genau vier Einträge" >&2; fehler=$((fehler + 1)); }
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest ruleset-pruefen." >&2

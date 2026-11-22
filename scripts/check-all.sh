@@ -33,6 +33,9 @@ set -euo pipefail
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
+#   --nur binaer     nur das Server-Binary wie im Release, ohne Dev-Abhängigkeiten (LLH-2033;
+#                    im PR der Pflicht-Check `Server-Binary`, parallel zu `schnell`; im vollen
+#                    Lauf und auf alpha Teil von `rust`)
 #   --nur ios        Swift-Kern der iOS-Hülle (`swift test`, LLH-1978); ohne Swift eine Lücke,
 #                    mit IOS_SWIFT_PFLICHT=1 (CI) rot
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
@@ -108,7 +111,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=18
+SCHRITTE=19
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -123,7 +126,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die achtzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die neunzehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -535,22 +538,38 @@ schritt_18() {
   swift test
 }
 
+schritt_19() {
+  echo "==> [19/$SCHRITTE] Server-Binary wie im Release: ohne Dev-Abhängigkeiten übersetzt (LLH-2033)"
+  # Jeder andere Rust-Schritt übersetzt mit den Dev-Abhängigkeiten, auch `--nur baut`
+  # (`--all-targets`): Cargo vereinigt dann deren Features mit denen der Bibliothek
+  # (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, `socket2/all`). Code, der ein
+  # Feature nur über eine Dev-Abhängigkeit hat, übersetzt so grün und bricht erst im Release und
+  # im e2e-Binary — so am 22.11.2026 (#1561, behoben mit #1563). Deshalb hier ohne Testziele, mit
+  # dem Feature-Satz von `scripts/build-release.sh` und `e2e.yml`. Im PR ein eigener Pflicht-Check
+  # neben den Schnellprüfungen (`pr.yml`, Job `binaer`), damit er sie nicht verlängert.
+  bauziel_pruefen "$ROOT"
+  ohne_dev_env cargo build --bin lifeline-hub
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
-# im Bündel `rust` mit: er nutzt die Abhängigkeiten, die Schritt 4 gerade gebaut hat.
+# im Bündel `rust` mit: er nutzt die Abhängigkeiten, die Schritt 4 gerade gebaut hat. Schritt 19
+# auch: so fährt ihn `--geaendert` bei jeder Rust-Änderung und alpha in der Rust-Suite.
 BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14 16"
-BUENDEL_rust="4 15"
+BUENDEL_rust="4 15 19"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
 # `baut` steht außerhalb von `alle` (Kopf, Bündel-Auswahl): Schritt 17 übersetzt nur, was 3, 4 und
 # 15 ohnehin übersetzen und testen.
 BUENDEL_baut="17"
 BUENDEL_ios="18"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18"
+# `binaer` ist ein Ausschnitt aus `rust` für den Pflicht-Check im PR und zählt unten nicht mit.
+BUENDEL_binaer="19"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18 19"
 
-# SELBSTPRÜFUNG: die fünf Bündel ergeben zusammen genau die siebzehn Schritte von `alle`, jeden
-# einmal (`baut` zählt nicht mit) —
+# SELBSTPRÜFUNG: die fünf Bündel ergeben zusammen genau die achtzehn Schritte von `alle`, jeden
+# einmal (`baut` und `binaer` zählen nicht mit) —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e $BUENDEL_ios | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
@@ -606,10 +625,11 @@ case "$NUR" in
   frontend) lauf="$BUENDEL_frontend" ;;
   e2e)      lauf="$BUENDEL_e2e" ;;
   baut)     lauf="$BUENDEL_baut" ;;
+  binaer)   lauf="$BUENDEL_binaer" ;;
   ios)      lauf="$BUENDEL_ios" ;;
   *)
     echo "FEHLER: unbekanntes Bündel '$NUR'." >&2
-    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, ios, baut" >&2
+    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, ios, baut, binaer" >&2
     exit 2
     ;;
 esac
