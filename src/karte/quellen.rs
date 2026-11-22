@@ -1416,8 +1416,15 @@ mod energie_tests {
     use serde_json::json;
 
     const BBOX: &str = "6.9,51.45,7.3,51.65";
-    /// Wartefrist im Test: kurz, aber mit Luft für Cache-Zugriff und Task unter paralleler Last.
+    /// Wartefrist für Tests, deren Aussage nicht davon abhängt, ob ein Abruf sie einhält: Cache,
+    /// sofortiges `None` oder ein Tor, das erst nach der Antwort öffnet, entscheiden das Ergebnis.
+    /// Wer einen Abruf rechtzeitig fertig sehen will, nimmt [`FRIST_OHNE_RISS`]: Nach der
+    /// gemeinsamen Vorlage aus `db::test_pool` starten alle Tests zugleich, und schon die beiden
+    /// Cache-Abfragen brauchten dann 260–320 ms (LLH-1875).
     const FRIST: Duration = Duration::from_millis(300);
+    /// Wartefrist, die auch unter Last nicht reißt. Taugt nur, wo die Abrufe sofort fertig sind
+    /// oder die Anfrage vorher wegfällt, sonst wartet der Test eine Stunde.
+    const FRIST_OHNE_RISS: Duration = Duration::from_secs(3600);
     /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
     /// Unter `ENERGIE_WARTE`, damit eine Antwort nach der echten statt der übergebenen Frist rot
     /// wird; mit Luft, weil eine Sekunde unter Last (Gate-Lauf, Load ~180) schon riss (LFH-649).
@@ -1721,7 +1728,7 @@ mod energie_tests {
             &pool,
             &infl,
             bbox,
-            Duration::from_secs(3600), // reißt nicht vor dem Abbruch, auch unter Last nicht
+            FRIST_OHNE_RISS, // reißt nicht vor dem Abbruch
             || async { None },
             move || async move {
                 let _ = laeuft.send(());
@@ -1906,6 +1913,9 @@ mod energie_tests {
     }
 
     /// Kalte Pfade werden live geholt (und nicht etwa übersprungen).
+    ///
+    /// Ohne Wanduhr (LLH-1875): Die Abrufe sind sofort fertig, die Frist reißt nie. Fehlt ein
+    /// Teil, hat `energie_kern` ihn nicht geholt, und die Last der Maschine spielt keine Rolle.
     #[tokio::test]
     async fn kalte_teile_werden_geholt() {
         let pool = crate::db::test_pool().await;
@@ -1914,7 +1924,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
-            FRIST,
+            FRIST_OHNE_RISS,
             || async { Some(osm_teil()) },
             || async { Some(mastr_teil()) },
         )

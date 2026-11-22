@@ -2,7 +2,11 @@ import { useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import {
+  darfEinsatzLeiten,
+  darfErfassungBeantragen,
+  darfImEinsatzSchreiben,
+} from '../einsatz/schreibrecht';
 import { useDichte, useHelligkeit, useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulFreigaben, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -82,6 +86,7 @@ export function useBefehle(
   });
   const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz);
   const darfLeiten = darfEinsatzLeiten(aktuellerEinsatz);
+  const darfErfassen = darfErfassungBeantragen(aktuellerEinsatz);
 
   /**
    * Der Speicher liegt in localStorage, nicht in React: gelesen wird bei JEDEM Render (höchstens
@@ -120,6 +125,7 @@ export function useBefehle(
         freigaben,
         darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
         darfEinsatzLeiten: darfLeiten,
+        darfErfassen,
         zuletztModulKeys,
         aktuellerModulKey,
         merkeModulBesuch: merkeBesuch,
@@ -149,6 +155,7 @@ export function useBefehle(
       freigaben,
       darfSchreibenImEinsatz,
       darfLeiten,
+      darfErfassen,
       navigate,
       setModus,
       setDichte,

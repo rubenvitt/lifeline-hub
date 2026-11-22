@@ -1,3 +1,4 @@
+import { waehlePerTastatur } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -220,18 +221,14 @@ test.describe(KAPITEL, () => {
     await page.getByRole('menuitem', { name: 'Ausgabe nachtragen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
     await dialog.getByLabel('Menge (EP)').fill('10');
-    await dialog.getByRole('combobox', { name: 'Stelle' }).click();
-    await page
-      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-      .locator(`.ant-select-item-option[title="${TURNHALLE}"]`)
-      .click();
+    // Per Tastatur (LLH-2002): unter angehaltener Uhr blenden Dialog und Liste verspätet ein und
+    // nehmen dabei keine Klicks an (`waehlePerTastatur` in `e2e/auswahl-kern.ts`).
+    await waehlePerTastatur(dialog.getByRole('combobox', { name: 'Stelle' }), TURNHALLE);
     await expect(dialog.getByLabel('Zuführungsziel')).toHaveCount(0);
     // Empfänger (LLH-1055): die eingetragene Menge bleibt, die Stärke belegt nur eine leere vor.
-    await dialog.getByRole('combobox', { name: 'Empfänger' }).click();
-    await page
-      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-      .locator(`.ant-select-item-option[title^="${STAFFEL}"]`)
-      .click();
+    await waehlePerTastatur(dialog.getByRole('combobox', { name: 'Empfänger' }), STAFFEL, {
+      beginntMit: true,
+    });
     await expect(dialog.getByLabel('Menge (EP)')).toHaveValue('10');
     await dialog.getByLabel('Menge (EP)').focus();
     await dialog.getByLabel('Menge (EP)').blur();

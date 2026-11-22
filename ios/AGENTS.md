@@ -19,6 +19,15 @@ Change `t39ltxxi-ios-huelle`.
 - **Wire-Format im Init-Skript:** Kennung `__LIFELINE_HUELLE__` und Befehle der Brücke stehen im
   Kopf von `ios/App/Huelle/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest führt das
   Skript aus (`frontend/src/test/huelle.ts`), eine Änderung zieht die Tests dort mit.
+- **Start ohne Server** (LLH-1980, ADR-0082): ohne erreichbaren Server lädt die App die
+  gespeicherte `index.html` **desselben** Servers per `loadSimulatedRequest` unter seiner
+  Adresse; die Assets kommen aus dem HTTP-Cache seines Datenspeichers. Vorgewärmt wird nach jedem
+  Laden vom Server mit `ios/App/Huelle/vorwaermen.js` und der Liste `assets` aus `/api/shell`;
+  was zu tun ist, entscheiden `Vorrat` und `Ablauf` im Kern, die Ablage hält `Vorratsablage`
+  (eine Datei je Server, gelöscht mit dem Server). Fährt die Oberfläche nicht hoch, gilt sie für
+  diesen App-Lauf nicht mehr. Die App-Tests prüfen das gegen einen https-Testserver, dessen CA
+  `scripts/ios/simulator-pruefung.sh` in jeden Simulator einträgt; der App-Code bekommt keine
+  Ausnahme bei der Zertifikatsprüfung.
 - **Gemeinsame Fälle:** Adressprüfung, Deeplink und Linkregeln prüft der Kern gegen
   `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
   JSON, nie nur in einen Swift-Test.

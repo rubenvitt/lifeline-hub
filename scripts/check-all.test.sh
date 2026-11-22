@@ -238,6 +238,18 @@ printf '#!/bin/sh\necho cargo-rot; exit 101\n' > "$ARBEIT/s19/bin/cargo"
 rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
 pruefe "17 Schritt 19 rot, wenn das Binary nicht übersetzt" 1 "$rc"
 
+# 18 — Schritt 19 prüft auch den karten-service ohne Dev-Abhängigkeiten (LLH-2038): er hat
+# `tokio/test-util` und `tower/util` nur über sie und wird sonst erst im Release ohne Testziele
+# gebaut. In EIGENEM Aufruf: mit dem Hauptpaket zusammen vereinigte Cargo die Features beider.
+printf '#!/bin/sh\necho "cargo-lief $*"\n' > "$ARBEIT/s19/bin/cargo"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "18 Schritt 19 grün mit karten-service" 0 "$rc"
+enthaelt "18 Schritt 19 prüft den karten-service" '^cargo-lief check -p karten-service$'
+fehlt "18 karten-service nicht im selben Aufruf wie das Binary" 'cargo-lief .*lifeline-hub.*karten-service|cargo-lief .*karten-service.*lifeline-hub'
+printf '#!/bin/sh\ncase "$*" in *karten-service*) echo karten-rot; exit 101 ;; esac\necho "cargo-lief $*"\n' > "$ARBEIT/s19/bin/cargo"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "18 Schritt 19 rot, wenn der karten-service nicht übersetzt" 1 "$rc"
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1

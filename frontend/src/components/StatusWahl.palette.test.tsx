@@ -72,7 +72,7 @@ interface Aufbau {
 function SuchenKnopf() {
   const { oeffne } = useCommandPalette();
   return (
-    <button type="button" onClick={oeffne}>
+    <button type="button" onClick={(e) => oeffne(e.currentTarget)}>
       Suchen
     </button>
   );

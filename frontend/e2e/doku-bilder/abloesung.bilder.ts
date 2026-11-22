@@ -77,6 +77,15 @@ function vor(basis: Date, minuten: number): Date {
   return new Date(basis.getTime() - minuten * 60_000);
 }
 
+/**
+ * Eine kurze Zeit im Bild: `1340`, oder `151340`, wenn sie in der Anzeigezone auf einen anderen
+ * Tag fällt als der Lauf (`zeitKurz`, LLH-1926). Die Füllungen liegen bis zu 4 h vor dem Lauf,
+ * zwischen Mitternacht und etwa 04:00 also auf dem Vortag. Die Uhr fest auf eine Tageszeit zu
+ * stellen trägt nicht: Fälligkeit und Vorwarnung rechnet der Server mit seiner Uhr (LLH-1913).
+ * Die genaue Schreibweise hält `src/abloesung/abloeserStand.test.ts` fest.
+ */
+const ZEIT = String.raw`(?:\d{4}|\d{6})`;
+
 async function liste<T>(api: APIRequestContext, pfad: string): Promise<T[]> {
   const antwort = await api.get(pfad);
   expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
@@ -172,13 +181,15 @@ test.describe(KAPITEL, () => {
         .getByRole('article', { name: 'Schicht Rettungsstaffel' })
         .locator('[data-lfh="abloesung-abloeser"]'),
     ).toHaveText(
-      /^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4} · eingetroffen \d{4} \(BR Sportplatz\)$/,
+      new RegExp(
+        String.raw`^Ablösung: 2\. Rettungsstaffel · alarmiert ${ZEIT} · eingetroffen ${ZEIT} \(BR Sportplatz\)$`,
+      ),
     );
     await expect(
       schichten
         .getByRole('article', { name: 'Schicht Sanitätszug Musterstadt' })
         .locator('[data-lfh="abloesung-planung-warnung"]'),
-    ).toHaveText(/^Sanitätsgruppe UHS steht selbst im Einsatz seit \d{4}$/);
+    ).toHaveText(new RegExp(String.raw`^Sanitätsgruppe UHS steht selbst im Einsatz seit ${ZEIT}$`));
     await fotografiere(schichten, KAPITEL, 'schichten');
   });
 

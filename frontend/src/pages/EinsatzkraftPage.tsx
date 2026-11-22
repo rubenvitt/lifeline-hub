@@ -46,7 +46,6 @@ import {
 import {
   SeitenFehler,
   SeitenNichtGefunden,
-  SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import {
@@ -92,6 +91,7 @@ import { statusKategorie } from '../theme/statusFarben';
 import { Marke } from '../components/instrument/Marke';
 import './EinsatzkraftPage.css';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 dayjs.extend(utc);
 
@@ -321,7 +321,7 @@ export default function EinsatzkraftPage() {
   // Die Perioden tragen die Einsatzdauer im Kopf: kämen sie nach dem ersten Bild, wüchse die
   // Meta in der Titelzeile, und alles darunter rückte (CLS 0,22 bei 1280 px, LLH-1060).
   if (einsatzQuery.isLoading || epQuery.isLoading || periodenQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="personal" />;
   }
   // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
   // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
@@ -351,7 +351,7 @@ export default function EinsatzkraftPage() {
         />
       );
     }
-    if (entlasseneQuery.isLoading) return <SeitenSkeleton />;
+    if (entlasseneQuery.isLoading) return <ModulGerippeSeite modulKey="personal" />;
     if (entlasseneQuery.isError || !entlasseneQuery.data) {
       return (
         <SeitenFehler

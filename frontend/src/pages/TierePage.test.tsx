@@ -259,6 +259,7 @@ describe('TierePage', () => {
    */
   it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(await screen.findByRole('heading', { level: 1, name: /Tiere/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
@@ -266,6 +267,7 @@ describe('TierePage', () => {
 
   it('Einsatzleitung sieht Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Tiere/ });
     expect(screen.getByRole('button', { name: 'Tier erfassen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();

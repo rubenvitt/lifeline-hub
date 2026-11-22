@@ -2232,6 +2232,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
   it('trägt Titel und Mono-Meta im Seitenkopf', async () => {
     basisHandler();
     renderSeite();
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(await screen.findByRole('heading', { level: 1, name: 'Lagekarte' })).toBeInTheDocument();
     // Schaden 9 ist verortet, UHS 5 (BHP 50) nicht.
     const meta = document.querySelector('[data-lfh="seitenkopf-meta"]') as HTMLElement;
@@ -2343,6 +2344,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
   it('führt im Seitenkopf den Datenstand, ohne Verbindung mit „offline"', async () => {
     basisHandler();
     renderSeite();
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     const kopf = await waitFor(() => {
       const el = document.querySelector('[data-lfh="seitenkopf"]') as HTMLElement | null;
       expect(el).not.toBeNull();

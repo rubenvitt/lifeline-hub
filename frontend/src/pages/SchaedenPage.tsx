@@ -42,7 +42,7 @@ import Datensicht, {
   type DatensichtSortierung,
   type Kartenplan,
 } from '../components/Datensicht';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -53,6 +53,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 import { useAdressWert } from '../routing/useAdressWert';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -346,7 +347,7 @@ export default function SchaedenPage() {
    * wie auf `PersonenPage`/`TierePage`.
    */
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="schaeden" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

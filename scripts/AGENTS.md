@@ -12,7 +12,8 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
 `swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
-`cargo build --bin lifeline-hub` (Schritt 19, Bündel `rust` und allein `binaer`, LLH-2033) →
+`cargo build --bin lifeline-hub` + `cargo check -p karten-service` (Schritt 19, Bündel `rust` und
+allein `binaer`, LLH-2033/LLH-2038) →
 `gradlew -p android/kern test` (Schritt 20, Bündel `android`, LLH-1989; ohne Java 17+ eine
 Lücke, mit `ANDROID_KERN_PFLICHT=1` rot).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
@@ -22,6 +23,10 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, …). Was ein Feature nur über sie
   hat, ist dort grün und bricht im Release. Schritt 19 baut deshalb nur das Binary, ohne
   Testziele; nie `--all-targets`, `--tests` oder `cargo test` dort (`check-all.test.sh`, Fall 17).
+  Den karten-service (`tokio/test-util`, `tower/util` nur als Dev-Features) prüft er ebenso, in
+  **eigenem** Cargo-Aufruf: in einem gemeinsamen vereinigte Cargo die Features beider Pakete
+  (LLH-2038, Fall 18). Ein weiteres Workspace-Mitglied, das ohne Testziele erst im Release gebaut
+  wird und Features nur über Dev-Abhängigkeiten hat, kommt genauso dazu.
 - **Leichte PR-Prüfung** (LLH-1889/LLH-1896, ADR-0048; ersetzt die zwei Stufen von LLH-1662):
   - **Ein Workflow je Ereignis:** `pr.yml` läuft nur am PR, `ci.yml` nur bei Push auf `alpha`,
     `beta`, `main`; was nur bei Push läuft (`migrationen-kanal.yml`, `ruleset.yml`), hat keinen

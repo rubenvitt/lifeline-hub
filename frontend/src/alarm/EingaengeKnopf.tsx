@@ -19,8 +19,7 @@ import { BENACHRICHTIGUNGEN_PFAD } from '../routing/deeplinks';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { verlaufInhalt, type VerlaufInhalt } from './benachrichtigungGedaechtnis';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
-import { ladeErinnerungTitel } from './erinnerungInhalt';
-import { ladeMeldungInhalt } from './meldungInhalt';
+import { ladeHinweisInhalt, titelMit } from './hinweisInhalt';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
 import { EINGANG_ARTEN, setzeStumm, useStummeArten } from './eingaengeStumm';
 import EingaengeZahl from './EingaengeZahl';
@@ -39,8 +38,9 @@ function istNeu(a: BenachrichtigungAnzeige): boolean {
 
 /**
  * Was der Eintrag unter „Neu“ zeigt (LLH-1737, Spec `benachrichtigungen`, „Der Verlauf nennt den
- * Inhalt einer Meldung“): bei einer Meldung Absender und Wortlautanfang (`meldungInhalt.ts`), bei
- * einer fälligen Erinnerung ihr Titel (`erinnerungInhalt.ts`), wie Alarmzone und Eingangsband.
+ * Inhalt einer Meldung“): bei einer Meldung Absender und Wortlautanfang, bei einer fälligen
+ * Erinnerung ihr Titel, bei Auftrag, Befehl, Lagebericht, Gefahr, Nachforderung und Chat ihr
+ * Gegenstand (LLH-1909, `hinweisInhalt.ts`), wie Alarmzone und Eingangsband.
  * Nur für Neues: „Früher“ kann 200 Einträge lang sein, und dort ist alles schon gelesen.
  */
 /**
@@ -57,12 +57,10 @@ function useVerlaufInhalt(a: BenachrichtigungAnzeige): VerlaufInhalt {
   useEffect(() => {
     if (!neu || verlaufInhalt.has(a.id)) return;
     let aktiv = true;
-    void Promise.all([ladeMeldungInhalt(a), ladeErinnerungTitel(a, qc)]).then(([m, titel]) => {
-      const wert: VerlaufInhalt | null = m
-        ? { titel: m.titel ?? a.titel, detail: m.anfang ?? a.detail }
-        : titel
-          ? { titel: `${a.titel}: ${titel}`, detail: a.detail }
-          : null;
+    void ladeHinweisInhalt(a, { pfad: a.pfad, qc }).then((inhalt) => {
+      const wert: VerlaufInhalt | null = inhalt
+        ? { titel: titelMit(a.titel, inhalt), detail: inhalt.anfang ?? a.detail }
+        : null;
       // Nur ein Inhalt wird gemerkt: lief die Frist ab oder fehlte das Netz, holt das nächste
       // Öffnen neu (Review vor dem PR). Eine Art ohne Inhalt fragt ohnehin nicht nach.
       if (wert) verlaufInhalt.set(a.id, wert);

@@ -898,10 +898,27 @@ describe('EinsatzabschnittePage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
 
-    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
+    const hinweis = await screen.findByText('Stand womöglich veraltet');
+    // In der festen Standzeile statt als Balken über dem Baum (LLH-1927): sein Erscheinen schiebt
+    // den Baum unter dem Zeiger nicht, und „Live“ steht nicht mehr da.
+    const stand = document.querySelector('[data-lfh="gliederung-stand"]') as HTMLElement;
+    expect(stand.contains(hinweis)).toBe(true);
+    expect(stand).not.toHaveTextContent('Live');
+    expect(hinweis).toHaveAttribute(
+      'title',
+      'Aktualisierung fehlgeschlagen · Stand womöglich veraltet',
+    );
+    expect(document.querySelector('.ant-alert')).toBeNull();
     // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
     expect(within(screen.getByRole('tree')).getByText('Nord')).toBeInTheDocument();
     expect(screen.queryByText('Abschnitte konnten nicht geladen werden')).not.toBeInTheDocument();
+
+    // Glückt der neue Abruf, geht der Hinweis; der Fokus bleibt auf der Standzeile.
+    server.use(...handlers());
+    await userEvent.click(within(stand).getByRole('button', { name: 'Erneut abrufen' }));
+    await waitFor(() => expect(screen.queryByText('Stand womöglich veraltet')).toBeNull());
+    expect(stand).toHaveFocus();
+    expect(stand).toHaveTextContent('Live');
   });
 
   /**
@@ -1219,6 +1236,22 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Organigramm' }));
     await screen.findByRole('region', { name: 'Organigramm' });
     expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+  });
+
+  it('meldet einen veralteten Stand in der Standzeile des Organigramms, nicht darüber (LLH-1927)', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    const { client } = rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
+    await within(organigramm).findByRole('link', { name: 'Nord' });
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 500 })),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
+    const hinweis = await screen.findByText('Stand womöglich veraltet');
+    const stand = organigramm.querySelector('[data-lfh="org-stand"]') as HTMLElement;
+    expect(stand.contains(hinweis)).toBe(true);
+    expect(document.querySelector('.ant-alert')).toBeNull();
+    expect(within(organigramm).getByRole('link', { name: 'Nord' })).toBeInTheDocument();
   });
 
   it('?ansicht=organigramm öffnet das Organigramm und bleibt in der Adresse (LLH-1826)', async () => {
