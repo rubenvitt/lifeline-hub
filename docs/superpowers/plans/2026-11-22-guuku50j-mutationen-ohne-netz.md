@@ -66,5 +66,5 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/guuku50jetu1zqkmbruioj69
 
 - [x] **Step 1:** Regel in `offline/AGENTS.md`: Mutationen pausieren nie — `erzeugeQueryClient` setzt `networkMode: 'always'` als Vorgabe; ohne Netz scheitern sie mit `NetzFehler`, die Erfassungshülle zeigt den Grund; was ohne Netz gelten soll, geht über die Offline-Queue. Herleitung: Spec-Pfad.
 - [x] **Step 2:** Kommentare anpassen.
-- [ ] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 4:** Commit `docs(frontend): Regel „Mutationen pausieren nie“ (LLH-1950)`.
+- [x] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün. (Lokal: Bündel `schnell` und `frontend` grün, 22681 Vitest-Tests; die Rust-Suite sprengte das Plattenkontingent des Containers — der Diff ändert kein Rust und keine von Rust gelesene Datei.)
+- [x] **Step 4:** Commit `docs(frontend): Regel „Mutationen pausieren nie“ (LLH-1950)`.
