@@ -373,4 +373,12 @@ final class Attrappe: Huellendienste {
     }
     var anmeldungen = 0
     func startAnmeldung() throws { anmeldungen += 1 }
+    var registrierungen = 0
+    var abmeldungen = 0
+    func registerPush() async throws -> PushRegistrierung {
+        registrierungen += 1
+        return PushRegistrierung(kennung: "k", token: "t", umgebung: "sandbox", schluessel: "s")
+    }
+    func unregisterPush() async throws { abmeldungen += 1 }
+    func pushState() async -> (Meldungsfreigabe, kennung: String?) { (freigabe, nil) }
 }

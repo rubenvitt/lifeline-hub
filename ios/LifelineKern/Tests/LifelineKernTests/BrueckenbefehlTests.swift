@@ -34,6 +34,12 @@ final class BrueckenbefehlTests: XCTestCase {
         XCTAssertEqual(Bruecke.parse(["cmd": "sign_in_with_browser", "id": 8]), .signInWithBrowser(id: 8))
     }
 
+    func testParseKenntDiePushBefehle() {
+        XCTAssertEqual(Bruecke.parse(["cmd": "push_register", "id": 1]), .pushRegister(id: 1))
+        XCTAssertEqual(Bruecke.parse(["cmd": "push_unregister", "id": 2]), .pushUnregister(id: 2))
+        XCTAssertEqual(Bruecke.parse(["cmd": "push_state", "id": 3]), .pushState(id: 3))
+    }
+
     func testFehlerhafteNachrichtenMitIdBekommenEineAblehnung() {
         let faelle: [[String: Any]] = [
             ["cmd": "show_notification", "id": 1],
@@ -183,6 +189,65 @@ final class BrueckenbefehlTests: XCTestCase {
     }
 
     @MainActor
+    func testPushRegisterLiefertKennungTokenUmgebungSchluessel() async {
+        let dienste = Dienste()
+        let antwort = await Brueckenausfuehrung.run(.pushRegister(id: 5), dienste: dienste)
+        XCTAssertEqual(
+            antwort,
+            Brueckenantwort(
+                id: 5, fehler: nil,
+                wert: .objekt([
+                    "registration_id": "kennung-1", "token": "abcd", "environment": "sandbox",
+                    "key": "schluessel-1",
+                ])))
+        XCTAssertEqual(dienste.registrierungen, 1)
+    }
+
+    @MainActor
+    func testPushRegisterVerweigertMeldetDenied() async {
+        let dienste = Dienste()
+        dienste.registrierungFehler = .denied
+        let a = await Brueckenausfuehrung.run(.pushRegister(id: 6), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 6, fehler: "denied", wert: .null))
+        dienste.registrierungFehler = .unavailable
+        let b = await Brueckenausfuehrung.run(.pushRegister(id: 7), dienste: dienste)
+        XCTAssertEqual(b, Brueckenantwort(id: 7, fehler: "unavailable", wert: .null))
+    }
+
+    @MainActor
+    func testPushUnregisterUndPushStateAntworten() async {
+        let dienste = Dienste()
+        dienste.freigabe = .erlaubt
+        dienste.kennung = "kennung-1"
+        let a = await Brueckenausfuehrung.run(.pushUnregister(id: 1), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 1, fehler: nil, wert: .null))
+        XCTAssertEqual(dienste.abmeldungen, 1)
+        let b = await Brueckenausfuehrung.run(.pushState(id: 2), dienste: dienste)
+        XCTAssertEqual(
+            b,
+            Brueckenantwort(
+                id: 2, fehler: nil,
+                wert: .objekt(["permission": "granted", "registration_id": "kennung-1"])))
+        dienste.freigabe = .offen
+        dienste.kennung = nil
+        let c = await Brueckenausfuehrung.run(.pushState(id: 3), dienste: dienste)
+        XCTAssertEqual(
+            c, Brueckenantwort(id: 3, fehler: nil, wert: .objekt(["permission": "undetermined"])))
+        dienste.freigabe = .verweigert
+        let d = await Brueckenausfuehrung.run(.pushState(id: 4), dienste: dienste)
+        XCTAssertEqual(
+            d, Brueckenantwort(id: 4, fehler: nil, wert: .objekt(["permission": "denied"])))
+    }
+
+    @MainActor
+    func testDieAntwortMitObjektIstEinJsObjekt() {
+        XCTAssertEqual(
+            Bruecke.replyScript(
+                Brueckenantwort(id: 1, fehler: nil, wert: .objekt(["b": "x\"y", "a": "1"]))),
+            #"window.__LIFELINE_REPLY__?.(1, null, {"a":"1","b":"x\"y"});"#)
+    }
+
+    @MainActor
     func testEinFehlerDesSystemsGehtAlsAblehnungAnDieSeite() async {
         let dienste = Dienste()
         dienste.wirft = true
@@ -238,6 +303,10 @@ private final class Dienste: Huellendienste {
     var badges: [Int] = []
     var drucke = 0
     var anmeldungen = 0
+    var registrierungen = 0
+    var abmeldungen = 0
+    var kennung: String?
+    var registrierungFehler: PushFehler?
 
     func play(_ feedback: Haptik.Feedback) { gespielt.append(feedback) }
 
@@ -268,4 +337,15 @@ private final class Dienste: Huellendienste {
         if wirft { throw Kaputt() }
         anmeldungen += 1
     }
+
+    func registerPush() async throws -> PushRegistrierung {
+        if let fehler = registrierungFehler { throw fehler }
+        registrierungen += 1
+        return PushRegistrierung(
+            kennung: "kennung-1", token: "abcd", umgebung: "sandbox", schluessel: "schluessel-1")
+    }
+
+    func unregisterPush() async throws { abmeldungen += 1 }
+
+    func pushState() async -> (Meldungsfreigabe, kennung: String?) { (freigabe, kennung) }
 }

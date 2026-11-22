@@ -73,6 +73,16 @@ final class Systemdienste: Huellendienste {
     }
 
     func startAnmeldung() throws { try anmelder.start() }
+
+    // Push über APNs: die Anbindung an APNs und den Schlüsselbund folgt mit der Extension (Aufgabe
+    // 10); bis dahin meldet die Hülle ehrlich „nicht verfügbar“.
+    func registerPush() async throws -> PushRegistrierung { throw PushFehler.unavailable }
+
+    func unregisterPush() async throws {}
+
+    func pushState() async -> (Meldungsfreigabe, kennung: String?) {
+        (await Mitteilungen.freigabe(), nil)
+    }
 }
 
 struct Druckfehler: LocalizedError {

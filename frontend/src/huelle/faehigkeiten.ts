@@ -26,6 +26,19 @@ declare global {
       readonly anmeldungImBrowser?: () => Promise<unknown>;
       readonly benachrichtigungZeigen?: (titel: string, text?: string) => Promise<unknown>;
       readonly setAppBadge?: (count: number) => Promise<unknown>;
+      /** Die iOS-Hülle kann Push über APNs (`push_register`, `push_unregister`, `push_state`). */
+      readonly push?: boolean;
+      readonly pushRegister?: () => Promise<{
+        registration_id: string;
+        token: string;
+        environment: string;
+        key: string;
+      }>;
+      readonly pushUnregister?: () => Promise<unknown>;
+      readonly pushState?: () => Promise<{
+        permission: 'granted' | 'denied' | 'undetermined';
+        registration_id?: string;
+      }>;
     };
   }
 }
