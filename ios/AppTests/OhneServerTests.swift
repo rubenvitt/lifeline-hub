@@ -138,9 +138,14 @@ final class OhneServerTests: XCTestCase {
     /// Zwei Anstöße kurz nacheinander (Laden und Prüfen danach) wärmen nur einmal vor.
     func testGleichzeitigesVorwaermenLaeuftNurEinmal() async throws {
         let online = try await ladeOnline()
-        async let erstes: Void = vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
-        async let zweites: Void = vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
-        _ = await (erstes, zweites)
+        // Nur Sendable-Werte in die Tasks: die Testklasse selbst ist es nicht.
+        let dienst: Vorratsdienst = vorrat
+        let ziel: ServerEintrag = eintrag
+        let neu = info("1.0")
+        let erstes = Task { @MainActor in await dienst.vorwaermen(ziel, info: neu, in: online) }
+        let zweites = Task { @MainActor in await dienst.vorwaermen(ziel, info: neu, in: online) }
+        await erstes.value
+        await zweites.value
         XCTAssertEqual(server.abrufe["/"], 2)
         XCTAssertEqual(vorrat.ablage.load(eintrag.id)?.version, "1.0")
     }
