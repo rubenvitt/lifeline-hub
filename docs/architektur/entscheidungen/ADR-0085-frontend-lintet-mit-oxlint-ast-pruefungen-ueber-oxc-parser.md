@@ -1,5 +1,5 @@
 ---
-id: ADR-0083
+id: ADR-0085
 titel: Das Frontend lintet mit oxlint, eigene AST-Prüfungen lesen über oxc-parser, typgeprüft wird mit TypeScript 7
 status: akzeptiert
 datum: 2026-11-22
@@ -12,7 +12,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-g2gwgpxa-oxlint-typescript-7-design.md
 ---
 
-# ADR-0083: Das Frontend lintet mit oxlint, eigene AST-Prüfungen lesen über oxc-parser, typgeprüft wird mit TypeScript 7
+# ADR-0085: Das Frontend lintet mit oxlint, eigene AST-Prüfungen lesen über oxc-parser, typgeprüft wird mit TypeScript 7
 
 ## Regeln
 

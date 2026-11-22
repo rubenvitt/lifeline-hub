@@ -2008,7 +2008,7 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 
 ## Frontend — Lint-Disziplin
 
-- **oxlint** (LLH-2020, ADR-0083): `pnpm lint` = `oxlint --deny-warnings
+- **oxlint** (LLH-2020, ADR-0085): `pnpm lint` = `oxlint --deny-warnings
 --report-unused-disable-directives`. Jede Warnung und jede tote Direktive bricht das Gate;
   Warnungen an der Wurzel beheben. Das Regelset steht einzeln in `.oxlintrc.json` (keine
   Kategorien), damit ein oxlint-Update keine Regel still einschaltet; eine neue Regel ist eine
