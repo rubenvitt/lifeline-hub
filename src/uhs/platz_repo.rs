@@ -251,40 +251,46 @@ pub async fn setze_verfuegbarkeit(
             "Reservierung erfordert eine Ziel-Person".into(),
         ));
     }
-    // Reservierung erfordert unbelegten Platz (Spec: Verfügbarkeits-Statuswechsel,
-    // letzter Punkt — andere Wechsel sind auch bei aktiver Belegung erlaubt).
-    if verfuegbarkeit == "reserviert" {
-        if ist_belegt(pool, uhs_id, id).await? {
-            return Err(AppError::UnprocessableEntity(
-                "Platz ist belegt — Reservierung nicht möglich".into(),
-            ));
-        }
-    }
     let neue_person_fk = if verfuegbarkeit == "reserviert" {
         person_id
     } else {
         None
     };
-    let ergebnis = sqlx::query(
-        "UPDATE uhs_platz SET verfuegbarkeit = ?, reserviert_fuer_person_id = ? \
-         WHERE id = ? AND uhs_id = ?",
-    )
-    .bind(verfuegbarkeit)
-    .bind(neue_person_fk)
-    .bind(id)
-    .bind(uhs_id)
-    .execute(pool)
-    .await?;
-    if ergebnis.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    laden(pool, uhs_id, id).await
+    // Belegungsprüfung und UPDATE in EINER Schreibtransaktion (LLH-1878): Eintritt und Wechsel
+    // laufen ebenfalls unter `write_retry!`, eine Belegung kann also nicht zwischen Prüfung und
+    // Reservierung committen.
+    crate::write_retry!(pool, |conn| {
+        // Reservierung erfordert unbelegten Platz (Spec: Verfügbarkeits-Statuswechsel,
+        // letzter Punkt — andere Wechsel sind auch bei aktiver Belegung erlaubt).
+        if verfuegbarkeit == "reserviert" && ist_belegt(&mut *conn, uhs_id, id).await? {
+            return Err(AppError::UnprocessableEntity(
+                "Platz ist belegt — Reservierung nicht möglich".into(),
+            ));
+        }
+        let ergebnis = sqlx::query(
+            "UPDATE uhs_platz SET verfuegbarkeit = ?, reserviert_fuer_person_id = ? \
+             WHERE id = ? AND uhs_id = ?",
+        )
+        .bind(verfuegbarkeit)
+        .bind(neue_person_fk)
+        .bind(id)
+        .bind(uhs_id)
+        .execute(&mut *conn)
+        .await?;
+        if ergebnis.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+        laden(&mut *conn, uhs_id, id).await
+    })
 }
 
 /// Ob eine Person auf dem Platz `id` der UHS `uhs_id` liegt. Ein Platz einer anderen UHS gilt als
 /// unbelegt (LLH-1694): Der Schreibweg danach trifft ihn nicht und endet mit 404, sonst verriete
 /// 409 bzw. 422 gegen 404 die Belegung fremder Plätze.
-async fn ist_belegt(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<bool, AppError> {
+///
+/// Läuft auf der Verbindung der Schreibtransaktion des Aufrufers, damit Prüfung und Schreiben
+/// atomar sind (LLH-1878).
+async fn ist_belegt(conn: &mut SqliteConnection, uhs_id: i64, id: i64) -> Result<bool, AppError> {
     let belegt: Option<i64> = sqlx::query_scalar(
         "SELECT ep.id FROM einsatz_person ep \
          JOIN uhs_platz p ON p.id = ep.aktueller_platz_id \
@@ -292,29 +298,33 @@ async fn ist_belegt(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<bool, App
     )
     .bind(id)
     .bind(uhs_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     Ok(belegt.is_some())
 }
 
 /// Soft-Delete eines Platzes; blockt mit `Conflict`, wenn aktuell belegt (nur Plätze der UHS im
-/// Pfad, [`ist_belegt`]).
+/// Pfad, [`ist_belegt`]). Prüfung und Storno teilen eine Schreibtransaktion (LLH-1878), sonst
+/// könnte ein Eintritt oder Wechsel dazwischen committen und die Person läge auf einem
+/// stornierten Platz.
 pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), AppError> {
-    if ist_belegt(pool, uhs_id, id).await? {
-        return Err(AppError::Conflict(
-            "Platz ist aktuell belegt — Storno nicht möglich".into(),
-        ));
-    }
-    crate::storno::storniere(
-        &mut *pool.acquire().await?,
-        "uhs_platz",
-        "uhs_id",
-        uhs_id,
-        id,
-        crate::storno::Vermerk::Keiner,
-        None,
-    )
-    .await
+    crate::write_retry!(pool, |conn| {
+        if ist_belegt(&mut *conn, uhs_id, id).await? {
+            return Err(AppError::Conflict(
+                "Platz ist aktuell belegt — Storno nicht möglich".into(),
+            ));
+        }
+        crate::storno::storniere(
+            &mut *conn,
+            "uhs_platz",
+            "uhs_id",
+            uhs_id,
+            id,
+            crate::storno::Vermerk::Keiner,
+            None,
+        )
+        .await
+    })
 }
 
 #[cfg(test)]
@@ -768,6 +778,116 @@ mod tests {
                 .await
                 .unwrap();
         assert!(storniert.is_none());
+    }
+
+    /// Ein anderer Schreiber hält die Schreibsperre und legt `person` auf den Platz, ohne schon
+    /// zu committen; der Aufrufer startet währenddessen seinen Schreibweg und committet die
+    /// Belegung danach (LLH-1878).
+    async fn belege_unter_gehaltener_sperre<T, F>(
+        pool: &SqlitePool,
+        uhs_id: i64,
+        platz_id: i64,
+        person: i64,
+        schreibweg: F,
+    ) -> T
+    where
+        T: Send + 'static,
+        F: std::future::Future<Output = T> + Send + 'static,
+    {
+        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        sqlx::query(
+            "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?",
+        )
+        .bind(uhs_id)
+        .bind(platz_id)
+        .bind(person)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let handle = tokio::spawn(schreibweg);
+        // Der Schreibweg erreicht seine Prüfung und wartet auf die Sperre.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        tx.commit().await.unwrap();
+        handle.await.unwrap()
+    }
+
+    /// LLH-1878: Belegt jemand den Platz, während der Storno läuft, darf der Storno den Platz
+    /// nicht unter der Person wegnehmen. Prüfung und Storno teilen eine Transaktion; der Storno
+    /// sieht die Belegung und endet mit 409.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn storniere_unter_gleichzeitiger_belegung_ist_409() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (_b, _e, u, _, pb) = setup(&pool).await;
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 1",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let pool_a = pool.clone();
+        let ergebnis = belege_unter_gehaltener_sperre(&pool, u, p.id, pb, async move {
+            storniere(&pool_a, u, p.id).await
+        })
+        .await;
+
+        assert!(
+            matches!(ergebnis, Err(AppError::Conflict(_))),
+            "Storno eines gerade belegten Platzes → 409, war {ergebnis:?}"
+        );
+        let storniert: Option<String> =
+            sqlx::query_scalar("SELECT storniert_at FROM uhs_platz WHERE id = ?")
+                .bind(p.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(storniert.is_none(), "belegter Platz bleibt bestehen");
+    }
+
+    /// LLH-1878: Dasselbe Rennen beim Reservieren: Belegt jemand den Platz, während die
+    /// Reservierung läuft, bleibt der Platz frei und die Reservierung endet mit 422.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reservieren_unter_gleichzeitiger_belegung_ist_422() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (_b, _e, u, pa, pb) = setup(&pool).await;
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 1",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let pool_a = pool.clone();
+        let ergebnis = belege_unter_gehaltener_sperre(&pool, u, p.id, pb, async move {
+            setze_verfuegbarkeit(&pool_a, u, p.id, "reserviert", Some(pa)).await
+        })
+        .await;
+
+        assert!(
+            matches!(ergebnis, Err(AppError::UnprocessableEntity(_))),
+            "Reservieren eines gerade belegten Platzes → 422, war {ergebnis:?}"
+        );
+        let (verf, fuer): (String, Option<i64>) = sqlx::query_as(
+            "SELECT verfuegbarkeit, reserviert_fuer_person_id FROM uhs_platz WHERE id = ?",
+        )
+        .bind(p.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(verf, "frei");
+        assert!(fuer.is_none());
     }
 
     #[tokio::test]
