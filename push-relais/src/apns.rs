@@ -21,6 +21,36 @@ const ABLAUF_SEKUNDEN: i64 = 12 * 3600;
 /// Frist je Anfrage an Apple. Apple antwortet gewöhnlich in Millisekunden; wer länger hängt,
 /// wird `Fehler`, statt den Aufruf aufzuhalten (`senden::GESAMTFRIST` begrenzt den ganzen).
 pub const APNS_FRIST: Duration = Duration::from_secs(5);
+/// Größter Push, den Apple annimmt (Körper der Anfrage samt `aps`), in Byte.
+pub const RUMPF_MAX: usize = 4096;
+/// Längste `apns-collapse-id`, die Apple annimmt, in Byte.
+pub const KOLLAPS_MAX: usize = 64;
+/// Gerätetoken haben höchstens 100 Byte, also 200 Hex-Zeichen.
+const TOKEN_MAX: usize = 200;
+
+/// Der Körper des Pushs an Apple: Rückfalltitel und Stufe der Mitteilung, dazu der
+/// verschlüsselte Teil `l`, den nur die Extension auf dem Gerät öffnet.
+pub fn rumpf(n: &Nachricht) -> Vec<u8> {
+    let (titel, stufe) = match n.stufe {
+        Stufe::Alarm => ("Alarm", "time-sensitive"),
+        Stufe::Hinweis => ("Neue Benachrichtigung", "active"),
+    };
+    serde_json::to_vec(&serde_json::json!({
+        "aps": {
+            "alert": { "title": titel },
+            "sound": "default",
+            "mutable-content": 1,
+            "interruption-level": stufe,
+        },
+        "l": n.nutzlast,
+    }))
+    .unwrap_or_default()
+}
+
+/// Ob Apple die Kollaps-Kennung annimmt: höchstens [`KOLLAPS_MAX`] Byte sichtbares ASCII.
+pub fn kollaps_gueltig(kollaps: &str) -> bool {
+    kollaps.len() <= KOLLAPS_MAX && kollaps.bytes().all(|b| b.is_ascii_graphic())
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -147,7 +177,10 @@ impl ApnsClient {
     /// Eine Nachricht an Apple. Kein Wiederholen; Token und Nutzlast nie ins Log.
     pub async fn senden(&self, n: &Nachricht) -> Ergebnis {
         // Gerätetoken sind hexadezimal; alles andere gehört nicht in den Pfad.
-        if n.token.is_empty() || !n.token.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if n.token.is_empty()
+            || n.token.len() > TOKEN_MAX
+            || !n.token.bytes().all(|b| b.is_ascii_hexdigit())
+        {
             return Ergebnis::TokenUngueltig;
         }
         let (basis, client) = match n.umgebung {
@@ -159,19 +192,6 @@ impl ApnsClient {
         } else {
             client
         };
-        let (titel, stufe) = match n.stufe {
-            Stufe::Alarm => ("Alarm", "time-sensitive"),
-            Stufe::Hinweis => ("Neue Benachrichtigung", "active"),
-        };
-        let rumpf = serde_json::json!({
-            "aps": {
-                "alert": { "title": titel },
-                "sound": "default",
-                "mutable-content": 1,
-                "interruption-level": stufe,
-            },
-            "l": n.nutzlast,
-        });
         let jetzt = jetzt_sekunden();
         let mut anfrage = client
             .post(format!("{basis}/3/device/{}", n.token))
@@ -183,7 +203,8 @@ impl ApnsClient {
             .header("apns-push-type", "alert")
             .header("apns-priority", "10")
             .header("apns-expiration", (jetzt + ABLAUF_SEKUNDEN).to_string())
-            .json(&rumpf);
+            .header("content-type", "application/json")
+            .body(rumpf(n));
         if let Some(kollaps) = n.kollaps.as_deref().filter(|k| !k.is_empty()) {
             anfrage = anfrage.header("apns-collapse-id", kollaps);
         }

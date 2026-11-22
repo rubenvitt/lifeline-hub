@@ -895,7 +895,7 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
   mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
   dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
 - **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
-  4096 Byte für den ganzen Push, das Relais 4096 Zeichen für den Umschlag). Zu langes kürzt
+  4096 Byte für den ganzen Push, das Relais weist einen größeren Push mit 400 ab). Zu langes kürzt
   `inhalt::kuerzen` in der Folge Wortlaut, Detail, Absender; Titel und Pfad nie.
 - **Je Gerät eine eigene Verschlüsselung** (`nutzlast_bauen`, Vertrag mit der Extension im
   gemeinsamen Fall `src-tauri/faelle/push-nutzlast.json`); Kollaps-Kennung `kollaps` aus

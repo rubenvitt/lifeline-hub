@@ -43,8 +43,8 @@ Release-Builds in der Produktion).
 | `PUSH_RELAIS_APNS_TEAM_ID` | leer | Team ID des Entwicklerkontos. **Pflicht.** |
 | `PUSH_RELAIS_BUNDLE_ID` | `dev.rubeen.lifeline.ios` | Bundle-ID der App; geht als `apns-topic` an Apple. |
 | `PUSH_RELAIS_LIMIT_MINUTE` | `600` | Nachrichten je Server und Minute; darüber antwortet das Relais mit 429. |
-| `PUSH_RELAIS_REGISTRIERUNGEN_STUNDE` | `10` | Registrierungen (`POST /v1/server`) je IP und Stunde. |
-| `PUSH_RELAIS_HINTER_PROXY` | `false` | Hinter einem TLS-Proxy `true`: dann zählt der erste Eintrag von `X-Forwarded-For` als Client-IP, sonst die Peer-Adresse. |
+| `PUSH_RELAIS_REGISTRIERUNGEN_STUNDE` | `10` | Registrierungen (`POST /v1/server`) je IP und Stunde; IPv6 zählt je /64. |
+| `PUSH_RELAIS_HINTER_PROXY` | `false` | Hinter einem TLS-Proxy `true`: dann zählt der letzte (rechte) Eintrag von `X-Forwarded-For` als Client-IP, den der Proxy anhängt, sonst die Peer-Adresse. |
 | `RUST_LOG` | `info` | Log-Stufe. |
 
 Zwei weitere Variablen (`PUSH_RELAIS_APNS_BASIS_PRODUCTION`, `PUSH_RELAIS_APNS_BASIS_SANDBOX`)
@@ -56,6 +56,18 @@ zeigt die übrigen.
 veröffentlichen: sonst zählt die Registrierungsgrenze nur die Adresse des Proxys, und zehn
 Registrierungen von irgendwo sperren sie für alle. Umgekehrt darf der Schalter ohne Proxy nicht
 gesetzt sein, weil dann jeder Client seine Adresse selbst wählt.
+
+**Annahme: genau ein Proxy vor dem Relais, und er hängt die Adresse seines Gegenübers an
+`X-Forwarded-For` an** (Traefik und nginx mit `proxy_add_x_forwarded_for` tun das). Das Relais
+nimmt den rechten Eintrag; alles links davon kann der Client selbst mitschicken und zählt nicht.
+Steht ein zweiter Proxy davor (etwa ein CDN), wäre der rechte Eintrag dessen Adresse: dann den
+inneren Proxy so einstellen, dass er die echte Client-Adresse als einzigen Eintrag setzt.
+
+Weitere Grenzen der Registrierung: der Körper höchstens 4 KiB (sonst 413), `version` 1 bis 64
+sichtbare ASCII-Zeichen und `kontakt` höchstens 200 Zeichen ohne Steuerzeichen (sonst 400). Ein
+`senden`-Aufruf ist auf 512 KiB begrenzt (413); eine Nachricht, deren Push bei Apple über
+4096 Byte käme oder deren `kollaps` länger als 64 Byte oder kein sichtbares ASCII ist, weist das
+Relais mit 400 ab, ein Token über 200 Hex-Zeichen wird `token_ungueltig`.
 
 ## Start per Abbild
 
@@ -114,8 +126,9 @@ Server nicht an (gesperrt seit …). Bitte den Betreiber des Relais informieren.
 dort mit bis zu einem Tag Verzug:** nach 24 Stunden versucht der nächste Versand es einmal mit
 demselben Zugang; nimmt das Relais ihn an, fällt die Sperre, antwortet es wieder 403, gilt sie ab
 dann weitere 24 Stunden. Löscht der Betreiber des Lifeline-Servers die Zeile, meldet sich der Server
-beim nächsten Versand mit neuer `server_id` an; eine Sperre lässt sich so umgehen, begrenzt nur
-durch die Registrierungen je IP und Stunde
+beim nächsten Versand mit neuer `server_id` an. **Eine Sperre gilt nur für diese eine
+`server_id`**: ein Betreiber, der sich neu registriert, bekommt eine neue, begrenzt nur durch die
+Registrierungen je IP (IPv6: je /64) und Stunde
 ([Risiko R48](../architektur/11-risiken-und-technische-schulden.md)).
 
 ## Sicherung

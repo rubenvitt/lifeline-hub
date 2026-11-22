@@ -36,8 +36,8 @@ pub struct RelaisConfig {
     /// Registrierungen je IP und Stunde.
     #[arg(long, env = "PUSH_RELAIS_REGISTRIERUNGEN_STUNDE", default_value_t = 10)]
     pub registrierungen_stunde: u32,
-    /// Hinter einem Reverse-Proxy zählt der erste Eintrag von `X-Forwarded-For` als Client-IP;
-    /// sonst die Peer-Adresse.
+    /// Hinter einem Reverse-Proxy zählt der letzte (rechte) Eintrag von `X-Forwarded-For` als
+    /// Client-IP, den der Proxy anhängt; sonst die Peer-Adresse.
     #[arg(long, env = "PUSH_RELAIS_HINTER_PROXY", default_value_t = false)]
     pub hinter_proxy: bool,
     #[arg(

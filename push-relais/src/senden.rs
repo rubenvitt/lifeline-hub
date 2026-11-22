@@ -1,7 +1,7 @@
 //! `POST /v1/senden`: prüft den Server, begrenzt und reicht Nachrichten an APNs weiter.
 use crate::{
     api::RelaisState,
-    apns::{Ergebnis, Nachricht},
+    apns::{self, Ergebnis, Nachricht},
     speicher::{self, Pruefung},
 };
 use axum::{
@@ -17,6 +17,9 @@ use tokio::time::Instant;
 
 const MAX_NACHRICHTEN: usize = 100;
 const MAX_NUTZLAST: usize = 4096;
+/// Körper eines `senden`-Aufrufs: 100 Nachrichten zu je höchstens 4096 Byte Push, 200 Zeichen
+/// Token, 64 Byte Kollaps und den Feldnamen passen darunter. Mehr lehnt axum mit 413 ab.
+pub const KOERPER_MAX: usize = 512 * 1024;
 /// So viele Anfragen eines Aufrufs laufen zugleich über die HTTP/2-Verbindung zu Apple. Eine
 /// hängende Anfrage hält so die übrigen nicht auf; 100 Nachrichten brauchen sieben Runden.
 const GLEICHZEITIG: usize = 16;
@@ -68,8 +71,16 @@ pub async fn senden(
         }
     }
     let nachrichten = anfrage.nachrichten;
+    // Was Apple ohnehin ablehnte (zu großer Push, ungültige Kollaps-Kennung), weist das Relais
+    // gleich ab; der Server schickt so etwas nie.
     if nachrichten.len() > MAX_NACHRICHTEN
-        || nachrichten.iter().any(|n| n.nutzlast.len() > MAX_NUTZLAST)
+        || nachrichten.iter().any(|n| {
+            n.nutzlast.len() > MAX_NUTZLAST
+                || apns::rumpf(n).len() > apns::RUMPF_MAX
+                || n.kollaps
+                    .as_deref()
+                    .is_some_and(|k| !apns::kollaps_gueltig(k))
+        })
     {
         return StatusCode::BAD_REQUEST.into_response();
     }

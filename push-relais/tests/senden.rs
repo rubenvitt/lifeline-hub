@@ -477,3 +477,75 @@ async fn gesamtfrist_beendet_den_aufruf_mit_fehlern() {
         "dauerte {dauer:?}"
     );
 }
+
+/// Review B-I2/M2: was Apple ohnehin ablehnt, weist das Relais früh ab. Der ganze Push darf bei
+/// Apple 4096 Byte haben (samt `aps` und Rückfalltitel), die Kollaps-Kennung 64 Byte; ein Token
+/// hat höchstens 200 Hex-Zeichen. Der Körper eines Aufrufs ist passend zu 100 Nachrichten
+/// begrenzt.
+#[tokio::test]
+async fn felder_die_apple_ablehnt_werden_frueh_abgewiesen() {
+    let d = doppel(200, "").await;
+    let (app, _, bearer) = aufbau(&d.basis, 600).await;
+    let status = |nachricht: Value| {
+        let app = app.clone();
+        let bearer = bearer.clone();
+        async move {
+            app.oneshot(senden_anfrage(
+                Some(&bearer),
+                json!({ "nachrichten": [nachricht] }),
+            ))
+            .await
+            .unwrap()
+            .status()
+        }
+    };
+    let mut gross = nachricht("hinweis", "production");
+    gross["nutzlast"] = json!("a".repeat(4000));
+    assert_eq!(status(gross).await, StatusCode::BAD_REQUEST);
+    let mut kollaps = nachricht("alarm", "production");
+    kollaps["kollaps"] = json!("k".repeat(65));
+    assert_eq!(status(kollaps).await, StatusCode::BAD_REQUEST);
+    let mut kollaps = nachricht("alarm", "production");
+    kollaps["kollaps"] = json!("a b");
+    assert_eq!(status(kollaps).await, StatusCode::BAD_REQUEST);
+    let mut riesig = nachricht("alarm", "production");
+    riesig["nutzlast"] = json!("a".repeat(600 * 1024));
+    assert_eq!(status(riesig).await, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(d.erfasst.lock().unwrap().is_empty());
+
+    let mut lang = nachricht("alarm", "production");
+    lang["token"] = json!("ab".repeat(101));
+    let a = app
+        .clone()
+        .oneshot(senden_anfrage(
+            Some(&bearer),
+            json!({ "nachrichten": [lang] }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        json_antwort(a).await,
+        json!({ "ergebnisse": ["token_ungueltig"] })
+    );
+    assert!(d.erfasst.lock().unwrap().is_empty());
+
+    // Was passt, geht weiter hinaus: 100 Nachrichten mit größter Nutzlast und längstem Token.
+    let passend: Vec<Value> = (0..100)
+        .map(|_| {
+            let mut n = nachricht("hinweis", "production");
+            n["token"] = json!("ab".repeat(100));
+            n["kollaps"] = json!("k".repeat(64));
+            n["nutzlast"] = json!("a".repeat(3900));
+            n
+        })
+        .collect();
+    let a = app
+        .oneshot(senden_anfrage(
+            Some(&bearer),
+            json!({ "nachrichten": passend }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(a.status(), StatusCode::OK);
+    assert_eq!(d.erfasst.lock().unwrap().len(), 100);
+}

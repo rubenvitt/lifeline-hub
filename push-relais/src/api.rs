@@ -1,6 +1,6 @@
 use crate::{apns::ApnsClient, senden, speicher};
 use axum::{
-    extract::{ConnectInfo, Extension, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Extension, State},
     http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
@@ -9,12 +9,19 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::{
     collections::HashMap,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 const FENSTER: Duration = Duration::from_secs(3600);
+/// Körper von `POST /v1/server`: Version und Kontakt passen weit darunter. Mehr lehnt axum mit
+/// 413 ab, bevor etwas gelesen ist.
+const REGISTRIERUNG_KOERPER_MAX: usize = 4 * 1024;
+/// Höchstlänge des Kontakts in Zeichen (wie `--betreiber-kontakt` am Lifeline-Server).
+const KONTAKT_MAX: usize = 200;
+/// Höchstlänge der Version in Zeichen.
+const VERSION_MAX: usize = 64;
 
 /// Gemeinsamer Zustand der Routen.
 #[derive(Clone)]
@@ -73,8 +80,10 @@ impl RelaisState {
         true
     }
 
-    /// Zählt eine Registrierung der IP; `false`, wenn das Stundenlimit erreicht ist.
+    /// Zählt eine Registrierung der IP ([`zaehladresse`]); `false`, wenn das Stundenlimit
+    /// erreicht ist.
     fn registrierung_zaehlen(&self, ip: IpAddr) -> bool {
+        let ip = zaehladresse(ip);
         let jetzt = Instant::now();
         let mut karte = self
             .registrierungen
@@ -91,10 +100,31 @@ impl RelaisState {
     }
 }
 
+/// Unter welcher Adresse eine Registrierung zählt: IPv4 je Adresse, IPv6 je /64. Ein /64 hat
+/// jeder Anschluss und jeder VPS; je Adresse gezählt, wäre die Grenze dort keine.
+fn zaehladresse(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V4(_) => ip,
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => IpAddr::V4(v4),
+            None => {
+                let s = v6.segments();
+                IpAddr::V6(Ipv6Addr::new(s[0], s[1], s[2], s[3], 0, 0, 0, 0))
+            }
+        },
+    }
+}
+
 pub fn router(state: RelaisState) -> Router {
     Router::new()
-        .route("/v1/server", post(server_registrieren))
-        .route("/v1/senden", post(senden::senden))
+        .route(
+            "/v1/server",
+            post(server_registrieren).layer(DefaultBodyLimit::max(REGISTRIERUNG_KOERPER_MAX)),
+        )
+        .route(
+            "/v1/senden",
+            post(senden::senden).layer(DefaultBodyLimit::max(senden::KOERPER_MAX)),
+        )
         .route("/v1/status", get(status))
         .with_state(state)
 }
@@ -111,13 +141,15 @@ struct RegistrierungAntwort {
     geheimnis: String,
 }
 
-/// Client-IP: hinter Proxy der erste `X-Forwarded-For`-Eintrag, sonst die Peer-Adresse.
+/// Client-IP: hinter Proxy der letzte (rechte) `X-Forwarded-For`-Eintrag, sonst die
+/// Peer-Adresse. Den rechten hängt der eigene Proxy an; alles links davon kann der Client selbst
+/// mitschicken. Voraussetzung: genau ein Proxy vor dem Relais (`docs/betrieb/push-relais.md`).
 fn client_ip(state: &RelaisState, headers: &HeaderMap, peer: Option<SocketAddr>) -> IpAddr {
     if state.hinter_proxy {
         if let Some(ip) = headers
             .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.split(',').next())
+            .and_then(|v| v.rsplit(',').next())
             .and_then(|v| v.trim().parse::<IpAddr>().ok())
         {
             return ip;
@@ -126,12 +158,29 @@ fn client_ip(state: &RelaisState, headers: &HeaderMap, peer: Option<SocketAddr>)
     peer.map(|p| p.ip()).unwrap_or(IpAddr::from([0, 0, 0, 0]))
 }
 
+/// Version: nicht leer, höchstens [`VERSION_MAX`] sichtbare ASCII-Zeichen. Kontakt: höchstens
+/// [`KONTAKT_MAX`] Zeichen ohne Steuerzeichen.
+fn felder_gueltig(anfrage: &RegistrierungAnfrage) -> bool {
+    let version = &anfrage.version;
+    let version_ok = !version.is_empty()
+        && version.len() <= VERSION_MAX
+        && version.bytes().all(|b| b.is_ascii_graphic());
+    let kontakt_ok = anfrage
+        .kontakt
+        .as_deref()
+        .is_none_or(|k| k.chars().count() <= KONTAKT_MAX && !k.chars().any(char::is_control));
+    version_ok && kontakt_ok
+}
+
 async fn server_registrieren(
     State(state): State<RelaisState>,
     peer: Option<Extension<ConnectInfo<SocketAddr>>>,
     headers: HeaderMap,
     Json(anfrage): Json<RegistrierungAnfrage>,
 ) -> Result<Json<RegistrierungAntwort>, StatusCode> {
+    if !felder_gueltig(&anfrage) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let ip = client_ip(&state, &headers, peer.map(|Extension(ConnectInfo(a))| a));
     if !state.registrierung_zaehlen(ip) {
         return Err(StatusCode::TOO_MANY_REQUESTS);

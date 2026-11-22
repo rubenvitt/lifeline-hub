@@ -21,6 +21,13 @@ und reicht Pushes der Lifeline-Server an APNs weiter; Ruben betreibt ihn selbst 
 - **Tests mit APNs-Doppel statt Apple:** die Basisadressen sind per Konfiguration austauschbar
   (`PUSH_RELAIS_APNS_BASIS_*`); Tests sprechen mit einem lokalen Doppel und nie mit
   `api.push.apple.com`.
-- Limits (600 Nachrichten je Server und Minute, 10 Registrierungen je IP und Stunde, höchstens
-  100 Nachrichten je `senden`-Aufruf) stehen im Code und in der Betriebsdoku; eine Änderung zieht
-  beide mit.
+- Limits (600 Nachrichten je Server und Minute, 10 Registrierungen je IP und Stunde, IPv6 je /64,
+  höchstens 100 Nachrichten je `senden`-Aufruf, Körper- und Feldgrenzen, Fristen) stehen im Code
+  und in der Betriebsdoku; eine Änderung zieht beide mit. Was Apple ohnehin ablehnte, weist das
+  Relais vorher ab.
+- **Client-IP hinter dem Proxy ist der rechte `X-Forwarded-For`-Eintrag** (`api::client_ip`):
+  angenommen ist genau ein Proxy, der anhängt. Den linken Teil setzt der Client selbst; er zählt
+  nie.
+- **`senden` blockiert nie auf eine einzelne Nachricht:** nebenläufig über die HTTP/2-Verbindung,
+  Frist je Anfrage an Apple und Gesamtfrist je Aufruf klar unter der Frist des Servers
+  (`RELAIS_SENDEN_FRIST` in `src/ios_push/mod.rs`); die Ergebnisse in Eingabe-Reihenfolge.
