@@ -31,6 +31,9 @@ import {
   loadWebhookVersuche,
   nimmWebhookWiederAuf,
   createWebhook,
+  fingerabdruckGruppen,
+  holeZertifikat,
+  pinNormal,
   sendTestereignis,
   webhookFehlerText,
   type WebhookEingabe,
@@ -57,12 +60,45 @@ interface WebhookWerte {
   url: string;
   arten: EventType[];
   lan_erlaubt: boolean;
+  /** Fingerabdruck des Zielzertifikats, wie eingegeben; leer = keiner (LLH-1872). */
+  zertifikat_pin?: string;
 }
 
 /** Warnung an der LAN-Ausnahme; steht im Modal und im Paneel gleich. */
 export const LAN_WARNUNG =
   'Nur für ein Fremdsystem im eigenen Netz, etwa im ELW. Rechner, Link-Local- und ' +
-  'Metadatenadressen bleiben gesperrt. Das Ziel braucht ein Zertifikat, dem dieser Server vertraut.';
+  'Metadatenadressen bleiben gesperrt. Das Ziel braucht ein Zertifikat, dem dieser Server vertraut, ' +
+  'oder einen hinterlegten Fingerabdruck.';
+
+/** Hinweis am Fingerabdruck; steht im Modal und im Paneel gleich (LLH-1872). */
+export const PIN_HINWEIS =
+  'Mit Fingerabdruck zählt nur dieses Zertifikat. Wechselt das Ziel sein Zertifikat, muss der ' +
+  'Fingerabdruck neu hinterlegt werden.';
+
+/** Hinweis, wenn die URL auf einen anderen Server zeigt als der hinterlegte Fingerabdruck. */
+export const NEUER_SERVER =
+  'Neuer Server: Der Fingerabdruck gilt dem alten und fällt beim Speichern weg. Neu holen oder ' +
+  'leer lassen.';
+
+/** Server einer URL, oder `null`, solange sie nicht lesbar ist. */
+function hostVon(url: string | undefined): string | null {
+  try {
+    return new URL((url ?? '').trim()).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fällt der Fingerabdruck beim Speichern weg? Ja, wenn die URL auf einen anderen Server zeigt und
+ * der Fingerabdruck noch der alte ist (Entscheidung Ruben 22.11.2026: neuer Server, neuer Pin).
+ */
+function pinFaelltWeg(vorher: WebhookWerte, nachher: WebhookWerte): boolean {
+  const alt = pinNormal(vorher.zertifikat_pin ?? '');
+  if (!alt || pinNormal(nachher.zertifikat_pin ?? '') !== alt) return false;
+  const host = hostVon(nachher.url);
+  return host != null && host !== hostVon(vorher.url);
+}
 
 /**
  * Nur Geändertes: die URL getrimmt, die Arten als Menge in fester Reihenfolge. Rein und
@@ -78,6 +114,10 @@ export function webhookPatch(vorher: WebhookWerte, nachher: WebhookWerte): Webho
   if (!gleich) patch.arten = ARTEN.filter((a) => arten.includes(a));
   if (Boolean(nachher.lan_erlaubt) !== vorher.lan_erlaubt)
     patch.lan_erlaubt = !!nachher.lan_erlaubt;
+  const pinVorher = pinNormal(vorher.zertifikat_pin ?? '');
+  const pinNachher = pinNormal(nachher.zertifikat_pin ?? '');
+  if (pinFaelltWeg(vorher, nachher)) patch.zertifikat_pin = null;
+  else if (pinNachher !== pinVorher) patch.zertifikat_pin = pinNachher || null;
   return patch;
 }
 
@@ -116,6 +156,19 @@ function ArtenAuswahl({
     </div>
   );
 }
+
+const PIN_REGELN = [
+  {
+    validator: (_: unknown, wert?: string) =>
+      !wert || /^[0-9a-f]{64}$/.test(pinNormal(wert))
+        ? Promise.resolve()
+        : Promise.reject(
+            new Error(
+              'Der Fingerabdruck besteht aus 64 Hex-Zeichen (SHA-256), mit oder ohne Doppelpunkte.',
+            ),
+          ),
+  },
+];
 
 const URL_REGELN = [
   pflicht('Ziel-URL', { whitespace: true }),
@@ -264,13 +317,15 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
           laeuft={einrichten.isPending}
           speicherung={einrichten}
           speicherFehlerTitel="Nicht eingerichtet"
-          onErfassen={(w) =>
-            einrichten.mutateAsync({
+          onErfassen={(w) => {
+            const pin = pinNormal(w.zertifikat_pin ?? '');
+            return einrichten.mutateAsync({
               url: w.url.trim(),
               arten: ARTEN.filter((a) => (w.arten ?? []).includes(a)),
               lan_erlaubt: !!w.lan_erlaubt,
-            })
-          }
+              ...(pin ? { zertifikat_pin: pin } : {}),
+            });
+          }}
           onFertig={() => setEinrichtenOffen(false)}
           onAbbrechen={() => setEinrichtenOffen(false)}
         >
@@ -286,6 +341,9 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
           </Feld>
           <Feld name="lan_erlaubt" initialValue={false}>
             <LanSchalter />
+          </Feld>
+          <Feld label="Zertifikat" name="zertifikat_pin" initialValue="" rules={PIN_REGELN}>
+            <PinEingabe zugangId={zugang.id} gesperrt={ohneNetz} />
           </Feld>
         </ErfassungsModal>
       </Paneel>
@@ -320,6 +378,27 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
       // `BearbeitbaresPaneel` reicht `value`/`onChange` durch, nicht `checked`.
       eingabe: <LanSchalter />,
     },
+    {
+      name: 'zertifikat_pin',
+      label: 'Zertifikat',
+      breit: true,
+      mono: !!webhook.zertifikat_pin,
+      anzeige: (
+        <span data-lfh="webhook-pin">
+          {webhook.zertifikat_pin
+            ? fingerabdruckGruppen(webhook.zertifikat_pin)
+            : 'kein Fingerabdruck – es gelten die Vertrauensanker des Servers'}
+        </span>
+      ),
+      eingabe: (
+        <PinEingabe
+          zugangId={zugang.id}
+          gesperrt={ohneNetz}
+          gespeichert={{ url: webhook.url ?? '', pin: webhook.zertifikat_pin ?? '' }}
+        />
+      ),
+      regeln: PIN_REGELN,
+    },
   ];
 
   return (
@@ -333,6 +412,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
           url: webhook.url ?? '',
           arten: [...webhook.arten],
           lan_erlaubt: webhook.lan_erlaubt,
+          zertifikat_pin: webhook.zertifikat_pin ?? '',
         }}
         felder={felder}
         patch={webhookPatch}
@@ -449,6 +529,15 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
             ) : (
               'keiner'
             )}
+            {/* Der Text bleibt neutral: ob beim Versuch schon ein Fingerabdruck galt, steht
+                nirgends (Design-Doc LLH-1872, D5). Nur in der laufenden Störung der Hinweis. */}
+            {webhook.zertifikat_pin &&
+              webhook.letzter_fehler?.art === 'tls' &&
+              (webhook.zustand === 'fehler' || webhook.zustand === 'angehalten') && (
+                <div data-lfh="webhook-pin-hinweis" style={{ color: rollen.gedaempft }}>
+                  Hat das Ziel sein Zertifikat gewechselt? Fingerabdruck neu holen.
+                </div>
+              )}
           </Datenfeld>
           <Datenfeld label="Zuletzt zugestellt">
             {webhook.letzter_erfolg_at ? zeit(webhook.letzter_erfolg_at) : 'noch nie'}
@@ -482,6 +571,110 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         {entfernen.error && <SpeicherFehler fehler={entfernen.error} titel="Nicht entfernt" />}
       </Modal>
     </>
+  );
+}
+
+/**
+ * Fingerabdruck des Zielzertifikats (LLH-1872): Textfeld und „Vom Ziel holen“. Der Abruf nimmt
+ * URL und LAN-Ausnahme, wie sie gerade im Formular stehen; übernommen wird erst nach
+ * Bestätigung, gespeichert mit dem Formular. `gespeichert` (nur beim Bearbeiten) zeigt, wenn die
+ * URL auf einen anderen Server zeigt und der alte Fingerabdruck beim Speichern wegfällt.
+ */
+function PinEingabe({
+  zugangId,
+  gesperrt,
+  gespeichert,
+  id,
+  value,
+  onChange,
+}: {
+  zugangId: string;
+  gesperrt: boolean;
+  gespeichert?: { url: string; pin: string };
+  id?: string;
+  value?: string;
+  onChange?: (wert: string) => void;
+}) {
+  const { rollen } = useRollen();
+  const form = Form.useFormInstance<WebhookWerte>();
+  const url = Form.useWatch('url', form);
+  const [gefunden, setGefunden] = useState<string | null>(null);
+  const abruf = useMutation({
+    mutationFn: () =>
+      holeZertifikat(
+        zugangId,
+        String(form.getFieldValue('url') ?? '').trim(),
+        !!form.getFieldValue('lan_erlaubt'),
+      ),
+    onSuccess: (e) => {
+      if (e.fingerabdruck) setGefunden(e.fingerabdruck);
+    },
+  });
+  const faelltWeg =
+    gespeichert != null &&
+    pinFaelltWeg(
+      { url: gespeichert.url, arten: [], lan_erlaubt: false, zertifikat_pin: gespeichert.pin },
+      { url: url ?? '', arten: [], lan_erlaubt: false, zertifikat_pin: value ?? '' },
+    );
+  const fehlerArt = abruf.data?.fehler_art;
+  return (
+    <div>
+      <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
+        <Input
+          id={id}
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder="AB:CD:… (SHA-256)"
+          autoComplete="off"
+          spellCheck={false}
+          style={monoStil('monoKlein')}
+          data-lfh="webhook-pin-eingabe"
+        />
+        <Button
+          disabled={gesperrt || !String(url ?? '').trim()}
+          loading={abruf.isPending}
+          onClick={() => {
+            abruf.reset();
+            abruf.mutate();
+          }}
+        >
+          Vom Ziel holen
+        </Button>
+      </Stapel>
+      <div style={{ color: rollen.gedaempft, marginBlockStart: 'var(--lfh-luft-1)' }}>
+        {PIN_HINWEIS}
+      </div>
+      {faelltWeg && (
+        <div
+          style={{ color: rollen.achtungText, marginBlockStart: 'var(--lfh-luft-1)' }}
+          data-lfh="webhook-pin-neuer-server"
+        >
+          {NEUER_SERVER}
+        </div>
+      )}
+      {fehlerArt && (
+        <div style={{ color: rollen.achtungText, marginBlockStart: 'var(--lfh-luft-1)' }}>
+          {`Kein Zertifikat gelesen: ${webhookFehlerText(fehlerArt)}`}
+        </div>
+      )}
+      {abruf.error && <SpeicherFehler fehler={abruf.error} titel="Zertifikat nicht abgerufen" />}
+      <Modal
+        open={gefunden != null}
+        title="Zertifikat des Ziels"
+        okText="Übernehmen"
+        cancelText="Abbrechen"
+        onOk={() => {
+          if (gefunden) onChange?.(fingerabdruckGruppen(gefunden));
+          setGefunden(null);
+        }}
+        onCancel={() => setGefunden(null)}
+      >
+        <p>Das Ziel zeigt dieses Zertifikat. Vergleiche den Fingerabdruck mit dem am Zielgerät.</p>
+        <p style={monoStil('monoKlein')} data-lfh="webhook-pin-gefunden">
+          {gefunden ? fingerabdruckGruppen(gefunden) : ''}
+        </p>
+      </Modal>
+    </div>
   );
 }
 
