@@ -91,9 +91,12 @@ class MainActivity : ComponentActivity() {
             LifecycleEventObserver { _, ereignis ->
                 when (ereignis) {
                     // Zurück im Vordergrund: keine Installation unter der Hand, Prüfung, wenn fällig.
-                    Lifecycle.Event.ON_START -> if (mitUpdates) {
-                        UpdatePruefung.rueckkehr(this)
-                        modell.imVordergrund()
+                    Lifecycle.Event.ON_START -> {
+                        app.imVordergrund = true
+                        if (mitUpdates) {
+                            UpdatePruefung.rueckkehr(this)
+                            modell.imVordergrund()
+                        }
                     }
                     Lifecycle.Event.ON_RESUME -> {
                         modell.phase(Rueckkehr.Phase.ACTIVE)
@@ -101,6 +104,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Lifecycle.Event.ON_PAUSE -> modell.phase(Rueckkehr.Phase.INACTIVE)
                     Lifecycle.Event.ON_STOP -> {
+                        app.imVordergrund = false
                         modell.phase(Rueckkehr.Phase.BACKGROUND)
                         anmelder.verlassen()
                         // Nach 15 Minuten im Hintergrund darf der Updater installieren (Entwurf D9, Fall b).
@@ -115,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 Wurzel(modell)
             }
         }
-        modell.start()
+        modell.start(neubau = savedInstanceState != null)
         // Nach einem Neubau der Activity ist das Intent schon ausgewertet.
         if (savedInstanceState == null) open(intent)
     }

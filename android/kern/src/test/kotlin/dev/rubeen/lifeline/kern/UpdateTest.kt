@@ -119,6 +119,13 @@ class UpdateTest {
         }
     }
 
+    /** Review K2: nur der erste Aufbau der Activity ist ein Start; ein Neubau liegt mitten in der Arbeit. */
+    @Test
+    fun `ein Neubau der Activity ist kein Start`() {
+        assertEquals(Installzeitpunkt.Lage.START_VOR_OBERFLAECHE, Installzeitpunkt.lageBeimAufbau(neubau = false))
+        assertEquals(Installzeitpunkt.Lage.VORDERGRUND, Installzeitpunkt.lageBeimAufbau(neubau = true))
+    }
+
     @Test
     fun `beim Start vor der Oberfläche wird installiert`() {
         for (rueckfrage in listOf(false, true)) {

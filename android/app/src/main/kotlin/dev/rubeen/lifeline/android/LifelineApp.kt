@@ -14,11 +14,19 @@ import dev.rubeen.lifeline.android.web.WebviewFabrik
 class LifelineApp : Application() {
     var webviewFabrik: WebviewFabrik = SystemWebviewFabrik
 
+    /**
+     * Steht die Oberfläche vorn (`ON_START` bis `ON_STOP` der Activity)? Die Hintergrundarbeit des
+     * Updaters fragt es, bevor sie installiert (Review K1).
+     */
+    @Volatile
+    var imVordergrund: Boolean = false
+
     private var eigenerUpdater: Updater? = null
 
+    /** Einer für alle: Hintergrundarbeit (eigener Faden) und Activity dürfen gleichzeitig fragen (Review K4). */
     var updater: Updater
-        get() = eigenerUpdater ?: Updater(this).also { eigenerUpdater = it }
+        get() = synchronized(this) { eigenerUpdater ?: Updater(this).also { eigenerUpdater = it } }
         set(wert) {
-            eigenerUpdater = wert
+            synchronized(this) { eigenerUpdater = wert }
         }
 }

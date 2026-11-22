@@ -7,6 +7,7 @@ import android.content.pm.PackageInstaller
 import android.util.Log
 import androidx.core.content.edit
 import dev.rubeen.lifeline.android.BuildConfig
+import dev.rubeen.lifeline.android.LifelineApp
 import dev.rubeen.lifeline.kern.Installzeitpunkt
 import dev.rubeen.lifeline.kern.Kanal
 import dev.rubeen.lifeline.kern.Updateentscheidung
@@ -41,6 +42,7 @@ import kotlinx.coroutines.withContext
  *
  * @param http lädt Manifest und APK und prüft dabei jede Weiterleitung
  * @param uhr Zeit in Millisekunden seit 1970
+ * @param imVordergrund steht die Oberfläche vorn? Eine Installation im Hintergrund fragt es vor `commit`
  */
 class Updater internal constructor(
     context: Context,
@@ -49,6 +51,7 @@ class Updater internal constructor(
     private val version: String,
     private val versionCode: Int,
     private val installation: Installation,
+    private val imVordergrund: () -> Boolean = { (context.applicationContext as? LifelineApp)?.imVordergrund == true },
 ) {
     constructor(context: Context, http: Updateabruf = Updateabruf(), uhr: () -> Long = System::currentTimeMillis) : this(
         context.applicationContext,
@@ -189,7 +192,11 @@ class Updater internal constructor(
         val bereit = bereit() ?: return
         aktuellerStand.value = Updatestand.INSTALLIERT_GLEICH
         try {
-            withContext(Dispatchers.IO) { installation.start(bereit.datei, vordergrund) }
+            // Im Hintergrund nur, solange die Oberfläche nicht wieder vorn steht (Review K1).
+            val uebergeben = withContext(Dispatchers.IO) {
+                installation.start(bereit.datei, vordergrund) { vordergrund || !imVordergrund() }
+            }
+            if (!uebergeben) aktuellerStand.value = bereitStand()
         } catch (e: Exception) {
             Log.w(TAG, "Installation ließ sich nicht starten", e)
             aktuellerStand.value = Updatestand.FEHLER

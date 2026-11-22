@@ -160,6 +160,13 @@ object Installzeitpunkt {
     }
 
     /**
+     * Lage beim Aufbau der Activity: nur der erste Aufbau ist der Start vor der Oberfläche (D9,
+     * Fall a). Ein Neubau (Schriftgröße geändert, vom System verworfen und wiederhergestellt) folgt
+     * auf Arbeit Sekunden vorher und zählt als Vordergrund (Review K2).
+     */
+    fun lageBeimAufbau(neubau: Boolean): Lage = if (neubau) Lage.VORDERGRUND else Lage.START_VOR_OBERFLAECHE
+
+    /**
      * Fragt das System vor der Installation nach (Entwurf D9, Fakt 6)? Ohne Rückfrage nur ab
      * Android 12 (API 31) und nur, wenn die App selbst die installierende App der laufenden
      * Fassung ist; das erste Update nach einer Installation aus Browser oder Dateien fragt immer.

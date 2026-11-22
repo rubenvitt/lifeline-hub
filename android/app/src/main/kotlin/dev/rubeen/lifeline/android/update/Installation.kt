@@ -46,23 +46,27 @@ class Installation(private val context: Context) {
     }
 
     /**
-     * Schreibt [apk] in eine neue Sitzung und übergibt sie. [vordergrund]: die App steht vorn und
-     * darf die Bestätigung des Systems zeigen. Wirft, wenn die Sitzung nicht zustande kommt; die
-     * Sitzung wird dann verworfen.
+     * Schreibt [apk] in eine neue Sitzung und übergibt sie, wenn [darfUebergeben] es unmittelbar
+     * vor `commit` noch erlaubt (das Kopieren dauert; die Oberfläche kann inzwischen vorn stehen,
+     * Review K1). [vordergrund]: die App steht vorn und darf die Bestätigung des Systems zeigen.
+     * `false`: nicht übergeben, die Sitzung ist verworfen. Wirft, wenn die Sitzung nicht zustande
+     * kommt; sie wird dann ebenfalls verworfen.
      */
-    fun start(apk: File, vordergrund: Boolean) {
+    fun start(apk: File, vordergrund: Boolean, darfUebergeben: () -> Boolean = { true }): Boolean {
         val installer = context.packageManager.packageInstaller
         val id = installer.createSession(sitzungsParameter(context.packageName))
         try {
-            installer.openSession(id).use { sitzung ->
+            val uebergeben = installer.openSession(id).use { sitzung ->
                 apk.inputStream().use { ein ->
                     sitzung.openWrite(SITZUNGSDATEI, 0, apk.length()).use { aus ->
                         ein.copyTo(aus)
                         sitzung.fsync(aus)
                     }
                 }
-                sitzung.commit(statusEmpfaenger(vordergrund, id).intentSender)
+                darfUebergeben().also { darf -> if (darf) sitzung.commit(statusEmpfaenger(vordergrund, id).intentSender) }
             }
+            if (!uebergeben) installer.abandonSession(id)
+            return uebergeben
         } catch (e: Exception) {
             installer.abandonSession(id)
             throw e

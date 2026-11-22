@@ -207,9 +207,10 @@ class AppModell(
 
     /**
      * Einmal, sobald die Activity steht: der Start des Ablaufs mit dem aktiven Server; im
-     * Testzustand die Beispielseite.
+     * Testzustand die Beispielseite. [neubau]: die Activity entsteht neu aus einem gesicherten
+     * Zustand (Schriftgröße, vom System verworfen); das ist kein Start der App (Review K2).
      */
-    fun start() {
+    fun start(neubau: Boolean = false) {
         if (gestartet) return
         gestartet = true
         if (testzustand != null) {
@@ -218,10 +219,11 @@ class AppModell(
         }
         // Ein bereites Update installiert die App vor der Oberfläche (Entwurf D9, Fall a), sichtbar
         // als „Lifeline wird aktualisiert“; ob, entscheidet `Installzeitpunkt` im Updater.
-        if (updater != null && updater.stand.value == Updatestand.BEREIT) {
+        val lage = Installzeitpunkt.lageBeimAufbau(neubau)
+        if (updater != null && updater.stand.value == Updatestand.BEREIT && lage == Installzeitpunkt.Lage.START_VOR_OBERFLAECHE) {
             zeigeUpdateSeite()
             scope.launch {
-                if (updater.installieren(Installzeitpunkt.Lage.START_VOR_OBERFLAECHE) != Installzeitpunkt.Weg.INSTALLIEREN) {
+                if (updater.installieren(lage) != Installzeitpunkt.Weg.INSTALLIEREN) {
                     endeUpdateSeite()
                 }
             }

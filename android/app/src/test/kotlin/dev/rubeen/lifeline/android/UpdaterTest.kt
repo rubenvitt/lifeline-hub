@@ -467,6 +467,41 @@ class UpdaterTest {
         assertEquals(Updatestand.INSTALLIERT_GLEICH, app.updater.stand.value)
     }
 
+    /** Review K1: liegt die Oberfläche inzwischen vorn, installiert die Arbeit nicht. */
+    @Test
+    fun `steht die Oberfläche wieder vorn, installiert die Arbeit nicht`() {
+        val work = workManager()
+        app.updater = bereit()
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, context.packageName, context.packageName)
+        UpdatePruefung.verlassen(context, jetzt)
+        jetzt += 15 * minute
+        // Die Person öffnet die App, bevor `cancelUniqueWork` die fällige Arbeit erreicht.
+        app.imVordergrund = true
+        val id = work.getWorkInfosForUniqueWork(UpdatePruefung.HINTERGRUND).get().single().id
+        WorkManagerTestInitHelper.getTestDriver(context)!!.setInitialDelayMet(id)
+
+        assertEquals(WorkInfo.State.SUCCEEDED, warteAufEnde(work, id))
+        assertTrue(sitzungen.isEmpty())
+        assertEquals(Updatestand.BEREIT, app.updater.stand.value)
+    }
+
+    /** Review K1: kommt die Oberfläche während des Kopierens nach vorn, übergibt die Arbeit nicht. */
+    @Test
+    fun `kommt die Oberfläche während des Kopierens nach vorn, wird die Sitzung verworfen`() {
+        manifest()
+        github(apkUrl, ::apkAntwort)
+        // Gefragt wird erst nach dem Kopieren, unmittelbar vor `commit`.
+        val updater = Updater(context, abruf, { jetzt }, "1.0.0-alpha.5", 100, Installation(context), imVordergrund = { true })
+        assertEquals(Updatestand.BEREIT, runBlocking { updater.pruefen() })
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, context.packageName, context.packageName)
+
+        val weg = runBlocking { updater.installieren(Installzeitpunkt.Lage.HINTERGRUND, jetzt - 15 * minute) }
+
+        assertEquals(Installzeitpunkt.Weg.INSTALLIEREN, weg)
+        assertTrue("nicht übergeben, verworfen", sitzungen.isEmpty())
+        assertEquals(Updatestand.BEREIT, updater.stand.value)
+    }
+
     // Nach dem Update
 
     @Test
@@ -520,6 +555,22 @@ class UpdaterTest {
         assertTrue(sitzungen.isEmpty())
         assertEquals(Updatestand.BEREIT, updater.stand.value)
         assertTrue("die APK bleibt", updater.isBereit)
+    }
+
+    /** Review K2: ein Neubau der Activity (Schriftgröße, vom System verworfen) installiert nicht. */
+    @Test
+    fun `ein Neubau der Activity installiert nicht, der Hinweis bleibt`() {
+        workManager()
+        app.updater = bereit()
+        app.webviewFabrik = AttrappenFabrik()
+
+        Robolectric.buildActivity(MainActivity::class.java).setup(android.os.Bundle()).use { steuerung ->
+            val modell = steuerung.get().modell
+            assertFalse(modell.zeigtUpdate)
+            assertTrue(sitzungen.isEmpty())
+            assertEquals(Updatestand.BEREIT, app.updater.stand.value)
+            assertSame(Ablauf.Seite.Onboarding, modell.seite)
+        }
     }
 
     private fun warte(sekunden: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(sekunden))

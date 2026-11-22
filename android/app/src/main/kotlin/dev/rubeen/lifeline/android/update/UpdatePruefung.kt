@@ -68,11 +68,17 @@ class Pruefarbeit(context: Context, parameter: WorkerParameters) : CoroutineWork
     }
 }
 
-/** Installation nach längerer Zeit im Hintergrund, nur ohne Rückfrage des Systems. */
+/**
+ * Installation nach längerer Zeit im Hintergrund, nur ohne Rückfrage des Systems. Steht die
+ * Oberfläche inzwischen vorn (die Rückkehr kam der Absage zuvor), ist die Lage `VORDERGRUND`:
+ * dann bleibt es beim Hinweis (Review K1).
+ */
 class Installationsarbeit(context: Context, parameter: WorkerParameters) : CoroutineWorker(context, parameter) {
     override suspend fun doWork(): Result {
         val seit = inputData.getLong(UpdatePruefung.IM_HINTERGRUND_SEIT, -1).takeIf { it >= 0 }
-        (applicationContext as LifelineApp).updater.installieren(Installzeitpunkt.Lage.HINTERGRUND, seit)
+        val app = applicationContext as LifelineApp
+        val lage = if (app.imVordergrund) Installzeitpunkt.Lage.VORDERGRUND else Installzeitpunkt.Lage.HINTERGRUND
+        app.updater.installieren(lage, seit)
         return Result.success()
     }
 }
