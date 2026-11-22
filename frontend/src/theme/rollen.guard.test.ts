@@ -23,6 +23,7 @@ import { seitenrinne } from './tokens';
 import { SCHRIFTSCHNITTE } from './schriften';
 import {
   FELDBREITE,
+  feldSchriftTouch,
   etbTypFarbenDunkel,
   etbTypFarbenHell,
   rahmenFarben,
@@ -500,5 +501,26 @@ describe('Feldbreiten — CSS und TS tragen dieselben Stufen (Spec `feldbreiten`
       (k) => k.startsWith('--lfh-feld-') && !['kurz', 'schmal', 'mittel'].includes(k.slice(11)),
     );
     expect(fremd).toEqual([]);
+  });
+});
+
+describe('Touch-Feldschrift — kein Fokus-Zoom auf iOS (LLH-2043)', () => {
+  it('CSS und TS tragen denselben Wert, die iOS-Schwelle 16 px', () => {
+    expect(feldSchriftTouch).toBe(16);
+    expect(hell['--lfh-touch-feldschrift']).toBe(`${feldSchriftTouch}px`);
+  });
+
+  it('hängt am Zeiger, nicht an der Dichte', () => {
+    for (const stufe of ['komfortabel', 'handschuh'] as const) {
+      expect(DICHTE_BLOECKE[stufe]['--lfh-touch-feldschrift']).toBeUndefined();
+    }
+  });
+
+  it('die Regel greift nur auf grobem Zeiger und liest die Variable', () => {
+    const regel = /@media \(pointer: coarse\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+    expect(regel).toMatch(/font-size: var\(--lfh-touch-feldschrift\) !important;/);
+    expect(regel).toMatch(/\binput:not\(/);
+    expect(regel).toMatch(/\btextarea\b/);
+    expect(css).not.toMatch(/font-size:\s*16px/);
   });
 });
