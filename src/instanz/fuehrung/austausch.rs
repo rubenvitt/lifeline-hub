@@ -25,7 +25,8 @@ use sqlx::SqliteConnection;
 
 /// Höchstzahl Akten je Nachricht.
 pub const AKTEN_MAX: usize = 50;
-/// Byte-Budget der Akten in einer Meldung (der Rumpf darf höchstens 64 KiB groß sein).
+/// Byte-Budget der Akten in einer Meldung (der Rumpf darf höchstens `extractor::MELDEN_MAX` groß
+/// sein, Test `melden::tests::groesste_anfrage_passt_in_die_grenze`).
 pub const MELDUNG_BYTES: usize = 40 * 1024;
 /// Byte-Budget der Akten in einer Antwort. Es geht vom Budget der Stammdaten ab und muss neben
 /// der größten Nachlieferung der Unterschriftsschlüssel in `melden::ANTWORT_MAX` passen (Test

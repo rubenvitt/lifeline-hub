@@ -91,7 +91,7 @@ pub struct MeldenOrg {
 }
 
 /// Byte-Budget der Unterschriftsschlüssel in einer Meldung (LLH-1678, design.md D6): neben den
-/// Führungsakten ([`fuehrung_austausch::MELDUNG_BYTES`]) muss alles in [`super::extractor::BODY_MAX`]
+/// Führungsakten ([`fuehrung_austausch::MELDUNG_BYTES`]) muss alles in [`super::extractor::MELDEN_MAX`]
 /// passen (Test `groesste_anfrage_passt_in_die_grenze`). Was nicht passt, folgt mit der nächsten
 /// Meldung.
 pub const UNTERSCHRIFT_ANFRAGE_BYTES: usize = 12 * 1024;
@@ -2191,32 +2191,64 @@ mod tests {
     }
 
     /// Die meldende Seite liefert ihre Schlüssel in der Meldung (LLH-1678, design.md D6): Die
-    /// größte Lieferung passt allein ins Budget, sonst bliebe sie ewig hängen, und eine Meldung mit
-    /// vollen Akten und vollem Schlüsselbudget passt in die Körpergrenze.
+    /// größte Lieferung passt allein ins Budget, sonst bliebe sie ewig hängen. Die größte zulässige
+    /// Meldung passt in die Körpergrenze des Meldepfads (LLH-1877), sonst lehnte die erreichte
+    /// Seite jede Meldung ab, und die Kopplung meldete sich dauerhaft vergeblich. Gerechnet wird
+    /// von oben: die Hülle mit [`ORGS_MAX`] Orgs und Widerrufen, jedes Feld an seiner Grenze,
+    /// dazu die Budgets der Führungsakten und der Schlüssel samt allem, was sie nicht mitzählen.
     #[test]
     fn groesste_anfrage_passt_in_die_grenze() {
+        use super::super::extractor::body_max;
         let lieferung = groesste_lieferung();
         let eine = serde_json::to_vec(&lieferung).expect("JSON").len();
         assert!(
             eine <= UNTERSCHRIFT_ANFRAGE_BYTES,
             "{eine} Byte je Schlüssel über {UNTERSCHRIFT_ANFRAGE_BYTES}"
         );
-        let mut a = anfrage(&["k"; 4], &[]);
+        // Die erreichte Seite baut die Org-Kennung selbst (`org_kennung`: UUID, `/`, `i64`, höchstens
+        // 56 Zeichen); 88 ist die Grenze, die sie an der Org eines Einlösers prüft
+        // (`routes::instanz`, `KENNUNG_MAX + 24`), also mit Luft.
+        let kennung = "k".repeat(88);
+        let mut a = anfrage(
+            &vec![kennung.as_str(); ORGS_MAX],
+            &vec![kennung.as_str(); ORGS_MAX],
+        );
         for o in &mut a.orgs {
-            o.org = "k".repeat(88);
-            o.unterschrift_grundstock_bis = Some(i64::MAX);
+            o.unterschrift_stand = i64::MIN;
+            o.stammdaten_stand = i64::MIN;
+            o.unterschrift_grundstock_bis = Some(i64::MIN);
+            o.stammdaten_checksum = Some("0".repeat(stammdaten_bestand::CHECKSUM_LEN));
         }
+        a.fuehrung_bis = i64::MIN;
+        a.fuehrung_gesendet_bis = i64::MIN;
+        // `config::instanz_anzeigename` lässt 120 Zeichen; ein Steuerzeichen kostet in JSON sechs
+        // Byte (`\u0001`).
+        a.name = "\u{1}".repeat(120);
+        a.softwarestand = "s".repeat(64);
+        a.stammdaten_arten = stammdaten::eigene_arten();
+        a.age_empfaenger = Some("a".repeat(AGE_EMPFAENGER_MAX));
+        a.datentraeger_verschluesselt = true;
+        a.tls_zertifikat = Some("f".repeat(64));
+        let huelle = serde_json::to_vec(&a).expect("JSON").len();
+        // Führung: `build_ausgang` packt Akten bis `MELDUNG_BYTES` zusammen, dazu höchstens ein
+        // Komma je Akte.
+        let fuehrung = fuehrung_austausch::MELDUNG_BYTES + fuehrung_austausch::AKTEN_MAX;
+        // Schlüssel: Inhalte bis `UNTERSCHRIFT_ANFRAGE_BYTES` über alle Orgs (`melden_einmal_mit`),
+        // dazu je Org der Rahmen des Felds und je Lieferung höchstens ein Komma; eine Lieferung
+        // ist länger als ein Byte, also höchstens so viele Kommas wie Byte im Budget.
+        let rahmen = r#","unterschrift":[]"#.len();
+        let schluessel = 2 * UNTERSCHRIFT_ANFRAGE_BYTES + ORGS_MAX * rahmen;
+        let groesste = huelle + fuehrung + schluessel;
+        let grenze = body_max(MELDEN_PFAD);
+        assert!(groesste <= grenze, "{groesste} Byte über {grenze}");
+        // Die Rechnung liegt über einer gebauten Meldung mit großer Akte und großem Schlüssel.
         a.orgs[0].unterschrift = vec![lieferung; UNTERSCHRIFT_ANFRAGE_BYTES / eine];
         let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
-        let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
-        a.fuehrung = vec![akte; fuehrung_austausch::MELDUNG_BYTES / akte_bytes];
-        a.age_empfaenger = Some("a".repeat(70));
-        a.tls_zertifikat = Some("f".repeat(64));
-        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        a.fuehrung = vec![akte];
+        let gebaut = serde_json::to_vec(&a).expect("JSON").len();
         assert!(
-            groesse <= super::super::extractor::BODY_MAX,
-            "{groesse} Byte über {}",
-            super::super::extractor::BODY_MAX
+            gebaut <= groesste,
+            "{gebaut} Byte über der Rechnung {groesste}"
         );
     }
 
