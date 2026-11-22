@@ -21,7 +21,7 @@ const SUCH_DEFAULT: NonNullable<SelectProps['showSearch']> = { optionFilterProp:
  * Remote-Filter (`showSearch={{ filterOption: false, onSearch }}`) und explizites
  * `showSearch={false}` (Suche aus) bleiben unangetastet — reine Ersetzung, kein Merge.
  *
- * Der direkte Import von `Select` aus 'antd' ist per ESLint gesperrt: immer hierher importieren,
+ * Der direkte Import von `Select` aus 'antd' ist per Lint gesperrt (`frontend/.oxlintrc.json`): immer hierher importieren,
  * damit neue Selects automatisch such-fähig sind.
  */
 export function Select<

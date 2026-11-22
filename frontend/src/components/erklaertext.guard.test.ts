@@ -22,8 +22,8 @@ import { describe, expect, it } from 'vitest';
  * tatsächlichen Zahl ist ebenfalls rot — die Schuld schrumpft nur, wer einen Satz entfernt,
  * verkleinert den Eintrag im selben Commit.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * Wie `dichte.guard.test.ts`: `pnpm lint` läuft mit `--max-warnings 0`, eine rot geborene Regel
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * Wie `dichte.guard.test.ts`: `pnpm lint` bricht bei jeder Warnung, eine rot geborene Regel
  * würde abgeschaltet statt befolgt.
  *
  * ── Was dieser Guard NICHT sieht (Teil des Vertrags) ────────────────────────────

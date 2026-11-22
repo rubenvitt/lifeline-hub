@@ -21,8 +21,8 @@ import { describe, expect, it } from 'vitest';
  * mit Grund). Mehr Treffer → rot; ein Eintrag größer als der Fund → ebenfalls rot: wer eine
  * Stelle umstellt, verkleinert den Eintrag im selben Commit.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * Wie `erklaertext.guard.test.ts`: `pnpm lint` läuft mit `--max-warnings 0`, eine rot geborene
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * Wie `erklaertext.guard.test.ts`: `pnpm lint` bricht bei jeder Warnung, eine rot geborene
  * Regel würde abgeschaltet statt befolgt.
  *
  * ── Was dieser Guard NICHT sieht (Teil des Vertrags) ────────────────────────────

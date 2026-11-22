@@ -14,8 +14,8 @@
  * hinter dem Wort oder sind anders geschrieben. „Standardansicht“ ist ein Wort und fällt nicht
  * unter das Muster.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * `pnpm lint` läuft mit `--max-warnings 0`; eine rot geborene Regel würde abgeschaltet
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * `pnpm lint` bricht bei jeder Warnung; eine rot geborene Regel würde abgeschaltet
  * (`frontend/AGENTS.md`, Lint-Disziplin). Muster: `dichte.guard.test.ts`.
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
