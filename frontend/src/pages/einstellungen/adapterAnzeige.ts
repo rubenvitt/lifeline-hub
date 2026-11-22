@@ -1,0 +1,130 @@
+import type { QueryClient } from '@tanstack/react-query';
+import type { AdapterEinstellungen } from '../../api/adapter';
+import { globalKeys } from '../../api/queryKeys';
+import type { AdapterAnzeige, AdapterFeld, AdapterListe, AdapterZustand } from '../../api/types';
+import { anbindungenPath } from './anbindungAnzeige';
+
+// Gemeinsames der Adapter-Seiten (LLH-2018): Paneel „Adapter“ auf den Anbindungen und Ansicht.
+
+/** Die Ansicht eines Adapters, unter den Anbindungen. */
+export function adapterPath(id: string): string {
+  return `${anbindungenPath()}/adapter/${encodeURIComponent(id)}`;
+}
+
+type Ton = 'normal' | 'bedien' | 'neutral' | 'achtung';
+
+const ZUSTAND: Record<AdapterZustand, { wort: string; ton: Ton }> = {
+  ok: { wort: 'ok', ton: 'normal' },
+  wartet: { wort: 'noch nie abgerufen', ton: 'neutral' },
+  gestoert: { wort: 'gestört', ton: 'bedien' },
+  braucht_eingriff: { wort: 'braucht Eingriff', ton: 'achtung' },
+  aus: { wort: 'aus', ton: 'neutral' },
+  art_unbekannt: { wort: 'Art unbekannt', ton: 'achtung' },
+};
+
+/** Wort und Ton des Zustands (Entwurf `docs/design/2026-11-22-adapter/`). */
+export function adapterZustandAnzeige(a: Pick<AdapterAnzeige, 'zustand'>): {
+  wort: string;
+  ton: Ton;
+} {
+  return ZUSTAND[a.zustand];
+}
+
+/** In der Liste steht der Status nur, wenn er etwas verlangt; „ok“ und „wartet“ nicht. */
+export function isZustandSichtbar(z: AdapterZustand): boolean {
+  return z !== 'ok' && z !== 'wartet';
+}
+
+/** Setzt die Antwort einer eigenen Änderung in die Liste und lässt sie danach neu laden. */
+export function uebernimmAdapter(qc: QueryClient, a: AdapterAnzeige): void {
+  qc.setQueryData<AdapterListe>(globalKeys.adapter(), (alt) =>
+    alt
+      ? {
+          ...alt,
+          adapter: alt.adapter.some((x) => x.id === a.id)
+            ? alt.adapter.map((x) => (x.id === a.id ? a : x))
+            : [...alt.adapter, a],
+        }
+      : alt,
+  );
+  void qc.invalidateQueries({ queryKey: globalKeys.adapter() });
+}
+
+/** Nimmt einen gelöschten Adapter aus der Liste. */
+export function entferneAdapter(qc: QueryClient, id: string): void {
+  qc.setQueryData<AdapterListe>(globalKeys.adapter(), (alt) =>
+    alt ? { ...alt, adapter: alt.adapter.filter((x) => x.id !== id) } : alt,
+  );
+  qc.removeQueries({ queryKey: globalKeys.adapterVersuche(id) });
+  void qc.invalidateQueries({ queryKey: globalKeys.adapter() });
+}
+
+function hostVon(wert: unknown): string | null {
+  if (typeof wert !== 'string' || wert.trim() === '') return null;
+  try {
+    const host = new URL(wert.trim()).hostname;
+    return host ? host.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ein URL-Feld, dessen Host eine Änderung wechselt. */
+export interface HostWechsel {
+  feld: string;
+  bisher: string | null;
+  neu: string;
+}
+
+/**
+ * Welche URL-Felder einen neuen Host bekämen; wie `art::has_neues_ziel` im Server: zählt nur, wenn
+ * danach ein lesbarer Host dasteht, der vorher nicht dastand. Dann entfernt der Server die
+ * Geheimnisse, und die Ansicht fragt vorher.
+ */
+export function hostWechsel(
+  felder: readonly AdapterFeld[],
+  vorher: Record<string, unknown>,
+  nachher: Record<string, unknown>,
+): HostWechsel[] {
+  return felder
+    .filter((f) => f.typ === 'url')
+    .flatMap((f) => {
+      const neu = hostVon(nachher[f.name]);
+      const bisher = hostVon(vorher[f.name]);
+      return neu != null && neu !== bisher ? [{ feld: f.bezeichnung, bisher, neu }] : [];
+    });
+}
+
+/**
+ * Formularwerte → Einstellungen der Art: Text getrimmt, Zahlen als Zahl, Leeres fällt weg (der
+ * Server nimmt ein fehlendes Feld als leer).
+ */
+export function einstellungenVon(
+  felder: readonly AdapterFeld[],
+  werte: Record<string, unknown>,
+): AdapterEinstellungen {
+  const aus: AdapterEinstellungen = {};
+  for (const f of felder) {
+    const roh = werte[f.name];
+    if (roh == null) continue;
+    if (f.typ === 'zahl') {
+      const text = String(roh).trim();
+      if (text === '') continue;
+      const zahl = Number(text);
+      if (Number.isFinite(zahl)) aus[f.name] = zahl;
+      continue;
+    }
+    const text = String(roh).trim();
+    if (text !== '') aus[f.name] = text;
+  }
+  return aus;
+}
+
+/** Die Einstellungen einer Antwort als Objekt (der Server liefert sie nur dem System-Admin). */
+export function einstellungenVonAdapter(a: Pick<AdapterAnzeige, 'einstellungen'>): Record<
+  string,
+  unknown
+> {
+  const e = a.einstellungen as unknown;
+  return e != null && typeof e === 'object' ? (e as Record<string, unknown>) : {};
+}

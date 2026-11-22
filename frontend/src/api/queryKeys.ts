@@ -1125,6 +1125,10 @@ export const GLOBAL_KEYS = {
   anbindungWebhookVersuche: 'anbindung-webhook-versuche',
   // Einwurf-Zugänge für Absender ohne Signatur (LLH-1654), Verwaltung auf derselben Seite.
   einwurfZugaenge: 'einwurf-zugaenge',
+  // Adapter (LLH-2018): Anbindungen, die der Hub selbst abruft, Verwaltung auf derselben Seite.
+  adapter: 'adapter',
+  // Verlauf der Abrufversuche eines Adapters (LLH-2018).
+  adapterVersuche: 'adapter-versuche',
   // Lagebild für Externe (LLH-1496): Abruf der Seite `/extern` mit dem Schlüssel aus dem Link.
   lagebildExtern: 'lagebild-extern',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
@@ -1261,6 +1265,9 @@ export const globalKeys = {
   anbindungWebhookVersuche: (zugangId: string) =>
     [GLOBAL_KEYS.anbindungWebhookVersuche, zugangId] as const,
   einwurfZugaenge: () => [GLOBAL_KEYS.einwurfZugaenge] as const,
+  /** Adapter der Org samt Arten und Zustand des Geheimnisspeichers (LLH-2018). */
+  adapter: () => [GLOBAL_KEYS.adapter] as const,
+  adapterVersuche: (adapterId: string) => [GLOBAL_KEYS.adapterVersuche, adapterId] as const,
   /** Abruf der Seite `/extern` (LLH-1496). Ohne den Schlüssel: der bleibt aus dem Cache. */
   lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
@@ -1468,6 +1475,9 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   meldet kein Ereignis je Versuch. Die Ansicht fragt im Takt der Liste nach.
  * - `einwurfZugaenge` (LLH-1654): Verwaltung der Einwurf-Zugänge; die eigene Änderung setzt die
  *   Antwort. „Zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Einwurf.
+ * - `adapter`, `adapterVersuche` (LLH-2018): Verwaltung der Adapter und Verlauf ihrer Abrufe; die
+ *   eigene Änderung setzt die Antwort, den Zustand aus dem Lauf im Hintergrund zeigt der nächste
+ *   Abruf (30 s), kein Ereignis je Abruf. Geheimnisse stehen in keinem der beiden.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
@@ -1500,6 +1510,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.anbindungen,
   GLOBAL_KEYS.anbindungWebhookVersuche,
   GLOBAL_KEYS.einwurfZugaenge,
+  GLOBAL_KEYS.adapter,
+  GLOBAL_KEYS.adapterVersuche,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,
