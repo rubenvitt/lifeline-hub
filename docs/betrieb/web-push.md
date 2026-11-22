@@ -18,6 +18,11 @@ LIFELINE_WEB_PUSH_KONTAKT=mailto:betrieb@example.org   # oder https://…
 - Die App muss über HTTPS erreichbar sein; Browser bieten Push nur auf sicheren Seiten an.
 - Den Schalter „Auch bei geschlossener App“ setzt jede Person selbst, je Browser (Anwenderdoku,
   Kapitel „Einsatz-Oberfläche“). Ohne `--web-push` fehlt er.
+- Die iOS-App bekommt keinen Web Push (kein Service Worker im Webview). Für sie gibt es den
+  getrennten Weg **iOS-Push** über Apples Dienst und das Push-Relais des Projekts, eingeschaltet mit
+  `LIFELINE_IOS_PUSH` und unabhängig von `LIFELINE_WEB_PUSH`: [push-relais.md](push-relais.md),
+  [ios-app.md](ios-app.md) („Meldungen im Hintergrund“). Derselbe Schalter in der Oberfläche wählt
+  den Weg selbst.
 
 ## Ausgehende Verbindungen
 
@@ -79,6 +84,8 @@ Internet und zu den Push-Diensten, nicht der ELW.
   Empfängerfunktion einer Meldung bekommt es deshalb keinen Push, nur den Hinweis in der App.
 - Bietet der Hub keinen Push an (oder kennt er die Hinweise noch nicht, älterer Softwarestand),
   pusht der ELW wie ohne Kopplung, sofern er selbst `LIFELINE_WEB_PUSH` hat.
+- Web Push und iOS-Push gelten getrennt: der ELW lässt einen Kanal nur aus, wenn der Hub ihn
+  anbietet. Ein Hub nur mit Web Push lässt den iOS-Push beim ELW, und umgekehrt.
 - Der Link zeigt die Adresse, unter der der ELW den Hub erreicht. Läuft die Kopplung über ein
   internes Netz (Overlay, VPN), ist das diese interne Adresse.
 - Ein Hinweis am Hub kommt mit dem nächsten Abgleich an, ohne Verbindung später, höchstens 12

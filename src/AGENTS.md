@@ -872,6 +872,52 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   `jeder_bezugstyp_ist_eingeordnet`), ein neuer Adressat seine Textform dort. Das Aufräumen
   schließt Spiegel ein. Nachweis `tests/instanz_hinweise.rs`.
 
+## Backend — iOS-Push (LLH-1981)
+
+Entscheidung [ADR-0082](../docs/architektur/entscheidungen/ADR-0082-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)
+(Relais, Verschlüsselung, Opt-in, Bindung an Konto und Gerät), Design-Doc
+`docs/superpowers/specs/2026-11-22-mbbk7iwo-ios-apns-alarme-design.md`; `src/ios_push/`,
+`src/routes/ios_push.rs`. Das Relais selbst: `push-relais/AGENTS.md`, Betrieb
+`docs/betrieb/push-relais.md`.
+- **Versand nur aus `benachrichtigung::ausliefern`, neben Web Push:** dieselben Ereignisse an
+  `IosPush::versenden`, Stilles nie, Konten in `UeberHub::ios_push` nie; die auf dem Gerät stumme
+  Art filtert `ios_push::soll_senden` je Anmeldung, ein Alarm geht immer. Ohne `--ios-push` ist
+  `LiveHub::ios_push()` `None`, und die Routen antworten 404.
+- **Klartext aus derselben Stelle wie `GET /api/benachrichtigungen/{id}`**
+  (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
+  Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`. Absender und Wortlaut nur mit
+  „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
+  (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
+  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
+  dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
+- **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
+  4096 Byte für den ganzen Push, das Relais 4096 Zeichen für den Umschlag). Zu langes kürzt
+  `inhalt::kuerzen` in der Folge Wortlaut, Detail, Absender; Titel und Pfad nie.
+- **Je Gerät eine eigene Verschlüsselung** (`nutzlast_bauen`, Vertrag mit der Extension im
+  gemeinsamen Fall `src-tauri/faelle/push-nutzlast.json`); Kollaps-Kennung `kollaps` aus
+  `server_id` und Benachrichtigung. Höchstens 100 Nachrichten je `POST /v1/senden`, nichts wird
+  wiederholt; `token_ungueltig` löscht die Anmeldung nur bei unverändertem Token
+  (`repo::erloschen`). Der Client kommt aus `ausgehend::client_builder` (`Zweck::IosPush`, 10 s,
+  keine Weiterleitung, nur `https`).
+- **Zugang zum Relais** in der Einzeilentabelle `ios_push_relais`, angelegt beim ersten Versand
+  unter einer Sperre (kein doppelter Zugang bei parallelen Versänden). `401` vom Relais: einmal
+  neu anmelden; `403`: `gesperrt_at` setzen, warnen und nichts mehr senden; `GET /api/ios-push`
+  meldet dann `relais_gesperrt`, die Oberfläche zeigt statt des Schalters den Hinweis.
+- **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
+  durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, vor dem Löschen der
+  Sitzung), „Sitzungen beenden“ (die der beendeten Sitzungen; beendet ein Admin alle einer anderen
+  Person, alle des Kontos), Deaktivieren und Löschen des Kontos, `POST /api/ios-push/abmelden` der
+  App und `token_ungueltig`. Der Ablauf einer Sitzung und ein Passwortwechsel lassen sie stehen
+  (`session_token_hash` ist `ON DELETE SET NULL`). Ein neuer Weg, der Konten sperrt oder alle
+  Sitzungen beendet, entscheidet über die Anmeldungen mit.
+- **`POST /api/ios-push/abmelden` ohne Sitzung:** Nachweis
+  `HMAC-SHA256(schluessel, "abmelden:" + kennung)`; die Antwort ist immer 204, auch bei falschem
+  Nachweis oder unbekannter Kennung. Gerätekonten erreichen die übrigen Routen nicht (403).
+- **Kopplung je Kanal:** `MeldenAntwort.ios_push` und `instanz_kopplung.gegenueber_ios_push`
+  neben `web_push`; der ELW lässt den eigenen iOS-Push an Konten vom Hub nur aus, wenn der Hub
+  iOS-Push anbietet (`hinweis::Kanal`), sonst pusht er selbst. Nur dann antwortet `PUT` am ELW mit
+  422 und `GET` nennt `ueber_hub`. Nachweis `tests/ios_push.rs`, `tests/instanz_hinweise.rs`.
+
 ## Backend — Meldungsmodell (LLH-1027)
 
 Begriffe, Datenfluss, Migrations-SQL und Folgestellen:

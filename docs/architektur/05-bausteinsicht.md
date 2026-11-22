@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 21.11.2026 (Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 22.11.2026 (iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -27,11 +27,16 @@ flowchart LR
   fremd([Fremdsystem])
   ks["karten-service"]
   kb["karten-build"]
+  relais["push-relais<br/>(APNs-Relais)"]
+  apns([APNs])
   s3[(S3-Speicher)]
   nutzer -- "HTTPS: Seiten, /api, SSE" --> hub
   tauri -- "Webview lädt Server-Adresse" --> hub
   ios -- "Webview lädt Server-Adresse,<br/>GET /api/shell" --> hub
   ios -.-|gemeinsame Fälle| tauri
+  hub -- "HTTPS /v1/senden<br/>(iOS-Push, verschlüsselt)" --> relais
+  relais -- "HTTP/2" --> apns
+  apns -. "Push" .-> ios
   hub -- "liefert aus" --> fe
   hub -- "HTTP + Bearer-Token<br/>(Region-Bau)" --> ks
   ks -- "make tiles" --> kb
@@ -50,6 +55,7 @@ flowchart LR
 | Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
 | iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` ([AGENTS.md](../../ios/AGENTS.md)) |
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
+| `push-relais` | Eigener Dienst, den das Projekt betreibt: hält den APNs-Schlüssel und reicht verschlüsselte Pushes der Lifeline-Server an Apple weiter; kennt keine Inhalte und keine Tokens ([ADR-0082](entscheidungen/ADR-0082-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)) | `POST /v1/server`, `POST /v1/senden`, `GET /v1/status` (`push-relais/src/api.rs`), Unterbefehle `sperren`/`entsperren` (`push-relais/src/main.rs`) | `push-relais/` ([AGENTS.md](../../push-relais/AGENTS.md)) |
 | `karten-build` | Bau-zeitiges Erzeugen der Shortbread-MBTiles mit Planetiler, nie zur Laufzeit der App | `make tiles AREA=…`, `make validate` (`karten-build/README.md`) | `karten-build/` |
 | `crates/karten-katalog` | Geteilte Wire-Typen des Offline-Kartenkatalogs und der Bau-Jobs | Lib-Crate, Feature `schema` für den Typ-Codegen (`crates/karten-katalog/Cargo.toml`) | `crates/karten-katalog/src/lib.rs` |
 | `crates/lifeline-machine-client` | Referenz-Client des Maschinenzugangs: Code einlösen, Anfragen signieren, Antworten prüfen; absichtlich unabhängig vom Server | Lib-Crate, Feature `http` (`crates/lifeline-machine-client/Cargo.toml`); genutzt vom Kommando `lifeline-hub zugang` | `crates/lifeline-machine-client/src/lib.rs` |
@@ -58,8 +64,8 @@ flowchart LR
 Belege: Der Release-Build bettet `frontend/dist` per `rust-embed` ein, der Debug-Build liest vom
 Dateisystem (`src/static_files.rs`); unbekannte Pfade ohne Dateiendung fallen auf `index.html`
 zurück, eingehängt als Router-Fallback in `src/app.rs`. Der Workspace umfasst `.`,
-`crates/karten-katalog`, `crates/lifeline-machine-client`, `karten-service` und `src-tauri`
-(`Cargo.toml`). Die Kopplung an den
+`crates/karten-katalog`, `crates/lifeline-machine-client`, `karten-service`, `push-relais` und
+`src-tauri` (`Cargo.toml`). Die Kopplung an den
 `karten-service` ist optional: ohne `LIFELINE_KARTEN_SERVICE_URL` und
 `LIFELINE_KARTEN_SERVICE_TOKEN` ist der Region-Bau aus (`src/config.rs`); die Proxy-Routen
 `/api/karte/offline-karten/bauen|baubare-regionen|bau-status` stehen in `src/app.rs`. Der
@@ -184,6 +190,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/nachforderung` | Nachforderung von Kräften und Mitteln mit linearem Bedarfsstatus | `…/{id}/nachforderungen`; Live `nachforderung` |
 | `src/benachrichtigung` | Eine Stelle entscheidet Empfänger, schreibt je Empfänger eine Zeile, stellt zu | `/api/benachrichtigungen`; Live `benachrichtigung`, `org_benachrichtigung` |
 | `src/web_push` | Web Push bei geschlossenem Tab, nur mit `--web-push`, RFC-8291-Verschlüsselung | `/api/web-push`; aus `benachrichtigung::melden` |
+| `src/ios_push` | iOS-Push über das Push-Relais, nur mit `--ios-push`: Anmeldungen je Konto und Gerät, Klartext wie `GET /api/benachrichtigungen/{id}`, AES-256-GCM je Gerät, Relais-Client mit Selbstanmeldung | `/api/ios-push` (`src/routes/ios_push.rs`); aus `benachrichtigung::melden`; `POST /v1/server`, `/v1/senden` am Relais |
 | `src/externe_stelle` | Org-Katalog externer Stellen als Vorschlagsquelle (Speicherform Text) | `/api/externe-stellen` |
 
 ### Führungsorganisation
@@ -335,7 +342,7 @@ flowchart TB
 | `frontend/src/hilfe` | Hilfe-Seite mit den Kapiteln aus `docs/anwender/kapitel/` | — |
 | `frontend/src/neuigkeiten` | Versionshinweise aus dem CHANGELOG | `src/versionsstand` |
 | `frontend/src/rueckmeldung` | Adresse des Rückmeldeformulars (GitHub-Issue) mit Version und Routenmuster | `.github/workflows/rueckmeldung.yml` |
-| `frontend/src/alarm` | Benachrichtigungen, Alarmton, Badge, Desktop-Alarm, Web-Push-Anmeldung | `src/benachrichtigung`, `src/web_push` |
+| `frontend/src/alarm` | Benachrichtigungen, Alarmton, Badge, Desktop-Alarm, Anmeldung für Web Push und iOS-Push (`pushKanal.ts` wählt) | `src/benachrichtigung`, `src/web_push`, `src/ios_push` |
 | `frontend/src/test` | Test-Setup, Attrappen und Hilfen der Vitest-Suite | — |
 | `frontend/src/pages` | Seiten der Module; Unterordner u. a. `lagekarte` ([AGENTS.md](../../frontend/src/pages/lagekarte/AGENTS.md)), `lage-dashboard`, `uhs`, `gefahren`, `einstellungen` | je Modul |
 
@@ -422,20 +429,33 @@ das Laden des Servers; `kanal.rs` und `update.rs` Update-Kanal und Updater. Die 
 
 ### `ios`
 
-Die iOS-Hülle (LLH-1978, ADR-0068), Regeln in [ios/AGENTS.md](../../ios/AGENTS.md). `ios/LifelineKern` ist ein Swift-Paket
-ohne UIKit und WebKit (`ios/LifelineKern/Package.swift`): Adressprüfung (`Adresse.swift`),
-Deeplink (`Deeplink.swift`), Linkregeln (`Linkregeln.swift`), Serverliste (`Serverliste.swift`),
-Vertragsprüfung gegen `GET /api/shell` (`Vertrag.swift`), Onboarding (`Onboarding.swift`) und
-Haptik-Abbildung (`Haptik.swift`). Seine Suite liest die gemeinsamen Fälle der Desktop-Hülle aus
-`src-tauri/faelle/` und läuft auch unter Linux (Schritt 18 von `scripts/check-all.sh`);
-`AppVersion.swift` liest die Version aus der Info.plist. `ios/App` trägt das App-Target
-`LifelineHub` (Einstieg `ios/App/LifelineHubApp.swift`); das Init-Skript `ios/App/Huelle/huelle.js`
-meldet der Seite die Kennung `__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in
-seinem Kopf. Die Notification Service Extension `ios/Benachrichtigungsdienst` entschlüsselt
-Push-Meldungen über APNs (`Dienst.swift`); Schlüsselbund, Entschlüsseln und App Group teilt sie mit
-der App über `ios/Gemeinsam`. Das Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App,
-Extension, `ios/AppTests`, `ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt
-`scripts/ios/version.sh`.
+Die iOS-Hülle (LLH-1978, ADR-0068), Regeln in [ios/AGENTS.md](../../ios/AGENTS.md).
+`ios/LifelineKern` ist ein Swift-Paket ohne UIKit und WebKit (`ios/LifelineKern/Package.swift`):
+Adressprüfung (`Adresse.swift`), Deeplink (`Deeplink.swift`), Linkregeln (`Linkregeln.swift`),
+Serverliste (`Serverliste.swift`), Vertragsprüfung gegen `GET /api/shell` (`Vertrag.swift`),
+Onboarding (`Onboarding.swift`), Haptik-Abbildung (`Haptik.swift`) sowie Nutzlast und Anmeldungen
+des iOS-Push (`PushNutzlast.swift`, `PushAnmeldungen.swift`). Seine Suite liest die gemeinsamen
+Fälle der Desktop-Hülle aus `src-tauri/faelle/` und läuft auch unter Linux (Schritt 18 von
+`scripts/check-all.sh`); `AppVersion.swift` liest die Version aus der Info.plist. `ios/App` trägt
+das App-Target `LifelineHub` (Einstieg `ios/App/LifelineHubApp.swift`); das Init-Skript
+`ios/App/Huelle/huelle.js` meldet der Seite die Kennung `__LIFELINE_HUELLE__` und beschreibt das
+Wire-Format der Brücke in seinem Kopf. Die Notification Service Extension
+`ios/Benachrichtigungsdienst` entschlüsselt Push-Meldungen über APNs (`Dienst.swift`);
+Schlüsselbund, Entschlüsseln und App Group teilt sie mit der App über `ios/Gemeinsam`. Das
+Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App, Extension, `ios/AppTests`,
+`ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt `scripts/ios/version.sh`.
+
+### `push-relais`
+
+Eigenes Binary im Workspace (`push-relais/Cargo.toml`, Abbild `push-relais/Dockerfile`), Regeln in
+[push-relais/AGENTS.md](../../push-relais/AGENTS.md), Betrieb in
+[`docs/betrieb/push-relais.md`](../betrieb/push-relais.md). `push-relais/src/api.rs` trägt die
+Routen samt Bearer-Prüfung und Grenzen (Nachrichten je Server und Minute, Registrierungen je IP und
+Stunde), `senden.rs` einen Aufruf von `/v1/senden` (Prüfung des Servers, Versand, Zählung im Log),
+`apns.rs` den HTTP/2-Client mit dem Anbieter-Token (ES256 aus dem `.p8`) und die Abbildung der
+Apple-Antworten auf `zugestellt`, `token_ungueltig`, `gedrosselt` und `fehler`, `speicher.rs` die
+SQLite-Tabelle `server` (Hash des Geheimnisses, Kontakt, Version, Sperre), `config.rs` die Umgebung
+`PUSH_RELAIS_*`. Es gehört nicht zur ausgelieferten Anwendung.
 
 ### `karten-service`
 

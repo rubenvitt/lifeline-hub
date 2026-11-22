@@ -102,6 +102,14 @@ docker exec push-relais /usr/local/bin/push-relais entsperren <server_id>
 Die `server_id` steht im Log jeder `senden`-Zeile. Ist sie nicht registriert, endet der Befehl mit
 Fehler. Die Sperre wirkt sofort, ein Neustart ist nicht nötig.
 
+Der gesperrte Lifeline-Server merkt sich die Sperre (Spalte `gesperrt_at` in `ios_push_relais`),
+warnt im Log, nimmt keinen Kontakt mehr auf, und die Seite „Benachrichtigungen“ zeigt dort statt des
+Schalters „Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.“
+**Entsperren wirkt dort nicht von selbst:** solange die Zeile steht, sendet der Server nicht. Löscht
+sein Betreiber sie, meldet sich der Server beim nächsten Versand mit neuer `server_id` an; eine
+Sperre lässt sich so umgehen, begrenzt nur durch die Registrierungen je IP und Stunde
+([Risiko R48](../architektur/11-risiken-und-technische-schulden.md)).
+
 ## Sicherung
 
 Gesichert wird die **SQLite-Datei** (`/data/push-relais.sqlite`) und separat die **`.p8`-Datei**
@@ -128,10 +136,13 @@ Ein Push lässt sich nur auf einem echten iPhone prüfen, nicht im Simulator.
 3. Die App als **Debug-Build** aus Xcode auf das Gerät installieren; Debug-Builds tragen die
    APNs-Umgebung „development“ und melden das Gerät bei der **Sandbox** an. TestFlight-Builds
    gehören zur Produktion.
-4. In der App am Server anmelden und die Mitteilungen erlauben.
-5. Auf dem Server einen Alarm auslösen (Benachrichtigung mit Stufe Alarm). Erwartet: Der Push
-   erscheint bei gesperrtem Gerät mit dem Titel „Alarm“ bzw. „Neue Benachrichtigung“, der
-   Wortlaut danach in der App; im Relais-Log steht eine `senden`-Zeile mit `zugestellt=1`.
+4. In der App am Server anmelden, unter Benutzermenü → „Benachrichtigungen“ den Schalter „Auch
+   bei geschlossener App“ einschalten und die Mitteilungen erlauben.
+5. Die App schließen und auf dem Server einen Alarm auslösen (Benachrichtigung mit Stufe Alarm).
+   Erwartet: Der Push erscheint bei gesperrtem Gerät mit Titel und Detail wie im Browser; steht
+   nur „Alarm“ bzw. „Neue Benachrichtigung“ mit „Öffnen, um die Meldung zu sehen“, hat die
+   Extension die Nutzlast nicht geöffnet (Schlüsselbund oder App Group). Im Relais-Log steht eine
+   `senden`-Zeile mit `zugestellt=1`. Tippen öffnet die Seite der Meldung.
 6. Bleibt der Push aus: `token_ungueltig` heißt, Sandbox und Produktion passen nicht zum
    Build (Debug gegen Produktion oder umgekehrt); `fehler` heißt, Key ID, Team ID oder Schlüssel
    stimmen nicht; `gedrosselt` kommt von Apple.

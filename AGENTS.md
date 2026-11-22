@@ -32,10 +32,10 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs), ihre Nummern und Prüfungen |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
-| `src/AGENTS.md` | Statuscodes, Typ-Codegen, öffentliche API v1, Adapter (Geheimnisse, Abrufe), Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, ETB live verteilen, Präsenz, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
+| `src/AGENTS.md` | Statuscodes, Typ-Codegen, öffentliche API v1, Adapter (Geheimnisse, Abrufe), Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, ETB live verteilen, Präsenz, Benachrichtigungen, iOS-Push, Demo-Daten, Aufbewahrung, ClamAV |
 | `migrations/AGENTS.md` | Migrationsvergabe (Nummern, Autofix, Stau-Wächter), Tabellenumbau und `-- no-transaction` |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
-| `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Bauen nur auf macOS |
+| `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Push über APNs, Bauen nur auf macOS |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `push-relais/AGENTS.md` | APNs-Relais: keine Inhalte, nie Token/Nutzlast loggen, Wire deutsch und additiv, Sperren nur per Unterbefehl, APNs-Doppel in Tests |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |

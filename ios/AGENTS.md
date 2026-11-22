@@ -40,3 +40,38 @@ Change `t39ltxxi-ios-huelle`.
   `Kopfschwarz` kommen aus der Bildmarke (Spec `app-marke`); neu erzeugt mit
   `scripts/ios/erzeuge-symbol.sh` (auch aus `scripts/marke/erzeuge-symbole.sh` gerufen), geprüft in
   `frontend/src/marke/marke.guard.test.ts`. Nie von Hand ändern.
+
+## Push über APNs (LLH-1981)
+
+Entscheidung ADR-0082; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais in
+`push-relais/AGENTS.md`.
+
+- **Brücke:** `push_register` (fragt die Berechtigung, holt das Token, legt je Server einmal
+  Kennung und Schlüssel an; Antwort `{ registration_id, token, environment, key }`, Fehler
+  `denied` oder `unavailable`), `push_unregister`, `push_state` (`{ permission, registration_id? }`);
+  die Kennung trägt `push: true`. Am Server meldet nur die Oberfläche an und ab
+  (`frontend/src/alarm/iosPush.ts`): Schalter, Abgleich und Stumm-Wahl liegen dort, nie in der Hülle.
+- **Kennung und Schlüssel je Server:** die Zuordnung Kennung → Server liegt in `push.json` neben
+  der Serverliste (`PushAnmeldungen`, Kern), der Schlüssel im gemeinsamen Schlüsselbund von App und
+  Extension (`ios/Gemeinsam/Schluesselbund.swift`, lesbar nach dem ersten Entsperren). Token und
+  Schlüssel stehen in keinem Log.
+- **Die Extension bleibt dünn** (`ios/Benachrichtigungsdienst`): Schlüssel lesen, öffnen
+  (`ios/Gemeinsam/Entschluesseler.swift`), Inhalt setzen; was angezeigt wird, entscheidet
+  `PushNutzlast` im Kern. Kein Netz, keine Ablage. Scheitert etwas, bleibt der Rückfalltitel des
+  Relais mit „Öffnen, um die Meldung zu sehen“. AES-GCM steht in `ios/Gemeinsam`, weil es unter
+  Linux kein CryptoKit gibt; Server und App hält der gemeinsame Fall
+  `src-tauri/faelle/push-nutzlast.json` zusammen (Klartext: `push-inhalt.json`).
+- **Native Anfragen an einen Server** gibt es nur zwei: `GET /api/shell` und
+  `POST /api/ios-push/abmelden` beim Entfernen eines Servers (`Vertragsabruf.meldePushAb`, ohne
+  Sitzung, einmal, ohne Wiederholen; danach den Schlüssel löschen). Eine dritte braucht eine neue
+  Entscheidung.
+- **Tippen auf eine Meldung** entscheidet `Ablauf` (`meldungAngetippt`): eine unbekannte Kennung
+  tut nichts, ein anderer Server wird sichtbar aktiv wie bei einem Wechsel in der Serverliste, der
+  Pfad geht durch `Linkregeln.sichererPfad` (Abschnitt `push_pfad` in
+  `src-tauri/faelle/deeplink.json`), sonst die Startseite. Eine Push-Meldung des Servers, dessen
+  Oberfläche gerade läuft, zeigt die App nicht als Banner; die Oberfläche meldet sie selbst.
+- **Umgebung und Berechtigungen:** `aps-environment` steht in `ios/App/LifelineHub.entitlements`
+  fest auf `development`, der Export für App Store Connect setzt `production`; dem Server meldet
+  die App die Umgebung über `#if DEBUG` (`ios/App/Systemdienste.swift`). App und Extension teilen
+  App Group und Schlüsselbund-Gruppe; die Zahl der Server legt die App für den Untertitel in die
+  `UserDefaults` der App Group (Privacy-Manifest: Grund 1C8F.1).

@@ -6,11 +6,14 @@ Sie lädt die https-Adresse des Einsatzservers in einen Webview, wie die
 [Desktop-App](desktop-app.md). Anwendung, Daten und Anmeldung liegen auf dem Server. Die Hülle
 bringt das Onboarding, eine Serverliste mit einem eigenen Datenspeicher je Server, native
 Status-Seiten, die Anmeldung im Systembrowser, Downloads mit dem Teilen-Blatt, Drucken, die
-Meldung bei offener App, die Zahl am App-Symbol und Haptik mit.
+Meldung bei offener App, Meldungen bei geschlossener App über Apple Push (siehe „Meldungen im
+Hintergrund“), die Zahl am App-Symbol und Haptik mit.
 
-Anforderungen: Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`. Quellcode und Regeln:
-`ios/` ([`ios/AGENTS.md`](../../ios/AGENTS.md)). Herleitung: `design.md` der Change
-`t39ltxxi-ios-huelle`.
+Anforderungen: Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`, für den Push
+[ADR-0082](../architektur/entscheidungen/ADR-0082-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md).
+Quellcode und Regeln: `ios/` ([`ios/AGENTS.md`](../../ios/AGENTS.md)). Herleitung: `design.md`
+der Change `t39ltxxi-ios-huelle`, für den Push
+`docs/superpowers/specs/2026-11-22-mbbk7iwo-ios-apns-alarme-design.md`.
 
 ## Bezug und Installation (TestFlight)
 
@@ -165,30 +168,82 @@ im Browser ein, nicht in der App.
   Der Titel nennt, wer fragt: die Adresse des Servers oder, bei einer fremden Seite wie dem
   Anmeldedienst, deren Adresse.
 - **Meldungen und Zahl am App-Symbol:** Bei laufender App zeigt sie eine Benachrichtigung als
-  Mitteilung des Systems und setzt die Zahl der ungelesenen Eingänge am Symbol. iOS fragt beim
-  ersten Mal nach der Erlaubnis, auch wenn zuerst eine Zahl kommt (nur das Entfernen der Zahl
-  fragt nie); ändern unter Einstellungen → Mitteilungen → „Lifeline“.
+  Mitteilung des Systems und setzt die Zahl der ungelesenen Eingänge am Symbol; bei geschlossener
+  App kommen Meldungen nur über den Push („Meldungen im Hintergrund“), die Zahl am Symbol nicht.
+  iOS fragt beim ersten Mal nach der Erlaubnis, auch wenn zuerst eine Zahl kommt (nur das
+  Entfernen der Zahl fragt nie); ändern unter Einstellungen → Mitteilungen → „Lifeline“.
 - **Haptik:** beim Speichern einer Erfassung, bei einem eingehenden Alarm und beim Wechsel eines
   Segments, nur auf dem iPhone und nur mit eingeschaltetem Schalter.
+
+## Meldungen im Hintergrund
+
+iOS hält die App kurz nach dem Wechsel in den Hintergrund an; der Live-Kanal ruht, und Web Push
+gibt es im Webview nicht (Service Worker laufen im Webview einer App nicht). Benachrichtigungen
+und Alarme erreichen ein iPhone mit geschlossener, verdeckter oder beendeter App deshalb über
+Apples Push-Dienst (APNs) und das Push-Relais des Projekts (LLH-1981,
+[push-relais.md](push-relais.md)). Voraussetzungen:
+
+1. Der Betreiber des Servers schaltet `LIFELINE_IOS_PUSH=true` (`--ios-push`) ein
+   ([env-registry.md](env-registry.md)). Der Server braucht ausgehend HTTPS zum Relais
+   (`https://push.rubeen.dev`, anders mit `LIFELINE_IOS_PUSH_RELAIS`) und meldet sich dort beim
+   ersten Versand selbst an. `--web-push` ist dafür nicht nötig.
+2. Die Person schaltet in der App unter Benutzermenü → „Benachrichtigungen“ → „Dieses Gerät“ den
+   Schalter „Auch bei geschlossener App“ ein und erlaubt die Mitteilungen, für jeden Server in der
+   App einzeln (Anwenderdoku, Kapitel „Einsatz auswählen und Oberfläche“).
+3. Die Mitteilungen für „Lifeline“ bleiben in den iOS-Einstellungen erlaubt; verweigert, zeigt der
+   Schalter „In den iOS-Einstellungen verweigert“.
+
+Was ankommt:
+
+- Dieselben Regeln wie bei Web Push: ein Alarm immer, ein Hinweis nicht, wenn seine Art auf dem
+  Gerät stumm ist; eine Meldung gilt 12 Stunden. Alarme sind zeitkritisch und kommen durch einen
+  Fokus, sofern das für die App nicht abgeschaltet ist. Bei stummgeschaltetem iPhone klingen sie
+  nicht: kritische Warnungen gibt es nicht.
+- Titel und Detail wie im Browser, mit „Mit Absender und Wortlaut“ dazu Absender und der Anfang
+  des Wortlauts. Den Inhalt verschlüsselt der Server für das Gerät; Relais und Apple sehen
+  Gerätetoken, Stufe und Zeitpunkt, nicht den Inhalt. Entschlüsselt wird auf dem Gerät (Extension
+  „Benachrichtigungsdienst“). Gelingt das nicht, steht nur „Alarm“ bzw. „Neue Benachrichtigung“
+  mit „Öffnen, um die Meldung zu sehen“.
+- Mit mehr als einem Server in der App nennt die Meldung den Server.
+- Tippen öffnet den Server der Meldung und dort ihre Seite; war ein anderer Server aktiv, wechselt
+  die App sichtbar dorthin wie in der Serverliste.
+- Ist die App offen und zeigt den Server der Meldung, erscheint kein zweites Banner; die
+  Oberfläche meldet selbst.
+
+Die Anmeldung hängt an Konto und Gerät, nicht an der Sitzung: anders als bei Web Push beenden der
+Ablauf der Sitzung und ein Passwortwechsel sie nicht. Sie endet durch den Schalter, Abmelden in der
+App, das Beenden der Anmeldung dieses Geräts unter Profil → „Anmeldungen“, das Beenden aller
+Anmeldungen der Person durch einen Admin, Deaktivieren des Kontos und Entfernen des Servers aus der
+Serverliste. Beim Entfernen meldet die App das Gerät einmal ohne Sitzung ab. Erreicht sie den
+Server dabei nicht, schickt er weiter, und die Meldungen zeigen nur den Rückfalltitel, bis die
+Anmeldung dieses Geräts unter „Anmeldungen“ beendet wird (nur solange sie dort noch steht), ein
+Admin alle Anmeldungen der Person beendet oder die App neu installiert wird (Apple lehnt dann das
+alte Token ab).
+
+Am gekoppelten ELW gilt dasselbe wie bei Web Push ([web-push.md](web-push.md), „Gekoppelter ELW“),
+aber je Kanal: bietet der Hub iOS-Push an, kommen die Meldungen für Konten vom Hub über den Hub;
+dafür den Hub als Server in der App hinzufügen und dort einschalten. Bietet er ihn nicht an, pusht
+der ELW selbst.
 
 ## Daten auf dem Gerät
 
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Datenspeicher des
 Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Die
 Serverliste liegt als `server.json` in Application Support der App, der Schalter „Haptik“ in den
-Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Das
-Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit Grund CA92.1,
-kein Tracking und keine erhobenen Daten. Vorgaben für
+Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Für den Push
+liegt daneben `push.json` (welche Kennung zu welchem Server gehört), der Schlüssel je Kennung im
+Schlüsselbund, den App und Extension teilen (lesbar nach dem ersten Entsperren), und die Zahl der
+Server in den Einstellungen der App Group. Das Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`)
+erklärt dafür UserDefaults mit den Gründen CA92.1 und 1C8F.1, kein Tracking und keine erhobenen
+Daten. Vorgaben für
 Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 
 ## Grenzen (offen)
 
-- **Keine Meldung im Hintergrund** (LLH-1981): iOS hält die App kurz nach dem Wechsel in den
-  Hintergrund an; der Live-Kanal ruht, und eine Benachrichtigung oder ein Alarm erscheint erst,
-  wenn die App wieder vorn ist. Web Push gibt es in der App nicht (Service Worker laufen im
-  Webview einer App nicht, design.md Fakt 1), der Push-Schalter fehlt deshalb. Wer im Einsatz auf
-  Alarme angewiesen ist, lässt die App offen oder nutzt zusätzlich Browser bzw. Desktop-App mit
-  Web Push. Push über APNs ist eine eigene Aufgabe.
+- **Meldungen im Hintergrund nur mit Push** (siehe dort): ohne `--ios-push` am Server, ohne
+  erreichbares Relais oder ohne Schalter auf dem Gerät erscheint eine Benachrichtigung erst, wenn
+  die App wieder vorn ist. Kritische Warnungen (hörbar trotz Stummschaltung) gibt es nicht, und
+  eine anderswo quittierte Meldung bleibt auf dem Sperrbildschirm stehen.
 - **Kein Passkey im Webview:** Anmeldung über „Im Browser anmelden“ (siehe „Anmeldung“).
 - **Kein Start ohne Server** (LLH-1980): Ist der Server beim Start nicht erreichbar, zeigt die App
   „Server nicht erreichbar“ statt der Oberfläche; einen Precache wie im Browser gibt es in der App
@@ -198,7 +253,8 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
   Webview so meldet.
 - **Nicht gemessen:** alles auf echten Geräten (Aufgabe 10.3 der Change): Onboarding mit
   `elw.local` und CA-Profil, zwei Server, Anmeldung mit Passkey, Haptik, Meldung, CSV-Export,
-  Drucken. Bisher belegt sind nur Simulator und Tests (`ios-pruefung.yml`).
+  Drucken, Push im Hintergrund (Gerätetest: [push-relais.md](push-relais.md), „Gerätetest“).
+  Bisher belegt sind nur Simulator und Tests (`ios-pruefung.yml`).
 
 ## Release-Ablauf
 
@@ -235,7 +291,8 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 - Zwei Uploads derselben Minute trügen dieselbe Build-Nummer; Apple lehnt den zweiten ab. Dann
   den Lauf eine Minute später neu starten.
 - Die Verschlüsselungsfrage beim Upload ist beantwortet (`ITSAppUsesNonExemptEncryption = false`
-  in `ios/project.yml`): die App nutzt nur die Verschlüsselung des Systems (HTTPS).
+  in `ios/project.yml`): die App nutzt nur die Verschlüsselung des Systems (HTTPS, dazu CryptoKit
+  für das Öffnen der Push-Meldungen).
 
 ## Signierung und Secrets
 
@@ -269,8 +326,11 @@ Die `.p8` lässt sich in App Store Connect nur einmal laden. Ablage wie die übr
 Bevor der erste Upload gelingt (Aufgabe 10.1 der Change):
 
 1. **Bundle-ID** `dev.rubeen.lifeline.ios` im Team `H95J852PKP` registrieren
-   (developer.apple.com → Certificates, Identifiers & Profiles → Identifiers). Besondere
-   Fähigkeiten braucht sie nicht.
+   (developer.apple.com → Certificates, Identifiers & Profiles → Identifiers) mit den Fähigkeiten
+   Push Notifications, Time Sensitive Notifications und App Groups; dazu die Bundle-ID
+   `dev.rubeen.lifeline.ios.benachrichtigung` der Extension mit App Groups und die App Group
+   `group.dev.rubeen.lifeline.ios` (LLH-1981). Den APNs-Schlüssel braucht nur das Relais
+   ([push-relais.md](push-relais.md), „Apple-Schlüssel anlegen“).
 2. **App in App Store Connect anlegen** (Meine Apps → „+“ → Neue App, Plattform iOS, diese
    Bundle-ID). Der Name in App Store Connect muss im App Store eindeutig sein; auf dem
    Home-Bildschirm steht unabhängig davon „Lifeline“ (`CFBundleDisplayName`).
