@@ -99,15 +99,115 @@ impl ServerCertVerifier for Verifier {
     }
 }
 
-/// Baut einen Client für eine Direktkopplung: Verifier mit `erwartet`, TLS-Info an der Antwort,
-/// keine Weiterleitung, Fristen wie beim Melden.
-pub fn build_client(erwartet: Option<String>) -> Result<reqwest::Client, String> {
-    let config = rustls::ClientConfig::builder_with_provider(provider())
+/// Text des TLS-Fehlers, mit dem der [`Erfasser`] den Handshake abbricht, sobald er das Zertifikat
+/// gelesen hat.
+pub const ERFASST: &str = "Zertifikat erfasst, Verbindung abgebrochen";
+
+/// Verifier, der nur das Zertifikat der Gegenstelle liest (LLH-1872, Webhook-Fingerabdruck vom
+/// Ziel abrufen): Er merkt sich den Fingerabdruck und lehnt den Handshake dann ab, so dass nie ein
+/// HTTP-Byte hinausgeht.
+#[derive(Debug)]
+pub struct Erfasser {
+    gesehen: Mutex<Option<String>>,
+    provider: Arc<CryptoProvider>,
+}
+
+impl Erfasser {
+    pub fn new() -> Self {
+        Self {
+            gesehen: Mutex::new(None),
+            provider: provider(),
+        }
+    }
+
+    /// Fingerabdruck des Endzertifikats, falls der Handshake so weit kam.
+    pub fn gesehen(&self) -> Option<String> {
+        self.gesehen.lock().ok().and_then(|g| g.clone())
+    }
+}
+
+impl Default for Erfasser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ServerCertVerifier for Erfasser {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        if let Ok(mut g) = self.gesehen.lock() {
+            *g = Some(tls_fingerabdruck(end_entity.as_ref()));
+        }
+        Err(rustls::Error::General(ERFASST.into()))
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.provider
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
+}
+
+fn config_mit(verifier: Arc<dyn ServerCertVerifier>) -> Result<rustls::ClientConfig, String> {
+    Ok(rustls::ClientConfig::builder_with_provider(provider())
         .with_safe_default_protocol_versions()
         .map_err(|e| e.to_string())?
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(Verifier::new(erwartet)))
-        .with_no_client_auth();
+        .with_custom_certificate_verifier(verifier)
+        .with_no_client_auth())
+}
+
+/// TLS-Konfiguration mit dem [`Verifier`]: mit `erwartet` zählt nur dieses Zertifikat (weder
+/// Kette noch Name noch Vertrauensanker). Genutzt von der Direktkopplung und vom Webhook mit
+/// Fingerabdruck (LLH-1872, ADR-0082).
+pub fn tls_config(erwartet: Option<String>) -> Result<rustls::ClientConfig, String> {
+    config_mit(Arc::new(Verifier::new(erwartet)))
+}
+
+/// TLS-Konfiguration mit einem [`Erfasser`]; jeder Handshake damit scheitert nach dem Lesen des
+/// Zertifikats.
+pub fn erfasser_config(erfasser: Arc<Erfasser>) -> Result<rustls::ClientConfig, String> {
+    config_mit(erfasser)
+}
+
+/// Baut einen Client für eine Direktkopplung: Verifier mit `erwartet`, TLS-Info an der Antwort,
+/// keine Weiterleitung, Fristen wie beim Melden.
+pub fn build_client(erwartet: Option<String>) -> Result<reqwest::Client, String> {
+    let config = tls_config(erwartet)?;
     crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
         .tls_backend_preconfigured(config)
         .tls_info(true)
