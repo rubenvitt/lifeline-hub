@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 21.11.2026 (Abruf eines Adapters, LLH-2017; Direktkopplung vor Ort, LLH-1497).
+Stand: 22.11.2026 (Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln

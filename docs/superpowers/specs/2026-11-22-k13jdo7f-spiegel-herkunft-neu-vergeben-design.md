@@ -2,7 +2,10 @@
 
 Zunder: https://zunder.rubeen.dev/#/aufgabe/k13jdo7fgc22cwrszylmhiqs
 Lösungsweg mit Ruben am 22.11.2026 abgestimmt: A (Herkunft beim Neuanlegen räumen) und C (Merker
-„neu vergeben“ für `kennt: true`) in dieser Aufgabe.
+„neu vergeben“ für `kennt: true`) in dieser Aufgabe. Nach dem Review vor dem PR am selben Tag
+ergänzt (D8): Der Merker trägt den fremden Schlüssel der gelöschten Zeile, und `gegen_hinaus`
+nennt ihn für die neue. Damit ist Akzeptanzkriterium 2 der Aufgabe umgekehrt; Entscheidung
+ADR-0080.
 
 ## Problem
 
@@ -72,9 +75,12 @@ und Lösch-Trigger bleiben, wie sie sind.
 
 ```sql
 CREATE TRIGGER t_spiegellog_i AFTER INSERT ON t WHEN <Einsatz besteht> BEGIN
-    -- C: Stand im Log vor dieser Zeile = die ID war in diesem Einsatz schon vergeben.
-    INSERT OR REPLACE INTO spiegel_neu_vergeben (einsatz_id, art, lokaler_schluessel, stand)
-    SELECT <einsatz>, 't', <schluessel>, 0 WHERE <kein Merker> AND EXISTS (
+    -- C: Stand im Log vor dieser Zeile = die ID war in diesem Einsatz schon vergeben. Der
+    -- fremde Schlüssel kommt aus der Herkunft, sonst aus einem älteren Merker (D8).
+    INSERT OR REPLACE INTO spiegel_neu_vergeben (einsatz_id, art, lokaler_schluessel,
+        fremder_schluessel)
+    SELECT <einsatz>, 't', <schluessel>, COALESCE(<Herkunft dieser ID>, <älterer Merker>)
+    WHERE <kein Merker> AND EXISTS (
         SELECT 1 FROM einsatz_aenderung WHERE einsatz_id = <einsatz> AND art = 't'
         AND schluessel = <schluessel>);
     -- A: die Herkunft einer früheren Zeile unter derselben ID, in jedem Einsatz.
@@ -82,10 +88,6 @@ CREATE TRIGGER t_spiegellog_i AFTER INSERT ON t WHEN <Einsatz besteht> BEGIN
         AND lokaler_schluessel = <schluessel>;
     DELETE FROM einsatz_aenderung WHERE einsatz_id = <einsatz> AND art = 't' AND schluessel = <schluessel>;
     INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (<einsatz>, 't', <schluessel>);
-    -- C: Der Merker trägt den Stand der neuen Zeile.
-    UPDATE spiegel_neu_vergeben SET stand = (SELECT stand FROM einsatz_aenderung
-        WHERE einsatz_id = <einsatz> AND art = 't' AND schluessel = <schluessel>)
-    WHERE art = 't' AND lokaler_schluessel = <schluessel> AND stand = 0;
 END;
 ```
 
@@ -104,17 +106,18 @@ CREATE TABLE spiegel_neu_vergeben (
     einsatz_id         INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
     art                TEXT NOT NULL,
     lokaler_schluessel TEXT NOT NULL,
-    stand              INTEGER NOT NULL,
+    fremder_schluessel TEXT,
     PRIMARY KEY (einsatz_id, art, lokaler_schluessel)
 );
 ```
 
-Er bedeutet: Dieser Schlüssel steht in diesem Einsatz seit `stand` für eine neue Zeile, und ein
-Gegenüber, das bis dahin nicht abgeglichen hat, meint mit ihm vielleicht noch die alte. Eine
-weitere Neuvergabe setzt `stand` auf die jüngste.
+Er bedeutet: Dieser Schlüssel steht in diesem Einsatz für eine neue Zeile, und ein Gegenüber, das
+seinen jüngsten Stand im Log nicht kennt, meint mit ihm vielleicht noch die alte.
 
-- **Aufräumen beim Wechsel zum Spiegel** (`fuehrung::werde_spiegel`): Merker mit
-  `stand <= bekannt_bis` fallen. Diese Neuvergabe kennt der neue Führer schon.
+- **Aufräumen beim Wechsel zum Spiegel** (`fuehrung::werde_spiegel`): Ein Merker fällt, wenn der
+  jüngste Stand des Schlüssels im Log `<= bekannt_bis` ist. Maßgeblich ist das Log, nicht der
+  Zeitpunkt der Neuvergabe: Eine spätere Änderung kann auf einer Seite liegen, die das Gegenüber
+  noch nicht hat (Review vor dem PR).
 - **Bruchstelle mit `kennt: true`** (`uebernimm_bruch_antwort`): Offene Zeilen der Bruchstelle bis
   `bis`, deren Schlüssel einen Merker hat, gelten als unbekannt, auch wenn der Führer sie kennt.
   Sie werden entfernt, und ihr Inhalt bleibt in der Bruchstelle (`entfernt = 1`). Bei
@@ -139,6 +142,19 @@ Sie muss Löschen und Neuanlegen unter derselben ID nicht selbst unterscheiden. 
 Schlüssel ohnehin nur den jüngsten Stand. Die Unterscheidung trägt der Merker aus D4, und
 `uebernimm_bruch_antwort` wertet ihn aus.
 
+### D8 Die neue Zeile ersetzt beim Gegenüber die gelöschte (Review vor dem PR)
+
+Das Log führt je Schlüssel einen Eintrag. Die neue Zeile verdrängt dort die Löschung der alten,
+die also nie hinausgeht. Ginge die neue Zeile ohne `gegen` hinaus, käme sie beim alten Führer als
+weitere Zeile an, und die gelöschte bliebe dort dauerhaft stehen (nachgestellt: Notübernahme am
+Hub, Neuvergabe, der ELW bestätigt). Deshalb bewahrt der Merker den fremden Schlüssel, und
+`fuehrung::gegen_hinaus` nennt ihn für die neue Zeile, wenn keine Herkunft da ist. Beim Gegenüber
+ersetzt die neue Zeile die gelöschte, wie vor dieser Änderung, und das ist für einen Spiegel
+richtig. Ordnet die Herkunft denselben fremden Schlüssel inzwischen einer anderen Zeile zu, gilt
+die Herkunft, damit nicht zwei Zeilen dieselbe ersetzen. Eine eigene Löschung für die alte Zeile
+(Grabstein) wurde verworfen: Sie hätte zwei Zeilen mit demselben Schlüssel in einer Lieferung
+bedeutet. So mit Ruben am 22.11.2026 entschieden.
+
 ### D7 Nicht in dieser Aufgabe
 
 Wird eine ID in einem **anderen** Einsatz neu vergeben, behält das Gegenüber eine Zuordnung in den
@@ -156,14 +172,18 @@ Mit zwei Instanzen in `tests/instanz_fuehrung.rs`, jeweils für eine Tabelle aus
    übernimmt per Notübernahme, löscht Z (die höchste ID) und zeichnet N unter derselben ID. Dann
    widerspricht der ELW, und es folgen Abgleiche. Danach steht N in der Bruchstelle mit
    `entfernt = 1`, und Z ist am Hub wieder da, einmal.
-2. **`gegen_hinaus` (Akzeptanz):** Nach Löschen und Neuanlegen am Hub nennt `gegen_hinaus` für
-   die neue Zeile keinen fremden Schlüssel, und die Herkunft der alten ist fort.
+2. **`gegen_hinaus` (umgekehrt, D8):** Nach Löschen und Neuanlegen am Hub nennt `gegen_hinaus`
+   für die neue Zeile den Schlüssel der gelöschten. Bestätigt der ELW die Notübernahme, steht am
+   ELW nur noch N. Ordnet die Herkunft den Schlüssel einer anderen Zeile zu, nennt nur sie ihn.
 3. **`kennt: true`:** Der Hub legt als Führer eine Zeile an, der ELW spiegelt sie, der Hub löscht
    sie und legt eine neue unter derselben ID an, ohne dass der ELW das bekommt. Dann übernimmt der
    ELW. Die neue Zeile des Hubs steht als entfernt in der Bruchstelle, und die Zeile des ELW ist am
    Hub, einmal.
 4. **Kein Merker ohne Neuvergabe:** Eine gewöhnliche neue Zeile setzt keinen Merker, und ein
-   abgeglichener Wechsel räumt ihn (`stand <= bekannt_bis`).
+   abgeglichener Wechsel räumt ihn.
+5. **Merker nach dem jüngsten Stand:** Ändert der Hub N nach der Neuvergabe und hat der ELW nur
+   bis zur Neuvergabe quittiert, bleibt der Merker, und N steht nach der Notübernahme als
+   entfernt in der Bruchstelle.
 
 Dazu ein Unit-Test für den Trigger in `art::tests`: Unter dem Merker `spiegel_uebernahme` bleibt
 die Herkunft stehen, und es entsteht kein Merker.

@@ -1,6 +1,6 @@
 # Spiegel: neu vergebene ID ist eine neue Zeile — Implementierungsplan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Eine Zeile, die eine Instanz unter einer schon vergebenen ID neu anlegt, gilt weder am
 Hub noch nach einem Rückfall als Zeile des Gegenübers (LLH-1893).
@@ -52,7 +52,7 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
   `trigger_sql(tabelle, sc, k, mit_schutz)` behält die Signatur; die Zusatzschritte hängen an
   `sc != Scoping::SelbstId && *k == Schluessel::Spalte("id".into())`.
 
-- [ ] **Step 1: Failing tests schreiben**
+- [x] **Step 1: Failing tests schreiben**
   - `art::tests::neu_vergebene_id_raeumt_die_herkunft_und_setzt_den_merker`: Einsatz, Zeile in
     `freies_zeichen` (id 1) anlegen, Herkunft `('freies_zeichen', 'x', '1')` eintragen, Zeile
     löschen, neue Zeile mit id 1 anlegen → keine Herkunft mehr, Merker
@@ -69,17 +69,17 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
     (Akzeptanz 2): wie oben bis N angelegt → `spiegel::fuehrung::gegen_hinaus(conn, h, kopplung,
     "freies_zeichen", id)` ist `None` (öffentlich über `lifeline_hub::instanz::spiegel::fuehrung`;
     sonst über die Herkunftstabelle prüfen: keine Zeile mit `lokaler_schluessel = id`).
-- [ ] **Step 2: Tests laufen lassen, sie scheitern** (`cargo test --lib art::tests::` und
+- [x] **Step 2: Tests laufen lassen, sie scheitern** (`cargo test --lib art::tests::` und
   `cargo test --test instanz_fuehrung neue_zeile`).
-- [ ] **Step 3: `trigger_sql` erweitern** wie Spec D3 (Reihenfolge: Merker mit `stand = 0` wenn
+- [x] **Step 3: `trigger_sql` erweitern** wie Spec D3 (Reihenfolge: Merker mit `stand = 0` wenn
   alte Logzeile, Herkunft räumen, Log ersetzen, Merker-Stand setzen). Tabelle in der Migration
   anlegen, `DROP TRIGGER`/`CREATE TRIGGER` für jede betroffene Tabelle aus dem Generator
   (einmalig per lokalem, nicht committetem Test erzeugt). `spiegel_neu_vergeben` in
   `AUSGENOMMEN` („Verwaltung des Spiegels selbst“) und in der Schwärzungsregistrierung wie
   `spiegel_herkunft` (alle Spalten `retain`).
-- [ ] **Step 4: Tests laufen lassen**, dazu `art::tests::` (Wächter) und
+- [x] **Step 4: Tests laufen lassen**, dazu `art::tests::` (Wächter) und
   `schwaerzung_registry`-Wächter: grün.
-- [ ] **Step 5: Commit** `fix: neu vergebene ID räumt die Spiegel-Herkunft (LLH-1893)`.
+- [x] **Step 5: Commit** `fix: neu vergebene ID räumt die Spiegel-Herkunft (LLH-1893)`.
 
 ### Task 2: Merker auswerten (`kennt: true`, `gegen`, Wechsel zum Spiegel, Lebensende)
 
@@ -93,7 +93,7 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
 - Consumes: Tabelle `spiegel_neu_vergeben` aus Task 1.
 - Produces: keine neuen öffentlichen Funktionen.
 
-- [ ] **Step 1: Failing tests schreiben**
+- [x] **Step 1: Failing tests schreiben**
   - `nach_notuebernahme_durch_den_elw_steht_die_neue_zeile_unter_alter_id_in_der_bruchstelle`
     (`kennt: true`): ELW legt Einsatz und Z an, meldet, übergibt an den Hub, meldet (der ELW wird
     Spiegel und bekommt Z mit `gegen`); Hub löscht Z, legt N unter derselben ID an; ohne Meldung
@@ -102,20 +102,35 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
   - `abgeglichene_rueckgabe_raeumt_den_merker`: wie oben, aber der ELW meldet nach N und der Hub
     übergibt regulär zurück → kein Merker am Hub, am Hub genau ein Zeichen mit Label von N, keine
     entfernte Zeile in der Bruchstelle.
-- [ ] **Step 2: Tests laufen lassen, der erste scheitert.**
-- [ ] **Step 3: Umsetzen** nach Spec D4: in `werde_spiegel` vor `sichere_bruchstelle`
+- [x] **Step 2: Tests laufen lassen, der erste scheitert.**
+- [x] **Step 3: Umsetzen** nach Spec D4: in `werde_spiegel` vor `sichere_bruchstelle`
   `DELETE FROM spiegel_neu_vergeben WHERE einsatz_id = ? AND stand <= ?` (`bekannt_bis`); in
   `uebernimm_bruch_antwort` bei `a.kennt` die offenen Zeilen bis `bis` mit Merker an `unbekannt`
   hängen (ohne Doppelte, höchstens `BRUCH_MAX`); in `uebernimm_gegen` nach der Prüfung
   `bisher == gegen` mit `Ok(false)` enden, wenn `(einsatz_id, art, gegen)` einen Merker hat; in
   `lebensende::umwandeln` `spiegel_neu_vergeben` mit den übrigen Spiegeltabellen räumen. Doku von
   `nicht_vom_fuehrer` (Lücke LLH-1893) berichtigen.
-- [ ] **Step 4: Tests laufen lassen**, dazu die ganze `instanz_fuehrung`-Suite: grün.
-- [ ] **Step 5: Commit** `fix: neu vergebene ID gilt nach dem Rückfall als unbekannt (LLH-1893)`.
+- [x] **Step 4: Tests laufen lassen**, dazu die ganze `instanz_fuehrung`-Suite: grün.
+- [x] **Step 5: Commit** `fix: neu vergebene ID gilt nach dem Rückfall als unbekannt (LLH-1893)`.
+
+### Task 2b: Befunde aus dem Review vor dem PR (Entwurf D8, D4)
+
+**Files:** `src/instanz/spiegel/art.rs`, `src/instanz/spiegel/fuehrung.rs`,
+`migrations/0362_spiegel_neu_vergeben.sql`, `src/einsatz/schwaerzung_registry.rs`,
+`tests/instanz_fuehrung.rs`, ADR-0080, `docs/architektur/06-laufzeitsicht.md`
+
+- [x] **Step 1: Failing tests:** `bestaetigte_notuebernahme_ersetzt_am_elw_die_geloeschte_zeile`
+  (ersetzt den Test zu Akzeptanzkriterium 2), `merker_bleibt_bis_der_juengste_stand_der_zeile_quittiert_ist`,
+  `gegen_hinaus_nennt_den_schluessel_der_geloeschten_nur_einmal`, Unit-Test mit
+  `fremder_schluessel` statt `stand`.
+- [x] **Step 2:** Merker mit `fremder_schluessel` statt `stand`; `gegen_hinaus` mit Merker als
+  Rückfall; Aufräumen in `werde_spiegel` nach dem jüngsten Log-Stand. Migration neu erzeugt.
+- [x] **Step 3:** ADR-0080 (Mitänderungsregel, Route `entwurf`, E1) und Kapitel 6.
+- [x] **Step 4:** Tests grün, Gegenproben gegen Filter und Ablehnung rot.
 
 ### Task 3: Nachzug und Gates
 
-- [ ] **Step 1:** Folgeaufgabe für D7 (ID in anderem Einsatz neu vergeben, `gegen` ohne
+- [x] **Step 1:** Folgeaufgabe für D7 (ID in anderem Einsatz neu vergeben, `gegen` ohne
   Einsatzprüfung) per `zunder-task-anlegen`.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis kommt in den PR
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis kommt in den PR
   unter „Geprüft“.
