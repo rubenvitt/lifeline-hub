@@ -384,7 +384,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, e2e-Anteile, Lauf-Verzeichnis (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -417,13 +417,6 @@ schritt_11() {
   # Das Lauf-Verzeichnis der Playwright-Läufe (LLH-1666): ein vergessenes füllt jeden dauerhaften
   # Rechner, ein zu eifrig gelöschtes zöge einem parallelen Lauf die Datenbank weg.
   mise exec -- node --test "$ROOT/scripts/e2e-run-dir.test.mjs"
-  # Der eigene Runner (LLH-1666): die Weiche darf nie einen Fork-PR auf den Server schicken, die
-  # Schleife nie einen Container mit Docker-Socket, Privilegien oder dem Token starten.
-  "$ROOT/scripts/runner/select-runner.test.sh"
-  "$ROOT/scripts/runner/runner-loop.test.sh"
-  # Schritte mit `sudo` oder Caches der gehosteten Runner tragen in den Jobs des eigenen Runners
-  # ihre Bedingung; sonst scheitert der erste Lauf auf dem Server und sperrt jeden PR.
-  "$ROOT/scripts/runner/ci-schritte.test.sh"
 }
 
 schritt_12() {

@@ -1351,6 +1351,120 @@ async fn entscheidung_nur_einsatzleitung_und_pid_invariante() {
     );
 }
 
+/// LLH-1883: Der Fall aus der Aufgabe am Wire, nacheinander ohne Wettlauf. Verdacht anlegen,
+/// dann die vermisste Person umstellen (422) bzw. stornieren (409): das Bestätigen meldet sie
+/// nicht ab und schreibt kein „aufgeklärt“ ins ETB; Verwerfen räumt den Verdacht ab.
+#[tokio::test]
+async fn bestaetigen_nach_statuswechsel_oder_storno_wird_abgelehnt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    let aid = abgleich_anlegen_helper(&app, &admin, e, v, g).await;
+    let bestaetigen = |aid: i64| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            anfrage(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"),
+                &admin,
+                Some(r#"{"entscheidung":"bestaetigt"}"#),
+            )
+            .await
+        }
+    };
+    let person_status = |pid: i64| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let (_, d) = anfrage(
+                &app,
+                "GET",
+                &format!("/api/einsaetze/{e}/personen/{pid}"),
+                &admin,
+                None,
+            )
+            .await;
+            d["status"].as_str().unwrap().to_string()
+        }
+    };
+
+    // Umgestellt auf betroffen: 422, Person bleibt betroffen.
+    status_setzen(&app, &admin, e, v, "betroffen").await;
+    let (s, j) = bestaetigen(aid).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j}");
+    assert_eq!(person_status(v).await, "betroffen");
+
+    // Zurück auf vermisst und storniert: 409, nicht abgemeldet.
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{v}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, j) = bestaetigen(aid).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(person_status(v).await, "vermisst");
+
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        !inhalte.iter().any(|i| i.contains("aufgeklärt")),
+        "kein „aufgeklärt“ im ETB: {inhalte:?}"
+    );
+
+    // Der Verdacht bleibt offen und lässt sich verwerfen.
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"),
+        &admin,
+        Some(r#"{"entscheidung":"verworfen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["status"], "verworfen");
+}
+
+/// LLH-1883: Die gefundene Person wird beim Bestätigen erneut geprüft; storniert → 409.
+#[tokio::test]
+async fn bestaetigen_mit_stornierter_gefundener_person_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    let aid = abgleich_anlegen_helper(&app, &admin, e, v, g).await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{g}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"),
+        &admin,
+        Some(r#"{"entscheidung":"bestaetigt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+}
+
 // ── LFH-266/F12: PATCH-Tri-State-Semantik am HTTP-Wire ───────────────────────────────
 //
 // Bewusste Wire-Semantik-Änderung: vor dem Fix behielt der Server bei `null` oder `""`

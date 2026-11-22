@@ -34,7 +34,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     `e2e` bedeutet nichts mehr.
   - **Wann `voll`** (LLH-1898, ADR-0050), selten und nur, wenn mindestens eines zutrifft:
     (1) der PR ändert eine dieser Stellen (abschließend): `suiten.yml`, `e2e.yml`, den Job
-    `suiten` in `pr.yml` oder `ci.yml`, `scripts/runner/`, `frontend/playwright.config.ts` oder
+    `suiten` in `pr.yml` oder `ci.yml`, `frontend/playwright.config.ts` oder
     den Block `test:` in `frontend/vite.config.ts`; (2) der Mensch verlangt es ausdrücklich.
     **Kein Grund** sind „riskant“, Backend-Verhalten, UI-Abläufe, Migrationen und alle übrigen
     CI- und Gate-Änderungen. Dafür lokal: immer `--geaendert --ohne-e2e`; bei UI-Abläufen dazu die
@@ -186,16 +186,9 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   hängender Ubuntu-Spiegel hielt sonst jeden Job bis zu seinem Timeout fest, auf allen PRs
   zugleich; apts eigene Zeitgrenzen fangen einen tröpfelnden Spiegel nicht. Selbsttest
   `scripts/wiederholen.test.sh` (Schritt 11).
-- **Eigener Runner** (LLH-1666, LLH-2014, [ADR-0075](../docs/architektur/entscheidungen/ADR-0075-schwere-suiten-laufen-bei-push-auf-dem-eigenen-server.md),
-  [ADR-0076](../docs/architektur/entscheidungen/ADR-0076-frontend-anteile-laufen-immer-auf-github.md)):
-  Rust-Suite, `e2e-Binary` und die e2e-Shards laufen bei Push auf einen Kanal-Branch auf einem
-  eigenen Server (Repo-Variable `E2E_RUNNER`, Wahl im Job `runner` von `suiten.yml`,
-  `scripts/runner/`); PR-Läufe und die Frontend-Anteile nie. Dort gibt es kein `sudo`: ein neuer Schritt in
-  diesen Jobs, der `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, trägt
-  `runner.environment == 'github-hosted'`, und was der eigene Runner dafür braucht, kommt ins
-  `scripts/runner/Dockerfile`. Nach einem Bump von `@playwright/test` oder einer Änderung unter
-  `scripts/runner/` das Image auf dem Server neu bauen (`scripts/runner/README.md`). Selbsttests
-  `scripts/runner/*.test.sh` (Schritt 11).
+- **Nur GitHub-Runner** ([ADR-0078](../docs/architektur/entscheidungen/ADR-0078-alle-ci-jobs-laufen-auf-github.md)):
+  jeder Job läuft auf `ubuntu-latest`. Der eigene Server (LLH-1666, LLH-2014) ist zurückgebaut;
+  ein neuer selbst betriebener Runner braucht eine neue ADR. Wächter: `scripts/ci-stufen.test.sh`.
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über
