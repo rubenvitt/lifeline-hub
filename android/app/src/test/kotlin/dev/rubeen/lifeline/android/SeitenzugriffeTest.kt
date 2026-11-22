@@ -94,6 +94,7 @@ class SeitenzugriffeTest {
         }
     }
 
+    @Suppress("DEPRECATION") // Robolectric kennt sonst keine Endungen.
     @Test
     fun `die Dateiwahl nennt die Typen aus accept und erlaubt mehrere Dateien`() {
         shadowOf(MimeTypeMap.getSingleton()).addExtensionMimeTypeMapping("pdf", "application/pdf")
@@ -193,6 +194,7 @@ class SeitenzugriffeTest {
         assertArrayEquals(arrayOf(datei), gewaehlt)
     }
 
+    @Suppress("DEPRECATION") // Die Antwort des Systems kommt über diesen Rückruf.
     @Test
     fun `mit dem Recht CAMERA fragt die Activity nicht, ohne fragt sie`() {
         val steuerung = Robolectric.buildActivity(ComponentActivity::class.java)
