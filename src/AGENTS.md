@@ -252,7 +252,8 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Transaktion, `zustand::meldung_nach_fehlschlag` entscheidet: Eingriff sofort, gestört ab 30
   Minuten, gesperrter Speicher nie). Ein Admin-Schreibweg, der einen Stopp aufhebt oder setzt
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
-  `benachrichtigung::erledigen_adapter` ab; Löschen erledigt vorher.
+  `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
+  (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
 
 ## Anhänge
 

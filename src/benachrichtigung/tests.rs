@@ -1365,6 +1365,13 @@ async fn erledigen_adapter_quittiert_offene() {
 #[tokio::test]
 async fn detail_adapter_liest_nur_adapterspalten() {
     let pool = crate::db::test_pool().await;
+    // Das SQL der Detailzeile liest genau diese Liste, nicht mehr.
+    let sql = adapter::detail_sql();
+    for (_, spalte) in adapter::DETAIL_ADAPTER_SPALTEN {
+        assert!(sql.contains(spalte), "{spalte} fehlt in {sql}");
+    }
+    assert!(!sql.contains("einstellungen"), "{sql}");
+    assert!(!sql.contains('*'), "{sql}");
     for (tabelle, spalte) in adapter::DETAIL_ADAPTER_SPALTEN {
         assert_eq!(*tabelle, "adapter");
         assert_ne!(*spalte, "einstellungen");

@@ -279,6 +279,16 @@ pub async fn quittieren_fuer_adapter(
     pool: &SqlitePool,
     adapter_id: &str,
 ) -> Result<Vec<Zeile>, AppError> {
+    let mut conn = pool.acquire().await?;
+    Ok(quittieren_fuer_adapter_in(&mut conn, adapter_id).await?)
+}
+
+/// Wie [`quittieren_fuer_adapter`] in der Transaktion des Aufrufers: beim Löschen des Adapters,
+/// damit ein gescheitertes Löschen auch nichts quittiert.
+pub async fn quittieren_fuer_adapter_in(
+    conn: &mut sqlx::SqliteConnection,
+    adapter_id: &str,
+) -> Result<Vec<Zeile>, sqlx::Error> {
     let sql = format!(
         "UPDATE benachrichtigung SET quittiert_at = ? \
          WHERE adapter_id = ? AND quittiert_at IS NULL \
@@ -288,7 +298,7 @@ pub async fn quittieren_fuer_adapter(
     let roh = sqlx::query_as::<_, RohZeile>(sqlx::AssertSqlSafe(sql))
         .bind(crate::zeit::jetzt())
         .bind(adapter_id)
-        .fetch_all(pool)
+        .fetch_all(conn)
         .await?;
     let mut zeilen: Vec<Zeile> = roh.into_iter().filter_map(aus_roh).collect();
     zeilen.sort_by_key(|z| z.id);

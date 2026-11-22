@@ -881,3 +881,74 @@ async fn loeschen_erledigt_und_raeumt() {
     assert_eq!(n, 0);
     assert!(u.meldungen(&u.admin).await.is_empty());
 }
+
+// ───────────────────── Review-Befunde (LLH-2026) ─────────────────────
+
+/// Meldet die Org des Adapters bei einem Hub an: Schreibwege am Adapter sind dann gesperrt (409).
+async fn an_den_hub(u: &Umgebung) {
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&u.pool)
+        .await
+        .unwrap();
+    let kopplung: i64 = sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, gegenueber_adresse, zustand, art) VALUES ('hub-a', 'X', 'Hub Kreis', 'meldet_sich', \
+         'https://hub.example', 'aktiv', 'standard') RETURNING id",
+    )
+    .fetch_one(&u.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
+         VALUES (?, ?, 'hub-a/1', 'Kreis')",
+    )
+    .bind(kopplung)
+    .bind(org)
+    .execute(&u.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn gescheitertes_loeschen_laesst_die_meldung_offen() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    an_den_hub(&u).await;
+    let (s, _) = anfrage_json(&u.app, "DELETE", &format!("{LISTE}/{id}"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("eingriff"));
+}
+
+#[tokio::test]
+async fn meldung_nur_fuer_admins_der_org_lesbar() {
+    let u = umgebung().await;
+    eingriff_gemeldet(&u).await;
+    let id = u.meldungen(&u.admin2).await[0]["id"].clone();
+    let pfad = format!("/api/benachrichtigungen/{id}");
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Nicht mehr Admin: 404, die Liste lässt sie aus.
+    sqlx::query("UPDATE benutzer SET system_rolle = 'keiner' WHERE benutzername = 'admin2'")
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(u.meldungen(&u.admin2).await.is_empty());
+
+    // Wieder Admin, aber in einer anderen Org: ebenso.
+    let (fremde_org, _) =
+        fremde_org_anlegen(&u.pool, "Dritte Orga", "dritter", "drittpw123", "keine").await;
+    sqlx::query(
+        "UPDATE benutzer SET system_rolle = 'admin', org_id = ? WHERE benutzername = 'admin2'",
+    )
+    .bind(fremde_org)
+    .execute(&u.pool)
+    .await
+    .unwrap();
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(u.meldungen(&u.admin2).await.is_empty());
+}

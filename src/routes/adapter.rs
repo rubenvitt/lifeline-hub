@@ -621,21 +621,22 @@ pub async fn delete(
     PfadParam(id): PfadParam<String>,
 ) -> Result<StatusCode, AppError> {
     let org_id = admin.org_id;
-    // Offene Störungsmeldungen vorher erledigen (LLH-2026): mit dem Adapter fallen ihre Zeilen,
-    // danach erreichte das Quittier-Ereignis niemanden mehr.
-    let gemeldet = {
-        let mut conn = state.pool.acquire().await?;
-        repo::load_in_org(&mut conn, org_id, &id)
-            .await?
-            .is_some_and(|a| a.gemeldet.is_some())
-    };
-    meldung_erledigen(&state, org_id, &id, gemeldet).await;
-    let a = crate::write_retry!(&state.pool, |conn| {
+    // Offene Störungsmeldungen in derselben Transaktion quittieren (LLH-2026): mit dem Adapter
+    // fallen ihre Zeilen; scheitert das Löschen, bleiben sie offen. Das Quittier-Ereignis geht
+    // nach dem Commit aus den gelesenen Zeilen.
+    let (a, erledigt) = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
-        repo::delete(&mut *conn, org_id, &id)
+        if repo::load_in_org(&mut *conn, org_id, &id).await?.is_none() {
+            return Err(AppError::NotFound);
+        }
+        let erledigt =
+            crate::benachrichtigung::repo::quittieren_fuer_adapter_in(&mut *conn, &id).await?;
+        let a = repo::delete(&mut *conn, org_id, &id)
             .await?
-            .ok_or(AppError::NotFound)
+            .ok_or(AppError::NotFound)?;
+        Ok((a, erledigt))
     })?;
+    crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(
         &state,
         &admin,

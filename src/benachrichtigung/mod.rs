@@ -830,16 +830,18 @@ pub async fn erledigen_adapter(
             return 0;
         }
     };
-    for z in &zeilen {
-        zustellen(
-            live,
-            org_id,
-            None,
-            z.art,
-            &quittier_ereignisse(std::slice::from_ref(z)),
-        );
-    }
+    quittiert_zustellen_adapter(live, org_id, &zeilen);
     zeilen.len()
+}
+
+/// Stellt jedem Empfänger der gerade quittierten Adapter-Zeilen sein Quittier-Ereignis über den
+/// Org-Kanal zu (LLH-2026); für Zeilen, die der Aufrufer in seiner Transaktion quittiert hat
+/// (`repo::quittieren_fuer_adapter_in`), nach deren Commit.
+pub fn quittiert_zustellen_adapter(live: &LiveHub, org_id: i64, zeilen: &[repo::Zeile]) {
+    for z in zeilen {
+        let ereignisse = quittier_ereignisse(std::slice::from_ref(z));
+        zustellen(live, org_id, None, z.art, &ereignisse);
+    }
 }
 
 /// Richtet die Benachrichtigungen eines Bezugs neu aus, wenn sich sein Adressat ändert (LLH-1381:

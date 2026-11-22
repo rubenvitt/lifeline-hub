@@ -431,9 +431,10 @@ Admins der Organisation, auch wenn niemand diese Seite offen hat:
   Störungsmeldung ist dann für alle erledigt.
 
 Jede Störung meldet sich einmal, nicht bei jedem Fehlversuch. Wird sie schlimmer (aus „gestört“
-wird „braucht Eingriff“), kommt die zweite Meldung und ersetzt die erste. Greift ein Admin ein
-(Fortsetzen, Anhalten, neues Geheimnis, geänderte Einstellung, Löschen), ist die Meldung
-erledigt, ohne Entwarnung.
+wird „braucht Eingriff“), kommt die zweite Meldung und ersetzt die erste. Greift ein Admin ein, ist
+die Meldung erledigt, ohne Entwarnung: beim Fortsetzen, Anhalten und Löschen und bei einem
+angehaltenen Adapter auch dann, wenn ein neues Geheimnis oder eine geänderte Einstellung ihn
+wieder laufen lässt. Ein Adapter, der nur gestört ist, behält seine Meldung, bis er wieder abruft.
 
 Die Meldung nennt den Namen des Adapters und den Fehler, nie ein Geheimnis oder eine Adresse.
 Sie kommt als Eingang mit dezentem Ton, auf Wunsch auch bei geschlossener App. Ein Klick führt

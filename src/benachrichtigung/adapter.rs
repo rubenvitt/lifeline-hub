@@ -24,6 +24,13 @@ pub const DETAIL_ADAPTER_SPALTEN: &[(&str, &str)] = &[
     ("adapter", "letzter_fehler_status"),
 ];
 
+/// Das SQL der Detailzeile, gebaut aus [`DETAIL_ADAPTER_SPALTEN`] in deren Reihenfolge: so liest
+/// es nichts, was der Guard nicht kennt.
+pub fn detail_sql() -> String {
+    let spalten: Vec<&str> = DETAIL_ADAPTER_SPALTEN.iter().map(|(_, s)| *s).collect();
+    format!("SELECT {} FROM adapter WHERE id = ?", spalten.join(", "))
+}
+
 /// Ob `benutzer` die Störungen eines Adapters der Org `org_id` bekommt und lesen darf: aktiver
 /// System-Admin dieser Org. Nur er kann den Adapter ändern (`routes::adapter`).
 fn ist_zustaendig(benutzer: &Benutzer, org_id: i64) -> bool {
@@ -136,13 +143,11 @@ pub async fn text(
     art: BenachrichtigungArt,
     adapter_id: &str,
 ) -> Result<Option<Text>, AppError> {
-    let zeile: Option<(String, Option<String>, Option<String>, Option<i64>)> = sqlx::query_as(
-        "SELECT name, angehalten_grund, letzter_fehler_art, letzter_fehler_status \
-         FROM adapter WHERE id = ?",
-    )
-    .bind(adapter_id)
-    .fetch_optional(pool)
-    .await?;
+    let zeile: Option<(String, Option<String>, Option<String>, Option<i64>)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(detail_sql()))
+            .bind(adapter_id)
+            .fetch_optional(pool)
+            .await?;
     let Some((name, angehalten_grund, letzter_fehler_art, letzter_status)) = zeile else {
         return Ok(None);
     };
