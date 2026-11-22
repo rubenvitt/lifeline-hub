@@ -3230,6 +3230,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             // Die auslösende Untereinheit eines geplanten Verbands (LLH-1509): wie `einheit_id`.
             retain("durch_einheit_id", G_FK),
+            // Der Adapter einer Störungsmeldung (LLH-2026, 0363): Org-Stammdatum statt Einsatz;
+            // solche Zeilen haben keine `einsatz_id` und fallen mit dem Adapter.
+            retain("adapter_id", G_FK),
         ],
     },
     // Vorgabe je Funktion (LLH-1421, design.md D2): Einsatz-Konfiguration, keine Person; fällt mit

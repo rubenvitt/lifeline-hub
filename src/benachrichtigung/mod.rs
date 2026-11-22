@@ -58,7 +58,7 @@ wire_enum! {
 wire_enum! {
     /// Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
     /// fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)
+    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)
     /// spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum BenachrichtigungArt {
@@ -107,6 +107,13 @@ wire_enum! {
         /// Die Gegenstelle einer Direktkopplung bittet um die Führung; die Einsatzleitung
         /// entscheidet (LLH-1678, Spec `benachrichtigungen`, „Führung angefragt“).
         FuehrungAngefragt => "fuehrung_angefragt",
+        /// Org-Art (LLH-2026): der Lauf hat eine Anbindung angehalten, weil nur ein Mensch den
+        /// Fehler beheben kann. An die Admins der Org des Adapters.
+        AdapterEingriff => "adapter_eingriff",
+        /// Org-Art (LLH-2026): eine Anbindung ist seit 30 Minuten am Stück gestört.
+        AdapterGestoert => "adapter_gestoert",
+        /// Org-Art (LLH-2026): eine gemeldete Anbindung läuft von selbst wieder (Entwarnung).
+        AdapterWiederOk => "adapter_wieder_ok",
     }
     try_from = |s| format!("Ungültige Benachrichtigungsart: {s}");
 }
@@ -146,16 +153,24 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::EinsatzAufnahme
             | BenachrichtigungArt::EinsatzNeu
             | BenachrichtigungArt::FuehrungUebernommen
-            | BenachrichtigungArt::FuehrungAngefragt => BenachrichtigungStufe::Hinweis,
+            | BenachrichtigungArt::FuehrungAngefragt
+            | BenachrichtigungArt::AdapterEingriff
+            | BenachrichtigungArt::AdapterGestoert
+            | BenachrichtigungArt::AdapterWiederOk => BenachrichtigungStufe::Hinweis,
         }
     }
 
     /// Org-Arten gehen über den Org-Kanal (`org_benachrichtigung`), nicht über den Einsatz-Strom:
-    /// ihr Empfänger hat den Einsatz typischerweise nicht offen (design.md D2).
+    /// ihr Empfänger hat den Einsatz typischerweise nicht offen (design.md D2). Die Störungen einer
+    /// Anbindung (LLH-2026) haben gar keinen Einsatz.
     pub const fn ist_org(self) -> bool {
         matches!(
             self,
-            BenachrichtigungArt::EinsatzAufnahme | BenachrichtigungArt::EinsatzNeu
+            BenachrichtigungArt::EinsatzAufnahme
+                | BenachrichtigungArt::EinsatzNeu
+                | BenachrichtigungArt::AdapterEingriff
+                | BenachrichtigungArt::AdapterGestoert
+                | BenachrichtigungArt::AdapterWiederOk
         )
     }
 
@@ -245,6 +260,10 @@ wire_enum! {
         /// Disponiertes Fahrzeug (`einsatz_fahrzeug.id`).
         Fahrzeug => "fahrzeug",
         ChatNachricht => "chat_nachricht",
+        /// Ein Versuch eines Adapters (`adapter_versuch.id`), der eine Störungsmeldung ausgelöst
+        /// hat (LLH-2026). Den Adapter selbst trägt `benachrichtigung.adapter_id`; die Kennung
+        /// des Versuchs bleibt ohne FK, weil der Verlauf gekappt wird.
+        Adapter => "adapter",
     }
     try_from = |s| format!("Ungültiger Bezug: {s}");
 }
@@ -290,6 +309,8 @@ impl BenachrichtigungBezugTyp {
             BenachrichtigungBezugTyp::Einheit => Some("einheiten"),
             BenachrichtigungBezugTyp::Fahrzeug => Some("fahrzeuge"),
             BenachrichtigungBezugTyp::ChatNachricht => Some("chat"),
+            // Kein Einsatz, kein Modul: lesen darf, wer Admin der Org des Adapters ist.
+            BenachrichtigungBezugTyp::Adapter => None,
         }
     }
 }

@@ -77,6 +77,18 @@ wire_enum! {
     }
 }
 
+wire_enum! {
+    /// Was zur laufenden Störung eines Adapters schon gemeldet ist (`adapter.gemeldet`, LLH-2026).
+    /// Leer, wenn nichts; so meldet sich eine Störung nur einmal.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AdapterGemeldet {
+        /// „Anbindung gestört“ ist gemeldet.
+        Gestoert => "gestoert",
+        /// „Anbindung braucht Eingriff“ ist gemeldet.
+        Eingriff => "eingriff",
+    }
+}
+
 /// Ob ein Fehler einen Menschen braucht: dann hält der Adapter an, statt zu wiederholen.
 pub fn braucht_eingriff(fehler: AdapterFehler) -> bool {
     use AdapterFehler::*;

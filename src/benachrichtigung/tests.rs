@@ -54,7 +54,10 @@ fn org_arten_sind_aufnahme_und_neuer_einsatz_und_unwetter_nur_einstellung() {
         org,
         vec![
             &BenachrichtigungArt::EinsatzAufnahme,
-            &BenachrichtigungArt::EinsatzNeu
+            &BenachrichtigungArt::EinsatzNeu,
+            &BenachrichtigungArt::AdapterEingriff,
+            &BenachrichtigungArt::AdapterGestoert,
+            &BenachrichtigungArt::AdapterWiederOk,
         ]
     );
     let nur: Vec<_> = BenachrichtigungArt::ALLE
@@ -62,6 +65,67 @@ fn org_arten_sind_aufnahme_und_neuer_einsatz_und_unwetter_nur_einstellung() {
         .filter(|a| a.nur_einstellung())
         .collect();
     assert_eq!(nur, vec![&BenachrichtigungArt::Unwetter]);
+}
+
+/// Störungen einer Anbindung (LLH-2026): Eingänge an die Admins der Org, nie am Einsatz
+/// einstellbar, ohne Modul.
+#[test]
+fn adapter_arten_sind_eingang_und_nicht_am_einsatz_einstellbar() {
+    for art in [
+        BenachrichtigungArt::AdapterEingriff,
+        BenachrichtigungArt::AdapterGestoert,
+        BenachrichtigungArt::AdapterWiederOk,
+    ] {
+        assert_eq!(art.stufe(), BenachrichtigungStufe::Hinweis, "{art:?}");
+        assert!(art.ist_org(), "{art:?}");
+        assert!(!art.vorgabe_einstellbar(), "{art:?}");
+    }
+    assert_eq!(BenachrichtigungBezugTyp::Adapter.modul(), None);
+}
+
+/// Eine Benachrichtigung hängt an genau einem Ort: einem Einsatz oder einem Adapter (LLH-2026).
+#[tokio::test]
+async fn benachrichtigung_hat_genau_einen_ort() {
+    let pool = crate::db::test_pool().await;
+    crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let (benutzer_id, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query("INSERT INTO adapter (id, org_id, art, name, intervall_s) VALUES ('a1', ?, 'test', 'Quelle', 60)")
+        .bind(org_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let einsatz_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (?, 'E') RETURNING id",
+    )
+    .bind(org_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let einfuegen = |einsatz: Option<i64>, adapter: Option<&'static str>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO benachrichtigung (einsatz_id, adapter_id, benutzer_id, art, stufe, \
+                     bezug_typ, bezug_id, erstellt_at) \
+                 VALUES (?, ?, ?, 'adapter_eingriff', 'hinweis', 'adapter', 1, '2026-11-22 10:00:00')",
+            )
+            .bind(einsatz)
+            .bind(adapter)
+            .bind(benutzer_id)
+            .execute(&pool)
+            .await
+        }
+    };
+    assert!(einfuegen(None, Some("a1")).await.is_ok());
+    assert!(einfuegen(Some(einsatz_id), None).await.is_ok());
+    assert!(einfuegen(None, None).await.is_err());
+    assert!(einfuegen(Some(einsatz_id), Some("a1")).await.is_err());
 }
 
 #[test]

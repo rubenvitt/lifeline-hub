@@ -490,6 +490,8 @@ pub const fn bezug_tabelle(typ: BenachrichtigungBezugTyp) -> Option<&'static str
         T::Einheit => Some("einsatz_einheit"),
         T::Fahrzeug => Some("einsatz_fahrzeug"),
         T::ChatNachricht => Some("chat_nachricht"),
+        // Ohne Einsatz: reist nie zum Hub (LLH-2026).
+        T::Adapter => None,
     }
 }
 
