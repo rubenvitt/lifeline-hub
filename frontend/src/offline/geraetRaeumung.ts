@@ -302,7 +302,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     datei: 'alarm/iosPush.ts',
     entscheidung: 'bleibt',
     grund:
-      'SHA-256 aus Kennung und Token, die dieses Gerät zuletzt für iOS-Push angemeldet hat: der Seitenstart erkennt daran ein geändertes Token. Kein Token, kein Personenbezug; ausschalten entfernt ihn.',
+      'SHA-256 aus Kennung, Token und Schlüssel, die dieses Gerät zuletzt für iOS-Push angemeldet hat: der Seitenstart erkennt daran ein geändertes Token oder einen neuen Schlüssel. Weder Token noch Schlüssel, kein Personenbezug; ausschalten entfernt ihn.',
   },
   {
     ort: 'localStorage lfh:lagekarte:zeitachse-eingeklappt',

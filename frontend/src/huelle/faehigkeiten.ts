@@ -144,7 +144,8 @@ export function huelleHaptics(kind: HapticsKind): void {
  * Push über APNs in der iOS-Hülle (Entwurf „iOS-Alarme über APNs“). `register` fragt die
  * Berechtigung, holt das Token und liefert Kennung (`registration_id`), Umgebung und den Schlüssel
  * der Nutzlast; die Brücke lehnt mit `denied` (Berechtigung verweigert) oder `unavailable` ab.
- * `state` fragt nie nach der Berechtigung. Token und Schlüssel gehören in kein Log.
+ * `state` fragt nie nach der Berechtigung und nennt die Kennung, sobald die App eine für diesen
+ * Server angelegt hat, auch wenn ihr Schlüssel fehlt. Token und Schlüssel gehören in kein Log.
  */
 export type HuellePush = {
   register(): Promise<{

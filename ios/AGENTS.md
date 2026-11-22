@@ -57,7 +57,8 @@ Entscheidung ADR-0084; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
 
 - **Brücke:** `push_register` (fragt die Berechtigung, holt das Token, legt je Server einmal
   Kennung und Schlüssel an; Antwort `{ registration_id, token, environment, key }`, Fehler
-  `denied` oder `unavailable`), `push_unregister`, `push_state` (`{ permission, registration_id? }`);
+  `denied` oder `unavailable`), `push_unregister`, `push_state` (`{ permission, registration_id? }`,
+  die Kennung, sobald es eine gibt, auch ohne Schlüssel: nur mit ihr meldet die Seite am Server ab);
   die Kennung trägt `push: true`. Am Server meldet nur die Oberfläche an und ab
   (`frontend/src/alarm/iosPush.ts`): Schalter, Abgleich und Stumm-Wahl liegen dort, nie in der Hülle.
 - **Kennung und Schlüssel je Server:** die Zuordnung Kennung → Server liegt in `push.json` neben

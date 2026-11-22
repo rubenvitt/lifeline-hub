@@ -15,7 +15,12 @@ type Antwort = { permission: 'granted' | 'denied' | 'undetermined'; registration
 
 /** Hülle mit Push; die Brücke antwortet mit dem Stand des Geräts. */
 function huelle(
-  opts: { permission?: Antwort['permission']; token?: string; ablehnen?: string } = {},
+  opts: {
+    permission?: Antwort['permission'];
+    token?: string;
+    schluessel?: string;
+    ablehnen?: string;
+  } = {},
 ) {
   const geraet = { permission: opts.permission ?? 'undetermined', token: opts.token ?? TOKEN };
   const nachrichten: string[] = [];
@@ -32,7 +37,7 @@ function huelle(
             registration_id: KENNUNG,
             token: geraet.token,
             environment: 'sandbox',
-            key: SCHLUESSEL,
+            key: opts.schluessel ?? SCHLUESSEL,
           });
         }
         if (n.cmd === 'push_unregister') return antwort(n.id, null);
@@ -163,6 +168,23 @@ describe('iOS-Push in der Seite', () => {
     });
     expect(h.nachrichten).toContain('push_register');
     expect(localStorage.getItem(IOS_PUSH_TOKEN_MERKER)).not.toBeNull();
+  });
+
+  it('abgleichen_meldet_einen_neuen_schluessel_neu', async () => {
+    huelle();
+    const s = server_();
+    await iosPushKanal.einschalten(BENUTZER);
+    s.anmeldungen.length = 0;
+    // Der Schlüssel fehlte im Schlüsselbund, die App hat unter derselben Kennung einen neuen
+    // angelegt; der Server verschlüsselt sonst weiter mit dem alten, und die Extension zeigt nur
+    // „Öffnen, um die Meldung zu sehen“.
+    const neuerSchluessel = 'bmV1ZXJTY2hsdWVzc2VsbmV1ZXJTY2hsdWVzc2VsMTI';
+    beendeHuelle();
+    huelle({ permission: 'granted', schluessel: neuerSchluessel });
+    const neu = server_({ angemeldet: true, an_dieser_sitzung: true });
+    await iosPushKanal.abgleichen(BENUTZER, { nurBeiBedarf: true });
+    expect(neu.anmeldungen).toHaveLength(1);
+    expect(neu.anmeldungen[0]).toMatchObject({ kennung: KENNUNG, schluessel: neuerSchluessel });
   });
 
   it('abgleichen_bindet_eine_anmeldung_aus_einer_anderen_sitzung_neu', async () => {

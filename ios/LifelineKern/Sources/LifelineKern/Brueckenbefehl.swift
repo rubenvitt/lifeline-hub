@@ -173,7 +173,8 @@ public protocol Huellendienste: AnyObject, Sendable {
     func registerPush() async throws -> PushRegistrierung
     /// Nimmt die Anmeldung des aktiven Servers weg (Schlüssel, Kennung).
     func unregisterPush() async throws
-    /// Berechtigung und Kennung des aktiven Servers, falls angemeldet; fragt nie.
+    /// Berechtigung und Kennung des aktiven Servers, sobald die App eine angelegt hat (auch wenn
+    /// ihr Schlüssel fehlt: nur mit ihr meldet die Seite am Server ab); fragt nie.
     func pushState() async -> (Meldungsfreigabe, kennung: String?)
 }
 

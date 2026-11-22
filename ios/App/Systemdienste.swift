@@ -130,12 +130,13 @@ final class Systemdienste: Huellendienste {
         for kennung in kennungen { Schluesselbund.loeschen(kennung: kennung) }
     }
 
-    /// Angemeldet ist der aktive Server nur mit Kennung und Schlüssel.
+    /// Die Kennung des aktiven Servers, auch wenn ihr Schlüssel im Schlüsselbund fehlt: der Server
+    /// kann sie noch angemeldet haben, und nur mit ihr kann die Seite dort abmelden. Den fehlenden
+    /// Schlüssel legt `registerPush` neu an; die Seite meldet ihn beim nächsten Abgleich.
     func pushState() async -> (Meldungsfreigabe, kennung: String?) {
         let freigabe = await Mitteilungen.freigabe()
         guard let pushablage, let server = aktiverServer(),
-            let kennung = (try? pushablage.load())?.vorhandeneKennung(fuer: server),
-            Schluesselbund.lesen(kennung: kennung) != nil
+            let kennung = (try? pushablage.load())?.vorhandeneKennung(fuer: server)
         else { return (freigabe, nil) }
         return (freigabe, kennung)
     }

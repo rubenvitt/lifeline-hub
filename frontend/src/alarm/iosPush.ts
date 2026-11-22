@@ -41,20 +41,21 @@ export function iosPushMerker(benutzerId: number): string {
 }
 
 /**
- * SHA-256 aus Kennung und Token, die dieses Gerät zuletzt angemeldet hat: der Seitenstart erkennt
- * daran ein geändertes Token, ohne es im Speicher zu halten.
+ * SHA-256 aus Kennung, Token und Schlüssel, die dieses Gerät zuletzt angemeldet hat: der Seitenstart
+ * erkennt daran ein geändertes Token oder einen neuen Schlüssel (fehlte er im Schlüsselbund, legt
+ * die App unter derselben Kennung einen neuen an), ohne beide im Speicher zu halten.
  */
 export const IOS_PUSH_TOKEN_MERKER = 'lfh:ios-push-token';
 
-async function tokenKennung(kennung: string, token: string): Promise<string> {
+type Registrierung = Awaited<ReturnType<HuellePush['register']>>;
+
+async function tokenKennung(r: Registrierung): Promise<string> {
   const hash = await crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode(`${kennung}:${token}`),
+    new TextEncoder().encode(`${r.registration_id}:${r.token}:${r.key}`),
   );
   return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }
-
-type Registrierung = Awaited<ReturnType<HuellePush['register']>>;
 
 /** Die Berechtigung ist verweigert (Antwort der Brücke `denied`). */
 function istVerweigert(e: unknown): boolean {
@@ -78,7 +79,7 @@ function anmelden(r: Registrierung, inhalt: boolean): Promise<void> {
       inhalt,
       stumm: [...stummeArten()],
     });
-    sicherSchreiben(IOS_PUSH_TOKEN_MERKER, await tokenKennung(r.registration_id, r.token));
+    sicherSchreiben(IOS_PUSH_TOKEN_MERKER, await tokenKennung(r));
   });
   anmeldeKette = schritt.catch(() => undefined);
   return schritt;
@@ -173,7 +174,7 @@ async function ausschalten(benutzerId: number): Promise<PushZustand> {
  * Nach jeder bestätigten Anmeldung und jedem Umschalten von „Stumm auf diesem Gerät“: Hat diese
  * Person Push auf diesem Gerät gewählt, meldet es das Gerät mit der aktuellen Wahl an. Fragt nie
  * nach der Berechtigung und wirft nie. `nurBeiBedarf` (Seitenstart): kennt der Server das Gerät
- * schon an dieser Sitzung mit derselben Wahl und demselben Token, bleibt es stehen. Hängt es an
+ * schon an dieser Sitzung mit derselben Wahl, demselben Token und Schlüssel, bleibt es stehen. Hängt es an
  * einer anderen (abgelaufen, neu angemeldet), bindet das `PUT` es an diese; sonst bliebe es nach
  * einem Logout hier angemeldet.
  */
@@ -197,7 +198,7 @@ async function abgleichen(
       stand.an_dieser_sitzung &&
       stand.inhalt === inhalt &&
       gleicheArten(stand.stumm, stummeArten()) &&
-      sicherLesen(IOS_PUSH_TOKEN_MERKER) === (await tokenKennung(r.registration_id, r.token))
+      sicherLesen(IOS_PUSH_TOKEN_MERKER) === (await tokenKennung(r))
     ) {
       return;
     }
