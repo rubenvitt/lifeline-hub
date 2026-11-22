@@ -54,7 +54,7 @@
   - `pub fn follows_redirect(von: &Url, nach: &Url) -> bool` (gleiche Origin)
   - `pub async fn check(server: &Url, letzter_vertrag: Option<u32>) -> Vertragsergebnis` (bei `NichtVertraeglich` aus 404 trägt `server_version` die Version aus `/api/health`, falls lesbar)
 
-- [ ] **Step 1: Failing tests in `vertrag.rs` (`#[cfg(test)] mod tests`)** — als Satz benannt, gespiegelt aus `ios/LifelineKern/Tests/LifelineKernTests/VertragTests.swift`:
+- [x] **Step 1: Failing tests in `vertrag.rs` (`#[cfg(test)] mod tests`)** — als Satz benannt, gespiegelt aus `ios/LifelineKern/Tests/LifelineKernTests/VertragTests.swift`:
   - `bekannter_vertrag_ist_vertraeglich`: 200, `application/json; charset=utf-8`, `{"version":"1.0.0","shell_contract":1,"neu":true}` → `Vertraeglich(ShellInfo{version:"1.0.0", shell_contract:1})`.
   - `groesserer_vertrag_heisst_app_aktualisieren`: `shell_contract: 2`, Version `"9"` → `NichtVertraeglich{ZuNeu, Some("9")}`.
   - `kleinerer_vertrag_heisst_server_zu_alt`: `richtung(0) == Some(ZuAlt)`; Abruf mit `shell_contract: 0` → `NichtVertraeglich{ZuAlt, Some(..)}`.
@@ -68,13 +68,13 @@
   - `abruf_folgt_404_zur_health_version` (I/O, `tauri::async_runtime::block_on`): ein `std::net::TcpListener` auf `127.0.0.1:0` in einem Thread beantwortet `/api/shell` mit `404` und `/api/health` mit `200 application/json {"version":"0.9.0"}`; `check(http://127.0.0.1:port/, None)` → `NichtVertraeglich{ZuAlt, Some("0.9.0")}`.
   - `abruf_eines_geschlossenen_ports_ist_nicht_erreichbar`: Port belegen und freigeben (wie `erreichbar.rs`) → `NichtErreichbar`, Dauer < 3 s.
 
-- [ ] **Step 2: Run** `cargo test -p lifeline-desktop vertrag::` — Expected: FAIL (Modul/Funktionen fehlen).
+- [x] **Step 2: Run** `cargo test -p lifeline-desktop vertrag::` — Expected: FAIL (Modul/Funktionen fehlen).
 
-- [ ] **Step 3: Implement.** `Cargo.toml`: `reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }` (dieselbe Version wie im Lockfile; vor dem Commit `cargo tree -p lifeline-desktop -i rustls -e features` zeigt weiter nur `ring`). `check`: Client per `reqwest::Client::builder().connect_timeout(1.5 s).timeout(5 s).redirect(Policy::custom(|a| if follows_redirect(erste_url, a.url()) { a.follow() } else { a.stop() }))` (Ausgangs-URL aus `a.previous()[0]`), kein `cookie_store`; vor dem Bau `rustls::crypto::ring::default_provider().install_default()`, falls `CryptoProvider::get_default()` leer ist — dafür `rustls` nur als bereits vorhandene transitive Abhängigkeit direkt aufnehmen (gleiche Version, Feature `ring`). Medientyp-Prüfung wie `ShellAbruf.isJson` in Swift.
+- [x] **Step 3: Implement.** `Cargo.toml`: `reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }` (dieselbe Version wie im Lockfile; vor dem Commit `cargo tree -p lifeline-desktop -i rustls -e features` zeigt weiter nur `ring`). `check`: Client per `reqwest::Client::builder().connect_timeout(1.5 s).timeout(5 s).redirect(Policy::custom(|a| if follows_redirect(erste_url, a.url()) { a.follow() } else { a.stop() }))` (Ausgangs-URL aus `a.previous()[0]`), kein `cookie_store`; vor dem Bau `rustls::crypto::ring::default_provider().install_default()`, falls `CryptoProvider::get_default()` leer ist — dafür `rustls` nur als bereits vorhandene transitive Abhängigkeit direkt aufnehmen (gleiche Version, Feature `ring`). Medientyp-Prüfung wie `ShellAbruf.isJson` in Swift.
 
-- [ ] **Step 4: Run** `cargo test -p lifeline-desktop vertrag::` — Expected: PASS.
+- [x] **Step 4: Run** `cargo test -p lifeline-desktop vertrag::` — Expected: PASS.
 
-- [ ] **Step 5: ADR.** Neue ADR nach `VORLAGE.md`, `status: akzeptiert`, `datum: 2026-11-22`, `ersetzt: ADR-0009`, `gilt_fuer` wie 0009, `herleitung`: Design-Doc dieses Tasks plus die drei Herleitungen von 0009. Regeln: alle Regeln von 0009 sinngemäß, mit den zwei Lockerungen (einziger eigener Abruf = anonymer Vertragsabruf `GET /api/shell`, bei 404 `GET /api/health`, ohne Cookies; `src-tauri/ui/` enthält Maske, „nicht erreichbar“, „nicht verträglich“ und „Verbinde…“). Prüfung:
+- [x] **Step 5: ADR.** Neue ADR nach `VORLAGE.md`, `status: akzeptiert`, `datum: 2026-11-22`, `ersetzt: ADR-0009`, `gilt_fuer` wie 0009, `herleitung`: Design-Doc dieses Tasks plus die drei Herleitungen von 0009. Regeln: alle Regeln von 0009 sinngemäß, mit den zwei Lockerungen (einziger eigener Abruf = anonymer Vertragsabruf `GET /api/shell`, bei 404 `GET /api/health`, ohne Cookies; `src-tauri/ui/` enthält Maske, „nicht erreichbar“, „nicht verträglich“ und „Verbinde…“). Prüfung:
   ```sh
   verlange '"frontendDist": "ui"' src-tauri/tauri.conf.json
   verbiete '^(lifeline-hub|karten-katalog|sqlx|rusqlite|axum) *=' src-tauri/Cargo.toml
@@ -86,9 +86,9 @@
   ```
   ADR-0009: nur Kopf auf `status: ersetzt` (+ Verweisfeld laut `docs/architektur/AGENTS.md`), Text bleibt.
 
-- [ ] **Step 6: Verify** `scripts/check-adr.sh` bzw. den ADR-Schritt von `check-all.sh` (`./scripts/check-all.sh --nur adr` oder wie der Skriptkopf ihn nennt) und `scripts/check-adr-nummern.sh` — Expected: grün.
+- [x] **Step 6: Verify** `scripts/check-adr.sh` bzw. den ADR-Schritt von `check-all.sh` (`./scripts/check-all.sh --nur adr` oder wie der Skriptkopf ihn nennt) und `scripts/check-adr-nummern.sh` — Expected: grün.
 
-- [ ] **Step 7: Commit** `feat(huelle): Vertragsprüfung gegen GET /api/shell in der Desktop-Hülle (LLH-1982)` mit Zunder-Zeile.
+- [x] **Step 7: Commit** `feat(huelle): Vertragsprüfung gegen GET /api/shell in der Desktop-Hülle (LLH-1982)` mit Zunder-Zeile.
 
 ### Task 2: Gemerkter Vertrag in `verbindung.rs`
 
@@ -101,15 +101,15 @@
   - `pub fn merke_vertrag(konfig_dir: &Path, server: &Url, vertrag: u32) -> io::Result<()>` (nur für bekannte Server; Schlüssel = `server.origin().ascii_serialization()`)
   - `Datei.vertraege: BTreeMap<String, u32>` mit `#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]`
 
-- [ ] **Step 1: Failing tests** (im bestehenden Testmodul):
+- [x] **Step 1: Failing tests** (im bestehenden Testmodul):
   - `alte_datei_ohne_vertraege_bleibt_lesbar`: Datei `{"server":"https://elw.local:8443/"}` → `lesen` liefert die Adresse, `letzter_vertrag` = `None`.
   - `gemerkter_vertrag_gilt_je_origin`: `schreiben(A)`, `merke_vertrag(A, 1)` → `letzter_vertrag(A) == Some(1)`, auch für `A` mit anderem Pfad; `letzter_vertrag(B) == None`.
   - `unbekannter_server_wird_nicht_gemerkt`: `merke_vertrag(C, 1)` ohne `schreiben(C)` → `letzter_vertrag(C) == None`.
   - `schreiben_und_vergessen_erhalten_bzw_entfernen_den_vertrag`: nach `schreiben(B)` gilt `letzter_vertrag(A)` weiter; nach `vergessen(A)` ist er `None`.
-- [ ] **Step 2: Run** `cargo test -p lifeline-desktop verbindung::` — FAIL.
-- [ ] **Step 3: Implement**; `schreiben` und `vergessen` übernehmen `vertraege` und streichen Einträge, deren Origin nicht mehr in `bekannt`/`server` steht.
-- [ ] **Step 4: Run** — PASS.
-- [ ] **Step 5: Commit** `feat(huelle): zuletzt bestätigten Hüllen-Vertrag je Server merken (LLH-1982)`.
+- [x] **Step 2: Run** `cargo test -p lifeline-desktop verbindung::` — FAIL.
+- [x] **Step 3: Implement**; `schreiben` und `vergessen` übernehmen `vertraege` und streichen Einträge, deren Origin nicht mehr in `bekannt`/`server` steht.
+- [x] **Step 4: Run** — PASS.
+- [x] **Step 5: Commit** `feat(huelle): zuletzt bestätigten Hüllen-Vertrag je Server merken (LLH-1982)`.
 
 ### Task 3: Kennung mit `platform` und `version`
 
@@ -120,11 +120,11 @@
 **Interfaces:**
 - Produces: `fn kennung_skript() -> String` — ersetzt in `kennung.js` die Platzhalter `__PLATFORM__` und `__VERSION__` durch `serde_json::to_string` der Werte (Zeichenketten samt Anführungszeichen).
 
-- [ ] **Step 1: Failing tests** in `main.rs`:
+- [x] **Step 1: Failing tests** in `main.rs`:
   - `kennung_nennt_plattform_und_version`: `kennung_skript()` enthält `platform: "{std::env::consts::OS}"` und `version: "{CARGO_PKG_VERSION}"`, keinen Platzhalter `__` mehr.
   - `init_skripte_ergaenzen_dieselbe_kennung` um `include_str!("kennung.js")` erweitern.
-- [ ] **Step 2: Run** `cargo test -p lifeline-desktop kennung` — FAIL.
-- [ ] **Step 3: Implement** `kennung.js` (Kopfkommentar wie die anderen Skripte: läuft in jeder Hülle, zuerst, gelesen nur in `frontend/src/huelle/faehigkeiten.ts`; Spec `huellen-vertrag`):
+- [x] **Step 2: Run** `cargo test -p lifeline-desktop kennung` — FAIL.
+- [x] **Step 3: Implement** `kennung.js` (Kopfkommentar wie die anderen Skripte: läuft in jeder Hülle, zuerst, gelesen nur in `frontend/src/huelle/faehigkeiten.ts`; Spec `huellen-vertrag`):
   ```js
   (() => {
     window.__LIFELINE_HUELLE__ = Object.freeze({
@@ -135,8 +135,8 @@
   })();
   ```
   In `baue_fenster` `.initialization_script(kennung_skript())` vor `BENACHRICHTIGUNG_SKRIPT`; den Kommentar dort nachziehen.
-- [ ] **Step 4: Run** — PASS.
-- [ ] **Step 5: Commit** `feat(huelle): Kennung der Desktop-Hülle nennt platform und version (LLH-1982)`.
+- [x] **Step 4: Run** — PASS.
+- [x] **Step 5: Commit** `feat(huelle): Kennung der Desktop-Hülle nennt platform und version (LLH-1982)`.
 
 ### Task 4: Lokale Seiten „nicht verträglich“ und „Verbinde…“, ihre Commands und Rechte
 
@@ -154,11 +154,11 @@
   - Command `update_suchen(app)` → `update::auf_wunsch_pruefen(app)`.
   - `erneut_versuchen` liest das Ziel künftig aus `ausfaelle` **oder** `unvertraeglich` (Task 5 setzt dann `pruefe_und_lade` ein).
 
-- [ ] **Step 1: Failing test** `anzeige_nicht_vertraeglich_ist_lokal_und_setzt_keine_adresse` (Muster wie `anzeige_nicht_erreichbar_ist_lokal_und_setzt_keine_adresse`): Capability ohne `remote`, Fenster `main` und `neben-*`, Rechte genau `core:default`, `allow-nicht-vertraeglich`, `allow-erneut-versuchen`, `allow-server-wechseln`, `allow-update-suchen`; keins davon in `SERVER_RECHTE`; `lokal.json` enthält `allow-update-suchen` nicht. Dazu `verbinde_seite_traegt_nur_die_origin`: `verbinde_seite("https://elw.local:8443/einsatz/1?q=x")` ist `WebviewUrl::App` mit Query `server=https%3A%2F%2Felw.local%3A8443`.
-- [ ] **Step 2: Run** `cargo test -p lifeline-desktop anzeige_nicht_vertraeglich verbinde_seite` — FAIL.
-- [ ] **Step 3: Implement.** HTML nach `nicht-erreichbar.html` (Kopfkommentar, `stil.css`, `defer`-Skript): Überschrift (per JS nach `richtung`), `<code id="adresse">`, Zeilen „Server-Version: …“ (ausgeblendet ohne Wert) und „App-Version: …“, Hinweissatz (zu neu: „Dieser Server spricht einen neueren Vertrag, als diese App kennt.“; zu alt: „Aktualisieren Sie den Server; die App lädt ihn danach von selbst nach ‚Erneut prüfen‘.“), Knöpfe `#update` (nur zu neu, primär), `#erneut` („Erneut prüfen“), `#wechseln` („Server wechseln“); Sperre mit Wort wie in `nicht-erreichbar.js`. `verbinde.html`: ohne Skript-IPC, liest `server` aus `location.search` und zeigt „Verbinde mit <host> …“ (CSP erlaubt nur `'self'`-Skripte: eigenes `verbinde.js`, kein Inline-Skript).
-- [ ] **Step 4: Run** `cargo test -p lifeline-desktop` — PASS; `cargo build -p lifeline-desktop` baut (Permissions erzeugt).
-- [ ] **Step 5: Commit** `feat(huelle): Seite „nicht verträglich“ und Startseite „Verbinde…“ (LLH-1982)` inkl. `src-tauri/permissions/autogenerated/*` falls neu erzeugt.
+- [x] **Step 1: Failing test** `anzeige_nicht_vertraeglich_ist_lokal_und_setzt_keine_adresse` (Muster wie `anzeige_nicht_erreichbar_ist_lokal_und_setzt_keine_adresse`): Capability ohne `remote`, Fenster `main` und `neben-*`, Rechte genau `core:default`, `allow-nicht-vertraeglich`, `allow-erneut-versuchen`, `allow-server-wechseln`, `allow-update-suchen`; keins davon in `SERVER_RECHTE`; `lokal.json` enthält `allow-update-suchen` nicht. Dazu `verbinde_seite_traegt_nur_die_origin`: `verbinde_seite("https://elw.local:8443/einsatz/1?q=x")` ist `WebviewUrl::App` mit Query `server=https%3A%2F%2Felw.local%3A8443`.
+- [x] **Step 2: Run** `cargo test -p lifeline-desktop anzeige_nicht_vertraeglich verbinde_seite` — FAIL.
+- [x] **Step 3: Implement.** HTML nach `nicht-erreichbar.html` (Kopfkommentar, `stil.css`, `defer`-Skript): Überschrift (per JS nach `richtung`), `<code id="adresse">`, Zeilen „Server-Version: …“ (ausgeblendet ohne Wert) und „App-Version: …“, Hinweissatz (zu neu: „Dieser Server spricht einen neueren Vertrag, als diese App kennt.“; zu alt: „Aktualisieren Sie den Server; die App lädt ihn danach von selbst nach ‚Erneut prüfen‘.“), Knöpfe `#update` (nur zu neu, primär), `#erneut` („Erneut prüfen“), `#wechseln` („Server wechseln“); Sperre mit Wort wie in `nicht-erreichbar.js`. `verbinde.html`: ohne Skript-IPC, liest `server` aus `location.search` und zeigt „Verbinde mit <host> …“ (CSP erlaubt nur `'self'`-Skripte: eigenes `verbinde.js`, kein Inline-Skript).
+- [x] **Step 4: Run** `cargo test -p lifeline-desktop` — PASS; `cargo build -p lifeline-desktop` baut (Permissions erzeugt).
+- [x] **Step 5: Commit** `feat(huelle): Seite „nicht verträglich“ und Startseite „Verbinde…“ (LLH-1982)` inkl. `src-tauri/permissions/autogenerated/*` falls neu erzeugt.
 
 ### Task 5: Ladeweg `pruefe_und_lade`, Maske, Deeplink, Start und Urteil je Server
 
@@ -174,35 +174,35 @@
   - `fn speichern_nach_pruefung(ergebnis: &Vertragsergebnis) -> bool` — `true` außer bei `NichtVertraeglich`.
   - `fn nebenfenster_seite(urteil: Option<&Unvertraeglich>, ziel: Url) -> NebenfensterStart` mit `enum NebenfensterStart { Server(Url), NichtVertraeglich(Unvertraeglich) }`.
 
-- [ ] **Step 1: Failing tests** (reine Funktionen):
+- [x] **Step 1: Failing tests** (reine Funktionen):
   - `maske_nennt_beide_versionen_und_die_richtung`: `maske_meldung(ZuAlt, Some("1.0.0-alpha.120"), "1.0.0-alpha.195")` == „Der Server (Version 1.0.0-alpha.120) ist zu alt für diese App (Version 1.0.0-alpha.195).“; `ZuNeu`, `None` → „Der Server ist neuer als diese App (Version 1.0.0-alpha.195). Aktualisieren Sie die App.“
   - `maske_speichert_nicht_erreichbaren_server`: `speichern_nach_pruefung(&NichtErreichbar)` und `(&Vertraeglich(..))` true, `(&NichtVertraeglich{..})` false.
   - `nebenfenster_eines_unvertraeglichen_servers_zeigt_die_seite`: mit Urteil → `NichtVertraeglich`, ohne → `Server(ziel)`.
-- [ ] **Step 2: Run** `cargo test -p lifeline-desktop maske_ nebenfenster_eines` — FAIL.
-- [ ] **Step 3: Implement** die Funktionen, dann verdrahten:
+- [x] **Step 2: Run** `cargo test -p lifeline-desktop maske_ nebenfenster_eines` — FAIL.
+- [x] **Step 3: Implement** die Funktionen, dann verdrahten:
   - `setup`: gespeicherter Server → `baue_fenster(FENSTER, verbinde_seite(&server))`, dann `tauri::async_runtime::spawn(pruefe_und_lade(handle, "main", server))`; ohne Server Maske wie bisher. Updater-Start unverändert daneben.
   - `lade_server` wird zum dünnen Wrapper: Nebenfenster-Aufräumen wie bisher, dann `pruefe_und_lade` für `main`.
   - `verbinden` → `async`: `pruefe_adresse`, `check(&server, letzter_vertrag)`; bei `NichtVertraeglich` `Err(maske_meldung(..))` ohne Speichern; sonst `schreiben` und `pruefe_und_lade` (die zweite Prüfung darin ist bewusst in Kauf genommen — einfacher als ein Sonderweg; bei `Vertraeglich` ist sie schnell).
   - `abbrechen`, `erneut_versuchen`: über `pruefe_und_lade` (async Commands).
   - `bestaetige_wechsel`: im Dialog-Callback `spawn`: `check`; `NichtVertraeglich` → nativer Dialog mit `maske_meldung`, nicht speichern; sonst `schreiben` + `lade_server`.
   - `open_nebenfenster`: vor dem Bau `nebenfenster_seite(urteil des verbundenen Servers, ziel)`; bei `NichtVertraeglich` Fenster mit lokaler Seite bauen und `show_nicht_vertraeglich`-Zustand setzen statt Wache.
-- [ ] **Step 4: Run** `cargo test -p lifeline-desktop` und `cargo clippy -p lifeline-desktop` — PASS, keine neuen Warnungen.
-- [ ] **Step 5: Commit** `feat(huelle): Server nur nach bestandener Vertragsprüfung laden (LLH-1982)`.
+- [x] **Step 4: Run** `cargo test -p lifeline-desktop` und `cargo clippy -p lifeline-desktop` — PASS, keine neuen Warnungen.
+- [x] **Step 5: Commit** `feat(huelle): Server nur nach bestandener Vertragsprüfung laden (LLH-1982)`.
 
 ### Task 6: Frontend — Oberfläche der Rückmeldung nach Plattform
 
 **Files:**
 - Modify: `frontend/src/rueckmeldung/adresse.ts` (`oberflaecheText`), `frontend/src/rueckmeldung/adresse.test.ts`, `frontend/src/huelle/faehigkeiten.ts` (Doku-Kommentare: Desktop-Hüllen setzen `platform` und `version`)
 
-- [ ] **Step 1: Failing tests** in `adresse.test.ts` (Block mit `oberflaeche()`):
+- [x] **Step 1: Failing tests** in `adresse.test.ts` (Block mit `oberflaeche()`):
   - `nennt in der macOS-Hülle die Desktop-App (macOS)`: Kennung `{ platform: 'macos', version: '1.0.0' }` → `'Desktop-App (macOS)'`.
   - `nennt in der Windows-Hülle die Desktop-App (Windows)`: `'windows'` → `'Desktop-App (Windows)'`.
   - `nennt in einer Hülle mit unbekannter Plattform die Desktop-App`: `'linux'` → `'Desktop-App'`.
   - Bestehende Tests (`iOS-App`, ohne Plattform `Desktop-App`, Browser) bleiben.
-- [ ] **Step 2: Run** `mise exec -- pnpm -C frontend exec vitest run src/rueckmeldung` — FAIL.
-- [ ] **Step 3: Implement** `oberflaecheText` mit Tabelle `{ ios: 'iOS-App', macos: 'Desktop-App (macOS)', windows: 'Desktop-App (Windows)' }`; Kommentar der Funktion und in `faehigkeiten.ts` (`platform`/`version`-Felder, `huellePlatform`, `huelleVersion`) nachziehen.
-- [ ] **Step 4: Run** dieselben Tests + `vitest run src/huelle` — PASS; `mise exec -- pnpm -C frontend exec prettier --check src/rueckmeldung src/huelle` grün.
-- [ ] **Step 5: Commit** `feat(rueckmeldung): Desktop-App nennt ihre Plattform (LLH-1982)`.
+- [x] **Step 2: Run** `mise exec -- pnpm -C frontend exec vitest run src/rueckmeldung` — FAIL.
+- [x] **Step 3: Implement** `oberflaecheText` mit Tabelle `{ ios: 'iOS-App', macos: 'Desktop-App (macOS)', windows: 'Desktop-App (Windows)' }`; Kommentar der Funktion und in `faehigkeiten.ts` (`platform`/`version`-Felder, `huellePlatform`, `huelleVersion`) nachziehen.
+- [x] **Step 4: Run** dieselben Tests + `vitest run src/huelle` — PASS; `mise exec -- pnpm -C frontend exec prettier --check src/rueckmeldung src/huelle` grün.
+- [x] **Step 5: Commit** `feat(rueckmeldung): Desktop-App nennt ihre Plattform (LLH-1982)`.
 
 ### Task 7: Regeln, Doku, Folgeaufgabe, Gates
 
@@ -212,7 +212,7 @@
 - Modify: `docs/architektur/08-querschnittliche-konzepte.md` (Hüllen-Vertrag: Desktop prüft auch), `docs/architektur/05-bausteinsicht.md` (Desktop-Hülle: `GET /api/shell`, `vertrag.rs`), weitere Stellen nach der Mitänderungstabelle in `docs/architektur/AGENTS.md`
 - Modify: `docs/anwender/kapitel/rueckmeldung.md` Zeile ~63 (Oberfläche nennt bei der Desktop-App die Plattform), Regeln aus `docs/anwender/AGENTS.md` beachten
 
-- [ ] **Step 1:** Texte schreiben; `grep -rn "ADR-0009" docs src-tauri .claude` und Verweise auf die neue ADR umstellen, wo sie Regeln zitieren.
-- [ ] **Step 2:** Folgeaufgabe per `zunder-task-anlegen`: gemeinsame Vertragsfälle `src-tauri/faelle/vertrag.json` für Rust- und Swift-Tests.
-- [ ] **Step 3: Run** `./scripts/check-all.sh --geaendert --ohne-e2e` — Expected: alle Schritte grün.
-- [ ] **Step 4: Commit** `docs(huelle): Hüllen-Vertrag der Desktop-Hülle in Regeln und Betrieb (LLH-1982)`.
+- [x] **Step 1:** Texte schreiben; `grep -rn "ADR-0009" docs src-tauri .claude` und Verweise auf die neue ADR umstellen, wo sie Regeln zitieren.
+- [x] **Step 2:** Folgeaufgabe per `zunder-task-anlegen`: gemeinsame Vertragsfälle `src-tauri/faelle/vertrag.json` für Rust- und Swift-Tests.
+- [x] **Step 3: Run** `./scripts/check-all.sh --geaendert --ohne-e2e` — Expected: alle Schritte grün.
+- [x] **Step 4: Commit** `docs(huelle): Hüllen-Vertrag der Desktop-Hülle in Regeln und Betrieb (LLH-1982)`.
