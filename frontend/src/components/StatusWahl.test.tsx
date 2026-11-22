@@ -169,6 +169,34 @@ describe('StatusWahl', () => {
       expect(kopf.closest('[role="menuitem"]')).toBeNull();
     });
 
+    it('mit `titel` fokussiert das Öffnen den gewählten Eintrag, ohne zu scrollen (LLH-2003)', async () => {
+      // Der Fokus fällt mitten in die Einblendung, nachdem `menueLage` gemessen hat. Ein
+      // scrollendes `focus()` verschob das Fenster (Handschuh 1366 × 520: Menü ragte unten
+      // heraus) oder rollte ein langes Menü nach unten (S1 bis S3 weg). rc-dropdown fokussiert
+      // aus demselben Grund mit `preventScroll`.
+      const fokus = vi.spyOn(HTMLElement.prototype, 'focus');
+      renderMitProviders(
+        <StatusWahl
+          darstellung={gebunden}
+          aktuell={4}
+          optionen={OPTIONEN}
+          kennung={KENNUNG}
+          titel="85-1"
+          onWaehlen={vi.fn()}
+          darfSchreiben
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: `Status von ${KENNUNG} ändern` }));
+      const gewaehlt = await screen.findByRole('menuitem', { name: /4 – Am Einsatzort/ });
+      await vi.waitFor(() => expect(gewaehlt).toHaveFocus());
+      const aufrufe = fokus.mock.contexts
+        .map((ziel, i) => ({ ziel, optionen: fokus.mock.calls[i][0] }))
+        .filter(({ ziel }) => (ziel as HTMLElement).getAttribute?.('role') === 'menuitem');
+      fokus.mockRestore();
+      expect(aufrufe.length, 'Vorbedingung: ein Eintrag wurde fokussiert').toBeGreaterThan(0);
+      for (const { optionen } of aufrufe) expect(optionen).toEqual({ preventScroll: true });
+    });
+
     it('`gross`: der Statusblock trägt die große Ziffer, ohne Schreibrecht ohne Rahmen', () => {
       const { unmount } = renderMitProviders(
         <StatusWahl

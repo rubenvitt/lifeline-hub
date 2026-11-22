@@ -70,6 +70,29 @@ async fn anonymer_abruf_liefert_version_wie_health_und_vertrag() {
     assert_eq!(shell["version"], env!("CARGO_PKG_VERSION"));
 }
 
+/// LLH-1980: die Liste, die die iOS-Hülle für den Start ohne Server vorwärmt. Ihr Inhalt hängt
+/// am gebauten Frontend; geprüft wird die Form.
+#[tokio::test]
+async fn assets_nennt_nur_pfade_unter_assets_ohne_doku() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+
+    let (status, shell) = abrufen(&app, "/api/shell", None).await;
+    assert_eq!(status, StatusCode::OK, "{shell}");
+    let assets: Vec<&str> = shell["assets"]
+        .as_array()
+        .expect("assets ist eine Liste")
+        .iter()
+        .map(|a| a.as_str().expect("jeder Eintrag ist ein Pfad"))
+        .collect();
+    for pfad in &assets {
+        assert!(pfad.starts_with("assets/"), "{pfad}");
+        assert!(!pfad.starts_with("assets/doku/"), "{pfad}");
+    }
+    let mut sortiert = assets.clone();
+    sortiert.sort();
+    assert_eq!(assets, sortiert);
+}
+
 #[tokio::test]
 async fn gekoppeltes_geraet_erreicht_den_vertrag() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

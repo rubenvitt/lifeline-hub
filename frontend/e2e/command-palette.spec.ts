@@ -259,6 +259,31 @@ test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)',
  */
 const AKTION = { exact: true } as const;
 
+/**
+ * Fokusrückgabe (LLH-1915, WCAG 2.4.3): die Palette wird beim Schließen ausgehängt, die Rückgabe
+ * von rc-dialog läuft deshalb nie. Ohne die eigene Rückgabe des Providers stand der Fokus nach Esc
+ * auf `body`, und Tastatur und Screenreader sprangen an den Dokumentanfang.
+ */
+test('gibt den Fokus nach Esc an „Suchen“ im Kopf bzw. an das Feld vor Strg+K zurück (LLH-1915)', async ({
+  page,
+}) => {
+  await zurSchadensliste(page, `E2E Fokus ${Date.now()}`);
+
+  const suchen = page.locator('header').getByRole('button', { name: 'Suchen' });
+  await suchen.click();
+  await expect(paletteInput(page)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(paletteInput(page)).toBeHidden();
+  await expect(suchen).toBeFocused();
+
+  await schadenSuche(page).focus();
+  await page.keyboard.press('Control+k');
+  await expect(paletteInput(page)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(paletteInput(page)).toBeHidden();
+  await expect(schadenSuche(page)).toBeFocused();
+});
+
 test('über den sichtbaren Trigger geöffnet, zeigt die Palette die Seitenaktion „Neue Zeile" (Aktionen)', async ({
   page,
 }) => {

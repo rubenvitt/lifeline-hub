@@ -5,6 +5,12 @@
 # Merge Queue gibt es für Repositories eines Benutzerkontos nicht, und „Branches must be up to
 # date" erzwänge nach jedem Merge einen vollen CI-Lauf für jeden offenen PR.
 #
+# GRENZE (LLH-2030): Die Neubewertung nach einem Push braucht einen Runner, also Sekunden bis
+# Minuten. Mergen zwei PRs mit derselben Nummer kurz nacheinander (am 22.11.2026 #1558 und #1557
+# im Abstand von 4 s, beide ADR-0077), trägt der zweite beim Merge noch seinen alten grünen
+# Status. Das Fenster bleibt bewusst offen (keine Merge Queue, kein „up to date"); die doppelte
+# Nummer fällt dann auf `alpha` auf und geht über „alpha rot" (Stau-Wächter, `scripts/AGENTS.md`).
+#
 # Deshalb zwei Auslöser für dieselbe Prüfung, je in einem eigenen Workflow (LLH-1896: ein Job,
 # der nur bei Push läuft, stünde sonst an jedem PR als übersprungener Eintrag):
 #   pull_request  — dieser Workflow: der PR selbst bewegt sich (neu, neuer Commit, Ziel-Branch).

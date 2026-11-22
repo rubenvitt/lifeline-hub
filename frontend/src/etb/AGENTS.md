@@ -60,7 +60,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (LLH-1842, LLH-1865). Enter im Feld übernimmt und springt in den Inhalt. Fokus beim Laden und
   nach dem Erfassen im ersten leeren Pflichtfeld (`fokusStart`), sonst im Inhalt; ein Pflicht- oder
   Zeitgrund steht in der Fußzeile, das Feld ist `aria-invalid`, beschreibt sich per
-  `aria-describedby` und bekommt den Fokus. **Ohne Standard-Rufname** (Abfrage offen, LLH-1764)
+  `aria-describedby` und bekommt den Fokus. Auch was das Feld Zeit selbst zur Eingabe sagt (Grund
+  „Zeit: nicht lesbar“ rot, Deutung „Zeit = 221430nov26“ grau, `onHinweis`) steht höflich in der
+  Fußzeile, nicht im Feld: dort verdrängte es in Handschuh und am Handschirm die Eingabe (LLH-1917). **Ohne Standard-Rufname** (Abfrage offen, LLH-1764)
   haben die fehlenden Seiten, die beim Typ die eigene Stelle tragen (`hatVorgabe`), EINEN Grund
   („Absender und Empfänger fehlen – Rufname oben eintragen“, `rufnameFehltText`), auf den Feld und
   Abfrage verweisen; Start- und Pflichtfokus gehen in die Abfrage (`data-startfeld="rufname"`),

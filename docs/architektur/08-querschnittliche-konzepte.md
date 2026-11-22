@@ -440,11 +440,12 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   kommen nur hinzu. Die iOS-Hülle lädt einen Server nur, wenn sie seinen Vertrag kennt
   (`bekannteVertraege` in `ios/LifelineKern/Sources/LifelineKern/LifelineKern.swift`,
   `Vertragspruefung` in `Vertrag.swift` daneben), bei Start, Wechsel und Rückkehr in den
-  Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Desktop-Hülle liest den Endpunkt noch
-  nicht (Zunder LLH-1982).
+  Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Desktop-Hülle prüft genauso vor jedem
+  Laden, das sie selbst anstößt (`BEKANNTE_VERTRAEGE` und `evaluate` in `src-tauri/src/vertrag.rs`,
+  LLH-1982, [ADR-0083](entscheidungen/ADR-0083-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md)).
 - **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
-  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, bei iOS dazu
-  `platform`, `version` und `haptics`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
+  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, `platform` und
+  `version`, bei iOS dazu `haptics`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
   das Frontend unterscheidet die Hüllen nur darüber. Gesetzt wird sie von den Init-Skripten der
   Desktop-Hülle (`src-tauri/src/*.js`) und von `ios/App/Huelle/huelle.js`; Vitest führt beide aus
   (`frontend/src/test/huelle.ts`).

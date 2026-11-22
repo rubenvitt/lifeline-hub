@@ -874,6 +874,16 @@ export const schriftskala = {
 export type Schriftstufenname = keyof typeof schriftskala;
 
 /**
+ * Schrift der Eingabefelder auf grobem Zeiger in px (LLH-2043, `frontend/AGENTS.md`,
+ * Bedien-Leitlinie „Zoom frei“). iOS zoomt beim Fokus in jedes Feld unter 16 px Schrift; seit der
+ * Zoom frei ist, tragen Felder auf Touchgeräten deshalb diese Größe. Keine Stufe der
+ * `schriftskala`: sie hängt am Zeiger, nicht an Rolle oder Dichte. CSS-Seite
+ * `--lfh-touch-feldschrift` mit der Regel in `rollen.css`, deckungsgleich per
+ * `rollen.guard.test.ts`.
+ */
+export const feldSchriftTouch = 16;
+
+/**
  * Der antd-Algorithmus eines Modus.
  *
  * Nachts läuft zuerst antds `darkAlgorithm` (leitet Hover-, Aktiv-, Füll- und Randstufen ab),

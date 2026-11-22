@@ -416,6 +416,80 @@ describe('Eingangshinweis (LLH-1062)', () => {
     await waitFor(() => expect(s.quittiert).toEqual([1901]));
   });
 
+  it('ein neuer Auftrag nennt Nummer und Anfang seines Texts (LLH-1909)', async () => {
+    const a = auftragEingang(1902, 12);
+    serverMit([a], {});
+    server.use(
+      http.get('/api/einsaetze/:id/auftraege/:aid', () =>
+        HttpResponse.json({
+          id: 12,
+          lfd_nr: 4,
+          auftrag_text: 'Wasserentnahme an der Mühlbachbrücke einrichten',
+          empfaenger: [],
+        }),
+      ),
+    );
+    renderZentrale();
+    live(a);
+    const n = await waitFor(() => hinweis('Neuer Auftrag'));
+    expect(
+      await within(n).findByText('#4 · Wasserentnahme an der Mühlbachbrücke einrichten'),
+    ).toBeInTheDocument();
+    expect(within(n).queryByText('Auftrag #12')).not.toBeInTheDocument();
+  });
+
+  it('eine Erwähnung im Chat nennt Absender und Text, den Kanal aus dem Sprungpfad (LLH-1909)', async () => {
+    const b: BenachrichtigungAnzeige = {
+      id: 1903,
+      einsatz_id: 1,
+      art: 'chat_erwaehnung',
+      stufe: 'hinweis',
+      bezug_typ: 'chat_nachricht',
+      bezug_id: 20,
+      erstellt_at: '2026-10-21 12:05:00',
+      titel: 'Erwähnt im Chat',
+      detail: null,
+      pfad: '/einsaetze/1/chat?kanal=6',
+    };
+    serverMit([b], {});
+    server.use(
+      http.get('/api/einsaetze/:id/chat/kanaele/6/nachrichten', () =>
+        HttpResponse.json([
+          { id: 20, kanal_id: 6, autor_name: 'Anna Berg', inhalt: '@S4 bitte Feldbetten zählen' },
+        ]),
+      ),
+    );
+    renderZentrale();
+    live(b);
+    const n = await waitFor(() => hinweis('Erwähnt im Chat · Anna Berg'));
+    expect(within(n).getByText('@S4 bitte Feldbetten zählen')).toBeInTheDocument();
+  });
+
+  it('nachgereicht: ein Befehl nennt seinen Titel (LLH-1909)', async () => {
+    const b: BenachrichtigungAnzeige = {
+      id: 1904,
+      einsatz_id: 1,
+      art: 'befehl',
+      stufe: 'hinweis',
+      bezug_typ: 'befehl',
+      bezug_id: 7,
+      erstellt_at: '2026-10-21 12:05:00',
+      titel: 'Neuer Befehl',
+      detail: 'Fassung 2',
+      pfad: '/einsaetze/1/auftraege?reiter=befehle&befehl=7',
+    };
+    serverMit([b], {});
+    server.use(
+      http.get('/api/benachrichtigungen', () => HttpResponse.json([b])),
+      http.get('/api/einsaetze/:id/befehle/:bid', () =>
+        HttpResponse.json({ id: 7, titel: 'Räumung Nord' }),
+      ),
+    );
+    renderZentrale();
+    const n = await waitFor(() => hinweis('Neuer Befehl: Räumung Nord'));
+    expect(within(n).getByText(/Fassung 2/)).toBeInTheDocument();
+  });
+
   it('das Band ordnet wie der Server: jüngste Anlagezeit oben, die Kennung nur bei Gleichstand', async () => {
     const liste = [
       auftragEingang(2102, 21, '2026-10-21 12:01:00'),

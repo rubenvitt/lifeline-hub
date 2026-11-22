@@ -161,6 +161,36 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('mit `onHinweis` meldet das Feld Grund und Deutung nach außen und zeigt sie nicht selbst (LLH-1917)', async () => {
+    const onHinweis = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" art="ereignis" onHinweis={onHinweis} />
+          <button type="button">daneben</button>
+        </>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '1430');
+    expect(onHinweis).toHaveBeenLastCalledWith({ art: 'deutung', text: '= 171430okt26' });
+    expect(screen.queryByText('= 171430okt26')).not.toBeInTheDocument();
+    await user.clear(zeitFeld('Zeit'));
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    expect(onHinweis).toHaveBeenLastCalledWith({ art: 'grund', text: 'nicht lesbar' });
+    await user.click(screen.getByRole('button', { name: 'daneben' }));
+    // Nach dem Verlassen steht der Grund weiter, aber nur draußen; das Feld bleibt rot.
+    expect(onHinweis).toHaveBeenLastCalledWith({ art: 'grund', text: 'nicht lesbar' });
+    expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
+    expect(zeitFeld('Zeit')).toHaveValue('14:3x');
+    expect(zeitFeld('Zeit')).toHaveAttribute('aria-invalid', 'true');
+    expect(zeitFeld('Zeit')).not.toHaveAccessibleDescription(/nicht lesbar/);
+    await user.click(zeitFeld('Zeit'));
+    await user.keyboard('{Escape}');
+    expect(onHinweis).toHaveBeenLastCalledWith(null);
+  });
+
   it('nennt „gestern“, wenn ein Ereignis sonst in der Zukunft läge', async () => {
     const user = userEvent.setup();
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Lage" art="ereignis" />));

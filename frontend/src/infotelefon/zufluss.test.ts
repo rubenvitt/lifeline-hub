@@ -13,9 +13,25 @@ describe('Zufluss der Anruf-Zeitachse (LFH-554)', () => {
     });
   });
 
-  it('hält neue fremde Anrufe zurück, eigene stehen sofort', () => {
+  it('hält neue fremde Anrufe zurück, auf diesem Gerät erfasste stehen sofort', () => {
     const gefroren = einfrieren([a(2), a(1)]);
-    const { sichtbar, zurueckgehalten } = teileZufluss([a(4, 9), a(3, 7), a(2), a(1)], gefroren, 7);
+    const { sichtbar, zurueckgehalten } = teileZufluss(
+      [a(4, 9), a(3, 7), a(2), a(1)],
+      gefroren,
+      new Set([3]),
+    );
+    expect(sichtbar.map((x) => x.id)).toEqual([3, 2, 1]);
+    expect(zurueckgehalten).toBe(1);
+  });
+
+  it('hält einen neuen Anruf desselben Kontos von einem anderen Gerät zurück (LLH-1977)', () => {
+    // Konto 7 hat Anruf 3 hier erfasst und Anruf 4 auf dem Zweitgerät: nur 3 steht sofort.
+    const gefroren = einfrieren([a(2), a(1)]);
+    const { sichtbar, zurueckgehalten } = teileZufluss(
+      [a(4, 7), a(3, 7), a(2), a(1)],
+      gefroren,
+      new Set([3]),
+    );
     expect(sichtbar.map((x) => x.id)).toEqual([3, 2, 1]);
     expect(zurueckgehalten).toBe(1);
   });
@@ -27,7 +43,7 @@ describe('Zufluss der Anruf-Zeitachse (LFH-554)', () => {
     const { sichtbar, zurueckgehalten } = teileZufluss(
       [a(31, 9), a(20), a(19), a(30, 9), a(18)],
       gefroren,
-      7,
+      new Set(),
     );
     expect(sichtbar.map((x) => x.id)).toEqual([20, 19, 30, 18]);
     expect(zurueckgehalten).toBe(1);

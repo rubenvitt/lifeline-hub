@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -40,9 +41,14 @@ interface TastaturEbene {
 
 interface PaletteWert {
   offen: boolean;
-  oeffne: () => void;
+  /**
+   * Öffnet die Palette. `rueckkehrZiel` bekommt den Fokus beim Schließen zurück (LLH-1915); ohne
+   * Ziel das Element, das ihn beim Öffnen hatte. Ein Auslöser gibt sich selbst mit: Safari
+   * fokussiert Knöpfe beim Klick nicht, `document.activeElement` wäre dort `body`.
+   */
+  oeffne: (rueckkehrZiel?: HTMLElement | null) => void;
   schliesse: () => void;
-  toggle: () => void;
+  toggle: (rueckkehrZiel?: HTMLElement | null) => void;
   registriereTastaturEbene: (ebene: Omit<TastaturEbene, 'id' | 'reihenfolge'>) => () => void;
   meldeTastaturAktionenAenderung: () => void;
 }
@@ -163,18 +169,30 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const vorPaletteKetteRef = useRef<TastaturEbene[]>([]);
   const naechsteReihenfolgeRef = useRef(0);
   const offenRef = useRef(false);
+  /**
+   * Fokusrückgabe (LLH-1915, WCAG 2.4.3): `PaletteHost` wird beim Schließen ausgehängt, nicht
+   * unsichtbar geschaltet, also läuft die Rückgabe von rc-dialog nie. Gemerkt beim Öffnen,
+   * eingelöst im Layout-Effekt nach dem Aushängen (Muster `useFokusRueckgabe`).
+   */
+  const rueckkehrZielRef = useRef<HTMLElement | null>(null);
   const [, setAktionsRevision] = useState(0);
   const meldeTastaturAktionenAenderung = useCallback(() => {
     setAktionsRevision((revision) => revision + 1);
   }, []);
-  const oeffne = useCallback(() => {
-    if (offenRef.current || ohnePalette) return;
-    // Bewusst die ROHE Kette merken: ein Anzeige-Fallback liefe sonst über `schliesse` in den
-    // Tastenweg, und Strg+S feuerte auf einer Maske, die der Fokus verlassen hat.
-    vorPaletteKetteRef.current = aktiveKetteRef.current;
-    offenRef.current = true;
-    setOffen(true);
-  }, [ohnePalette]);
+  const oeffne = useCallback(
+    (rueckkehrZiel?: HTMLElement | null) => {
+      if (offenRef.current || ohnePalette) return;
+      const aktiv = document.activeElement;
+      rueckkehrZielRef.current =
+        rueckkehrZiel ?? (aktiv instanceof HTMLElement && aktiv !== document.body ? aktiv : null);
+      // Bewusst die ROHE Kette merken: ein Anzeige-Fallback liefe sonst über `schliesse` in den
+      // Tastenweg, und Strg+S feuerte auf einer Maske, die der Fokus verlassen hat.
+      vorPaletteKetteRef.current = aktiveKetteRef.current;
+      offenRef.current = true;
+      setOffen(true);
+    },
+    [ohnePalette],
+  );
   const schliesse = useCallback(() => {
     if (!offenRef.current) return;
     aktiveKetteRef.current = vorPaletteKetteRef.current;
@@ -182,10 +200,27 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     offenRef.current = false;
     setOffen(false);
   }, []);
-  const toggle = useCallback(() => {
-    if (offenRef.current) schliesse();
-    else oeffne();
-  }, [oeffne, schliesse]);
+  const toggle = useCallback(
+    (rueckkehrZiel?: HTMLElement | null) => {
+      if (offenRef.current) schliesse();
+      else oeffne(rueckkehrZiel);
+    },
+    [oeffne, schliesse],
+  );
+
+  /**
+   * Bei JEDEM Schließen (Esc, Maske, ausgeführte Zeile; abgestimmt 22.11.2026), aber nur bei
+   * verwaistem Fokus: hat eine Aktion ihn bewusst gesetzt (Erfassung, Rückfrage), bleibt er dort.
+   * Ein Ziel, das inzwischen ausgehängt ist, fällt weg.
+   */
+  useLayoutEffect(() => {
+    if (offen) return;
+    const ziel = rueckkehrZielRef.current;
+    rueckkehrZielRef.current = null;
+    if (!ziel?.isConnected) return;
+    const aktiv = document.activeElement;
+    if (aktiv === document.body || aktiv === null) ziel.focus();
+  }, [offen]);
 
   /**
    * Sammelt ALLE Ebenen, deren Wurzel das Ziel enthält, von tief nach flach (Gleichstand → später
