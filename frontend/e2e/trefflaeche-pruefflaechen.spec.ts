@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { navigateInApp } from './navigation-kern';
 import { weitereAusloeser, weitereEintrag } from './nebenweg-kern';
@@ -1597,9 +1598,7 @@ async function messeErfassungsdialog(
       .click();
   const karte = inMain(page).locator(`[data-nachforderung-id="${nfId}"]`);
   await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
-  const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, '„Tauchpumpe“ als Material übernehmen');
   await expect(dialog.getByRole('radio', { name: 'Verbrauchsgut' })).toBeChecked();
 
   const kreuz = dialog.locator('.ant-modal-close');
@@ -1648,9 +1647,7 @@ async function fussVerdecktKeinFeld(page: Page, einsatzId: string, wo: string) {
   await page.goto(`/einsaetze/${einsatzId}/material`);
   await page.addStyleTag({ content: '[class*="tsqd-open-btn"] { display: none !important; }' });
   await inMain(page).getByRole('button', { name: 'Ad-hoc-Material', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Ad-hoc-Material ohne Stammeintrag' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Ad-hoc-Material ohne Stammeintrag');
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await expect(dialog.getByLabel('Bestandsnummer')).toBeVisible();
   // Erst wenn der Klappteil steht: mitten im Aufklappen wächst der Dialog unter dem Rollen.

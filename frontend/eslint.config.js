@@ -34,11 +34,11 @@ const E2E_RIEGEL_EINBLENDUNG_MELDUNG =
 const E2E_EINBLENDUNG_ERLAUBT = ['e2e/dialog-kern.ts', 'e2e/doku-bilder/**/*.ts'];
 const E2E_RIEGEL_EINBLENDUNG = [
   {
-    selector: 'Literal[value=/ant-zoom(-big)?-(appear|enter)/]',
+    selector: 'Literal[value=/ant-zoom/]',
     message: E2E_RIEGEL_EINBLENDUNG_MELDUNG,
   },
   {
-    selector: 'Literal[regex.pattern=/ant-zoom(-big)?-(appear|enter)/]',
+    selector: 'Literal[regex.pattern=/ant-zoom/]',
     message: E2E_RIEGEL_EINBLENDUNG_MELDUNG,
   },
 ];

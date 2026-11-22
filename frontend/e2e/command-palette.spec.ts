@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { haeltStufe, ruhigeHoehe, SUBPIXEL } from './trefflaeche-kern';
 import { einsatzAnlegen } from './einsatz-kern';
@@ -134,9 +135,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   // holt den Fokus kurz zu sich (Feld → Drawer-Schließen → Feld), und am Ende der Animation setzt
   // der Dialog ihn ggf. auf seinen Rahmen. Ein Tab in diesem Fenster landete unter Last im
   // Drawer und kam nie in der Liste an.
-  await expect(page.locator('.ant-modal').filter({ has: palette })).not.toHaveClass(
-    /ant-zoom-(appear|enter)/,
-  );
+  await eingeblendet(palette);
   await expect(palette).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(palette).not.toBeFocused();

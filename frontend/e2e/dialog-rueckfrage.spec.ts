@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { einsatzPerApi } from './einsatz-kern';
 
@@ -38,7 +39,7 @@ test('Vermisst melden: Klick neben den Dialog schließt nicht, Escape fragt, „
   await expect(rueckfrage).toContainText('Die Eingaben in „Vermisst melden“ gehen verloren.');
   await expect(rueckfrage.getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused();
   // Bild der Änderung erst nach der Einblende-Animation.
-  await expect(rueckfrage).not.toHaveClass(/ant-zoom-appear|ant-zoom-enter/);
+  await eingeblendet(rueckfrage);
   await page.screenshot({ path: info.outputPath('rueckfrage.png') });
 
   await rueckfrage.getByRole('button', { name: 'Weiter bearbeiten' }).click();
