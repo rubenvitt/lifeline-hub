@@ -448,6 +448,10 @@ geprüft sein.
    App Group `group.dev.rubeen.lifeline.ios`. (Ob die automatische Signierung über den API-Schlüssel
    das selbst anlegt, ist offen; von Hand ist sicher.)
 2. APNs-Schlüssel (`.p8`) anlegen, Key-ID und Team-ID notieren.
+
+   Schritte 1 und 2 übernimmt Claude im Browser auf Rubens Rechner (Remote Control), Ruben meldet
+   sich dort selbst an (Wunsch Ruben, 22.11.2026). Den `.p8` liest Claude nicht: er landet im
+   Download-Ordner, und Ruben bringt ihn auf den Relais-Host.
 3. Relais deployen (Image aus `artefakte.yml`), Domain `push.rubeen.dev` mit TLS, Umgebung
    setzen, `GET /v1/status` erreichbar.
 4. Gerätetest: Debug-Build aus Xcode (Sandbox) gegen einen Server mit `--ios-push`, Akzeptanz 1–6.
