@@ -458,8 +458,8 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
 
 function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienung }) {
   const { rollen } = useRollen();
-  // Nicht bearbeitbar: eine pausierte Änderung überschriebe nach der Rückkehr des Netzes einen
-  // Wert, den niemand gesehen hat (LFH-1095).
+  // Nicht bearbeitbar: der Wert ist nicht geladen, eine Änderung überschriebe einen Wert, den
+  // niemand gesehen hat (LFH-1095).
   if (nichtGeladen(p, 'zustand')) return <NichtGeladenZelle />;
   // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {

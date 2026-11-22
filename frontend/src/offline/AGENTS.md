@@ -210,7 +210,8 @@ draußen gelassen werden.
   (PATCH) ebenso. Vorgemerktes einer Person zeigt `useVorgemerktePersonEintraege` am Ort.
 - **Personendaten und „Zustand / Verdacht“ sind ohne Netz gesperrt, nie vorgemerkt** (LLH-1103,
   Spec `personendaten-bearbeiten`, „Ohne Netz gesperrt“): es gibt keinen PATCH-Weg in die Queue,
-  und eine pausierte Änderung überschriebe nach der Rückkehr einen Wert, den niemand gesehen hat.
+  und der Grund steht da, bevor jemand tippt. Bis LLH-1950 hätte eine pausierte Änderung nach der
+  Rückkehr still einen Wert überschrieben, den niemand gesehen hat.
   Gefragt wird `useOhneVerbindung`. Ein Wortlaut für jeden dieser Gründe:
   `OHNE_VERBINDUNG_NICHT_AENDERBAR` (`offline/verbindung.ts`). Wo der Grund der Personendaten
   steht: `frontend/src/personen/AGENTS.md`, „Personendaten nur feldweise“. „Zustand / Verdacht“
