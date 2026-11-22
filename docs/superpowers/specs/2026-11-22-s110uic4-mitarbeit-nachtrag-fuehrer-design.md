@@ -164,6 +164,9 @@ Trigger: Die Änderung landet im Log und geht im nächsten Abgleich als `mitarbe
 übernimmt. N kennt die Fähigkeit von O, `keep_mitarbeit` greift also nicht mehr. So bleiben
 beide nie uneinig. Abgelehnt, weil 1–3 nicht gelten: nichts tun.
 
+Steht die Mitgliedschaft schon auf `mitarbeit` (ein wiederholter Nachtrag, weil eine Quittung
+verloren ging), quittiert O nur, ohne Neu-Log. *Beim Planen ergänzt.*
+
 Jeder Nachtrag außer Fall 0 wird quittiert.
 
 Die Migration 0358 baut `einsatz_mitgliedschaft` vor dem Anlegen der Trigger neu; das Aufrüsten
