@@ -876,7 +876,9 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Erinnerung mit `quelle = 'auto_frist'` und Bezug `meldung`, `auftrag`, `abloesung` oder
   `abloesung_vorwarnung` zählt und steht dort, wo man sie erledigt — an der Meldung („Bestätigung
   überfällig“), am Auftrag („überfällig“), an der Ablösung — sofern die Person das Modul des Bezugs
-  sieht. Sie fehlt dann im Zähler „Erinnerungen fällig“ (`erinnerung::repo::faellige_offene`, auch
+  sieht (sichtbar und Zugriff; ein Admin erreicht ein ausgeblendetes Modul, sieht es aber nicht) und
+  der Bezug offen ist (Meldung nicht erledigt, Auftrag offen oder in Arbeit; Ablösungen schließen
+  ihre Fristen beim Ende selbst). Sie fehlt dann im Zähler „Erinnerungen fällig“ (`erinnerung::repo::faellige_offene`, auch
   Lagemonitor), in Offene Vorgänge → Erinnerungen und doppelt in Nächste Marken; das
   Erinnerungsmodul zeigt sie weiter, als „automatisch“. Den Planungshinweis (`abloesung_planung`)
   und selbst angelegte Erinnerungen mit Bezug zeigt sonst nichts, sie bleiben Erinnerungen. Die Menge

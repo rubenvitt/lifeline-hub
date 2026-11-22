@@ -85,6 +85,12 @@ Eine Erinnerung gilt als **am Bezug getragen**, wenn `quelle = 'auto_frist'` ist
 (`meldungen`, `auftraege`, `abloesung`). Ohne das Modul sähe sie die Frist sonst nirgends;
 dann bleibt sie eine Erinnerung.
 
+Nachtrag aus dem Review: „Sieht“ heißt sichtbar und Zugriff, wie der Überblick es prüft; ein
+System-Admin erreicht ein ausgeblendetes Modul, sieht es aber nicht. Und der Bezug muss **offen**
+sein, also in der Liste offener Vorgänge seines Moduls stehen (Meldung nicht erledigt, Auftrag
+offen oder in Arbeit). Sonst zeigte ihn keine Liste: Die Quittierfrist eines vollzogenen Auftrags
+ohne Quittung zählte nirgends mehr. Ablösungen schließen ihre Fristen beim Ende selbst.
+
 `abloesung_planung` gehört **nicht** dazu: Den Planungshinweis zeigt keine andere Liste und
 kein anderer Zähler. Er bleibt in Offene Vorgänge → Erinnerungen und im Zähler. Dass Nächste
 Marken ihn schon heute überspringt, bleibt wie es ist; das ist eine eigene Frage, nicht diese.

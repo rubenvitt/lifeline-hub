@@ -18,13 +18,14 @@ export const AM_BEZUG_GETRAGEN: Readonly<Record<string, BezugModul>> = {
 
 /**
  * Steht diese Erinnerung schon an ihrem Bezug? Nur eine automatische Frist (`auto_frist`), und
- * nur, wenn das Modul des Bezugs für die Person frei ist; sonst sähe sie die Frist nirgends.
+ * nur, wenn `traegt` den Bezug in seinem Modul zeigt: Modul für die Person frei und der Bezug
+ * dort offen; sonst sähe sie die Frist nirgends.
  */
 export function amBezugGetragen(
-  e: Pick<Erinnerung, 'quelle' | 'bezug_typ'>,
-  frei: (modul: BezugModul) => boolean,
+  e: Pick<Erinnerung, 'quelle' | 'bezug_typ' | 'bezug_id'>,
+  traegt: (modul: BezugModul, bezugId: number) => boolean,
 ): boolean {
-  if (e.quelle !== 'auto_frist' || !e.bezug_typ) return false;
+  if (e.quelle !== 'auto_frist' || !e.bezug_typ || e.bezug_id == null) return false;
   const modul = AM_BEZUG_GETRAGEN[e.bezug_typ];
-  return modul !== undefined && frei(modul);
+  return modul !== undefined && traegt(modul, e.bezug_id);
 }

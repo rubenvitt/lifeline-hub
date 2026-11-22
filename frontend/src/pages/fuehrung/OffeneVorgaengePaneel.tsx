@@ -44,6 +44,7 @@ import { empfaengerText } from './ueberblickDaten';
 import {
   VORGAENGE_JE_ABSCHNITT,
   auftragFuerMich,
+  bezugTraeger,
   erinnerungFuerMich,
   listenStand,
   meldungFuerMich,
@@ -59,7 +60,6 @@ import {
   type MeineStelle,
   type VorgangsSicht,
 } from './offeneVorgaenge';
-import type { BezugModul } from '../../erinnerung/amBezug';
 
 /** Eine Listenquelle eines Abschnitts: Freigabe des Moduls und die Abfrage. */
 export interface VorgangsQuelle<T> {
@@ -169,14 +169,17 @@ export default function OffeneVorgaengePaneel({
   const nListe = nachSicht(vorgangsNachforderungen(daten(nachforderungen), jetzt), sicht, (n) =>
     nachforderungFuerMich(n, stelle),
   );
-  // Automatische Fristen stehen am Bezug, wenn dessen Modul frei ist (LLH-1908, `src/AGENTS.md`,
-  // „Automatische Fristen stehen am Bezug“); der Server zählt dieselbe Menge.
-  const bezugFrei = (m: BezugModul) =>
-    m === 'meldungen' ? meldungen.frei : m === 'auftraege' ? auftraege.frei : abloesungen.frei;
-  const eListe = nachSicht(
-    vorgangsErinnerungen(daten(erinnerungen), jetzt, bezugFrei),
-    sicht,
-    (e) => erinnerungFuerMich(e, stelle),
+  // Automatische Fristen stehen am offenen Bezug, wenn dessen Modul frei ist (LLH-1908,
+  // `src/AGENTS.md`, „Automatische Fristen stehen am Bezug“); der Server zählt dieselbe Menge.
+  const offenIn = <T,>(quelle: VorgangsQuelle<T>, offen: (liste: T[]) => { id: number }[]) =>
+    !quelle.frei ? null : quelle.q.data === undefined ? undefined : offen(quelle.q.data);
+  const traeger = bezugTraeger({
+    meldungen: offenIn(meldungen, vorgangsMeldungen),
+    auftraege: offenIn(auftraege, vorgangsAuftraege),
+    abloesung: abloesungen.frei,
+  });
+  const eListe = nachSicht(vorgangsErinnerungen(daten(erinnerungen), jetzt, traeger), sicht, (e) =>
+    erinnerungFuerMich(e, stelle),
   );
   const abListe = vorgangsAbloesungen(abloesungDaten ?? [], jetzt);
 

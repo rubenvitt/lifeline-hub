@@ -101,8 +101,10 @@ der Zahl „Erinnerungen“ fehlen die von Meldungen, Aufträgen und Ablösungen
 ihrem Anlass, etwa als „Bestätigung überfällig“ an der Meldung. So erscheint dieselbe Frist nicht
 doppelt. Der Hinweis auf eine fehlende ablösende Einheit bleibt eine Erinnerung, ebenso eine
 Erinnerung, die jemand selbst zu einer Meldung oder einem Auftrag angelegt hat. Ist das Modul des
-Anlasses für eine Person nicht freigegeben, zählt die automatische Erinnerung für sie weiter als
-Erinnerung.
+Anlasses für eine Person nicht freigegeben oder ausgeblendet, zählt die automatische Erinnerung für
+sie weiter als Erinnerung. Dasselbe gilt, sobald der Anlass nicht mehr offen ist, die Frist aber
+noch: etwa ein vollzogener Auftrag, dessen Quittung fehlt, oder eine erledigte, aber unbestätigte
+Meldung.
 
 Die automatischen Erinnerungen melden sich nicht als „Erinnerung fällig“, sondern mit dem Hinweis
 ihres Anlasses: „Bestätigung ausstehend“, „Auftrag überfällig“, „Keine ablösende Einheit
