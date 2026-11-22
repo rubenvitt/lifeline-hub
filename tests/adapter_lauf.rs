@@ -764,3 +764,120 @@ async fn meldung_enthaelt_keine_einstellung_und_kein_geheimnis() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+// ───────────────────── Admin greift ein (LLH-2026) ─────────────────────
+
+/// Ein Adapter, den der Lauf mit 401 angehalten und gemeldet hat.
+async fn eingriff_gemeldet(u: &Umgebung) -> String {
+    let id = u.adapter(true).await;
+    u.art.plane(abgelehnt());
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_eingriff")]);
+    id
+}
+
+/// Ein Adapter, der als gestört gemeldet ist (sechs Verbindungsfehler über 30 Minuten), und der
+/// Zeitpunkt, bis zu dem gelaufen wurde.
+async fn stoerung_gemeldet(u: &Umgebung) -> (String, chrono::DateTime<Utc>) {
+    let id = u.adapter(true).await;
+    for _ in 0..20 {
+        u.art.plane(verbindung());
+    }
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    let bis = t0 + Duration::minutes(31);
+    laufen_bis(u, &id, bis).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    (id, bis)
+}
+
+async fn post(u: &Umgebung, pfad: &str) -> StatusCode {
+    let (s, _) = anfrage_json(&u.app, "POST", pfad, &u.admin, None).await;
+    s
+}
+
+#[tokio::test]
+async fn fortsetzen_erledigt_ohne_entwarnung() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    assert_eq!(
+        post(&u, &format!("{LISTE}/{id}/fortsetzen")).await,
+        StatusCode::OK
+    );
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+    // Auch der nächste Erfolg entwarnt nicht: der Admin weiß es schon.
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+}
+
+#[tokio::test]
+async fn neues_geheimnis_erledigt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    u.set_token(&id, "neues-token").await;
+    assert_eq!(u.arten(&u.admin2).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn wirksame_aenderung_nach_anhalten_erledigt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    let (s, v) = anfrage_json(
+        &u.app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &u.admin,
+        Some(&json!({ "einstellungen": { "gruppe": "neu" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn anhalten_durch_admin_erledigt_stoerung() {
+    let u = umgebung().await;
+    let (id, _) = stoerung_gemeldet(&u).await;
+    assert_eq!(
+        post(&u, &format!("{LISTE}/{id}/anhalten")).await,
+        StatusCode::OK
+    );
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_gestoert")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn umbenennen_laesst_merker_stehen() {
+    let u = umgebung().await;
+    let (id, _) = stoerung_gemeldet(&u).await;
+    let (s, v) = anfrage_json(
+        &u.app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &u.admin,
+        Some(&json!({ "name": "Quelle Nord" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("gestoert"));
+}
+
+#[tokio::test]
+async fn loeschen_erledigt_und_raeumt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    let (s, _) = anfrage_json(&u.app, "DELETE", &format!("{LISTE}/{id}"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE adapter_id = ?")
+        .bind(&id)
+        .fetch_one(&u.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+    assert!(u.meldungen(&u.admin).await.is_empty());
+}

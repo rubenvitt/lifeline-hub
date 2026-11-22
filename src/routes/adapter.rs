@@ -532,7 +532,7 @@ pub async fn update(
         .transpose()?;
     let jetzt = crate::zeit::jetzt();
     let org_id = admin.org_id;
-    let (vorher, nachher, entfernt) = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher, entfernt, erledigt) = crate::write_retry!(&state.pool, |conn| {
         let vorher = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
         let art = art_von(rahmen, &vorher)?;
         let lan_erlaubt = body.lan_erlaubt.unwrap_or(vorher.lan_erlaubt);
@@ -567,8 +567,15 @@ pub async fn update(
         } else {
             Vec::new()
         };
-        Ok((vorher, nachher, entfernt))
+        // Hebt die Änderung einen Stopp des Laufs auf, ist die Meldung erledigt (LLH-2026).
+        let erledigt = if vorher.angehalten_grund.is_some() && nachher.angehalten_grund.is_none() {
+            repo::clear_gemeldet(&mut *conn, &id).await?
+        } else {
+            false
+        };
+        Ok((vorher, nachher, entfernt, erledigt))
     })?;
+    meldung_erledigen(&state, org_id, &id, erledigt).await;
     if vorher.name != nachher.name
         || vorher.einstellungen_json != nachher.einstellungen_json
         || vorher.intervall_s != nachher.intervall_s
@@ -614,6 +621,15 @@ pub async fn delete(
     PfadParam(id): PfadParam<String>,
 ) -> Result<StatusCode, AppError> {
     let org_id = admin.org_id;
+    // Offene Störungsmeldungen vorher erledigen (LLH-2026): mit dem Adapter fallen ihre Zeilen,
+    // danach erreichte das Quittier-Ereignis niemanden mehr.
+    let gemeldet = {
+        let mut conn = state.pool.acquire().await?;
+        repo::load_in_org(&mut conn, org_id, &id)
+            .await?
+            .is_some_and(|a| a.gemeldet.is_some())
+    };
+    meldung_erledigen(&state, org_id, &id, gemeldet).await;
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
         repo::delete(&mut *conn, org_id, &id)
@@ -681,11 +697,18 @@ pub async fn set_geheimnis(
         .map_err(|_| AppError::Internal("Verschlüsseln fehlgeschlagen".into()))?;
     let jetzt = crate::zeit::jetzt();
     let admin_id = admin.id;
-    let a = crate::write_retry!(&state.pool, |conn| {
+    let (a, erledigt) = crate::write_retry!(&state.pool, |conn| {
         let a = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
         repo::save_geheimnis(&mut *conn, &a.id, &platz, &chiffrat, &fp, admin_id, &jetzt).await?;
-        Ok(a)
+        // Ein neues Geheimnis hebt einen Stopp des Laufs auf: die Meldung ist erledigt (LLH-2026).
+        let erledigt = if a.angehalten_grund.is_some() {
+            repo::clear_gemeldet(&mut *conn, &a.id).await?
+        } else {
+            false
+        };
+        Ok((a, erledigt))
     })?;
+    meldung_erledigen(&state, org_id, &id, erledigt).await;
     spur(
         &state,
         &admin,
@@ -759,14 +782,16 @@ pub async fn halt(
 ) -> Result<Json<AdapterAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let org_id = admin.org_id;
-    let a = crate::write_retry!(&state.pool, |conn| {
+    let (a, erledigt) = crate::write_retry!(&state.pool, |conn| {
         load_fuer_schreiben(&mut *conn, org_id, &id).await?;
-        repo::halt(&mut *conn, org_id, &id, &jetzt)
+        let a = repo::halt(&mut *conn, org_id, &id, &jetzt)
             .await?
             .ok_or_else(|| {
                 AppError::UnprocessableEntity("Der Adapter ist schon angehalten.".into())
-            })
+            })?;
+        Ok((a, repo::clear_gemeldet(&mut *conn, &id).await?))
     })?;
+    meldung_erledigen(&state, org_id, &id, erledigt).await;
     spur(
         &state,
         &admin,
@@ -788,12 +813,14 @@ pub async fn resume(
     PfadParam(id): PfadParam<String>,
 ) -> Result<Json<AdapterAnzeige>, AppError> {
     let org_id = admin.org_id;
-    let a = crate::write_retry!(&state.pool, |conn| {
+    let (a, erledigt) = crate::write_retry!(&state.pool, |conn| {
         load_fuer_schreiben(&mut *conn, org_id, &id).await?;
-        repo::resume(&mut *conn, org_id, &id)
+        let a = repo::resume(&mut *conn, org_id, &id)
             .await?
-            .ok_or_else(|| AppError::UnprocessableEntity("Der Adapter läuft schon.".into()))
+            .ok_or_else(|| AppError::UnprocessableEntity("Der Adapter läuft schon.".into()))?;
+        Ok((a, repo::clear_gemeldet(&mut *conn, &id).await?))
     })?;
+    meldung_erledigen(&state, org_id, &id, erledigt).await;
     spur(
         &state,
         &admin,
@@ -805,6 +832,14 @@ pub async fn resume(
     .await;
     let mut conn = state.pool.acquire().await?;
     Ok(Json(anzeige(&mut conn, &state.adapter, &a, true).await?))
+}
+
+/// Erledigt die offene Störungsmeldung eines Adapters, wenn ein Admin eingegriffen hat und eine
+/// gemeldet war (LLH-2026): ohne Entwarnung, der Admin weiß es schon.
+async fn meldung_erledigen(state: &AppState, org_id: i64, id: &str, war_gemeldet: bool) {
+    if war_gemeldet {
+        crate::benachrichtigung::erledigen_adapter(&state.pool, &state.live, org_id, id).await;
+    }
 }
 
 /// GET /api/admin/adapter/{id}/versuche — die letzten Versuche, neueste zuerst.
