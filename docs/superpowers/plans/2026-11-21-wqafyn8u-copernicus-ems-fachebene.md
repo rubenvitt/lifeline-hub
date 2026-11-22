@@ -80,5 +80,5 @@ läuft per TDD: erst der rote Test, dann der Code.
 - [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Bündel einzeln; Rust in Portionen,
       weil der volle Testbau das Plattenkontingent der Cloud-Sitzung sprengt; Desktop-Hülle
       ohne gdk-3.0 im Container nicht baubar).
-- [ ] Bild der Änderung mit Live-Daten EMSR728.
-- [ ] PR gegen `alpha`.
+- [x] Bild der Änderung mit Live-Daten EMSR728.
+- [x] PR gegen `alpha`: https://github.com/rubenvitt/lifeline-hub/pull/1558
