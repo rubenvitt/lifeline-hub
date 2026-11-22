@@ -21,7 +21,9 @@ Herkunft: `openspec/changes/archive/2026-11-19-t39ltxxi-ios-huelle/design.md`, D
   Schreib-Queue des Frontends greifen dann wie im Browser ohne Netz.
 - Die Offline-Kennzeichnung kommt vom Frontend selbst (`offline/useOnline.ts`,
   `offline/verbindung.ts`); die Hülle fügt keine eigene hinzu.
-- Kommt der Server zurück, lädt die App ohne Zutun die Oberfläche vom Server neu.
+- Kommt der Server zurück, arbeitet die App ohne Zutun wieder mit ihm. Mit derselben Version
+  läuft die Oberfläche einfach weiter (offene Eingaben bleiben), mit einer anderen lädt die App
+  sie vom Server neu (Entscheidung Ruben, 22.11.2026).
 - Auch Seiten, die nie geöffnet wurden (`lazy()`-Chunks), funktionieren ohne Server.
 - Der Build ist zugleich der Spike: Ruben misst ihn auf dem Gerät (Flugmodus, Speicherdruck);
   das Ergebnis wird in der ADR festgehalten.
@@ -84,8 +86,12 @@ Spike ist; Asset-Liste als neues Feld in `/api/shell`; automatischer Test im Sim
 
 - Neues Feld `assets` in `ShellInfo`: Liste der Pfade relativ zur Wurzel (ohne führenden
   Schrägstrich), die die Oberfläche ohne Server braucht: alle Dateien unter `assets/` des
-  eingebetteten Bundles (`static_files.rs`, `Asset::iter()`), sortiert. Ohne eingebettetes
-  Frontend die leere Liste.
+  eingebetteten Bundles (`static_files.rs`, `Asset::iter()`), sortiert, **ohne
+  `assets/doku/`**. Die Liste folgt damit dem Precache des Service Workers
+  (`globIgnores` in `frontend/vite.config.ts`; die Doku-Bilder, heute rund 28 MB, lüde sonst
+  jedes Release vor, auch über Mobilfunk). `bibliotheken/libheif/` liegt nicht unter `assets/`
+  und bleibt ebenfalls draußen. Ohne eingebettetes Frontend die leere Liste. (Wahl des
+  Entwurfs.)
 - Weiter anonym und ohne Datenbank. Ältere Hüllen ignorieren das Feld
   (`ShellInfo` in `Vertrag.swift` dekodiert nur bekannte Felder), `SHELL_CONTRACT` bleibt 1.
 - Typ-Codegen und OpenAPI ziehen mit.
@@ -104,17 +110,32 @@ Spike ist; Asset-Liste als neues Feld in `/api/shell`; automatischer Test im Sim
   - Ohne gespeicherte Oberfläche, bei Zertifikatsfehler und bei „nicht verträglich“: wie bisher
     die Status-Seite.
   - Auf „ohne Server“ prüft die App alle `wiederholIntervall` (5 s) und bei Rückkehr in den
-    Vordergrund; ist der Server verträglich → Seite `web`, `markVerbunden`, Laden vom Server.
+    Vordergrund. Ist der Server verträglich → Seite `web` und `markVerbunden`. Neu geladen
+    wird **nur**, wenn die Version aus `/api/shell` von der Version der gespeicherten
+    Oberfläche abweicht; bei gleicher Version läuft die Oberfläche weiter, denn sie hat
+    dieselbe Origin, `/api` antwortet wieder und die Queue gleicht das Frontend selbst ab
+    (Entscheidung Ruben, 22.11.2026: offene Eingaben gehen nicht verloren). Nach einer
+    abweichenden Version lädt sie vom Server, damit kein altes Frontend mit einem neuen Server
+    spricht.
   - Ende des Web-Prozesses (Speicherdruck) und gescheiterte Navigation auf „ohne Server“ →
     gespeicherte Oberfläche erneut laden, nicht `reload()` (das ginge ans Netz).
-  - Startet die gespeicherte Oberfläche nicht (siehe Hülle), → Status-Seite „nicht erreichbar“
-    wie bisher; die Wiederholung läuft weiter.
+  - Startet die gespeicherte Oberfläche nicht (siehe Hülle) → Status-Seite „nicht erreichbar“
+    wie bisher; die Wiederholung läuft weiter, versucht die gespeicherte Oberfläche aber **in
+    diesem App-Lauf nicht noch einmal** (Markierung im Speicher, nicht in der Ablage). Sonst
+    wechselten alle 5 s Status-Seite und kaputte Oberfläche. Gelöscht wird nichts: ein
+    langsames Gerät soll die Fähigkeit nicht dauerhaft verlieren. (Wahl des Entwurfs.)
   - Wechsel des Servers, Entfernen des Servers: wie bisher; das Entfernen löscht auch die
     gespeicherte Oberfläche (`Serverentfernung`).
 - **Vorwärmen**: nach einem verträglichen Online-Laden, wenn sich die Server-Version gegenüber
   der gespeicherten Oberfläche geändert hat oder noch keine vorliegt. Reihenfolge: erst Assets
   vorwärmen, dann `index.html` speichern; so verweist eine gespeicherte Seite nie auf Assets,
-  die nicht im Cache sind. Scheitert das Vorwärmen, bleibt die alte gespeicherte Oberfläche.
+  die nicht im Cache sind.
+- **Andere Version online geladen → alte Oberfläche sofort ungültig**, noch vor dem
+  Vorwärmen. Die neue Version kann beim Online-Laden die IndexedDB-Schemata heben
+  (`lifeline-offline`, `lifeline-lagebild`); alter Code scheiterte daran beim nächsten Start
+  ohne Server (`VersionError`), Queue oder Lagebild gingen kaputt, und die Startprüfung merkte
+  es nicht. Scheitert das Vorwärmen danach, fehlt der Start ohne Server, bis es gelingt.
+  Sicherheit geht vor Verfügbarkeit. (Wahl des Entwurfs.)
 
 ### Hülle (`ios/App`)
 
@@ -140,8 +161,8 @@ Spike ist; Asset-Liste als neues Feld in `/api/shell`; automatischer Test im Sim
 - Simulator (`ios-pruefung.yml`): ein App-Test mit einem https-Testserver im Testprozess:
   Oberfläche mit einem Haupt- und einem nachgeladenen Chunk ausliefern, online laden und
   vorwärmen, Server anhalten, neuen Webview mit demselben Datenspeicher bauen und ohne Server
-  laden → Oberfläche läuft, auch der nie geladene Chunk; Server wieder starten → das Modell lädt
-  vom Server. Wie der Test dem selbst signierten Zertifikat traut, ohne dass die ausgelieferte
+  laden → Oberfläche läuft, auch der nie geladene Chunk; Server mit derselben Version wieder
+  starten → Seite `web` ohne Neuladen; mit anderer Version → Laden vom Server. Wie der Test dem selbst signierten Zertifikat traut, ohne dass die ausgelieferte
   App es tut, entscheidet der Bauende (nur im Test-Target oder hinter `#if DEBUG`).
 - Gerät (Ruben, TestFlight): Messprotokoll im Plan: Flugmodus-Kaltstart, Server weg und wieder
   da, Speicherdruck (viele Apps öffnen, dann zurück), Gerät neu gestartet, lange nicht geöffnet,
