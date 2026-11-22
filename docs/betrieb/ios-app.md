@@ -219,6 +219,15 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 - **Handstart** (auch zum Nachholen nach einer Störung bei Apple): Actions → „iOS-App
   (TestFlight)“ → „Run workflow“ mit dem Tag, etwa `v1.0.0-beta.3`. Andere Vorabkanäle (`-rc.1`)
   weist das Skript ab, ebenso Alpha-Tags von vor LLH-1988: der Lauf nutzt das Skript des Tags.
+- **Vorab-Build** (Handstart mit „stand“): baut einen Branch oder Commit statt des Tags, etwa
+  solange `alpha` rot ist und kein Release entsteht. Der Tag gibt dann nur Kanal und Gruppen vor
+  und muss zur Workspace-Version dieses Stands passen; „Was testen“ nennt den Stand statt der
+  Release-Notizen. Per Kommandozeile:
+  `gh workflow run ios.yml --ref <branch> -f tag=v1.0.0-alpha.195 -f stand=<branch>`.
+- **Xcode:** gebaut wird mit Xcode 26.6 auf dem Runner `macos-26` (`ios.yml`, `ios-pruefung.yml`).
+  App Store Connect nimmt seit dem 28.04.2026 nur Builds mit Xcode 26 und dem iOS-26-SDK an und
+  nie einen Build aus einer Beta von Xcode. Lokal hochladen geht deshalb nur mit einem
+  freigegebenen Xcode, nicht mit einer Beta.
 - Nach dem Upload verarbeitet Apple den Build (meist Minuten, selten länger); erst dann erscheint
   er in TestFlight. Externe Tester sehen ihn nach dem Beta-App-Review. Fehlen dafür die
   Testinformationen (siehe Übergaben), scheitert die Einreichung, und Apples Begründung steht im
