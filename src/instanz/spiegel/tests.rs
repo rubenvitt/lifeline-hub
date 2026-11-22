@@ -1744,3 +1744,214 @@ async fn nachlieferung_nutzt_das_frische_flag() {
         .collect();
     assert_eq!(rollen, ["\"mitarbeit\""]);
 }
+
+// ── Mitarbeit-Nachtrag an den Führer (LLH-2007) ─────────────────────────────────────────────
+
+/// Der Spiegel `s` hält Erika als `mitarbeit` gegen einen älteren Führer `f` fest (über
+/// `keep_mitarbeit`, wie nach einer Rückgabe), Max ist dort Führungspersonal. Beide Flags stehen
+/// danach auf 0. Liefert (Einsatz am Spiegel, Erika am Spiegel, Max am Spiegel, Erika am Führer).
+async fn mitarbeit_am_spiegel_festgehalten(f: &SqlitePool, s: &SqlitePool) -> (i64, i64, i64, i64) {
+    let (erika_elw, erika_hub) = gemeinsames_konto(f, s, "Erika").await;
+    let (max_elw, max_hub) = gemeinsames_konto(f, s, "Max").await;
+    exec(
+        f,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    let einsatz: i64 = eine(
+        f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        f,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika_elw}, 'mitarbeit'), ({einsatz}, {max_elw}, 'fuehrungspersonal')"
+        ),
+    )
+    .await;
+    while abgleichen(f, s, 500).await > 0 {}
+    // Der Führer ist (wieder) ein älterer Stand: er liefert Erika als Beobachter.
+    exec(
+        f,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 0",
+    )
+    .await;
+    exec(
+        f,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'beobachter' \
+             WHERE benutzer_id = {erika_elw}"
+        ),
+    )
+    .await;
+    while abgleichen(f, s, 500).await > 0 {}
+    assert_eq!(rolle(s, erika_hub).await, "mitarbeit", "festgehalten");
+    let spiegel: i64 = eine(s, "SELECT einsatz_id FROM einsatz_spiegel").await;
+    (spiegel, erika_hub, max_hub, erika_elw)
+}
+
+async fn nachtraege(pool: &SqlitePool) -> Vec<String> {
+    sqlx::query_scalar("SELECT schluessel FROM mitarbeit_nachtrag ORDER BY id")
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn wechsel_der_faehigkeit_merkt_festgehaltene_mitarbeit_vor() {
+    let (f, s) = zwei_seiten().await;
+    let (spiegel, erika, _, _) = mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let vorher: i64 = eine(&s, "SELECT COALESCE(MAX(stand), 0) FROM einsatz_aenderung").await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    drop(sc);
+    assert_eq!(nachtraege(&s).await, vec![format!("[{spiegel},{erika}]")]);
+    let grenze: Option<i64> = eine(
+        &s,
+        "SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1",
+    )
+    .await;
+    assert_eq!(grenze, Some(vorher));
+}
+
+#[tokio::test]
+async fn zweites_melden_merkt_nichts_neu_vor() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    let grenze: Option<i64> =
+        sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1")
+            .fetch_one(&mut *sc)
+            .await
+            .unwrap();
+    sqlx::query("DELETE FROM mitarbeit_nachtrag")
+        .execute(&mut *sc)
+        .await
+        .unwrap();
+    // Etwas ändert sich im Log, dann meldet das Gegenüber die Fähigkeit erneut.
+    sqlx::query("INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (1, 'x', 'y')")
+        .execute(&mut *sc)
+        .await
+        .unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    drop(sc);
+    assert!(nachtraege(&s).await.is_empty(), "nichts neu vorgemerkt");
+    let nachher: Option<i64> = eine(
+        &s,
+        "SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1",
+    )
+    .await;
+    assert_eq!(nachher, grenze, "Grenze unverändert");
+}
+
+#[tokio::test]
+async fn nur_aktive_spiegel_dieser_kopplung() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    exec(
+        &s,
+        "UPDATE einsatz_spiegel SET beendet_at = '2026-11-22 00:00:00'",
+    )
+    .await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    drop(sc);
+    assert!(nachtraege(&s).await.is_empty(), "beendeter Spiegel");
+
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let mut sc = s.acquire().await.unwrap();
+    super::nachtrag::queue_nachtraege(&mut sc, 1).await.unwrap();
+    let vorgemerkt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM mitarbeit_nachtrag")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(vorgemerkt, 1);
+    // Ohne die Fähigkeit des Gegenübers geht nichts hinaus.
+    assert!(super::nachtrag::list_offene(&mut sc, 1)
+        .await
+        .unwrap()
+        .is_empty());
+    sqlx::query("UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1")
+        .execute(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(
+        super::nachtrag::list_offene(&mut sc, 1)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    // Widerrufene Org: nichts mehr.
+    sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-22 00:00:00'")
+        .execute(&mut *sc)
+        .await
+        .unwrap();
+    assert!(super::nachtrag::list_offene(&mut sc, 1)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn offener_nachtrag_nennt_kennung_und_gegenstueck() {
+    let (f, s) = zwei_seiten().await;
+    let (spiegel, erika, _, erika_elw) = mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    let offen = super::nachtrag::list_offene(&mut sc, 1).await.unwrap();
+    drop(sc);
+    let kennung: String = eine(&s, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    let fuehrer_einsatz: i64 = eine(&f, "SELECT id FROM einsatz").await;
+    assert_eq!(offen.len(), 1);
+    assert_eq!(offen[0].kennung, kennung);
+    assert_eq!(offen[0].schluessel, format!("[{spiegel},{erika}]"));
+    assert_eq!(
+        offen[0].gegen.as_deref(),
+        Some(format!("[{fuehrer_einsatz},{erika_elw}]").as_str()),
+        "Schlüssel beim Führer aus der Herkunft"
+    );
+}
+
+#[tokio::test]
+async fn quittung_loescht_nur_eigene() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    let id: i64 = sqlx::query_scalar("SELECT id FROM mitarbeit_nachtrag")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    super::nachtrag::delete_quittiert(&mut sc, 2, &[id])
+        .await
+        .unwrap();
+    drop(sc);
+    assert_eq!(
+        nachtraege(&s).await.len(),
+        1,
+        "fremde Kopplung löscht nicht"
+    );
+    let mut sc = s.acquire().await.unwrap();
+    super::nachtrag::delete_quittiert(&mut sc, 1, &[id])
+        .await
+        .unwrap();
+    drop(sc);
+    assert!(nachtraege(&s).await.is_empty());
+}
