@@ -24,7 +24,7 @@ use crate::public_api::events::EventType;
 use crate::public_api::scope::ZugangZustand;
 use crate::public_api::webhook::lauf::testereignis;
 use crate::public_api::webhook::repo::{self, Eingabe, Versuch, Webhook};
-use crate::public_api::webhook::ziel::{self, host_von, HttpZusteller};
+use crate::public_api::webhook::ziel::{self, host_von, normalize_pin, HttpZusteller};
 use crate::public_api::webhook::{ruht_grund, RuhtGrund, WebhookFehler, WebhookZustand, URL_MAX};
 use crate::public_api::zugang::{self, Zugang};
 use crate::routes::anbindungen::gesperrt_grund;
@@ -51,6 +51,10 @@ pub struct WebhookAnzeige {
     pub host: String,
     pub arten: Vec<EventType>,
     pub lan_erlaubt: bool,
+    /// Fingerabdruck des Zielzertifikats (SHA-256, Hex); gesetzt zählt nur dieses Zertifikat
+    /// (LLH-1872). Nicht geheim: sieht jeder, der die Anbindung sieht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zertifikat_pin: Option<String>,
     pub zustand: WebhookZustand,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ruht_grund: Option<RuhtGrund>,
@@ -102,6 +106,7 @@ impl WebhookAnzeige {
             host: host_von(&w.url).unwrap_or_default(),
             arten: w.arten(),
             lan_erlaubt: w.lan_erlaubt,
+            zertifikat_pin: w.zertifikat_pin.clone(),
             zustand,
             ruht_grund: ruht,
             fehler_seit: w.fehler_seit.clone(),
@@ -178,6 +183,9 @@ pub struct WebhookEingabe {
     pub arten: Vec<String>,
     #[serde(default)]
     pub lan_erlaubt: bool,
+    /// Fingerabdruck des Zielzertifikats, mit oder ohne Doppelpunkte; leer oder fehlend = keiner.
+    #[serde(default)]
+    pub zertifikat_pin: Option<String>,
 }
 
 /// Änderung; nur die gesendeten Felder.
@@ -189,6 +197,14 @@ pub struct WebhookAenderung {
     pub arten: Option<Vec<String>>,
     #[serde(default)]
     pub lan_erlaubt: Option<bool>,
+    /// Tri-State: fehlt = unverändert, `null` (oder leer) = entfernen, Text = setzen. Ändert die
+    /// Änderung den Host eines Webhooks mit Fingerabdruck, ist das Feld Pflicht (LLH-1872).
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub zertifikat_pin: Option<Option<String>>,
     /// Optimistisches Lock: `geaendert_at` beim Öffnen. Weicht er ab → 409; fehlt er („Meine
     /// Änderung übernehmen“ nach der Rückfrage), wird ohne Vergleich geschrieben.
     #[serde(default)]
@@ -202,6 +218,19 @@ fn check_url(roh: &str, lan_erlaubt: bool) -> Result<String, AppError> {
         .map_err(|f| AppError::Validation(format!("url: {}", f.text())))?;
     Ok(url)
 }
+
+/// Fingerabdruck: normalisiert oder `None` (400 bei falscher Form).
+fn check_pin(roh: Option<&str>) -> Result<Option<String>, AppError> {
+    match roh {
+        None => Ok(None),
+        Some(roh) => normalize_pin(roh)
+            .map_err(|f| AppError::Validation(format!("zertifikat_pin: {}", f.text()))),
+    }
+}
+
+/// Text des 400, wenn ein neuer Host ohne Angabe zum Fingerabdruck kommt (LLH-1872, D1).
+const NEUES_ZIEL_OHNE_PIN: &str =
+    "zertifikat_pin: Neues Ziel: Fingerabdruck neu holen oder entfernen.";
 
 /// Mindestens eine bekannte Art, ohne Dopplung (400).
 fn check_arten(roh: &[String]) -> Result<Vec<EventType>, AppError> {
@@ -249,6 +278,19 @@ async fn spur(
     url: &str,
     peer_ip: Option<std::net::IpAddr>,
 ) {
+    spur_mit_pin(state, admin, aktion, zugang, url, (None, None), peer_ip).await;
+}
+
+/// Wie [`spur`], mit Fingerabdruck nachher und vorher (LLH-1872).
+async fn spur_mit_pin(
+    state: &AppState,
+    admin: &Benutzer,
+    aktion: AdminAktion,
+    zugang: &Zugang,
+    url: &str,
+    (fingerabdruck, fingerabdruck_vorher): (Option<String>, Option<String>),
+    peer_ip: Option<std::net::IpAddr>,
+) {
     admin_audit::schreibe(
         &state.pool,
         AdminEintrag {
@@ -258,10 +300,39 @@ async fn spur(
             angaben: Some(ZugangsAngaben {
                 zugang_id: Some(zugang.id.clone()),
                 host: host_von(url),
+                fingerabdruck,
+                fingerabdruck_vorher,
                 ..Default::default()
             }),
             peer_ip,
         },
+    )
+    .await;
+}
+
+/// Spur eines geänderten Fingerabdrucks: gesetzt/gewechselt oder entfernt; unverändert nichts.
+async fn spur_pin_wechsel(
+    state: &AppState,
+    admin: &Benutzer,
+    zugang: &Zugang,
+    url: &str,
+    vorher: Option<&String>,
+    nachher: Option<&String>,
+    peer_ip: Option<std::net::IpAddr>,
+) {
+    let aktion = match (vorher, nachher) {
+        (v, n) if v == n => return,
+        (_, Some(_)) => AdminAktion::MaschinenzugangWebhookPinGesetzt,
+        (_, None) => AdminAktion::MaschinenzugangWebhookPinEntfernt,
+    };
+    spur_mit_pin(
+        state,
+        admin,
+        aktion,
+        zugang,
+        url,
+        (nachher.cloned(), vorher.cloned()),
+        peer_ip,
     )
     .await;
 }
@@ -280,7 +351,7 @@ pub async fn create(
         url: check_url(&body.url, body.lan_erlaubt)?,
         arten: check_arten(&body.arten)?,
         lan_erlaubt: body.lan_erlaubt,
-        zertifikat_pin: None,
+        zertifikat_pin: check_pin(body.zertifikat_pin.as_deref())?,
     };
     let org_id = admin.org_id;
     let (z, w) = crate::write_retry!(&state.pool, |conn| {
@@ -308,6 +379,16 @@ pub async fn create(
         )
         .await;
     }
+    spur_pin_wechsel(
+        &state,
+        &admin,
+        &z,
+        &w.url,
+        None,
+        w.zertifikat_pin.as_ref(),
+        peer_ip,
+    )
+    .await;
     Ok((
         StatusCode::CREATED,
         Json(WebhookAnzeige::aus(&w, &z, &jetzt, true)),
@@ -326,6 +407,11 @@ pub async fn update(
 ) -> Result<Json<WebhookAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let arten = body.arten.as_deref().map(check_arten).transpose()?;
+    let pin_neu = body
+        .zertifikat_pin
+        .as_ref()
+        .map(|p| check_pin(p.as_deref()))
+        .transpose()?;
     let org_id = admin.org_id;
     let (z, vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
         let z = zugang_fuer_schreiben(&mut *conn, org_id, &id).await?;
@@ -336,11 +422,20 @@ pub async fn update(
         // Auch ein unverändertes Ziel wird mit der neuen Ausnahme geprüft: ohne sie darf ein
         // LAN-Ziel nicht stehen bleiben.
         let url = check_url(body.url.as_deref().unwrap_or(&vorher.url), lan_erlaubt)?;
+        // Ein Fingerabdruck gilt einem Server: ein neuer Host verlangt eine Angabe dazu.
+        if pin_neu.is_none()
+            && vorher.zertifikat_pin.is_some()
+            && host_von(&url) != host_von(&vorher.url)
+        {
+            return Err(AppError::Validation(NEUES_ZIEL_OHNE_PIN.into()));
+        }
         let eingabe = Eingabe {
             url,
             arten: arten.clone().unwrap_or_else(|| vorher.arten()),
             lan_erlaubt,
-            zertifikat_pin: vorher.zertifikat_pin.clone(),
+            zertifikat_pin: pin_neu
+                .clone()
+                .unwrap_or_else(|| vorher.zertifikat_pin.clone()),
         };
         let (vorher, nachher) = repo::update(
             &mut *conn,
@@ -372,6 +467,16 @@ pub async fn update(
         };
         spur(&state, &admin, aktion, &z, &nachher.url, peer_ip).await;
     }
+    spur_pin_wechsel(
+        &state,
+        &admin,
+        &z,
+        &nachher.url,
+        vorher.zertifikat_pin.as_ref(),
+        nachher.zertifikat_pin.as_ref(),
+        peer_ip,
+    )
+    .await;
     Ok(Json(WebhookAnzeige::aus(&nachher, &z, &jetzt, true)))
 }
 
@@ -457,6 +562,63 @@ pub async fn test(
         status: e.status.map(i64::from),
         fehler_art: e.fehler,
         dauer_ms: e.dauer_ms,
+    }))
+}
+
+/// Eingabe des Abrufs: das Ziel, wie es gerade im Formular steht.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct WebhookZertifikatAbruf {
+    pub url: String,
+    #[serde(default)]
+    pub lan_erlaubt: bool,
+}
+
+/// Ergebnis des Abrufs: der Fingerabdruck, den das Ziel zeigt, oder warum keiner kam.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct WebhookZertifikat {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerabdruck: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fehler_art: Option<WebhookFehler>,
+}
+
+/// POST /api/admin/anbindungen/{id}/webhook/zertifikat-abrufen — liest den Fingerabdruck des
+/// Zertifikats, das ein Ziel zeigt (LLH-1872, D4). Es geht nie eine HTTP-Anfrage hinaus; die URL
+/// besteht vorher den Zielschutz (400). Gespeichert wird nichts; ein Webhook muss noch nicht
+/// existieren. Admin-Spur `maschinenzugang_webhook_zertifikat_abgerufen`, weil der Abruf jedes
+/// Ziel samt LAN-Ausnahme aus dem Body nimmt.
+pub async fn zertifikat_abrufen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<String>,
+    JsonBody(body): JsonBody<WebhookZertifikatAbruf>,
+) -> Result<Json<WebhookZertifikat>, AppError> {
+    let url = check_url(&body.url, body.lan_erlaubt)?;
+    let z = {
+        let mut conn = state.pool.acquire().await?;
+        zugang_fuer_schreiben(&mut conn, admin.org_id, &id).await?
+    };
+    let ergebnis = ziel::hole_fingerabdruck(&url, body.lan_erlaubt).await;
+    spur_mit_pin(
+        &state,
+        &admin,
+        AdminAktion::MaschinenzugangWebhookZertifikatAbgerufen,
+        &z,
+        &url,
+        (ergebnis.clone().ok(), None),
+        peer_ip,
+    )
+    .await;
+    Ok(Json(match ergebnis {
+        Ok(fp) => WebhookZertifikat {
+            fingerabdruck: Some(fp),
+            fehler_art: None,
+        },
+        Err(art) => WebhookZertifikat {
+            fingerabdruck: None,
+            fehler_art: Some(art),
+        },
     }))
 }
 

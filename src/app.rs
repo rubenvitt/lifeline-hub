@@ -2015,6 +2015,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::anbindungen_webhook::test),
         )
         .route(
+            "/api/admin/anbindungen/{id}/webhook/zertifikat-abrufen",
+            post(routes::anbindungen_webhook::zertifikat_abrufen),
+        )
+        .route(
             "/api/admin/anbindungen/{id}/webhook/versuche",
             get(routes::anbindungen_webhook::versuche),
         )
