@@ -55,8 +55,8 @@ fun Statusseite.text(servername: String?, appVersion: String?): Statustext {
             schritte = listOf(
                 "CA-Zertifikat auf das Gerät laden.",
                 "Unter Einstellungen → Sicherheit → Weitere Sicherheitseinstellungen → Zertifikat " +
-                    "installieren → CA-Zertifikat das Zertifikat auswählen (der Menüpfad heißt je " +
-                    "nach Hersteller etwas anders).",
+                    "installieren → CA-Zertifikat die Datei des Zertifikats auswählen (der " +
+                    "Menüpfad heißt je nach Hersteller etwas anders).",
                 "Zurück in die App wechseln oder „Erneut prüfen“ tippen.",
             ),
         )
