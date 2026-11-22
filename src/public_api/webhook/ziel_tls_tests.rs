@@ -31,7 +31,7 @@ fn normalize_pin_nimmt_schreibweisen_an() {
 #[tokio::test]
 async fn pin_passt_nicht_ist_tls() {
     let (adresse, _, zaehler) = gegenstelle_mit_zaehler().await;
-    let e = reqwest::Client::builder()
+    let e = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Webhook)
         .tls_backend_preconfigured(tls_config(Some(PIN.to_string())).unwrap())
         .build()
         .unwrap()

@@ -125,7 +125,7 @@ pub(crate) async fn gegenstelle_mit_zaehler() -> (
 }
 
 fn client_mit(config: rustls::ClientConfig) -> reqwest::Client {
-    reqwest::Client::builder()
+    crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
         .tls_backend_preconfigured(config)
         .build()
         .unwrap()
