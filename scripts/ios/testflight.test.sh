@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/ios/testflight.sh (LLH-1978, Spec `ios-auslieferung`, „TestFlight erhält
-# Beta- und stabile Stände“).
+# Selbsttest für scripts/ios/testflight.sh (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0078).
 #
-# Ein Fehler fiele erst an einem echten Release auf: ein Alpha-Build in TestFlight, ein Build mit
+# Ein Fehler fiele erst an einem echten Release auf: ein fremder Vorabkanal in TestFlight, ein Build mit
 # einer anderen Version als der Tag, ein API-Schlüssel, der im Log steht oder auf dem Runner liegen
 # bleibt, oder ExportOptions, die nur exportieren statt hochzuladen. Gefahren in einer
 # Wegwerf-Wurzel mit Attrappen für `xcodebuild` und `xcodegen`, ohne Netz und ohne macOS. Ob Apple
@@ -70,7 +69,7 @@ laufe() { # <wurzel> [<arg>…] → Exit-Code; Ausgabe in $ARBEIT/log, Attrappen
   : > "$ARBEIT/aufrufe"
   local rc=0
   PATH="$ARBEIT/bin:$PATH" ATTRAPPEN_LOG="$ARBEIT/aufrufe" ERWARTETER_SCHLUESSEL="$GEHEIM" \
-    IOS_BUILD_NUMMER=202611181200 \
+    IOS_BUILD_NUMMER=202611181200 GITHUB_OUTPUT="${AUSGABE_DATEI-}" \
     APP_STORE_CONNECT_KEY_ID="${KEY_ID-ABC123XYZ9}" \
     APP_STORE_CONNECT_ISSUER_ID="${ISSUER_ID-11111111-2222-3333-4444-555555555555}" \
     APP_STORE_CONNECT_KEY_P8="${KEY_P8-$GEHEIM}" \
@@ -128,17 +127,29 @@ w="$(wurzel_mit 1.2.0)"
 pruefe "stabil: Exit 0" 0 "$(laufe "$w" --tag v1.2.0 --ausgabe "$w/aus")"
 pruefe "stabil: hochgeladen" 1 "$(aufrufe_mit '^xcodebuild -exportArchive')"
 
-echo "==> ios/testflight.sh: abgewiesen"
+echo "==> ios/testflight.sh: Alpha-Tag (LLH-1988, ADR-0078)"
 w="$(wurzel_mit 1.0.0-alpha.200)"
-rc="$(laufe "$w" --tag v1.0.0-alpha.200 --ausgabe "$w/aus")"
-pruefe "Alpha: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
-pruefe "Alpha: kein xcodebuild" 0 "$(aufrufe_mit '^xcodebuild')"
-pruefe "Alpha: Meldung nennt die Kanäle" ja "$(ja_nein grep -q 'beta' "$ARBEIT/log")"
+pruefe "Alpha: Exit 0" 0 "$(laufe "$w" --tag v1.0.0-alpha.200 --ausgabe "$w/aus")"
+pruefe "Alpha: hochgeladen" 1 "$(aufrufe_mit '^xcodebuild -exportArchive')"
+pruefe "Alpha: Marketing-Version ohne Suffix" "MARKETING_VERSION = 1.0.0" \
+  "$(grep '^MARKETING_VERSION' "$w/ios/App/Version.xcconfig")"
+
+echo "==> ios/testflight.sh: Build-Nummer für den Verteilschritt"
+w="$(wurzel_mit 1.0.0-beta.3)"
+ausgabe="$ARBEIT/github-output"
+: > "$ausgabe"
+pruefe "Ausgabe: Exit 0" 0 "$(AUSGABE_DATEI="$ausgabe" laufe "$w" --tag v1.0.0-beta.3 --ausgabe "$w/aus")"
+pruefe "Ausgabe: build= mit der Nummer aus version.sh" "build=202611181200" "$(cat "$ausgabe")"
+w="$(wurzel_mit 1.0.0-beta.3)"
+pruefe "ohne GITHUB_OUTPUT: Exit 0" 0 "$(laufe "$w" --tag v1.0.0-beta.3 --ausgabe "$w/aus")"
+
+echo "==> ios/testflight.sh: abgewiesen"
 
 w="$(wurzel_mit 1.0.0-rc.1)"
 rc="$(laufe "$w" --tag v1.0.0-rc.1 --ausgabe "$w/aus")"
 pruefe "anderer Vorabkanal: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
 pruefe "anderer Vorabkanal: kein xcodebuild" 0 "$(aufrufe_mit '^xcodebuild')"
+pruefe "anderer Vorabkanal: Meldung nennt die Kanäle" ja "$(ja_nein grep -q 'alpha.*beta' "$ARBEIT/log")"
 
 rc="$(laufe "$w" --tag 'v1.0.0;id' --ausgabe "$w/aus")"
 pruefe "kein Release-Tag: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
