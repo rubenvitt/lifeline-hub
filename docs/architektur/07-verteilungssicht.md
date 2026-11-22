@@ -181,7 +181,7 @@ flowchart LR
   F -->|alpha| DEP["deployment.yml<br/>→ Pull-Agent am Server"]
   F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
   F -->|beta, stabil| IOSJ["ios → ios.yml<br/>→ TestFlight"]
-  F -->|"alpha, beta, stabil"| ANDJ["android → android.yml<br/>→ APK, android-alpha/-beta"]
+  F -->|"alpha, beta, stabil"| ANDJ["android → android.yml<br/>→ APK, android-alpha/-beta/-stabil"]
 ```
 
 Jeder Workflow hört entweder auf einen PR oder auf einen Push, damit ein PR keine Jobs der
@@ -217,10 +217,11 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
   automatisch über einen App-Store-Connect-API-Schlüssel ([`ios-app.md`](../betrieb/ios-app.md)).
 - Die Android-App baut nach der Freigabe jedes Tags der Kanäle `alpha`, `beta` und `main` eine
   signierte APK (Job `android` in `artefakte.yml`, `android.yml`, `scripts/android/release-apk.sh`)
-  und hängt sie ans Release; ein roter Bau hält das Release nicht auf. Das Manifest `android.json`
-  und eine APK unter festem Namen liegen für stabile Tags am Release (`releases/latest/download/`),
-  für Alpha und Beta in den Kanal-Releases `android-alpha` und `android-beta`, nur vorwärts
-  (`scripts/release/android-kanal.mjs`). Signiert wird mit einem Schlüssel für immer aus den
+  und hängt sie ans Release, ohne je eine schon abgelegte zu überschreiben
+  (`scripts/android/apk-ablegen.sh`); ein roter Bau hält das Release nicht auf. Das Manifest
+  `android.json` und eine APK unter festem Namen liegen in den Kanal-Releases `android-alpha`,
+  `android-beta` und `android-stabil`, nur vorwärts (`scripts/release/android-kanal.mjs`); auch
+  stabil nicht unter `releases/latest/download/`, das bis zum fertigen Bau leer wäre. Signiert wird mit einem Schlüssel für immer aus den
   Geheimnissen `ANDROID_KEY*` ([`android-app.md`](../betrieb/android-app.md)).
 - Beta (LLH-1545, [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md)):
   `kanal-nachziehen.yml` bringt einen veröffentlichten Alpha-Tag nach `beta`

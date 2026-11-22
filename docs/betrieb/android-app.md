@@ -20,11 +20,21 @@ Handys und Tablets ab **Android 10**, hoch und quer. Paketname: `dev.rubeen.life
 |---|---|---|
 | Alpha | `https://github.com/rubenvitt/lifeline-hub/releases/download/android-alpha/lifeline-hub-android.apk` | letzte Alpha |
 | Beta | `https://github.com/rubenvitt/lifeline-hub/releases/download/android-beta/lifeline-hub-android.apk` | letzte Beta |
-| Stabil | `https://github.com/rubenvitt/lifeline-hub/releases/latest/download/lifeline-hub-android.apk` | letztes stabiles Release (erst ab dem ersten stabilen Release) |
+| Stabil | `https://github.com/rubenvitt/lifeline-hub/releases/download/android-stabil/lifeline-hub-android.apk` | letztes stabiles Release (erst ab dem ersten stabilen Release) |
 
 Ein QR-Code an der Wand enthält genau diesen Link und führt damit immer zur aktuellen Fassung des
-Kanals. Jede Version liegt zusätzlich am versionierten Release als
-`lifeline-hub-android-<version>.apk` mit `.sha256`.
+Kanals. Jeder Kanal ist ein eigenes Release (`android-alpha`, `android-beta`, `android-stabil`),
+auch der stabile: `releases/latest/download/` zeigt nach jeder Freigabe sofort auf das neue
+Release, dessen APK erst danach gebaut wird, und wäre bis dahin (bei rotem Bau bis zum Nachbau)
+leer. Der Kanal behält stattdessen den letzten Stand. Jede Version liegt zusätzlich am
+versionierten Release als `lifeline-hub-android-<version>.apk` mit `.sha256`.
+
+**Alpha nach einem stabilen Release:** `alpha` zählt nach einem stabilen Release als Alpha
+desselben Kerns weiter (nach `1.0.0` etwa `1.0.0-alpha.201`, ADR-0019). Diese Alphas sind nach
+SemVer älter als `1.0.0`; Manifest und feste APK im Alpha-Kanal bleiben deshalb auf `1.0.0` bzw.
+der letzten Alpha davor stehen, und **Alpha-Apps bekommen keine Alpha mehr, bis die erste Alpha
+eines höheren Kerns kommt** (`1.1.0-alpha.1`). Die Desktop-Hülle verhält sich genauso
+(`scripts/release/desktop-kanal.mjs`).
 
 **Der Kanal steht mit der ersten Installation fest.** Beim ersten Start leitet die App ihn aus
 ihrer Version ab (`-alpha.` → Alpha, `-beta.` → Beta, ohne Suffix → Stabil) und behält ihn für
@@ -180,8 +190,9 @@ Die App aktualisiert sich selbst, ohne Google Play und ohne MDM
 `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Update.kt`):
 
 - **Prüfen:** beim Start, bei der Rückkehr in den Vordergrund und im Hintergrund, höchstens alle
-  4 Stunden, liest sie `android.json` ihres Kanals (Alpha und Beta im Release `android-alpha` bzw.
-  `android-beta`, Stabil unter `releases/latest/download/`). „Jetzt prüfen“ in den Einstellungen
+  4 Stunden, liest sie `android.json` ihres Kanals (im Release `android-alpha`, `android-beta`
+  bzw. `android-stabil`). Gibt es dort noch keins (etwa vor dem ersten stabilen Release), ist das
+  „kein Update“, kein Fehler (`Updateentscheidung.isKanalLeer`). „Jetzt prüfen“ in den Einstellungen
   prüft sofort. Neuer ist ein Stand nur, wenn die Version nach SemVer **und** `version_code` größer
   sind.
 - **Laden:** im Hintergrund, nur von `github.com` und GitHubs Download-Hosts, mit Prüfung der
@@ -214,10 +225,22 @@ Die App aktualisiert sich selbst, ohne Google Play und ohne MDM
   `scripts/android/release-apk.sh` eine signierte APK und hängt sie ans Release. Der Job hält
   nichts auf: scheitert er, ist das Release trotzdem veröffentlicht, es fehlt nur die APK.
 - Manifest und feste APK der Kanäle schreibt `scripts/release/android-kanal.mjs` fort: jeder
-  Vorabkanal nur mit seinen eigenen Tags, stabile Tags schreiben das Manifest beider fort, alles
-  nur vorwärts. Die feste APK eines Vorabkanals ersetzen nur Tags dieses Kanals.
-- **Handstart** (etwa nach dem Anlegen der Geheimnisse oder einer Störung): Actions →
+  Vorabkanal nur mit seinen eigenen Tags, stabile Tags schreiben das Manifest aller drei fort,
+  alles nur vorwärts. Die feste APK eines Kanals ersetzen nur Tags dieses Kanals (im stabilen
+  Kanal also nur stabile Releases). Ein Tag außerhalb der drei Kanäle (etwa `-rc.1`) bekommt keine
+  APK; der Lauf überspringt ihn mit Hinweis.
+- **Die versionierte APK wird nie überschrieben** (`scripts/android/apk-ablegen.sh`): ein zweiter
+  Bau desselben Tags trägt eine andere Bauminute als `versionCode` und damit eine andere
+  `sha256`, die Kanäle nennen aber die alte. Liegt die APK schon am Release, lädt der Lauf nichts
+  hoch und schreibt keinen Kanal fort (Hinweis im Lauf); nur derselbe Bau („Re-run failed jobs“
+  innerhalb der 7 Tage, die die Artefakte leben) darf die Kanäle noch fortschreiben. Ist eine
+  APK am Release kaputt: sie samt `.sha256` am Release von Hand löschen, dann Handstart.
+- **Handstart** (etwa nach dem Anlegen der Geheimnisse oder einem roten Bau): Actions →
   „Android-App (APK)“ → „Run workflow“ mit dem Tag, etwa `v1.0.0-alpha.196`.
+- **Übersprungener Kanal-Stand:** GitHub hält je Kanal nur einen wartenden Job; kommt ein dritter
+  dazu, bricht es den wartenden ab (Kopf von `.github/workflows/android.yml`). Der Kanal bleibt
+  dann bis zum nächsten Release seines Kanals auf dem vorigen Stand; „Re-run failed jobs“ am Lauf
+  mit dem abgebrochenen Job holt ihn nach.
 - Die Prüfung an PRs (`android-pruefung.yml`) baut die App ohne Signatur, fährt die
   Robolectric-Tests und lädt die Bilder jeder nativen Seite als Artefakt `android-bilder` hoch
   ([`scripts/AGENTS.md`](../../scripts/AGENTS.md), „Android-Prüfung“).

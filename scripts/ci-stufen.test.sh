@@ -350,6 +350,20 @@ pruefe "android.yml: feste APK nach android-kanal.mjs, nur vorwärts (gegen den 
   enthaelt "$k" 'android-kanal.mjs --apk-ersetzen "$KANAL" --neu neu/android.json --alt alt/android.json'
 pruefe "android.yml: Manifest im Kanal nach android-kanal.mjs" enthaelt "$k" "android-kanal.mjs --kanal"
 pruefe "android.yml: Kanal-Release nie latest" enthaelt "$k" "--prerelease --latest=false"
+# Ein zweiter Bau desselben Tags überschreibt die versionierte APK nie (andere sha256 als in den
+# Kanälen); liegt sie schon da, schreibt der Lauf auch die Kanäle nicht fort.
+a="$(job "$ANDROIDREL" ablegen)"
+pruefe "android.yml: APK über apk-ablegen.sh" enthaelt "$a" "./scripts/android/apk-ablegen.sh --tag"
+pruefe "android.yml: ablegen überschreibt nichts" fehlt "$(grep -Ev '^[[:space:]]*#' <<< "$a")" "--clobber"
+pruefe "android.yml: Kanäle nur, wenn abgelegt" enthaelt "$a" 'ABGELEGT: ${{ steps.apk.outputs.abgelegt }}'
+pruefe "android.yml: ohne Ablage keine Kanäle" enthaelt "$a" 'if [ "$ABGELEGT" != ja ]; then'
+# Stabil hat ein eigenes Kanal-Release; `releases/latest/download/` stünde nach der Freigabe bis
+# zum fertigen Bau leer.
+pruefe "android.yml: kein Manifest unter latest" fehlt "$(code_ohne_kommentar "$ANDROIDREL")" "latest/download"
+pruefe "android.yml: Kanal-Release android-stabil" enthaelt "$k" 'android-stabil) titel="Stabil"'
+# Ein Tag außerhalb der drei Kanäle (`-rc.1`) wird übersprungen, nicht rot.
+pruefe "android.yml: fremde Vorabtags übersprungen" enthaelt "$(job "$ANDROIDREL" bauen)" 'echo "bauen=nein" >> "$GITHUB_OUTPUT"'
+pruefe "android.yml: ablegen nur nach einem Bau" enthaelt "$a" "if: \${{ needs.bauen.outputs.bauen == 'ja' }}"
 pruefe "artefakte.yml: Job android ruft android.yml" enthaelt "$(job "$ART" android)" "uses: ./.github/workflows/android.yml"
 pruefe "artefakte.yml: android erbt die Secrets" enthaelt "$(job "$ART" android)" "secrets: inherit"
 pruefe "artefakte.yml: android nach freigeben" enthaelt "$(job "$ART" android)" "needs: [vorbereiten, freigeben]"
