@@ -32,28 +32,28 @@
 - Modify: `frontend/src/erinnerung/erinnerungZustand.ts`, `erinnerungZustand.test.ts`
 - Modify: `frontend/src/pages/ErinnerungenPage.tsx`, `ErinnerungenPage.test.tsx`
 
-- [ ] Test: `ERINNERUNG_GRUPPE_LABEL.ueberfaellig === 'Fällig'`, die übrigen Schlüssel gleich `GRUPPE_LABEL`; rot.
-- [ ] `ERINNERUNG_GRUPPE_LABEL` anlegen; grün.
-- [ ] Seitentest: die fällige Erinnerung steht unter „Fällig (1)“, „Überfällig“ fehlt; rot.
-- [ ] Seite liest `ERINNERUNG_GRUPPE_LABEL`; grün.
+- [x] Test: `ERINNERUNG_GRUPPE_LABEL.ueberfaellig === 'Fällig'`, die übrigen Schlüssel gleich `GRUPPE_LABEL`; rot.
+- [x] `ERINNERUNG_GRUPPE_LABEL` anlegen; grün.
+- [x] Seitentest: die fällige Erinnerung steht unter „Fällig (1)“, „Überfällig“ fehlt; rot.
+- [x] Seite liest `ERINNERUNG_GRUPPE_LABEL`; grün.
 
 ### Task 2: Karte in Achtung
 
 **Files:**
 - Modify: `frontend/src/erinnerung/ErinnerungKarte.tsx`, `ErinnerungKarte.test.tsx`
 
-- [ ] Test umdrehen: fällig und angesprungen → `data-hervorgehoben`, kein `data-alarm`. Neu: fällig → Chip `data-ton="achtung"` mit „fällig“, kein `data-alarm`, Fälligkeitszeile in `achtungText`; rot.
-- [ ] Karte ohne `alarm`, Chip aus `ERINNERUNG_FAELLIG`, Zeile in `rollen.achtungText`; grün.
+- [x] Test umdrehen: fällig und angesprungen → `data-hervorgehoben`, kein `data-alarm`. Neu: fällig → Chip `data-ton="achtung"` mit „fällig“, kein `data-alarm`, Fälligkeitszeile in `achtungText`; rot.
+- [x] Karte ohne `alarm`, Chip aus `ERINNERUNG_FAELLIG`, Zeile in `rollen.achtungText`; grün.
 
 ### Task 3: Regel und Doku
 
 **Files:**
 - Modify: `frontend/AGENTS.md` („Linker Kartenrand“), `docs/anwender/kapitel/erinnerungen.md`
 
-- [ ] Regelsatz in `frontend/AGENTS.md`; Prettier.
-- [ ] Doku: Gruppen „Fällig“, „Heute fällig“, „Später“; Karte trägt „fällig“ in Gelb; Bildregeln aus `docs/anwender/AGENTS.md` geprüft.
+- [x] Regelsatz in `frontend/AGENTS.md`; Prettier.
+- [x] Doku: Gruppen „Fällig“, „Heute fällig“, „Später“; Karte trägt „fällig“ in Gelb; Bildregeln aus `docs/anwender/AGENTS.md` geprüft.
 
 ### Task 4: Verifikation
 
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] Bilder vorher/nachher für den PR.
+- [x] Bilder vorher/nachher für den PR.
