@@ -1,12 +1,23 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { Erinnerung } from '../api/types';
+import { GRUPPE_LABEL, type FaelligGruppe } from '../kommunikation/gruppierung';
 
 dayjs.extend(utc);
 
 /** Wort und Ton einer fälligen Erinnerung — die „Nächsten Marken“ lesen sie, wenn ihre Zeit
  *  verstrichen ist ({@link erinnerungZustand}). */
 export const ERINNERUNG_FAELLIG = { wort: 'fällig', ton: 'achtung' } as const;
+
+/**
+ * Gruppen der Seite Erinnerungen (LLH-1911): wie bei den übrigen Kommunikations-Modulen, nur die
+ * erste heißt „Fällig“ statt „Überfällig“. Eine Erinnerung ist ein Wecker, keine Frist — sie ist
+ * nie „überfällig“ (`frontend/AGENTS.md`, „Linker Kartenrand“).
+ */
+export const ERINNERUNG_GRUPPE_LABEL: Record<FaelligGruppe, string> = {
+  ...GRUPPE_LABEL,
+  ueberfaellig: 'Fällig',
+};
 
 /**
  * Zustand einer offenen Erinnerung im Überblick (LLH-1749, Spec `ueberblick-offene-vorgaenge`):
