@@ -640,7 +640,9 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
-    expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
+    // Das Aufklappen kommt aus `onFinishFailed`; die Meldung am Feld zeigt antd für sich an und
+    // kann einen Takt später stehen (LLH-1903).
+    expect(await screen.findByText('Frist mindestens 1 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 
