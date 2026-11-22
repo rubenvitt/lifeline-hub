@@ -21,9 +21,7 @@
 # `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
 # nicht.
 #
-# EIGENER SERVER (LLH-1666, LLH-2014, ADR-0075, ADR-0076): Rust-Suite und die e2e-Jobs laufen bei
-# diesem Push auf dem eigenen Server, wenn die Repo-Variable `E2E_RUNNER` ein
-# Runner-Label nennt. Die Wahl steht im Job `runner` von `suiten.yml` (Kopf dort).
+# NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`; der eigene Server ist zurückgebaut.
 #
 # Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
@@ -100,13 +98,11 @@ jobs:
         with:
           # shared-key statt key: sonst hängt rust-cache die Job-ID an, jeder Job hätte einen
           # eigenen mehrere GB großen Eintrag (GitHub deckelt bei 10 GB je Repository).
-          # Den Eintrag pflegt die Rust-Suite, solange sie gehostet läuft. Läuft sie auf dem eigenen
-          # Server (Push mit `E2E_RUNNER`, LLH-2014), speichert ihn dieser Job, damit PR-Läufe warm
-          # bleiben. Im PR ist die Bedingung immer falsch; der Text ist in pr.yml wortgleich.
+          # `save-if: false` überall außer im Rust-Job: EINER pflegt den Eintrag.
           shared-key: rust-openssl-vendored
-          save-if: ${{ github.event_name == 'push' && vars.E2E_RUNNER != '' }}
+          save-if: false
           cache-on-failure: true
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true

@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 21.11.2026 (Geheimnisspeicher und Abrufe der Adapter, LLH-2017; schwere Suiten bei Push auf dem eigenen Server, LLH-2014; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 22.11.2026 (CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App oder iOS-App darauf zu. Einen
@@ -218,15 +218,10 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
   Zielserver abholt. Der Agent liegt nicht in diesem Repo (Kopf von `deployment.yml`).
 - Regeln für Release-Skripte: [`scripts/AGENTS.md`](../../scripts/AGENTS.md); Ablauf und
   Signaturschlüssel der Desktop-App: [`desktop-app.md`](../betrieb/desktop-app.md).
-- **Wo die CI läuft** (LLH-1666, LLH-2014, LLH-2016, [ADR-0075](entscheidungen/ADR-0075-schwere-suiten-laufen-bei-push-auf-dem-eigenen-server.md), [ADR-0076](entscheidungen/ADR-0076-frontend-anteile-laufen-immer-auf-github.md)):
-  alle Jobs auf GitHub-Runnern, außer Rust-Suite, `e2e-Binary` und den e2e-Shards bei einem
-  Push auf `alpha`, `beta` oder `main`, solange die Repo-Variable
-  `E2E_RUNNER` ein Label nennt (`scripts/runner/select-runner.sh`, Job `runner` in
-  `.github/workflows/suiten.yml`). PR-Läufe bleiben immer auf GitHub. Auf dem eigenen Server
-  läuft jeder Job in einem frischen Container aus `scripts/runner/Dockerfile`, den
-  `scripts/runner/runner-loop.sh` (ein systemd-Dienst je Platz) per JIT-Registrierung startet,
-  nach dem Job löscht und bei GitHub abmeldet. Geteilt ist dort nur der Compiler-Cache als
-  Volume. Einrichtung und Betrieb: [`scripts/runner/README.md`](../../scripts/runner/README.md).
+- **Wo die CI läuft** ([ADR-0078](entscheidungen/ADR-0078-alle-ci-jobs-laufen-auf-github.md)):
+  alle Jobs auf den gehosteten Runnern von GitHub (`ubuntu-latest`, die Desktop- und iOS-Builds
+  auf ihren Plattformen). Der eigene Server für Rust-Suite und e2e (LLH-1666, LLH-2014) ist am
+  22.11.2026 zurückgebaut.
 
 ## 7.8 Beobachtbarkeit und Betrieb
 
