@@ -238,7 +238,10 @@ export default function StatusWahl<W extends string | number>({
       const ziel =
         liste?.querySelector<HTMLElement>('[role="menuitem"].ant-dropdown-menu-item-selected') ??
         liste?.querySelector<HTMLElement>('[role="menuitem"]');
-      ziel?.focus();
+      // Ohne Scrollen (LLH-2003): der Fokus fällt mitten in die Einblendung, nachdem
+      // `menueLage` gemessen hat. Ein scrollendes `focus()` verschob das Fenster oder rollte
+      // ein langes Menü nach unten; rc-dropdown fokussiert aus demselben Grund so.
+      ziel?.focus({ preventScroll: true });
     }, 0);
     return () => window.clearTimeout(t);
   }, [offen, titel]);
