@@ -113,7 +113,7 @@ final class InfoPlistTests: XCTestCase {
     /// über `#filePath` aus dem Repo (wie `EntschluesselerTests`).
     func testDieBerechtigungenTragenPushGruppeUndSchluesselbund() throws {
         let app = try Self.berechtigungen("App/LifelineHub.entitlements")
-        XCTAssertEqual(app["aps-environment"] as? String, "$(APS_UMGEBUNG)")
+        XCTAssertEqual(app["aps-environment"] as? String, "development")
         XCTAssertEqual(app["com.apple.developer.usernotifications.time-sensitive"] as? Bool, true)
         let dienst = try Self.berechtigungen(
             "Benachrichtigungsdienst/Benachrichtigungsdienst.entitlements")

@@ -69,13 +69,6 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: "NO"
         CODE_SIGN_ENTITLEMENTS: App/LifelineHub.entitlements
-      configs:
-        # `aps-environment` in App/LifelineHub.entitlements; die App meldet dem Server die passende
-        # Umgebung (`#if DEBUG` in App/Systemdienste.swift).
-        Debug:
-          APS_UMGEBUNG: development
-        Release:
-          APS_UMGEBUNG: production
     info:
       path: App/Info.plist
       properties:

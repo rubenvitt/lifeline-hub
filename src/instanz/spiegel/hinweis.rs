@@ -156,7 +156,7 @@ impl Kanal {
     }
 
     /// Kennwort für die Abfrage in [`push_hub_fuer`].
-    fn as_str(self) -> &'static str {
+    fn kennwort(self) -> &'static str {
         match self {
             Kanal::WebPush => "web_push",
             Kanal::IosPush => "ios_push",
@@ -246,7 +246,7 @@ pub async fn push_hub_fuer(
     )
     .bind(benutzer_id.to_string())
     .bind(benutzer_id)
-    .bind(kanal.as_str())
+    .bind(kanal.kennwort())
     .fetch_optional(&mut *conn)
     .await
 }
