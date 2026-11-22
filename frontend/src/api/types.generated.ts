@@ -3762,6 +3762,13 @@ export interface components {
              */
             meldung_id?: number | null;
             /**
+             * @description Der Eintrag oder ein Glied seiner Berichtigungs-Kette gehört zu einer Meldung in der Lage
+             *     (LLH-2008, [`repo::meldung_in_lage`]): die Mitarbeit berichtigt ihn nicht. Stand beim
+             *     Lesen; kommt die Meldung später in die Lage, sperrt der Server weiter mit 403. Fehlt bei
+             *     `false`. Nicht Teil des SELECT, wie `folgeauftraege`.
+             */
+            meldung_in_lage?: boolean;
+            /**
              * Format: int64
              * @description Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
              *     per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
@@ -7986,6 +7993,12 @@ export interface components {
         Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
         /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
         ShellInfo: {
+            /**
+             * @description Pfade relativ zur Wurzel (ohne führenden `/`), die die Oberfläche ohne Server braucht:
+             *     alles unter `assets/` außer den Doku-Bildern, sortiert (LLH-1980). Die iOS-Hülle holt sie
+             *     nach jedem Online-Laden in den Cache ihres Webviews. Ohne eingebettetes Frontend leer.
+             */
+            assets: string[];
             /**
              * Format: int32
              * @description Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).

@@ -8,6 +8,11 @@ ruft, für
 „jetzt“ nimmt (ETB-Erfassung, Meldungsformular, `anzeige/ZeitpunktEingabe.tsx`). Pfade relativ
 zu `frontend/src/`.
 
+**In der iOS-App** trägt nicht der Service Worker den Start ohne Netz, sondern die Hülle
+(`ios/AGENTS.md`, „Start ohne Server“, LLH-1980): sie lädt die zuletzt gespeicherte Oberfläche
+unter der Origin des Servers. Das Frontend hat dafür nichts Eigenes; alles hier gilt dort
+unverändert.
+
 **Was ohne Netz lesbar bleibt, steht in der Registry, nicht im Persister:** `LAGEBILD_OFFLINE`
 und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Kräfteübersicht, Betroffene,
 Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFreigaben` — seit

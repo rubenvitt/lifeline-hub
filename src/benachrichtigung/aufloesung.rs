@@ -3,7 +3,9 @@
 //!
 //! 1. `Funktion` → alle Mitglieder, deren `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt
 //!    (i6k6mzed, design.md D2). Für EL gilt zuerst der Einsatzleiter der Führungsstelle
-//!    (`einsatz_personal` → `personal.benutzer_id`); nur ohne ihn die Mitgliedschaft.
+//!    (`einsatz_personal` → `personal.benutzer_id`); nur ohne ihn die Mitgliedschaft. Wer im
+//!    Einsatz kein Schreibrecht hat (Mitarbeit, Beobachter, keine Mitgliedschaft), den erreicht
+//!    eine Funktion nicht (LLH-2008).
 //! 2. `Person` → `personal.benutzer_id` des Einsatzpersonals; ohne Verknüpfung niemand.
 //! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul; `ModulSchreiber` → nur die mit
 //!    Schreibrecht im Einsatz (Einsatzleitung, Führungspersonal), ebenso mit Zugriff aufs Modul.
@@ -125,7 +127,7 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
     let mut wege: BTreeMap<i64, Vec<Option<&'static str>>> = BTreeMap::new();
     for adressat in &anlass.adressaten {
         let (ids, modul) = match *adressat {
-            Adressat::Funktion(f) => (funktion_nutzer(pool, einsatz_id, f).await?, None),
+            Adressat::Funktion(f) => (funktion_nutzer(pool, &recht, f).await?, None),
             Adressat::Person(ep) => (person_nutzer(pool, einsatz_id, ep).await?, None),
             Adressat::Nutzer(id) => (vec![id], None),
             Adressat::ModulLeser(m) => (recht.rollen.keys().copied().collect(), Some(m)),
@@ -201,26 +203,34 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
 }
 
 /// Die Nutzer einer Funktion (Spec „Meine Funktion“): alle Mitglieder mit dieser Funktion; für
-/// EL zuerst der Einsatzleiter der Führungsstelle, ersatzweise die Mitgliedschaft.
+/// EL zuerst der Einsatzleiter der Führungsstelle, ersatzweise die Mitgliedschaft. Wer im Einsatz
+/// kein Schreibrecht hat, kann nicht handeln und fällt heraus (LLH-2008, `src/AGENTS.md`,
+/// „Erfassungs-Gate“): eine Rolle ohne Schreibrecht (Mitarbeit, Beobachter) oder gar keine
+/// Mitgliedschaft, auch beim Admin (LFH-1118). Ein solcher Einsatzleiter gilt als nicht da.
 async fn funktion_nutzer(
     pool: &SqlitePool,
-    einsatz_id: i64,
+    recht: &Leserecht,
     funktion: Fuehrungsfunktion,
 ) -> Result<Vec<i64>, AppError> {
+    let einsatz_id = recht.einsatz.id;
+    let handelt = |id: &i64| recht.rollen.get(id).is_some_and(|r| r.darf_schreiben());
     if funktion == Fuehrungsfunktion::El {
-        let einsatzleiter = einsatzleiter_nutzer(pool, einsatz_id).await?;
+        let mut einsatzleiter = einsatzleiter_nutzer(pool, einsatz_id).await?;
+        einsatzleiter.retain(handelt);
         if !einsatzleiter.is_empty() {
             return Ok(einsatzleiter);
         }
     }
-    Ok(sqlx::query_scalar(
+    let mut mitglieder: Vec<i64> = sqlx::query_scalar(
         "SELECT benutzer_id FROM einsatz_mitgliedschaft \
          WHERE einsatz_id = ? AND fuehrungsfunktion = ? ORDER BY benutzer_id",
     )
     .bind(einsatz_id)
     .bind(funktion.as_str())
     .fetch_all(pool)
-    .await?)
+    .await?;
+    mitglieder.retain(handelt);
+    Ok(mitglieder)
 }
 
 /// Der verknüpfte Nutzer des Einsatzleiters der Führungsstelle, sofern er aus dem Personal kommt.
