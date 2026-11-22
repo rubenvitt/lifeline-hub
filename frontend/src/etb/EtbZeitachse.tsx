@@ -165,7 +165,8 @@ interface Props {
   berichtigenGesperrt?: string;
   /**
    * „Berichtigen" nur an Einträgen von `eigeneBenutzerId` (Mitarbeit, LLH-1817: berichtigt nur
-   * Eigenes). Ohne bekannte Benutzer-id an keinem.
+   * Eigenes) und nicht an Einträgen mit `meldung_in_lage` (LLH-2008). Ohne bekannte Benutzer-id
+   * an keinem.
    */
   berichtigenNurEigene?: boolean;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */

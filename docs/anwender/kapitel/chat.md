@@ -146,8 +146,9 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 ### Erwähnungen
 
 - Eine erwähnte Person bekommt den Hinweis „Erwähnt im Chat“; er führt in den Kanal der
-  Nachricht. Eine erwähnte Funktion erreicht jede Person, die sie in ihrer Mitgliedschaft trägt;
-  EL erreicht zuerst den Einsatzleiter der Führungsstelle, wenn er mit einem Konto verknüpft ist.
+  Nachricht. Eine erwähnte Funktion erreicht jede Person, die sie in ihrer Mitgliedschaft trägt
+  und im Einsatz schreiben darf, also nicht Mitarbeit und Beobachter; EL erreicht zuerst den
+  Einsatzleiter der Führungsstelle, wenn er mit einem Konto verknüpft ist und schreiben darf.
   Trägt niemand die Funktion, erreicht der Hinweis niemanden.
 - Den Hinweis bekommt nur, wer den Chat sehen darf. Wer sich selbst oder die eigene Funktion
   erwähnt, bekommt nichts.
