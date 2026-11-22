@@ -13,7 +13,7 @@ import {
   schreibeErfassungsSitzungswert,
 } from '../../components/erfassungsSitzung';
 import EinsatzSeite from '../../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import { SeitenFehler } from '../../components/SeitenZustand';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { SK_META } from '../../personen/personMeta';
@@ -30,6 +30,7 @@ import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { modulName } from '../../einsatz/modulRegistry';
 import { ListenRueckweg } from '../../components/ListenRueckweg';
 import { vorgemerktText } from '../../offline/vorgemerktText';
+import { ModulGerippeSeite } from '../../einsatz/ModulWechselGerippe';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -202,7 +203,7 @@ export default function AufnahmePage() {
   };
 
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="personen" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

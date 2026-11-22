@@ -4,6 +4,7 @@ import {
   anmelden,
   apiAlsAdmin,
   demoEinsatz,
+  eintreffenVor,
   expect,
   fotografiere,
   fuelle,
@@ -73,22 +74,29 @@ test.describe(KAPITEL, () => {
 
       const rettung = await einheitNamens(api, demo.id, 'Rettungsstaffel');
       await nachtrag(rettung.id, 'alarmierung', vor(jetzt, 287), 'Alarmierung über ILS');
-      const falsch = await nachtrag(rettung.id, 'eintreffen', vor(jetzt, 262), 'per Funk gemeldet');
+      // Eintreffen höchstens 3 h zurück, auch das berichtigte: sonst ist die Ablösung je nach
+      // Tageszeit des Laufs fällig (LLH-1913). Die Dauer zählt ab der Alarmierung.
+      const falsch = await nachtrag(
+        rettung.id,
+        'eintreffen',
+        eintreffenVor(jetzt, 170),
+        'per Funk gemeldet',
+      );
       const irrtum = falsch.ereignisse.find((e) => e.art === 'eintreffen');
       expect(irrtum, 'nachgetragenes Eintreffen').toBeDefined();
       await fuelle(
         api,
         'post',
         `/api/einsaetze/${demo.id}/einheiten/${rettung.id}/zeitachse/${irrtum!.id}/berichtigen`,
-        { zeitpunkt_at: draht(vor(jetzt, 271)), grund: 'Zeit verwechselt' },
+        { zeitpunkt_at: draht(eintreffenVor(jetzt, 179)), grund: 'Zeit verwechselt' },
       );
 
       const zug = await einheitNamens(api, demo.id, 'Sanitätszug Musterstadt');
       await nachtrag(zug.id, 'alarmierung', vor(jetzt, 288));
-      await nachtrag(zug.id, 'eintreffen', vor(jetzt, 272));
+      await nachtrag(zug.id, 'eintreffen', eintreffenVor(jetzt, 178));
 
       const uhs = await einheitNamens(api, demo.id, 'Sanitätsgruppe UHS');
-      await nachtrag(uhs.id, 'eintreffen', vor(jetzt, 241));
+      await nachtrag(uhs.id, 'eintreffen', eintreffenVor(jetzt, 175));
     } finally {
       await api.dispose();
     }

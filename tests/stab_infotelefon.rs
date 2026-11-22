@@ -233,6 +233,16 @@ async fn parameter_der_liste() {
             StatusCode::UNPROCESSABLE_ENTITY,
         ),
         ("?vor_id=3", StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            "?nach_zeit=2026-10-01%2010:00:00",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        ("?nach_id=3", StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            "?vor_zeit=2026-10-01%2010:00:00&vor_id=3&nach_zeit=2026-10-01%2009:00:00&nach_id=1",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        ("?nach_zeit=2026-10-01%2010:00:00&nach_id=3", StatusCode::OK),
         ("?status=offen&limit=5", StatusCode::OK),
         ("?status=", StatusCode::OK),
     ] {

@@ -32,7 +32,7 @@ import {
   SeitenFehler,
   SeitenLeer,
   SeitenSkeleton,
-  SeitenStandVeraltet,
+  StandVeraltetHinweis,
 } from '../components/SeitenZustand';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -109,6 +109,7 @@ import {
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { Marke } from '../components/instrument/Marke';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Der Abschnitt in der Wire-Form des PATCH (LLH-1945): Altwert und Vergleichswert des Feld-CAS
@@ -692,7 +693,7 @@ export default function EinsatzabschnittePage() {
   //
   // Listenzustand — `abschnitteQuery` und alles Weitere entscheidet an der Stelle der Daten, nie
   // als Frühausstieg: sonst risse ein gescheiterter Nebenabruf die ganze Seite weg.
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="einsatzabschnitte" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
@@ -714,6 +715,7 @@ export default function EinsatzabschnittePage() {
    */
   const listeGescheitert = abschnitteQuery.isError && abschnitte.length === 0;
   const standVeraltet = abschnitteQuery.isError && abschnitte.length > 0;
+  const wiederholeAbschnitte = () => void abschnitteQuery.refetch();
 
   const einheitenListe = (
     <>
@@ -844,22 +846,20 @@ export default function EinsatzabschnittePage() {
             }
           />
         ) : (
-          <>
-            {standVeraltet && (
-              <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
+          // Ein veralteter Stand steht in der Standzeile des Organigramms, nicht als Balken
+          // darüber: sein Wechsel schöbe den Baum unter dem Zeiger (LLH-1927).
+          <Organigramm
+            zugeklappt={orgZugeklappt}
+            onZugeklappt={setOrgZugeklappt}
+            einsatz={einsatz}
+            abschnitte={abschnitte}
+            einheiten={einheitenQuelle}
+            datenstand={gemeinsamerDatenstand(
+              abschnitteQuery.dataUpdatedAt,
+              einheitenQuery.dataUpdatedAt,
             )}
-            <Organigramm
-              zugeklappt={orgZugeklappt}
-              onZugeklappt={setOrgZugeklappt}
-              einsatz={einsatz}
-              abschnitte={abschnitte}
-              einheiten={einheitenQuelle}
-              datenstand={gemeinsamerDatenstand(
-                abschnitteQuery.dataUpdatedAt,
-                einheitenQuery.dataUpdatedAt,
-              )}
-            />
-          </>
+            veraltet={standVeraltet ? { onWiederholen: wiederholeAbschnitte } : undefined}
+          />
         )
       ) : (
         /* Unter `md` stapeln statt einer 360-px-Spalte neben dem Detail. Kein Collapse:
@@ -929,9 +929,6 @@ export default function EinsatzabschnittePage() {
                   />
                 ) : (
                   <>
-                    {standVeraltet && (
-                      <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
-                    )}
                     {/* Der Bereich der Schleuse: Standzeile, Baum und Wurzelzone. Der Weg zum
                       Banner taut nicht auf. */}
                     <div data-lfh="gliederung-bereich" {...zufluss.bereich}>
@@ -960,10 +957,30 @@ export default function EinsatzabschnittePage() {
                             {wartet}
                           </Sammelbanner>
                         ) : (
-                          <span style={{ alignSelf: 'center' }}>
-                            <Textstufe stufe="textKlein" ton="gedaempft">
-                              {zufluss.offen ? 'Live' : 'Live pausiert'}
-                            </Textstufe>
+                          !standVeraltet && (
+                            <span style={{ alignSelf: 'center' }}>
+                              <Textstufe stufe="textKlein" ton="gedaempft">
+                                {zufluss.offen ? 'Live' : 'Live pausiert'}
+                              </Textstufe>
+                            </span>
+                          )
+                        )}
+                        {/* Ein veralteter Stand steht hier statt „Live“, nicht als Balken über
+                          dem Baum: die Zeile hält ihre Höhe (LLH-1927). */}
+                        {standVeraltet && (
+                          <span
+                            style={{
+                              alignSelf: 'center',
+                              marginInlineStart: wartet !== null ? token.marginXS : 0,
+                            }}
+                          >
+                            <StandVeraltetHinweis
+                              onWiederholen={() => {
+                                // Glückt der Abruf, geht der Knopf; der Fokus bleibt im Bereich.
+                                zufluss.standRef.current?.focus({ preventScroll: true });
+                                wiederholeAbschnitte();
+                              }}
+                            />
                           </span>
                         )}
                       </div>

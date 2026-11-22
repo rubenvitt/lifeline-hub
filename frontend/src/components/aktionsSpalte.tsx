@@ -41,8 +41,6 @@ export interface SpaltenWeitere<T> {
 
 /** antds Knopfpolster beidseits (15 px) und Rand (1 px) der Größe `middle`. */
 const KNOPF_RAHMEN = 2 * 15 + 2;
-/** Fuge von `Space size="middle"` (16 px): ≥ 16 px zwischen Knopf und ⋮ im Handschuh-Betrieb. */
-const FUGE = 16;
 
 export function aktionsSpaltenBreite({
   dichte,
@@ -62,7 +60,9 @@ export function aktionsSpaltenBreite({
     stufe.kleineZeilenhoehe,
     messen(primaer, stufe.schriftgroesse) + KNOPF_RAHMEN,
   );
-  return Math.ceil(menue + knopf + FUGE);
+  // Die Fuge von `Space size="middle"`: antd liest sie aus `token.padding`, und das ist
+  // `abstand.md` der Stufe (`antdToken`), also 12 / 20 / 24 px (LLH-1961).
+  return Math.ceil(menue + knopf + stufe.abstand.md);
 }
 
 /**

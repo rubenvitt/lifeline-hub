@@ -411,7 +411,15 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
 });
 
 for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) {
-  test(`Seitenkopf bleibt stehen: ${ziel} (1180 × 600)`, async ({ page }) => {
+  // Das ETB klebt Seitenkopf, Filterleiste und Spaltenkopf nur GEMEINSAM und nur, solange sie mit
+  // der Kopfleiste höchstens ein Drittel der Fensterhöhe nehmen (`etb/etbKopfKleben.ts`). Bei
+  // 1180 px steht die Filterleiste auf der Umbruchkante: lokal einzeilig (53 + 44 + 48 + 26 = 171 px
+  // von 200), auf dem CI-Runner bricht die Volltextsuche um, und die Köpfe rollen bei 600 px Höhe
+  // regelgerecht mit (alpha rot am 22.11.2026, LLH-2034). Das ETB misst deshalb im Querformat des
+  // Tablets (1180 × 820, wie `BREITEN`): dort hält das Drittel auch die zweizeilige Leiste aus.
+  // Das Mitrollen im niedrigen Fenster prüft „niedriges Fenster: …“ unten.
+  const hoehe = ziel === 'etb' ? 820 : 600;
+  test(`Seitenkopf bleibt stehen: ${ziel} (1180 × ${hoehe})`, async ({ page }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Seitenkopf ${ziel} ${Date.now()}`);
     if (ziel === 'etb') await etbFuellen(page, einsatzId);
@@ -436,7 +444,7 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
         expect(antwort.ok(), `Benutzer ${i}: ${antwort.status()}`).toBe(true);
       }
     }
-    await page.setViewportSize({ width: 1180, height: 600 });
+    await page.setViewportSize({ width: 1180, height: hoehe });
     await page.goto(
       ziel === 'verwaltung'
         ? '/admin/benutzer'

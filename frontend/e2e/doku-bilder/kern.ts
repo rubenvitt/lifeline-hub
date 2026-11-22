@@ -82,7 +82,25 @@ async function warteAufModus(seite: Page, modus: Modus) {
   );
 }
 
+/**
+ * Wartet, bis keine Ein- oder Ausblendung von antd (rc-motion, `ant-zoom-appear`,
+ * `ant-fade-leave` …) mehr läuft. `animations: 'disabled'` spult nur laufende Animationen vor;
+ * in der Vorbereitung steht ein Dialog noch statisch auf `scale(0.2)` und käme in Fünftelgröße
+ * ins Bild (LLH-1985: `auftrag-aufheben.png` 104×47 statt 520×231).
+ */
+async function warteAufRuhe(seite: Page) {
+  await seite.waitForFunction(
+    () =>
+      !Array.from(
+        document.querySelectorAll('[class*="-appear"], [class*="-enter"], [class*="-leave"]'),
+      ).some((el) =>
+        Array.from(el.classList).some((k) => /^ant-[a-z-]+-(appear|enter|leave)$/.test(k)),
+      ),
+  );
+}
+
 async function aufnehmen(ziel: Locator | Page, pfad: string) {
+  await warteAufRuhe('goto' in ziel ? ziel : ziel.page());
   await ziel.screenshot({
     path: pfad,
     animations: 'disabled',
@@ -236,6 +254,31 @@ export async function fuehrungsstelleOrtFuellen(
     standort_lat: 50.9531,
     standort_lon: 10.2452,
   });
+}
+
+/**
+ * Wie weit ein nachgetragenes Eintreffen einer Einheit höchstens zurückliegt, in Minuten
+ * (LLH-1913). Mit der Vorgabe des Demo-Einsatzes („12-h-Schicht Hochwasser“,
+ * `src/demo/szenario.rs`: Wechsel 06:00 und 18:00, Mindestdauer 4 h, Vorwarnung 30 min) beginnt
+ * die Einheit beim Eintreffen ihre Schicht selbst. Fällig ist sie zum ersten Wechsel ab
+ * Eintreffen + 4 h, vorgewarnt 30 min davor, also frühestens 3 h 30 min nach dem Eintreffen.
+ * Liegt das Eintreffen weiter zurück, stehen je nach Tageszeit des Laufs Zähler und Hinweis
+ * „Ablösung fällig“ im Bild: die rechnet der Server mit seiner Uhr, `uhrAnhalten` hält nur die
+ * des Browsers an. 180 min lassen dem Lauf eine halbe Stunde. Die Dauer „im Einsatz“ zählt ab
+ * der Alarmierung; die darf weiter zurückliegen.
+ */
+export const EINTREFFEN_HOECHSTENS_VOR_MINUTEN = 180;
+
+/**
+ * Zeitpunkt eines nachgetragenen Eintreffens einer Einheit, `minuten` vor `jetzt`. Rot über
+ * {@link EINTREFFEN_HOECHSTENS_VOR_MINUTEN}, auch für das Ziel einer Berichtigung.
+ */
+export function eintreffenVor(jetzt: Date, minuten: number): Date {
+  expect(
+    minuten,
+    `Eintreffen vor höchstens ${EINTREFFEN_HOECHSTENS_VOR_MINUTEN} min, sonst hängt das Bild von der Tageszeit ab (LLH-1913)`,
+  ).toBeLessThanOrEqual(EINTREFFEN_HOECHSTENS_VOR_MINUTEN);
+  return new Date(jetzt.getTime() - minuten * 60_000);
 }
 
 /**

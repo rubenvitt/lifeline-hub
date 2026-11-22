@@ -1099,7 +1099,9 @@ describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
     await userEvent.type(feld, '  ');
     await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
     expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
-    expect(feld).toHaveFocus();
+    // Den Fokus setzt `fokusInsFeld` ein Bild später (`requestAnimationFrame`); unter Last kommt
+    // die Meldung vorher. Darauf warten, nicht sofort fragen (alpha rot am 22.11.2026, LLH-2034).
+    await waitFor(() => expect(feld).toHaveFocus());
     expect(feld).toHaveAttribute('aria-invalid', 'true');
     expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
     expect(p.erfassen).not.toHaveBeenCalled();
@@ -2171,6 +2173,23 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     );
     await waitFor(() => expect(zeitFeld()).toHaveFocus());
     expect(zeitFeld()).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('der Hinweis des Felds Zeit steht in der Fußzeile, nicht im Feld (LLH-1917)', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    await userEvent.type(zeitFeld(), '1420');
+    // Die Deutung grau in der Fußzeile; im schmalen Feld verdrängte sie die Eingabe.
+    const deutung = screen.getByText('Zeit = 171420okt26');
+    expect(deutung.closest('[data-lfh="etb-zeit-hinweis"]')).not.toBeNull();
+    await userEvent.clear(zeitFeld());
+    await userEvent.type(zeitFeld(), '14:3x');
+    await userEvent.click(inhaltFeld());
+    const grund = screen.getByText('Zeit: nicht lesbar');
+    expect(grund.closest('[data-lfh="etb-zeit-hinweis"]')).toHaveAttribute('role', 'status');
+    expect(screen.queryByText('nicht lesbar')).toBeNull();
+    expect(feldWert('Zeit')).toBe('14:3x');
+    expect(zeitFeld()).toHaveAttribute('aria-invalid', 'true');
+    expect(zeitFeld()).toHaveAccessibleDescription('Zeit: nicht lesbar');
   });
 
   it('Enter im Inhalt nach einer verworfenen Zeit sendet nicht', async () => {

@@ -606,6 +606,17 @@ export default function UeberblickPage() {
     aufgebautFuer.current = einsatzId;
   }
   const startlisteSchranke = startlisteLaedt && aufgebautFuer.current !== einsatzId;
+  // Dasselbe für die Paneelreihen (LLH-1955): Gliederung und Marken halten sie nur beim ersten
+  // Aufbau je Einsatz zurück. Wird danach ein Modul freigegeben (neue Rolle, geänderte
+  // Modulfreigabe), lädt seine Quelle zum ersten Mal; die Reihen bleiben stehen, und nur das
+  // betroffene Paneel zeigt kurz seinen Ladezustand. Aufgebaut heißt: die Reihen standen schon
+  // einmal im Bild. Das gilt auch, wenn die Freigaben erst danach kommen (sonst hält sie der Rahmen
+  // bereit): bis dahin fragen die gebundenen Quellen nicht, die Reihen stehen mit „wird abgerufen“.
+  const reihenAufgebautFuer = useRef<number | null>(null);
+  if (!einsatzQ.isLoading && !zaehlerQ.isLoading && !startlisteSchranke && !reihenLaden) {
+    reihenAufgebautFuer.current = einsatzId;
+  }
+  const reihenSchranke = reihenLaden && reihenAufgebautFuer.current !== einsatzId;
   const startPunkte = useMemo(
     () =>
       startliste({
@@ -801,10 +812,10 @@ export default function UeberblickPage() {
             Platzhalterzeilen sie beim Laden halten. Kam er nach dem Körper, wuchsen die Abschnitte
             von einer Zeile auf ihre Platzhalter, derselbe Sprung wie ohne sie. Der Rahmen ruft ihn
             ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`).
-            Die Paneelreihen unter der Alarmzeile warten zusätzlich auf die Gliederung
-            (`gliederungLaedt`, LLH-1481) und die Quellen der Marken (`markenLaedt`, LLH-1748),
-            Startliste und Paneelreihen beim ersten Aufbau auf die Quellen der Startliste
-            (`startlisteSchranke`, LLH-1815). */}
+            Die Paneelreihen unter der Alarmzeile warten beim ersten Aufbau zusätzlich auf die
+            Gliederung (`gliederungLaedt`, LLH-1481) und die Quellen der Marken (`markenLaedt`,
+            LLH-1748; Schranke `reihenSchranke`, LLH-1955), Startliste und Paneelreihen auf die
+            Quellen der Startliste (`startlisteSchranke`, LLH-1815). */}
         {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Die Alarmzeile „Was brennt“ steht als erstes unter dem Seitenkopf, auf Überblick,
@@ -827,7 +838,7 @@ export default function UeberblickPage() {
                     </KachelGrenze>
                   </PaneelReihe>
                 )}
-                {reihenLaden ? null : (
+                {reihenSchranke ? null : (
                   <>
                     {/* Kein Band (LLH-1748, Spec `lage-verdichtung`): Reihe 1 trägt die Fristen und die
                         offenen Vorgänge, Reihe 2 die Gliederung und die Entscheidungen. Gestapelt (unter `lg`)
@@ -922,7 +933,8 @@ export default function UeberblickPage() {
                           // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
                           // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
                           // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883). Seit LLH-1481
-                          // lädt das Paneel hier nur noch, solange die Freigaben fehlen (`gliederungLaedt`).
+                          // lädt das Paneel hier nur noch, solange die Freigaben fehlen (`gliederungLaedt`),
+                          // oder kurz, wenn ein Modul nach dem ersten Aufbau freigegeben wird (LLH-1955).
                           meta={
                             zAbschnitte === 'daten' ? (
                               // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.

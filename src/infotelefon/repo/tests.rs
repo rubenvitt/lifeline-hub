@@ -1,6 +1,7 @@
 //! Repo-Tests des Informationstelefons (LFH-554), je Spec-Szenario mindestens ein Test.
 
 use super::*;
+use crate::kommunikation::{Blaettern, FensterSeite, ZeitCursor};
 use crate::write_retry;
 use axum::http::StatusCode;
 
@@ -73,7 +74,10 @@ async fn all_pages(
     let mut alle: Vec<InfotelefonAnrufAnzeige> = Vec::new();
     let mut vor = None;
     loop {
-        let seite = crate::kommunikation::Seite { vor, limit };
+        let seite = FensterSeite {
+            cursor: vor.map(Blaettern::Vor),
+            limit,
+        };
         let teil = list_page(&w.pool, e, filter, &seite).await.unwrap();
         let ende = (teil.len() as i64) < limit;
         vor = teil.last().map(|a| crate::kommunikation::ZeitCursor {
@@ -247,6 +251,54 @@ async fn blaettern_liefert_jeden_anruf_genau_einmal() {
     }
 }
 
+/// LLH-1886: Vom ältesten Anruf aus nach oben geblättert (`nach`), kommt jeder Anruf genau einmal,
+/// in derselben Ordnung wie von oben — auch über Gleichstände im Eingang und einen Nachtrag mit
+/// frühem Eingang und hoher Kennung. Jede Seite steht direkt über ihrem Cursor und kommt
+/// absteigend wie jede Seite.
+#[tokio::test]
+async fn nach_oben_blaettern_liefert_jeden_anruf_genau_einmal() {
+    let w = welt().await;
+    for i in 0..9 {
+        let mut a = anruf(InfotelefonAnliegen::AuskunftLage, None, false);
+        a.eingang_at = format!("2026-09-30 1{}:00:00", i / 3);
+        anlegen(&w, w.e, a).await.unwrap();
+    }
+    let mut nachtrag = anruf(InfotelefonAnliegen::Hinweis, None, false);
+    nachtrag.eingang_at = "2026-09-30 07:00:00".into();
+    anlegen(&w, w.e, nachtrag).await.unwrap();
+    let ganz = all_pages(&w, w.e, &OHNE, 100).await;
+    let unterster = ganz.last().unwrap();
+
+    for limit in [1, 2, 3, 4, 7] {
+        let mut nach = ZeitCursor {
+            zeit: unterster.eingang_at.clone(),
+            id: unterster.id,
+        };
+        let mut von_unten = vec![unterster.id];
+        loop {
+            let seite = FensterSeite {
+                cursor: Some(Blaettern::Nach(nach.clone())),
+                limit,
+            };
+            let teil = list_page(&w.pool, w.e, &OHNE, &seite).await.unwrap();
+            let kennungen: Vec<i64> = teil.iter().map(|a| a.id).collect();
+            // Absteigend geliefert: von unten gelesen kommt die Seite umgekehrt dazu.
+            von_unten.extend(kennungen.iter().rev());
+            let Some(oberster) = teil.first() else { break };
+            nach = ZeitCursor {
+                zeit: oberster.eingang_at.clone(),
+                id: oberster.id,
+            };
+            if (teil.len() as i64) < limit {
+                break;
+            }
+        }
+        von_unten.reverse();
+        let erwartet: Vec<i64> = ganz.iter().map(|a| a.id).collect();
+        assert_eq!(von_unten, erwartet, "limit {limit}");
+    }
+}
+
 #[tokio::test]
 async fn seite_haelt_das_limit() {
     let w = welt().await;
@@ -255,8 +307,8 @@ async fn seite_haelt_das_limit() {
             .await
             .unwrap();
     }
-    let seite = crate::kommunikation::Seite {
-        vor: None,
+    let seite = FensterSeite {
+        cursor: None,
         limit: 2,
     };
     assert_eq!(

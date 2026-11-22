@@ -1,3 +1,163 @@
+## [1.0.0-alpha.196](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.195...v1.0.0-alpha.196) (2026-11-22)
+
+### Wichtige Änderungen
+
+- **Neue Einsatzrolle „Mitarbeit“:** Mitarbeitende dürfen erfassen, auch ohne Schreibrecht. Sie schreiben im Chat, laden Anhänge hoch, erfassen ETB-Einträge und Meldungen und berichtigen ihre eigenen Einträge. Sie löschen nur selbst hochgeladene Anhänge und korrigieren nichts, was schon in die Lage übernommen ist. Die Rolle kommt mit einer Datenbankmigration samt Tabellenumbau. Bei gekoppelten Instanzen wird die Rolle für ältere Gegenstellen herabgestuft und nachgeliefert, sobald die Gegenstelle sie kennt.
+- **Adapter-Rahmen mit Geheimnisspeicher:** Externe Anbindungen laufen jetzt über einen gemeinsamen Rahmen. Er bringt einen Speicher für Zugangsdaten, Abrufe mit Wartezeit, einen eigenen Zustand je Adapter und eine neue Admin-Schnittstelle mit. Ändert sich das Ziel eines Adapters, werden seine gespeicherten Geheimnisse entfernt.
+- **Start-Stichworte an Einsatz-Vorlagen gebunden:** Eine Migration koppelt die vorhandenen Start-Stichworte bestehender Organisationen an deren Einsatz-Vorlagen.
+- **Begründete Lesesperre:** Wird der Zugriff auf einen Einsatz verweigert, nennt die Antwort jetzt einen Grund: kein Mitglied, Nachlaufzeit abgelaufen oder nicht mehr lesbar.
+- **Instanzkopplung:** Eine einzelne Meldung zwischen gekoppelten Instanzen darf höchstens 192 KiB groß sein. Wird eine ID neu vergeben, ersetzt der neue Datensatz beim Gegenüber die gelöschte Zeile.
+- **Neue Schnittstelle für App-Hüllen:** Ein neuer Endpunkt nennt die Serverversion und den Vertrag mit den App-Hüllen.
+- **Sicherheit:** SQLite ist auf 3.54.1 angehoben. Damit ist eine gemeldete Sicherheitslücke geschlossen.
+
+### Bedienung allgemein
+
+- **Rundgang für neue Nutzer:** Er führt durch Einsatzliste, Einsatz, Lagekarte und Sprungpalette.
+- **Hilfe zur aktuellen Seite:** Mit dem Knopf „?“ im Kopf oder den Tasten ? und F1 öffnet sich eine Seitenleiste. Sie zeigt das passende Kapitel der Anwenderhilfe und die Tastenkürzel. Neu ist außerdem eine Willkommenskarte auf der Einsatzliste.
+- **Ansicht, Filter und Rollposition bleiben erhalten:** Sie stehen jetzt in der Adresse und sind nach dem Zurückgehen wieder da. Das gilt für fast alle Module. Detailseiten, Unterseiten, Druck und Verwaltung kehren über den Ortspfad zur Liste zurück, an die zuletzt gezeigte Stelle.
+- **Ungespeichertes ist sichtbar:** Geänderte Felder tragen einen Punkt, offene Einzelangaben zeigen „Nicht gespeichert“.
+- **Dialoge schützen Eingaben:** Sie schließen nicht mehr durch einen Klick neben das Fenster. Vor dem Verwerfen geänderter Eingaben fragen sie nach.
+- **Einheitliche Erfassung:**
+  - ein Sendeverb („Erfassen“ oder „Anlegen“) und klare Regeln für die Enter-Taste
+  - Pflichtfehler lauten einheitlich „‹Feld› fehlt“
+  - Scheitert die Prüfung, rollt die Seite zum Fehler, und der Fehler wird auch am Knopf genannt.
+- **Keine stillen Korrekturen mehr:**
+  - Zahlenfelder prüfen den Wert, statt ihn zu kappen.
+  - Unlesbare Zeitangaben bleiben stehen und sperren das Speichern.
+  - „gestern/morgen“ bleibt sichtbar.
+- **Am Handy:**
+  - Der Erfassungsknopf klebt am unteren Rand und über der Tastatur.
+  - In Dialogen klebt nur der Abschluss, „Abbrechen“ steht im Kopf.
+  - Filter liegen hinter „Filter (n)“.
+  - In Liste-und-Detail-Ansichten rückt das Detail ins Bild.
+- **Gleichzeitiges Bearbeiten:**
+  - Eine Präsenzanzeige zeigt, wenn jemand anderes gerade dieselbe Angabe bearbeitet.
+  - Zahlreiche Einzelangaben prüfen vor dem Speichern, ob sie zwischenzeitlich geändert wurden. Das betrifft Kräfte, Abschnitte, Betreuung, Lagekarte, Personen, Programmpunkte, Gefahrengebiete und die Fernmeldeskizze.
+- **Status:** ein einheitlicher Status-Baustein mit Statusknopf und Tableau-Kachel. Ein FMS-Status lässt sich zurücknehmen.
+- **Kürzel und Texte:**
+  - Kürzel und die Schreibweise der Stärke lassen sich antippen und werden dann erklärt.
+  - Die Oberfläche spricht unpersönlich, Begriffe sind vereinheitlicht.
+  - Fehlermeldungen enthalten keine technischen Reste mehr.
+- **Seitenkopf und Lagefläche:**
+  - Der Seitenkopf ist einzeilig, Nebenwege liegen bei größerer Bedienstufe hinter „Weitere“.
+  - Beim Modulwechsel erscheint sofort ein Seitengerüst.
+  - Fällt auf einer Lagefläche eine einzelne Kachel aus, bleibt der Rest der Seite stehen.
+- **Leistung:** Große Tabellen öffnen spürbar schneller.
+
+### Einsatz und Rollen
+
+- **Mitglieder beim Anlegen:** Sie lassen sich schon im Anlegedialog eines Einsatzes wählen.
+- **Vorlage im Anlegedialog:** Die Vorlage ist das oberste Feld, die Stichwortliste erscheint erst beim Tippen.
+- **Rollen verständlicher:**
+  - Rollennamen sind vereinheitlicht.
+  - Jede Rolle zeigt, was sie im Einsatz darf.
+  - Gesperrte Module nennen, wer sie öffnen kann.
+- **Fehlendes Recht:** Ein Direktlink ohne Recht nennt den Weg zum Zugang, statt „Erneut abrufen“ anzubieten. Eine leere Einsatzliste sagt, wer Einsätze aufnimmt.
+- **Stornierte Datensätze:**
+  - Eine Stornierung an einem Platz sperrt sofort die offenen Detailseiten von Personen, Tieren, Schäden und Betreuungsstellen an anderen Plätzen.
+  - Es erscheint ein Hinweis, wer storniert hat.
+  - Stammdaten aufgelöster Stellen sind auch serverseitig gesperrt.
+- **Erinnerungen:**
+  - Die Fälligkeit ist mit +30 Minuten vorbelegt.
+  - Fällige Erinnerungen stehen auch im Modul unter „Achtung“.
+  - Erledigen, Quittieren und Wieder öffnen laufen zuverlässig als ein Schritt.
+
+### Einsatztagebuch
+
+- **Systemeinträge in Echtzeit:** Sie erscheinen jetzt aus allen Modulen sofort bei allen Nutzern. Das gilt auch für Einträge aus Aufbewahrung und Löschlauf.
+- **Erfassen:**
+  - „Erfassen“ mit leerem Inhalt meldet „Inhalt fehlt“ am Feld.
+  - Ein Kurzbefehl landet nie als Text im Tagebuch.
+  - Enter im leeren Feld schaltet den Sendeweg nicht mehr um.
+  - Fehlt in einer Meldung der Rufname, wird das erklärt.
+- **Hinweis-Banner:** Er zählt auch Einträge desselben Kontos von anderen Geräten.
+- **Druck:** Jede Seite trägt eine Laufzeile mit Einsatz und Stand, Systemeinträge sind verdichtet.
+
+### Lagekarte
+
+- **Neue Ebene Copernicus EMS:** Sie zeigt die Satellitenauswertung aus Copernicus EMS Rapid Mapping für den Kartenausschnitt.
+- **Fehlender Einsatzort:** Ein Band weist darauf hin.
+- **Esc während des Ziehens:** Wer an einem Griff zieht, beendet den Zug mit Esc sauber.
+- **Kartenabruf:** Er sperrt Multicast-, reservierte und Benchmark-Netze.
+
+### Kräfte und Mittel
+
+- **Stärke im Seitenkopf:** Sie steht als Angabe im Kopf. Einheiten zeigen die Besatzung vor den Kopfdaten und haben eine Sprungleiste zu den Paneelen.
+- **Rücknahme:** Sie setzt nicht mehr versehentlich in eine neue Einheit mit alter ID. Ohne Modulrecht nennt sie keine Namen.
+- **Unterkunfts- und Betreuungsstellen (UHS):**
+  - Platzkacheln wachsen mit der Fläche.
+  - Stornieren und Reservieren prüfen die Belegung zuverlässig.
+- **Bereitstellung:** Die Besatzungsspalte bleibt einzeilig. Die Betreuungsstellen zeigen „frei“ am Handy ohne Querscrollen.
+
+### Betroffene
+
+- **Personendetail:**
+  - Name im Kopf und ein einziges „Bearbeiten“ im Patientenkopf.
+  - Das Körperschema rollt ins Bild und zeigt Regionen.
+- **Kurzeingabe „/person“:** Sie versteht Farben und „ca“, markiert Unerkanntes und nutzt am Handy die volle Breite.
+- **Robustere Anzeige:** Eine unbekannte Sichtung und ein fehlender Status bringen Liste, Detail, Karte und Druck nicht mehr zum Absturz.
+- **Abgleich:** Beim Bestätigen werden beide Personen erneut geprüft.
+- **Leere Datensätze:** Personen und Tiere werden nicht mehr durch einen Fehlklick leer angelegt.
+
+### Meldungen, Aufträge und Kommunikation
+
+- **Meldungen:**
+  - Die eigene Stelle ist je nach Art vorbelegt.
+  - Eine Empfängerfunktion ersetzt die vorbelegte eigene Stelle.
+- **Meldebild:**
+  - neue Schnellfilter „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“
+  - Drucken und Übernahme in einen Lagebericht als Nebenwege im Kopf
+  - „In die Lage übernehmen“ zeigt je Meldung ihren eigenen Text.
+- **Aufträge:** „Vollzug melden“ nennt eine leere Rückmeldung am Feld.
+- **Chat und Infotelefon:**
+  - Ältere Einträge laden sich beim Blättern nach oben nach.
+  - Der Chat bricht auf Touch-Geräten mit Enter in eine neue Zeile um.
+
+### Ohne Netz und Sitzung
+
+- **Ehrlicher Sendestatus:**
+  - „n nicht gesendet“ im Kopf führt zum Wiederherstellungsbereich.
+  - Vorgemerkte Meldungen stehen als „Nicht gesendet“ über der Liste.
+  - Bei einem Serverfehler heißt es „wird erneut gesendet“.
+  - „Erfasst: n“ zählt nur, was der Server angenommen hat.
+- **Gerätespeicher räumen:** Er lässt sich leeren, ohne den Speicher des aktuellen Tabs zu verlieren.
+- **Sitzungsende im Betrieb:**
+  - Die Arbeit wird unterbrochen, statt abzumelden.
+  - Die Anmeldung erscheint als Dialog über der Seite.
+  - Leseanfragen warten auf die erneute Anmeldung.
+  - Live-Verbindungen bauen sich danach neu auf.
+
+### Druck und Export
+
+- **Einsatzakte:** Neu ist eine Druckansicht. Dazu kommt ein ZIP-Export mit Anhängen und Tabellen eines Einsatzes.
+- **Druckeinstiege:** Sie heißen einheitlich „Druckansicht“. Der Seitendruck steht im Seitenkopf, der Druck eines einzelnen Objekts im Kopf des Objekts.
+
+### Verwaltung
+
+- **Übersicht als Einstieg:** Die Verwaltung beginnt mit einer Übersicht und einer Wertung der Bereitschaft. Am Handy ist die ganze Zeile der Sprung.
+- **Adapter auf der Seite Anbindungen:** Jeder Adapter zeigt Zustand, Prüfung, Verlauf und Zugangsdaten. Zugangsdaten werden über ein Feld hinterlegt, das nur geschrieben, nie angezeigt wird.
+
+### iOS-App
+
+- **Erste iOS-App als Hülle um die Weboberfläche:**
+  - Serverliste mit QR-Code, Prüfung von Version und Vertrag des Servers
+  - getrennter Datenspeicher je Server
+  - Anmeldung im Systembrowser
+- **Bedienung:**
+  - Rückfragen der Seite erscheinen als native Dialoge.
+  - Haptik bei Erfassung, Alarm und Segmentwechsel.
+  - „Zur Oberfläche“ führt von einer fremden Seite zurück.
+- **Netz und Zertifikate:**
+  - Ein Captive Portal oder ein Auth-Proxy gilt nicht als zu alter Server.
+  - Bei einem Zertifikatsfehler erscheint eine Anleitung.
+- **Im Zugangsprotokoll:** Die App meldet sich als „iOS-App“, die Anmeldung über die App als „Lifeline-App“.
+- **Verteilung:** Builds kommen je Kanal (auch Alpha) über TestFlight an die passenden Testgruppen.
+
+### Betrieb und Installation
+
+- **Copernicus EMS:** Es steht jetzt in der Liste der Datenquellen.
+- **Laufzeitumgebung:** Node.js ist auf 26.13.1 angehoben, dazu aktualisierte Rust- und JavaScript-Abhängigkeiten.
+
 ## [1.0.0-alpha.195](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.194...v1.0.0-alpha.195) (2026-11-18)
 
 ### Wichtige Änderungen

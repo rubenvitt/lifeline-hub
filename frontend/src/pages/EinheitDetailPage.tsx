@@ -43,7 +43,6 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import {
   SeitenFehler,
   SeitenNichtGefunden,
-  SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import {
@@ -83,6 +82,7 @@ import { useBesatzungErrors } from './einheit/useBesatzungErrors';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
 import EinheitGliederung, { Sprungziel, useEinheitGliederung } from './einheit/EinheitGliederung';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Vollseiten-Ansicht einer Einheit (LFH-339, seit LLH-1036 Spec `einheit-ansicht`): eigene Route,
@@ -181,7 +181,8 @@ export default function EinheitDetailPage() {
   );
   if (!idGueltig) return nichtGefunden;
 
-  if (einsatzQuery.isLoading || einheitenQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading || einheitenQuery.isLoading)
+    return <ModulGerippeSeite modulKey="einheiten" />;
   // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
   // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
   // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
@@ -231,7 +232,7 @@ export default function EinheitDetailPage() {
   }
   // Auch während ein veralteter Stand nachlädt: er kennt die eben aufgelöste Einheit noch nicht.
   if (!aktuell && (aufgeloesteQuery.isPending || aufgeloesteQuery.isFetching)) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="einheiten" />;
   }
   if (!aktuell && aufgeloesteQuery.isError) {
     return (

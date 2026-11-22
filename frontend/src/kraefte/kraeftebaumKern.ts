@@ -628,7 +628,9 @@ function vollQuelle(
 /**
  * Die Mittel EINER Einheit (Einheit-Ansicht LLH-1036, Lagebericht-Text): Fahrzeuge mit
  * Besatzung, Personal ohne Fahrzeug, Material. `einheitId: null` ordnet die Mittel ohne
- * `einheit_id`. `quelle` sind die ungefilterten Listen; ohne sie gelten die übergebenen.
+ * `einheit_id` und die an einer Einheit, die nicht (mehr) in `roh.einheiten` steht — dieselbe
+ * Regel wie {@link groupByEinheit} (LLH-1916). `quelle` sind die ungefilterten Listen; ohne sie
+ * gelten die übergebenen.
  */
 export function mittelDerEinheit(
   einheitId: number | null,
@@ -637,12 +639,17 @@ export function mittelDerEinheit(
 ): MittelDerEinheit {
   roh = aktiveEingabe(roh);
   const einheit = einheitId != null ? roh.einheiten.find((e) => e.id === einheitId) : undefined;
-  const hier = (x: { einheit_id?: number | null }) => (x.einheit_id ?? null) === einheitId;
+  // Eine Einheit ohne Eintrag zählt wie keine — aber nur für „Ohne Einheit“: die Einheit-Ansicht
+  // fragt ihre eigene id und bekommt deren Mittel wie bisher.
+  const bekannt = new Set(roh.einheiten.map((e) => e.id));
+  const zuordnung = (id: number | null | undefined): number | null =>
+    id == null ? null : einheitId == null && !bekannt.has(id) ? null : id;
+  const hier = (x: { einheit_id?: number | null }) => zuordnung(x.einheit_id) === einheitId;
   const fahrzeuge = roh.fahrzeuge.filter(hier);
   // Material nach seinem Ort (D14): die Gruppe nimmt nur Posten dieser Einheit (ohne Einheit: ohne
-  // Ort), die Beladung nur die der eigenen Fahrzeuge.
+  // Ort oder an einer unbekannten Einheit), die Beladung nur die der eigenen Fahrzeuge.
   const { gruppen, beladung } = splitMaterial(roh.material, fahrzeuge, (z) =>
-    (z.art === 'einheit' ? z.einheitId : null) === einheitId ? einheitId : undefined,
+    zuordnung(z.art === 'einheit' ? z.einheitId : null) === einheitId ? einheitId : undefined,
   );
   return sortMittel(
     {
@@ -681,7 +688,11 @@ export interface KraeftebaumEingabe extends MittelListen {
   quelle?: Partial<MittelQuelle>;
 }
 
-function groupByEinheit<T extends { einheit_id?: number | null }>(
+/**
+ * Mittel je Einheit; eine `einheit_id`, die nicht in `bekannt` steht, zählt wie keine („Ohne
+ * Einheit“). Die eine Zuordnung für Meldebild und Kräftebild (LLH-1916).
+ */
+export function groupByEinheit<T extends { einheit_id?: number | null }>(
   liste: readonly T[],
   bekannt: ReadonlySet<number>,
 ): Map<number | null, T[]> {

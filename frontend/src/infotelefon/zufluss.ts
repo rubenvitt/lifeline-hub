@@ -4,8 +4,10 @@ import type { InfotelefonAnruf } from '../api/types';
  * Zufluss-Schleuse der Anruf-Zeitachse (LFH-554), nach dem Muster der ETB-Zeitachse
  * (`etb/zeitachseModell.ts`): Solange der Fokus in der Liste liegt, ist der gezeigte Stand
  * eingefroren (seit LLH-732 der geladene Ausschnitt, nicht die Vollliste). Neue Anrufe ANDERER
- * Plätze werden gezählt statt eingeschoben und erst auf „anzeigen“ eingefügt; eigene stehen
- * sofort (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
+ * Plätze werden gezählt statt eingeschoben und erst auf „anzeigen“ eingefügt; auf diesem Gerät
+ * erfasste stehen sofort (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Das Gerät zählt, nicht das
+ * Konto (LLH-1977, wie das ETB seit LLH-1833): derselbe Benutzer auf einem Zweitgerät erfasst aus
+ * Sicht dieser Liste fremd, sein Anruf wartet hinter dem Banner.
  */
 export interface Einfrierstand {
   ids: ReadonlySet<number>;
@@ -23,10 +25,10 @@ export function einfrieren(anrufe: readonly InfotelefonAnruf[]): Einfrierstand |
 }
 
 /**
- * Nimmt nachgeladene Anrufe in den eingefrorenen Stand auf (LLH-732): „Ältere laden“ hängt eine
- * Seite an, während der Fokus in der Liste liegt. Die Wassermarke bleibt, sonst gäbe sie neue
- * fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen Nachtrag (alter Eingang, hohe
- * Kennung) aus der älteren Seite als „neuen Anruf“ zurück.
+ * Nimmt nachgeladene Anrufe in den eingefrorenen Stand auf (LLH-732, LLH-1886): „Ältere laden“
+ * oder „Neuere laden“ holt eine Seite, während der Fokus in der Liste liegt. Die Wassermarke
+ * bleibt, sonst gäbe sie neue fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen
+ * Nachtrag (alter Eingang, hohe Kennung) aus der geholten Seite als „neuen Anruf“ zurück.
  */
 export function extendEinfrierstand(
   gefroren: Einfrierstand | null,
@@ -36,19 +38,24 @@ export function extendEinfrierstand(
   return { ...gefroren, ids: new Set([...gefroren.ids, ...ids]) };
 }
 
+const KEINE_IDS: ReadonlySet<number> = new Set();
+
+/**
+ * `hierErfasst`: Kennungen der Anrufe, die die Erfassung auf diesem Gerät zurückbekam. Das
+ * Informationstelefon erfasst nicht ohne Netz, die Kennung steht also mit der Antwort fest; eine
+ * `client_id` wie im ETB braucht es dafür nicht.
+ */
 export function teileZufluss(
   anrufe: readonly InfotelefonAnruf[],
   gefroren: Einfrierstand | null,
-  eigeneBenutzerId?: number | null,
+  hierErfasst: ReadonlySet<number> = KEINE_IDS,
 ): { sichtbar: InfotelefonAnruf[]; zurueckgehalten: number } {
   if (gefroren == null) return { sichtbar: [...anrufe], zurueckgehalten: 0 };
   const sichtbar: InfotelefonAnruf[] = [];
   let zurueckgehalten = 0;
   for (const a of anrufe) {
     const zurueck =
-      !gefroren.ids.has(a.id) &&
-      a.id > gefroren.wassermarke &&
-      (eigeneBenutzerId == null || a.angelegt_von_id !== eigeneBenutzerId);
+      !gefroren.ids.has(a.id) && a.id > gefroren.wassermarke && !hierErfasst.has(a.id);
     if (zurueck) zurueckgehalten += 1;
     else sichtbar.push(a);
   }

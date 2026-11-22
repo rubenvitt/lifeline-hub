@@ -34,12 +34,7 @@ import UnterbringungKennzahlen from '../betreuung/UnterbringungKennzahlen';
 import { unterbringungKennzahl, unterbringungKurzform } from '../betreuung/unterbringungKennzahl';
 import { KlappBand } from '../components/instrument';
 import EinsatzSeite from '../components/EinsatzSeite';
-import {
-  SeitenFehler,
-  SeitenLeer,
-  SeitenSkeleton,
-  SeitenStandVeraltet,
-} from '../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -47,6 +42,7 @@ import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const betreuungRechteText = einsatzRechteGrund;
@@ -250,7 +246,7 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
     [resetStelleStornieren, navigate, einsatzId],
   );
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="betreuung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

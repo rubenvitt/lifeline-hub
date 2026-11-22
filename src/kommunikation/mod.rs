@@ -171,6 +171,54 @@ pub fn parse_page(
     Ok(Seite { vor, limit })
 }
 
+/// Blätterrichtung eines Cursors in einer Liste, die in beide Richtungen blättert (LLH-1886,
+/// Informationstelefon): `Vor` liest die Seite unter dem Cursor (älter), `Nach` die Seite direkt
+/// darüber (neuer).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Blaettern {
+    Vor(ZeitCursor),
+    Nach(ZeitCursor),
+}
+
+/// Eine angeforderte Seite einer Liste mit Fenster in beide Richtungen. Getrennt von [`Seite`],
+/// die Meldungen, Aufträge und Erinnerungen lesen: ein `nach` dort ginge an deren Repos still
+/// vorbei.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FensterSeite {
+    pub cursor: Option<Blaettern>,
+    pub limit: i64,
+}
+
+/// Liest Cursor beider Richtungen und Seitengröße (LLH-1886). Je Richtung gilt [`parse_page`]
+/// (halber Cursor → 422, leerer Zeitwert fehlt, `limit` geklemmt); beide Richtungen zugleich → 422.
+pub fn parse_fenster(
+    vor_zeit: Option<&str>,
+    vor_id: Option<i64>,
+    nach_zeit: Option<&str>,
+    nach_id: Option<i64>,
+    limit: Option<i64>,
+) -> Result<FensterSeite, crate::error::AppError> {
+    let vor = parse_page(vor_zeit, vor_id, limit)?;
+    // Derselbe Leser, aber der Fehlertext nennt die Felder dieser Richtung.
+    let nach = parse_page(nach_zeit, nach_id, limit).map_err(|_| {
+        crate::error::AppError::UnprocessableEntity("nach_zeit und nach_id gehören zusammen".into())
+    })?;
+    let cursor = match (vor.vor, nach.vor) {
+        (Some(_), Some(_)) => {
+            return Err(crate::error::AppError::UnprocessableEntity(
+                "vor_… und nach_… schließen sich aus".into(),
+            ))
+        }
+        (Some(c), None) => Some(Blaettern::Vor(c)),
+        (None, Some(c)) => Some(Blaettern::Nach(c)),
+        (None, None) => None,
+    };
+    Ok(FensterSeite {
+        cursor,
+        limit: vor.limit,
+    })
+}
+
 /// Geteilter Status eines Objekts: beide Achsen getrennt. `quittiert_at` ist die
 /// Quittungs-Achse, `vollzug_status`/`vollzogen_at` die Vollzugs-Achse — beide
 /// unabhängig setzbar.
@@ -237,6 +285,43 @@ mod tests {
                 id: 7
             })
         );
+    }
+
+    #[test]
+    fn parse_fenster_liest_eine_richtung_und_lehnt_beide_ab() {
+        use crate::error::AppError;
+        let c = ZeitCursor {
+            zeit: "2026-10-01 10:00:00".into(),
+            id: 7,
+        };
+        assert_eq!(
+            parse_fenster(Some("2026-10-01 10:00:00"), Some(7), None, None, Some(3)).unwrap(),
+            FensterSeite {
+                cursor: Some(Blaettern::Vor(c.clone())),
+                limit: 3
+            }
+        );
+        assert_eq!(
+            parse_fenster(None, None, Some("2026-10-01 10:00:00"), Some(7), None).unwrap(),
+            FensterSeite {
+                cursor: Some(Blaettern::Nach(c)),
+                limit: SEITE_STANDARD
+            }
+        );
+        assert!(matches!(
+            parse_fenster(None, None, Some(" "), Some(7), None),
+            Err(AppError::UnprocessableEntity(t)) if t.contains("nach_zeit")
+        ));
+        assert!(matches!(
+            parse_fenster(
+                Some("2026-10-01 10:00:00"),
+                Some(7),
+                Some("2026-10-01 09:00:00"),
+                Some(1),
+                None
+            ),
+            Err(AppError::UnprocessableEntity(_))
+        ));
     }
 
     #[test]

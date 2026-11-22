@@ -8,6 +8,7 @@ import type { PlatzhalterRueckweg } from './Platzhalter';
 import Paneel from './instrument/Paneel';
 import { useRollen } from './instrument/rollenwerte';
 import Stapel from './instrument/Stapel';
+import { Status } from './instrument/Status';
 import Textstufe from './instrument/Textstufe';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache (`.lfh-skelett`). Der Import gehört
 // HIERHER: Konsumenten in `AdminPage` montieren kein `EinsatzSeite`, ihre Balken wären sonst
@@ -313,6 +314,9 @@ export function SeitenSackgasse({
   );
 }
 
+/** Wortlaut von {@link SeitenStandVeraltet}; die kompakte Form trägt ihn im Titel. */
+const STAND_VERALTET_GANZ = 'Aktualisierung fehlgeschlagen · Stand womöglich veraltet';
+
 interface SeitenStandVeraltetProps {
   onWiederholen: () => void;
 }
@@ -332,9 +336,42 @@ export function SeitenStandVeraltet({ onWiederholen }: SeitenStandVeraltetProps)
       type="warning"
       showIcon
       banner
-      title="Aktualisierung fehlgeschlagen · Stand womöglich veraltet"
+      title={STAND_VERALTET_GANZ}
       action={<Button onClick={onWiederholen}>Erneut abrufen</Button>}
     />
+  );
+}
+
+/**
+ * Dieselbe Lage wie {@link SeitenStandVeraltet}, kompakt für eine Standzeile fester Höhe
+ * (LLH-1927): über einem Baum mit Zufluss-Schleuse schöbe der Alert-Balken beim Erscheinen und
+ * Verschwinden die Knoten unter dem Zeiger. Achtung, nicht Alarm: die Zeilen sind echt, nur alt.
+ *
+ * Verschwindet der Hinweis nach geglücktem Abruf, ginge der Fokus mit dem Knopf auf `body`; der
+ * Aufrufer setzt ihn in `onWiederholen` vorher auf seine Standzeile (WCAG 2.4.3).
+ */
+export function StandVeraltetHinweis({ onWiederholen }: SeitenStandVeraltetProps) {
+  const { token } = useRollen();
+  return (
+    <span
+      role="status"
+      data-lfh="stand-veraltet"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: token.marginXS,
+        flex: '0 0 auto',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <Status
+        groesse="klein"
+        ton="achtung"
+        wort="Stand womöglich veraltet"
+        title={STAND_VERALTET_GANZ}
+      />
+      <Button onClick={onWiederholen}>Erneut abrufen</Button>
+    </span>
   );
 }
 

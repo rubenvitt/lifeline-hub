@@ -33,6 +33,24 @@ describe('CommandPaletteTrigger', () => {
     expect(await screen.findByRole('combobox')).toHaveFocus();
   });
 
+  // LLH-1915: der Knopf gibt sich als Rückkehrziel mit. Safari fokussiert Knöpfe beim Klick nicht,
+  // ein bloßes `document.activeElement` wäre dort `body`; der Klick per `dispatchEvent` bildet das ab.
+  it.each([1024, 600])(
+    'bekommt den Fokus nach Esc zurück, auch ohne Fokus beim Klick (%i px)',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      const u = userEvent.setup();
+      zeige();
+      const suchen = screen.getByRole('button', { name: 'Suchen' });
+
+      suchen.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(await screen.findByRole('combobox')).toHaveFocus();
+      await u.keyboard('{Escape}');
+
+      expect(suchen).toHaveFocus();
+    },
+  );
+
   it('steht breit als Suchfeld: Hinweistext, Plattformkürzel, Name bleibt „Suchen"', () => {
     zeige();
 

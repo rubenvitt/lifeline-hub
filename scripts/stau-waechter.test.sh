@@ -517,6 +517,7 @@ regeln() { # <klon> <integration_id von Migrationsnummern oder leer>
   jq -n --arg m "$2" '[{type: "required_status_checks", parameters: {
       strict_required_status_checks_policy: false,
       required_status_checks: [{context: "Schnellprüfungen", integration_id: 15368},
+        {context: "Server-Binary", integration_id: 15368},
         (if $m == "" then {context: "Migrationsnummern"} else {context: "Migrationsnummern", integration_id: ($m | tonumber)} end),
         {context: "ADR-Nummern"}]}}]' > "$(fake "$1")/regeln.json"
 }

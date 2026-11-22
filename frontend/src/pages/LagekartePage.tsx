@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
-import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
 import {
   EinsatzstatusMarke,
@@ -136,6 +135,7 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { modulName } from '../einsatz/modulRegistry';
 import { waermeVokabularAuf } from './lagekarte/zeichenWahl';
 import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../api/anhangAbruf';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -965,6 +965,9 @@ export default function LagekartePage() {
       onBestaetigungZurueck();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'verwerfen') {
+      // Erst den Zug an den Griffen beenden: sonst meldet er nach dem Verwerfen die Zeigerlage,
+      // und die verworfene Änderung wäre wieder da (LLH-1891).
+      kartenRef.current?.zugBeenden();
       if (zonenBearbeitung) onBearbeitung({ art: 'verwerfen' });
       else if (kreisEntwurf) onKreisVerwerfen();
       else kartenRef.current?.zeichnungVerwerfen();
@@ -1331,7 +1334,7 @@ export default function LagekartePage() {
   }, [searchParams, abschnittAuftrag, ladt, start, fokussiereAbschnitt]);
 
   if (ladt) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="lagekarte" />;
   }
 
   const onlineStyles = config?.online_styles ?? [];

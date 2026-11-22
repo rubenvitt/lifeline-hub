@@ -38,7 +38,7 @@ import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -67,6 +67,7 @@ import { POSITION_LABELS } from '../api/personal';
 import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
 import { Marke } from '../components/instrument/Marke';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
@@ -262,7 +263,7 @@ export default function PersonalPage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="personal" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

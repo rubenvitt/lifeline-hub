@@ -14,7 +14,7 @@ import { IconPfeileAuswaerts } from '../icons';
 import { Paneel } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import LagebesprechungGrossbild, {
@@ -27,6 +27,7 @@ import TerminPaneel from '../lagebesprechung/TerminPaneel';
 import VorbereitungPaneel from '../lagebesprechung/VorbereitungPaneel';
 import { zeigeAbschlussToast } from '../lagebesprechung/abschlussToast';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Modul „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung, Abschluss und Verlauf an einem Ort,
@@ -109,7 +110,7 @@ export default function LagebesprechungPage() {
     hasStand,
   ]);
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="lagebesprechung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

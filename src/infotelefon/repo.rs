@@ -8,7 +8,7 @@ use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 
 use super::{InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus, InfotelefonZaehler};
 use crate::error::AppError;
-use crate::kommunikation::Seite;
+use crate::kommunikation::{Blaettern, FensterSeite};
 use crate::routes::support::hoechstens;
 
 /// Eingabe „Anruf erfassen“. Anliegen und Eingang hat die Route gelesen und normalisiert.
@@ -91,31 +91,43 @@ fn filter_clause(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &AnrufF
 
 /// Eine Seite des Protokolls: jüngster Eingang zuerst, Gleichstand über die Kennung, ab dem
 /// Cursor `(eingang_at, id)` (ein nachgetragener Anruf hat frühen Eingang und hohe Kennung).
+/// `Vor` liest die Seite darunter, `Nach` die Seite direkt darüber (LLH-1886); geliefert wird
+/// beide Male absteigend.
 pub async fn list_page(
     pool: &SqlitePool,
     einsatz_id: i64,
     filter: &AnrufFilter,
-    seite: &Seite,
+    seite: &FensterSeite,
 ) -> Result<Vec<InfotelefonAnrufAnzeige>, AppError> {
     let mut qb = QueryBuilder::<Sqlite>::new(anruf_select!());
     filter_clause(&mut qb, einsatz_id, filter);
-    if let Some(vor) = &seite.vor {
-        qb.push(" AND (a.eingang_at < ");
-        qb.push_bind(vor.zeit.clone());
+    let (cursor, vergleich) = match &seite.cursor {
+        Some(Blaettern::Vor(c)) => (Some(c), "<"),
+        Some(Blaettern::Nach(c)) => (Some(c), ">"),
+        None => (None, "<"),
+    };
+    if let Some(c) = cursor {
+        qb.push(format!(" AND (a.eingang_at {vergleich} "));
+        qb.push_bind(c.zeit.clone());
         qb.push(" OR (a.eingang_at = ");
-        qb.push_bind(vor.zeit.clone());
-        qb.push(" AND a.id < ");
-        qb.push_bind(vor.id);
+        qb.push_bind(c.zeit.clone());
+        qb.push(format!(" AND a.id {vergleich} "));
+        qb.push_bind(c.id);
         qb.push("))");
     }
-    qb.push(" ORDER BY a.eingang_at DESC, a.id DESC LIMIT ");
+    // Nach oben: aufsteigend lesen, damit die Seite DIREKT über dem Cursor beginnt, dann umdrehen.
+    let nach_oben = matches!(seite.cursor, Some(Blaettern::Nach(_)));
+    if nach_oben {
+        qb.push(" ORDER BY a.eingang_at ASC, a.id ASC LIMIT ");
+    } else {
+        qb.push(" ORDER BY a.eingang_at DESC, a.id DESC LIMIT ");
+    }
     qb.push_bind(seite.limit);
-    qb.build_query_as::<Zeile>()
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .map(TryInto::try_into)
-        .collect()
+    let mut zeilen = qb.build_query_as::<Zeile>().fetch_all(pool).await?;
+    if nach_oben {
+        zeilen.reverse();
+    }
+    zeilen.into_iter().map(TryInto::try_into).collect()
 }
 
 /// Zählt die Anrufe, die die Liste mit demselben Filter über alle Seiten liefert (LLH-732).

@@ -221,7 +221,11 @@ Wer lieber wählt: „Kalender und Uhrzeit“ neben dem Feld öffnen, einen Tag 
 
 1. Die Meldung lesen: Ein Alarm steht in der Alarmzone direkt unter der Kopfzeile, ein Eingang
    im Eingangsband unten. Vorn steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“,
-   dahinter, wo vorhanden, der Gegenstand, etwa „Auftrag #12“.
+   dahinter, wo vorhanden, der Gegenstand: beim Auftrag Nummer und Anfang des Auftragstexts
+   („#12 · Wasserentnahme an der Mühlbachbrücke …“), beim Befehl oder Lagebericht der Titel
+   („Neuer Befehl: Räumung Nord“), bei einer Gefahr ihre Bezeichnung, bei einer Nachforderung
+   Art und Bezeichnung, bei einer Erwähnung im Chat Absender und Textanfang. Antwortet die App
+   damit nicht binnen anderthalb Sekunden, steht nur die Kennung, etwa „Auftrag #12“.
 2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder „Gelesen“, um auf der Seite zu bleiben.
    Stehen im Eingangsband mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“;
    kommen sie aus mehreren Modulen, öffnet „Ansehen“ die Liste der Eingänge.
@@ -239,7 +243,8 @@ wird; andere Tabs und Geräte zeigen ihn weiter. „Ansehen“ quittiert ebenfal
    ungelesenen). Auf dem Handy und auf dem Tablet mit Finger trägt die Alarmzentrale die Zahl:
    sie öffnen und „Eingänge, … ungelesen“ wählen.
 2. Unter „Neu“ stehen die ungelesenen Eingänge, unter „Früher“ die gelesenen, jeweils mit der
-   Uhrzeit, der Art und der Kennung.
+   Uhrzeit, der Art und der Kennung. Unter „Neu“ steht dazu der Gegenstand wie in Alarmzone und
+   Eingangsband.
 3. Einen Eintrag wählen: Die App springt zum Gegenstand, der Eintrag gilt als gelesen.
 4. Oder „Alle gelesen“ wählen: Alle Eingänge des Einsatzes gelten als gelesen, auf allen Geräten
    der Person. Alarme bleiben, bis jemand sie selbst öffnet oder schließt.
@@ -551,7 +556,9 @@ erfassen“ …), laufenden Einsätzen, Einstellungen, der „Hilfe“ und, ab z
 Datensätzen des Einsatzes: Personen, Fahrzeuge (auch über Fahrzeugtyp und Kennzeichen), Personal
 (auch über die Funktion), Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
-Rolle schreiben darf.
+Rolle schreiben darf. Ausnahmen sind „ETB-Eintrag schreiben“ und „Meldung erfassen“: Sie stehen auch
+für die Mitarbeit, die diese beiden selbst erfasst, und am Spiegel einer gekoppelten Instanz, wo sie
+einen Antrag an die führende Instanz stellen.
 
 Ein Treffer braucht für jedes getippte Wort einen Wortanfang oder, ab drei Zeichen, einen Teil
 eines Wortes; „rtw“ findet also Fahrzeuge vom Typ RTW, aber nicht die Lagekarte. Umlaute und ihre
@@ -641,7 +648,7 @@ Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten rechts. Hat die 
 Einsatztagebuch oder „Entwurf speichern“ und „Freigeben“ am Befehl, steht das Band darüber und
 deckt keinen ihrer Knöpfe ab. Es bündelt sie: „3 neue Meldungen“ oder, sind andere Eingänge dabei, „3 neue
 Eingänge“, mit den beiden jüngsten und darunter „+ n weitere“; eine Meldung nennt Absender und
-Wortlautanfang. Sein Ton klingt höchstens alle zwei Minuten, auch wenn in der Zeit zehn Eingänge
+Wortlautanfang, jeder andere Eingang seinen Gegenstand. Sein Ton klingt höchstens alle zwei Minuten, auch wenn in der Zeit zehn Eingänge
 kommen. Wer gerade in ein Feld schreibt, behält den Fokus: Das Band erscheint erst, wenn das Feld
 verlassen ist. Auf der Seite „Meldungen“ zeigt es keine Meldungen, denn dort stehen sie schon in
 der Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was eine Meldung

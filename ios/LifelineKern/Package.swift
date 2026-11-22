@@ -2,7 +2,8 @@
 //
 // Testbare Logik der iOS-Hülle ohne UIKit und WebKit (LLH-1978, design.md D1): Adressprüfung,
 // Deeplink, Linkregeln und Linkweiche, Serverliste und Serverentfernung, Vertragsprüfung,
-// Onboarding, Ablauf der Seiten mit Status-Texten, Brücke und Init-Skript, Anmeldung (PKCE),
+// Onboarding, Ablauf der Seiten mit Status-Texten, Vorrat für den Start ohne Server (LLH-1980),
+// Brücke und Init-Skript, Anmeldung (PKCE),
 // Stil der Hülle, Dialoge der Seite und Haptik-Abbildung. Läuft auch unter Linux (`swift test`, Schritt `ios` von scripts/check-all.sh); die App
 // (`ios/App`) bindet das Paket ein. Die Fälle, die die Desktop-Hülle teilt, liest die Suite aus
 // `src-tauri/faelle/` (Tests/LifelineKernTests/GemeinsameFaelle.swift).

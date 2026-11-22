@@ -21,7 +21,7 @@ import {
   type SegmentOption,
 } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { KEINE_BERECHTIGUNG, istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -32,6 +32,7 @@ import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/de
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 import { useAdressWert } from '../routing/useAdressWert';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 type Ansicht = 'rechner' | 'richtwerte';
 /** Werte von `?ansicht=` (LLH-1826); exhaustiv, Vorgabe `rechner`. */
@@ -119,7 +120,8 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
     },
   });
 
-  if (einsatzQuery.isLoading || betreuungQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading || betreuungQuery.isLoading)
+    return <ModulGerippeSeite modulKey="betreuung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

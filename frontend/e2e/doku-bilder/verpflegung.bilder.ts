@@ -1,7 +1,9 @@
+import { waehlePerTastatur } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
   demoEinsatz,
+  eintreffenVor,
   expect,
   fotografiere,
   fuelle,
@@ -98,7 +100,7 @@ test.describe(KAPITEL, () => {
       for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
         await fuelle(api, 'post', `/api/einsaetze/${demo.id}/einheiten/${e.id}/zeitachse`, {
           art: 'eintreffen',
-          zeitpunkt_at: new Date(jetzt.getTime() - 120 * 60_000).toISOString(),
+          zeitpunkt_at: eintreffenVor(jetzt, 120).toISOString(),
         });
       }
 
@@ -219,18 +221,14 @@ test.describe(KAPITEL, () => {
     await page.getByRole('menuitem', { name: 'Ausgabe nachtragen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
     await dialog.getByLabel('Menge (EP)').fill('10');
-    await dialog.getByRole('combobox', { name: 'Stelle' }).click();
-    await page
-      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-      .locator(`.ant-select-item-option[title="${TURNHALLE}"]`)
-      .click();
+    // Per Tastatur (LLH-2002): unter angehaltener Uhr blenden Dialog und Liste verspätet ein und
+    // nehmen dabei keine Klicks an (`waehlePerTastatur` in `e2e/auswahl-kern.ts`).
+    await waehlePerTastatur(dialog.getByRole('combobox', { name: 'Stelle' }), TURNHALLE);
     await expect(dialog.getByLabel('Zuführungsziel')).toHaveCount(0);
     // Empfänger (LLH-1055): die eingetragene Menge bleibt, die Stärke belegt nur eine leere vor.
-    await dialog.getByRole('combobox', { name: 'Empfänger' }).click();
-    await page
-      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-      .locator(`.ant-select-item-option[title^="${STAFFEL}"]`)
-      .click();
+    await waehlePerTastatur(dialog.getByRole('combobox', { name: 'Empfänger' }), STAFFEL, {
+      beginntMit: true,
+    });
     await expect(dialog.getByLabel('Menge (EP)')).toHaveValue('10');
     await dialog.getByLabel('Menge (EP)').focus();
     await dialog.getByLabel('Menge (EP)').blur();

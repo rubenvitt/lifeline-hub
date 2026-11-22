@@ -11,18 +11,14 @@ import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenModal from './uhs/UhsAnlegenModal';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
-import {
-  SeitenFehler,
-  SeitenLeer,
-  SeitenSkeleton,
-  SeitenStandVeraltet,
-} from '../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { Status } from '../components/instrument/Status';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 const TYP_FILTER = (Object.keys(uhsTyp) as UhsTyp[]).map((t) => ({
   text: uhsTyp[t].label,
@@ -126,7 +122,7 @@ export default function UnfallhilfsstellenPage() {
   //
   // Listenzustand — `uhsQuery`. Ihr Zustand gehört an die Stelle der Liste (unten), nicht in diesen
   // Guard: sonst stünde die ganze Seite im Ladebild oder Fehler.
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="unfallhilfsstellen" />;
   if (einsatzQuery.error) {
     return (
       <SeitenFehler

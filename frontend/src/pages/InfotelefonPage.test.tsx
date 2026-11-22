@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { AdresseSteht } from '../test/adresseSteht';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
   ANRUFE_PAGE_SIZE,
@@ -17,7 +17,8 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, InfotelefonAnruf, InfotelefonZaehler } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
-import { freigabenFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
 import { modulName } from '../einsatz/modulRegistry';
 import { setzeViewportBreite } from '../test/viewport';
 
@@ -194,13 +195,16 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(loadAnrufe).toHaveBeenLastCalledWith(1, {
       status: undefined,
       vor: { zeit: '2026-09-30 10:00:00', id: 901 },
+      limit: ANRUFE_PAGE_SIZE,
     });
     // Die zweite Seite ist kürzer als eine volle: es gibt nichts Älteres mehr.
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull());
   });
 
   it('holt einen per ?anruf= angesteuerten Anruf außerhalb des Fensters einzeln', async () => {
-    vi.mocked(loadAnruf).mockResolvedValue(anruf({ id: 77, notiz: 'alter Anruf' }));
+    vi.mocked(loadAnruf).mockResolvedValue(
+      anruf({ id: 77, eingang_at: '2026-09-30 08:00:00', notiz: 'alter Anruf' }),
+    );
     setup('/einsaetze/1/infotelefon?anruf=77');
     await waitFor(() => expect(loadAnruf).toHaveBeenCalledWith(1, 77));
     const ziel = await waitFor(() => {
@@ -298,7 +302,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     );
     await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
     await waitFor(() =>
-      expect(loadAnrufe).toHaveBeenCalledWith(1, { status: 'offen', vor: undefined }),
+      expect(loadAnrufe).toHaveBeenCalledWith(1, { status: 'offen', limit: ANRUFE_PAGE_SIZE }),
     );
     await waitFor(() => expect(screen.queryByText('Sperrung B 3')).toBeNull());
     expect(screen.getByRole('radio', { name: 'offene Rückrufe' })).toBeChecked();
@@ -311,7 +315,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
     await waitFor(() => expect(screen.queryByText('Sperrung B 3')).toBeNull());
     expect(screen.getByText('sucht Vater')).toBeInTheDocument();
-    expect(loadAnrufe).toHaveBeenCalledWith(1, { status: 'offen', vor: undefined });
+    expect(loadAnrufe).toHaveBeenCalledWith(1, { status: 'offen', limit: ANRUFE_PAGE_SIZE });
   });
 
   it('führt bei Vermisstensuche zu den Vermissten — nur mit Freigabe der Personen', async () => {
@@ -374,6 +378,19 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(screen.queryByText('Keller voll')).toBeNull();
   });
 
+  it('meldet einen Anruf desselben Kontos von einem anderen Gerät im Banner (LLH-1977)', async () => {
+    // Angemeldet ist Konto 1, das auch die geladenen Anrufe erfasst hat. Anruf 3 kommt vom
+    // Zweitgerät desselben Kontos: aus Sicht dieser Liste fremd, er wartet hinter dem Banner.
+    server.use(meHandler(benutzerFixture({ id: 1 })));
+    const { client } = setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    (await within(liste).findAllByRole('button', { name: /^Status von Anruf / }))[0].focus();
+    serve([anruf({ id: 3, angelegt_von_id: 1, notiz: 'vom Zweitgerät' }), ...ANRUFE]);
+    await client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) });
+    expect(await screen.findByText('1 neuer Anruf')).toBeInTheDocument();
+    expect(screen.queryByText('vom Zweitgerät')).toBeNull();
+  });
+
   it('hält einen Nachtrag aus „Ältere laden“ nicht als neuen Anruf zurück', async () => {
     // Fokus auf „Ältere laden“ (in der Liste) friert ein; die ältere Seite bringt einen Nachtrag
     // eines anderen Platzes (alter Eingang, hohe Kennung). Er gehört zum Gelesenen, nicht zum
@@ -415,6 +432,126 @@ describe('InfotelefonPage (LFH-554)', () => {
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) }));
     expect(await screen.findByText('1 neuer Anruf')).toBeInTheDocument();
     expect(screen.queryByText('fremder Nachtrag')).toBeNull();
+  });
+
+  /*
+   * Seitenfenster in beide Richtungen (LLH-1886). Der Mock blättert wie der Server: Ordnung
+   * (Eingang, Kennung) absteigend, `vor` darunter, `nach` direkt darüber (absteigend geliefert).
+   * Der Eingang wächst mit der Kennung, damit ein Nachtrag mitten im Fenster einsortiert.
+   */
+  describe('Seitenfenster', () => {
+    const eingang = (id: number) =>
+      `2026-09-30 10:${String(Math.floor(id / 60)).padStart(2, '0')}:${String(id % 60).padStart(2, '0')}`;
+    const vergleich = (a: InfotelefonAnruf, b: InfotelefonAnruf) =>
+      a.eingang_at === b.eingang_at ? b.id - a.id : a.eingang_at < b.eingang_at ? 1 : -1;
+    function blaettere(bestand: () => InfotelefonAnruf[]) {
+      vi.mocked(loadAnrufe).mockImplementation(async (_e, seite = {}) => {
+        const alle = [...bestand()].sort(vergleich);
+        const limit = seite.limit ?? ANRUFE_PAGE_SIZE;
+        const c = seite.vor ?? seite.nach;
+        if (c == null) return alle.slice(0, limit);
+        const cursor = anruf({ id: c.id, eingang_at: c.zeit });
+        if (seite.nach) {
+          const ueber = alle.filter((a) => vergleich(a, cursor) < 0);
+          return ueber.slice(Math.max(0, ueber.length - limit));
+        }
+        return alle.filter((a) => vergleich(a, cursor) > 0).slice(0, limit);
+      });
+    }
+    const reihe = (von: number, bis: number) =>
+      Array.from({ length: von - bis + 1 }, (_, i) =>
+        anruf({ id: von - i, eingang_at: eingang(von - i), notiz: `Anruf ${von - i}` }),
+      );
+
+    it('hält einen fremden Nachtrag zurück, auch wenn vorn die neueste Seite herausfällt', async () => {
+      let bestand = reihe(1000, 401);
+      blaettere(() => bestand);
+      const { client } = setup();
+      const knopf = await screen.findByRole('button', { name: 'Ältere laden' });
+      act(() => knopf.focus());
+      for (let i = 0; i < 5; i += 1) {
+        await userEvent.click(knopf);
+        await screen.findByText(`Anruf ${801 - i * 100}`);
+      }
+      // Fünf Seiten im Fenster: die neueste ist gefallen, unten steht der Rückweg.
+      await waitFor(() => expect(screen.queryByText('Anruf 1000')).toBeNull());
+      expect(screen.getByRole('button', { name: 'Neuere laden' })).toBeInTheDocument();
+      expect(knopf).toHaveFocus();
+
+      // Ein anderer Platz trägt einen Anruf nach, der mitten ins Fenster sortiert.
+      bestand = [
+        ...bestand,
+        anruf({
+          id: 6000,
+          eingang_at: eingang(650),
+          angelegt_von_id: 9,
+          notiz: 'fremder Nachtrag',
+        }),
+      ];
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) }));
+      expect(await screen.findByText('1 neuer Anruf')).toBeInTheDocument();
+      expect(screen.queryByText('fremder Nachtrag')).toBeNull();
+    }, 60_000);
+
+    it('ein Deeplink auf einen jüngeren Anruf ohne Kopf im Fenster sortiert unten ein', async () => {
+      blaettere(() => reihe(950, 801));
+      vi.mocked(loadAnruf).mockResolvedValue(
+        anruf({ id: 940, eingang_at: eingang(940), notiz: 'Anruf 940' }),
+      );
+      const client = neuerQueryClient();
+      // `gcTime: 0` im Test-Client: bis die Freigabe steht, beobachtet niemand das Fenster.
+      client.setQueryDefaults(einsatzKeys.infotelefonListe(1, 'alle'), { gcTime: Infinity });
+      client.setQueryData(einsatzKeys.infotelefonListe(1, 'alle'), {
+        pages: [reihe(900, 801)],
+        pageParams: [{ aelter: { zeit: eingang(901), id: 901 } }],
+      });
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/infotelefon?anruf=940', client },
+      );
+      const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+      await within(liste).findByText('Anruf 940');
+      const zeilen = within(liste).getAllByRole('listitem');
+      // Funkprotokoll: jüngster unten. Er ist jünger als das Fenster, also ganz unten.
+      expect(zeilen[zeilen.length - 1]).toHaveTextContent('Anruf 940');
+    });
+
+    it('„Neuere laden“ bei eingefrorener Schleuse zeigt die geholte Seite ganz', async () => {
+      const bestand = [
+        ...reihe(950, 801),
+        anruf({ id: 7000, eingang_at: eingang(951), angelegt_von_id: 9, notiz: 'fremd und neu' }),
+      ];
+      blaettere(() => bestand);
+      const client = neuerQueryClient();
+      // `gcTime: 0` im Test-Client: bis die Freigabe steht, beobachtet niemand das Fenster.
+      client.setQueryDefaults(einsatzKeys.infotelefonListe(1, 'alle'), { gcTime: Infinity });
+      client.setQueryData(einsatzKeys.infotelefonListe(1, 'alle'), {
+        pages: [reihe(900, 801)],
+        pageParams: [{ aelter: { zeit: eingang(901), id: 901 } }],
+      });
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/infotelefon', client },
+      );
+      const knopf = await screen.findByRole('button', { name: 'Neuere laden' });
+      act(() => knopf.focus());
+      await userEvent.click(knopf);
+      expect(await screen.findByText('fremd und neu')).toBeInTheDocument();
+      expect(screen.queryByText(/neuer Anruf/)).toBeNull();
+      expect(loadAnrufe).toHaveBeenCalledWith(1, {
+        status: undefined,
+        nach: { zeit: eingang(900), id: 900 },
+        limit: ANRUFE_PAGE_SIZE + 1,
+      });
+      // Nicht voll (eine mehr angefragt): die neueste Seite ist da, der Rückweg verschwindet.
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull(),
+      );
+    });
   });
 
   it('Beobachtung liest, die Erfassung fehlt, und der Grund steht da', async () => {
@@ -604,6 +741,7 @@ describe('InfotelefonPage als eigenes Modul (i6k6mzed, design.md D3)', () => {
 
   it('Titel aus der Registry, Ortspfad ohne Stab', async () => {
     setup();
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(
       await screen.findByRole('heading', { level: 1, name: modulName('infotelefon') }),
     ).toBeInTheDocument();

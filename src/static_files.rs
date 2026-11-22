@@ -13,6 +13,33 @@ use sha2::{Digest, Sha256};
 #[folder = "frontend/dist"]
 struct Asset;
 
+/// Präfix der gehashten Vite-Assets.
+const ASSETS_PRAEFIX: &str = "assets/";
+/// Bilder der Anwenderdoku: auch der Precache des Service Workers lässt sie aus
+/// (`globIgnores` in `frontend/vite.config.ts`), sonst lüde jedes Release sie vor.
+const DOKU_BILDER_PRAEFIX: &str = "assets/doku/";
+
+/// Die Assets, die die Oberfläche ohne Server braucht (LLH-1980): alles unter `assets/` außer
+/// den Doku-Bildern, sortiert. Die iOS-Hülle wärmt sie nach jedem Online-Laden vor
+/// (`GET /api/shell`, Feld `assets`).
+fn filter_offline_assets(pfade: impl IntoIterator<Item = impl AsRef<str>>) -> Vec<String> {
+    let mut liste: Vec<String> = pfade
+        .into_iter()
+        .filter(|p| {
+            let p = p.as_ref();
+            p.starts_with(ASSETS_PRAEFIX) && !p.starts_with(DOKU_BILDER_PRAEFIX)
+        })
+        .map(|p| p.as_ref().to_string())
+        .collect();
+    liste.sort();
+    liste
+}
+
+/// [`filter_offline_assets`] über das eingebettete Frontend; ohne Frontend die leere Liste.
+pub fn offline_assets() -> Vec<String> {
+    filter_offline_assets(Asset::iter())
+}
+
 /// MIME-Typ anhand der Dateiendung; ein kleiner fester Satz statt zusätzlicher Dependency.
 fn content_type(pfad: &str) -> &'static str {
     match pfad.rsplit('.').next() {
@@ -195,6 +222,24 @@ mod tests {
     fn getter(eintraege: Vec<(&'static str, &'static [u8])>) -> impl Fn(&str) -> Option<Vec<u8>> {
         let map: HashMap<&str, &[u8]> = eintraege.into_iter().collect();
         move |p: &str| map.get(p).map(|b| b.to_vec())
+    }
+
+    /// LLH-1980: die iOS-Hülle wärmt genau diese Liste vor. Sie folgt dem Precache des Service
+    /// Workers: keine Doku-Bilder, kein HEIC-Decoder, nichts außerhalb von `assets/`.
+    #[test]
+    fn offline_assets_nimmt_nur_assets_ohne_doku_und_sortiert() {
+        let pfade = [
+            "index.html",
+            "assets/index-b.js",
+            "assets/doku/bild.png",
+            "assets/a.css",
+            "bibliotheken/libheif/libheif.js",
+            "sw.js",
+        ];
+        assert_eq!(
+            filter_offline_assets(pfade),
+            vec!["assets/a.css".to_string(), "assets/index-b.js".to_string()]
+        );
     }
 
     #[test]

@@ -133,17 +133,22 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 - Jeder Einsatz hat den Kanal **„Allgemein“**; weitere Kanäle legen Einsatzleitung und
   Führungspersonal an.
 - Kanäle mit ungelesenen Nachrichten stehen oben und tragen ihre Zahl; danach ordnet die jüngste
-  Nachricht. Wer einen Kanal öffnet, hat ihn gelesen. Gelesen wird je Person, nicht je Gerät.
+  Nachricht. Wer einen Kanal öffnet, hat ihn gelesen. Gelesen wird je Person, nicht je Gerät. Wer
+  weit zurückgeblättert hat, liest erst, wenn er wieder bei den neuesten Nachrichten ankommt.
 - Die Summe der ungelesenen Nachrichten steht als Zähler am Modul „Chat“.
 - Neue Nachrichten erscheinen ohne Neuladen. Wer gerade weiter oben liest, bleibt dort; unten
   erscheint „1 neue Nachricht“ oder „n neue Nachrichten“ und führt ans Ende.
-- Lange Verläufe lädt „Ältere laden“ am oberen Ende nach.
+- Lange Verläufe lädt „Ältere laden“ am oberen Ende nach. Der Chat hält dabei höchstens 500
+  Nachrichten; wer weiter zurückblättert, verliert unten die neuesten aus der Ansicht. Dann steht
+  über der Eingabe „Neuere laden“ und führt Stück für Stück zurück nach unten. Wer in dieser Lage
+  eine Nachricht schickt, springt direkt ans Ende zu seiner Nachricht.
 
 ### Erwähnungen
 
 - Eine erwähnte Person bekommt den Hinweis „Erwähnt im Chat“; er führt in den Kanal der
-  Nachricht. Eine erwähnte Funktion erreicht jede Person, die sie in ihrer Mitgliedschaft trägt;
-  EL erreicht zuerst den Einsatzleiter der Führungsstelle, wenn er mit einem Konto verknüpft ist.
+  Nachricht. Eine erwähnte Funktion erreicht jede Person, die sie in ihrer Mitgliedschaft trägt
+  und im Einsatz schreiben darf, also nicht Mitarbeit und Beobachter; EL erreicht zuerst den
+  Einsatzleiter der Führungsstelle, wenn er mit einem Konto verknüpft ist und schreiben darf.
   Trägt niemand die Funktion, erreicht der Hinweis niemanden.
 - Den Hinweis bekommt nur, wer den Chat sehen darf. Wer sich selbst oder die eigene Funktion
   erwähnt, bekommt nichts.

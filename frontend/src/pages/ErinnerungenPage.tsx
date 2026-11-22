@@ -21,7 +21,8 @@ import {
 } from '../api/erinnerungen';
 import type { AbschlussCursor } from '../api/meldungen';
 import type { Erinnerung, NeueErinnerung } from '../api/types';
-import { GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, type FaelligGruppe } from '../kommunikation';
+import { GRUPPE_ORDNUNG, faelligGruppe, type FaelligGruppe } from '../kommunikation';
+import { ERINNERUNG_GRUPPE_LABEL } from '../erinnerung/erinnerungZustand';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
@@ -492,7 +493,7 @@ export default function ErinnerungenPage() {
             {offeneGruppen.map(({ gruppe, erinnerungen }) => (
               <Stapel key={gruppe} abstand="xs">
                 <Augenbraue als="h2">
-                  {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
+                  {ERINNERUNG_GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
                 </Augenbraue>
                 <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
               </Stapel>

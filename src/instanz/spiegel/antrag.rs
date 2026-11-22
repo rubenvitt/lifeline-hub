@@ -1751,6 +1751,25 @@ mod tests {
         assert!(leer.is_empty());
     }
 
+    /// Am Spiegel trägt genau die Positivliste des Erfassungs-Gates (ADR-0072) das Recht
+    /// `Erfassen`: POST auf ETB und Meldungen (LLH-2008). Eine weitere Route mit `Erfassen` ließe
+    /// die Mitarbeit dort beantragen, was sie am Führer nicht darf.
+    #[test]
+    fn nur_etb_und_meldung_sind_mit_erfassungsrecht_beantragbar() {
+        let erfassen: BTreeSet<(&str, &str)> = BEANTRAGBAR
+            .iter()
+            .filter(|b| b.recht == Antragsrecht::Erfassen)
+            .map(|b| (b.methode, b.pfad))
+            .collect();
+        assert_eq!(
+            erfassen,
+            BTreeSet::from([
+                ("POST", "/api/einsaetze/{id}/etb"),
+                ("POST", "/api/einsaetze/{id}/meldungen"),
+            ])
+        );
+    }
+
     /// Jede beantragbare Art sagt, wo ihre Route die Erfassungszeit annimmt (oder dass sie keine
     /// braucht); eine neue Art ohne Eintrag landete beim Führer mit der Zeit der Ausführung.
     #[test]

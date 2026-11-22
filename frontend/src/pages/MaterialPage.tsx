@@ -15,7 +15,6 @@ import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/list
 import {
   nichtGefundenInhalt,
   SeitenFehler,
-  SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
@@ -105,6 +104,7 @@ import { nachforderungName } from '../nachforderungen/nachforderungName';
 import { Marke } from '../components/instrument/Marke';
 import { useAdressWert } from '../routing/useAdressWert';
 import { pflicht } from '../components/pflichtRegel';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -626,7 +626,7 @@ function MaterialInhalt() {
   // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden, nie als
   // Frühausstieg.
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="material" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

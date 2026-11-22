@@ -13,6 +13,7 @@ import {
   listeKanaele,
   listeNachrichten,
   loescheBezug,
+  NACHRICHT_CURSOR,
   loescheNachricht,
   markiereKanalGelesen,
   sendeNachricht,
@@ -62,6 +63,8 @@ import {
   type BezugOptionen,
 } from '../chat/bezug';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import { fensterOptionen, useKopfAnnehmen } from '../components/fensterBeideRichtungen';
+import { useKopfBeimVerlassen, zumKopf } from '../components/listenFenster';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { NUR_LEITUNG_FUEHRUNG_MITARBEIT, einsatzRechteGrund } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
@@ -187,28 +190,35 @@ export default function ChatPage() {
   const ungelesenImAktivenKanal =
     kanaele.find((kanal) => kanal.id === kanalId)?.ungelesen_anzahl ?? 0;
 
+  /*
+   * Seitenfenster in beide Richtungen (LLH-1886, `components/fensterBeideRichtungen.ts`):
+   * höchstens fünf Seiten, ein Live-Ereignis lädt nur sie neu. Der Server liefert je Seite id DESC.
+   * Ohne Kopf im Fenster steht unten „Neuere laden“; wer den Kanal so verlässt, holt beim nächsten
+   * Mal frisch die neueste Seite.
+   */
+  const nachrichtenSchluessel = einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId);
   const nachrichtenQuery = useInfiniteQuery({
-    queryKey: einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId),
+    queryKey: nachrichtenSchluessel,
     queryFn: ({ pageParam }) => listeNachrichten(einsatzId, kanalId as number, pageParam),
-    initialPageParam: undefined as number | undefined,
-    // Backend liefert je Seite id DESC (neueste zuerst); der Cursor für ältere
-    // Nachrichten ist die kleinste (= letzte) id der zuletzt geladenen Seite.
-    getNextPageParam: (letzteSeite) =>
-      letzteSeite.length === CHAT_SEITENGROESSE
-        ? letzteSeite[letzteSeite.length - 1].id
-        : undefined,
+    ...fensterOptionen(NACHRICHT_CURSOR, CHAT_SEITENGROESSE),
     enabled: kanalId !== null,
   });
+  const kopfImFenster = !nachrichtenQuery.hasPreviousPage;
+  useKopfAnnehmen(nachrichtenSchluessel, nachrichtenQuery.data, CHAT_SEITENGROESSE);
+  useKopfBeimVerlassen(nachrichtenSchluessel, kanalId !== null);
 
   // Erst nach einem erfolgreichen Nachrichtenabruf markieren. Der Gelesen-Stand ist je Nachricht
   // und Benutzer persistent; ein späteres SSE-Update hebt `dataUpdatedAt` an und markiert den
-  // sichtbaren Kanal erneut.
+  // sichtbaren Kanal erneut. Der Server markiert den ganzen Kanal: ohne die neueste Seite im
+  // Fenster gälte Ungesehenes als gelesen (LLH-1886). Zurück am Kopf ändern sich die Daten, und
+  // der Effekt markiert.
   useEffect(() => {
     if (
       !dokumentSichtbar ||
       document.visibilityState !== 'visible' ||
       kanalId === null ||
       ungelesenImAktivenKanal === 0 ||
+      !kopfImFenster ||
       !nachrichtenQuery.isSuccess ||
       nachrichtenQuery.dataUpdatedAt === 0
     )
@@ -233,6 +243,7 @@ export default function ChatPage() {
     einsatzId,
     dokumentSichtbar,
     kanalId,
+    kopfImFenster,
     nachrichtenQuery.dataUpdatedAt,
     nachrichtenQuery.isSuccess,
     qc,
@@ -326,12 +337,22 @@ export default function ChatPage() {
         erwaehnungen,
       );
     },
-    onSuccess: () => {
-      invalidiereNachrichten(einsatzId);
+    onSuccess: async () => {
       // Wer selbst absendet, will seinen Satz sehen, auch wenn er gerade weiter oben las. Der
       // Zähler unterscheidet die eigene Absendung vom Live-Ereignis und hängt bewusst nicht am
-      // Autor: sonst führte jede fremde Nachricht desselben Kontos zum Sprung.
+      // Autor: sonst führte jede fremde Nachricht desselben Kontos zum Sprung. Er steigt VOR dem
+      // Nachladen: der Strom springt mit dem Wachsen, das den eigenen Satz bringt.
       setEigeneSendungen((n) => n + 1);
+      // Aus tiefem Fenster (LLH-1886) läge der eigene Satz außerhalb: das Fenster wird durch die
+      // neueste Seite ersetzt, wie im ETB (`erfassenUndZeigen`). Scheitert der Abruf, bleibt es.
+      if (kanalId !== null && nachrichtenQuery.hasPreviousPage) {
+        const kid = kanalId;
+        await zumKopf(qc, einsatzKeys.chatNachrichtenKanal(einsatzId, kid), () =>
+          listeNachrichten(einsatzId, kid),
+        );
+        return;
+      }
+      invalidiereNachrichten(einsatzId);
     },
     // Kein Toast: der Fehler steht an der Eingabe (`NachrichtEingabe`), bis zum nächsten Senden.
   });
@@ -586,6 +607,7 @@ export default function ChatPage() {
             key={kanalId ?? 'kein-kanal'}
             nachrichten={nachrichten}
             eigeneSendungen={eigeneSendungen}
+            kopfImFenster={kopfImFenster}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
             darfErfassen={darfErfassen}
@@ -609,6 +631,18 @@ export default function ChatPage() {
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
             bezugInfo={bezugInfo}
           />
+          {/* Das Fenster steht nicht an der neuesten Nachricht (LLH-1886): der Rückweg nach
+              unten, lückenlos über den Cursor. */}
+          {!kopfImFenster && (
+            <div style={{ textAlign: 'center', marginBlock: token.marginSM }}>
+              <Button
+                onClick={() => nachrichtenQuery.fetchPreviousPage()}
+                loading={nachrichtenQuery.isFetchingPreviousPage}
+              >
+                Neuere laden
+              </Button>
+            </div>
+          )}
           {darfErfassen && kanalId !== null && (
             <NachrichtEingabe
               onSenden={(t, d, e) =>

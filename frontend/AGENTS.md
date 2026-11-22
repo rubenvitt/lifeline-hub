@@ -185,7 +185,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
     im selben Modul. Beim ersten Aufruf zeigt `ModulWechselGerippe` kein Vorab-Gerippe; lädt der
     Einsatz dann noch, gibt die Seite in ihrem Frühausstieg selbst `ModulGerippeSeite` zurück
-    (Kopf sofort, Einsatz im Ortspfad als „…“, LLH-1830), nie ein nacktes `SeitenSkeleton`. Was
+    (Kopf sofort, Einsatz im Ortspfad als „…“, LLH-1830), nie ein nacktes `SeitenSkeleton`; ebenso
+    der Ladefall von `modulFreigabeAnzeige` und die Detailseiten im Einsatz mit dem Namen ihres
+    Moduls, bis ihr eigener Titel kommt (LLH-2005, Nachweis `pages/Erstaufruf.test.tsx`). Was
     erst mit den Daten kommt, reserviert seine Zeile vorher (unsichtbar, ohne Nullen) oder steht
     unter allem, was schon steht; Nachweis: `e2e/erstaufruf-cls.spec.ts` (Erstaufruf mit langsamem
     Server, CLS < 0,1). Eine Seite baut kein eigenes Vorab-Gerippe für den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
@@ -317,7 +319,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Zeilen; Längeres endet mit „…“ und steht ganz im `title`). Die tragende Aussage einer Notiz
   steht deshalb vorn (LFH-691, `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`).
 - **Dashboard-Baukasten** (LLH-1140, Vorbild Lagebild): jede Fläche, die eine Lage in Zahlen
-  zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
+  zeigt (Lagebild, Führung · Überblick, Kopf der Kräfteübersicht), baut sich aus denselben Bausteinen in
   `components/instrument/`.
   Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
   Warnstufe ist keine Kennzahl). Darunter, vor Band und Paneelen, auf Überblick, Lagebild und Lagemonitor
@@ -340,9 +342,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Paneelreihe trägt „Nächste Marken“ und „Offene Vorgänge“, die zweite „Einsatzabschnitte“ und
   die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen. Beim ersten Aufbau
   warten die Reihen auf die Quellen der Gliederung und der Marken, sonst rückt alles darunter.
+  Standen sie einmal, bleiben sie: lädt eine Quelle erst danach (Modul live freigegeben), zeigt
+  nur ihr Paneel kurz den Ladezustand (LLH-1955).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
-  (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
+  (Kräfteübersicht) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
   Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
   „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
   `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, Kopf-Aktion ohne „↗“ für eine
@@ -374,7 +378,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
-  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  über die Gründe der Tönung der Kräfteübersicht (`toenungsGruende`, gelesen über
   `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
   Einheiten in der Folge der Einheitenliste (`einheitenMitAusfall`). Für den Lagemonitor zählt der
   Server dieselbe Regel nach (`einsatz::ausfall`, LLH-1929); `tests/fixtures/verdichtung/regeln.json`,
@@ -397,9 +401,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
 - **Eine Baumlogik der Kräfte: `kraefte/kraeftebaumKern.ts`** (LLH-1025, Spec `kraeftebaum`).
   Einheit → Untereinheiten, je Einheit Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, Material; jede
-  Kraft genau einmal, Elternstärke über `accumulateStaerke`. Meldebild (`meldebildRaster.ts`) und
+  Kraft genau einmal, Elternstärke über `accumulateStaerke`. Kräfteübersicht (`meldebildRaster.ts`) und
   Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
-  eigenen Baum. Meldebild, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
+  eigenen Baum. Kräfteübersicht, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
   Abschnitt ungleich dem der Obereinheit) über `detachAbgestellte`/`abgestelltVon` vom Verband,
   „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
   (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
@@ -468,6 +472,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
+| Geheimnis setzen oder ersetzen, nie lesen (Zugangsdaten eines Adapters)                         | `Geheimfeld` (Wert nur im State der Zeile, nie in `Form`, Query- oder Mutations-Cache)                                                           | `Geheimfeld`                       |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
 | Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
@@ -605,7 +610,7 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
   `buildFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, nur eine abgestellte
-  Untereinheit steht wie im Meldebild unter ihrem Abschnitt, LLH-1744; Vorlage für Auto-Layout
+  Untereinheit steht wie in der Kräfteübersicht unter ihrem Abschnitt, LLH-1744; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
   „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`
   (LFH-1199); die Stabsstelle nur aus den Mitgliedern (`fuehrung/besetzungAusMitgliedern.ts`,
@@ -800,7 +805,7 @@ Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
 `src/fuehrung/`): `frontend/src/fuehrung/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
-**Kräfte-Zeitachse** (Einsatzdauer im Meldebild, Personal und Einheit-Detail; auch
+**Kräfte-Zeitachse** (Einsatzdauer in der Kräfteübersicht, Personal und Einheit-Detail; auch
 `src/zeitachse/`, Status-Kataloge mit `zeitachse_marke`) und **Ablösung** (Rangfolge,
 Vorwarnung aus dem DTO, Schichtmodelle; auch `abloesung/`, `src/schichtmodell/`):
 `frontend/src/kraefte/AGENTS.md`.
@@ -893,7 +898,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
-  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Meldebild) hängt ihn dort ein:
+  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Kräfteübersicht) hängt ihn dort ein:
   Zustand aus `useSpaltenSchalterZustand`, an die Sicht als `spaltenSchalterAussen` (LLH-1417);
   sein Fokus hält die Zeilenschleuse nicht, die Werkzeugzeile der Sicht bleibt Standzeile des
   Sammelbanners. Sonst bleibt der eingebaute Schalter.
@@ -914,7 +919,7 @@ anwendbar), „nicht geprüft" ist keins.
   `Datensicht`/`KatalogTabelle` reicht; ohne gemerkte Spaltenwahl gilt `spaltenAusVoreinstellung`.
   Spalten, die beim ersten Rendern noch nicht feststehen (Werte aus den Zeilen, Spalte hinter einer
   Freigabe), nennt die Seite als `ausDaten`, sonst fiele ihr Filter aus der Adresse. Eine Sicht im
-  Baummodus sortiert und filtert nicht (Meldebild, Funkplan, Kommunikationsplan; Kommentar an der
+  Baummodus sortiert und filtert nicht (Kräfteübersicht, Funkplan, Kommunikationsplan; Kommentar an der
   Sicht). Ein Filter mit `ohneKartenfeld` hat im Kartenzweig kein Auswahlfeld (Betroffene, Status
   der Tiere: die Seite führt die Achse schon, die erste Karte bleibt im ersten Bild), wirkt aber
   und steht als Chip da. Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen,
@@ -956,7 +961,7 @@ anwendbar), „nicht geprüft" ist keins.
 - **Das Aufklappsymbol im Baum der `Datensicht` folgt der Dichte** (LLH-1240): antds Symbol steht
   in einem Knopf mit Höhe `controlHeight` und Breite `controlHeightSM` (`baumSymbolZielStil`),
   der Text daneben mittig in derselben Höhe (`baumTextStil`); im Druck fällt der Boden. Nachweis
-  `e2e/gate3-trefflaeche.spec.ts` „Baumtabellen“ (Einheiten, Meldebild, Funkplan).
+  `e2e/gate3-trefflaeche.spec.ts` „Baumtabellen“ (Einheiten, Kräfteübersicht, Funkplan).
 - Stehende Kopfzeile hält Freiraum (`setzeKopfFreiraum`, `scroll-margin-top` in `sprache.css`);
   Fokus-Nachweis darunter auch mit `Shift+Tab` (`fokus-kern.ts`, `taste`). In der ersten Zeile
   beschneidet Chromium den Rand am Scrollcontainer von `scroll.x`; dort rollt
@@ -972,11 +977,13 @@ anwendbar), „nicht geprüft" ist keins.
   (Höhe und Breite) und steht am unteren Rand (LLH-1032, `verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
-- **Kein Zoom wie in einer App** (LLH-1328): der Viewport in `index.html` sperrt den Zoom
-  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
-  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
-  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
-  Wächter `theme/keinZoom.guard.test.ts`.
+- **Zoom frei, Felder 16 px auf Touch** (LLH-2043; umgekehrt 22.11.2026 gegenüber LLH-1328 „Kein
+  Zoom wie in einer App“): der Viewport in `index.html` sperrt den Zoom nicht, wer schlecht liest,
+  zieht die Seite größer. `touch-action: manipulation` auf `html` (`index.css`) sperrt nur den
+  Doppeltipp. Damit iOS beim Fokus nicht in ein Feld hineinzoomt (es tut das unter 16 px), tragen
+  Eingabefelder auf grobem Zeiger `feldSchriftTouch` (16 px, `theme/tokens.ts`, Regel am Ende von
+  `theme/rollen.css`), auch gegen Inline-Größen. Die Regel hebt nur an: antds große Felder
+  (`size="large"`, 16 px oder mehr) bleiben, Knöpfe, Etiketten und Lauftext bleiben in der Dichte. Wächter `theme/zoomFrei.guard.test.ts`, Beleg `e2e/zoom-frei.spec.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
   `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
@@ -1156,7 +1163,7 @@ anwendbar), „nicht geprüft" ist keins.
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Das Meldebild (Kräfteübersicht) trägt „In Lagebericht übernehmen“ als Nebenweg (LLH-1786).
+  Die Kräfteübersicht trägt „In Lagebericht übernehmen“ als Nebenweg (LLH-1786).
   Wortlaut und Platz jedes Druckeinstiegs: `src/druck/AGENTS.md`, „Wortlaut und Platz der
   Druckeinstiege“ (LLH-1836).
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`,
@@ -1303,7 +1310,9 @@ anwendbar), „nicht geprüft" ist keins.
   Nebenweg. Tests tippen über `test/zeitEingabe.ts` (`tippeZeit`, `setzeZeit`), nie über
   Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
   oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
-  Deutung steht deshalb immer im DOM.
+  Deutung steht deshalb immer im DOM. Wo der Hinweis neben der Eingabe keinen Platz hat (ETB-Feldzeile,
+  190 px), meldet das Feld ihn per `onHinweis` und zeigt ihn nicht selbst; der Aufrufer nennt ihn
+  und verweist per `aria-describedby` darauf (LLH-1917).
 - **Unlesbares bleibt stehen und sperrt** (LLH-1768,
   `docs/superpowers/specs/2026-11-20-obmcvm14-stille-korrekturen-sichtbar-design.md`; löst in der
   Spec `zeiteingabe`, „Unlesbare Eingabe wird nicht übernommen“, das „wieder den geltenden Wert
@@ -1497,7 +1506,11 @@ und `pages/personen/`.
 - **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`alarm` vor dem Eingang in `linieStark`,
   sonst `linie`; prüfbar über `data-alarm`/`data-unbearbeitet`; der Eingang ist neutral, Spec
   `statusrollen`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
-  fünfte `KommPhase`.
+  fünfte `KommPhase`. **Eine fällige Erinnerung ist ein Wecker, keine Frist** (LLH-1911): sie
+  trägt weder Kante noch Fläche, nur „fällig“ in Achtung aus `ERINNERUNG_FAELLIG`
+  (`erinnerung/erinnerungZustand.ts`), im Modul wie im Überblick; ihre Gruppe heißt „Fällig“, nie
+  „Überfällig“ (`ERINNERUNG_GRUPPE_LABEL`). Angesprungen trägt sie die Markierung wie jede Karte;
+  das Szenario „Erinnerung“ der eingefrorenen Spec `deeplink-hervorhebung` ist damit überholt.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
   der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder
@@ -1876,9 +1889,9 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   entsteht mit dem Fach-Ticket, das die Ansicht bearbeitbar macht; offen ist sie für den
   Einsatzabschnitt (`?abschnitt=` wählt heute im Detailpaneel).
 - **Zwei Bestands-Params neben einer Item-Route** (LLH-1060 D2): `?einheit=` an der
-  Einheitenliste leitet auf `einheitDetailPfad` weiter (am Meldebild ist `?einheit=` ein Auftrag,
+  Einheitenliste leitet auf `einheitDetailPfad` weiter (an der Kräfteübersicht ist `?einheit=` ein Auftrag,
   `kraefteuebersichtPfad`, LLH-1049). `?personal=` bleibt **Zeilenmarke** der Personalliste
-  (`personalPfad`): Lagekarte, Schaden und Meldebild springen auf die hervorgehobene Zeile, um
+  (`personalPfad`): Lagekarte, Schaden und Kräfteübersicht springen auf die hervorgehobene Zeile, um
   die Person im Vergleich zu zeigen; Sprungpalette, Namenslink und Block „Entlassen“ öffnen die
   Personenansicht (`einsatzkraftPfad`), ihre Brotkrume führt auf die Zeilenmarke zurück.
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
