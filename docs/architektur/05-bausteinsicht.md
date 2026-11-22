@@ -431,8 +431,11 @@ Haptik-Abbildung (`Haptik.swift`). Seine Suite liest die gemeinsamen Fälle der 
 `AppVersion.swift` liest die Version aus der Info.plist. `ios/App` trägt das App-Target
 `LifelineHub` (Einstieg `ios/App/LifelineHubApp.swift`); das Init-Skript `ios/App/Huelle/huelle.js`
 meldet der Seite die Kennung `__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in
-seinem Kopf. Das Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App, `ios/AppTests`,
-`ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt `scripts/ios/version.sh`.
+seinem Kopf. Die Notification Service Extension `ios/Benachrichtigungsdienst` entschlüsselt
+Push-Meldungen über APNs (`Dienst.swift`); Schlüsselbund, Entschlüsseln und App Group teilt sie mit
+der App über `ios/Gemeinsam`. Das Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App,
+Extension, `ios/AppTests`, `ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt
+`scripts/ios/version.sh`.
 
 ### `karten-service`
 

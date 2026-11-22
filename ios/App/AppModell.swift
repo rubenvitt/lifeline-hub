@@ -34,6 +34,8 @@ final class AppModell {
     let testzustand: Testzustand?
 
     @ObservationIgnored private let ablage: Serverablage?
+    /// Anmeldungen am Push-Kanal (`push.json` neben der Serverliste); `nil` im Testzustand.
+    @ObservationIgnored private let pushablage: Pushablage?
     @ObservationIgnored private var wiederholung: Task<Void, Never>?
     @ObservationIgnored private var rueckkehr = Rueckkehr()
     @ObservationIgnored private var gestartet = false
@@ -52,17 +54,22 @@ final class AppModell {
         testzustand = Testzustand(argumente: argumente)
         if testzustand != nil {
             ablage = nil
+            pushablage = nil
             liste = Self.beispielliste()
         } else {
-            let ablage = Serverablage(
-                verzeichnis: URL.applicationSupportDirectory.appendingPathComponent("Lifeline"))
+            let verzeichnis = URL.applicationSupportDirectory.appendingPathComponent("Lifeline")
+            let ablage = Serverablage(verzeichnis: verzeichnis)
             self.ablage = ablage
+            pushablage = Pushablage(verzeichnis: verzeichnis)
             liste = ablage.loadOrRecover()
+            meldeServerAnzahl()
         }
         anmelder = Anmelder(
             webView: { [weak self] in self?.webView },
             aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
-        dienste = Systemdienste(webView: { [weak self] in self?.webView }, anmelder: anmelder)
+        dienste = Systemdienste(
+            webView: { [weak self] in self?.webView }, anmelder: anmelder, pushablage: pushablage,
+            aktiverServer: { [weak self] in self?.liste.aktiv?.id })
         empfang = Brueckenempfang(
             dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
         navigation = Navigationsbegleiter(aktiverServer: { [weak self] in self?.liste.aktiv?.adresse }) {
@@ -87,6 +94,9 @@ final class AppModell {
             zeigeBeispielseite(testzustand)
         } else {
             send(.start(aktiv: liste.aktiv))
+            // Erst jetzt: ein Tippen auf eine Meldung beim Kaltstart wartete bis hierher und folgt
+            // dem Start, statt von ihm überschrieben zu werden.
+            Meldungsweg.verbinde(self)
         }
     }
 
@@ -258,10 +268,75 @@ final class AppModell {
 
     private func save() {
         guard let ablage else { return }
+        meldeServerAnzahl()
         do {
             try ablage.save(liste)
         } catch {
             protokoll.error("Serverliste nicht gespeichert: \(error.localizedDescription)")
+        }
+    }
+
+    /// Die Extension zeigt den Namen des Servers nur bei mehr als einem (`PushNutzlast.meldung`);
+    /// die Liste selbst sieht sie nicht.
+    private func meldeServerAnzahl() {
+        AppGroup.defaults?.set(liste.eintraege.count, forKey: AppGroup.serverAnzahl)
+    }
+
+    // MARK: Meldungen
+
+    /// Tipp auf eine Push-Meldung (`Meldungsweg`): die Kennung nennt den Server, `Ablauf`
+    /// entscheidet über Wechsel und Pfad. Ein anderer Server wird wie beim Wechsel in der Liste
+    /// aktiv, damit die Brücke seine Seite annimmt.
+    func meldungAngetippt(kennung: String, pfad: String?) {
+        guard testzustand == nil else { return }
+        let eintrag = server(zu: kennung).flatMap { id in
+            id == inEntfernung ? nil : liste.eintraege.first { $0.id == id }
+        }
+        if let eintrag {
+            zeigtServerliste = false
+            zeigtEinstellungen = false
+            wechselRueckfrage = nil
+            if liste.aktiv?.id != eintrag.id {
+                try? liste.activate(eintrag.id)
+                save()
+            }
+        }
+        send(.meldungAngetippt(eintrag, pfad: pfad))
+    }
+
+    /// Eine Push-Meldung des Servers, dessen Oberfläche gerade läuft, zeigt die App nicht: die
+    /// Oberfläche meldet sie selbst über den Live-Kanal (`Meldungsdelegat`).
+    func isAktiverServer(kennung: String) -> Bool {
+        guard case .web(let aktiv, _) = seite else { return false }
+        return server(zu: kennung) == aktiv.id
+    }
+
+    private func server(zu kennung: String) -> UUID? {
+        guard let pushablage, let anmeldungen = try? pushablage.load() else { return nil }
+        return anmeldungen.server(zu: kennung)
+    }
+
+    /// Entfernter Server: jede Kennung einmal beim Server abmelden, dann ihren Schlüssel löschen.
+    /// Kein Wiederholen; ist der Server nicht erreichbar, löscht er die Anmeldung, sobald Apple das
+    /// Token ablehnt.
+    private func meldePushAb(server id: UUID, adresse: ServerAdresse) {
+        guard let pushablage, var anmeldungen = try? pushablage.load() else { return }
+        let kennungen = anmeldungen.entfernen(server: id)
+        guard !kennungen.isEmpty else { return }
+        do {
+            try pushablage.save(anmeldungen)
+        } catch {
+            protokoll.error("Push-Anmeldungen nicht gespeichert: \(error.localizedDescription)")
+        }
+        Task {
+            for kennung in kennungen {
+                if let schluessel = Schluesselbund.lesen(kennung: kennung) {
+                    await Vertragsabruf.meldePushAb(
+                        adresse, kennung: kennung,
+                        nachweis: Entschluesseler.nachweis(kennung: kennung, schluessel: schluessel))
+                }
+                Schluesselbund.loeschen(kennung: kennung)
+            }
         }
     }
 
@@ -381,7 +456,9 @@ extension AppModell: Entfernungsdienste {
     }
 
     func removeEintrag(_ id: UUID) throws(Serverliste.ListError) {
+        let adresse = liste.eintraege.first { $0.id == id }?.adresse
         try liste.remove(id)
         save()
+        if let adresse { meldePushAb(server: id, adresse: adresse) }
     }
 }

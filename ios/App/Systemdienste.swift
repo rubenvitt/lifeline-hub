@@ -10,10 +10,19 @@ import WebKit
 final class Systemdienste: Huellendienste {
     private let webView: @MainActor () -> WKWebView?
     private let anmelder: Anmelder
+    /// Anmeldungen am Push-Kanal; `nil` im Testzustand (kein Netz, keine Ablage).
+    private let pushablage: Pushablage?
+    /// Der Server, dessen Seite gerade die Brücke ruft.
+    private let aktiverServer: @MainActor () -> UUID?
 
-    init(webView: @escaping @MainActor () -> WKWebView?, anmelder: Anmelder) {
+    init(
+        webView: @escaping @MainActor () -> WKWebView?, anmelder: Anmelder, pushablage: Pushablage?,
+        aktiverServer: @escaping @MainActor () -> UUID?
+    ) {
         self.webView = webView
         self.anmelder = anmelder
+        self.pushablage = pushablage
+        self.aktiverServer = aktiverServer
     }
 
     var isHaptikEnabled: Bool {
@@ -74,14 +83,109 @@ final class Systemdienste: Huellendienste {
 
     func startAnmeldung() throws { try anmelder.start() }
 
-    // Push über APNs: die Anbindung an APNs und den Schlüsselbund folgt mit der Extension (Aufgabe
-    // 10); bis dahin meldet die Hülle ehrlich „nicht verfügbar“.
-    func registerPush() async throws -> PushRegistrierung { throw PushFehler.unavailable }
+    // MARK: Push über APNs (Entwurf „iOS-Alarme über APNs“)
 
-    func unregisterPush() async throws {}
+    /// Fragt bei Bedarf nach der Berechtigung (zeitkritisch trägt die Capability, keine eigene
+    /// Option), holt das Token und legt Kennung und Schlüssel des aktiven Servers einmalig an.
+    func registerPush() async throws -> PushRegistrierung {
+        guard let pushablage, let server = aktiverServer() else { throw PushFehler.unavailable }
+        switch await Mitteilungen.freigabe() {
+        case .erlaubt: break
+        case .verweigert: throw PushFehler.denied
+        case .offen: guard await Mitteilungen.requestFreigabe() else { throw PushFehler.denied }
+        }
+        let token: Data
+        do {
+            token = try await Geraetetoken.anfordern()
+        } catch {
+            throw PushFehler.unavailable
+        }
+        // Eine unlesbare Ablage nicht überschreiben: sie trägt die Kennungen der anderen Server.
+        guard var anmeldungen = try? pushablage.load() else { throw PushFehler.unavailable }
+        let kennung = anmeldungen.kennung(fuer: server)
+        let schluessel: Data
+        do {
+            try pushablage.save(anmeldungen)
+            if let vorhanden = Schluesselbund.lesen(kennung: kennung) {
+                schluessel = vorhanden
+            } else {
+                schluessel = Entschluesseler.neuerSchluessel()
+                try Schluesselbund.speichern(kennung: kennung, schluessel: schluessel)
+            }
+        } catch {
+            throw PushFehler.unavailable
+        }
+        return PushRegistrierung(
+            kennung: kennung, token: token.map { String(format: "%02x", $0) }.joined(),
+            umgebung: Self.umgebung, schluessel: Base64URL.encode(schluessel))
+    }
 
+    /// Nimmt Kennung und Schlüssel des aktiven Servers weg; beim Server meldet die Seite selbst ab.
+    func unregisterPush() async throws {
+        guard let pushablage, let server = aktiverServer() else { return }
+        var anmeldungen = try pushablage.load()
+        let kennungen = anmeldungen.entfernen(server: server)
+        guard !kennungen.isEmpty else { return }
+        try pushablage.save(anmeldungen)
+        for kennung in kennungen { Schluesselbund.loeschen(kennung: kennung) }
+    }
+
+    /// Angemeldet ist der aktive Server nur mit Kennung und Schlüssel.
     func pushState() async -> (Meldungsfreigabe, kennung: String?) {
-        (await Mitteilungen.freigabe(), nil)
+        let freigabe = await Mitteilungen.freigabe()
+        guard let pushablage, let server = aktiverServer(),
+            let kennung = (try? pushablage.load())?.vorhandeneKennung(fuer: server),
+            Schluesselbund.lesen(kennung: kennung) != nil
+        else { return (freigabe, nil) }
+        return (freigabe, kennung)
+    }
+
+    /// Debug-Builds aus Xcode bekommen Token der Sandbox, TestFlight und App Store der Produktion
+    /// (`aps-environment` in `App/LifelineHub.entitlements`).
+    private static var umgebung: String {
+        #if DEBUG
+            return "sandbox"
+        #else
+            return "production"
+        #endif
+    }
+}
+
+/// Das Token von APNs: `registerForRemoteNotifications()` antwortet über den App-Delegate
+/// (`AppDelegat`), nicht an der Stelle des Aufrufs. Wer wartet, steht hier; antwortet iOS nicht
+/// binnen `frist`, gilt Push als nicht verfügbar statt die Anfrage der Seite hängen zu lassen.
+@MainActor
+enum Geraetetoken {
+    static let frist: Duration = .seconds(30)
+    private static var wartende: [CheckedContinuation<Data, any Error>] = []
+    private static var runde = 0
+
+    static func anfordern() async throws -> Data {
+        try await withCheckedThrowingContinuation { fortsetzung in
+            wartende.append(fortsetzung)
+            guard wartende.count == 1 else { return }
+            runde += 1
+            let diese = runde
+            UIApplication.shared.registerForRemoteNotifications()
+            Task { @MainActor in
+                try? await Task.sleep(for: frist)
+                if runde == diese { gescheitert(PushFehler.unavailable) }
+            }
+        }
+    }
+
+    static func erhalten(_ token: Data) {
+        for fortsetzung in nimmWartende() { fortsetzung.resume(returning: token) }
+    }
+
+    static func gescheitert(_ fehler: any Error) {
+        for fortsetzung in nimmWartende() { fortsetzung.resume(throwing: fehler) }
+    }
+
+    private static func nimmWartende() -> [CheckedContinuation<Data, any Error>] {
+        let alle = wartende
+        wartende = []
+        return alle
     }
 }
 

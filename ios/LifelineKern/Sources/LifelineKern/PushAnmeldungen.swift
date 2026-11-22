@@ -18,6 +18,11 @@ public struct PushAnmeldungen: Codable, Equatable, Sendable {
         return neu
     }
 
+    /// Die Kennung des Servers, falls er eine hat; legt keine an (`push_state`).
+    public func vorhandeneKennung(fuer server: UUID) -> String? {
+        kennungen[server]
+    }
+
     /// Der Server zu einer Kennung aus einer Nutzlast; `nil` für eine unbekannte oder entfernte.
     public func server(zu kennung: String) -> UUID? {
         kennungen.first { $0.value == kennung }?.key

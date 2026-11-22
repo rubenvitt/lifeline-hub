@@ -3,8 +3,9 @@
 <!--
   Privacy-Manifest der iOS-Hülle (Regeln: ios/AGENTS.md). Die Hülle verfolgt niemanden und erhebt
   selbst keine Daten; die Oberfläche kommt vom Einsatzserver des Betreibers. Required-Reason-API ist
-  nur UserDefaults (Schalter „Haptik“, `@AppStorage` und `UserDefaults.standard`), gelesen und
-  geschrieben nur von der App selbst: Grund CA92.1. Wer eine weitere Required-Reason-API nutzt
+  nur UserDefaults: der Schalter „Haptik“ (`@AppStorage` und `UserDefaults.standard`), gelesen und
+  geschrieben nur von der App selbst, Grund CA92.1; die Zahl der Server in der App Group für die
+  Extension Benachrichtigungsdienst, Grund 1C8F.1. Wer eine weitere Required-Reason-API nutzt
   (Dateizeitstempel, Systemstartzeit, Speicherplatz, aktive Tastaturen), trägt sie hier ein;
   geprüft in ios/AppTests/InfoPlistTests.swift.
 -->
@@ -24,6 +25,7 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<string>1C8F.1</string>
 			</array>
 		</dict>
 	</array>

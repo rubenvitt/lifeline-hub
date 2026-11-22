@@ -1,15 +1,16 @@
 import Foundation
 
-/// base64url ohne Auffüllung (RFC 4648 §5), wie ihn Server und Relais für Push schreiben.
-enum Base64URL {
-    static func decode(_ text: String) -> Data? {
+/// base64url ohne Auffüllung (RFC 4648 §5), wie ihn Server und Relais für Push schreiben. Öffentlich
+/// für die App (Schlüssel an die Seite, Nachweis beim Abmelden).
+public enum Base64URL {
+    public static func decode(_ text: String) -> Data? {
         var b64 = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
         guard !b64.contains("=") else { return nil }
         b64 += String(repeating: "=", count: (4 - b64.count % 4) % 4)
         return Data(base64Encoded: b64)
     }
 
-    static func encode(_ daten: Data) -> String {
+    public static func encode(_ daten: Data) -> String {
         daten.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")

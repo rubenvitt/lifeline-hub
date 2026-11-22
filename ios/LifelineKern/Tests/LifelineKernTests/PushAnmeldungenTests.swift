@@ -17,6 +17,18 @@ final class PushAnmeldungenTests: XCTestCase {
         XCTAssertNil(anmeldungen.server(zu: UUID().uuidString))
     }
 
+    /// `push_state` fragt nur nach und darf dabei keine Kennung anlegen.
+    func testVorhandeneKennungLegtKeineAn() {
+        var anmeldungen = PushAnmeldungen()
+        let server = UUID()
+        XCTAssertNil(anmeldungen.vorhandeneKennung(fuer: server))
+        XCTAssertEqual(anmeldungen, PushAnmeldungen())
+        let kennung = anmeldungen.kennung(fuer: server)
+        XCTAssertEqual(anmeldungen.vorhandeneKennung(fuer: server), kennung)
+        anmeldungen.entfernen(server: server)
+        XCTAssertNil(anmeldungen.vorhandeneKennung(fuer: server))
+    }
+
     func testEntfernenLiefertDieKennungenDesServers() {
         var anmeldungen = PushAnmeldungen()
         let a = UUID()
