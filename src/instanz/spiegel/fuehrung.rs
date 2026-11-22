@@ -917,16 +917,19 @@ pub async fn gegen_hinaus(
 }
 
 /// Übernimmt am Spiegel den Schlüssel beim Empfänger (E3): Die Zeile `fremd` des Führers ist die
-/// eigene Zeile `gegen`. Nur eine Zeile dieses Einsatzes (sie steht in seinem Log) wird so
-/// zugeordnet; eine ältere Zuordnung derselben lokalen Zeile fällt weg. Keine Zuordnung auf eine
-/// ID, die diese Instanz neu vergeben hat (`spiegel_neu_vergeben`, LLH-1893).
+/// eigene Zeile `gegen`. Nur eine Zeile dieses Einsatzes (sie steht in seinem Log und besteht
+/// hier in ihm) wird so zugeordnet; eine ältere Zuordnung derselben lokalen Zeile fällt weg. Keine
+/// Zuordnung auf eine ID, die diese Instanz neu vergeben hat, im selben Einsatz
+/// (`spiegel_neu_vergeben`, LLH-1893) oder in einem anderen (LLH-2029): Der Führer meint die
+/// gelöschte Zeile, und seine kommt als neue an.
 pub async fn uebernimm_gegen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-    art: &str,
+    t: &schema::Tabelle,
     fremd: &str,
     gegen: &str,
 ) -> Result<bool, AppError> {
+    let art = t.name;
     let eigen: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? \
          AND schluessel = ?)",
@@ -937,6 +940,19 @@ pub async fn uebernimm_gegen(
     .fetch_one(&mut *conn)
     .await?;
     if !eigen {
+        return Ok(false);
+    }
+    let hier: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT EXISTS (SELECT 1 FROM {} WHERE {} AND {} = ?)",
+        t.name,
+        t.schluessel.gleich(t.name),
+        super::art::einsatz_ausdruck(t.scoping, t.name)
+    )))
+    .bind(gegen)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if !hier {
         return Ok(false);
     }
     let bisher = super::abbildung::einsatz_lokal(conn, einsatz_id, art, fremd).await?;

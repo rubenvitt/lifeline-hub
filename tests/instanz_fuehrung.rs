@@ -5914,6 +5914,147 @@ async fn abgeglichene_rueckgabe_raeumt_den_merker() {
     assert!(!zeichen_entfernt(&hub, h, "N vom Hub").await);
 }
 
+// ── ID in einem anderen Einsatz neu vergeben (LLH-2029) ──────────────────────────────────────
+
+/// Wie `neue_zeile_unter_alter_id_nach_uebergabe`, aber der Hub legt die neue Zeile unter
+/// derselben ID in seinem eigenen Einsatz B an: (Hub, ELW, Einsatz am Hub, Einsatz B).
+async fn neue_zeile_unter_alter_id_in_anderem_einsatz() -> (Instanz, Instanz, i64, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    zeichen_anlegen(&elw, e, "Z vom ELW").await;
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await, "der ELW spiegelt");
+    let h = einsatz_der_akte(&hub, akte).await;
+    mitglied_werden(&hub, h).await;
+    let b = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let z: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen WHERE einsatz_id = ?")
+        .bind(h)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    zeichen_loeschen(&hub, h, z).await;
+    assert_eq!(
+        zeichen_anlegen(&hub, b, "N in B").await,
+        z,
+        "SQLite vergibt die ID in B neu"
+    );
+    (hub, elw, h, b)
+}
+
+/// Akzeptanz LLH-2029: Der ELW übernimmt per Notübernahme und nennt für sein Z die ID, die der Hub
+/// inzwischen in Einsatz B neu vergeben hat. Die Zeile von B bleibt unverändert in B, und Z steht
+/// in A.
+#[tokio::test]
+async fn gegen_auf_eine_in_anderem_einsatz_neu_vergebene_id_laesst_die_zeile_dort() {
+    let (hub, elw, h, b) = neue_zeile_unter_alter_id_in_anderem_einsatz().await;
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        json!({"grund": "Hub nicht erreichbar"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None);
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    assert_eq!(zeichen_labels(&hub, b).await, ["N in B"]);
+    assert_eq!(zeichen_labels(&hub, h).await, ["Z vom ELW"]);
+}
+
+/// LLH-2029: `uebernimm_gegen` ordnet die Zeile des Führers keiner ID zu, die der Hub in einem
+/// anderen Einsatz neu vergeben hat, obwohl ihre Löschung im Log von A steht.
+#[tokio::test]
+async fn uebernimm_gegen_ordnet_keine_zeile_eines_anderen_einsatzes_zu() {
+    let (hub, elw, h, b) = neue_zeile_unter_alter_id_in_anderem_einsatz().await;
+    let z_elw: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen WHERE einsatz_id = ?")
+        .bind(b)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    let schema = lifeline_hub::instanz::spiegel::schema::schema(&mut conn)
+        .await
+        .unwrap();
+    let t = schema.tabelle("freies_zeichen").unwrap();
+    let zugeordnet = lifeline_hub::instanz::spiegel::fuehrung::uebernimm_gegen(
+        &mut conn,
+        h,
+        t,
+        &z_elw.to_string(),
+        &n.to_string(),
+    )
+    .await
+    .unwrap();
+    assert!(!zugeordnet);
+    let herkunft: Option<String> = sqlx::query_scalar(
+        "SELECT lokaler_schluessel FROM spiegel_herkunft WHERE einsatz_id = ? \
+         AND art = 'freies_zeichen' AND fremder_schluessel = ?",
+    )
+    .bind(h)
+    .bind(z_elw.to_string())
+    .fetch_optional(&mut *conn)
+    .await
+    .unwrap();
+    assert_ne!(herkunft, Some(n.to_string()));
+}
+
+/// LLH-2029: Zeigt die Herkunft am Spiegel veraltet auf eine Zeile eines anderen Einsatzes, ändert
+/// die nächste Lieferung sie nicht, sondern legt die Zeile im Spiegel neu an.
+#[tokio::test]
+async fn veraltete_herkunft_aendert_keine_zeile_eines_anderen_einsatzes() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let z = zeichen_anlegen(&elw, e, "Z vom ELW").await;
+    elw_meldet(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert_eq!(zeichen_labels(&hub, h).await, ["Z vom ELW"]);
+    let b = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let n = zeichen_anlegen(&hub, b, "N in B").await;
+    // Den Weg zu einer solchen Herkunft verbaut LLH-2029 in `uebernimm_gegen`; hier steht sie
+    // für jeden, den es noch geben mag.
+    sqlx::query(
+        "UPDATE spiegel_herkunft SET lokaler_schluessel = ? WHERE einsatz_id = ? \
+         AND art = 'freies_zeichen' AND fremder_schluessel = ?",
+    )
+    .bind(n.to_string())
+    .bind(h)
+    .bind(z.to_string())
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/freie-zeichen/{z}"),
+        &elw.admin,
+        Some(&json!({"label": "Z geändert"})),
+    )
+    .await;
+    assert!(s.is_success(), "{s}: {v}");
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None);
+    assert_eq!(zeichen_labels(&hub, b).await, ["N in B"]);
+    assert!(zeichen_labels(&hub, h)
+        .await
+        .contains(&"Z geändert".to_string()));
+}
+
 // ── Größe der Erklärung (LLH-1702) ───────────────────────────────────────────────────────────
 
 /// Größte Erklärung, die das Gegenüber an einer Akte annimmt (`austausch::ERKLAERUNG_MAX`, dort
