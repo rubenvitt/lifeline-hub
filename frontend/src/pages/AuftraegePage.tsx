@@ -10,11 +10,12 @@ import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { modulName } from '../einsatz/modulRegistry';
 import { useAdressAenderung } from '../routing/useLinkAuftrag';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 export default function AuftraegePage() {
   const { id } = useParams();
@@ -66,7 +67,7 @@ export default function AuftraegePage() {
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   // Seitenzustände wie die Nachbarseiten (oxgob5gk D11): Skelett statt Spinner, Fehler mit Ursache.
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="auftraege" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

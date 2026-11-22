@@ -28,7 +28,7 @@ import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
 } from '../components/erfassungsSitzung';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { parseListenZustand, tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
@@ -55,6 +55,7 @@ import { ortEingabe } from '../anzeige/ortsfeldFormular';
 import { Marke } from '../components/instrument/Marke';
 import { useAdressWert } from '../routing/useAdressWert';
 import { pflicht } from '../components/pflichtRegel';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /** Formularwerte: der Fundort ist ein Ortsfeld mit Text und Koordinate (LLH-1114). */
 type TierFormular = Omit<TierEingabe, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
@@ -365,7 +366,7 @@ export default function TierePage() {
    * hängen an ihr. Deshalb hier ein Frühausstieg, und nur hier.
    */
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="tiere" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

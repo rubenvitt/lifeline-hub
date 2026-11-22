@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
-import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenSackgasse } from '../components/SeitenZustand';
+import { ModulGerippeSeite } from './ModulWechselGerippe';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { freiesRueckwegModul, istKeyFreigegeben, modulName, modulZielRoute } from './modulRegistry';
 
@@ -66,7 +67,9 @@ export function modulFreigabeAnzeige(
     case 'frei':
       return null;
     case 'laden':
-      return <SeitenSkeleton />;
+      // Kopf sofort statt nacktem Gerippe (LLH-2005, `frontend/AGENTS.md`, „Modulwechsel zeigt
+      // sofort Kopf und Gerippe“).
+      return <ModulGerippeSeite modulKey={key} />;
     case 'fehler':
       return (
         <SeitenFehler

@@ -727,6 +727,7 @@ describe('InfotelefonPage als eigenes Modul (i6k6mzed, design.md D3)', () => {
 
   it('Titel aus der Registry, Ortspfad ohne Stab', async () => {
     setup();
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(
       await screen.findByRole('heading', { level: 1, name: modulName('infotelefon') }),
     ).toBeInTheDocument();

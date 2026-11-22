@@ -36,7 +36,7 @@ import {
   useRollen,
   type KennzahlZustand,
 } from '../components/instrument';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusWahl from '../components/StatusWahl';
 import { useViewport } from '../components/useViewport';
@@ -65,6 +65,7 @@ import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { useAdressWert } from '../routing/useAdressWert';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Informationstelefon (LFH-554, Spec `stab-infotelefon`): das Protokoll der Anrufe aus der
@@ -352,7 +353,7 @@ export default function InfotelefonPage() {
   );
 
   if (freigabe.zustand !== 'frei') return modulFreigabeAnzeige(freigabe, MODUL, SEITE, einsatzId);
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey={MODUL} />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
