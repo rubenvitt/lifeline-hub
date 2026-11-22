@@ -370,9 +370,7 @@ export function StandVeraltetHinweis({ onWiederholen }: SeitenStandVeraltetProps
         wort="Stand womöglich veraltet"
         title={STAND_VERALTET_GANZ}
       />
-      <Button size="small" onClick={onWiederholen}>
-        Erneut abrufen
-      </Button>
+      <Button onClick={onWiederholen}>Erneut abrufen</Button>
     </span>
   );
 }
