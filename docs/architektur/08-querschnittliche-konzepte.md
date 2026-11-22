@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 21.11.2026 (Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 22.11.2026 (Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -310,8 +310,8 @@ Umgebungsvariable; kein anderes Modul liest `std::env::var` (`tests/env_config_g
 
 Schreibwege und Scheduler melden nach dem Commit über `benachrichtigung::melden`
 (`src/benachrichtigung/`); zugestellt wird über die Live-Ströme, mit Schalter `--web-push` auch per
-Web Push an geschlossene Tabs (`src/web_push/`) und in Desktop- und iOS-Hülle als native Meldung,
-in der iOS-Hülle nur bei laufender App (8.31).
+Web Push an geschlossene Tabs (`src/web_push/`) und in Desktop-, iOS- und Android-Hülle als native
+Meldung, in iOS- und Android-Hülle nur bei laufender App (8.31).
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Benachrichtigungen“; Spec
 [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md); Betrieb
 [`docs/betrieb/web-push.md`](../betrieb/web-push.md).
@@ -430,8 +430,10 @@ Warteschlange; ein Fehler beim Senden wird verschluckt. Der Server (`src/routes/
 
 ## 8.31 Hüllen-Vertrag
 
-Desktop-Hülle (`src-tauri`) und iOS-Hülle (`ios`) laden die Weboberfläche des Servers und tragen
-keine Anwendungslogik ([ADR-0068](entscheidungen/ADR-0068-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
+Desktop-Hülle (`src-tauri`), iOS-Hülle (`ios`) und Android-Hülle (`android`) laden die
+Weboberfläche des Servers und tragen keine Anwendungslogik
+([ADR-0068](entscheidungen/ADR-0068-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md),
+[ADR-0084](entscheidungen/ADR-0084-die-android-huelle-ist-eine-eigene-kotlin-app-ohne-anwendungslogik-und-kommt-als-apk-die-sich-selbst-aktualisiert.md)).
 Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; drei Teile:
 
 - **Server → Hülle:** `GET /api/shell` liefert anonym und ohne Datenbank `version` und
@@ -440,25 +442,31 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   kommen nur hinzu. Die iOS-Hülle lädt einen Server nur, wenn sie seinen Vertrag kennt
   (`bekannteVertraege` in `ios/LifelineKern/Sources/LifelineKern/LifelineKern.swift`,
   `Vertragspruefung` in `Vertrag.swift` daneben), bei Start, Wechsel und Rückkehr in den
-  Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Desktop-Hülle liest den Endpunkt noch
+  Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Android-Hülle prüft genauso
+  (`bekannteVertraege` in `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/LifelineKern.kt`,
+  `Vertragspruefung` in `Vertrag.kt`). Die Desktop-Hülle liest den Endpunkt noch
   nicht (Zunder LLH-1982).
 - **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
-  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, bei iOS dazu
-  `platform`, `version` und `haptics`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
+  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, bei iOS und Android
+  dazu `platform`, `version` und `haptics`; Android ohne `setAppBadge`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
   das Frontend unterscheidet die Hüllen nur darüber. Gesetzt wird sie von den Init-Skripten der
-  Desktop-Hülle (`src-tauri/src/*.js`) und von `ios/App/Huelle/huelle.js`; Vitest führt beide aus
-  (`frontend/src/test/huelle.ts`).
+  Desktop-Hülle (`src-tauri/src/*.js`), von `ios/App/Huelle/huelle.js` und von
+  `android/app/src/main/assets/huelle.js`; Vitest führt sie aus (`frontend/src/test/huelle.ts`).
 - **Seite → Hülle, die Brücke:** in der iOS-Hülle der Message-Handler `lifeline`, Wire-Format im
   Kopf von `ios/App/Huelle/huelle.js`. Er nimmt Aufrufe nur aus dem Hauptframe und von der Origin
   des aktiven Servers an (`Bruecke.accepts` in `ios/LifelineKern/Sources/LifelineKern/Bruecke.swift`);
-  jeder Server hat einen eigenen Datenspeicher. Die Anmeldung im Systembrowser
-  (`POST /api/auth/app-code[/einloesen]`) nutzen beide Hüllen gleich.
+  jeder Server hat einen eigenen Datenspeicher. In der Android-Hülle ist es das Objekt `lifeline`
+  aus `addWebMessageListener` mit derselben Annahmeregel (`Bruecke.accepts` in
+  `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Bruecke.kt`, Wire-Format im Kopf von
+  `android/app/src/main/assets/huelle.js`); jeder Server hat dort ein eigenes WebView-Profil. Die
+  Anmeldung im Systembrowser (`POST /api/auth/app-code[/einloesen]`) nutzen alle Hüllen gleich.
 
-Adressprüfung, Deeplink und Linkregeln stehen einmal in Rust (`src-tauri/src/adresse.rs`,
-`deeplink.rs`, `links.rs`) und einmal im Swift-Kern; zusammengehalten werden sie von den
-gemeinsamen Fällen unter `src-tauri/faelle/`, die beide Suiten prüfen. Regeln:
-[`ios/AGENTS.md`](../../ios/AGENTS.md), [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md),
-„Gemeinsame Fälle“; Betrieb: [`ios-app.md`](../betrieb/ios-app.md),
+Adressprüfung, Deeplink und Linkregeln stehen in Rust (`src-tauri/src/adresse.rs`,
+`deeplink.rs`, `links.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden sie von den
+gemeinsamen Fällen unter `src-tauri/faelle/`, die alle drei Suiten prüfen. Regeln:
+[`ios/AGENTS.md`](../../ios/AGENTS.md), [`android/AGENTS.md`](../../android/AGENTS.md),
+[`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), „Gemeinsame Fälle“; Betrieb:
+[`ios-app.md`](../betrieb/ios-app.md), [`android-app.md`](../betrieb/android-app.md),
 [`desktop-app.md`](../betrieb/desktop-app.md).
 
 ## 8.32 Geheimnisse und Abrufe der Adapter
