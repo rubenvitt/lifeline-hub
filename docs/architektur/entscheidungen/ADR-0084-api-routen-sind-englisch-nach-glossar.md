@@ -1,5 +1,5 @@
 ---
-id: ADR-0082
+id: ADR-0084
 titel: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 status: akzeptiert
 datum: 2026-11-22
@@ -7,6 +7,7 @@ gilt_fuer:
   - src/app.rs
   - src/public_api/**
   - src/routes/shell.rs
+  - src-tauri/src/vertrag.rs
   - scripts/api-routen-woerter.tsv
   - scripts/api-routen-bestand.txt
   - scripts/check-api-routen.sh
@@ -14,7 +15,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md
 ---
 
-# ADR-0082: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
+# ADR-0084: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 
 ## Regeln
 
@@ -26,7 +27,8 @@ herleitung:
   selben PR um. Pfade unter `/api/v1/` erst, wenn eine ADR die Zusage von ADR-0022 ersetzt.
 - MUST: Ab 1.0.0 bleibt ein umbenannter Pfad drei Major-Versionen lang als Alias erreichbar.
 - MUST: Bricht eine Umbenennung einen Pfad, den eine Hülle fest aufruft, steigt
-  `SHELL_CONTRACT` in `src/routes/shell.rs`.
+  `SHELL_CONTRACT` in `src/routes/shell.rs`, und die Hüllen kennen im selben PR nur noch die neue
+  Nummer (iOS `bekannteVertraege`, Desktop `BEKANNTE_VERTRAEGE`).
 
 ## Prüfung
 

@@ -1,4 +1,4 @@
-# Glossar der API-Routen (ADR-0082): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0084): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accommodation	Unterkunft
 adapter	-
