@@ -2191,6 +2191,11 @@ pub async fn setze_mitgliedschaft(
         crate::geraet::repo::OHNE_GERAETEKONTEN,
         crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
+    // Lesen und Schreiben in einer Schreibtransaktion (LLH-2064, Entwurf D2): Weicht beim
+    // Rollenwechsel die Funktion, liest der UPDATE-Zweig sie, wandelt sie per
+    // `Funktionsangabe::as_freitext` und schreibt im selben Zug. `BEGIN IMMEDIATE` hält ein
+    // paralleles Setzen der Funktion dazwischen heraus.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_mitgliedschaft \
             (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
@@ -2202,12 +2207,42 @@ pub async fn setze_mitgliedschaft(
     .bind(rolle.as_str())
     .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
     .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if eingefuegt > 0 {
+        tx.commit().await?;
         return Ok(true);
     }
+
+    // Eine Rolle außerhalb der Führung trägt keine Funktion (CHECK aus 0363); ohne Angabe im
+    // Body wird die bestehende zur Bezeichnung.
+    let gewichen = if !rolle.gehoert_zur_fuehrung() && fuehrungsstelle.is_none() {
+        let bestand: Option<(Option<String>, Option<String>, bool)> = sqlx::query_as(
+            "SELECT m.fuehrungsfunktion, m.fuehrungsstelle, e.geschwaerzt_at IS NOT NULL \
+             FROM einsatz_mitgliedschaft m JOIN einsatz e ON e.id = m.einsatz_id \
+             WHERE m.einsatz_id = ? AND m.benutzer_id = ?",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        match bestand {
+            Some((Some(code), text, geschwaerzt)) => {
+                crate::fuehrung::Fuehrungsfunktion::parse(&code).map(|f| {
+                    crate::fuehrung::Funktionsangabe {
+                        funktion: Some(f),
+                        text,
+                    }
+                    .as_freitext(geschwaerzt)
+                })
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let fuehrungsstelle = fuehrungsstelle.or(gewichen.as_ref());
 
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = ?3, \
@@ -2221,7 +2256,7 @@ pub async fn setze_mitgliedschaft(
     .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
     .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
     .bind(fuehrungsstelle.is_some())
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
 
@@ -2231,6 +2266,7 @@ pub async fn setze_mitgliedschaft(
         // dem bestehenden „Ziel-Benutzer unbekannt"-Pfad in `mitglied_setzen`).
         return Err(AppError::NotFound);
     }
+    tx.commit().await?;
     Ok(false)
 }
 
