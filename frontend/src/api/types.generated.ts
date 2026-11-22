@@ -1540,8 +1540,11 @@ export interface components {
             bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
             /** @description Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt. */
             detail?: string | null;
-            /** Format: int64 */
-            einsatz_id: number;
+            /**
+             * Format: int64
+             * @description Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026).
+             */
+            einsatz_id: number | null;
             erstellt_at: string;
             /** Format: int64 */
             id: number;
@@ -1555,17 +1558,17 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen" | "fuehrung_angefragt";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen" | "fuehrung_angefragt" | "adapter_eingriff" | "adapter_gestoert" | "adapter_wieder_ok";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht" | "adapter";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
@@ -1578,8 +1581,12 @@ export interface components {
             /** Format: int64 */
             bezug_id: number;
             bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
-            /** Format: int64 */
-            einsatz_id: number;
+            /**
+             * Format: int64
+             * @description Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit
+             *     Client und Service Worker denselben Tag bilden.
+             */
+            einsatz_id: number | null;
             /**
              * Format: int64
              * @description „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes

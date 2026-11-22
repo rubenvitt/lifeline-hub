@@ -463,6 +463,7 @@ impl Anlass {
 pub struct BenachrichtigungEreignis {
     /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit
     /// Client und Service Worker denselben Tag bilden.
+    #[schema(required)]
     pub einsatz_id: Option<i64>,
     pub benachrichtigung_id: i64,
     pub art: BenachrichtigungArt,
@@ -497,6 +498,7 @@ pub struct BenachrichtigungVerlauf {
 pub struct BenachrichtigungAnzeige {
     pub id: i64,
     /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026).
+    #[schema(required)]
     pub einsatz_id: Option<i64>,
     pub art: BenachrichtigungArt,
     pub stufe: BenachrichtigungStufe,
