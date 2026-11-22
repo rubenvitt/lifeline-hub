@@ -1,5 +1,6 @@
 pub mod abloesung;
 pub mod abloesung_schichtplan;
+pub mod adapter;
 pub mod anbindungen;
 pub mod anbindungen_webhook;
 pub mod anhang;

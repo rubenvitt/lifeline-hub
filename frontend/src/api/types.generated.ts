@@ -462,6 +462,116 @@ export interface components {
          * @enum {string}
          */
         AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
+        /** @description Ein Adapter, wie die Verwaltung ihn zeigt. */
+        AdapterAnzeige: {
+            angehalten_at?: string | null;
+            angehalten_grund?: components["schemas"]["AdapterFehler"] | null;
+            angelegt_at: string;
+            /** @description Code der Art. */
+            art: string;
+            /** @description Anzeigename der Art; fehlt, wenn dieser Server die Art nicht kennt. */
+            art_bezeichnung?: string | null;
+            /** @description Die Einstellungen; nur für den System-Admin. */
+            einstellungen?: Record<string, never> | null;
+            /** @description Erster Fehlschlag der laufenden Störung. */
+            fehler_seit?: string | null;
+            /** Format: int64 */
+            fehlversuche: number;
+            /** @description Optimistisches Lock für Änderungen (`basis_geaendert_at`). */
+            geaendert_at: string;
+            geheimnisse: components["schemas"]["AdapterGeheimnisAnzeige"][];
+            id: string;
+            /** Format: int64 */
+            intervall_s: number;
+            lan_erlaubt: boolean;
+            /**
+             * Format: int64
+             * @description Einträge des letzten erfolgreichen Abrufs.
+             */
+            letzte_anzahl?: number | null;
+            letzter_erfolg_at?: string | null;
+            letzter_fehler?: components["schemas"]["AdapterLetzterFehler"] | null;
+            naechster_abruf_at?: string | null;
+            name: string;
+            zustand: components["schemas"]["AdapterZustand"];
+        };
+        /** @description Eine Art, wie die Verwaltung sie zum Anlegen sieht. */
+        AdapterArtAnzeige: {
+            bezeichnung: string;
+            code: string;
+            felder: components["schemas"]["Feld"][];
+            /** Format: int64 */
+            intervall_min_s: number;
+            /** Format: int64 */
+            intervall_vorschlag_s: number;
+            plaetze: components["schemas"]["Platz"][];
+        };
+        /**
+         * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
+         * @enum {string}
+         */
+        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "intern";
+        /** @description Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert. */
+        AdapterGeheimnisAnzeige: {
+            bezeichnung: string;
+            gesetzt_at?: string | null;
+            gesetzt_von_name?: string | null;
+            is_gesetzt: boolean;
+            /** @description Gesetzt, aber an einen anderen als den geladenen Schlüssel verschlüsselt. */
+            is_unlesbar: boolean;
+            name: string;
+            pflicht: boolean;
+        };
+        /** @description Der letzte Fehlschlag eines Adapters. */
+        AdapterLetzterFehler: {
+            art: components["schemas"]["AdapterFehler"];
+            at: string;
+            /** Format: int64 */
+            status?: number | null;
+        };
+        /** @description Die Adapter der Org, die Arten zum Anlegen und der Zustand des Speichers. */
+        AdapterListe: {
+            adapter: components["schemas"]["AdapterAnzeige"][];
+            arten: components["schemas"]["AdapterArtAnzeige"][];
+            /** @description Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet: Schreiben gesperrt. */
+            gesperrt_grund?: string | null;
+            speicher: components["schemas"]["GeheimnisspeicherZustand"];
+            /** @description Fingerabdruck des geladenen Schlüssels (16 Hex-Zeichen), nie der Schlüssel. */
+            speicher_fingerabdruck?: string | null;
+        };
+        /** @description Ergebnis von „Verbindung prüfen“. */
+        AdapterPruefErgebnis: {
+            /**
+             * Format: int64
+             * @description Einträge, die der Abruf geliefert hätte.
+             */
+            anzahl?: number | null;
+            /** Format: int64 */
+            dauer_ms: number;
+            erfolg: boolean;
+            fehler_art?: components["schemas"]["AdapterFehler"] | null;
+            /** Format: int64 */
+            status?: number | null;
+        };
+        /** @description Ein Versuch im Verlauf. Kein Rumpf der Antwort. */
+        AdapterVersuchAnzeige: {
+            /** Format: int64 */
+            anzahl?: number | null;
+            at: string;
+            /** Format: int64 */
+            dauer_ms: number;
+            erfolg: boolean;
+            fehler_art?: components["schemas"]["AdapterFehler"] | null;
+            /** @description „Verbindung prüfen“. */
+            probe: boolean;
+            /** Format: int64 */
+            status?: number | null;
+        };
+        /**
+         * @description Zustand eines Adapters, wie die Verwaltung ihn zeigt; abgeleitet aus seiner Zeile.
+         * @enum {string}
+         */
+        AdapterZustand: "wartet" | "ok" | "gestoert" | "braucht_eingriff" | "aus" | "art_unbekannt";
         /**
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
@@ -471,7 +581,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen" | "adapter_angelegt" | "adapter_geaendert" | "adapter_geloescht" | "adapter_geheimnis_gesetzt" | "adapter_geheimnis_entfernt" | "adapter_lan_erlaubt" | "adapter_lan_entzogen" | "adapter_angehalten" | "adapter_fortgesetzt";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -3895,6 +4005,20 @@ export interface components {
             standort: string[];
             traegerorganisation: string[];
         };
+        /** @description Ein Einstellungsfeld der Art. Nichts Geheimes: das gehört in einen [`Platz`]. */
+        Feld: {
+            bezeichnung: string;
+            /** @description Höchstlänge in Zeichen (Text, URL). */
+            max: number;
+            name: string;
+            pflicht: boolean;
+            typ: components["schemas"]["FeldTyp"];
+        };
+        /**
+         * @description Typ eines Einstellungsfelds.
+         * @enum {string}
+         */
+        FeldTyp: "text" | "zahl" | "url";
         /**
          * @description Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers
          *     (`None`, wenn der Benutzer fehlt).
@@ -4249,6 +4373,11 @@ export interface components {
          * @enum {string}
          */
         GegenRat: "behandlung" | "transport";
+        /**
+         * @description Zustand des Geheimnisspeichers für die Verwaltung.
+         * @enum {string}
+         */
+        GeheimnisspeicherZustand: "bereit" | "fehlt" | "passt_nicht";
         /** @description Body von `POST …/benachrichtigungen/gelesen`. */
         GelesenEingabe: {
             /**
@@ -7360,6 +7489,12 @@ export interface components {
              */
             stand: number;
         };
+        /** @description Ein Platz für ein Geheimnis, den die Art festlegt (etwa `accesskey`). */
+        Platz: {
+            bezeichnung: string;
+            name: string;
+            pflicht: boolean;
+        };
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;
@@ -9846,8 +9981,14 @@ export interface components {
          *     - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
          *       sein Hash.
          *     - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
+         *     - `adapter_*` (LLH-2017): `adapter_id`, `adapter_art`, bei `_geheimnis_*` der `platz`, bei
+         *       einer URL in den Einstellungen ihr `host`. Nie ein Geheimnis, nie ein Pfad.
          */
         ZugangsAngaben: {
+            /** @description Adapter: Code seiner Art. */
+            adapter_art?: string | null;
+            /** @description Adapter (LLH-2017): seine Kennung. */
+            adapter_id?: string | null;
             /** @description Adresse der Gegenstelle (nur auf der Seite, die sich meldet). */
             adresse?: string | null;
             /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
@@ -9884,6 +10025,8 @@ export interface components {
              *     Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
              */
             passkeys_entfernt?: number | null;
+            /** @description Adapter: Platz des gesetzten oder entfernten Geheimnisses (nie der Wert). */
+            platz?: string | null;
             /** @description Maschinenzugang: Scopes (Wire-Werte) nach der Aktion. */
             scopes?: string[] | null;
             /** @description Maschinenzugang: Scopes vor einer Änderung. */

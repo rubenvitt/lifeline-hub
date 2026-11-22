@@ -332,7 +332,43 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     );
     // Webhooks (LLH-1656): stellt die Ausgangsereignisse an Fremdsysteme zu. Ohne Webhook ist
     // jeder Durchgang eine leere Abfrage; das Stoppsignal teilt er mit der Sicherung.
-    let webhook_task = lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang);
+    let webhook_task =
+        lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang.clone());
+    // Adapter (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung, Abrufe im
+    // Hintergrund. Ohne Schlüssel läuft der Server; Adapter mit Geheimnissen melden das selbst.
+    let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
+        lifeline_hub::adapter::geheimnis::Geheimnisspeicher::new(
+            config.geheimnis_schluessel.clone(),
+        ),
+        lifeline_hub::adapter::art::Verzeichnis::produktiv(),
+    );
+    // Ohne Schlüssel warnt der Start nur, wenn Geheimnisse liegen; mit Schlüssel, wenn welche
+    // nicht zu ihm passen (Wiederherstellung auf einem anderen Rechner). Nie ein Wert im Log.
+    let fp = adapter_rahmen.speicher.fingerabdruck();
+    let fremde = lifeline_hub::adapter::repo::count_fremde_chiffrate(&pool, fp)
+        .await
+        .unwrap_or(0);
+    match fp {
+        Some(fp) if fremde > 0 => tracing::warn!(
+            fingerabdruck = fp,
+            anzahl = fremde,
+            "Geheimnisse von Adapter-Anbindungen passen nicht zum Schlüssel \
+             (LIFELINE_GEHEIMNIS_SCHLUESSEL): in der Verwaltung neu setzen"
+        ),
+        Some(fp) => tracing::info!(fingerabdruck = fp, "Geheimnisspeicher der Adapter bereit"),
+        None if fremde > 0 => tracing::warn!(
+            anzahl = fremde,
+            "Kein Schlüssel für den Geheimnisspeicher der Adapter \
+             (--geheimnis-schluessel / LIFELINE_GEHEIMNIS_SCHLUESSEL): Adapter mit Geheimnis \
+             halten an"
+        ),
+        None => tracing::info!(
+            "Geheimnisspeicher der Adapter ohne Schlüssel (LIFELINE_GEHEIMNIS_SCHLUESSEL): \
+             Geheimnisse lassen sich nicht speichern"
+        ),
+    }
+    let adapter_task =
+        lifeline_hub::adapter::lauf::start(pool.clone(), adapter_rahmen.clone(), stopp_empfang);
 
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.
@@ -533,6 +569,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         einsatzakte_bau: Default::default(),
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
+        adapter: adapter_rahmen,
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());
@@ -628,7 +665,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .await
     };
 
-    herunterfahren(&stopp, backup_task, webhook_task, pool_fuer_ende).await;
+    herunterfahren(
+        &stopp,
+        backup_task,
+        webhook_task,
+        adapter_task,
+        pool_fuer_ende,
+    )
+    .await;
     ergebnis?;
     Ok(())
 }
@@ -642,6 +686,10 @@ const BACKUP_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(45
 /// etwas Luft für das Festhalten des Ergebnisses.
 const WEBHOOK_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// Wie lange das Herunterfahren auf einen laufenden Adapter-Abruf wartet: sein Zeitlimit und
+/// etwas Luft für das Festhalten des Ergebnisses.
+const ADAPTER_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(25);
+
 /// Nach dem Serve (LFH-926): Sicherungs-Task stoppen und begrenzt abwarten, dann den Pool
 /// schließen, damit SQLite den WAL zurückschreibt und keine Verbindung mitten im Schreiben
 /// abreißt.
@@ -649,6 +697,7 @@ async fn herunterfahren(
     stopp: &tokio::sync::watch::Sender<bool>,
     backup_task: Option<tokio::task::JoinHandle<()>>,
     webhook_task: tokio::task::JoinHandle<()>,
+    adapter_task: tokio::task::JoinHandle<()>,
     pool: sqlx::SqlitePool,
 ) {
     let _ = stopp.send(true);
@@ -665,6 +714,15 @@ async fn herunterfahren(
     {
         webhook_task.abort();
         tracing::warn!("Webhook-Zustellung beim Herunterfahren abgebrochen");
+    }
+    // Adapter (LLH-2017): wie die Webhooks; ein abgebrochener Abruf läuft beim nächsten Start.
+    let mut adapter_task = adapter_task;
+    if tokio::time::timeout(ADAPTER_ENDE_FRIST, &mut adapter_task)
+        .await
+        .is_err()
+    {
+        adapter_task.abort();
+        tracing::warn!("Adapter-Abruf beim Herunterfahren abgebrochen");
     }
     if tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await

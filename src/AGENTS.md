@@ -221,6 +221,30 @@ Spec `webhook-zustellung`, Herleitung
 - **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
   Sekunden-Auflösung.
 
+## Backend — Adapter (LLH-2017)
+
+Anbindungen, die Lifeline Hub selbst abruft (Divera, HiOrg, Postfach …): `src/adapter/`
+([ADR-0077](../docs/architektur/entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
+Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`):
+- **Eine neue Anbindung ist eine Art** (`adapter::art::AdapterArt`) im Verzeichnis
+  `art::Verzeichnis::produktiv()`: Code, Plätze für Geheimnisse, Einstellungsfelder, Intervall,
+  Abruf. Kein eigener Lauf, keine eigene Tabelle für Zustand oder Geheimnisse, keine eigene Route
+  zum Setzen von Zugangsdaten. Tests bringen eine eigene Art mit (`tests/adapter_testart/`), keine
+  `#[cfg(test)]`-Art im Verzeichnis.
+- **Abruf in zwei Phasen:** `abrufen` nur Netz über den `AbrufKontext` (`request`/`get`, `send`,
+  `read_json`/`read_text` mit eigenem Deckel), `Uebernahme::uebernehmen` nur Datenbank in der
+  Transaktion des Laufs. `uebernehmen` kann bei belegter Datenbank mehrmals laufen; es schreibt
+  idempotent in den Vertrag der Art.
+- **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
+  vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
+- **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/geheimnisse/{platz}`; gelesen und
+  entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
+  Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
+  Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
+  URL), entfernt die Geheimnisse; eine neue Art mit URL-Feldern erbt das, ohne eigenen Code.
+- **Fehlercodes:** ein neuer Code kommt in `AdapterFehler` samt Einteilung in
+  `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)

@@ -2714,6 +2714,7 @@ mod finalisierung_tests {
             einsatzakte_bau: Default::default(),
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
+            adapter: Default::default(),
         };
         let url = reqwest::Url::parse("https://example.test/de.mbtiles").unwrap();
 

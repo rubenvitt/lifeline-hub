@@ -159,6 +159,7 @@ pub fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
         einsatzakte_bau: Default::default(),
         backup_empfaenger: Default::default(),
         datentraeger: Default::default(),
+        adapter: Default::default(),
     }
 }
 

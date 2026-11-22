@@ -393,6 +393,22 @@ pub struct Config {
     )]
     pub backup_empfaenger: Vec<age::x25519::Recipient>,
 
+    /// Privater `age`-Schlüssel (`AGE-SECRET-KEY-1…`, aus `age-keygen`) des Geheimnisspeichers
+    /// der Adapter (LLH-2017, ADR-0077): Accesskeys und Passwörter von Anbindungen liegen nur
+    /// verschlüsselt an diesen Schlüssel in der Datenbank. Getrennt von der Datenbank sichern;
+    /// ohne ihn sind die gespeicherten Geheimnisse wertlos und müssen neu gesetzt werden.
+    ///
+    /// **Ohne Angabe** startet der Server; Adapter mit Geheimnissen melden „Geheimnisspeicher
+    /// gesperrt“, und Geheimnisse lassen sich nicht speichern. Ein ungültiger Wert bricht den
+    /// Start ab, ohne ihn zu nennen. `Debug` zeigt ihn nie.
+    #[arg(
+        long,
+        env = "LIFELINE_GEHEIMNIS_SCHLUESSEL",
+        hide_env_values = true,
+        value_parser = GeheimnisSchluesselParser
+    )]
+    pub geheimnis_schluessel: Option<crate::adapter::geheimnis::GeheimnisSchluessel>,
+
     /// Zusicherung des Betreibers, dass der Datenträger außerhalb der Sicht des Servers
     /// verschlüsselt ist (LFH-1100), etwa LUKS auf dem Docker-Host. Dann warnt die
     /// Datenträgerprüfung bei „unbekannt“ nicht mehr; ein erkannter unverschlüsselter Datenträger
@@ -666,6 +682,34 @@ fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
         }
     }
     Ok(netz)
+}
+
+/// Der private Schlüssel des Geheimnisspeichers (LLH-2017). Ein eigener Parser, weil clap den
+/// Wert sonst in die Fehlermeldung schriebe: ein Tippfehler im Schlüssel landete im Log.
+#[derive(Clone)]
+struct GeheimnisSchluesselParser;
+
+impl clap::builder::TypedValueParser for GeheimnisSchluesselParser {
+    type Value = crate::adapter::geheimnis::GeheimnisSchluessel;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        wert: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let fehler = |grund: &str| {
+            clap::Error::raw(
+                clap::error::ErrorKind::ValueValidation,
+                format!("--geheimnis-schluessel (LIFELINE_GEHEIMNIS_SCHLUESSEL): {grund}\n"),
+            )
+            .with_cmd(cmd)
+        };
+        wert.to_str()
+            .ok_or_else(|| fehler("kein gültiges UTF-8"))?
+            .parse()
+            .map_err(|f: crate::adapter::geheimnis::SchluesselFehler| fehler(f.0))
+    }
 }
 
 /// Ein Eintrag der Empfänger-Liste: ein öffentlicher X25519-Schlüssel von `age`. Ein leerer

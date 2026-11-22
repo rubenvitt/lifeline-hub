@@ -172,6 +172,22 @@ hart beendet (Strg+C), bleibt ein Verzeichnis `.restore-entschluesselt-…` nebe
 liegen; der nächste Serverstart entfernt es. Die Passphrase einer geschützten Identitätsdatei
 besser per Pipe übergeben: am Terminal getippt, erscheint sie im Klartext.
 
+### Geheimnisse der Adapter (LLH-2017)
+
+Accesskeys und Passwörter von Anbindungen (Adapter, ADR-0077) liegen in der Datenbank nur
+verschlüsselt an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`. Eine Sicherung enthält die
+Chiffrate, **nie den Schlüssel**. Ihn deshalb getrennt aufbewahren, wie die Identität der
+Sicherungen, und beim Wiederherstellen auf einem anderen Rechner wieder setzen:
+
+```bash
+age-keygen -o lifeline-geheimnisse.key   # einmal erzeugen, sicher ablegen
+LIFELINE_GEHEIMNIS_SCHLUESSEL="$(grep AGE-SECRET-KEY lifeline-geheimnisse.key)" lifeline-hub …
+```
+
+Startet der Server nach dem Restore ohne Schlüssel oder mit einem anderen, läuft er trotzdem. Die
+Verwaltung zeigt unter Anbindungen „Geheimnisspeicher: Schlüssel fehlt“ bzw. „passt nicht“, und
+jeder Adapter mit Geheimnis hält mit diesem Grund an, bis ein Admin die Geheimnisse neu setzt.
+
 ### „Auf der Datenbank ist noch eine Verbindung offen"
 
 Liegen `-wal`/`-shm` neben der Ziel-Datenbank, bricht der Restore ab. Diese Dateien

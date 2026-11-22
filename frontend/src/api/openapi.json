@@ -1022,6 +1022,399 @@
           "kritisch"
         ]
       },
+      "AdapterAnzeige": {
+        "type": "object",
+        "description": "Ein Adapter, wie die Verwaltung ihn zeigt.",
+        "required": [
+          "id",
+          "art",
+          "name",
+          "intervall_s",
+          "lan_erlaubt",
+          "zustand",
+          "fehlversuche",
+          "geheimnisse",
+          "angelegt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "angehalten_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angehalten_grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdapterFehler",
+                "description": "Bei `braucht_eingriff`: der Fehler, der einen Menschen braucht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "art": {
+            "type": "string",
+            "description": "Code der Art."
+          },
+          "art_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Art; fehlt, wenn dieser Server die Art nicht kennt."
+          },
+          "einstellungen": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Die Einstellungen; nur für den System-Admin."
+          },
+          "fehler_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erster Fehlschlag der laufenden Störung."
+          },
+          "fehlversuche": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string",
+            "description": "Optimistisches Lock für Änderungen (`basis_geaendert_at`)."
+          },
+          "geheimnisse": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterGeheimnisAnzeige"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "intervall_s": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lan_erlaubt": {
+            "type": "boolean"
+          },
+          "letzte_anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einträge des letzten erfolgreichen Abrufs."
+          },
+          "letzter_erfolg_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "letzter_fehler": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdapterLetzterFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "naechster_abruf_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/AdapterZustand"
+          }
+        }
+      },
+      "AdapterArtAnzeige": {
+        "type": "object",
+        "description": "Eine Art, wie die Verwaltung sie zum Anlegen sieht.",
+        "required": [
+          "code",
+          "bezeichnung",
+          "plaetze",
+          "felder",
+          "intervall_min_s",
+          "intervall_vorschlag_s"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "felder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Feld"
+            }
+          },
+          "intervall_min_s": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "intervall_vorschlag_s": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "plaetze": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Platz"
+            }
+          }
+        }
+      },
+      "AdapterFehler": {
+        "type": "string",
+        "description": "Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.",
+        "enum": [
+          "status",
+          "abgelehnt",
+          "weiterleitung",
+          "zeitueberschreitung",
+          "verbindung",
+          "tls",
+          "ziel_intern",
+          "dns",
+          "ziel_ungueltig",
+          "zu_gross",
+          "antwort_ungueltig",
+          "geheimnis_fehlt",
+          "geheimnis_unlesbar",
+          "geheimnisspeicher_gesperrt",
+          "einstellung_ungueltig",
+          "intern"
+        ]
+      },
+      "AdapterGeheimnisAnzeige": {
+        "type": "object",
+        "description": "Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert.",
+        "required": [
+          "name",
+          "bezeichnung",
+          "pflicht",
+          "is_gesetzt",
+          "is_unlesbar"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "gesetzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gesetzt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_gesetzt": {
+            "type": "boolean"
+          },
+          "is_unlesbar": {
+            "type": "boolean",
+            "description": "Gesetzt, aber an einen anderen als den geladenen Schlüssel verschlüsselt."
+          },
+          "name": {
+            "type": "string"
+          },
+          "pflicht": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdapterLetzterFehler": {
+        "type": "object",
+        "description": "Der letzte Fehlschlag eines Adapters.",
+        "required": [
+          "at",
+          "art"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/AdapterFehler"
+          },
+          "at": {
+            "type": "string"
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AdapterListe": {
+        "type": "object",
+        "description": "Die Adapter der Org, die Arten zum Anlegen und der Zustand des Speichers.",
+        "required": [
+          "adapter",
+          "arten",
+          "speicher"
+        ],
+        "properties": {
+          "adapter": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterAnzeige"
+            }
+          },
+          "arten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterArtAnzeige"
+            }
+          },
+          "gesperrt_grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet: Schreiben gesperrt."
+          },
+          "speicher": {
+            "$ref": "#/components/schemas/GeheimnisspeicherZustand"
+          },
+          "speicher_fingerabdruck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fingerabdruck des geladenen Schlüssels (16 Hex-Zeichen), nie der Schlüssel."
+          }
+        }
+      },
+      "AdapterPruefErgebnis": {
+        "type": "object",
+        "description": "Ergebnis von „Verbindung prüfen“.",
+        "required": [
+          "erfolg",
+          "dauer_ms"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einträge, die der Abruf geliefert hätte."
+          },
+          "dauer_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfolg": {
+            "type": "boolean"
+          },
+          "fehler_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdapterFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AdapterVersuchAnzeige": {
+        "type": "object",
+        "description": "Ein Versuch im Verlauf. Kein Rumpf der Antwort.",
+        "required": [
+          "at",
+          "probe",
+          "erfolg",
+          "dauer_ms"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "at": {
+            "type": "string"
+          },
+          "dauer_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfolg": {
+            "type": "boolean"
+          },
+          "fehler_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdapterFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "probe": {
+            "type": "boolean",
+            "description": "„Verbindung prüfen“."
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AdapterZustand": {
+        "type": "string",
+        "description": "Zustand eines Adapters, wie die Verwaltung ihn zeigt; abgeleitet aus seiner Zeile.",
+        "enum": [
+          "wartet",
+          "ok",
+          "gestoert",
+          "braucht_eingriff",
+          "aus",
+          "art_unbekannt"
+        ]
+      },
       "AdminAktion": {
         "type": "string",
         "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
@@ -1074,7 +1467,16 @@
           "maschinenzugang_webhook_entfernt",
           "maschinenzugang_webhook_wieder_aufgenommen",
           "maschinenzugang_webhook_lan_erlaubt",
-          "maschinenzugang_webhook_lan_entzogen"
+          "maschinenzugang_webhook_lan_entzogen",
+          "adapter_angelegt",
+          "adapter_geaendert",
+          "adapter_geloescht",
+          "adapter_geheimnis_gesetzt",
+          "adapter_geheimnis_entfernt",
+          "adapter_lan_erlaubt",
+          "adapter_lan_entzogen",
+          "adapter_angehalten",
+          "adapter_fortgesetzt"
         ]
       },
       "AdressatKategorie": {
@@ -9624,6 +10026,45 @@
           }
         }
       },
+      "Feld": {
+        "type": "object",
+        "description": "Ein Einstellungsfeld der Art. Nichts Geheimes: das gehört in einen [`Platz`].",
+        "required": [
+          "name",
+          "bezeichnung",
+          "typ",
+          "pflicht",
+          "max"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "max": {
+            "type": "integer",
+            "description": "Höchstlänge in Zeichen (Text, URL).",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "pflicht": {
+            "type": "boolean"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/FeldTyp"
+          }
+        }
+      },
+      "FeldTyp": {
+        "type": "string",
+        "description": "Typ eines Einstellungsfelds.",
+        "enum": [
+          "text",
+          "zahl",
+          "url"
+        ]
+      },
       "FeldVermerk": {
         "type": "object",
         "description": "Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers\n(`None`, wenn der Benutzer fehlt).",
@@ -10528,6 +10969,15 @@
         "enum": [
           "behandlung",
           "transport"
+        ]
+      },
+      "GeheimnisspeicherZustand": {
+        "type": "string",
+        "description": "Zustand des Geheimnisspeichers für die Verwaltung.",
+        "enum": [
+          "bereit",
+          "fehlt",
+          "passt_nicht"
         ]
       },
       "GelesenEingabe": {
@@ -18220,6 +18670,26 @@
         ],
         "description": "Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der\nPlanung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die\nPlanung seitdem geändert, ist es 409."
       },
+      "Platz": {
+        "type": "object",
+        "description": "Ein Platz für ein Geheimnis, den die Art festlegt (etwa `accesskey`).",
+        "required": [
+          "name",
+          "bezeichnung",
+          "pflicht"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pflicht": {
+            "type": "boolean"
+          }
+        }
+      },
       "PlatzAnzeige": {
         "type": "object",
         "description": "Serialisierbare Platz-Anzeige (1:1 zur Tabelle).",
@@ -24656,8 +25126,22 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.\n- `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.\n- `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.\n- `adapter_*` (LLH-2017): `adapter_id`, `adapter_art`, bei `_geheimnis_*` der `platz`, bei\n  einer URL in den Einstellungen ihr `host`. Nie ein Geheimnis, nie ein Pfad.",
         "properties": {
+          "adapter_art": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adapter: Code seiner Art."
+          },
+          "adapter_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adapter (LLH-2017): seine Kennung."
+          },
           "adresse": {
             "type": [
               "string",
@@ -24764,6 +25248,13 @@
             ],
             "format": "int64",
             "description": "Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten\nAnmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`."
+          },
+          "platz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adapter: Platz des gesetzten oder entfernten Geheimnisses (nie der Wert)."
           },
           "scopes": {
             "type": [

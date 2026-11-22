@@ -685,6 +685,15 @@ fn serde_wire_gleich_as_str() {
         MaschinenzugangWebhookWiederAufgenommen,
         MaschinenzugangWebhookLanErlaubt,
         MaschinenzugangWebhookLanEntzogen,
+        AdapterAngelegt,
+        AdapterGeaendert,
+        AdapterGeloescht,
+        AdapterGeheimnisGesetzt,
+        AdapterGeheimnisEntfernt,
+        AdapterLanErlaubt,
+        AdapterLanEntzogen,
+        AdapterAngehalten,
+        AdapterFortgesetzt,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
@@ -781,6 +790,44 @@ fn serde_wire_gleich_as_str() {
         ZugangWiderrufen => "zugang_widerrufen",
         ZugangAbgelaufen => "zugang_abgelaufen",
         OhneEventsRead => "ohne_events_read",
+    });
+    // Adapter (LLH-2017): `AdapterFehler` steht auch in `adapter.letzter_fehler_art`,
+    // `adapter.angehalten_grund` und `adapter_versuch.fehler_art`.
+    enum_wire!(lifeline_hub::adapter::zustand::AdapterFehler {
+        Status => "status",
+        Abgelehnt => "abgelehnt",
+        Weiterleitung => "weiterleitung",
+        Zeitueberschreitung => "zeitueberschreitung",
+        Verbindung => "verbindung",
+        Tls => "tls",
+        ZielIntern => "ziel_intern",
+        Dns => "dns",
+        ZielUngueltig => "ziel_ungueltig",
+        ZuGross => "zu_gross",
+        AntwortUngueltig => "antwort_ungueltig",
+        GeheimnisFehlt => "geheimnis_fehlt",
+        GeheimnisUnlesbar => "geheimnis_unlesbar",
+        GeheimnisspeicherGesperrt => "geheimnisspeicher_gesperrt",
+        EinstellungUngueltig => "einstellung_ungueltig",
+        Intern => "intern",
+    });
+    enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {
+        Wartet => "wartet",
+        Ok => "ok",
+        Gestoert => "gestoert",
+        BrauchtEingriff => "braucht_eingriff",
+        Aus => "aus",
+        ArtUnbekannt => "art_unbekannt",
+    });
+    enum_wire!(lifeline_hub::adapter::art::FeldTyp {
+        Text => "text",
+        Zahl => "zahl",
+        Url => "url",
+    });
+    enum_wire!(lifeline_hub::routes::adapter::GeheimnisspeicherZustand {
+        Bereit => "bereit",
+        Fehlt => "fehlt",
+        PasstNicht => "passt_nicht",
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {

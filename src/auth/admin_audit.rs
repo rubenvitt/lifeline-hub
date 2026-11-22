@@ -147,6 +147,24 @@ wire_enum! {
         MaschinenzugangWebhookLanErlaubt => "maschinenzugang_webhook_lan_erlaubt",
         /// LAN-Ausnahme eines Webhooks zurückgenommen.
         MaschinenzugangWebhookLanEntzogen => "maschinenzugang_webhook_lan_entzogen",
+        /// Adapter angelegt (LLH-2017, Migration 0361).
+        AdapterAngelegt => "adapter_angelegt",
+        /// Name, Einstellungen oder Intervall eines Adapters geändert.
+        AdapterGeaendert => "adapter_geaendert",
+        /// Adapter samt Geheimnissen gelöscht.
+        AdapterGeloescht => "adapter_geloescht",
+        /// Ein Geheimnis eines Adapters gesetzt oder ersetzt; nie der Wert.
+        AdapterGeheimnisGesetzt => "adapter_geheimnis_gesetzt",
+        /// Ein Geheimnis eines Adapters entfernt.
+        AdapterGeheimnisEntfernt => "adapter_geheimnis_entfernt",
+        /// Ziel im privaten Netz für einen Adapter bewusst erlaubt (LAN-Ausnahme).
+        AdapterLanErlaubt => "adapter_lan_erlaubt",
+        /// LAN-Ausnahme eines Adapters zurückgenommen.
+        AdapterLanEntzogen => "adapter_lan_entzogen",
+        /// Adapter von einem Admin angehalten.
+        AdapterAngehalten => "adapter_angehalten",
+        /// Angehaltener Adapter fortgesetzt.
+        AdapterFortgesetzt => "adapter_fortgesetzt",
     }
 }
 
@@ -167,6 +185,8 @@ pub enum Ziel<'a> {
     Maschinenzugang(&'a str),
     /// Ein Einwurf-Zugang für einen Absender ohne Signatur, mit seinem Namen (LLH-1654).
     EinwurfZugang(&'a str),
+    /// Ein Adapter, mit seinem Namen (LLH-2017).
+    Adapter(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -191,6 +211,8 @@ pub enum Ziel<'a> {
 /// - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
 ///   sein Hash.
 /// - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
+/// - `adapter_*` (LLH-2017): `adapter_id`, `adapter_art`, bei `_geheimnis_*` der `platz`, bei
+///   einer URL in den Einstellungen ihr `host`. Nie ein Geheimnis, nie ein Pfad.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -247,6 +269,15 @@ pub struct ZugangsAngaben {
     /// Webhook (LLH-1656): Host des Ziels. Nie die ganze URL, ihr Pfad kann ein Token tragen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
+    /// Adapter (LLH-2017): seine Kennung.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adapter_id: Option<String>,
+    /// Adapter: Code seiner Art.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adapter_art: Option<String>,
+    /// Adapter: Platz des gesetzten oder entfernten Geheimnisses (nie der Wert).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platz: Option<String>,
 }
 
 impl ZugangsAngaben {
@@ -289,7 +320,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         | Ziel::Unterschrift(id)
         | Ziel::Archiv(id)
         | Ziel::Maschinenzugang(id)
-        | Ziel::EinwurfZugang(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        | Ziel::EinwurfZugang(id)
+        | Ziel::Adapter(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -412,7 +444,8 @@ fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
         | Ziel::Unterschrift(t)
         | Ziel::Archiv(t)
         | Ziel::Maschinenzugang(t)
-        | Ziel::EinwurfZugang(t) => (None, t),
+        | Ziel::EinwurfZugang(t)
+        | Ziel::Adapter(t) => (None, t),
     }
 }
 
