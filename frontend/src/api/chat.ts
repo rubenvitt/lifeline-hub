@@ -9,6 +9,11 @@ import type {
   NeuerAuftrag,
 } from './types';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import {
+  seitenLimit,
+  type CursorAdapter,
+  type FensterParam,
+} from '../components/fensterBeideRichtungen';
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
   return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/kanaele`);
@@ -33,16 +38,33 @@ export function markiereKanalGelesen(einsatzId: number, kanalId: number): Promis
  *  greift — das Frontend sendet kein eigenes limit. */
 export const CHAT_SEITENGROESSE = 100;
 
+/**
+ * Eine Seite eines Kanals, neueste zuerst. Der Parameter ist der des Seitenfensters
+ * (`components/fensterBeideRichtungen.ts`, LLH-1886): `aelter` → `before_id`, `neuer` →
+ * `after_id` (die Seite direkt darüber, mit `limit` nach `seitenLimit`), fehlt → die neueste Seite.
+ */
 export function listeNachrichten(
   einsatzId: number,
   kanalId: number,
-  beforeId?: number,
+  param?: FensterParam<number>,
 ): Promise<ChatNachricht[]> {
-  const q = beforeId !== undefined ? `?before_id=${beforeId}` : '';
+  const q =
+    param == null
+      ? ''
+      : 'aelter' in param
+        ? `?before_id=${param.aelter}`
+        : `?after_id=${param.neuer}&limit=${seitenLimit(CHAT_SEITENGROESSE, param)}`;
   return apiGet<ChatNachricht[]>(
     `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten${q}`,
   );
 }
+
+/** Cursor der Nachrichtenliste: die Kennung (LLH-1886). */
+export const NACHRICHT_CURSOR: CursorAdapter<ChatNachricht, number> = {
+  cursor: (n) => n.id,
+  einschliessendAelter: (id) => id + 1,
+  einschliessendNeuer: (id) => id - 1,
+};
 
 /** Lädt Dateien hoch und liefert die Anhang-Metadaten zurück (LFH-102). Der
  *  Upload ist von der Nachricht entkoppelt: erst hochladen, dann beim Senden die

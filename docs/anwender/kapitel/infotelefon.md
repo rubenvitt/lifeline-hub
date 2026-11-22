@@ -55,11 +55,15 @@ Anrufe schreiben nichts ins Einsatztagebuch; das Anrufprotokoll ist selbst der N
 
 Das Anrufprotokoll liest sich wie das Einsatztagebuch: der älteste geladene Anruf steht oben, der
 jüngste unten direkt über der Erfassung, und die Seite öffnet am Ende. Geladen sind zuerst die
-jüngsten 100 Anrufe; „Ältere laden“ über der Liste holt die nächsten. Die Zahlen „Anrufe“ und
+jüngsten 100 Anrufe; „Ältere laden“ über der Liste holt die nächsten. Die Liste hält höchstens
+500 Anrufe: wer weiter zurückblättert, verliert unten die jüngsten aus der Ansicht, und unter der
+Liste steht „Neuere laden“, das Stück für Stück zurück nach unten führt. Wer in dieser Lage einen
+Anruf erfasst, springt direkt ans Ende zu seinem Anruf. Die Zahlen „Anrufe“ und
 „offene Rückrufe“ und die Aufgliederung „Nach Anliegen“ zählen immer alle Anrufe des Einsatzes,
 auch die noch nicht geladenen. Ein Link auf einen älteren Anruf zeigt ihn hervorgehoben am Anfang
 der Liste. Neue Anrufe anderer Plätze erscheinen am Ende unten; wer hochgerollt hat, sieht dort
-„1 neuer Anruf“ mit „anzeigen“.
+„1 neuer Anruf“ mit „anzeigen“. Was „Ältere laden“ oder „Neuere laden“ holt, steht dagegen sofort
+da, auch neue Anrufe anderer Plätze: das hat man selbst angefordert.
 
 ### Personenbezug
 

@@ -207,6 +207,37 @@ enthaelt "15 mit swift → swift test im Paket" "^swift-lief test in $ARBEIT/s18
 rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/rot'; $schritt_18_def" 0 18 || rc=$?
 pruefe "15 rotes swift test → rot" 1 "$rc"
 
+# 16 — Schritt 19, das Server-Binary wie im Release (LLH-2033): eigenes Bündel `binaer` für den
+# Pflicht-Check im PR, Teil von `rust` (also vom vollen Lauf und von `--geaendert` bei Rust),
+# nicht von `schnell` (der Check läuft daneben, nicht darin).
+rc=0; "$CHECK_ALL" --nur binaer --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "16 Bündel binaer ist bekannt" 0 "$rc"
+enthaelt "16 Bündel binaer fährt nur das Server-Binary" '^Schritte: 19$'
+rc=0; "$CHECK_ALL" --nur rust --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "16 rust fährt das Server-Binary mit" '^Schritte: 4 15 19$'
+rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "16 voller Lauf fährt das Server-Binary" '^Schritte: .*\b19\b'
+rc=0; "$CHECK_ALL" --nur schnell --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+fehlt "16 schnell fährt das Server-Binary nicht" '^Schritte: .*\b19\b'
+
+# 17 — Schritt 19 übersetzt OHNE Dev-Abhängigkeiten: nur das Binary, kein Testziel. Mit
+# `--all-targets`, `--tests` oder `cargo test` vereinigte Cargo die Features der
+# Dev-Abhängigkeiten, und der Bruch aus #1561 bliebe grün. Gefahren wird der echte Schritt gegen
+# eine Attrappe von `cargo`, die ihre Argumente meldet.
+mkdir -p "$ARBEIT/s19/bin"
+printf '#!/bin/sh\necho "cargo-lief $*"\n' > "$ARBEIT/s19/bin/cargo"
+chmod +x "$ARBEIT/s19/bin/cargo"
+schritt_19_def="$(sed -n '/^schritt_19() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_19_def" ] || { echo "FAIL 17 schritt_19 fehlt in check-all.sh" >&2; fehler=1; }
+attrappen="bauziel_pruefen() { :; }; ohne_dev_env() { \"\$@\"; }"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "17 Schritt 19 grün, wenn cargo grün ist" 0 "$rc"
+enthaelt "17 Schritt 19 baut das Server-Binary" '^cargo-lief build --bin lifeline-hub$'
+fehlt "17 Schritt 19 baut kein Testziel" 'cargo-lief .*(test|--all-targets|--tests|--benches|--examples)'
+printf '#!/bin/sh\necho cargo-rot; exit 101\n' > "$ARBEIT/s19/bin/cargo"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "17 Schritt 19 rot, wenn das Binary nicht übersetzt" 1 "$rc"
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1

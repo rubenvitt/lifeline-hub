@@ -136,6 +136,30 @@ jobs:
       - name: Schnellprüfungen
         run: ./scripts/check-all.sh --nur schnell
 
+  # ── Server-Binary wie im Release, Pflicht (LLH-2033) ────────────────────────────────────
+  # Neben `schnell`, nicht darin: der Bau kostet ~3 min und verlängerte sonst jeden PR. Jeder
+  # andere Rust-Schritt übersetzt mit den Features der Dev-Abhängigkeiten; ein Bruch nur ohne sie
+  # (#1561) kam erst auf alpha ans Licht. Nur in `pr.yml`: auf alpha baut `e2e-Binary` dasselbe.
+  # Der Name ist der Pflicht-Check im Ruleset (`scripts/ruleset-pruefen.sh`).
+  binaer:
+    name: Server-Binary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Über das Skript, nie `apt-get` direkt (LFH-1101).
+      - name: System-Werkzeuge für die nativen Crates
+        run: ./scripts/apt-pakete.sh nasm
+      - name: Rust-Toolchain (stable)
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: rust-openssl-vendored
+          save-if: false
+          cache-on-failure: true
+      - name: Server-Binary
+        run: ./scripts/check-all.sh --nur binaer
+
   # ── Suiten nur mit Label `voll`, ohne Pflicht (`suiten.yml`) ────────────────────────────
   # Bei JEDEM Ereignis an einem PR mit `voll`, auch einem fremden Label: ein übersprungener
   # gleichnamiger Check wäre der jüngste und verdeckte eine rote Suite (Review LLH-1889).

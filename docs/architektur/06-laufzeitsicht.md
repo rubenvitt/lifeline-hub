@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 21.11.2026 (Abruf eines Adapters, LLH-2017; Direktkopplung vor Ort, LLH-1497).
+Stand: 22.11.2026 (Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -475,7 +475,11 @@ sequenceDiagram
   kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Hat der Führer den Einsatz nie von
   ihr gespiegelt (Widerspruch gegen eine Notübernahme), antwortet er `kennt: false`; dann entfernt
   sie alles, was nicht über `spiegel_herkunft` vom Führer stammt (`fuehrung::nicht_vom_fuehrer`,
-  LLH-1854). Zeilen, die aufeinander zeigen,
+  LLH-1854). Vergibt SQLite die ID einer gelöschten Zeile neu, räumt der Log-Trigger ihre
+  Herkunft und merkt sich die Neuvergabe in `spiegel_neu_vergeben`: Die neue Zeile geht mit dem
+  `gegen` der gelöschten hinaus, und nach einem Rückfall gilt sie als dem Führer unbekannt
+  (`fuehrung::neu_vergeben`, [ADR-0081](entscheidungen/ADR-0081-eine-neu-vergebene-id-ist-am-spiegel-eine-neue-zeile.md),
+  LLH-1893). Zeilen, die aufeinander zeigen,
   ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
   Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
   kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine

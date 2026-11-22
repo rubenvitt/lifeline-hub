@@ -19,8 +19,10 @@ set -euo pipefail
 # <name>|<art>. Art `status`: Commit-Status über die Status-API (`migrationen.yml`); MUSS im
 # Ruleset ohne Quelle stehen. Art `check`: Check-Run eines Jobs (Token von GitHub Actions); ohne
 # Quelle oder mit GitHub Actions. `Baut mit Ziel-Branch` ist seit LLH-1899 abgeschafft.
+# `Server-Binary` (LLH-2033): das Binary ohne Dev-Abhängigkeiten, Job `binaer` in `pr.yml`.
 PFLICHT=(
   "Schnellprüfungen|check"
+  "Server-Binary|check"
   "Migrationsnummern|status"
   "ADR-Nummern|status"
 )
