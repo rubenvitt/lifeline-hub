@@ -797,7 +797,10 @@ sequenceDiagram
 - Ohne `--ios-push` richtet `src/main.rs` keinen Client ein: kein Kontakt zum Relais, die Routen
   antworten 404. Der Server meldet sich erst beim ersten Versand selbst an
   (`IosPush::zugang` in `src/ios_push/mod.rs`); `401` vom Relais führt zu einer neuen Anmeldung,
-  `403` (gesperrt) beendet den Versand, `GET /api/ios-push` meldet dann `relais_gesperrt`.
+  `403` (gesperrt) beendet den Versand für `SPERRE_GILT_STUNDEN` (24 h), danach versucht der
+  nächste Versand es einmal mit demselben Zugang (angenommen: Sperre weg; wieder `403`: sie gilt
+  ab jetzt neu). Solange sie steht, meldet `GET /api/ios-push` `relais_gesperrt`, und
+  `GET /api/admin/instanz` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
 - Das Relais setzt `apns-expiration` auf 12 Stunden, `apns-priority` 10 und für einen Alarm
   `interruption-level: time-sensitive`, für einen Hinweis `active` (`push-relais/src/apns.rs`).
   Ohne Extension oder Schlüssel bleibt der Rückfalltitel „Alarm“ bzw. „Neue Benachrichtigung“.

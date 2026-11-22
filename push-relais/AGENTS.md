@@ -1,4 +1,4 @@
-# push-relais (LLH-2040) — Regeln
+# push-relais (LLH-2039) — Regeln
 
 Gilt für `push-relais/`, zusätzlich zur `AGENTS.md` der Wurzel. Der Dienst hält den Apple-`.p8`-Schlüssel
 und reicht Pushes der Lifeline-Server an APNs weiter; Ruben betreibt ihn selbst (Betrieb:

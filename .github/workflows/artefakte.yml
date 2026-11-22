@@ -185,7 +185,7 @@ jobs:
         if: runner.os == 'Linux' && !matrix.mingw
         run: cargo build --release -p karten-service --target ${{ matrix.target }}
 
-      # Das Relais betreibt Ruben auf einem Server (LLH-2040): ebenfalls nur Linux-Ziele.
+      # Das Relais betreibt Ruben auf einem Server (LLH-2039): ebenfalls nur Linux-Ziele.
       - name: push-relais bauen
         if: runner.os == 'Linux' && !matrix.mingw
         run: cargo build --release -p push-relais --target ${{ matrix.target }}

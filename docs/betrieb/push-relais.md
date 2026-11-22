@@ -1,4 +1,4 @@
-# Betrieb: Push-Relais für iOS (LLH-2040)
+# Betrieb: Push-Relais für iOS (LLH-2039)
 
 Die iOS-App ([ios-app.md](ios-app.md)) bekommt Alarme und Hinweise über Apples Push-Dienst (APNs).
 APNs nimmt Pushes nur mit dem Schlüssel des Apple-Entwicklerkontos an, und dieser Schlüssel gehört
@@ -103,11 +103,15 @@ Die `server_id` steht im Log jeder `senden`-Zeile. Ist sie nicht registriert, en
 Fehler. Die Sperre wirkt sofort, ein Neustart ist nicht nötig.
 
 Der gesperrte Lifeline-Server merkt sich die Sperre (Spalte `gesperrt_at` in `ios_push_relais`),
-warnt im Log, nimmt keinen Kontakt mehr auf, und die Seite „Benachrichtigungen“ zeigt dort statt des
-Schalters „Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.“
-**Entsperren wirkt dort nicht von selbst:** solange die Zeile steht, sendet der Server nicht. Löscht
-sein Betreiber sie, meldet sich der Server beim nächsten Versand mit neuer `server_id` an; eine
-Sperre lässt sich so umgehen, begrenzt nur durch die Registrierungen je IP und Stunde
+warnt im Log und nimmt 24 Stunden keinen Kontakt auf. Die Seite „Benachrichtigungen“ zeigt dort
+statt des Schalters „Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber
+informieren.“, die Seite „Instanzkopplung“ der Verwaltung „iOS-Push: Das Relais nimmt diesen
+Server nicht an (gesperrt seit …). Bitte den Betreiber des Relais informieren.“ **Entsperren wirkt
+dort mit bis zu einem Tag Verzug:** nach 24 Stunden versucht der nächste Versand es einmal mit
+demselben Zugang; nimmt das Relais ihn an, fällt die Sperre, antwortet es wieder 403, gilt sie ab
+dann weitere 24 Stunden. Löscht der Betreiber des Lifeline-Servers die Zeile, meldet sich der Server
+beim nächsten Versand mit neuer `server_id` an; eine Sperre lässt sich so umgehen, begrenzt nur
+durch die Registrierungen je IP und Stunde
 ([Risiko R48](../architektur/11-risiken-und-technische-schulden.md)).
 
 ## Sicherung

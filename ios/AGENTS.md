@@ -63,7 +63,10 @@ Entscheidung ADR-0082; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
   `src-tauri/faelle/push-nutzlast.json` zusammen (Klartext: `push-inhalt.json`).
 - **Native Anfragen an einen Server** gibt es nur zwei: `GET /api/shell` und
   `POST /api/ios-push/abmelden` beim Entfernen eines Servers (`Vertragsabruf.meldePushAb`, ohne
-  Sitzung, einmal, ohne Wiederholen; danach den Schlüssel löschen). Eine dritte braucht eine neue
+  Sitzung). Die Abmeldung liegt in `PushAnmeldungen.ausstehend`, bis sie erledigt ist
+  (`AusstehendeAbmeldung.isErledigt`: 2xx oder ein 4xx außer 408/429); erst dann fällt der
+  Schlüssel. Versucht wird sie nach dem Entfernen, beim Start und bei jeder Rückkehr in den
+  Vordergrund je einmal, nie in einer Schleife. Eine dritte Anfrage braucht eine neue
   Entscheidung.
 - **Tippen auf eine Meldung** entscheidet `Ablauf` (`meldungAngetippt`): eine unbekannte Kennung
   tut nichts, ein anderer Server wird sichtbar aktiv wie bei einem Wechsel in der Serverliste, der

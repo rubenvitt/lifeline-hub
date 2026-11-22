@@ -1,4 +1,4 @@
-# Container-Abbild des push-relais (LLH-2040, iOS-Push über APNs).
+# Container-Abbild des push-relais (LLH-2039, iOS-Push über APNs).
 #
 # Wie beim Hauptabbild (../Dockerfile) und beim karten-service KEIN Build aus Quelle:
 # artefakte.yml baut die Linux-Binaries nativ in der Matrix, dieses Abbild nimmt sie nur

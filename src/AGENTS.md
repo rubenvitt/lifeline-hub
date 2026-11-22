@@ -901,12 +901,17 @@ Entscheidung [ADR-0082](../docs/architektur/entscheidungen/ADR-0082-ios-push-lae
   keine Weiterleitung, nur `https`).
 - **Zugang zum Relais** in der Einzeilentabelle `ios_push_relais`, angelegt beim ersten Versand
   unter einer Sperre (kein doppelter Zugang bei parallelen Versänden). `401` vom Relais: einmal
-  neu anmelden; `403`: `gesperrt_at` setzen, warnen und nichts mehr senden; `GET /api/ios-push`
-  meldet dann `relais_gesperrt`, die Oberfläche zeigt statt des Schalters den Hinweis.
+  neu anmelden; `403`: `gesperrt_at` auf jetzt setzen, warnen, nie neu anmelden und
+  `SPERRE_GILT_STUNDEN` (24 h) nichts senden; danach versucht der nächste Versand es einmal mit
+  demselben Zugang (angenommen: Sperre weg, wieder `403`: erneuert). Solange sie steht, meldet
+  `GET /api/ios-push` `relais_gesperrt` (die Oberfläche zeigt statt des Schalters den Hinweis) und
+  `GET /api/admin/instanz` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
   durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, vor dem Löschen der
-  Sitzung), „Sitzungen beenden“ (die der beendeten Sitzungen; beendet ein Admin alle einer anderen
-  Person, alle des Kontos), Deaktivieren und Löschen des Kontos, `POST /api/ios-push/abmelden` der
+  Sitzung), „Sitzungen beenden“ (eine Sitzung: deren Anmeldungen; alle anderen: alle des Kontos
+  außer denen der behaltenen Sitzung, auch die ohne Sitzung, `repo::loeschen_fuer_benutzer_ausser`;
+  ein Admin für eine andere Person: alle des Kontos), Deaktivieren und Löschen des Kontos,
+  `POST /api/ios-push/abmelden` der
   App und `token_ungueltig`. Der Ablauf einer Sitzung und ein Passwortwechsel lassen sie stehen
   (`session_token_hash` ist `ON DELETE SET NULL`). Ein neuer Weg, der Konten sperrt oder alle
   Sitzungen beendet, entscheidet über die Anmeldungen mit.

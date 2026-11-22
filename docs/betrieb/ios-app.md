@@ -212,18 +212,20 @@ Was ankommt:
 
 Die Anmeldung hängt an Konto und Gerät, nicht an der Sitzung: anders als bei Web Push beenden der
 Ablauf der Sitzung und ein Passwortwechsel sie nicht. Sie endet durch den Schalter, Abmelden in der
-App, das Beenden der Anmeldung dieses Geräts unter Profil → „Anmeldungen“, das Beenden aller
+App, das Beenden der Anmeldung dieses Geräts unter Profil → „Anmeldungen“, „Alle anderen
+beenden“ von einem anderen Gerät aus (trifft alle iOS-Anmeldungen der Person außer der des eigenen
+Geräts, auch die, deren Sitzung längst abgelaufen ist: das verlorene Gerät), das Beenden aller
 Anmeldungen der Person durch einen Admin, Deaktivieren des Kontos und Entfernen des Servers aus der
-Serverliste. Beim Entfernen meldet die App das Gerät einmal ohne Sitzung ab. Erreicht sie den
-Server dabei nicht, schickt er weiter, und die Meldungen zeigen nur den Rückfalltitel, bis die
-Anmeldung dieses Geräts unter „Anmeldungen“ beendet wird (nur solange sie dort noch steht), ein
-Admin alle Anmeldungen der Person beendet oder die App neu installiert wird (Apple lehnt dann das
-alte Token ab).
+Serverliste. Beim Entfernen meldet die App das Gerät ohne Sitzung ab. Erreicht sie den Server dabei
+nicht, merkt sie sich die Abmeldung samt Schlüssel und versucht sie bei jedem Start und jeder
+Rückkehr in den Vordergrund einmal, bis der Server antwortet; bis dahin zeigen seine Meldungen nur
+den Rückfalltitel.
 
 Am gekoppelten ELW gilt dasselbe wie bei Web Push ([web-push.md](web-push.md), „Gekoppelter ELW“),
 aber je Kanal: bietet der Hub iOS-Push an, kommen die Meldungen für Konten vom Hub über den Hub;
-dafür den Hub als Server in der App hinzufügen und dort einschalten. Bietet er ihn nicht an, pusht
-der ELW selbst.
+dafür den Hub als Server in der App hinzufügen und dort einschalten; die Seite
+„Benachrichtigungen“ des ELW sagt das in der App so und nennt die Adresse des Hubs. Bietet er ihn
+nicht an, pusht der ELW selbst.
 
 ## Daten auf dem Gerät
 
