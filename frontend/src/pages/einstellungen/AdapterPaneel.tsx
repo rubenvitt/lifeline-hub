@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Form, Input, InputNumber, Select } from 'antd';
+import { Button, Form, Input, InputNumber } from 'antd';
+import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
 import { IconPlus } from '../../icons';
@@ -243,7 +244,8 @@ export default function AdapterPaneel() {
             options={liste.arten.map((x) => ({ value: x.code, label: x.bezeichnung }))}
             onChange={(code: string) => {
               const neu = liste.arten.find((x) => x.code === code);
-              if (neu) form.setFieldsValue({ intervall_s: neu.intervall_vorschlag_s, einstellungen: {} });
+              if (neu)
+                form.setFieldsValue({ intervall_s: neu.intervall_vorschlag_s, einstellungen: {} });
             }}
           />
         </Feld>
@@ -255,10 +257,18 @@ export default function AdapterPaneel() {
             { max: ADAPTER_NAME_MAX, message: `Höchstens ${ADAPTER_NAME_MAX} Zeichen` },
           ]}
         >
-          <Input placeholder="Alarmquelle Leitstelle" maxLength={ADAPTER_NAME_MAX} autoComplete="off" />
+          <Input
+            placeholder="Alarmquelle Leitstelle"
+            maxLength={ADAPTER_NAME_MAX}
+            autoComplete="off"
+          />
         </Feld>
         {art?.felder.map((f) => (
-          <EinstellungsFeld key={`${art.code}-${f.name}`} feld={f} pfad={['einstellungen', f.name]} />
+          <EinstellungsFeld
+            key={`${art.code}-${f.name}`}
+            feld={f}
+            pfad={['einstellungen', f.name]}
+          />
         ))}
         {art && (
           <Feld
@@ -286,4 +296,3 @@ export default function AdapterPaneel() {
     </Paneel>
   );
 }
-

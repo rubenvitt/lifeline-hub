@@ -93,7 +93,9 @@ describe('hostWechsel', () => {
 
 describe('einstellungenVon', () => {
   it('trimmt Text, nimmt Zahlen als Zahl und lässt Leeres weg', () => {
-    expect(einstellungenVon(felder, { url: ' https://a.example ', standort: '  ', seite: '25' })).toEqual({
+    expect(
+      einstellungenVon(felder, { url: ' https://a.example ', standort: '  ', seite: '25' }),
+    ).toEqual({
       url: 'https://a.example',
       seite: 25,
     });
@@ -115,8 +117,8 @@ describe('adapterFehlerText', () => {
     expect(adapterVersuchText({ erfolg: true, status: 200, anzahl: 1, probe: true })).toBe(
       'erreichbar (200) · 1 Eintrag · Prüfung',
     );
-    expect(
-      adapterVersuchText({ erfolg: false, fehler_art: 'verbindung', probe: false }),
-    ).toBe('Keine Verbindung zum Ziel');
+    expect(adapterVersuchText({ erfolg: false, fehler_art: 'verbindung', probe: false })).toBe(
+      'Keine Verbindung zum Ziel',
+    );
   });
 });

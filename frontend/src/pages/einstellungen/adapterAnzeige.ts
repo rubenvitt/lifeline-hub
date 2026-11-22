@@ -142,10 +142,9 @@ export function einstellungenVon(
 }
 
 /** Die Einstellungen einer Antwort als Objekt (der Server liefert sie nur dem System-Admin). */
-export function einstellungenVonAdapter(a: Pick<AdapterAnzeige, 'einstellungen'>): Record<
-  string,
-  unknown
-> {
+export function einstellungenVonAdapter(
+  a: Pick<AdapterAnzeige, 'einstellungen'>,
+): Record<string, unknown> {
   const e = a.einstellungen as unknown;
   return e != null && typeof e === 'object' ? (e as Record<string, unknown>) : {};
 }

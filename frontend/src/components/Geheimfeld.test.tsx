@@ -45,7 +45,9 @@ describe('Geheimfeld', () => {
   it('nennt einen fehlenden Pflichtwert und bietet „Setzen“', () => {
     rendere();
     expect(screen.getByText('API-Schlüssel')).toBeInTheDocument();
-    expect(screen.getByText(/nicht gesetzt: der Adapter ruft ohne ihn nicht ab/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/nicht gesetzt: der Adapter ruft ohne ihn nicht ab/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Setzen' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Entfernen/ })).not.toBeInTheDocument();
   });
@@ -73,9 +75,14 @@ describe('Geheimfeld', () => {
       expect(screen.queryByLabelText('Neuer Wert für API-Schlüssel')).not.toBeInTheDocument(),
     );
     expect(document.body.innerHTML).not.toContain(GEHEIM);
-    expect(JSON.stringify(client.getMutationCache().getAll().map((m) => m.state))).not.toContain(
-      GEHEIM,
-    );
+    expect(
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state),
+      ),
+    ).not.toContain(GEHEIM);
   });
 
   it('leert das Feld auch, wenn das Speichern scheitert, und zeigt den Fehler', async () => {
@@ -127,7 +134,9 @@ describe('Geheimfeld', () => {
 
   it('nennt einen unlesbaren Wert und bietet „Neu setzen“', () => {
     rendere({ platz: { ...gesetzt, is_unlesbar: true } });
-    expect(screen.getByText(/unlesbar: mit einem anderen Schlüssel des Servers gesetzt/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/unlesbar: mit einem anderen Schlüssel des Servers gesetzt/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neu setzen' })).toBeEnabled();
   });
 

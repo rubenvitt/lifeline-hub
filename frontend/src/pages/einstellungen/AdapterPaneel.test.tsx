@@ -26,9 +26,12 @@ function stelleBereit(liste: AdapterListe) {
     http.post('/api/admin/adapter', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push(body);
-      return HttpResponse.json(adapterFixture('neu', { name: String(body.name), zustand: 'wartet' }), {
-        status: 201,
-      });
+      return HttpResponse.json(
+        adapterFixture('neu', { name: String(body.name), zustand: 'wartet' }),
+        {
+          status: 201,
+        },
+      );
     }),
   );
   return aufrufe;
@@ -102,14 +105,14 @@ describe('AdapterPaneel', () => {
     )!;
     expect(within(ok).queryByText('ok')).not.toBeInTheDocument();
     expect(ok).toHaveTextContent(/Beispiel-Alarmquelle · zuletzt erfolgreich/);
-    const st = screen.getByRole('link', { name: 'Adapter st' }).closest<HTMLElement>(
-      '[data-lfh="adapter-eintrag"]',
-    )!;
+    const st = screen
+      .getByRole('link', { name: 'Adapter st' })
+      .closest<HTMLElement>('[data-lfh="adapter-eintrag"]')!;
     expect(within(st).getByText('gestört')).toBeInTheDocument();
     expect(st).toHaveTextContent(/letzter Fehler Keine Antwort in 20 s/);
-    const ein = screen.getByRole('link', { name: 'Adapter ein' }).closest<HTMLElement>(
-      '[data-lfh="adapter-eintrag"]',
-    )!;
+    const ein = screen
+      .getByRole('link', { name: 'Adapter ein' })
+      .closest<HTMLElement>('[data-lfh="adapter-eintrag"]')!;
     expect(within(ein).getByText('braucht Eingriff')).toBeInTheDocument();
     expect(ein).toHaveTextContent(/angehalten: Zugang abgelehnt/);
   });
@@ -117,7 +120,9 @@ describe('AdapterPaneel', () => {
   it('nennt einen fehlenden Schlüssel des Geheimnisspeichers', async () => {
     stelleBereit(adapterListeFixture({ speicher: 'fehlt', speicher_fingerabdruck: undefined }));
     rendere();
-    expect(await screen.findByText(/Schlüssel fehlt: Geheimnisse lassen sich nicht setzen/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Schlüssel fehlt: Geheimnisse lassen sich nicht setzen/),
+    ).toBeInTheDocument();
   });
 
   it('legt einen Adapter mit den Feldern der Art an und springt in die Ansicht', async () => {
@@ -127,7 +132,10 @@ describe('AdapterPaneel', () => {
     await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Adapter anlegen' });
     expect(within(dialog).getByRole('spinbutton', { name: 'Intervall' })).toHaveValue('60');
-    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Alarmquelle Leitstelle');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Name' }),
+      'Alarmquelle Leitstelle',
+    );
     await user.type(
       within(dialog).getByRole('textbox', { name: 'Adresse' }),
       'https://alarm.example/api',

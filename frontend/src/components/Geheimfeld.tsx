@@ -89,11 +89,15 @@ export default function Geheimfeld({
   ) : platz.is_gesetzt ? (
     <span>
       gesetzt{' '}
-      {platz.gesetzt_at && <span style={monoStil('monoKlein')}>{zeitKurz(platz.gesetzt_at, konv)}</span>}
+      {platz.gesetzt_at && (
+        <span style={monoStil('monoKlein')}>{zeitKurz(platz.gesetzt_at, konv)}</span>
+      )}
       {platz.gesetzt_von_name ? ` von ${platz.gesetzt_von_name}` : ''}
     </span>
   ) : platz.pflicht ? (
-    <span style={{ color: rollen.achtungText }}>nicht gesetzt: der Adapter ruft ohne ihn nicht ab</span>
+    <span style={{ color: rollen.achtungText }}>
+      nicht gesetzt: der Adapter ruft ohne ihn nicht ab
+    </span>
   ) : (
     <span>nicht gesetzt</span>
   );
