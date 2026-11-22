@@ -368,7 +368,9 @@ Person den Hub in der App haben und dort Push einschalten; die Oberfläche des E
     `denied` / `unavailable`. Fragt die Berechtigung (alert, sound, badge, timeSensitive), holt
     das Token, erzeugt pro Server einmalig Kennung und Schlüssel (oder liefert die vorhandenen).
   - `push_unregister {}` → entfernt Kennung und Schlüssel dieses Servers lokal.
-  - `push_state {}` → `{ permission: "granted"|"denied"|"undetermined", registered: bool }`.
+  - `push_state {}` → `{ permission: "granted"|"denied"|"undetermined", registration_id? }`;
+    `registration_id` ist die Kennung dieses Servers, sobald die App eine angelegt hat (auch ohne
+    Schlüssel), damit die Seite den Server danach fragen und dort abmelden kann.
 - Kennung `__LIFELINE_HUELLE__` bekommt additiv `push: true`.
 
 **App (`ios/App`)**:

@@ -91,6 +91,8 @@ Entscheidung ADR-0084; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
   meldet sie selbst. Die gespeicherte Oberfläche hat keinen Live-Kanal, dort erscheint das Banner.
 - **Umgebung und Berechtigungen:** `aps-environment` steht in `ios/App/LifelineHub.entitlements`
   fest auf `development`, der Export für App Store Connect setzt `production`; dem Server meldet
-  die App die Umgebung über `#if DEBUG` (`ios/App/Systemdienste.swift`). App und Extension teilen
-  App Group und Schlüsselbund-Gruppe; die Zahl der Server legt die App für den Untertitel in die
-  `UserDefaults` der App Group (Privacy-Manifest: Grund 1C8F.1).
+  die App die Umgebung über `#if DEBUG` (`ios/App/Systemdienste.swift`). Push gegen die Sandbox
+  also nur mit Debug: ein Release-Build mit Entwicklungsprofil (Xcode „Run“ oder Profiling in
+  Release) meldet `production` zu einem Sandbox-Token, APNs lehnt ab, der Server löscht die
+  Anmeldung. App und Extension teilen App Group und Schlüsselbund-Gruppe; die Zahl der Server legt
+  die App für den Untertitel in die `UserDefaults` der App Group (Privacy-Manifest: Grund 1C8F.1).
