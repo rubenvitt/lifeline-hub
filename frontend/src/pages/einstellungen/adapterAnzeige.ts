@@ -1,7 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { AdapterEinstellungen } from '../../api/adapter';
 import { globalKeys } from '../../api/queryKeys';
-import type { AdapterAnzeige, AdapterFeld, AdapterListe, AdapterZustand } from '../../api/types';
+import type {
+  AdapterAnzeige,
+  AdapterFeld,
+  AdapterListe,
+  AdapterZustand,
+  GeheimnisspeicherZustand,
+} from '../../api/types';
 import { anbindungenPath } from './anbindungAnzeige';
 
 // Gemeinsames der Adapter-Seiten (LLH-2018): Paneel „Adapter“ auf den Anbindungen und Ansicht.
@@ -33,6 +39,21 @@ export function adapterZustandAnzeige(a: Pick<AdapterAnzeige, 'zustand'>): {
 /** In der Liste steht der Status nur, wenn er etwas verlangt; „ok“ und „wartet“ nicht. */
 export function isZustandSichtbar(z: AdapterZustand): boolean {
   return z !== 'ok' && z !== 'wartet';
+}
+
+/**
+ * Hinweis zum Geheimnisspeicher; `null`, wenn er bereit ist. Fehlt der Schlüssel, lässt sich
+ * nichts setzen; passt er nicht, ist Neusetzen der Weg (Design-Doc, Nachtrag „Speicher“).
+ */
+export function speicherHinweisText(speicher: GeheimnisspeicherZustand): string | null {
+  switch (speicher) {
+    case 'fehlt':
+      return 'Schlüssel fehlt: Geheimnisse lassen sich nicht setzen, Adapter mit Geheimnis rufen nicht ab. Der Betrieb richtet LIFELINE_GEHEIMNIS_SCHLUESSEL ein.';
+    case 'passt_nicht':
+      return 'Schlüssel passt nicht: mindestens ein Geheimnis ist mit einem anderen Schlüssel gesetzt und unlesbar. Es muss neu gesetzt werden.';
+    case 'bereit':
+      return null;
+  }
 }
 
 /** Setzt die Antwort einer eigenen Änderung in die Liste und lässt sie danach neu laden. */
