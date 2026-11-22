@@ -1955,3 +1955,274 @@ async fn quittung_loescht_nur_eigene() {
     drop(sc);
     assert!(nachtraege(&s).await.is_empty());
 }
+
+/// Führer O nach der Übernahme von Kopplung 1: eigener Einsatz `n/1` mit Erika als Beobachter,
+/// deren Zeile von N stammt (`spiegel_herkunft`: `[7,9]` bei N). O kennt die Fähigkeit von N, die
+/// Grenze ist gesetzt. Liefert (Einsatz, Erika).
+async fn fuehrer_nach_rueckgabe(o: &SqlitePool) -> (i64, i64) {
+    let erika = konto(o, "Erika").await;
+    let einsatz: i64 = eine(
+        o,
+        "INSERT INTO einsatz (org_id, bezeichnung, kennung) VALUES (1, 'Lage', 'n/1') RETURNING id",
+    )
+    .await;
+    exec(
+        o,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika}, 'beobachter')"
+        ),
+    )
+    .await;
+    exec(
+        o,
+        &format!(
+            "INSERT INTO spiegel_herkunft (einsatz_id, art, fremder_schluessel, lokaler_schluessel) \
+             VALUES ({einsatz}, 'einsatz_mitgliedschaft', '[7,9]', '[{einsatz},{erika}]')"
+        ),
+    )
+    .await;
+    exec(
+        o,
+        &format!(
+            "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, bezeichnung, status, \
+             epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, stand, \
+             geaendert_at, herkunft_kopplung_id, uebernommen_stand) VALUES ('n/1', {einsatz}, 1, \
+             'Lage', 'aktiv', 2, 'gegen', 'eigen', 'Hub', 'uebergabe', 1, '2026-11-22 00:00:00', \
+             1, 0)"
+        ),
+    )
+    .await;
+    exec(
+        o,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    let mut c = o.acquire().await.unwrap();
+    super::nachtrag::save_grenze(&mut c, 1).await.unwrap();
+    (einsatz, erika)
+}
+
+fn nachtrag_n(id: i64, gegen: Option<String>) -> super::nachtrag::MitarbeitNachtrag {
+    super::nachtrag::MitarbeitNachtrag {
+        id,
+        kennung: "n/1".into(),
+        schluessel: "[7,9]".into(),
+        gegen,
+    }
+}
+
+async fn annehmen(
+    o: &SqlitePool,
+    kopplung: i64,
+    n: &[super::nachtrag::MitarbeitNachtrag],
+) -> super::nachtrag::Annahme {
+    let mut c = o.begin().await.unwrap();
+    let a = super::nachtrag::accept(&mut c, kopplung, n).await.unwrap();
+    c.commit().await.unwrap();
+    a
+}
+
+async fn stand_der_zeile(o: &SqlitePool, einsatz: i64, erika: i64) -> i64 {
+    eine(
+        o,
+        &format!(
+            "SELECT COALESCE(MAX(stand), 0) FROM einsatz_aenderung WHERE art = \
+             'einsatz_mitgliedschaft' AND schluessel = '[{einsatz},{erika}]'"
+        ),
+    )
+    .await
+}
+
+async fn grenze(o: &SqlitePool) -> i64 {
+    eine(
+        o,
+        "SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1",
+    )
+    .await
+}
+
+#[tokio::test]
+async fn nachtrag_hebt_beobachter_an() {
+    let (o, _) = zwei_seiten().await;
+    let (einsatz, erika) = fuehrer_nach_rueckgabe(&o).await;
+    let a = annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert_eq!(rolle(&o, erika).await, "mitarbeit");
+    assert_eq!(a.quittungen, vec![1]);
+    assert_eq!(a.einsaetze, vec![einsatz]);
+    assert!(stand_der_zeile(&o, einsatz, erika).await > grenze(&o).await);
+}
+
+#[tokio::test]
+async fn nachtrag_ueber_das_gegenstueck_hebt_an() {
+    let (o, _) = zwei_seiten().await;
+    let (einsatz, erika) = fuehrer_nach_rueckgabe(&o).await;
+    exec(&o, "DELETE FROM spiegel_herkunft").await;
+    let mut n = nachtrag_n(1, Some(format!("[{einsatz},{erika}]")));
+    n.schluessel = "[99,99]".into();
+    annehmen(&o, 1, &[n]).await;
+    assert_eq!(rolle(&o, erika).await, "mitarbeit");
+}
+
+#[tokio::test]
+async fn vor_der_grenze_bearbeitet_hebt_trotzdem_an() {
+    let (o, _) = zwei_seiten().await;
+    let (_, erika) = fuehrer_nach_rueckgabe(&o).await;
+    // Bearbeitet an der noch alten Instanz, also vor der Grenze.
+    exec(
+        &o,
+        "UPDATE instanz_kopplung SET mitarbeit_grenze_stand = NULL",
+    )
+    .await;
+    exec(
+        &o,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+        ),
+    )
+    .await;
+    let mut c = o.acquire().await.unwrap();
+    super::nachtrag::save_grenze(&mut c, 1).await.unwrap();
+    drop(c);
+    annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert_eq!(rolle(&o, erika).await, "mitarbeit");
+}
+
+#[tokio::test]
+async fn abgelehnter_nachtrag_legt_die_zeile_neu_ins_log() {
+    let (o, _) = zwei_seiten().await;
+    let (einsatz, erika) = fuehrer_nach_rueckgabe(&o).await;
+    exec(
+        &o,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+        ),
+    )
+    .await;
+    let nach_bearbeitung = stand_der_zeile(&o, einsatz, erika).await;
+    let a = annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert_eq!(rolle(&o, erika).await, "beobachter");
+    assert_eq!(a.quittungen, vec![1]);
+    assert!(a.einsaetze.is_empty());
+    assert!(
+        stand_der_zeile(&o, einsatz, erika).await > nach_bearbeitung,
+        "neu im Log, damit der Spiegel dem Führer folgt"
+    );
+}
+
+#[tokio::test]
+async fn wiederholter_nachtrag_aendert_nichts() {
+    let (o, _) = zwei_seiten().await;
+    let (_, erika) = fuehrer_nach_rueckgabe(&o).await;
+    annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    let log: i64 = eine(&o, "SELECT MAX(stand) FROM einsatz_aenderung").await;
+    let a = annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert_eq!(a.quittungen, vec![1]);
+    assert_eq!(rolle(&o, erika).await, "mitarbeit");
+    assert_eq!(
+        eine::<i64>(&o, "SELECT MAX(stand) FROM einsatz_aenderung").await,
+        log,
+        "kein neuer Logeintrag"
+    );
+}
+
+#[tokio::test]
+async fn ohne_faehigkeit_des_spiegels_wartet_der_nachtrag() {
+    let (o, _) = zwei_seiten().await;
+    let (_, erika) = fuehrer_nach_rueckgabe(&o).await;
+    exec(
+        &o,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 0",
+    )
+    .await;
+    let a = annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert!(a.quittungen.is_empty(), "nicht quittiert");
+    assert_eq!(rolle(&o, erika).await, "beobachter");
+}
+
+#[tokio::test]
+async fn fuehrung_von_anderer_kopplung_hebt_nicht_an() {
+    let (o, _) = zwei_seiten().await;
+    let (einsatz, erika) = fuehrer_nach_rueckgabe(&o).await;
+    exec(
+        &o,
+        "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+         gegenueber_name, richtung, zustand, gegenueber_rolle_mitarbeit) \
+         VALUES (2, 'dritte', 'y', 'Dritte', 'wird_gemeldet', 'aktiv', 1)",
+    )
+    .await;
+    let vorher = stand_der_zeile(&o, einsatz, erika).await;
+    let a = annehmen(&o, 2, &[nachtrag_n(1, None)]).await;
+    assert_eq!(a.quittungen, vec![1]);
+    assert_eq!(rolle(&o, erika).await, "beobachter");
+    assert_eq!(
+        stand_der_zeile(&o, einsatz, erika).await,
+        vorher,
+        "kein Neu-Log"
+    );
+}
+
+#[tokio::test]
+async fn gegen_aus_einem_anderen_einsatz_hebt_nicht_an() {
+    let (o, _) = zwei_seiten().await;
+    let (_, erika) = fuehrer_nach_rueckgabe(&o).await;
+    let max = konto(&o, "Max").await;
+    let anderer: i64 = eine(
+        &o,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Anderer') RETURNING id",
+    )
+    .await;
+    exec(
+        &o,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({anderer}, {max}, 'beobachter')"
+        ),
+    )
+    .await;
+    exec(&o, "DELETE FROM spiegel_herkunft").await;
+    let mut n = nachtrag_n(1, Some(format!("[{anderer},{max}]")));
+    n.schluessel = "[99,99]".into();
+    let a = annehmen(&o, 1, &[n]).await;
+    assert_eq!(a.quittungen, vec![1]);
+    assert_eq!(rolle(&o, max).await, "beobachter");
+    assert_eq!(rolle(&o, erika).await, "beobachter");
+}
+
+#[tokio::test]
+async fn spiegel_nimmt_keinen_nachtrag_an() {
+    let (_, s) = zwei_seiten().await;
+    let erika = konto(&s, "Erika").await;
+    let einsatz: i64 = eine(
+        &s,
+        "INSERT INTO einsatz (org_id, bezeichnung, kennung) VALUES (1, 'Lage', 'n/1') RETURNING id",
+    )
+    .await;
+    exec(
+        &s,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika}, 'beobachter')"
+        ),
+    )
+    .await;
+    exec(
+        &s,
+        &format!(
+            "INSERT INTO spiegel_uebernahme (id) VALUES (1); \
+             INSERT INTO einsatz_spiegel (einsatz_id, kopplung_org_id, fremde_kennung) \
+             VALUES ({einsatz}, 1, 'n/1'); DELETE FROM spiegel_uebernahme"
+        ),
+    )
+    .await;
+    exec(
+        &s,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    let mut n = nachtrag_n(1, Some(format!("[{einsatz},{erika}]")));
+    n.schluessel = "[99,99]".into();
+    let a = annehmen(&s, 1, &[n]).await;
+    assert_eq!(a.quittungen, vec![1]);
+    assert_eq!(rolle(&s, erika).await, "beobachter");
+}

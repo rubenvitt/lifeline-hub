@@ -147,3 +147,153 @@ pub async fn delete_quittiert(
     .await?;
     Ok(())
 }
+
+/// Legt eine Mitgliedschaft neu ins Änderungslog (wie der Log-Trigger, `art::trigger_sql`): alte
+/// Logzeile weg, neue mit frischem Stand. So geht sie im nächsten Abgleich mit ihrem echten Wert
+/// hinaus.
+pub(super) async fn relog_mitgliedschaft(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    schluessel: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? AND schluessel = ?",
+    )
+    .bind(einsatz_id)
+    .bind(TABELLE)
+    .bind(schluessel)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query("INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (?, ?, ?)")
+        .bind(einsatz_id)
+        .bind(TABELLE)
+        .bind(schluessel)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+// ── Führer ──────────────────────────────────────────────────────────────────────────────────
+
+/// Ergebnis von [`accept`]: zu quittierende Nachträge und die Einsätze, deren Mitgliedschaft
+/// sich geändert hat (für die Live-Meldung nach dem Commit).
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Annahme {
+    pub quittungen: Vec<i64>,
+    pub einsaetze: Vec<i64>,
+}
+
+/// Führer: nimmt die Nachträge eines Spiegels an (Design D4). Angehoben wird nur
+/// `beobachter` → `mitarbeit`, nur wenn dieser Einsatz hier geführt wird, die Führung von dieser
+/// Kopplung kam und die Zeile seit der Grenze unverändert ist. Kennt diese Instanz die Fähigkeit
+/// des Spiegels noch nicht, bleibt alles unquittiert: Die angehobene Rolle ginge ihm sonst als
+/// `beobachter` zu. Abgelehnt, aber auflösbar: die Zeile neu ins Log, damit der Spiegel dem
+/// Führer folgt; steht sie schon auf `mitarbeit` (wiederholter Nachtrag), nur quittieren.
+pub async fn accept(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    nachtraege: &[MitarbeitNachtrag],
+) -> Result<Annahme, AppError> {
+    let mut annahme = Annahme::default();
+    if nachtraege.is_empty()
+        || !crate::instanz::repo::load_gegenueber_rolle_mitarbeit(conn, kopplung_id).await?
+    {
+        return Ok(annahme);
+    }
+    let grenze: Option<i64> =
+        sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = ?")
+            .bind(kopplung_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    for n in nachtraege {
+        annahme.quittungen.push(n.id);
+        let einsatz_id: Option<i64> = sqlx::query_scalar(
+            "SELECT e.id FROM einsatz e JOIN einsatz_fuehrung f ON f.einsatz_id = e.id \
+             WHERE e.kennung = ? AND e.spiegel = 0 AND f.herkunft_kopplung_id = ?",
+        )
+        .bind(&n.kennung)
+        .bind(kopplung_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some(einsatz_id) = einsatz_id else {
+            continue;
+        };
+        let Some(lokal) = schluessel_lokal(conn, einsatz_id, n).await? else {
+            continue;
+        };
+        let rolle: Option<String> = sqlx::query_scalar(
+            "SELECT einsatz_rolle FROM einsatz_mitgliedschaft \
+             WHERE einsatz_id = ? AND json_array(einsatz_id, benutzer_id) = ?",
+        )
+        .bind(einsatz_id)
+        .bind(&lokal)
+        .fetch_optional(&mut *conn)
+        .await?;
+        match rolle.as_deref().map(EinsatzRolle::parse) {
+            None | Some(Some(EinsatzRolle::Mitarbeit)) => continue,
+            Some(Some(EinsatzRolle::Beobachter)) => {}
+            Some(_) => {
+                relog_mitgliedschaft(conn, einsatz_id, &lokal).await?;
+                continue;
+            }
+        }
+        let bearbeitet = match grenze {
+            None => true,
+            Some(g) => {
+                sqlx::query_scalar(
+                    "SELECT EXISTS (SELECT 1 FROM einsatz_aenderung WHERE einsatz_id = ? \
+                 AND art = ? AND schluessel = ? AND stand > ?)",
+                )
+                .bind(einsatz_id)
+                .bind(TABELLE)
+                .bind(&lokal)
+                .bind(g)
+                .fetch_one(&mut *conn)
+                .await?
+            }
+        };
+        if bearbeitet {
+            relog_mitgliedschaft(conn, einsatz_id, &lokal).await?;
+            continue;
+        }
+        sqlx::query(
+            "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = ? \
+             WHERE einsatz_id = ? AND json_array(einsatz_id, benutzer_id) = ?",
+        )
+        .bind(EinsatzRolle::Mitarbeit.as_str())
+        .bind(einsatz_id)
+        .bind(&lokal)
+        .execute(&mut *conn)
+        .await?;
+        tracing::info!(einsatz_id, kopplung_id, "Mitarbeit nachgetragen");
+        if !annahme.einsaetze.contains(&einsatz_id) {
+            annahme.einsaetze.push(einsatz_id);
+        }
+    }
+    Ok(annahme)
+}
+
+/// Lokaler Schlüssel der Mitgliedschaft eines Nachtrags: das Gegenstück, wenn es eine
+/// Mitgliedschaft dieses Einsatzes nennt, sonst die Herkunft der Zeile (der Führer war Spiegel
+/// des Absenders).
+async fn schluessel_lokal(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    n: &MitarbeitNachtrag,
+) -> Result<Option<String>, AppError> {
+    if let Some(gegen) = &n.gegen {
+        let gibt: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft \
+             WHERE einsatz_id = ? AND json_array(einsatz_id, benutzer_id) = ?)",
+        )
+        .bind(einsatz_id)
+        .bind(gegen)
+        .fetch_one(&mut *conn)
+        .await?;
+        if gibt {
+            return Ok(Some(gegen.clone()));
+        }
+    }
+    Ok(super::abbildung::einsatz_lokal(conn, einsatz_id, TABELLE, &n.schluessel).await?)
+}
