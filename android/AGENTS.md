@@ -29,7 +29,9 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   (`Bruecke.accepts`), Antworten nur, solange derselbe WebView noch auf dieser Origin steht
   (`web/Brueckenempfang.kt`).
 - **Vertrauen wie das System:** System- und Nutzer-CAs (`res/xml/network_security_config.xml`),
-  keine Ausnahme, kein Pinning, kein Klartext; `onReceivedSslError` bricht immer ab.
+  keine Ausnahme, kein Pinning, kein Klartext; `onReceivedSslError` bricht immer ab. Nur die
+  Download-Hosts des Updaters (`Updateentscheidung.ERLAUBTE_HOSTS`) vertrauen allein den CAs des
+  Systems (`domain-config`, geprüft in `NetzvertrauenTest`).
 - **Wire-Format im Init-Skript:** Kennung und Befehle stehen im Kopf von
   `android/app/src/main/assets/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest
   führt das Skript aus (`frontend/src/test/huelle.ts`, `frontend/src/huelle/androidHuelle.test.ts`),

@@ -509,6 +509,19 @@ class UpdaterTest {
         }
     }
 
+    @Test
+    fun `eine aufgegebene Installation verwirft ihre Sitzung, das Update bleibt bereit`() {
+        val updater = bereit()
+        runBlocking { updater.installieren(Installzeitpunkt.Lage.START_VOR_OBERFLAECHE) }
+        assertEquals(1, sitzungen.size)
+
+        updater.abandonInstallation()
+
+        assertTrue(sitzungen.isEmpty())
+        assertEquals(Updatestand.BEREIT, updater.stand.value)
+        assertTrue("die APK bleibt", updater.isBereit)
+    }
+
     private fun warte(sekunden: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(sekunden))
 
     @Test
@@ -533,6 +546,8 @@ class UpdaterTest {
                 assertSame(Ablauf.Seite.Onboarding, activity.modell.seite)
             }
             assertEquals("der Hinweis bleibt", Updatestand.BEREIT, app.updater.stand.value)
+            // Die übergebene Sitzung ist verworfen: das System installiert nicht später unter der Oberfläche.
+            assertTrue(sitzungen.isEmpty())
             compose.onNodeWithText("Lifeline wird aktualisiert").assertDoesNotExist()
         }
     }
@@ -550,6 +565,7 @@ class UpdaterTest {
 
             szenario.onActivity { assertFalse(it.modell.zeigtUpdate) }
             assertEquals(Updatestand.BEREIT, app.updater.stand.value)
+            assertTrue("die Sitzung ist verworfen", sitzungen.isEmpty())
         }
     }
 

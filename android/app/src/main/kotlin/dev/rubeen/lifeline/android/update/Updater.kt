@@ -198,10 +198,14 @@ class Updater internal constructor(
 
     /**
      * Die App gibt eine Installation auf, auf die kein Ergebnis kam (`Startinstallation` im Kern):
-     * das Update bleibt bereit, der Hinweis bleibt. Kommt das Ergebnis später doch, gilt es.
+     * die übergebene Sitzung wird verworfen, damit das System nicht später unter der laufenden
+     * Oberfläche installiert (Review W7); das Update bleibt bereit, der Hinweis bleibt. Kommt das
+     * Ergebnis doch noch (das System installierte schon), gilt es.
      */
     fun abandonInstallation() {
-        if (stand.value == Updatestand.INSTALLIERT_GLEICH) aktuellerStand.value = bereitStand()
+        if (stand.value != Updatestand.INSTALLIERT_GLEICH) return
+        installation.abandon()
+        aktuellerStand.value = bereitStand()
     }
 
     /** Nach der Rückkehr aus der Systemeinstellung: hat die Person die Erlaubnis erteilt? */

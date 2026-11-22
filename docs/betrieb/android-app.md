@@ -107,6 +107,8 @@ laden. Ein nie geladener Server zeigt ohne Netz „Server nicht erreichbar“.
 
 Die App vertraut den CAs des Systems **und** vom Nutzer installierten CAs, ohne Ausnahme, ohne
 „Trotzdem fortfahren“ und ohne Pinning (`android/app/src/main/res/xml/network_security_config.xml`).
+Nur für die Download-Hosts des Updaters (GitHub) gelten allein die CAs des Systems; eine Nutzer-CA
+kann Manifest und APK nicht austauschen.
 Ein Server mit öffentlichem Zertifikat braucht nichts. Ein Server im Einsatz-LAN braucht ein
 Zertifikat aus **mkcert oder einer eigenen CA**; das selbst signierte Rückfall-Zertifikat taugt
 nicht (Begründung und Abhilfe: [iOS-App](ios-app.md#ca-profil-für-das-einsatz-lan)).
@@ -322,6 +324,8 @@ Jeder Punkt mit Ergebnis an die Aufgabe LLH-1989.
 - [ ] Erstes Update: Hinweis „Update bereit“ am Knopf, beim nächsten Start „Lifeline wird
   aktualisiert“ mit Rückfrage des Systems; danach die Meldung „Lifeline aktualisiert – zum Öffnen
   tippen“. Rückfrage ablehnen: die Oberfläche lädt nach höchstens wenigen Sekunden.
+  Gibt die App nach 3 bzw. 60 Sekunden ohne Ergebnis auf, verwirft sie die Sitzung beim System
+  (`PackageInstaller.abandonSession`); das Update bleibt bereit.
 - [ ] Ab dem zweiten Update ohne Rückfrage: App 15 Minuten in den Hintergrund, Update kommt ohne
   Zutun (Zeitpunkt notieren; unter Doze kann WorkManager später laufen).
 - [ ] Nie im Vordergrund: bei offener Oberfläche nur der Hinweis, keine Installation.

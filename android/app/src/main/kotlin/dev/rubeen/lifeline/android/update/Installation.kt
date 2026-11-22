@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.IntentCompat
 import dev.rubeen.lifeline.android.LifelineApp
 import dev.rubeen.lifeline.kern.Installzeitpunkt
@@ -68,6 +69,24 @@ class Installation(private val context: Context) {
         }
     }
 
+    /**
+     * Verwirft die Sitzungen der App, die das System noch nicht installiert (Review W7): gibt die
+     * Seite „Lifeline wird aktualisiert“ auf, darf eine übergebene Sitzung nicht später unter der
+     * laufenden Oberfläche installieren. Eine wartende Rückfrage des Systems endet damit
+     * (`STATUS_FAILURE_ABORTED`, das Update bleibt bereit). Eine Sitzung, die das System schon
+     * installiert, lässt sich nicht mehr zurückholen; das System übergeht den Aufruf dann.
+     */
+    fun abandon() {
+        val installer = context.packageManager.packageInstaller
+        for (sitzung in installer.mySessions) {
+            try {
+                installer.abandonSession(sitzung.sessionId)
+            } catch (e: Exception) {
+                Log.w(TAG, "Sitzung ${sitzung.sessionId} ließ sich nicht verwerfen", e)
+            }
+        }
+    }
+
     private fun statusEmpfaenger(vordergrund: Boolean, id: Int): PendingIntent {
         val intent = Intent(context, Installationsstatus::class.java)
             .setPackage(context.packageName)
@@ -77,6 +96,7 @@ class Installation(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "Lifeline"
         const val SITZUNGSDATEI = "lifeline.apk"
         const val EXTRA_VORDERGRUND = "dev.rubeen.lifeline.android.update.VORDERGRUND"
 
