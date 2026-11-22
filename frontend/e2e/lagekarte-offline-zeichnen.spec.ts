@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenPerApi } from './anmelde-kern';
+import { navigateInApp } from './navigation-kern';
 
 // Zeichnet die Lagekarte ohne Netz ihre Ebenen? (LFH-723, design.md D9, Aufgabe 7.2)
 //
@@ -53,14 +54,6 @@ async function schluessel(page: Page): Promise<string[]> {
   });
 }
 
-/** Navigation innerhalb der App (Data Router hört auf `popstate`), ohne Dokument-Abruf. */
-async function innerhalbNavigieren(page: Page, pfad: string) {
-  await page.evaluate((ziel) => {
-    window.history.pushState({}, '', ziel);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }, pfad);
-}
-
 test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', async ({ page }) => {
   test.setTimeout(120_000);
   await anmelden(page, { startseite: false });
@@ -84,9 +77,9 @@ test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', a
 
   // Netz weg, Karte verlassen und ohne Netz neu aufbauen.
   await page.context().setOffline(true);
-  await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/etb`);
+  await navigateInApp(page, `/einsaetze/${einsatzId}/etb`);
   await expect(page.getByTestId('kartenflaeche')).toHaveCount(0);
-  await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/lagekarte`);
+  await navigateInApp(page, `/einsaetze/${einsatzId}/lagekarte`);
   await expect(page.getByTestId('kartenflaeche')).toBeVisible();
   await expect.poll(() => schluessel(page), { timeout: 60_000 }).toContain(marker);
 
