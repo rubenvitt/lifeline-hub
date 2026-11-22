@@ -531,7 +531,7 @@ das sichtbar.
 Der Copernicus Emergency Management Service wertet auf Anforderung Satellitenbilder aus:
 Abgrenzung (DEL) der Überflutungs- oder Brandfläche mit Wassertiefe, Schadensklassen (GRA) für
 Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je Kartenausschnitt
-(`karte::copernicus`, ADR-0077, Entwurf
+(`karte::copernicus`, ADR-0079, Entwurf
 `docs/superpowers/specs/2026-11-21-wqafyn8u-copernicus-ems-fachebene-design.md`).
 
 - **Auswahl:** Aktivierungen mit Produkten, deren Mittelpunkt höchstens 500 km vom Ausschnitt
