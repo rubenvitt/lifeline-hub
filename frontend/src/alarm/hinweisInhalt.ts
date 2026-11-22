@@ -180,7 +180,7 @@ const chat: Lader = async (e, k) => {
   const kanal = zahlAusPfad(await k.pfad, 'kanal');
   if (kanal == null) return null;
   // Die Seite vor `id + 1` beginnt mit der Nachricht selbst (`src/chat/repo.rs`, absteigend).
-  const seite = await listeNachrichten(e.einsatz_id, kanal, e.bezug_id + 1);
+  const seite = await listeNachrichten(e.einsatz_id, kanal, { aelter: e.bezug_id + 1 });
   const n = seite.find((x) => x.id === e.bezug_id);
   if (!n) return null;
   const wortlaut = n.geloescht_at ? null : text(n.inhalt);
