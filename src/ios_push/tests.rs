@@ -297,3 +297,148 @@ fn krypto_folgt_dem_gemeinsamen_testvektor() {
         );
     }
 }
+
+// ---- Relais-Client ----
+
+mod relais_client {
+    use crate::ios_push::relais::{RelaisFehler, RelaisNachricht, Stufe, Umgebung};
+    use crate::ios_push::repo::{self, RelaisZugang};
+    use crate::ios_push::IosPush;
+    use axum::{
+        body::to_bytes, body::Body, http::Request, http::StatusCode, response::IntoResponse,
+    };
+    use serde_json::{json, Value};
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
+    /// Was das Relais-Doppel gesehen hat: Pfad, Authorization, Rumpf.
+    type Gesehen = Arc<Mutex<Vec<(String, Option<String>, Value)>>>;
+    /// Vorgegebene Antworten von `/v1/senden` (Status, Rumpf), der Reihe nach.
+    type Antworten = Arc<Mutex<VecDeque<(u16, Value)>>>;
+
+    async fn relais_doppel(antworten: Antworten) -> (String, Gesehen) {
+        let gesehen: Gesehen = Arc::default();
+        let g = gesehen.clone();
+        let zaehler = Arc::new(Mutex::new(0u32));
+        let app = axum::Router::new().fallback(move |req: Request<Body>| {
+            let g = g.clone();
+            let antworten = antworten.clone();
+            let zaehler = zaehler.clone();
+            async move {
+                let pfad = req.uri().path().to_owned();
+                let auth = req
+                    .headers()
+                    .get("authorization")
+                    .map(|v| v.to_str().unwrap().to_owned());
+                let rumpf = to_bytes(req.into_body(), usize::MAX).await.unwrap();
+                let rumpf: Value = serde_json::from_slice(&rumpf).unwrap_or(Value::Null);
+                g.lock().unwrap().push((pfad.clone(), auth, rumpf));
+                if pfad == "/v1/server" {
+                    let mut n = zaehler.lock().unwrap();
+                    *n += 1;
+                    let antwort =
+                        json!({ "server_id": format!("s{n}"), "geheimnis": format!("g{n}") });
+                    return (StatusCode::OK, axum::Json(antwort)).into_response();
+                }
+                let (status, rumpf) = antworten
+                    .lock()
+                    .unwrap()
+                    .pop_front()
+                    .unwrap_or((200, json!({ "ergebnisse": ["zugestellt"] })));
+                (StatusCode::from_u16(status).unwrap(), axum::Json(rumpf)).into_response()
+            }
+        });
+        let lauscher = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let adresse = lauscher.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(lauscher, app).await.unwrap() });
+        (format!("http://{adresse}"), gesehen)
+    }
+
+    fn nachricht() -> RelaisNachricht {
+        RelaisNachricht {
+            token: "tok".into(),
+            umgebung: Umgebung::Sandbox,
+            stufe: Stufe::Alarm,
+            kollaps: None,
+            nutzlast: "xyz".into(),
+        }
+    }
+
+    fn pfade(g: &Gesehen) -> Vec<String> {
+        g.lock()
+            .unwrap()
+            .iter()
+            .map(|(p, _, _)| p.clone())
+            .collect()
+    }
+
+    async fn aufbau(antworten: Vec<(u16, Value)>) -> (sqlx::SqlitePool, IosPush, Gesehen) {
+        let pool = crate::db::test_pool().await;
+        let (basis, gesehen) = relais_doppel(Arc::new(Mutex::new(antworten.into()))).await;
+        let ios = IosPush::einrichten_fuer_test(pool.clone(), basis.parse().unwrap()).unwrap();
+        (pool, ios, gesehen)
+    }
+
+    #[tokio::test]
+    async fn ohne_bedarf_kein_kontakt_zum_relais() {
+        let (pool, _ios, gesehen) = aufbau(vec![]).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert!(pfade(&gesehen).is_empty());
+        assert!(repo::relais_zugang(&pool).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn erster_versand_registriert_einmal() {
+        let (pool, ios, gesehen) = aufbau(vec![]).await;
+        let e = ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(e.len(), 1);
+        ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(pfade(&gesehen), ["/v1/server", "/v1/senden", "/v1/senden"]);
+        let g = gesehen.lock().unwrap();
+        assert_eq!(g[0].2["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(g[1].1.as_deref(), Some("Bearer s1.g1"));
+        assert_eq!(g[1].2["nachrichten"][0]["umgebung"], "sandbox");
+        assert_eq!(g[1].2["nachrichten"][0]["stufe"], "alarm");
+        drop(g);
+        let z = repo::relais_zugang(&pool).await.unwrap().unwrap();
+        assert_eq!(z.server_id, "s1");
+    }
+
+    #[tokio::test]
+    async fn unbekannt_401_fuehrt_zu_neuer_registrierung() {
+        let (pool, ios, gesehen) = aufbau(vec![(401, json!({ "fehler": "unbekannt" }))]).await;
+        repo::relais_zugang_speichern(
+            &pool,
+            &RelaisZugang {
+                server_id: "alt".into(),
+                geheimnis: "alt".into(),
+                gesperrt: false,
+            },
+        )
+        .await
+        .unwrap();
+        let e = ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(e.len(), 1);
+        assert_eq!(pfade(&gesehen), ["/v1/senden", "/v1/server", "/v1/senden"]);
+        assert_eq!(
+            gesehen.lock().unwrap()[2].1.as_deref(),
+            Some("Bearer s1.g1")
+        );
+        assert_eq!(
+            repo::relais_zugang(&pool).await.unwrap().unwrap().server_id,
+            "s1"
+        );
+    }
+
+    #[tokio::test]
+    async fn gesperrt_403_merkt_sperre_und_registriert_nicht_neu() {
+        let (pool, ios, gesehen) = aufbau(vec![(403, json!({ "fehler": "gesperrt" }))]).await;
+        let f = ios.senden(&[nachricht()]).await.unwrap_err();
+        assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
+        assert!(repo::relais_zugang(&pool).await.unwrap().unwrap().gesperrt);
+        // Danach kein weiterer Kontakt zum Relais.
+        let f = ios.senden(&[nachricht()]).await.unwrap_err();
+        assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
+        assert_eq!(pfade(&gesehen), ["/v1/server", "/v1/senden"]);
+    }
+}

@@ -416,6 +416,9 @@ pub struct LiveHub {
     /// ([`Self::web_push_einrichten`]). Hier, weil jede Benachrichtigung über den Hub zugestellt
     /// wird und `benachrichtigung::melden` sonst an jedem Aufrufer einen Parameter mehr bräuchte.
     web_push: Arc<std::sync::OnceLock<crate::web_push::WebPush>>,
+    /// iOS-Push über das Relais, nur mit `--ios-push` beim Start eingerichtet
+    /// ([`Self::ios_push_einrichten`]); aus demselben Grund hier wie `web_push`.
+    ios_push: Arc<std::sync::OnceLock<crate::ios_push::IosPush>>,
     /// Wer gerade welche Angabe bearbeitet (LLH-1946, Entwurf D3): nur im Speicher.
     praesenz: Arc<praesenz::PraesenzSpeicher>,
     /// Geänderte Präsenzstände, am Replay-Ring vorbei (Entwurf D2): ohne Id, ohne Nachlieferung.
@@ -497,6 +500,7 @@ impl LiveHub {
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
             web_push: Arc::default(),
+            ios_push: Arc::default(),
             praesenz: Arc::new(praesenz::PraesenzSpeicher::mit_melden(praesenz_tx.clone())),
             praesenz_tx,
         }
@@ -550,6 +554,17 @@ impl LiveHub {
     /// zweiter Aufruf ändert nichts.
     pub fn web_push_einrichten(&self, web_push: crate::web_push::WebPush) {
         let _ = self.web_push.set(web_push);
+    }
+
+    /// Richtet iOS-Push für diesen Hub ein (nur beim Start mit `--ios-push`). Ein zweiter
+    /// Aufruf ändert nichts.
+    pub fn ios_push_einrichten(&self, ios_push: crate::ios_push::IosPush) {
+        let _ = self.ios_push.set(ios_push);
+    }
+
+    /// iOS-Push, falls eingerichtet.
+    pub fn ios_push(&self) -> Option<&crate::ios_push::IosPush> {
+        self.ios_push.get()
     }
 
     /// Web Push, falls eingerichtet.

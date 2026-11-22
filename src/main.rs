@@ -234,6 +234,18 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
         live.web_push_einrichten(web_push);
     }
+    // iOS-Push nur mit Schalter; verbunden wird erst beim ersten Versand.
+    if let Some(relais) = config.ios_push_relais()? {
+        let ios_push = lifeline_hub::ios_push::IosPush::einrichten(
+            pool.clone(),
+            relais,
+            config.betreiber_kontakt()?,
+        )?;
+        tracing::warn!(
+            "iOS-Push AKTIV: verschlüsselte Benachrichtigungen gehen über das Relais an Apple"
+        );
+        live.ios_push_einrichten(ios_push);
+    }
     // Live-Kanäle ohne Empfänger nach der Replay-Karenz abräumen (LFH-918).
     live.starte_kanal_sweep();
     live.starte_praesenz_sweep();
