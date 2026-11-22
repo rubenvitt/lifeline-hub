@@ -24,7 +24,7 @@ async fn benutzer(pool: &SqlitePool, name: &str) -> i64 {
 async fn sitzung(pool: &SqlitePool, benutzer_id: i64, hash: &str) {
     sqlx::query(
         "INSERT INTO session (token_hash, benutzer_id, expires_at) \
-         VALUES (?, ?, '2999-01-01T00:00:00Z')",
+         VALUES (?, ?, '2999-01-01 00:00:00')",
     )
     .bind(hash)
     .bind(benutzer_id)
@@ -510,7 +510,7 @@ mod relais_client {
         .unwrap();
         sqlx::query(
             "UPDATE ios_push_relais \
-             SET gesperrt_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)",
+             SET gesperrt_at = datetime('now', ?)",
         )
         .bind(format!("-{stunden} hours"))
         .execute(pool)
@@ -521,7 +521,7 @@ mod relais_client {
     /// Ob die Sperre in der letzten Minute gesetzt oder erneuert wurde.
     async fn gerade_gesperrt(pool: &sqlx::SqlitePool) -> bool {
         sqlx::query_scalar(
-            "SELECT datetime(gesperrt_at) > datetime('now', '-1 minute') \
+            "SELECT gesperrt_at > datetime('now', '-1 minute') \
              FROM ios_push_relais WHERE id = 1",
         )
         .fetch_one(pool)

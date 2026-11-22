@@ -236,7 +236,7 @@ pub struct RelaisZugang {
 pub async fn relais_zugang(pool: &SqlitePool) -> Result<Option<RelaisZugang>, AppError> {
     let zeile: Option<(String, String, bool, bool)> = sqlx::query_as(
         "SELECT server_id, geheimnis, gesperrt_at IS NOT NULL, \
-                COALESCE(datetime(gesperrt_at) <= datetime('now', ?), 0) \
+                COALESCE(gesperrt_at <= datetime('now', ?), 0) \
          FROM ios_push_relais WHERE id = 1",
     )
     .bind(format!("-{SPERRE_GILT_STUNDEN} hours"))
@@ -256,7 +256,7 @@ pub async fn relais_zugang(pool: &SqlitePool) -> Result<Option<RelaisZugang>, Ap
 /// `None` ohne Sperre. Für die Warnung in der Verwaltung der Instanz.
 pub async fn relais_gesperrt_seit(pool: &SqlitePool) -> Result<Option<String>, AppError> {
     Ok(sqlx::query_scalar(
-        "SELECT strftime('%Y-%m-%d %H:%M:%S', gesperrt_at) FROM ios_push_relais \
+        "SELECT gesperrt_at FROM ios_push_relais \
          WHERE id = 1 AND gesperrt_at IS NOT NULL",
     )
     .fetch_optional(pool)
@@ -268,7 +268,7 @@ pub async fn relais_gesperrt_seit(pool: &SqlitePool) -> Result<Option<String>, A
 pub async fn relais_zugang_speichern(pool: &SqlitePool, z: &RelaisZugang) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO ios_push_relais (id, server_id, geheimnis, gesperrt_at) \
-         VALUES (1, ?, ?, CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END) \
+         VALUES (1, ?, ?, CASE WHEN ? THEN datetime('now') END) \
          ON CONFLICT(id) DO UPDATE SET server_id = excluded.server_id, \
              geheimnis = excluded.geheimnis, gesperrt_at = excluded.gesperrt_at",
     )
@@ -291,7 +291,7 @@ pub async fn relais_zugang_loeschen(pool: &SqlitePool) -> Result<(), AppError> {
 /// ältere Sperre stand. Damit gilt sie wieder [`SPERRE_GILT_STUNDEN`].
 pub async fn relais_gesperrt_setzen(pool: &SqlitePool) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE ios_push_relais SET gesperrt_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
+        "UPDATE ios_push_relais SET gesperrt_at = datetime('now') \
          WHERE id = 1",
     )
     .execute(pool)

@@ -529,7 +529,7 @@ async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
         .unwrap()
         .contains_key("ios_push_relais_gesperrt_seit"));
 
-    relais_gesperrt_seit(&pool, "2026-11-20T08:15:00Z").await;
+    relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
     let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ios_push_relais_gesperrt_seit"], "2026-11-20 08:15:00");
@@ -538,7 +538,7 @@ async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
 #[tokio::test]
 async fn ohne_ios_push_zeigt_die_verwaltung_keine_sperre() {
     let (app, pool, _live) = setup_mit_pool_und_live().await;
-    relais_gesperrt_seit(&pool, "2026-11-20T08:15:00Z").await;
+    relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
