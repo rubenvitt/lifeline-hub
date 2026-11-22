@@ -3,6 +3,7 @@ import {
   KONTEXTE,
   anmelden,
   demoEinsatz,
+  eintreffenVor,
   expect,
   fotografiere,
   fuelle,
@@ -49,7 +50,7 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
   for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
     await fuelle(page, 'post', `/api/einsaetze/${einsatz}/einheiten/${e.id}/zeitachse`, {
       art: 'eintreffen',
-      zeitpunkt_at: new Date(jetzt - 2 * stunde).toISOString(),
+      zeitpunkt_at: eintreffenVor(new Date(jetzt), 120).toISOString(),
     });
   }
   const stelle = async (bezeichnung: string, standort: string) => {

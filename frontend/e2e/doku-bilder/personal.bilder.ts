@@ -4,6 +4,7 @@ import {
   anmelden,
   apiAlsAdmin,
   demoEinsatz,
+  eintreffenVor,
   expect,
   fotografiere,
   fuelle,
@@ -95,9 +96,10 @@ test.describe(KAPITEL, () => {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 287)),
       });
+      // Höchstens 3 h zurück, sonst ist die Ablösung je nach Tageszeit fällig (LLH-1913).
       await fuelle(api, 'post', einheitPfad, {
         art: 'eintreffen',
-        zeitpunkt_at: draht(vor(jetzt, 271)),
+        zeitpunkt_at: draht(eintreffenVor(jetzt, 180)),
       });
 
       const lena = await personNamens(api, demo.id, 'Lena Beispiel');
