@@ -1807,3 +1807,87 @@ fn normalize_funktion_ohne_rollenspalte_unveraendert() {
     uebernehmen::normalize_funktion(&mut werte, false);
     assert_eq!(werte, vorher);
 }
+
+/// Ein älteres Gegenüber kennt die Regel nicht und liefert Beobachter + `s4`: der Spiegel
+/// übernimmt die Zeile ohne Hinweis, die Funktion als Bezeichnung (LLH-2064, Entwurf D4/D7).
+#[tokio::test]
+async fn beobachter_mit_funktion_vom_alten_gegenueber_kommt_als_bezeichnung_an() {
+    let (f, s) = zwei_seiten().await;
+    let (erika_elw, erika_hub) = gemeinsames_konto(&f, &s, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    // Das Gegenüber hat den CHECK aus 0363 nicht; hier nur auf dieser einen Verbindung aus.
+    let mut c = f.acquire().await.unwrap();
+    sqlx::query("PRAGMA ignore_check_constraints = ON")
+        .execute(&mut *c)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+         fuehrungsfunktion) VALUES (?, ?, 'beobachter', 's4')",
+    )
+    .bind(einsatz)
+    .bind(erika_elw)
+    .execute(&mut *c)
+    .await
+    .unwrap();
+    sqlx::query("PRAGMA ignore_check_constraints = OFF")
+        .execute(&mut *c)
+        .await
+        .unwrap();
+    drop(c);
+
+    while abgleichen(&f, &s, 500).await > 0 {}
+
+    let (rolle, code, stelle): (String, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT einsatz_rolle, fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
+         WHERE benutzer_id = ?",
+    )
+    .bind(erika_hub)
+    .fetch_one(&s)
+    .await
+    .unwrap();
+    assert_eq!(rolle, "beobachter");
+    assert_eq!(code, None);
+    assert_eq!(stelle.as_deref(), Some("S4"));
+}
+
+/// Ist der Einsatz hier geschwärzt, fällt nur der Code weg; Text kommt nicht in die geschwärzte
+/// Spalte (LLH-2064, Entwurf D1/D4).
+#[tokio::test]
+async fn strip_funktion_liest_die_schwaerzung_am_lokalen_einsatz() {
+    let pool = crate::db::test_pool().await;
+    let mut conn = pool.acquire().await.unwrap();
+    let t = super::schema::schema(&mut conn)
+        .await
+        .unwrap()
+        .tabelle("einsatz_mitgliedschaft")
+        .unwrap()
+        .clone();
+    for (geschwaerzt, erwartet) in [
+        (false, serde_json::json!("S4")),
+        (true, serde_json::Value::Null),
+    ] {
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, geschwaerzt_at) \
+             VALUES (1, 'Lage', CASE WHEN ? THEN '2026-11-01 00:00:00' END) RETURNING id",
+        )
+        .bind(geschwaerzt)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+        let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+        uebernehmen::strip_funktion(&mut conn, &t, einsatz, &mut werte)
+            .await
+            .unwrap();
+        assert!(wert(&werte, "fuehrungsfunktion").is_null());
+        assert_eq!(
+            wert(&werte, "fuehrungsstelle"),
+            &erwartet,
+            "geschwärzt={geschwaerzt}"
+        );
+    }
+}

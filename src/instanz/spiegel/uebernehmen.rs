@@ -769,7 +769,7 @@ async fn keep_mitarbeit(
 /// Zeile wird vor dem Schreiben nach `Funktionsangabe::as_freitext` zur Bezeichnung, sonst bliebe
 /// der Abgleich an ihr hängen. Der Spiegel weicht damit bewusst vom Gegenüber ab, wie bei
 /// [`keep_mitarbeit`]. Ob der Einsatz geschwärzt ist, gilt am lokalen Einsatz.
-async fn strip_funktion(
+pub(super) async fn strip_funktion(
     conn: &mut SqliteConnection,
     t: &Tabelle,
     einsatz_id: i64,
