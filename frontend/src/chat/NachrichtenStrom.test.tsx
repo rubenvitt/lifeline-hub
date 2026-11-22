@@ -817,6 +817,16 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
   });
 
+  it('kommt der Kopf ohne neue Nachricht (leere Seite), läuft die nächste Nachricht mit', () => {
+    const { strom, scrollTo, zeige } = aufbau([A], false);
+    setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A], 0, true);
+    zeige([A, B], 0, true);
+    expect(scrollTo).toHaveBeenCalled();
+  });
+
   it('eigene Absendung aus tiefem Fenster springt, sobald der Kopf da ist', () => {
     const { strom, scrollTo, zeige } = aufbau([A], false);
     setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });

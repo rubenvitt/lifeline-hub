@@ -63,7 +63,7 @@ import {
   type BezugOptionen,
 } from '../chat/bezug';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { fensterOptionen } from '../components/fensterBeideRichtungen';
+import { fensterOptionen, useKopfAnnehmen } from '../components/fensterBeideRichtungen';
 import { useKopfBeimVerlassen, zumKopf } from '../components/listenFenster';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { NUR_LEITUNG_FUEHRUNG_MITARBEIT, einsatzRechteGrund } from '../components/nurAnsicht';
@@ -204,6 +204,7 @@ export default function ChatPage() {
     enabled: kanalId !== null,
   });
   const kopfImFenster = !nachrichtenQuery.hasPreviousPage;
+  useKopfAnnehmen(nachrichtenSchluessel, nachrichtenQuery.data, CHAT_SEITENGROESSE);
   useKopfBeimVerlassen(nachrichtenSchluessel, kanalId !== null);
 
   // Erst nach einem erfolgreichen Nachrichtenabruf markieren. Der Gelesen-Stand ist je Nachricht

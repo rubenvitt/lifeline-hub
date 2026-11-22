@@ -116,6 +116,10 @@ Cursor-Adapter die drei Teile, die `useInfiniteQuery` braucht: `initialPageParam
   bliebe stehen und holte beim nächsten Klick eine leere Seite (so heute im ETB, mit der
   Folgeaufgabe zu beheben). Keine Lücke, keine Doppelten: der nächste Cursor ist der oberste
   Eintrag der Seite.
+- **Kopf annehmen** (aus dem Review): Eine nicht volle `neuer`-Seite vorn ist der Kopf; ihr
+  Parameter wird auf `undefined` umgeschrieben (`kopfAngenommen`, `useKopfAnnehmen`). Sonst läse
+  jedes Live-Neuladen die Seite direkt über dem alten Cursor, eine neue Nachricht machte sie
+  „voll“, der Kopf gälte als verloren, und ab zwei fehlte die neueste.
 - Kopf im Fenster heißt `!hasPreviousPage`.
 
 Dazu `kopfVerlassen`, `zumKopf` und `useKopfBeimVerlassen` aus `components/listenFenster.ts`:
@@ -158,7 +162,9 @@ Kommentar dort („Chat und Infotelefon tragen das Fenster bewusst nicht“) wir
   den Kennungen, mit denen sie kam (`extendEinfrierstand`). Eine Buchführung je Seite entfällt.
   Ein Live-Nachladen bringt so weiter keinen fremden Nachtrag in den Stand. Die Wassermarke
   bleibt die höchste beim Einfrieren gezeigte Kennung.
-- **Deeplink** außerhalb des Fensters: wie bisher einzeln holen und oben anstellen.
+- **Deeplink** außerhalb des Fensters: wie bisher einzeln holen, aber nach der Ordnung des Servers
+  einsortieren (`anrufOrdnung`, aus dem Review): ohne Kopf im Fenster kann er jünger sein als
+  das Fenster.
 - **Verlassen** mit Fenster ohne Kopf: `useKopfBeimVerlassen` je Sicht.
 
 ### D5 Regeln und Doku

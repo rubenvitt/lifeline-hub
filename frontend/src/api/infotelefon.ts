@@ -30,6 +30,15 @@ export function anrufCursor(a: Pick<InfotelefonAnruf, 'id' | 'eingang_at'>): Abs
   return { zeit: a.eingang_at, id: a.id };
 }
 
+/** Ordnung des Protokolls wie am Server: jüngster Eingang zuerst, Gleichstand über die Kennung. */
+export function anrufOrdnung(
+  a: Pick<InfotelefonAnruf, 'id' | 'eingang_at'>,
+  b: Pick<InfotelefonAnruf, 'id' | 'eingang_at'>,
+): number {
+  if (a.eingang_at !== b.eingang_at) return a.eingang_at < b.eingang_at ? 1 : -1;
+  return b.id - a.id;
+}
+
 /**
  * Cursor des Seitenfensters (LLH-1886, `components/fensterBeideRichtungen.ts`): Eingang und
  * Kennung, lexikografisch geordnet — `(zeit, id ± 1)` schließt den Anruf `(zeit, id)` ein.

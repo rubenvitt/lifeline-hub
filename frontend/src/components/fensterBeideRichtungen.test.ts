@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FENSTER_MAX_SEITEN,
   fensterOptionen,
+  kopfAngenommen,
   naechsterParam,
   seitenLimit,
   vorigerParam,
@@ -113,5 +114,28 @@ describe('Seitenfenster in beide Richtungen', () => {
     const o = fensterOptionen(chat, GROESSE);
     expect(o.getNextPageParam(nachrichten(10, 3), [], undefined)).toEqual({ aelter: 8 });
     expect(o.getPreviousPageParam(nachrichten(7, 3), [], { aelter: 8 })).toEqual({ neuer: 7 });
+  });
+
+  it('eine nicht volle `neuer`-Seite vorn wird zum Kopf (Parameter `undefined`)', () => {
+    const daten = {
+      pages: [nachrichten(10, 3), nachrichten(7, 3)],
+      pageParams: [{ neuer: 7 }, { aelter: 8 }] as const,
+    };
+    expect(kopfAngenommen(daten, GROESSE)).toEqual({
+      pages: daten.pages,
+      pageParams: [undefined, { aelter: 8 }],
+    });
+    // Voll (eine über der Seitengröße): darüber liegt mehr, nichts umzuschreiben.
+    expect(
+      kopfAngenommen({ pages: [nachrichten(11, 4)], pageParams: [{ neuer: 7 }] }, GROESSE),
+    ).toBeNull();
+    // Schon der Kopf, oder eine `aelter`-Seite vorn: nichts zu tun.
+    expect(
+      kopfAngenommen({ pages: [nachrichten(10, 2)], pageParams: [undefined] }, GROESSE),
+    ).toBeNull();
+    expect(
+      kopfAngenommen({ pages: [nachrichten(7, 3)], pageParams: [{ aelter: 8 }] }, GROESSE),
+    ).toBeNull();
+    expect(kopfAngenommen(undefined, GROESSE)).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import {
   ANRUF_CURSOR,
   ANRUFE_PAGE_SIZE,
+  anrufOrdnung,
   anrufSeite,
   erfasseAnruf,
   loadAnruf,
@@ -44,7 +45,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
 import { funkprotokollFolge, useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
-import { fensterOptionen } from '../components/fensterBeideRichtungen';
+import { fensterOptionen, useKopfAnnehmen } from '../components/fensterBeideRichtungen';
 import { useKopfBeimVerlassen, zumKopf } from '../components/listenFenster';
 import {
   einfrieren,
@@ -163,6 +164,7 @@ export default function InfotelefonPage() {
     enabled: frei,
   });
   const kopfImFenster = !anrufeQuery.hasPreviousPage;
+  useKopfAnnehmen(listenSchluessel, anrufeQuery.data, ANRUFE_PAGE_SIZE);
   useKopfBeimVerlassen(listenSchluessel, frei);
   const ladeKopf = () =>
     zumKopf(qc, listenSchluessel, () =>
@@ -241,15 +243,16 @@ export default function InfotelefonPage() {
     },
   });
 
-  // Der Server filtert; der einzeln geholte Anruf steht hinten (in der Darstellung oben), er ist
-  // älter als das Fenster.
-  const gefiltert = useMemo(
-    () =>
-      linked && sicht === 'alle' && !loaded.some((a) => a.id === linked.id)
-        ? [...loaded, linked]
-        : loaded,
-    [loaded, linked, sicht],
-  );
+  // Der Server filtert; der einzeln geholte Anruf sortiert nach der Ordnung des Servers ein: meist
+  // älter als das Fenster (hinten, in der Darstellung oben), ohne Kopf im Fenster aber womöglich
+  // jünger (LLH-1886, Review).
+  const gefiltert = useMemo(() => {
+    if (!linked || sicht !== 'alle' || loaded.some((a) => a.id === linked.id)) return loaded;
+    const stelle = loaded.findIndex((a) => anrufOrdnung(linked, a) < 0);
+    return stelle < 0
+      ? [...loaded, linked]
+      : [...loaded.slice(0, stelle), linked, ...loaded.slice(stelle)];
+  }, [loaded, linked, sicht]);
   // Erst springen, wenn die Zeile steht: der einzeln geholte Anruf kommt später als die Liste.
   const isHervorgehobenLoaded = gefiltert.some((a) => a.id === hervorgehoben);
   useEffect(() => {

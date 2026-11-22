@@ -297,6 +297,15 @@ export default function NachrichtenStrom({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- wächst die jüngste id, nicht der Kopf
   }, [juengsteId]);
 
+  /*
+   * Kommt der Kopf ohne neue jüngste Nachricht (eine leere „Neuere laden“-Seite), läuft der Effekt
+   * oben nicht: der Merker folgt hier, sonst bekäme die nächste Nachricht weder Sprung noch Pille.
+   * Steht NACH dem Sprung-Effekt: wächst beides in einer Runde, liest der Sprung den alten Stand.
+   */
+  useEffect(() => {
+    kopfVorher.current = kopfImFenster;
+  }, [kopfImFenster]);
+
   return (
     <div
       ref={behaelter}

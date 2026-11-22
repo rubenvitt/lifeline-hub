@@ -201,7 +201,9 @@ describe('InfotelefonPage (LFH-554)', () => {
   });
 
   it('holt einen per ?anruf= angesteuerten Anruf außerhalb des Fensters einzeln', async () => {
-    vi.mocked(loadAnruf).mockResolvedValue(anruf({ id: 77, notiz: 'alter Anruf' }));
+    vi.mocked(loadAnruf).mockResolvedValue(
+      anruf({ id: 77, eingang_at: '2026-09-30 08:00:00', notiz: 'alter Anruf' }),
+    );
     setup('/einsaetze/1/infotelefon?anruf=77');
     await waitFor(() => expect(loadAnruf).toHaveBeenCalledWith(1, 77));
     const ziel = await waitFor(() => {
@@ -477,6 +479,31 @@ describe('InfotelefonPage (LFH-554)', () => {
       expect(screen.queryByText('fremder Nachtrag')).toBeNull();
     }, 60_000);
 
+    it('ein Deeplink auf einen jüngeren Anruf ohne Kopf im Fenster sortiert unten ein', async () => {
+      blaettere(() => reihe(950, 801));
+      vi.mocked(loadAnruf).mockResolvedValue(
+        anruf({ id: 940, eingang_at: eingang(940), notiz: 'Anruf 940' }),
+      );
+      const client = neuerQueryClient();
+      // `gcTime: 0` im Test-Client: bis die Freigabe steht, beobachtet niemand das Fenster.
+      client.setQueryDefaults(einsatzKeys.infotelefonListe(1, 'alle'), { gcTime: Infinity });
+      client.setQueryData(einsatzKeys.infotelefonListe(1, 'alle'), {
+        pages: [reihe(900, 801)],
+        pageParams: [{ aelter: { zeit: eingang(901), id: 901 } }],
+      });
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/infotelefon?anruf=940', client },
+      );
+      const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+      await within(liste).findByText('Anruf 940');
+      const zeilen = within(liste).getAllByRole('listitem');
+      // Funkprotokoll: jüngster unten. Er ist jünger als das Fenster, also ganz unten.
+      expect(zeilen[zeilen.length - 1]).toHaveTextContent('Anruf 940');
+    });
+
     it('„Neuere laden“ bei eingefrorener Schleuse zeigt die geholte Seite ganz', async () => {
       const bestand = [
         ...reihe(950, 801),
@@ -484,6 +511,8 @@ describe('InfotelefonPage (LFH-554)', () => {
       ];
       blaettere(() => bestand);
       const client = neuerQueryClient();
+      // `gcTime: 0` im Test-Client: bis die Freigabe steht, beobachtet niemand das Fenster.
+      client.setQueryDefaults(einsatzKeys.infotelefonListe(1, 'alle'), { gcTime: Infinity });
       client.setQueryData(einsatzKeys.infotelefonListe(1, 'alle'), {
         pages: [reihe(900, 801)],
         pageParams: [{ aelter: { zeit: eingang(901), id: 901 } }],

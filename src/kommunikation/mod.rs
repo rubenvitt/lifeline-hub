@@ -199,7 +199,10 @@ pub fn parse_fenster(
     limit: Option<i64>,
 ) -> Result<FensterSeite, crate::error::AppError> {
     let vor = parse_page(vor_zeit, vor_id, limit)?;
-    let nach = parse_page(nach_zeit, nach_id, limit)?;
+    // Derselbe Leser, aber der Fehlertext nennt die Felder dieser Richtung.
+    let nach = parse_page(nach_zeit, nach_id, limit).map_err(|_| {
+        crate::error::AppError::UnprocessableEntity("nach_zeit und nach_id gehören zusammen".into())
+    })?;
     let cursor = match (vor.vor, nach.vor) {
         (Some(_), Some(_)) => {
             return Err(crate::error::AppError::UnprocessableEntity(
@@ -307,7 +310,7 @@ mod tests {
         );
         assert!(matches!(
             parse_fenster(None, None, Some(" "), Some(7), None),
-            Err(AppError::UnprocessableEntity(_))
+            Err(AppError::UnprocessableEntity(t)) if t.contains("nach_zeit")
         ));
         assert!(matches!(
             parse_fenster(

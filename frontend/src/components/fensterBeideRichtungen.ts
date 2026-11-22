@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/react-query';
+
 /**
  * Seitenfenster in beide Richtungen für Chat und Infotelefon (LLH-1886, Entwurf
  * `docs/superpowers/specs/2026-11-22-se7ytm9j-chat-infotelefon-seitenfenster-design.md`, D2), nach
@@ -95,4 +98,38 @@ export function fensterOptionen<T, C>(adapter: CursorAdapter<T, C>, seitengroess
     getPreviousPageParam: (erste: T[], _alle: T[][], param: FensterParam<C>) =>
       vorigerParam(adapter, seitengroesse, erste, param),
   };
+}
+
+/**
+ * Eine nicht volle `neuer`-Seite vorn IST der Kopf (Review zu LLH-1886): Über ihr lag nichts mehr.
+ * Bliebe ihr Parameter `{ neuer: c }`, läse jedes Live-Neuladen die Seite direkt über `c` — schon
+ * eine neue Nachricht machte sie „voll“, der Kopf gälte als verloren (kein Mitlaufen, kein
+ * Gelesen), und ab zwei fehlte die neueste ganz. Liefert die Daten mit dem Parameter `undefined`
+ * vorn, oder `null`, wenn nichts umzuschreiben ist. Das nächste Neuladen holt dann die neuesten
+ * Einträge und rechnet die Folgeseiten aus ihnen neu (TanStack: `getNextPageParam`), ohne Doppelte.
+ */
+export function kopfAngenommen<T, C>(
+  daten: InfiniteData<T[], FensterParam<C>> | undefined,
+  seitengroesse: number,
+): InfiniteData<T[], FensterParam<C>> | null {
+  const param = daten?.pageParams[0];
+  const erste = daten?.pages[0];
+  if (daten == null || erste == null || param == null || !('neuer' in param)) return null;
+  if (erste.length >= seitenLimit(seitengroesse, param)) return null;
+  return { pages: daten.pages, pageParams: [undefined, ...daten.pageParams.slice(1)] };
+}
+
+/** Schreibt {@link kopfAngenommen} in den Cache, sobald die Daten es verlangen. */
+export function useKopfAnnehmen<T, C>(
+  schluessel: QueryKey,
+  daten: InfiniteData<T[], FensterParam<C>> | undefined,
+  seitengroesse: number,
+) {
+  const qc = useQueryClient();
+  const s = JSON.stringify(schluessel);
+  useEffect(() => {
+    const neu = kopfAngenommen(daten, seitengroesse);
+    if (neu == null) return;
+    qc.setQueryData(JSON.parse(s) as QueryKey, neu);
+  }, [qc, s, daten, seitengroesse]);
 }

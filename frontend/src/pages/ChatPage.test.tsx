@@ -326,6 +326,9 @@ describe('ChatPage', () => {
       }),
     );
     const client = neuerQueryClient();
+    // Der Test-Client räumt Unbeobachtetes sofort (`gcTime: 0`); bis die Kanalliste steht, beobachtet
+    // niemand das vorbelegte Fenster.
+    client.setQueryDefaults(['einsatz-chat-nachrichten', 7, 1], { gcTime: Infinity });
     client.setQueryData(['einsatz-chat-nachrichten', 7, 1], {
       pages: [alle.slice(100)],
       pageParams: [{ aelter: 601 }],
@@ -354,7 +357,18 @@ describe('ChatPage', () => {
       expect(screen.queryByRole('button', { name: 'Neuere laden' })).not.toBeInTheDocument(),
     );
     await waitFor(() => expect(markiert).toBeGreaterThan(0));
-  });
+
+    // Review: Zurück am Kopf bleibt er es auch, wenn neue Nachrichten kommen. Der Rückweg endete
+    // auf `{ neuer: 600 }`; ohne Umschreiben auf den Kopf lüde ein Live-Ereignis 101 Nachrichten
+    // über 600, hielte die Seite für voll, und die neuesten fehlten.
+    alle.unshift(
+      { ...nachricht, id: 702, inhalt: 'N 702' },
+      { ...nachricht, id: 701, inhalt: 'N 701' },
+    );
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz-chat-nachrichten', 7] }));
+    expect(await screen.findByText('N 702')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Neuere laden' })).not.toBeInTheDocument();
+  }, 30_000);
 
   it('zeigt keinen „Ältere laden"-Button bei einer kurzen Seite', async () => {
     setup();
