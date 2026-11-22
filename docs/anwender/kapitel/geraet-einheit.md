@@ -2,7 +2,7 @@
 titel: Einheit am Gerät
 gruppen: [geraete]
 reihenfolge: 755
-quellen: [frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetStatusPage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/StandortFeld.tsx, frontend/src/geraet/GeraetKontaktePage.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/geraet/auftragsVibration.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/geraet/abschnitt.rs, src/geraet/stelle.rs, src/routes/einsatz_person.rs]
+quellen: [frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetStatusPage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/StandortFeld.tsx, frontend/src/geraet/GeraetKontaktePage.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/geraet/auftragsVibration.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/geraet/abschnitt.rs, src/geraet/stelle.rs, src/routes/einsatz_person.rs, frontend/src/kraefte/useStatusQuittung.ts, src/status_ruecknahme.rs]
 ---
 
 ## Überblick
@@ -44,6 +44,9 @@ Gekoppelt wird nur an eine Einheit, die noch nicht aufgelöst ist.
 1. Unten „Status“ wählen. Oben steht der aktuelle Status der Einheit mit „seit“.
 2. Darunter steht je Status des Statuskatalogs eine Fläche. Die passende antippen. Die
    Einsatzleitung sieht den neuen Status sofort, das Einsatztagebuch hält den Wechsel fest.
+3. Unten erscheint kurz „Rettungsstaffel: S2 → S3 · Rückgängig“. Daneben getippt? „Rückgängig“
+   antippen: Die Einheit steht wieder auf dem Status davor. Das geht nur direkt danach (höchstens
+   zehn Minuten) und nur mit dem Handy, das gewechselt hat.
 
 Führt die Einheit ein Fahrzeug, ergibt sich ihr Status aus dem Fahrzeug: Das Handy zeigt ihn
 dann nur an.
