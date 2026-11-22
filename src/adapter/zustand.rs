@@ -19,6 +19,10 @@ pub const WARTEZEIT_START_S: i64 = 60;
 /// Längste Wartezeit nach Fehlschlägen (ein längeres Intervall gilt trotzdem).
 pub const WARTEZEIT_MAX_S: i64 = 15 * 60;
 
+/// Ab wann eine Störung den Admins gemeldet wird (LLH-2026): so lange am Stück seit
+/// `fehler_seit`. Bei den Wartezeiten 1, 2, 4, 8, 15 Minuten etwa nach dem fünften Fehlversuch.
+pub const MELDESCHWELLE_GESTOERT_S: i64 = 30 * 60;
+
 wire_enum! {
     /// Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -158,6 +162,38 @@ pub fn nach_fehlschlag(
     }
 }
 
+/// Was nach einem Fehlschlag den Admins zu melden ist (LLH-2026), oder `None`. `gemeldet` ist
+/// der Merker der laufenden Störung (`adapter.gemeldet`), `jetzt` im Format `zeit::FORMAT`.
+///
+/// Anhalten meldet „braucht Eingriff“, auch nach einer schon gemeldeten Störung (Eskalation),
+/// aber nur einmal. Eine vorübergehende Störung meldet sich erst ab
+/// [`MELDESCHWELLE_GESTOERT_S`] und nur, wenn noch nichts gemeldet ist. Ein gesperrter
+/// Geheimnisspeicher meldet nie: ihn behebt der Betrieb des Servers, kein Admin der Org.
+pub fn meldung_nach_fehlschlag(
+    fehler: AdapterFehler,
+    nach: &NachFehlschlag,
+    gemeldet: Option<AdapterGemeldet>,
+    jetzt: &str,
+) -> Option<AdapterGemeldet> {
+    if fehler == AdapterFehler::GeheimnisspeicherGesperrt {
+        return None;
+    }
+    match nach {
+        NachFehlschlag::Anhalten { .. } => {
+            (gemeldet != Some(AdapterGemeldet::Eingriff)).then_some(AdapterGemeldet::Eingriff)
+        }
+        NachFehlschlag::Wiederholen { fehler_seit, .. } => {
+            if gemeldet.is_some() {
+                return None;
+            }
+            let seit = zeit::parse(fehler_seit)?;
+            let jetzt = zeit::parse(jetzt)?;
+            (jetzt - seit >= Duration::seconds(MELDESCHWELLE_GESTOERT_S))
+                .then_some(AdapterGemeldet::Gestoert)
+        }
+    }
+}
+
 /// Die Angaben einer Zeile, aus denen der Zustand folgt.
 #[derive(Debug, Clone, Copy)]
 pub struct ZustandAngaben<'a> {
@@ -190,6 +226,69 @@ pub fn zustand_von(a: ZustandAngaben<'_>) -> AdapterZustand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn wiederholen(seit: &str) -> NachFehlschlag {
+        NachFehlschlag::Wiederholen {
+            fehler_seit: seit.into(),
+            fehlversuche: 3,
+            naechster_abruf_at: "2026-11-21 11:00:00".into(),
+        }
+    }
+
+    fn anhalten() -> NachFehlschlag {
+        NachFehlschlag::Anhalten {
+            fehler_seit: "2026-11-21 10:00:00".into(),
+            fehlversuche: 1,
+        }
+    }
+
+    #[test]
+    fn anhalten_meldet_eingriff_einmal() {
+        let jetzt = "2026-11-21 10:00:00";
+        let f = AdapterFehler::Abgelehnt;
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &anhalten(), None, jetzt),
+            Some(AdapterGemeldet::Eingriff)
+        );
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &anhalten(), Some(AdapterGemeldet::Gestoert), jetzt),
+            Some(AdapterGemeldet::Eingriff)
+        );
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &anhalten(), Some(AdapterGemeldet::Eingriff), jetzt),
+            None
+        );
+    }
+
+    #[test]
+    fn gestoert_erst_ab_dreissig_minuten() {
+        let f = AdapterFehler::Verbindung;
+        let n = wiederholen("2026-11-21 10:00:00");
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &n, None, "2026-11-21 10:29:59"),
+            None
+        );
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &n, None, "2026-11-21 10:30:00"),
+            Some(AdapterGemeldet::Gestoert)
+        );
+        for schon in [AdapterGemeldet::Gestoert, AdapterGemeldet::Eingriff] {
+            assert_eq!(
+                meldung_nach_fehlschlag(f, &n, Some(schon), "2026-11-21 11:30:00"),
+                None
+            );
+        }
+        assert_eq!(MELDESCHWELLE_GESTOERT_S, 30 * 60);
+    }
+
+    #[test]
+    fn gesperrter_speicher_meldet_nie() {
+        let f = AdapterFehler::GeheimnisspeicherGesperrt;
+        assert_eq!(
+            meldung_nach_fehlschlag(f, &anhalten(), None, "2026-11-21 10:00:00"),
+            None
+        );
+    }
 
     #[test]
     fn wartezeit_verdoppelt_bis_fuenfzehn_minuten_und_nie_unter_dem_intervall() {
