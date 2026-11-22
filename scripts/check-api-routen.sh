@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0082, Wurzel-`AGENTS.md`,
+# „Bezeichner-Sprache“). Herleitung:
+# `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
+#
+# Gelesen werden die registrierten Pfade:
+#   - `src/app.rs`: Zeilen, die mit `.route("/api…"` oder mit `"/api…"` beginnen (die
+#     mehrzeilige Form), bis zur ersten Zeile `#[cfg(test)]`;
+#   - `src/public_api/**/*.rs`: `path = "/api…"` (utoipa);
+#   - `src/**/*.rs`: Konstanten `…_PFAD: &str = "/api…"`.
+# Jedes feste Segment (nicht `{…}`) wird im Glossar `scripts/api-routen-woerter.tsv`
+# nachgeschlagen (Spalten `segment<TAB>deutsch`).
+#
+# Rot ist:
+#   - ein registrierter Pfad mit einem Segment außerhalb des Glossars, der nicht im Bestand
+#     `scripts/api-routen-bestand.txt` steht;
+#   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
+#     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
+#   - ein Bestandseintrag, der auf `origin/alpha` fehlt (der Bestand wächst nicht). Ohne den Ref
+#     (flacher Checkout) laut übersprungen; trägt `origin/alpha` die Datei noch nicht, entfällt
+#     der Vergleich;
+#   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
+#     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
+#     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
+#
+# Grenze: Eine Route, deren Pfad weder als Literal am Zeilenanfang noch als `…_PFAD`-Konstante
+# steht (etwa aus `format!`), sieht der Wächter nicht. `src/app.rs` hat heute keine.
+#
+# Abhilfe: das Segment englisch benennen und, falls neu, mit dem deutschen Begriff ins Glossar
+# eintragen. Nach einem Umbenennungspaket den Bestand neu schreiben:
+#   scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt
+#
+# Aufruf: scripts/check-api-routen.sh [<repo-wurzel>] [--bestand]   (Selbsttest: *.test.sh daneben)
+set -euo pipefail
+export LC_ALL=C
+
+modus=pruefen
+ROOT=""
+for arg in "$@"; do
+  case "$arg" in
+    --bestand) modus=bestand ;;
+    *) ROOT="$arg" ;;
+  esac
+done
+ROOT="${ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+GLOSSAR="$ROOT/scripts/api-routen-woerter.tsv"
+BESTAND_REL="scripts/api-routen-bestand.txt"
+BESTAND="$ROOT/$BESTAND_REL"
+
+registrierte_pfade() {
+  {
+    awk '
+      /^[[:space:]]*#\[cfg\(test\)\]/ { exit }
+      match($0, /^[[:space:]]*(\.route\()?"\/api[^"]*"/) {
+        s = substr($0, RSTART, RLENGTH)
+        sub(/^[^"]*"/, "", s)
+        sub(/"$/, "", s)
+        print s
+      }
+    ' "$ROOT/src/app.rs"
+    if [ -d "$ROOT/src/public_api" ]; then
+      grep -rhoE 'path = "/api[^"]*"' --include='*.rs' "$ROOT/src/public_api" || true
+    fi
+    grep -rhoE '_PFAD: &str = "/api[^"]*"' --include='*.rs' "$ROOT/src" || true
+  } | sed -E 's/^[^"]*"(\/api[^"]*)"$/\1/' | sort -u
+}
+
+glossar_zeilen() { # Glossar ohne Kommentare und Leerzeilen
+  awk '!/^[[:space:]]*(#|$)/' "$GLOSSAR"
+}
+
+# Pfade mit mindestens einem Segment außerhalb des Glossars, je Zeile `<pfad><TAB><segment>`.
+unbekannte_segmente() {
+  registrierte_pfade | awk -F'\t' -v glossar="$1" '
+    BEGIN {
+      while ((getline zeile < glossar) > 0) {
+        if (zeile ~ /^[[:space:]]*(#|$)/) continue
+        split(zeile, f, "\t")
+        bekannt[f[1]] = 1
+      }
+    }
+    {
+      n = split($0, seg, "/")
+      for (i = 1; i <= n; i++) {
+        if (seg[i] == "" || seg[i] ~ /^\{.*\}$/) continue
+        if (!(seg[i] in bekannt)) print $0 "\t" seg[i]
+      }
+    }
+  '
+}
+
+if [ "$modus" = bestand ]; then
+  unbekannte_segmente "$GLOSSAR" | cut -f1 | sort -u
+  exit 0
+fi
+
+fehler=0
+melde() {
+  echo "check-api-routen: $*" >&2
+  fehler=$((fehler + 1))
+}
+
+# 1. Das Glossar selbst.
+glossar_befunde="$(glossar_zeilen | awk -F'\t' -v q="'" '
+  NF != 2 { print "Glossarzeile ohne genau zwei Spalten: " $0; next }
+  $1 !~ /^[a-z0-9]+([.-][a-z0-9]+)*$/ { print "Segment " q "" $1 "" q " ist nicht klein, mit - oder . verbunden" }
+  vorher != "" && $1 <= vorher { print "Glossar nicht nach segment sortiert oder doppelt: " q "" $1 "" q " nach " q "" vorher "" q "" }
+  { vorher = $1 }
+  $2 != "-" && ($2 in deutsch) { print "deutscher Begriff " q "" $2 "" q " doppelt: " deutsch[$2] " und " $1 }
+  $2 != "-" { deutsch[$2] = $1 }
+')"
+if [ -n "$glossar_befunde" ]; then
+  while IFS= read -r z; do melde "$z"; done <<< "$glossar_befunde"
+fi
+
+# 2. Registrierte Pfade gegen Glossar und Bestand.
+unbekannt="$(unbekannte_segmente "$GLOSSAR")"
+deutsch_pfade="$(printf '%s\n' "$unbekannt" | cut -f1 | awk 'NF' | sort -u)"
+bestand="$(awk 'NF' "$BESTAND" 2> /dev/null | sort -u || true)"
+
+# Mengenvergleich mit `comm`, nicht je Zeile `grep -q`: unter `pipefail` zählte ein `grep -q`,
+# das die Pipe vor dem Ende schließt, als Fehlschlag (SIGPIPE beim `printf`).
+ohne_bestand="$(comm -23 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '%s\n' "$bestand" | awk 'NF'))"
+if [ -n "$ohne_bestand" ]; then
+  while IFS="$(printf '\t')" read -r pfad seg; do
+    melde "$pfad: Segment '$seg' steht nicht im Glossar (scripts/api-routen-woerter.tsv)." \
+      "Englisch benennen und den Begriff eintragen (ADR-0082)."
+  done <<< "$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NR == FNR { neu[$0] = 1; next } ($1 in neu)' \
+    <(printf '%s\n' "$ohne_bestand") -)"
+fi
+
+veraltet="$(comm -13 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '%s\n' "$bestand" | awk 'NF'))"
+if [ -n "$veraltet" ]; then
+  while IFS= read -r pfad; do
+    melde "$pfad: Bestandseintrag veraltet (nicht registriert oder schon englisch);" \
+      "Zeile aus $BESTAND_REL löschen."
+  done <<< "$veraltet"
+fi
+
+# 3. Der Bestand wächst nicht gegenüber origin/alpha.
+if git -C "$ROOT" rev-parse --verify --quiet 'refs/remotes/origin/alpha^{commit}' > /dev/null; then
+  if alt="$(git -C "$ROOT" show "origin/alpha:$BESTAND_REL" 2> /dev/null)"; then
+    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
+    if [ -n "$neu_zeilen" ]; then
+      while IFS= read -r pfad; do
+        melde "$pfad: neu im Bestand gegenüber origin/alpha; der Bestand darf nur schrumpfen" \
+          "(ADR-0082). Die Route englisch benennen."
+      done <<< "$neu_zeilen"
+    fi
+  fi
+else
+  echo "check-api-routen: Bestandsvergleich übersprungen: origin/alpha fehlt."
+fi
+
+if [ "$fehler" -gt 0 ]; then
+  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0082)." >&2
+  exit 1
+fi
+echo "OK: $(registrierte_pfade | wc -l | tr -d ' ') API-Routen geprüft, $(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ') im deutschen Bestand."
