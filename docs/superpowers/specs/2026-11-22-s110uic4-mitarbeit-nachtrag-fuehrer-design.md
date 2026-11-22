@@ -27,8 +27,8 @@ Die Rolle, die die Einsatzleitung an N gesetzt hat, geht also verloren, ohne das
 geändert hat.
 
 **Erfolg:** Nach dem Aufrüsten von O hat die Person an O und an N wieder `mitarbeit`, ohne
-Handgriff. Eine Rolle, die die Einsatzleitung an O nach der Übernahme bewusst gesetzt hat,
-bleibt unangetastet.
+Handgriff. Eine Rolle, die die Einsatzleitung an O gesetzt hat, nachdem O die Rolle `mitarbeit`
+kennt, bleibt unangetastet, und N folgt ihr.
 
 ## Ziele, Nicht-Ziele, Anti-Ziele
 
@@ -46,8 +46,9 @@ bleibt unangetastet.
 
 **Anti-Ziele** (wäre ein Fehlschlag, auch wenn es technisch läuft)
 - Eine gekoppelte Instanz kann am Führer beliebige Beobachter zu Mitarbeit anheben.
-- Ein Nachtrag überschreibt eine Rolle, die die Einsatzleitung an O nach der Übernahme bewusst
-  gesetzt hat, auch wenn sie dabei `beobachter` gewählt hat.
+- Ein Nachtrag überschreibt eine Rolle, die die Einsatzleitung an O gesetzt hat, als O
+  `mitarbeit` schon kannte, auch wenn sie dabei `beobachter` gewählt hat.
+- O und N bleiben nach einem Nachtrag uneinig (das war der Grund gegen B).
 - Ein Nachtrag wirkt mehr als einmal (später wiederholt, nachdem O die Rolle geändert hat).
 
 ## Ansätze
@@ -112,36 +113,70 @@ sie, `paket.rs` Kopf):
 
 Beide Richtungen tragen beide Felder: N kann meldende oder erreichte Seite sein. N schickt
 offene Nachträge in jeder Anfrage (`abgleich_einmal`) und jeder Antwort (`handle_abgleich`) an
-diese Kopplung, nur wenn das Gegenüber die Fähigkeit meldet. `SpiegelPaket::check` begrenzt die
+diese Kopplung, nur wenn das Gegenüber die Fähigkeit meldet. Unquittierte gehen im nächsten
+Abgleich erneut hinaus; die Annahme ist dafür gebaut (D4, Bedingung 5). `SpiegelPaket::check` begrenzt die
 Anzahl (Höchstzahl wie bei Hinweisen: Wert dem Builder überlassen, ein Paket muss die
 vorhandenen Grenzen weiter einhalten). Quittungen löschen die Ausgangszeilen
 (Muster `hinweis::quittiert`).
 
 ### D4 Annahme (O, Führer)
 
+**Grenze „O kennt die Rolle“:** Beim eigenen Wechsel 0 → 1 in `repo::save_rolle_mitarbeit`
+(O lernt, dass N die Rolle kennt) merkt O sich den höchsten Stand des Logs (`einsatz_aenderung.stand`
+ist ein globaler Zähler, `AUTOINCREMENT`) als neue Spalte
+`instanz_kopplung.mitarbeit_grenze_stand` (dieselbe Migration wie D2). Was an O vor dieser Grenze
+an einer Mitgliedschaft geschah, konnte `mitarbeit` nicht ausdrücken und gilt nicht als bewusste
+Wahl. *Eigene Festlegung* (Befund aus dem Gegenlesen): Eine Bearbeitung an der noch alten O,
+etwa der Führungsstelle, hat `beobachter` nur mitgeschickt; N hat dabei `mitarbeit` behalten.
+Mit der Grenze bei `uebernommen_stand` (erster Entwurf) hätte O den Nachtrag abgelehnt und beide
+wären uneinig geblieben.
+
 In der Schreibtransaktion des Abgleichs, nach den Zeilen (`uebernehme_alle`). Für jeden
-Nachtrag hebt O die Mitgliedschaft nur an, wenn **alle** gelten:
+Nachtrag:
+
+0. **Kennt O die Fähigkeit von N noch nicht** (`gegenueber_rolle_mitarbeit = 0` an O, etwa weil
+   O meldet und die Antwort mit der Fähigkeit noch nicht verarbeitet hat): nichts tun, **nicht
+   quittieren**. Sonst ginge die angehobene Rolle über `herabstufen_fuer` als `beobachter` an N,
+   und N (Fähigkeit 1) stufte wirklich herab. N schickt den Nachtrag im nächsten Abgleich erneut.
+
+Sonst hebt O die Mitgliedschaft an, wenn **alle** gelten:
 
 1. Der Einsatz mit dieser `kennung` ist hier eigen (`einsatz.spiegel = 0`).
 2. Die Führung kam von dieser Kopplung: `einsatz_fuehrung.herkunft_kopplung_id = kopplung.id`.
    Die Spalte setzt `spiegel::fuehrung::werde_fuehrer` bei jedem Übergang Spiegel → Führer,
-   also bei Rückgabe, Übergabe und Notübernahme gleichermaßen; sie bestand schon an der alten O.
+   also bei Rückgabe, Übergabe und Notübernahme gleichermaßen; sie bestand schon an der alten O
+   (Migration 0321).
 3. Die Mitgliedschaft lässt sich auflösen: über `gegen`, sonst über `spiegel_herkunft` (O hat
-   N's Schlüssel als `fremder_schluessel`, als O noch Spiegel war).
+   den Schlüssel von N als `fremder_schluessel`, aus der Zeit, als O Spiegel war).
 4. Sie steht hier auf `beobachter`.
-5. **Seit der Übernahme hier unverändert:** kein Eintrag in `einsatz_aenderung` für diese Zeile
-   mit `stand > einsatz_fuehrung.uebernommen_stand`. Hat die Einsatzleitung an O sie nach der
-   Übernahme bearbeitet (auch auf `beobachter`), bleibt sie. Das deckt auch einen verspäteten
-   oder wiederholten Nachtrag.
+5. **Seit der Grenze unverändert:** kein Eintrag in `einsatz_aenderung` für diese Zeile mit
+   `stand > instanz_kopplung.mitarbeit_grenze_stand`. Ist die Grenze leer (die Kopplung kannte
+   die Fähigkeit schon vor dieser Migration, Nachträge kann es dann nicht geben), gilt 5 als
+   nicht erfüllt. Hat die Einsatzleitung an O sie bearbeitet,
+   nachdem O die Rolle kannte (auch auf `beobachter`), bleibt sie. Das deckt auch einen
+   wiederholten Nachtrag: Nach dem Anheben liegt die Zeile über der Grenze.
 
 Dann `UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'mitarbeit'` über den gewöhnlichen
-Trigger: Die Änderung landet im Log und geht im nächsten Abgleich als `mitarbeit` an N (die das
-übernimmt, weil O die Fähigkeit meldet). Jeder Nachtrag wird quittiert, angehoben oder nicht.
+Trigger: Die Änderung landet im Log und geht im nächsten Abgleich als `mitarbeit` an N.
+
+**Abgelehnt, aber auflösbar** (1–3 gelten, 4 oder 5 nicht): O legt die Zeile neu ins Log (wie
+`resend_mitarbeit`: alte Logzeile weg, neue mit frischem Stand), damit N den Wert von O
+übernimmt. N kennt die Fähigkeit von O, `keep_mitarbeit` greift also nicht mehr. So bleiben
+beide nie uneinig. Abgelehnt, weil 1–3 nicht gelten: nichts tun.
+
+Jeder Nachtrag außer Fall 0 wird quittiert.
 
 Die Migration 0358 baut `einsatz_mitgliedschaft` vor dem Anlegen der Trigger neu; das Aufrüsten
-von O schreibt also keine Logzeilen, und Bedingung 5 gilt nach dem Aufrüsten weiter. Der Test
-belegt das mit einem Stand vor 0358 nicht, weil er das Aufrüsten über die Fähigkeit nachstellt
-(D6); die Begründung steht im Code-Kommentar.
+von O schreibt also keine Logzeilen.
+
+**Auslieferung:** LLH-1817 ist noch nicht auf `main`. Der Wechsel 0 → 1 geschieht nur einmal;
+eine Instanz, die mit einem Stand ohne diesen Nachtrag aufgerüstet wurde, merkt ihn nie vor.
+Deshalb muss diese Änderung im selben Release wie LLH-1817 hinausgehen, also vor dem nächsten
+Schnitt von `alpha` nach `main` gemergt sein.
+
+**Außerhalb:** Die Verwahrung (`lebensende`, nach der Nachbereitung) ruft `werde_fuehrer` nicht
+und löscht `spiegel_herkunft`; Bedingungen 2 und 3 schlagen dort fehl. Gewollt: Nach der
+Nachbereitung erfasst niemand mehr, die Rolle spielt keine Rolle. *Eigene Festlegung.*
 
 ### D5 Spur
 
@@ -151,18 +186,29 @@ eine Mitgliedschaftsänderung schreibt auch sonst keinen. *Eigene Festlegung.*
 
 ### D6 Test mit echtem Rollentausch
 
-In `src/instanz/spiegel/tests.rs` (dort stehen die Mitarbeit-Tests von LLH-1817 mit zwei
-Instanzen): Instanz N führt, Mitgliedschaft `mitarbeit`; O ohne Fähigkeit (Spalte 0). N gibt
-die Führung an O zurück (echter Wechsel über die Führung, nicht per SQL gesetzt), O führt mit
-`beobachter`, N hält `mitarbeit`. Dann meldet O die Fähigkeit (Wechsel 0 → 1 auf beiden Seiten)
-und es folgt ein Abgleich. Erwartet:
+In `tests/instanz_fuehrung.rs`: Dort laufen zwei echte Instanzen mit Führung über HTTP
+(`gekoppelt_mit`, `elw_meldet`, `abgleichen`, `hub_uebernimmt_mit_unterschrift`). Die
+Mitarbeit-Tests von LLH-1817 in `src/instanz/spiegel/tests.rs` bauen nur zwei nackte Pools ohne
+Akten und können keinen Führungswechsel. *Eigene Festlegung.*
+
+Eine alte Instanz gibt es im Test nicht; „alt“ heißt dort: Die Fähigkeit ist auf beiden Seiten 0
+und wird nach jedem Melden wieder auf 0 gesetzt, bis zum „Aufrüsten“ (wie es genau gelingt,
+entscheidet der Builder; der Führungswechsel selbst läuft echt über die Routen). Ablauf: Die
+Instanz N führt, Mitgliedschaft `mitarbeit`. N gibt die Führung an O zurück, O führt mit
+`beobachter`, N hält `mitarbeit`. Dann „Aufrüsten“, melden, abgleichen. Erwartet:
 
 - O hat `mitarbeit`, N hat `mitarbeit`, der Ausgang an N ist leer.
-- Gegenprobe 1: Bearbeitet die Einsatzleitung an O die Mitgliedschaft vor dem Abgleich (auf
-  `beobachter` mit anderer Führungsfunktion), bleibt sie `beobachter`, und N folgt.
-- Gegenprobe 2: Ein Nachtrag über eine Kopplung, von der die Führung nicht kam, hebt nicht an.
-- Dieselbe Folge mit Notübernahme statt Rückgabe, wenn die Testhelfer das ohne großen Umbau
-  hergeben (Builder entscheidet; sonst ein Satz im Plan, warum Bedingung 2 beide abdeckt).
+- Gegenprobe 1: Bearbeitet die Einsatzleitung an der noch alten O die Führungsfunktion, wird
+  trotzdem angehoben (vor der Grenze).
+- Gegenprobe 2: Bearbeitet die Einsatzleitung an O die Mitgliedschaft nach der Grenze (auf
+  `beobachter`), bleibt sie `beobachter`, und N folgt (Neu-Log aus D4).
+- Gegenprobe 3: Ein Nachtrag, während O die Fähigkeit von N noch nicht kennt, bleibt
+  unquittiert und wirkt im nächsten Abgleich.
+- Bedingung 2 (Führung von anderer Kopplung) als Unit-Test an der Annahme, falls ein dritter
+  Partner im Integrationstest zu aufwendig ist.
+- Dieselbe Folge mit Notübernahme statt Rückgabe, wenn die Helfer sie ohne großen Umbau hergeben
+  (`hub_uebernimmt_mit_unterschrift` liegt vor); sonst ein Satz im Plan, warum Bedingung 2 beide
+  abdeckt.
 
 ### D7 Doku
 
@@ -182,4 +228,5 @@ und es folgt ein Abgleich. Erwartet:
 ## Prüfung
 
 Review nötig (Eingaben von außen: Instanzkopplung; Berechtigung: Rolle am Führer). Er prüft
-besonders die Anti-Ziele: keine Anhebung außer unter D4 1–5, keine Wiederholung.
+besonders die Anti-Ziele: keine Anhebung außer unter D4 0–5, keine Wiederholung, kein
+dauerhaftes Auseinanderlaufen.
