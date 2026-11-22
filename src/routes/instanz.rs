@@ -506,6 +506,11 @@ async fn check_art(
         if alt.art() != code.art && repo::is_art_fest(conn, alt.id).await? {
             return Ok(Some(AppError::Conflict(repo::art_konflikt(alt.art()))));
         }
+        // Vor dem Verbrauch des Codes: sonst scheiterte das Anlegen der Zuordnung danach am
+        // selben Grund, ginge als 401 hinaus und kostete den Code (LLH-2019).
+        if let Some(voll) = repo::check_org_platz(conn, alt.id).await? {
+            return Ok(Some(voll));
+        }
     }
     if a.nur_vor_ort && code.art != InstanzKopplungArt::VorOrt {
         return Ok(Some(AppError::Conflict(

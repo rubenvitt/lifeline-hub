@@ -261,7 +261,10 @@ zehn Minuten. Eine Kopplung, deren erste Meldung 15 Minuten ausbleibt, verfällt
 
 Ein Code koppelt genau die Organisation des ausstellenden Admins mit der des einlösenden.
 Weitere Organisationen kommen mit eigenem Code dazu; zwischen zwei Installationen gibt es eine
-Kopplung. Jede Organisation sieht und widerruft nur ihre eigene Zuordnung.
+Kopplung. Jede Organisation sieht und widerruft nur ihre eigene Zuordnung. Eine Kopplung trägt
+höchstens 256 Organisationen zugleich; darüber weist das Einlösen ab mit „Mit dieser Instanz sind
+schon 256 Organisationen gekoppelt, mehr trägt eine Kopplung nicht. Erst eine Zuordnung
+widerrufen.“
 
 ### Widerruf
 
