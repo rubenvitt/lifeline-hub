@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Rückfrage neues Ziel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:760px;position:relative;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;overflow:hidden}
+.hinten{position:absolute;inset:0;padding:100px 260px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;opacity:.5}
+.balken{background:#0a0c0e;border:1px solid #2e343a}
+.maske{position:absolute;inset:0;background:rgba(5,6,8,.72);display:flex;align-items:center;justify-content:center;gap:48px}
+.dialog{width:480px;background:#14171b;border:1px solid #2e343a;display:flex;flex-direction:column}
+.dkopf{padding:14px 16px;border-bottom:1px solid #22262b}
+h2{margin:0;font-size:15px;font-weight:600}
+.dkoerper{padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5}
+.dkoerper p{margin:0}
+.dfuss{padding:12px 16px;border-top:1px solid #22262b;display:flex;justify-content:flex-end;gap:8px}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.primaer{background:#1f5f99;border-color:#1f5f99}
+.knopf.gefahr{background:#a61d24;border-color:#a61d24}
+.vergleich{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;padding:8px 10px;background:#0a0c0e;border:1px solid #22262b}
+.etikett{color:#9aa2ab}
+ul{margin:0;padding-left:18px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="hinten" aria-hidden="true">
+    <div class="balken" style="height:56px"></div>
+    <div class="balken" style="height:180px"></div>
+    <div class="balken" style="height:260px"></div>
+  </div>
+  <div class="maske">
+    <div class="dialog" role="alertdialog" aria-labelledby="t1" aria-describedby="b1">
+      <div class="dkopf"><h2 id="t1">Neues Ziel: Geheimnisse werden entfernt</h2></div>
+      <div class="dkoerper" id="b1">
+        <div class="vergleich">
+          <span class="etikett">bisher</span><span class="mono">alarm.leitstelle.example</span>
+          <span class="etikett">neu</span><span class="mono">alarm2.leitstelle.example</span>
+        </div>
+        <p>Die gespeicherten Geheimnisse gingen sonst an einen anderen Server. Nach dem Speichern sind sie entfernt und müssen neu gesetzt werden:</p>
+        <ul><li>API-Schlüssel</li></ul>
+      </div>
+      <div class="dfuss">
+        <button class="knopf" type="button">Abbrechen</button>
+        <button class="knopf primaer" type="button">Speichern und entfernen</button>
+      </div>
+    </div>
+
+    <div class="dialog" role="alertdialog" aria-labelledby="t2" aria-describedby="b2">
+      <div class="dkopf"><h2 id="t2">API-Schlüssel entfernen?</h2></div>
+      <div class="dkoerper" id="b2">
+        <p>Der Wert ist danach weg und lässt sich nicht wiederherstellen. Weil der Platz Pflicht ist, hält „Alarmquelle Leitstelle“ beim nächsten Abruf an, bis ein neuer gesetzt ist.</p>
+      </div>
+      <div class="dfuss">
+        <button class="knopf" type="button">Abbrechen</button>
+        <button class="knopf gefahr" type="button">Entfernen</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

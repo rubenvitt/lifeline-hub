@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anbindungen mit Adaptern</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+a{color:#7fb6e8}a:hover{color:#a9cff2}
+.schirm{width:1280px;height:760px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:44px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;box-sizing:border-box;flex-shrink:0}
+.markenzelle{width:56px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.koerper{display:flex;flex:1;min-height:0}
+.nav{width:220px;border-right:1px solid #22262b;background:#0a0c0e;padding:16px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;padding:10px 16px 6px}
+.navlink{display:block;padding:7px 16px;font-size:13px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.navlink.aktiv{background:#16191d;color:#e8ebee;border-left-color:#4d94d6}
+.inhalt{flex:1;min-width:0;padding:0 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.seitenkopf{height:56px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:18px;font-weight:600}
+.platz{flex:1}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.primaer{background:#1f5f99;border-color:#1f5f99}
+.paneel{background:#0a0c0e;border:1px solid #2e343a}
+.paneelkopf{height:36px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #22262b;gap:8px}
+h2{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#9aa2ab}
+.anzahl{font-size:11px;color:#838b94}
+.zeile{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-bottom:1px solid #22262b}
+.zeile:last-child{border-bottom:0}
+.zeit{color:#838b94;font-size:12px}
+.chip{display:inline-flex;align-items:center;height:20px;padding:0 6px;font-size:11px;border:1px solid}
+.chip.bedien{background:#0b1724;color:#7fb6e8;border-color:#4d94d6}
+.chip.achtung{background:#1c1705;color:#e8cc3a;border-color:#e8cc3a}
+.chip.neutral{background:#111417;color:#9aa2ab;border-color:#626a73}
+.hinweis{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:#1c1705;border:1px solid #e8cc3a;font-size:13px}
+.hmarke{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#e8cc3a;white-space:nowrap;font-weight:600}
+.zu{height:64px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:13px;font-weight:600">Verwaltung</span>
+    <span class="zeit">DRK Kreisverband Musterstadt</span>
+  </div>
+  <div class="koerper">
+    <nav class="nav" aria-label="Verwaltung">
+      <div class="augenbraue">Einstellungen</div>
+      <a class="navlink" href="#">Organisation</a>
+      <a class="navlink" href="#">Anmeldewege</a>
+      <a class="navlink" href="#">Lagemonitore</a>
+      <a class="navlink aktiv" href="#" aria-current="page">Anbindungen</a>
+      <a class="navlink" href="#">Instanzkopplung</a>
+    </nav>
+    <main class="inhalt">
+      <div class="seitenkopf">
+        <h1>Anbindungen</h1>
+        <div class="platz"></div>
+        <button class="knopf primaer" type="button">Anbindung anlegen</button>
+      </div>
+      <section class="paneel" aria-labelledby="zugaenge">
+        <div class="paneelkopf"><h2 id="zugaenge">Zugänge</h2><span class="anzahl mono">2</span></div>
+        <div class="zu zeile"><span class="zeit">… Zugänge wie bisher …</span></div>
+      </section>
+      <section class="paneel" aria-labelledby="einwurf">
+        <div class="paneelkopf"><h2 id="einwurf">Einwurf</h2><span class="anzahl mono">1</span></div>
+        <div class="zu zeile" style="height:48px"><span class="zeit">… Einwurf-Zugänge wie bisher …</span></div>
+      </section>
+      <section class="paneel" aria-labelledby="adapter">
+        <div class="paneelkopf"><h2 id="adapter">Adapter</h2><span class="anzahl mono">3</span><span class="platz"></span><button class="knopf" type="button">Adapter anlegen</button></div>
+        <div class="hinweis" role="status" style="margin:10px 12px">
+          <span class="hmarke">Geheimnisspeicher</span>
+          <span>Schlüssel fehlt: Geheimnisse lassen sich nicht setzen, Adapter mit Geheimnis rufen nicht ab. Einzurichten über <span class="mono">LIFELINE_GEHEIMNIS_SCHLUESSEL</span>.</span>
+        </div>
+        <div class="zeile">
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+            <span style="display:flex;gap:8px;align-items:center"><a href="Main.dc.html" style="font-size:13px">Alarmquelle Leitstelle</a><span class="chip bedien">gestört</span></span>
+            <span class="zeit">Beispiel-Alarmquelle · zuletzt erfolgreich <span class="mono">09:37</span> · letzter Fehler Zeitüberschreitung <span class="mono">09:51</span></span>
+          </div>
+        </div>
+        <div class="zeile">
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+            <span style="display:flex;gap:8px;align-items:center"><a href="#" style="font-size:13px">Stammdaten HiOrg</a><span class="chip achtung">braucht Eingriff</span></span>
+            <span class="zeit">Beispiel-Alarmquelle · angehalten: Zugang abgelehnt (401) · zuletzt erfolgreich <span class="mono">20.11. 22:10</span></span>
+          </div>
+        </div>
+        <div class="zeile">
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+            <span style="display:flex;gap:8px;align-items:center"><a href="#" style="font-size:13px">Probeabruf Übung</a><span class="chip neutral">aus</span></span>
+            <span class="zeit">Beispiel-Alarmquelle · noch nie abgerufen</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
