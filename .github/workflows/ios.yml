@@ -12,11 +12,14 @@
 #   oder eine hängende Verarbeitung bei Apple hält weder Release noch Deployment auf, es fehlt nur
 #   der TestFlight-Build dieses Tags (wie `desktop-alpha`).
 # - `workflow_dispatch` als Handstart, etwa nach einer Störung bei Apple. Ein Tag von vor LLH-1988
-#   trägt noch das alte Skript, das Alpha abweist.
+#   trägt noch das alte Skript, das Alpha abweist. Mit `stand` baut der Handstart statt des Tags
+#   einen Branch oder Commit (Vorab-Build, etwa solange `alpha` nicht released); der Tag gibt dann
+#   nur Kanal und Gruppen vor und muss zur Workspace-Version dieses Stands passen.
 #
 # Andere Vorabkanäle (`-rc.1`) weist das Skript ab. Signiert wird über den
 # App-Store-Connect-API-Schlüssel (APP_STORE_CONNECT_*); auf dem Runner liegt kein Zertifikat.
-# Runner und Xcode wie ios-pruefung.yml: Xcode 16.4 auf macos-15.
+# Runner und Xcode wie ios-pruefung.yml: Xcode 26.6 auf macos-26. App Store Connect nimmt seit dem
+# 28.04.2026 nur Builds mit Xcode 26 und dem iOS-26-SDK an, eine Beta von Xcode nie (LLH-1988).
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
 name: iOS-App (TestFlight)
@@ -34,6 +37,11 @@ on:
         description: 'Release-Tag, dessen App zu TestFlight soll, z. B. v1.0.0-alpha.196, v1.0.0-beta.3 oder v1.0.0'
         required: true
         type: string
+      stand:
+        description: 'Optional: Branch oder Commit statt des Tags bauen (Vorab-Build); der Tag gibt dann Kanal und Gruppen vor'
+        required: false
+        default: ''
+        type: string
 
 # Least privilege: der Lauf liest nur das Repository; hochgeladen wird zu Apple, nicht zu GitHub.
 permissions:
@@ -42,7 +50,7 @@ permissions:
 jobs:
   testflight:
     name: TestFlight
-    runs-on: macos-15
+    runs-on: macos-26
     # Archiv plus Upload; auf die Verarbeitung bei Apple wartet erst `verteilen` (auf Ubuntu).
     timeout-minutes: 60
     outputs:
@@ -53,21 +61,26 @@ jobs:
       group: ios-testflight-${{ inputs.tag }}
       cancel-in-progress: false
     env:
-      XCODE_APP: /Applications/Xcode_16.4.app
+      XCODE_APP: /Applications/Xcode_26.6.app
     steps:
       # Bei einem Handstart ist der Tag freie Eingabe: erst gegen das Muster prüfen, dann an
       # `actions/checkout` geben. Den Kanal prüft danach das Skript.
       - name: Tag prüfen
         env:
           ROH_TAG: ${{ inputs.tag }}
+          ROH_STAND: ${{ inputs.stand }}
         run: |
           if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
             echo "FEHLER: '$ROH_TAG' ist kein zulässiger Release-Tag (erwartet: vX.Y.Z[-vorab])." >&2
             exit 1
           fi
+          if [ -n "$ROH_STAND" ] && ! printf '%s' "$ROH_STAND" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]*$'; then
+            echo "FEHLER: '$ROH_STAND' ist kein zulässiger Branch- oder Commit-Name." >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.stand || inputs.tag }}
           persist-credentials: false
       - name: Xcode wählen
         run: |
@@ -114,24 +127,31 @@ jobs:
     permissions:
       contents: read
     steps:
-      # Den Tag hat der Job `testflight` schon gegen das Muster geprüft.
+      # Tag und Stand hat der Job `testflight` schon gegen das Muster geprüft.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.stand || inputs.tag }}
           persist-credentials: false
       - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           version: 2026.9.1
           cache: true
       # Die Release-Notizen werden „Was testen“. Fehlt das Release (Handstart eines Tags ohne
-      # Release), bleibt nur die Versionszeile.
+      # Release), bleibt nur die Versionszeile. Ein Vorab-Build (`stand`) nennt statt der Notizen
+      # den gebauten Stand: die Notizen des Tags beschrieben einen anderen.
       - name: Release-Notizen holen
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
+          STAND: ${{ inputs.stand }}
         run: |
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body \
-            > "$RUNNER_TEMP/notizen.md" || : > "$RUNNER_TEMP/notizen.md"
+          if [ -n "$STAND" ]; then
+            printf 'Vorab-Build vom Stand %s (%s), nicht der Tag %s.\n' \
+              "$STAND" "$(git rev-parse --short HEAD)" "$TAG" > "$RUNNER_TEMP/notizen.md"
+          else
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body \
+              > "$RUNNER_TEMP/notizen.md" || : > "$RUNNER_TEMP/notizen.md"
+          fi
       - name: Schlüssel ablegen
         env:
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
