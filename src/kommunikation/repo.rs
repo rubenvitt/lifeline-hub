@@ -5,8 +5,27 @@ use crate::kommunikation::{
 use sqlx::SqlitePool;
 
 /// Setzt die Quittungs-Achse (UPSERT je Objekt). Vollzug bleibt unberührt.
+/// Pool-Hülle um [`quittiere_tx`] ohne eigene Transaktion.
 pub async fn quittiere(
     pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    objekt_typ: &str,
+    objekt_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    quittiere_tx(
+        &mut conn, org_id, einsatz_id, objekt_typ, objekt_id, von_id, jetzt,
+    )
+    .await
+}
+
+/// Wie [`quittiere`] auf einer offenen Verbindung, damit die Quittung mit dem Status ihres Objekts
+/// gemeinsam committet (LLH-1874). Öffnet und committet nichts.
+pub async fn quittiere_tx(
+    conn: &mut sqlx::SqliteConnection,
     org_id: i64,
     einsatz_id: i64,
     objekt_typ: &str,
@@ -27,7 +46,7 @@ pub async fn quittiere(
     .bind(objekt_id)
     .bind(jetzt)
     .bind(von_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -37,9 +56,10 @@ pub async fn quittiere(
 /// keine.
 ///
 /// Kein UPSERT: existiert keine Zeile, gibt es nichts zu löschen. Das `UPDATE` trifft
-/// dann null Zeilen, und genau das ist richtig.
-pub async fn loesche_quittung(
-    pool: &SqlitePool,
+/// dann null Zeilen, und genau das ist richtig. Läuft auf der Verbindung des Aufrufers, damit die
+/// Rücknahme alle drei Achsen gemeinsam committet (LLH-1874); öffnet und committet nichts.
+pub async fn loesche_quittung_tx(
+    conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     objekt_typ: &str,
     objekt_id: i64,
@@ -51,7 +71,7 @@ pub async fn loesche_quittung(
     .bind(einsatz_id)
     .bind(objekt_typ)
     .bind(objekt_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }

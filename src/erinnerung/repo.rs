@@ -1,5 +1,6 @@
 use super::{ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT};
 use crate::error::AppError;
+use crate::kommunikation::{repo as krepo, OBJEKT_ERINNERUNG, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN};
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Eingabedaten für eine neue (manuelle) Erinnerung — bereits vom Handler validiert.
@@ -268,21 +269,117 @@ pub async fn status_setzen_tx(
     laden(&mut *conn, id, jetzt).await
 }
 
-/// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück.
+/// Schließt eine offene Erinnerung ab (LLH-1874): `erledigt` setzt die Vollzug-Achse auf
+/// `vollzogen`, `quittiert` die Quittungsachse. Andere Zielstatus → `Validation`.
 ///
-/// Nicht als dritter Wert in [`status_setzen`]: dessen Riegel sichert die Vorwärtsrichtung, und
-/// die Rücknahme räumt `erledigt_at`, das `status_setzen` gerade setzt.
-pub async fn wieder_oeffnen(
-    pool: &SqlitePool,
+/// Nur aus `offen`, und die Bedingung steht im schreibenden UPDATE (Muster
+/// `auftrag::repo::set_in_arbeit`): eine zweite Stelle, die zugleich erledigt oder quittiert,
+/// trifft nach der ersten auf eine abgeschlossene Erinnerung und bekommt 422, statt Zeitpunkt,
+/// Person oder Status zu überschreiben. Status und Achse gehen über dieselbe Verbindung; der
+/// Aufrufer legt beide in EINE Transaktion (`write_retry!`), damit ein Fehler der Achse den Status
+/// zurückrollt. Öffnet und committet nichts.
+#[allow(clippy::too_many_arguments)]
+pub async fn abschliessen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
     id: i64,
+    neuer_status: &str,
+    von_id: i64,
     jetzt: &str,
-) -> Result<ErinnerungAnzeige, AppError> {
-    sqlx::query("UPDATE erinnerung SET status = ?, erledigt_at = NULL WHERE id = ?")
-        .bind(STATUS_OFFEN)
-        .bind(id)
-        .execute(pool)
-        .await?;
-    laden(pool, id, jetzt).await
+) -> Result<(), AppError> {
+    if neuer_status != STATUS_ERLEDIGT && neuer_status != STATUS_QUITTIERT {
+        return Err(AppError::Validation("Ungültiger Zielstatus".into()));
+    }
+    let getroffen = sqlx::query(
+        "UPDATE erinnerung SET status = ?, erledigt_at = ? WHERE id = ? AND status = ?",
+    )
+    .bind(neuer_status)
+    .bind(jetzt)
+    .bind(id)
+    .bind(STATUS_OFFEN)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if getroffen == 0 {
+        // Zustandsverletzung, kein Feldfehler → 422 (`src/AGENTS.md`, Statuscode-Konvention).
+        return Err(AppError::UnprocessableEntity(
+            "Die Erinnerung ist nicht mehr offen".into(),
+        ));
+    }
+    if neuer_status == STATUS_ERLEDIGT {
+        krepo::setze_vollzug_tx(
+            conn,
+            org_id,
+            einsatz_id,
+            OBJEKT_ERINNERUNG,
+            id,
+            VOLLZUG_VOLLZOGEN,
+            von_id,
+            jetzt,
+        )
+        .await
+    } else {
+        krepo::quittiere_tx(
+            conn,
+            org_id,
+            einsatz_id,
+            OBJEKT_ERINNERUNG,
+            id,
+            von_id,
+            jetzt,
+        )
+        .await
+    }
+}
+
+/// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück (LFH-343 · C8) und räumt alle
+/// drei Achsen: Triage-Status samt `erledigt_at`, Vollzug und Quittung. Bliebe eine stehen,
+/// zeigte die Karte „offen“ und trüge zugleich den Vollzugs- oder Quittungsvermerk.
+///
+/// Nicht als dritter Wert in [`abschliessen_tx`]: das sichert die Vorwärtsrichtung, und die
+/// Rücknahme räumt `erledigt_at`, das es gerade setzt.
+///
+/// Nur aus `erledigt` oder `quittiert`, geprüft im schreibenden UPDATE statt vorab über den Pool
+/// (LLH-1874): eine gleichzeitige Rücknahme fiele sonst zwischen Prüfen und Schreiben, und die
+/// zweite meldete eine Rücknahme, die keine war. Aus `offen` → 422. Der Aufrufer legt die drei
+/// Anweisungen in EINE Transaktion (`write_retry!`); öffnet und committet nichts.
+pub async fn wieder_oeffnen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let getroffen = sqlx::query(
+        "UPDATE erinnerung SET status = ?, erledigt_at = NULL WHERE id = ? AND status IN (?, ?)",
+    )
+    .bind(STATUS_OFFEN)
+    .bind(id)
+    .bind(STATUS_ERLEDIGT)
+    .bind(STATUS_QUITTIERT)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if getroffen == 0 {
+        // Ein stiller Erfolg wäre schlimmer: der Toast behauptete eine Rücknahme, die keine war.
+        return Err(AppError::UnprocessableEntity(
+            "Die Erinnerung ist bereits offen".into(),
+        ));
+    }
+    krepo::setze_vollzug_tx(
+        conn,
+        org_id,
+        einsatz_id,
+        OBJEKT_ERINNERUNG,
+        id,
+        VOLLZUG_OFFEN,
+        von_id,
+        jetzt,
+    )
+    .await?;
+    krepo::loesche_quittung_tx(conn, einsatz_id, OBJEKT_ERINNERUNG, id).await
 }
 
 /// Eine fällige, offene Erinnerung für den Scheduler; `intervall_minuten` entscheidet einmalig

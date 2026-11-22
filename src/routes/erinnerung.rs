@@ -2,16 +2,13 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Erinnerungen;
 use crate::erinnerung::{
-    anreichern_alle, repo, ErinnerungAnzeige, INTERVALL_MAX_MINUTEN, STATUS_ERLEDIGT, STATUS_OFFEN,
+    anreichern_alle, repo, ErinnerungAnzeige, INTERVALL_MAX_MINUTEN, STATUS_ERLEDIGT,
     STATUS_QUITTIERT,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::kommunikation::{
-    repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_OFFEN,
-    VOLLZUG_VOLLZOGEN,
-};
+use crate::kommunikation::{OBJEKT_AUFTRAG, OBJEKT_MELDUNG};
 use crate::live::LiveEvent;
 use crate::routes::support::pflicht;
 use crate::zeit::jetzt;
@@ -228,54 +225,47 @@ async fn fordere_bearbeitbar(
 
 /// POST /api/einsaetze/{id}/erinnerungen/{eid}/erledigen — Status → erledigt.
 pub async fn erledigen(
-    State(state): State<AppState>,
+    state: State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
-    PfadParam((_eid, erinnerung_id)): PfadParam<(i64, i64)>,
+    pfad: PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let org_id = ctx.einsatz.org_id;
-    fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
-    let now = jetzt();
-    repo::status_setzen(&state.pool, erinnerung_id, STATUS_ERLEDIGT, &now).await?;
-    krepo::setze_vollzug(
-        &state.pool,
-        org_id,
-        einsatz_id,
-        OBJEKT_ERINNERUNG,
-        erinnerung_id,
-        VOLLZUG_VOLLZOGEN,
-        ctx.benutzer.id,
-        &now,
-    )
-    .await?;
-    let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
-    anreichern_alle(&state.pool, einsatz_id, org_id, ctx.geraet.as_ref(), &mut r).await?;
-    let [r] = r;
-    sse(&state, einsatz_id);
-    Ok(Json(r))
+    abschliessen(state, ctx, pfad, STATUS_ERLEDIGT).await
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen/{eid}/quittieren — Status → quittiert.
 pub async fn quittieren(
+    state: State<AppState>,
+    ctx: EinsatzSchreibzugriff<Erinnerungen>,
+    pfad: PfadParam<(i64, i64)>,
+) -> Result<Json<ErinnerungAnzeige>, AppError> {
+    abschliessen(state, ctx, pfad, STATUS_QUITTIERT).await
+}
+
+/// Gemeinsamer Rumpf von Erledigen und Quittieren: Status und Achse in EINER Transaktion, nur aus
+/// `offen` (LLH-1874, `repo::abschliessen_tx`); eine schon abgeschlossene Erinnerung → 422.
+async fn abschliessen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
     PfadParam((_eid, erinnerung_id)): PfadParam<(i64, i64)>,
+    neuer_status: &str,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let org_id = ctx.einsatz.org_id;
+    let von_id = ctx.benutzer.id;
     fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
-    repo::status_setzen(&state.pool, erinnerung_id, STATUS_QUITTIERT, &now).await?;
-    krepo::quittiere(
-        &state.pool,
-        org_id,
-        einsatz_id,
-        OBJEKT_ERINNERUNG,
-        erinnerung_id,
-        ctx.benutzer.id,
-        &now,
-    )
-    .await?;
+    crate::write_retry!(&state.pool, |conn| {
+        repo::abschliessen_tx(
+            conn,
+            org_id,
+            einsatz_id,
+            erinnerung_id,
+            neuer_status,
+            von_id,
+            &now,
+        )
+        .await
+    })?;
     let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
     anreichern_alle(&state.pool, einsatz_id, org_id, ctx.geraet.as_ref(), &mut r).await?;
     let [r] = r;
@@ -288,9 +278,9 @@ pub async fn quittieren(
 ///
 /// Der Gegenweg zur Direktaktion ohne Rückfrage: beide Knöpfe schalten seither mit
 /// EINEM Klick, und der Rückgängig-Toast braucht einen Weg, den der Server annimmt.
-/// Geräumt werden ALLE DREI Achsen — Triage-Status, Vollzug und Quittung. Bliebe eine
-/// stehen, zeigte die Karte „offen" und trüge zugleich den Vollzugs- oder
-/// Quittungsvermerk.
+/// Geräumt werden ALLE DREI Achsen in EINER Transaktion, und ob die Erinnerung überhaupt
+/// abgeschlossen ist, prüft der Schreibweg selbst (LLH-1874, `repo::wieder_oeffnen_tx`): aus
+/// `offen` → 422.
 pub async fn oeffnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
@@ -298,32 +288,14 @@ pub async fn oeffnen(
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let org_id = ctx.einsatz.org_id;
+    let von_id = ctx.benutzer.id;
     fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
-    let aktuell = repo::laden(&state.pool, erinnerung_id, &now).await?;
-    if aktuell.status == STATUS_OFFEN {
-        // Zustandsverletzung, kein Feldfehler → 422 (src/error.rs). Ein stiller
-        // Erfolg wäre schlimmer: der Toast behauptete eine Rücknahme, die keine war.
-        return Err(AppError::UnprocessableEntity(
-            "Die Erinnerung ist bereits offen".into(),
-        ));
-    }
-    repo::wieder_oeffnen(&state.pool, erinnerung_id, &now).await?;
-    krepo::setze_vollzug(
-        &state.pool,
-        org_id,
-        einsatz_id,
-        OBJEKT_ERINNERUNG,
-        erinnerung_id,
-        VOLLZUG_OFFEN,
-        ctx.benutzer.id,
-        &now,
-    )
-    .await?;
-    krepo::loesche_quittung(&state.pool, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id).await?;
-    // NACH den beiden Achsen laden — sonst trüge die Antwort einen Zustand, den es
-    // nie gab (dieselbe Regel wie bei der Sichtung in LFH-340/C5). Deshalb wird der
-    // Rückgabewert von `wieder_oeffnen` oben verworfen.
+    crate::write_retry!(&state.pool, |conn| {
+        repo::wieder_oeffnen_tx(conn, org_id, einsatz_id, erinnerung_id, von_id, &now).await
+    })?;
+    // NACH dem Commit laden — sonst trüge die Antwort einen Zustand, den es nie gab
+    // (dieselbe Regel wie bei der Sichtung in LFH-340/C5).
     let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
     anreichern_alle(&state.pool, einsatz_id, org_id, ctx.geraet.as_ref(), &mut r).await?;
     let [r] = r;
@@ -353,7 +325,7 @@ mod tests {
         (b, e)
     }
 
-    // Spiegelt die Wirkung des erledigen-Handlers: Scheduler-Status 'erledigt'
+    // Die Wirkung des erledigen-Handlers (`repo::abschliessen_tx`): Scheduler-Status 'erledigt'
     // UND geteilte Vollzugs-Achse 'vollzogen'.
     #[tokio::test]
     async fn erledigen_schreibt_vollzug_in_kommunikation_status() {
@@ -378,26 +350,19 @@ mod tests {
         .await
         .unwrap();
 
-        crate::erinnerung::repo::status_setzen(
-            &pool,
-            r.id,
-            crate::erinnerung::STATUS_ERLEDIGT,
-            "2026-06-11 11:00:00",
-        )
-        .await
-        .unwrap();
-        krepo::setze_vollzug(
-            &pool,
+        let mut conn = pool.acquire().await.unwrap();
+        crate::erinnerung::repo::abschliessen_tx(
+            &mut conn,
             1,
             e,
-            OBJEKT_ERINNERUNG,
             r.id,
-            VOLLZUG_VOLLZOGEN,
+            crate::erinnerung::STATUS_ERLEDIGT,
             b,
             "2026-06-11 11:00:00",
         )
         .await
         .unwrap();
+        drop(conn);
 
         let s = krepo::lade_status(&pool, e, OBJEKT_ERINNERUNG, r.id)
             .await
