@@ -3,7 +3,9 @@
 //! Ein Geheimnis (Accesskey, API-Key, Passwort) liegt nur als age-Chiffrat in
 //! `adapter_geheimnis`, verschlüsselt an den Empfänger des privaten Schlüssels aus
 //! `LIFELINE_GEHEIMNIS_SCHLUESSEL`. Jede Zeile trägt den Fingerabdruck dieses Empfängers; so ist
-//! erkennbar, ob ein Chiffrat zum geladenen Schlüssel passt, ohne es zu öffnen. Klartext gibt es
+//! erkennbar, ob ein Chiffrat zum geladenen Schlüssel passt, ohne es zu öffnen. Der Schlüssel kommt
+//! aus der Umgebung oder einer Datei (`…_DATEI`); für einen Schlüsselwechsel liest der Speicher
+//! zusätzlich mit dem alten (`…_ALT`, LLH-2025), schreibt aber nur mit dem neuen. Klartext gibt es
 //! nur als [`SecretString`] im Lauf, direkt vor einem Abruf; die API liest keine Geheimnisse.
 //!
 //! Ver- und Entschlüsseln rechnen; Aufrufer im async-Kontext rufen es über `spawn_blocking`

@@ -432,6 +432,10 @@ Klartext. Der Hinweis „Geheimnisspeicher“ über den Adaptern nennt zwei Stö
   etwa nach dem Einspielen einer Sicherung auf einem anderen Rechner. Seine Zeile nennt es
   „unlesbar“; „Neu setzen“ behebt es.
 
+Tauscht der Betrieb den Schlüssel, etwa nach einem Leck, gibt er dem Server für einen Neustart
+den alten zusätzlich mit (`LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT`). Der Server schlüsselt dabei alle
+Geheimnisse auf den neuen um; die Adapter laufen weiter, und niemand muss etwas neu setzen.
+
 Die Ziele eines Adapters prüft der Server wie die Ziele eines Webhooks: nur über https, keine
 Weiterleitung, kein Ziel in einem internen Netz. „Ziel im eigenen Netz erlauben“ öffnet private
 Netze; der Rechner selbst und Adressen wie `169.254.169.254` bleiben gesperrt.
