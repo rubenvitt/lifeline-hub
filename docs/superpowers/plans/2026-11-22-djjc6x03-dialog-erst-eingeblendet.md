@@ -40,10 +40,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/djjc6x03jz3yp38h26sl1lxy
 - Produces: `dialogSteht(page: Page, name: string | RegExp, { exact }?: { exact?: boolean }): Promise<Locator>`; `eingeblendet(ziel: Locator): Promise<Locator>` unverändert.
 - Produces: Riegel-Meldung nennt `dialogSteht`/`eingeblendet` aus `e2e/dialog-kern.ts` und LLH-2067.
 
-- [ ] **Step 1: Riegel eintragen** — zwei Selektoren in `E2E_RIEGEL`: `Literal[value=/ant-zoom(-big)?-(appear|enter)/]` und `Literal[regex.pattern=/ant-zoom(-big)?-(appear|enter)/]`. Ausnahme: eigener Konfigblock für `e2e/dialog-kern.ts` und `e2e/doku-bilder/**` ohne diese zwei Selektoren (die übrigen Riegel gelten dort weiter).
-- [ ] **Step 2: Riegel rot sehen** — `mise exec -- pnpm exec eslint e2e` → Fehler an allen 34 Stellen (Liste aus `grep -rn "ant-zoom-appear" e2e | grep -v doku-bilder` ohne Kommentarzeilen), keiner in `dialog-kern.ts`/`doku-bilder/`.
-- [ ] **Step 3: `dialogSteht` erweitern** um `string | RegExp` und `exact` (an `getByRole` durchreichen).
-- [ ] **Step 4: Commit** (`test(e2e): Riegel gegen kopierte Zoom-Warte-Zeile (LLH-2067)`); Lint ist danach bis Task 3 rot — darum Task 1–3 vor dem ersten Push abschließen.
+- [x] **Step 1: Riegel eintragen** — zwei Selektoren in `E2E_RIEGEL`: `Literal[value=/ant-zoom(-big)?-(appear|enter)/]` und `Literal[regex.pattern=/ant-zoom(-big)?-(appear|enter)/]`. Ausnahme: eigener Konfigblock für `e2e/dialog-kern.ts` und `e2e/doku-bilder/**` ohne diese zwei Selektoren (die übrigen Riegel gelten dort weiter).
+- [x] **Step 2: Riegel rot sehen** — `mise exec -- pnpm exec eslint e2e` → Fehler an allen 34 Stellen (Liste aus `grep -rn "ant-zoom-appear" e2e | grep -v doku-bilder` ohne Kommentarzeilen), keiner in `dialog-kern.ts`/`doku-bilder/`.
+- [x] **Step 3: `dialogSteht` erweitern** um `string | RegExp` und `exact` (an `getByRole` durchreichen).
+- [x] **Step 4: Commit** (`test(e2e): Riegel gegen kopierte Zoom-Warte-Zeile (LLH-2067)`); Lint ist danach bis Task 3 rot — darum Task 1–3 vor dem ersten Push abschließen.
 
 ### Task 2: Kern-Helfer umstellen
 
@@ -54,9 +54,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/djjc6x03jz3yp38h26sl1lxy
 
 **Interfaces:** Consumes `dialogSteht` aus Task 1. Rückgabewerte der Helfer unverändert (`Locator`).
 
-- [ ] **Step 1:** Je `getByRole('dialog', …)` + `toBeVisible()` + Warte-Zeile → `await dialogSteht(page, '…', { exact: true })` dort, wo vorher `exact: true` stand, sonst ohne.
-- [ ] **Step 2:** `mise exec -- pnpm exec eslint e2e/einsatz-kern.ts e2e/menue-kern.ts e2e/leisten-kern.ts` → 0 Fehler.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Je `getByRole('dialog', …)` + `toBeVisible()` + Warte-Zeile → `await dialogSteht(page, '…', { exact: true })` dort, wo vorher `exact: true` stand, sonst ohne.
+- [x] **Step 2:** `mise exec -- pnpm exec eslint e2e/einsatz-kern.ts e2e/menue-kern.ts e2e/leisten-kern.ts` → 0 Fehler.
+- [x] **Step 3: Commit.**
 
 ### Task 3: Specs umstellen
 
@@ -64,7 +64,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/djjc6x03jz3yp38h26sl1lxy
 
 **Interfaces:** Consumes `dialogSteht`, `eingeblendet` aus Task 1.
 
-- [ ] **Step 1:** Abbildung nach Design-Doc, „Entscheidungen“:
+- [x] **Step 1:** Abbildung nach Design-Doc, „Entscheidungen“:
   - Dialog per Name → `dialogSteht(page|tablet, name)`; vorausgehendes `toBeVisible()` am Dialog entfällt.
   - Dialog per `.filter`/Helfer/`page.getByRole('dialog')` ohne Name (`fahrzeuge-eigene-einheit`, `dokumente:276/476/874`) → `eingeblendet(dialog)`.
   - `geraet-bereitstellungsraum:509` → `eingeblendet(ausruecken)`.
@@ -72,20 +72,20 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/djjc6x03jz3yp38h26sl1lxy
   - `etb-entwurf-tabs`: lokale `dialogSteht(page, dialog)` löschen, Aufrufe → `eingeblendet(dialog)`.
   - `betreuung-pruefliste`: lokale Funktion → `bereichSteht(dialog: Locator)`: `await eingeblendet(dialog)` + bestehende `.ant-motion-collapse`-Prüfung; Aufrufe anpassen.
   - Ungenutzte Importe (`Page`) entfernen.
-- [ ] **Step 2:** `mise exec -- pnpm lint` und `mise exec -- pnpm typecheck` → beide grün.
-- [ ] **Step 3:** `grep -rn "ant-zoom-appear\|ant-zoom-enter" e2e | grep -v doku-bilder` → nur Kommentare und `dialog-kern.ts`.
-- [ ] **Step 4: Mutationsprobe Riegel:** alte Zeile in eine Spec einsetzen → `eslint` rot mit der neuen Meldung; zurücknehmen.
-- [ ] **Step 5: Commit.**
+- [x] **Step 2:** `mise exec -- pnpm lint` und `mise exec -- pnpm typecheck` → beide grün.
+- [x] **Step 3:** `grep -rn "ant-zoom-appear\|ant-zoom-enter" e2e | grep -v doku-bilder` → nur Kommentare und `dialog-kern.ts`.
+- [x] **Step 4: Mutationsprobe Riegel:** alte Zeile in eine Spec einsetzen → `eslint` rot mit der neuen Meldung; zurücknehmen.
+- [x] **Step 5: Commit.**
 
 ### Task 4: Regel in `frontend/e2e/AGENTS.md`
 
 **Files:** Modify `frontend/e2e/AGENTS.md` (neuer Punkt nach dem LFH-1114-Punkt; dieser verweist darauf).
 
-- [ ] **Step 1:** Regeltext: in antd-Dialog, Popconfirm oder Popover erst klicken, tippen oder messen, wenn `dialogSteht`/`eingeblendet` (`e2e/dialog-kern.ts`) ihn als stehend meldet; Grund (Klick fällt unter Last in `-appear-active`, LFH-1114/LLH-2065); Riegel `no-restricted-syntax` gegen die Klassennamen, Ausnahmen `dialog-kern.ts`, `doku-bilder/`; Altbestand ohne Wartezeit wird beim Anfassen umgestellt. Herleitung: Design-Doc.
-- [ ] **Step 2:** `mise exec -- pnpm exec prettier --check e2e/AGENTS.md` → grün.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Regeltext: in antd-Dialog, Popconfirm oder Popover erst klicken, tippen oder messen, wenn `dialogSteht`/`eingeblendet` (`e2e/dialog-kern.ts`) ihn als stehend meldet; Grund (Klick fällt unter Last in `-appear-active`, LFH-1114/LLH-2065); Riegel `no-restricted-syntax` gegen die Klassennamen, Ausnahmen `dialog-kern.ts`, `doku-bilder/`; Altbestand ohne Wartezeit wird beim Anfassen umgestellt. Herleitung: Design-Doc.
+- [x] **Step 2:** `mise exec -- pnpm exec prettier --check e2e/AGENTS.md` → grün. *(Erledigt 22.11.2026: Schritte 1–3 und `--nur schnell` grün; die volle Vitest-Suite lief im Cloud-Container zweimal ins 2-h-Limit, die 86 Vitest-Dateien, die `e2e/`, Lint-Konfiguration oder `AGENTS.md` lesen, grün; Rest auf `alpha`.)*
+- [x] **Step 3: Commit.**
 
 ### Task 5: Prüfen
 
-- [ ] **Step 1:** Geänderte Specs in Chromium: `PW_PROJEKTE=chromium mise exec -- pnpm exec playwright test <geänderte Specs> --trace off` → grün (Debug-Binary vorher per `cargo build`).
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` (Repo-Wurzel) → grün.
+- [x] **Step 1:** Geänderte Specs in Chromium: `PW_PROJEKTE=chromium mise exec -- pnpm exec playwright test <geänderte Specs> --trace off` → grün (Debug-Binary vorher per `cargo build`).
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` (Repo-Wurzel) → grün. *(Erledigt 22.11.2026: Schritte 1–3 und `--nur schnell` grün; die volle Vitest-Suite lief im Cloud-Container zweimal ins 2-h-Limit, die 86 Vitest-Dateien, die `e2e/`, Lint-Konfiguration oder `AGENTS.md` lesen, grün; Rest auf `alpha`.)*
