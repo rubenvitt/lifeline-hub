@@ -19,7 +19,6 @@ import {
 } from '../api/infotelefon';
 import { einsatzKeys } from '../api/queryKeys';
 import type { InfotelefonAnruf, InfotelefonStatus } from '../api/types';
-import { useAuth } from '../auth/AuthContext';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
@@ -113,7 +112,6 @@ function statusOptionen(a: InfotelefonAnruf): InfotelefonStatus[] {
 export default function InfotelefonPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
@@ -135,6 +133,9 @@ export default function InfotelefonPage() {
   // `ladeWeiter`). Aufgenommen werden die Kennungen der geholten Seite so, wie sie kam: ein
   // Live-Nachladen derselben Seite bringt einen fremden Nachtrag sonst unbemerkt in den Stand.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
+  // Die Anrufe, die DIESES Gerät erfasst hat (LLH-1977): nur sie stehen bei eingefrorener Schleuse
+  // sofort. Ein Anruf desselben Kontos von einem anderen Gerät wartet hinter dem Banner.
+  const [hierErfasst, setHierErfasst] = useState<ReadonlySet<number>>(() => new Set());
   const [linkedId, setLinkedId] = useState<number | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   // Ein Deeplink rollt selbst zu seinem Anruf; dann nicht beim Öffnen ans Ende.
@@ -232,7 +233,11 @@ export default function InfotelefonPage() {
 
   const erfassenMutation = useMutation({
     mutationFn: (e: AnrufEingabe) => erfasseAnruf(einsatzId, e),
-    onSuccess: invalidate,
+    // Erst die Kennung merken, dann neu laden: sonst käme der eigene Anruf als fremder zurück.
+    onSuccess: (angelegt) => {
+      setHierErfasst((vorher) => new Set(vorher).add(angelegt.id));
+      return invalidate();
+    },
   });
   const statusMutation = useMutation({
     mutationFn: (v: { id: number; status: InfotelefonStatus }) =>
@@ -261,7 +266,7 @@ export default function InfotelefonPage() {
       .querySelector(`[data-anruf="${hervorgehoben}"]`)
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben, isHervorgehobenLoaded]);
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, benutzer?.id);
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, hierErfasst);
 
   /**
    * „Ältere laden“ / „Neuere laden“ (LLH-1886): Die geholte Seite antwortet auf eine eigene
