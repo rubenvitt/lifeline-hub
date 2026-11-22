@@ -4886,12 +4886,14 @@ async fn hub_lehnt_ungueltige_akten_mit_hinweis_ab_und_quittiert_nur_plausible_s
         "fuehrung_bis": 0
     }))
     .unwrap();
-    // Ohne Web Push am Hub, wie die Route es dann übergibt (`state.live.web_push().is_some()`).
+    // Ohne Web Push und iOS-Push am Hub, wie die Route es dann übergibt
+    // (`state.live.web_push().is_some()`, `state.live.ios_push().is_some()`).
     lifeline_hub::instanz::melden::handle_meldung(
         &hub.pool,
         &identitaet,
         &kopplung,
         &anfrage,
+        false,
         false,
     )
     .await

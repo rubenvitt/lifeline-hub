@@ -134,6 +134,34 @@ pub struct Ziel {
     pub kopplung_org_id: i64,
     /// Die erreichte Seite bietet Web Push an: dann pusht diese Instanz nicht selbst (D4).
     pub web_push: bool,
+    /// Die erreichte Seite bietet iOS-Push an (LLH-2040); getrennt von Web Push.
+    pub ios_push: bool,
+}
+
+/// Ein Push-Kanal. Die Kopplung gilt je Kanal (LLH-2040): Für ein Konto vom Hub lässt diese
+/// Instanz den eigenen Push nur in dem Kanal aus, den der Hub selbst anbietet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kanal {
+    WebPush,
+    IosPush,
+}
+
+impl Kanal {
+    /// Bietet die erreichte Seite dieses Ziels den Kanal an?
+    pub fn bei(self, ziel: &Ziel) -> bool {
+        match self {
+            Kanal::WebPush => ziel.web_push,
+            Kanal::IosPush => ziel.ios_push,
+        }
+    }
+
+    /// Kennwort für die Abfrage in [`push_hub_fuer`].
+    fn as_str(self) -> &'static str {
+        match self {
+            Kanal::WebPush => "web_push",
+            Kanal::IosPush => "ios_push",
+        }
+    }
 }
 
 /// Wohin die Hinweise dieses Einsatzes reisen (D4): nur ein Einsatz, den diese Instanz führt und
@@ -142,7 +170,8 @@ pub struct Ziel {
 /// mit nicht widerrufener Zuordnung seiner Org. Was nicht geliefert wird, käme am Hub nie an.
 pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Ziel>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT o.id AS kopplung_org_id, k.gegenueber_web_push AS web_push \
+        "SELECT o.id AS kopplung_org_id, k.gegenueber_web_push AS web_push, \
+                k.gegenueber_ios_push AS ios_push \
          FROM einsatz e \
          JOIN instanz_kopplung_org o ON o.org_id = e.org_id AND o.widerrufen_at IS NULL \
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
@@ -157,23 +186,24 @@ pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Z
     .await
 }
 
-/// Pusht die erreichte Seite für diesen Einsatz (D4)? Dann lässt [`crate::benachrichtigung`] den
-/// eigenen Push aus.
-pub fn pusht_ueber_hub(ziele: &[Ziel]) -> bool {
-    ziele.iter().any(|z| z.web_push)
+/// Pusht die erreichte Seite für diesen Einsatz in diesem Kanal (D4)? Dann lässt
+/// [`crate::benachrichtigung`] den eigenen Push in diesem Kanal aus.
+pub fn pusht_ueber_hub(ziele: &[Ziel], kanal: Kanal) -> bool {
+    ziele.iter().any(|z| kanal.bei(z))
 }
 
-/// Welche dieser Konten der Hub kennt, der für diese Ziele pusht: ihr Konto kam aus einer
-/// solchen Kopplung (Herkunft der Stammdaten). Nur ihnen pusht der Hub; den übrigen pusht diese
-/// Instanz selbst (Entscheidung 12.11.2026, design.md D4).
+/// Welche dieser Konten der Hub kennt, der für diese Ziele in diesem Kanal pusht: ihr Konto kam
+/// aus einer solchen Kopplung (Herkunft der Stammdaten). Nur ihnen pusht der Hub; den übrigen
+/// pusht diese Instanz selbst (Entscheidung 12.11.2026, design.md D4).
 pub async fn konten_am_hub(
     conn: &mut SqliteConnection,
     ziele: &[Ziel],
+    kanal: Kanal,
     benutzer_ids: &[i64],
 ) -> Result<std::collections::HashSet<i64>, sqlx::Error> {
     let kopplungen: Vec<i64> = ziele
         .iter()
-        .filter(|z| z.web_push)
+        .filter(|z| kanal.bei(z))
         .map(|z| z.kopplung_org_id)
         .collect();
     if kopplungen.is_empty() || benutzer_ids.is_empty() {
@@ -192,12 +222,14 @@ pub async fn konten_am_hub(
     Ok(gefunden.iter().filter_map(|k| k.parse().ok()).collect())
 }
 
-/// Der Hub, über den dieser Nutzer Push bekommt (design.md D7): sein Konto kam aus einer aktiven
-/// meldenden Kopplung seiner Org, die Hinweise annimmt und Push anbietet. Name und Adresse für
-/// die Seite „Benachrichtigungen“; `None` für Konten, die der Hub nicht kennt.
+/// Der Hub, über den dieser Nutzer Push in diesem Kanal bekommt (design.md D7): sein Konto kam
+/// aus einer aktiven meldenden Kopplung seiner Org, die Hinweise annimmt und den Kanal anbietet.
+/// Name und Adresse für die Seite „Benachrichtigungen“; `None` für Konten, die der Hub nicht
+/// kennt, und wenn der Hub den Kanal nicht anbietet.
 pub async fn push_hub_fuer(
     conn: &mut SqliteConnection,
     benutzer_id: i64,
+    kanal: Kanal,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
     sqlx::query_as(
         "SELECT k.gegenueber_name, COALESCE(k.gegenueber_adresse, '') \
@@ -207,11 +239,14 @@ pub async fn push_hub_fuer(
          JOIN benutzer b ON b.org_id = o.org_id \
          WHERE h.art = 'konto' AND h.lokaler_schluessel = ? AND b.id = ? \
            AND k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' \
-           AND k.gegenueber_hinweise = 1 AND k.gegenueber_web_push = 1 \
+           AND k.gegenueber_hinweise = 1 \
+           AND CASE ? WHEN 'web_push' THEN k.gegenueber_web_push \
+                      WHEN 'ios_push' THEN k.gegenueber_ios_push ELSE 0 END = 1 \
          ORDER BY k.id LIMIT 1",
     )
     .bind(benutzer_id.to_string())
     .bind(benutzer_id)
+    .bind(kanal.as_str())
     .fetch_optional(&mut *conn)
     .await
 }
@@ -892,14 +927,23 @@ mod tests {
             ziele_von(&pool, e).await,
             vec![Ziel {
                 kopplung_org_id: 1,
-                web_push: false
+                web_push: false,
+                ios_push: false,
             }]
         );
         sqlx::query("UPDATE instanz_kopplung SET gegenueber_web_push = 1")
             .execute(&pool)
             .await
             .unwrap();
-        assert!(pusht_ueber_hub(&ziele_von(&pool, e).await));
+        assert!(pusht_ueber_hub(&ziele_von(&pool, e).await, Kanal::WebPush));
+        // Je Kanal getrennt (LLH-2040): Web Push am Hub heißt nicht iOS-Push.
+        assert!(!pusht_ueber_hub(&ziele_von(&pool, e).await, Kanal::IosPush));
+        sqlx::query("UPDATE instanz_kopplung SET gegenueber_web_push = 0, gegenueber_ios_push = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(pusht_ueber_hub(&ziele_von(&pool, e).await, Kanal::IosPush));
+        assert!(!pusht_ueber_hub(&ziele_von(&pool, e).await, Kanal::WebPush));
         for (sql, grund) in [
             (
                 "UPDATE instanz_kopplung SET gegenueber_hinweise = 0",

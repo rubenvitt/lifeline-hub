@@ -1,5 +1,5 @@
-//! iOS-Push über das Relais (LLH-2040): die Routen der Anmeldung und ihre Lebensdauer an Sitzung
-//! und Konto. Versand und Relais haben eigene Tests; hier wird nichts gesendet.
+//! iOS-Push über das Relais (LLH-2040): die Routen der Anmeldung, ihre Lebensdauer an Sitzung
+//! und Konto und der Versand aus `benachrichtigung::melden` an ein Relais-Doppel.
 
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
@@ -10,7 +10,10 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, setup_mit_pool_und_live};
+use common::relais::{oeffnen, relais_doppel, RelaisDoppel};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,
+};
 
 const KENNUNG: &str = "6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f10";
 const KENNUNG_2: &str = "0a8f3a6e-52a4-4d0b-8a3c-6b1f6c2d9e11";
@@ -433,4 +436,488 @@ async fn ablauf_der_sitzung_laesst_anmeldung_und_versand_bestehen() {
     .await
     .unwrap();
     assert_eq!(a.len(), 1, "der Versand findet die Anmeldung weiter");
+}
+
+// ── Versand aus `melden` (Aufgabe 7) ─────────────────────────────────────────────────────────
+
+use lifeline_hub::benachrichtigung::{
+    melden, Adressat, Anlass, BenachrichtigungArt as Art, BenachrichtigungBezugTyp as Typ, Bezug,
+};
+use lifeline_hub::ios_push::repo as ios_repo;
+use lifeline_hub::live::LiveHub;
+use lifeline_hub::web_push::repo::Wahl;
+use std::time::Duration;
+
+/// Ein Gerät: Kennung, Token, Schlüssel.
+struct Geraet {
+    kennung: String,
+    token: String,
+    schluessel: [u8; 32],
+}
+
+impl Geraet {
+    fn neu(n: u8) -> Self {
+        Geraet {
+            kennung: format!("6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f{n:02x}"),
+            token: format!("{n:02x}").repeat(32),
+            schluessel: [n; 32],
+        }
+    }
+}
+
+struct Versand {
+    app: axum::Router,
+    pool: sqlx::SqlitePool,
+    live: LiveHub,
+    einsatz: i64,
+    anna: i64,
+    relais: RelaisDoppel,
+}
+
+/// Eine Instanz mit iOS-Push an ein Relais-Doppel; Anna und Bert sind Führungspersonal eines
+/// Einsatzes.
+async fn versand() -> Versand {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let relais = relais_doppel().await;
+    live.ios_push_einrichten(relais.ios_push(&pool));
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = benutzer_anlegen(&app, &admin, "annika", "keine").await;
+    let bert = benutzer_anlegen(&app, &admin, "bertram", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, anna, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, einsatz, bert, "fuehrungspersonal").await;
+    Versand {
+        app,
+        pool,
+        live,
+        einsatz,
+        anna,
+        relais,
+    }
+}
+
+impl Versand {
+    /// Meldet ein Gerät für `benutzer` direkt im Speicher an, mit eigener Sitzung.
+    async fn geraet(&self, benutzer: i64, g: &Geraet, inhalt: bool, stumm: &[Art]) {
+        let sitzung = lifeline_hub::auth::session::anlegen(
+            &self.pool,
+            benutzer,
+            None,
+            lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+        )
+        .await
+        .unwrap();
+        ios_repo::anmelden(
+            &self.pool,
+            benutzer,
+            &lifeline_hub::auth::session::hash_token(&sitzung),
+            &ios_repo::Eingabe {
+                kennung: &g.kennung,
+                token: &g.token,
+                umgebung: "sandbox",
+                schluessel: &b64(&g.schluessel),
+                wahl: &Wahl {
+                    inhalt,
+                    stumm: stumm.to_vec(),
+                },
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Eine Sitzung für `benutzer` als Cookie.
+    async fn cookie(&self, benutzer: i64) -> String {
+        let token = lifeline_hub::auth::session::anlegen(
+            &self.pool,
+            benutzer,
+            None,
+            lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+        )
+        .await
+        .unwrap();
+        format!("{}={token}", lifeline_hub::auth::session::SESSION_COOKIE)
+    }
+
+    /// Eine Meldung direkt im Speicher (ohne eigenen Hinweis).
+    async fn meldung(&self, absender: &str, inhalt: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, \
+             eingang_at, erfasst_von_id) VALUES (?, 7, ?, 'funk', ?, '2026-11-22 08:00:00', \
+             '2026-11-22 08:00:00', 1) RETURNING id",
+        )
+        .bind(self.einsatz)
+        .bind(absender)
+        .bind(inhalt)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap()
+    }
+
+    async fn melden_an(&self, art: Art, typ: Typ, bezug_id: i64, an: i64) -> Vec<i64> {
+        melden(
+            &self.pool,
+            &self.live,
+            Anlass::neu(self.einsatz, art, Bezug::neu(typ, bezug_id)).an(Adressat::Nutzer(an)),
+        )
+        .await
+    }
+
+    /// Die Nachrichten des nächsten Aufrufs von `/v1/senden`.
+    async fn nachrichten(&mut self) -> Vec<Value> {
+        self.relais.naechste().await["nachrichten"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+}
+
+fn nachricht_an<'a>(nachrichten: &'a [Value], g: &Geraet) -> &'a Value {
+    nachrichten
+        .iter()
+        .find(|n| n["token"] == g.token.as_str())
+        .unwrap_or_else(|| panic!("keine Nachricht an {}: {nachrichten:?}", g.token))
+}
+
+/// Ziel 1: ein Alarm geht immer, ein Hinweis nicht an ein Gerät, auf dem seine Art stumm ist.
+#[tokio::test]
+async fn alarm_kommt_trotz_stumm_hinweis_nicht() {
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, false, &[Art::Meldung]).await;
+    let m = w.meldung("Florian Nord 1", "Deich bricht").await;
+
+    assert_eq!(
+        w.melden_an(Art::Meldung, Typ::Meldung, m, w.anna).await,
+        vec![w.anna]
+    );
+    w.relais.keine().await;
+
+    // Eine andere Art bleibt laut.
+    w.melden_an(Art::AuftragErteilt, Typ::Auftrag, 1, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["stufe"], "hinweis");
+
+    // Selbst ein Alarm in der Stummliste geht.
+    sqlx::query("UPDATE ios_push_anmeldung SET stumm = '[\"sofortmeldung\",\"meldung\"]'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, m, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["stufe"], "alarm");
+    assert_eq!(n[0]["token"], g.token.as_str());
+    assert_eq!(n[0]["umgebung"], "sandbox");
+}
+
+/// Stilles ist schon gelesen und erreicht kein Gerät.
+#[tokio::test]
+async fn still_erreicht_kein_geraet() {
+    let mut w = versand().await;
+    w.geraet(w.anna, &Geraet::neu(1), false, &[]).await;
+    sqlx::query(
+        "INSERT INTO benutzer_einstellungen (benutzer_id, schluessel, wert, geaendert_at) \
+         VALUES (?, 'benachrichtigungen_aus', '[\"gefahr\"]', datetime('now'))",
+    )
+    .bind(w.anna)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    assert!(w
+        .melden_an(Art::Gefahr, Typ::Gefahrengebiet, 1, w.anna)
+        .await
+        .is_empty());
+    let still: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM benachrichtigung WHERE benutzer_id = ? AND stufe = 'still'",
+    )
+    .bind(w.anna)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(still, 1, "die stille Zeile gibt es");
+    w.relais.keine().await;
+}
+
+/// Ziel 2: Titel, Detail und Pfad sind dieselben wie in `GET /api/benachrichtigungen/{id}`.
+#[tokio::test]
+async fn nutzlast_entschluesselt_ergibt_titel_detail_pfad_wie_die_anzeige() {
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, false, &[]).await;
+    let m = w.meldung("Florian Nord 1", "Deich bricht").await;
+    w.melden_an(Art::Meldung, Typ::Meldung, m, w.anna).await;
+    let n = w.nachrichten().await;
+    let (kennung, k) = oeffnen(
+        nachricht_an(&n, &g)["nutzlast"].as_str().unwrap(),
+        &g.schluessel,
+    );
+    assert_eq!(kennung, g.kennung);
+    let b = k["b"].as_i64().unwrap();
+    let cookie = w.cookie(w.anna).await;
+    let (s, anzeige) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/benachrichtigungen/{b}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{anzeige}");
+    assert_eq!(k["v"], 1);
+    assert_eq!(k["s"], lifeline_hub::instanz::name());
+    assert_eq!(k["e"], w.einsatz);
+    assert_eq!(k["stufe"], "hinweis");
+    assert_eq!(k["titel"], anzeige["titel"]);
+    assert_eq!(k["detail"], anzeige["detail"]);
+    assert!(k["detail"].is_string(), "{k}");
+    assert_eq!(k["pfad"], anzeige["pfad"]);
+    // Ohne die Wahl „Mit Absender und Wortlaut“ kein Inhalt.
+    assert!(
+        k.get("absender").is_none() && k.get("wortlaut").is_none(),
+        "{k}"
+    );
+}
+
+/// Ziel 2: mit der Wahl am Gerät kommen Absender und Wortlaut mit, auf dem anderen Gerät
+/// derselben Person nicht.
+#[tokio::test]
+async fn mit_inhalt_kommen_absender_und_wortlaut() {
+    let mut w = versand().await;
+    let mit = Geraet::neu(1);
+    let ohne = Geraet::neu(2);
+    w.geraet(w.anna, &mit, true, &[]).await;
+    w.geraet(w.anna, &ohne, false, &[]).await;
+    let m = w
+        .meldung("  Florian Nord 1 ", "  Deich bricht bei km 12  ")
+        .await;
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, m, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    assert_eq!(n.len(), 2);
+    let (_, k) = oeffnen(
+        nachricht_an(&n, &mit)["nutzlast"].as_str().unwrap(),
+        &mit.schluessel,
+    );
+    assert_eq!(k["absender"], "Florian Nord 1");
+    assert_eq!(k["wortlaut"], "Deich bricht bei km 12");
+    let (_, k) = oeffnen(
+        nachricht_an(&n, &ohne)["nutzlast"].as_str().unwrap(),
+        &ohne.schluessel,
+    );
+    assert!(
+        k.get("absender").is_none() && k.get("wortlaut").is_none(),
+        "{k}"
+    );
+
+    // Eine Art ohne Meldungsinhalt im Service Worker (Auftrag) trägt auch hier keinen.
+    w.melden_an(Art::AuftragErteilt, Typ::Auftrag, 1, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    let (_, k) = oeffnen(
+        nachricht_an(&n, &mit)["nutzlast"].as_str().unwrap(),
+        &mit.schluessel,
+    );
+    assert!(
+        k.get("absender").is_none() && k.get("wortlaut").is_none(),
+        "{k}"
+    );
+}
+
+/// Review Focus 5: Absender und Wortlaut nur, wenn der Empfänger die Meldung lesen dürfte. Die
+/// Übernahme in die Lage erreicht die Leser der Lagemeldungen; wer das Modul Meldungen nicht
+/// lesen darf, bekäme von `GET …/meldungen/{mid}` 403 und darum hier keinen Inhalt.
+#[tokio::test]
+async fn ohne_leserecht_fehlen_absender_und_wortlaut() {
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, true, &[]).await;
+    let m = w.meldung("Florian Nord 1", "Deich bricht").await;
+
+    // Mit Recht: der Inhalt kommt mit.
+    w.melden_an(Art::Meldung, Typ::LageUebernahme, m, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    let (_, k) = oeffnen(
+        nachricht_an(&n, &g)["nutzlast"].as_str().unwrap(),
+        &g.schluessel,
+    );
+    assert_eq!(k["absender"], "Florian Nord 1", "{k}");
+
+    // Das Modul Meldungen nur noch für Führungskräfte der Org: Anna verliert das Leserecht.
+    sqlx::query(
+        "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+         VALUES (?, 'meldungen', 1, 'fuehrungskraft')",
+    )
+    .bind(w.einsatz)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let cookie = w.cookie(w.anna).await;
+    let (s, _) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/meldungen/{m}", w.einsatz),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "die Route liest es ihr nicht vor");
+
+    assert_eq!(
+        w.melden_an(Art::Meldung, Typ::LageUebernahme, m, w.anna)
+            .await,
+        vec![w.anna],
+        "die Übernahme erreicht sie weiter"
+    );
+    let n = w.nachrichten().await;
+    let (_, k) = oeffnen(
+        nachricht_an(&n, &g)["nutzlast"].as_str().unwrap(),
+        &g.schluessel,
+    );
+    assert!(
+        k.get("absender").is_none() && k.get("wortlaut").is_none(),
+        "{k}"
+    );
+    assert!(k["titel"].is_string() && k["pfad"].is_string(), "{k}");
+}
+
+/// Review Focus 2: ein langer Wortlaut wird an einer Zeichengrenze gekürzt, der Umschlag bleibt
+/// unter der Grenze des Relais (4096) und dem Anteil an der APNs-Nutzlast (3 KB).
+#[tokio::test]
+async fn langer_wortlaut_wird_an_zeichengrenze_gekuerzt() {
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, true, &[]).await;
+    let lang = "ä🚑".repeat(10_000);
+    let m = w.meldung("Florian Nord 1", &lang).await;
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, m, w.anna)
+        .await;
+    let n = w.nachrichten().await;
+    let nutzlast = nachricht_an(&n, &g)["nutzlast"].as_str().unwrap();
+    assert!(nutzlast.len() <= 4096, "{}", nutzlast.len());
+    assert!(nutzlast.len() <= 3072, "{}", nutzlast.len());
+    let (_, k) = oeffnen(nutzlast, &g.schluessel);
+    let wortlaut = k["wortlaut"].as_str().expect("gekürzt, nicht weggelassen");
+    let anfang = wortlaut
+        .strip_suffix('…')
+        .expect("Auslassungszeichen am Ende");
+    assert!(anfang.chars().count() > 100, "{}", anfang.chars().count());
+    assert!(lang.starts_with(anfang));
+    assert_eq!(k["absender"], "Florian Nord 1");
+}
+
+/// Meldet das Relais ein Token als ungültig, fällt die Anmeldung.
+#[tokio::test]
+async fn token_ungueltig_loescht_die_anmeldung() {
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, false, &[]).await;
+    *w.relais.ergebnis.lock().unwrap() = "token_ungueltig";
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, 1, w.anna)
+        .await;
+    w.nachrichten().await;
+    for _ in 0..100 {
+        if ios_repo::anmeldungen_von(&w.pool, &[w.anna])
+            .await
+            .unwrap()
+            .is_empty()
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("Anmeldung nach token_ungueltig nicht gelöscht");
+}
+
+/// Review Focus 3: ein Relais, das annimmt, aber nie antwortet, hält `melden` nicht auf.
+#[tokio::test]
+async fn haengendes_relais_haelt_melden_nicht_auf() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    // Ein Port, der annimmt, aber nie antwortet.
+    let stumm = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let adresse = stumm.local_addr().unwrap();
+    live.ios_push_einrichten(
+        IosPush::einrichten_fuer_test(pool.clone(), format!("http://{adresse}").parse().unwrap())
+            .unwrap(),
+    );
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = benutzer_anlegen(&app, &admin, "annika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, anna, "fuehrungspersonal").await;
+    let w = Versand {
+        app,
+        pool,
+        live,
+        einsatz,
+        anna,
+        relais: relais_doppel().await,
+    };
+    w.geraet(anna, &Geraet::neu(1), true, &[]).await;
+    let start = std::time::Instant::now();
+    assert_eq!(
+        w.melden_an(Art::Sofortmeldung, Typ::Meldung, 1, anna).await,
+        vec![anna]
+    );
+    assert!(
+        start.elapsed() < Duration::from_millis(200),
+        "{:?}",
+        start.elapsed()
+    );
+    drop(stumm);
+}
+
+/// `kollaps` ersetzt eine erneute Zustellung, ohne Kennungen preiszugeben; auch sonst sieht das
+/// Relais nur Token, Umgebung, Stufe und den Umschlag.
+#[tokio::test]
+async fn kollaps_verraet_keine_ids() {
+    use sha2::{Digest, Sha256};
+    let mut w = versand().await;
+    let g = Geraet::neu(1);
+    w.geraet(w.anna, &g, true, &[]).await;
+    let m = w.meldung("Florian Nord 1", "Deich bricht").await;
+    let mut gesehen = Vec::new();
+    for _ in 0..2 {
+        w.melden_an(Art::Sofortmeldung, Typ::Meldung, m, w.anna)
+            .await;
+        let n = w.nachrichten().await;
+        let nachricht = nachricht_an(&n, &g).clone();
+        let mut felder: Vec<&str> = nachricht
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        felder.sort_unstable();
+        assert_eq!(
+            felder,
+            ["kollaps", "nutzlast", "stufe", "token", "umgebung"]
+        );
+        let (_, k) = oeffnen(nachricht["nutzlast"].as_str().unwrap(), &g.schluessel);
+        let b = k["b"].as_i64().unwrap();
+        let kollaps = nachricht["kollaps"].as_str().unwrap().to_owned();
+        let erwartet: String = Sha256::digest(format!("s1:{b}").as_bytes())
+            .iter()
+            .map(|x| format!("{x:02x}"))
+            .collect();
+        assert_eq!(kollaps, erwartet[..32]);
+        // Der Umschlag trägt nur Kennung, Nonce und Chiffrat.
+        let umschlag: Value = serde_json::from_slice(
+            &lifeline_hub::web_push::krypto::b64_lesen(nachricht["nutzlast"].as_str().unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        let mut felder: Vec<&String> = umschlag.as_object().unwrap().keys().collect();
+        felder.sort_unstable();
+        assert_eq!(felder, ["c", "k", "n"]);
+        let roh = nachricht.to_string();
+        for geheim in ["Florian", "Deich", "Sofortmeldung", "einsatz"] {
+            assert!(!roh.contains(geheim), "{geheim} im Klartext: {roh}");
+        }
+        gesehen.push(kollaps);
+    }
+    assert_ne!(gesehen[0], gesehen[1], "je Benachrichtigung ein eigener");
 }

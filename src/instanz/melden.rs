@@ -190,6 +190,11 @@ pub struct MeldenAntwort {
     /// Die erreichte Seite bietet Web Push an (D4).
     #[serde(default)]
     pub web_push: bool,
+    /// Die erreichte Seite bietet iOS-Push an (LLH-2040). Je Kanal getrennt: die meldende Seite
+    /// lässt den eigenen iOS-Push an Konten vom Hub nur aus, wenn der Hub ihn anbietet. Ein
+    /// älterer Stand nennt es nicht: dann `false`.
+    #[serde(default)]
+    pub ios_push: bool,
     /// Die erreichte Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7); wie
     /// [`MeldenAnfrage::rolle_mitarbeit`].
     #[serde(default)]
@@ -898,8 +903,15 @@ async fn melden_einmal_mit(
             &jetzt,
         )
         .await?;
-        repo::save_faehigkeiten(conn, kopplung.id, a.hinweise, a.web_push, a.rolle_mitarbeit)
-            .await?;
+        repo::save_faehigkeiten(
+            conn,
+            kopplung.id,
+            a.hinweise,
+            a.web_push,
+            a.ios_push,
+            a.rolle_mitarbeit,
+        )
+        .await?;
         let ids: Vec<i64> = offen.iter().map(|o| o.id).collect();
         repo::mark_widerruf_gemeldet(conn, &ids, &jetzt).await?;
         for oa in &a.orgs {
@@ -1287,6 +1299,7 @@ pub async fn handle_meldung(
     kopplung: &KopplungZeile,
     anfrage: &MeldenAnfrage,
     web_push: bool,
+    ios_push: bool,
 ) -> Result<MeldenAntwort, AppError> {
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
@@ -1714,6 +1727,7 @@ pub async fn handle_meldung(
         fuehrung_mehr: fuehrung_ausgang.mehr,
         hinweise: true,
         web_push,
+        ios_push,
         rolle_mitarbeit: true,
     })
 }
@@ -1816,6 +1830,7 @@ mod tests {
             fuehrung_mehr: false,
             hinweise: true,
             web_push: false,
+            ios_push: false,
             rolle_mitarbeit: true,
         }
     }
@@ -2116,6 +2131,7 @@ mod tests {
         .expect("ältere Antwort");
         assert!(!a.hinweise);
         assert!(!a.web_push);
+        assert!(!a.ios_push);
     }
 
     #[test]

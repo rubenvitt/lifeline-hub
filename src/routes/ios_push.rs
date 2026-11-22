@@ -16,8 +16,9 @@ use crate::auth::session::{hash_token, CurrentUser, SESSION_COOKIE};
 use crate::benachrichtigung::BenachrichtigungArt;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::instanz::spiegel::hinweis::Kanal;
 use crate::ios_push::{repo, IosPush};
-use crate::routes::web_push::{PushUeberHub, STUMM_MAX};
+use crate::routes::web_push::{ueber_hub, PushUeberHub, STUMM_MAX};
 use crate::web_push::krypto::b64_lesen;
 use crate::web_push::repo::Wahl;
 use axum::extract::{Query, State};
@@ -139,8 +140,8 @@ pub async fn stand(
         angemeldet,
         inhalt,
         stumm,
-        // LLH-2040, Aufgabe 7: Hub-Auskunft für iOS (Kanal-Parameter) und die 422 beim Anmelden.
-        ueber_hub: None,
+        // Nur wenn der Hub selbst iOS-Push anbietet; sonst pusht diese Instanz (je Kanal).
+        ueber_hub: ueber_hub(&state, benutzer.id, Kanal::IosPush).await?,
         relais_gesperrt,
     }))
 }
@@ -183,7 +184,14 @@ pub async fn anmelden(
         .iter()
         .filter_map(|a| BenachrichtigungArt::parse(a))
         .collect();
-    // LLH-2040, Aufgabe 7: 422, wenn Push für dieses Konto über den Hub läuft.
+    // Gekoppelter ELW: ein Zustand, nicht das Feld, also 422 (wie Web Push). Bestehende
+    // Anmeldungen bleiben und gelten nach dem Entkoppeln wieder.
+    if let Some(hub) = ueber_hub(&state, benutzer.id, Kanal::IosPush).await? {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Push läuft über {}.",
+            hub.name
+        )));
+    }
     repo::anmelden(
         &state.pool,
         benutzer.id,

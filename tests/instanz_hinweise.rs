@@ -7,6 +7,7 @@ mod instanz_hilfen;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use common::relais::{oeffnen, relais_doppel, RelaisDoppel};
 use instanz_hilfen::*;
 use lifeline_hub::benachrichtigung::{
     self, Adressat, Anlass, BenachrichtigungArt as Art, BenachrichtigungBezugTyp as Typ, Bezug,
@@ -25,6 +26,8 @@ struct Seite {
     live: LiveHub,
     /// Basis-URL und Empfang des Test-Push-Dienstes dieser Instanz.
     dienst: Option<(String, mpsc::UnboundedReceiver<Vec<u8>>)>,
+    /// Relais-Doppel für iOS-Push dieser Instanz (LLH-2040).
+    relais: Option<RelaisDoppel>,
 }
 
 /// Ein Test-Push-Dienst auf Loopback, der jede Anfrage meldet und mit 201 antwortet.
@@ -48,7 +51,19 @@ async fn push_dienst() -> (String, mpsc::UnboundedReceiver<Vec<u8>>) {
 }
 
 async fn seite(web_push: bool) -> Seite {
+    seite_mit(web_push, false).await
+}
+
+/// Wie [`seite`], dazu auf Wunsch iOS-Push an ein Relais-Doppel.
+async fn seite_mit(web_push: bool, ios_push: bool) -> Seite {
     let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let relais = if ios_push {
+        let r = relais_doppel().await;
+        live.ios_push_einrichten(r.ios_push(&pool));
+        Some(r)
+    } else {
+        None
+    };
     let dienst = if web_push {
         live.web_push_einrichten(
             WebPush::einrichten_fuer_test(&pool, &["127.0.0.1", "push.example.org"], false)
@@ -63,6 +78,7 @@ async fn seite(web_push: bool) -> Seite {
         i: instanz_aus(app, pool).await,
         live,
         dienst,
+        relais,
     }
 }
 
@@ -111,6 +127,40 @@ impl Seite {
         serde_json::from_slice(&entschluesseln(&rumpf, &b.schluessel, &b.auth).unwrap()).unwrap()
     }
 
+    /// Ein iOS-Gerät für `benutzer` direkt im Speicher, mit eigener Sitzung; liefert seinen
+    /// Schlüssel.
+    async fn ios_geraet(&self, benutzer: i64) -> [u8; 32] {
+        let schluessel = [benutzer as u8; 32];
+        let sitzung = lifeline_hub::auth::session::anlegen(
+            &self.i.pool,
+            benutzer,
+            None,
+            lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+        )
+        .await
+        .unwrap();
+        lifeline_hub::ios_push::repo::anmelden(
+            &self.i.pool,
+            benutzer,
+            &lifeline_hub::auth::session::hash_token(&sitzung),
+            &lifeline_hub::ios_push::repo::Eingabe {
+                kennung: &format!("6f1c2a64-3b1e-4a55-9c1d-{benutzer:012x}"),
+                token: &format!("{benutzer:064x}"),
+                umgebung: "production",
+                schluessel: &b64(&schluessel),
+                wahl: &push_repo::Wahl::default(),
+            },
+        )
+        .await
+        .unwrap();
+        schluessel
+    }
+
+    /// Das Relais-Doppel dieser Instanz.
+    fn relais(&mut self) -> &mut RelaisDoppel {
+        self.relais.as_mut().expect("iOS-Push an")
+    }
+
     /// Kein Push innerhalb einer Sekunde.
     async fn kein_push(&mut self) {
         let rx = &mut self.dienst.as_mut().expect("Push an").1;
@@ -139,8 +189,13 @@ async fn abgleichen(elw: &Instanz) {
 /// Hub und ELW gekoppelt und gemeldet; Erika ist am ELW Führungspersonal eines Einsatzes, den der
 /// ELW führt und der Hub spiegelt. Ihre Aufnahme hat schon einen Hinweis am Hub erzeugt.
 async fn welt(hub_push: bool, elw_push: bool) -> Welt {
-    let hub = seite(hub_push).await;
-    let elw = seite(elw_push).await;
+    welt_mit((hub_push, false), (elw_push, false)).await
+}
+
+/// Wie [`welt`], je Seite mit `(Web Push, iOS-Push)`.
+async fn welt_mit(hub_push: (bool, bool), elw_push: (bool, bool)) -> Welt {
+    let hub = seite_mit(hub_push.0, hub_push.1).await;
+    let elw = seite_mit(elw_push.0, elw_push.1).await;
     schluessel(&hub.i).await;
     koppeln(&hub.i, &elw.i).await;
     melden(&elw.i).await;
@@ -747,4 +802,103 @@ async fn ein_konto_nur_am_elw_bekommt_den_push_vom_elw() {
     let _erika = w.elw.abo(w.erika_elw).await;
     aufnahme_an_erika(&w).await;
     w.elw.kein_push().await;
+}
+
+// ── iOS-Push je Kanal (LLH-2040, Aufgabe 7) ──────────────────────────────────────────────────
+
+async fn faehigkeit_ios(elw: &Instanz) -> bool {
+    eine(
+        &elw.pool,
+        "SELECT gegenueber_ios_push FROM instanz_kopplung LIMIT 1",
+    )
+    .await
+}
+
+/// Spec `ios-apns-alarme`, „Kopplung je Kanal“: der ELW lässt den Push an ein Konto vom Hub nur
+/// in dem Kanal aus, den der Hub selbst anbietet; im anderen pusht er wie ohne Kopplung.
+#[tokio::test]
+async fn elw_ueberspringt_hub_konten_nur_im_kanal_den_der_hub_kann() {
+    // Hub mit Web Push, ohne iOS: der ELW pusht iOS selbst, Web Push nicht.
+    let mut w = welt_mit((true, false), (true, true)).await;
+    assert_eq!(faehigkeiten(&w.elw.i).await, (true, true));
+    assert!(!faehigkeit_ios(&w.elw.i).await);
+    let _web = w.elw.abo(w.erika_elw).await;
+    let schluessel = w.elw.ios_geraet(w.erika_elw).await;
+    aufnahme_an_erika(&w).await;
+    let r = w.elw.relais().naechste().await;
+    let n = r["nachrichten"].as_array().unwrap();
+    assert_eq!(n.len(), 1);
+    let (_, k) = oeffnen(n[0]["nutzlast"].as_str().unwrap(), &schluessel);
+    assert_eq!(k["e"], w.einsatz);
+    w.elw.kein_push().await;
+
+    // Hub mit iOS, ohne Web Push: umgekehrt. Den iOS-Push übernimmt der Hub mit seinen Kennungen.
+    let mut w = welt_mit((false, true), (true, true)).await;
+    assert_eq!(faehigkeiten(&w.elw.i).await, (true, false));
+    assert!(faehigkeit_ios(&w.elw.i).await);
+    let web = w.elw.abo(w.erika_elw).await;
+    w.elw.ios_geraet(w.erika_elw).await;
+    let am_hub = w.hub.ios_geraet(w.erika_hub).await;
+    aufnahme_an_erika(&w).await;
+    let n = w.elw.push(&web).await;
+    assert_eq!(n["einsatz_id"], w.einsatz);
+    w.elw.relais().keine().await;
+    abgleichen(&w.elw.i).await;
+    let r = w.hub.relais().naechste().await;
+    let n = r["nachrichten"].as_array().unwrap();
+    assert_eq!(n.len(), 1);
+    let (_, k) = oeffnen(n[0]["nutzlast"].as_str().unwrap(), &am_hub);
+    assert_eq!(k["e"], w.spiegel, "Kennung des Hubs");
+}
+
+/// Kann der Hub iOS-Push, verweist der ELW ein Konto vom Hub dorthin und nimmt kein Gerät an;
+/// kann er es nicht, bleibt der Schalter am ELW, auch wenn der Hub Web Push anbietet.
+#[tokio::test]
+async fn elw_lehnt_ios_anmeldung_fuer_hub_konto_mit_422_ab_wenn_der_hub_ios_kann() {
+    const KENNUNG: &str = "6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f10";
+    let anmeldung = json!({
+        "kennung": KENNUNG,
+        "token": "ab".repeat(32),
+        "umgebung": "production",
+        "schluessel": b64(&[3u8; 32]),
+    })
+    .to_string();
+    let uri = format!("/api/ios-push?kennung={KENNUNG}");
+
+    let w = welt_mit((false, true), (false, true)).await;
+    let erika = sitzung(&w.elw.i, w.erika_elw).await;
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", &uri, &erika, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ueber_hub"]["adresse"], w.hub.i.adresse.as_str());
+    let (s, v) = common::anfrage(
+        &w.elw.i.app,
+        "PUT",
+        "/api/ios-push/anmeldung",
+        &erika,
+        Some(&anmeldung),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let zahl: i64 = eine(&w.elw.i.pool, "SELECT COUNT(*) FROM ios_push_anmeldung").await;
+    assert_eq!(zahl, 0, "nichts gespeichert");
+    // Ein Konto nur am ELW meldet sich dort an.
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", &uri, &w.elw.i.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("ueber_hub").is_none(), "{v}");
+
+    // Hub mit Web Push, ohne iOS: der iOS-Schalter bleibt am ELW.
+    let w = welt_mit((true, false), (false, true)).await;
+    let erika = sitzung(&w.elw.i, w.erika_elw).await;
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", &uri, &erika, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("ueber_hub").is_none(), "{v}");
+    let (s, v) = common::anfrage(
+        &w.elw.i.app,
+        "PUT",
+        "/api/ios-push/anmeldung",
+        &erika,
+        Some(&anmeldung),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 }

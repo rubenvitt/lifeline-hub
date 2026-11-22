@@ -442,3 +442,124 @@ mod relais_client {
         assert_eq!(pfade(&gesehen), ["/v1/server", "/v1/senden"]);
     }
 }
+
+// ---- Klartext, Kürzung, Kollaps (Aufgabe 7) ----
+
+mod nutzlast {
+    use crate::benachrichtigung::BenachrichtigungStufe;
+    use crate::ios_push::inhalt::{kuerzen, Klartext};
+    use crate::ios_push::krypto::{entschluesseln, umschlag_lesen};
+    use crate::ios_push::{kollaps, nutzlast_bauen, UMSCHLAG_MAX};
+
+    fn klartext(detail: Option<&str>, wortlaut: Option<&str>) -> Klartext {
+        Klartext {
+            v: 1,
+            s: "ELW 1".into(),
+            e: 4,
+            b: 77,
+            stufe: BenachrichtigungStufe::Alarm,
+            titel: "Sofortmeldung".into(),
+            detail: detail.map(str::to_owned),
+            pfad: "/einsaetze/4/meldungen?meldung=9".into(),
+            absender: Some("Florian Nord 1".into()),
+            wortlaut: wortlaut.map(str::to_owned),
+        }
+    }
+
+    fn groesse(k: &Klartext) -> usize {
+        serde_json::to_vec(k).unwrap().len() + 16
+    }
+
+    #[test]
+    fn klartext_traegt_die_feldnamen_des_entwurfs() {
+        let v = serde_json::to_value(klartext(None, Some("x"))).unwrap();
+        let mut felder: Vec<&String> = v.as_object().unwrap().keys().collect();
+        felder.sort_unstable();
+        assert_eq!(
+            felder,
+            ["absender", "b", "e", "pfad", "s", "stufe", "titel", "v", "wortlaut"]
+        );
+        assert_eq!(v["stufe"], "alarm");
+    }
+
+    #[test]
+    fn kuerzen_schneidet_den_wortlaut_an_einer_zeichengrenze() {
+        let lang = "ä🚑".repeat(10_000);
+        let mut k = klartext(Some("Meldung 9"), Some(&lang));
+        kuerzen(&mut k, 1000);
+        assert!(groesse(&k) <= 1000, "{}", groesse(&k));
+        let w = k.wortlaut.as_deref().unwrap();
+        let anfang = w.strip_suffix('…').unwrap();
+        assert!(lang.starts_with(anfang));
+        assert!(
+            groesse(&k) > 900,
+            "nicht mehr als nötig gekürzt: {}",
+            groesse(&k)
+        );
+        assert_eq!(k.detail.as_deref(), Some("Meldung 9"), "Detail bleibt");
+    }
+
+    #[test]
+    fn kuerzen_laesst_einen_passenden_klartext_unveraendert() {
+        let mut k = klartext(Some("Meldung 9"), Some("kurz"));
+        let vorher = k.clone();
+        kuerzen(&mut k, 4096);
+        assert_eq!(k, vorher);
+    }
+
+    #[test]
+    fn kuerzen_nimmt_danach_das_detail() {
+        let lang = "x".repeat(2000);
+        let mut k = klartext(Some(&lang), Some(&lang));
+        kuerzen(&mut k, 600);
+        assert!(groesse(&k) <= 600, "{}", groesse(&k));
+        assert_eq!(k.wortlaut, None, "Wortlaut zuerst weg");
+        assert!(k.detail.as_deref().unwrap().ends_with('…'));
+    }
+
+    #[test]
+    fn nutzlast_bleibt_unter_der_grenze_und_ist_entschluesselbar() {
+        let lang = "ä🚑".repeat(10_000);
+        let schluessel = [9u8; 32];
+        let kennung = "6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f10";
+        let mut k = klartext(Some("Meldung 9"), Some(&lang));
+        let n = nutzlast_bauen(kennung, &schluessel, &mut k).unwrap();
+        assert!(n.len() <= UMSCHLAG_MAX, "{}", n.len());
+        const { assert!(UMSCHLAG_MAX <= 4096) };
+        let (k2, nonce, chiffrat) = umschlag_lesen(&n).unwrap();
+        assert_eq!(k2, kennung);
+        let klar = entschluesseln(&schluessel, kennung, &nonce, &chiffrat).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&klar).unwrap();
+        assert!(v["wortlaut"].as_str().unwrap().ends_with('…'));
+        // Mit falscher Kennung (AAD) nicht entschlüsselbar.
+        assert!(entschluesseln(&schluessel, "andere", &nonce, &chiffrat).is_err());
+    }
+
+    #[test]
+    fn zwei_nutzlasten_haben_verschiedene_nonces() {
+        let schluessel = [9u8; 32];
+        let kennung = "6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f10";
+        let a = nutzlast_bauen(kennung, &schluessel, &mut klartext(None, None)).unwrap();
+        let b = nutzlast_bauen(kennung, &schluessel, &mut klartext(None, None)).unwrap();
+        assert_ne!(umschlag_lesen(&a).unwrap().1, umschlag_lesen(&b).unwrap().1);
+    }
+
+    #[test]
+    fn kollaps_ist_ein_kurzer_hash_ohne_kennungen() {
+        let k = kollaps("s1", 77);
+        assert_eq!(k.len(), 32);
+        assert!(k
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert_eq!(k, kollaps("s1", 77));
+        assert_ne!(k, kollaps("s1", 78));
+        assert_ne!(k, kollaps("s2", 77));
+        // sha256("s1:77"), erste 32 Hex-Zeichen.
+        use sha2::{Digest, Sha256};
+        let voll: String = Sha256::digest(b"s1:77")
+            .iter()
+            .map(|x| format!("{x:02x}"))
+            .collect();
+        assert_eq!(k, voll[..32]);
+    }
+}

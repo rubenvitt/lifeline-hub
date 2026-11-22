@@ -830,6 +830,7 @@ pub async fn melden(
         &anfrage.kopplung,
         &body,
         state.live.web_push().is_some(),
+        state.live.ios_push().is_some(),
     )
     .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
