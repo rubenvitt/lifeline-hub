@@ -33,7 +33,8 @@ import {
  * Einsatzleiter (LFH-1199) und zwei einsatzlokalen Sprechgruppen kommen über die API, jeweils nur,
  * wenn sie noch fehlen (ein Lauf aller Kapitel teilt eine Datenbank). Kartengrundlage und
  * Ortssuche ohne Netz: Kacheln aus `e2e/kartenFixture.ts`, die Treffer der Ortssuche per
- * `page.route`, ebenso der Ortsname der Koordinate (kein Geocoder im Bildlauf).
+ * `page.route`. Einen Ortsnamen der Koordinate gibt es nicht: der Geocoder zeigt im Bildlauf auf
+ * Loopback (`e2e/geocoder-kern.ts`, LLH-2063).
  */
 
 const KAPITEL = 'einsatzdaten';
@@ -148,14 +149,8 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await kartengrundlage(page);
-    // Den Ortsnamen unter der Koordinate holt der Server bei einem externen Geocoder; mit Netz
-    // stünde dort ein echter Ort statt Musterstadt, und die Zeile schöbe die Paneele aus dem Bild.
-    // Wie in `lagemeldungen.bilder.ts`: die Vorschau ohne Ortsnamen.
-    await page.route(`**/api/einsaetze/${demo.id}/ort-vorschau*`, async (route) => {
-      const antwort = await route.fetch();
-      const json = (await antwort.json()) as Record<string, unknown>;
-      await route.fulfill({ response: antwort, json: { ...json, ortsname: null } });
-    });
+    // Die Ort-Vorschau trägt keinen Ortsnamen: der Geocoder zeigt im Bildlauf auf Loopback
+    // (`e2e/geocoder-kern.ts`, LLH-2063), die Peilung rechnet der Server selbst.
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     await expect(page.getByRole('region', { name: 'Erstmeldung' })).toBeVisible();

@@ -17,6 +17,14 @@ test.describe(KAPITEL, () => {
   test('Sektion „Anzeige“', async ({ page }) => {
     await anmelden(page);
     await uhrAnhalten(page);
+    // Der Lauf lenkt den Geocoder auf Loopback (`e2e/geocoder-kern.ts`, LLH-2063); das Bild zeigt
+    // das Feld, wie eine Organisation es vorfindet: leer, also der öffentliche Nominatim.
+    await page.route('**/api/org-einstellungen', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const antwort = await route.fetch();
+      const json = (await antwort.json()) as Record<string, unknown>;
+      await route.fulfill({ response: antwort, json: { ...json, geocoder_url: null } });
+    });
     await page.goto('/admin/einstellungen/anzeige');
     const formular = page.locator('form');
     await expect(formular.getByLabel('Geocoder-URL')).toBeVisible();
