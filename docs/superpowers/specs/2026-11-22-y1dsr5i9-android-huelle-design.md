@@ -266,8 +266,7 @@ mit dem Druckadapter des WebViews.
   steht in keinem `needs` davor; ein roter Bau hält weder Release noch Deployment auf.
 - Ein Manifest `android.json` `{ version, version_code, url, sha256 }` (`url` zeigt auf die
   APK des versionierten Release) liegt:
-  - für stabile Tags als Asset am Release, also unter
-    `…/releases/latest/download/android.json`;
+  - für stabile Tags im Kanal-Release `android-stabil` (Nachtrag 22.11.2026, siehe unten);
   - für Alpha und Beta im Kanal-Release `android-alpha` bzw. `android-beta` (Vorabversion, nie
     „latest“), fortgeschrieben nach denselben Regeln wie `scripts/release/desktop-kanal.mjs`
     (jeder Vorabkanal nur seine eigenen, stabile schreiben beide fort, nur vorwärts). Dort liegt
@@ -276,8 +275,12 @@ mit dem Druckadapter des WebViews.
     eigenen Kanals**, ein stabiles Release schreibt nur das Manifest fort: Wer nach einem
     stabilen Release über den Alpha-Code installiert, bekommt die letzte Alpha, legt damit den
     Kanal `alpha` fest und wird danach über das Manifest auf das stabile Release gehoben.
-  - Für stabile Tags liegt die APK zusätzlich unter festem Namen am Release, also unter
-    `…/releases/latest/download/lifeline-hub-android.apk`.
+  - Für stabile Tags liegt die APK unter festem Namen im Kanal-Release `android-stabil`, das nur
+    stabile Tags und nur vorwärts ersetzen.
+  - **Nachtrag 22.11.2026 (Review):** Ursprünglich hing der stabile Kanal an
+    `…/releases/latest/download/…`. Dort gäbe es zwischen Freigabe und fertigem Android-Bau, und
+    dauerhaft bei rotem Bau, nur 404. Mit dem Kanal-Release `android-stabil` bleibt der letzte
+    stabile Stand erreichbar; das Ziel dieses Abschnitts bleibt unverändert.
 - **Signieren:** ein Schlüssel für immer (Fakt: ein anderer Schlüssel kann die App nicht
   ersetzen). Keystore und Passwörter als GitHub-Geheimnisse; ohne Geheimnisse scheitert der
   Job sichtbar, das Release bleibt. Ruben legt den Schlüssel einmal an; die Anleitung steht in

@@ -56,24 +56,24 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `@Serializable(with = …) data class ServerAdresse(val text: String, val host: String) { val port: Int? ; companion object { fun parse(eingabe: String): ServerAdresse /* wirft AdressException(error: AdressError) */ } }`
 - Produces: `object GemeinsameFaelle { fun <T> load(name: String, serializer: KSerializer<T>): T }` (Test-Hilfe; Pfad `src-tauri/faelle` relativ zur Repo-Wurzel, gefunden über das Arbeitsverzeichnis des Testlaufs)
 
-- [ ] **Step 1: Gerüst anlegen.** `android/kern` ist ein eigenständiger Gradle-Build (Kotlin/JVM, JVM-Ziel 17, kotlinx.serialization, JUnit 5) mit eigenem `settings.gradle.kts`; `android/settings.gradle.kts` bindet ihn per `includeBuild("kern")` ein (die App kommt in Task 10). Wrapper auf Gradle 9.9.2. `android/kern` konfiguriert sich ohne Android-SDK: `android/gradlew -p android/kern test` läuft mit nur JDK.
+- [x] **Step 1: Gerüst anlegen.** `android/kern` ist ein eigenständiger Gradle-Build (Kotlin/JVM, JVM-Ziel 17, kotlinx.serialization, JUnit 5) mit eigenem `settings.gradle.kts`; `android/settings.gradle.kts` bindet ihn per `includeBuild("kern")` ein (die App kommt in Task 10). Wrapper auf Gradle 9.9.2. `android/kern` konfiguriert sich ohne Android-SDK: `android/gradlew -p android/kern test` läuft mit nur JDK.
 
-- [ ] **Step 2: Failing tests schreiben** — `AdresseTest`:
+- [x] **Step 2: Failing tests schreiben** — `AdresseTest`:
   - `` `jeder gemeinsame Fall der Adressprüfung gilt` `` liest `adresse.json`, prüft je Fall `ServerAdresse.parse(eingabe).text == adresse` bzw. `AdressException.error.kennwort == fehler`, und `meldungen[kennwort] == AdressError.meldung` für alle fünf.
   - `` `Standardport fällt weg, Host wird klein` ``: `parse("https://ELW.local:443/a?b#c").text == "https://elw.local/a?b#c"`.
   - `` `Adresse überlebt JSON` ``: Serialisieren und Lesen ergibt dieselbe Adresse; ein ungültiger Text beim Lesen wirft.
 
-- [ ] **Step 3: Lauf rot** — `android/gradlew -p android/kern test` → FAIL (Klassen fehlen).
+- [x] **Step 3: Lauf rot** — `android/gradlew -p android/kern test` → FAIL (Klassen fehlen).
 
-- [ ] **Step 4: `ServerAdresse.parse` umsetzen** nach `Adresse.swift` Regel für Regel (Trimmen, `leer`, Schema lesen, drei Schrägstriche, `ohne_host` für Schemata mit Host, `kein_https`, Zugangsdaten). Eigene kleine Zerlegung über `java.net.URI` mit Rückfall auf Handzerlegung, wo `URI` strenger ist; Wahrheit sind die gemeinsamen Fälle.
+- [x] **Step 4: `ServerAdresse.parse` umsetzen** nach `Adresse.swift` Regel für Regel (Trimmen, `leer`, Schema lesen, drei Schrägstriche, `ohne_host` für Schemata mit Host, `kein_https`, Zugangsdaten). Eigene kleine Zerlegung über `java.net.URI` mit Rückfall auf Handzerlegung, wo `URI` strenger ist; Wahrheit sind die gemeinsamen Fälle.
 
-- [ ] **Step 5: Lauf grün** — `android/gradlew -p android/kern test` → PASS.
+- [x] **Step 5: Lauf grün** — `android/gradlew -p android/kern test` → PASS.
 
-- [ ] **Step 6: Gate.** `schritt_20` in `check-all.sh` nach dem Muster von `schritt_18`: „Kotlin-Kern der Android-Hülle gegen die gemeinsamen Fälle (LLH-1989)“; ohne `java` (oder Version < 17) Lücke, mit `ANDROID_KERN_PFLICHT=1` rot; sonst `"$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain`. `BUENDEL_android="20"`, in `alle`, `--nur android`, Hilfe-Kopf. `bereiche.sh`: neue Ausgabe `android=true|false`; `android/*` → `android`; `src-tauri/faelle/*` zusätzlich `android`; `android/app/src/main/assets/huelle.js` → `frontend android`. Fälle in `bereiche.test.sh` dafür.
+- [x] **Step 6: Gate.** `schritt_20` in `check-all.sh` nach dem Muster von `schritt_18`: „Kotlin-Kern der Android-Hülle gegen die gemeinsamen Fälle (LLH-1989)“; ohne `java` (oder Version < 17) Lücke, mit `ANDROID_KERN_PFLICHT=1` rot; sonst `"$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain`. `BUENDEL_android="20"`, in `alle`, `--nur android`, Hilfe-Kopf. `bereiche.sh`: neue Ausgabe `android=true|false`; `android/*` → `android`; `src-tauri/faelle/*` zusätzlich `android`; `android/app/src/main/assets/huelle.js` → `frontend android`. Fälle in `bereiche.test.sh` dafür.
 
-- [ ] **Step 7: Prüfen** — `./scripts/check-all.sh --nur android` → OK; `scripts/bereiche.test.sh` → OK.
+- [x] **Step 7: Prüfen** — `./scripts/check-all.sh --nur android` → OK; `scripts/bereiche.test.sh` → OK.
 
-- [ ] **Step 8: Commit** `feat(android): Kotlin-Kern mit Adressprüfung im Gate (LLH-1989)`
+- [x] **Step 8: Commit** `feat(android): Kotlin-Kern mit Adressprüfung im Gate (LLH-1989)`
 
 ### Task 2: Deeplink, QR-Code, Linkregeln, Linkweiche, Downloadablage
 
@@ -87,11 +87,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `object Linkregeln { enum class Ziel(val kennwort: String) { HUELLE, NEBENFENSTER, DOWNLOAD, SYSTEM, VERWERFEN }; fun neuesFenster(server: URI?, ziel: URI): Ziel; fun navigation(server: URI?, ziel: URI): Ziel; fun belongsToServer(server: URI, seite: URI): Boolean; internal fun isEigeneOrigin(server: URI?, ziel: URI): Boolean }`
 - Produces: `object Linkweiche { sealed interface Entscheidung { data object Erlauben; data object Abbrechen; data object Download; data class ImWebviewLaden(val url: URI); data class System(val url: URI) }; fun navigation(server: URI?, ziel: URI, isMainFrame: Boolean, neuesFenster: Boolean, seite: URI?): Entscheidung }` und `object Downloadablage { fun dateiname(vorschlag: String): String }`
 
-- [ ] **Step 1: Failing tests** — `` `jeder gemeinsame Fall des Deeplinks gilt` `` (`deute`, `entscheide` aus `deeplink.json`); `` `ein unbekannter Server wird vorbelegt statt gewechselt` `` (zweite `decide`); `` `jeder gemeinsame Fall der Linkregeln gilt` `` (`neues_fenster`, `navigation`, `gehoert_zum_server` aus `links.json`); Linkweiche-Fälle wie `LinkweicheTests.swift` ohne `shouldPerformDownload`/`antwort` (Android meldet Downloads über den `DownloadListener`, Task 13); Review Focus 5: `` `fremder QR-Inhalt belegt nichts vor` `` mit `"WIFI:S:ELW;T:WPA;P:x;;"`, `"http://elw.local"`, `"lifeline://verbinden?server=https://elw.local:8443@evil.example"` → jeweils `null`; `Downloadablage.dateiname` mit `"../a/b:c.csv"` → `"b_c.csv"`, `"..."` → `"Download"`.
-- [ ] **Step 2: Lauf rot** — `android/gradlew -p android/kern test` → FAIL.
-- [ ] **Step 3: Umsetzen** nach `Deeplink.swift`, `Linkregeln.swift`, `Linkweiche.swift`, `Huellenhilfen.swift` (`adresseAusQrCode`).
-- [ ] **Step 4: Lauf grün** → PASS.
-- [ ] **Step 5: Commit** `feat(android): Deeplink und Linkregeln im Kern (LLH-1989)`
+- [x] **Step 1: Failing tests** — `` `jeder gemeinsame Fall des Deeplinks gilt` `` (`deute`, `entscheide` aus `deeplink.json`); `` `ein unbekannter Server wird vorbelegt statt gewechselt` `` (zweite `decide`); `` `jeder gemeinsame Fall der Linkregeln gilt` `` (`neues_fenster`, `navigation`, `gehoert_zum_server` aus `links.json`); Linkweiche-Fälle wie `LinkweicheTests.swift` ohne `shouldPerformDownload`/`antwort` (Android meldet Downloads über den `DownloadListener`, Task 13); Review Focus 5: `` `fremder QR-Inhalt belegt nichts vor` `` mit `"WIFI:S:ELW;T:WPA;P:x;;"`, `"http://elw.local"`, `"lifeline://verbinden?server=https://elw.local:8443@evil.example"` → jeweils `null`; `Downloadablage.dateiname` mit `"../a/b:c.csv"` → `"b_c.csv"`, `"..."` → `"Download"`.
+- [x] **Step 2: Lauf rot** — `android/gradlew -p android/kern test` → FAIL.
+- [x] **Step 3: Umsetzen** nach `Deeplink.swift`, `Linkregeln.swift`, `Linkweiche.swift`, `Huellenhilfen.swift` (`adresseAusQrCode`).
+- [x] **Step 4: Lauf grün** → PASS.
+- [x] **Step 5: Commit** `feat(android): Deeplink und Linkregeln im Kern (LLH-1989)`
 
 ### Task 3: Serverliste, Ablage, Entfernen
 
@@ -106,11 +106,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `class Serverablage(val verzeichnis: File) { fun load(): Serverliste; fun save(liste: Serverliste); fun loadOrRecover(): Serverliste }` (`server.json`, defekt → `server.defekt.json`)
 - Produces: `interface Entfernungsdienste { val serverliste: Serverliste; fun closeWebView(profil: String); suspend fun removeProfil(profil: String); fun removeEintrag(id: String) }`, `object Serverentfernung { val HINWEIS: String; fun rueckfrageTitel(e: ServerEintrag): String; fun isEntfernbar(id: String, liste: Serverliste): Boolean; suspend fun run(id: String, dienste: Entfernungsdienste) /* wirft EntfernungException(Fehler) */ ; sealed interface Fehler { Unbekannt; Aktiv; data class Profil(val name: String, val grund: String); val meldung: String } }`
 
-- [ ] **Step 1: Failing tests** nach `ServerlisteTests.swift`, `ServerentfernungTests.swift` und den Ablage-Fällen aus `HuellenhilfenTests.swift`, dazu: `` `markGeladen merkt sich, dass das Profil diesen Server schon zeigte` ``; Review Focus 4: `` `scheitert das Löschen des Profils, bleibt der Eintrag und ein zweiter Versuch geht` `` (Attrappe wirft beim ersten `removeProfil`, beim zweiten nicht; Reihenfolge der Aufrufe `closeWebView` → `removeProfil` → `removeEintrag`). Texte (`HINWEIS`, Meldungen) wortgleich wie Swift, „Datenspeicher“ → „Daten“ bleibt.
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen** (immutable Werte statt `mutating`; Coroutines nur `kotlinx-coroutines-core` im Kern).
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Serverliste und Entfernen im Kern (LLH-1989)`
+- [x] **Step 1: Failing tests** nach `ServerlisteTests.swift`, `ServerentfernungTests.swift` und den Ablage-Fällen aus `HuellenhilfenTests.swift`, dazu: `` `markGeladen merkt sich, dass das Profil diesen Server schon zeigte` ``; Review Focus 4: `` `scheitert das Löschen des Profils, bleibt der Eintrag und ein zweiter Versuch geht` `` (Attrappe wirft beim ersten `removeProfil`, beim zweiten nicht; Reihenfolge der Aufrufe `closeWebView` → `removeProfil` → `removeEintrag`). Texte (`HINWEIS`, Meldungen) wortgleich wie Swift, „Datenspeicher“ → „Daten“ bleibt.
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen** (immutable Werte statt `mutating`; Coroutines nur `kotlinx-coroutines-core` im Kern).
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Serverliste und Entfernen im Kern (LLH-1989)`
 
 ### Task 4: Vertrag, Fehlerklassen, Status-Seiten und Texte
 
@@ -128,14 +128,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `sealed interface Statusseite { data object Zertifikat; data object NichtErreichbar; data class NichtVertraeglich(val klasse: Fehlerklasse, val serverVersion: String?); data object WebviewVeraltet; companion object { fun from(ergebnis: Vertragsergebnis, healthVersion: String?): Statusseite? } }`
 - Produces: `data class Statustext(val titel: String, val text: String, val schritte: List<String>)`; `fun Statusseite.text(servername: String?, appVersion: String?): Statustext`
 
-- [ ] **Step 1: Failing tests** nach `VertragTests.swift` und `StatustextTests.swift`, mit diesen Android-Abweichungen:
+- [x] **Step 1: Failing tests** nach `VertragTests.swift` und `StatustextTests.swift`, mit diesen Android-Abweichungen:
   - `` `Zertifikat nennt den Android-Weg` ``: `schritte` = `["CA-Zertifikat auf das Gerät laden.", "Unter Einstellungen → Sicherheit → Weitere Sicherheitseinstellungen → Zertifikat installieren → CA-Zertifikat das Zertifikat auswählen (der Menüpfad heißt je nach Hersteller etwas anders).", "Zurück in die App wechseln oder „Erneut prüfen“ tippen."]`; `text` wie iOS mit „CA-Zertifikat“ statt „CA-Profil“.
   - `` `App aktualisieren verweist auf das Update der App` ``: Text endet mit „Bitte die App aktualisieren.“ (statt TestFlight).
   - `` `veralteter System-WebView hat eine eigene Seite` ``: `WebviewVeraltet.text(...)` → Titel „System-WebView aktualisieren“, Text „Diese App braucht einen aktuellen System-WebView, damit jeder Server seine eigenen Daten hat. Bitte „Android System WebView“ über Google Play aktualisieren.“
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.** `Netzfehler.ABGEBROCHEN` ist kein Fehler der Seite (wie `cancelled`).
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Vertragsprüfung und Status-Seiten im Kern (LLH-1989)`
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.** `Netzfehler.ABGEBROCHEN` ist kein Fehler der Seite (wie `cancelled`).
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Vertragsprüfung und Status-Seiten im Kern (LLH-1989)`
 
 ### Task 5: Ablauf mit Start ohne Server, Onboarding, Rückkehr, Testzustand
 
@@ -150,7 +150,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `class Rueckkehr { enum class Phase { ACTIVE, INACTIVE, BACKGROUND }; fun melde(phase: Phase): Boolean }`
 - Produces: `enum class Testzustand(val wert: String) { ONBOARDING("onboarding"), SERVERLISTE("serverliste"), EINSTELLUNGEN("einstellungen"), ZERTIFIKAT("zertifikat"), NICHT_ERREICHBAR("nicht-erreichbar"), ZU_ALT("zu-alt"), ZU_NEU("zu-neu"), WEBVIEW_VERALTET("webview-veraltet"), UPDATE_BEREIT("update-bereit"), UPDATE_LAEUFT("update-laeuft"), WEB("web"), FREMDE_SEITE("fremde-seite"); companion object { const val EXTRA = "lifeline.testzustand"; fun from(wert: String?): Testzustand? } }` und `Testzustand.BEISPIELSEITE` (HTML aus `Huellenstil.swift`)
 
-- [ ] **Step 1: Failing tests** — alle Fälle aus `AblaufTests.swift` und `OnboardingTests.swift` übertragen; dazu die Android-Fälle (Entwurf D3, D5):
+- [x] **Step 1: Failing tests** — alle Fälle aus `AblaufTests.swift` und `OnboardingTests.swift` übertragen; dazu die Android-Fälle (Entwurf D3, D5):
   - `` `ohne taugliches WebView zeigt der Start nur die Seite WebView veraltet` ``: `next(Onboarding, Start(aktiv=e, webviewTauglich=false)).seite == WebviewVeraltet`, keine Effekte; ebenso ohne Server.
   - `` `ohne Netz lädt ein schon geladener Server offline` ``: aus `Pruefung(e mit geladenImProfil=true, bestaetigterVertrag=1)` und `Ergebnis(NichtErreichbar(NICHT_ERREICHBAR))` → `Web(e, 1, offline=true)` mit `[Load(e), ScheduleRetry]`.
   - Review Focus 3: `` `ohne Netz zeigt ein nie geladener Server nicht erreichbar` ``: wie oben mit `geladenImProfil=false` → `Status(e, NichtErreichbar)` mit `[ScheduleRetry]`.
@@ -158,10 +158,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
   - `` `offline geladen und Hauptnavigation scheitert zeigt nicht erreichbar` ``: `Web(e,1,offline=true)` + `NavigationFehlgeschlagen(VERBINDUNG, url=e.adresse)` → `Status(e, NichtErreichbar)` mit `[ScheduleRetry]`.
   - `` `offline geladen prüft weiter und lädt bei Rückkehr des Servers nicht neu` ``: `Web(offline=true)` + `Wiederholen` → `[Check(e)]`; danach `Ergebnis(Vertraeglich(1))` → `Web(e,1,offline=false)` mit `[MarkVerbunden]` ohne `Load`; `Ergebnis(NichtErreichbar)` → bleibt `Web(offline=true)` mit `[ScheduleRetry]`.
   - `` `nach dem ersten geladenen Commit merkt sich die App das Profil` ``: `Web(e,1)` + `SeiteGeladen(url auf e)` mit `e.geladenImProfil=false` → Effekt `MarkGeladen(e.id)`.
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen** nach `Ablauf.swift` mit den Ergänzungen oben.
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Ablauf mit Start ohne Server im Kern (LLH-1989)`
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen** nach `Ablauf.swift` mit den Ergänzungen oben.
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Ablauf mit Start ohne Server im Kern (LLH-1989)`
 
 ### Task 6: Brücke, Befehle, Ausführung, Haptik, Init-Skript, Stil, Dialoge
 
@@ -178,16 +178,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `object Haptik { enum class Feedback { CONFIRM, REJECT, WARNING, SELECTION, TAP }; fun feedback(kind: String, isEnabled: Boolean): Feedback?; const val SCHALTER_SCHLUESSEL = "haptik"; fun isEnabled(gespeichert: Boolean?): Boolean }` (Zuordnung zu `HapticFeedbackConstants` macht die App, Task 13)
 - Produces: `object Initskript { const val PLATZHALTER = "__LIFELINE_VERSION__"; fun render(vorlage: String, version: String?): String }`, `object Huellenstil { const val KENNUNG; val CSS; val skript: String }`, `data class Seitendialog(…)` wie Swift
 
-- [ ] **Step 1: Failing tests** nach `BrueckeTests.swift`, `BrueckenbefehlTests.swift`, `HaptikTests.swift`, `InitskriptTests.swift`, `HuellenstilTests.swift`, `SeitendialogTests.swift`; Nachrichten kommen als JSON-Text (`{"cmd":"print","id":3}`), Zahlen als JSON-Zahlen, `"3"` als Text ist keine `id`. Dazu:
+- [x] **Step 1: Failing tests** nach `BrueckeTests.swift`, `BrueckenbefehlTests.swift`, `HaptikTests.swift`, `InitskriptTests.swift`, `HuellenstilTests.swift`, `SeitendialogTests.swift`; Nachrichten kommen als JSON-Text (`{"cmd":"print","id":3}`), Zahlen als JSON-Zahlen, `"3"` als Text ist keine `id`. Dazu:
   - `` `allowedOriginRule nennt Schema, Host und Port ohne Standardport` ``: `https://elw.local:8443/` → `"https://elw.local:8443"`, `https://elw.local/` → `"https://elw.local"`.
   - Review Focus 1: `` `nach einem Wechsel nimmt die Brücke die alte Origin nicht mehr an` ``: `accepts(true, origin(A), aktiverServer=B) == false`; und `` `ohne Origin nimmt die Brücke nichts an` `` (`origin = null`).
   - `` `set_app_badge gibt es auf Android nicht` `` → `Ungueltig`.
   - `` `Haptik bildet tap auf TAP und unbekanntes auf nichts ab` ``.
   - `` `ein zu großer blob-Download wird abgelehnt` `` und `` `download_blob ohne Namen heißt Download` ``.
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen** nach den Swift-Vorbildern; `replyJson` liefert `{"id":…,"fehler":…|null,"wert":…}` für den Reply-Proxy (Task 9 liest genau das).
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Brücke, Haptik und Init-Skript im Kern (LLH-1989)`
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen** nach den Swift-Vorbildern; `replyJson` liefert `{"id":…,"fehler":…|null,"wert":…}` für den Reply-Proxy (Task 9 liest genau das).
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Brücke, Haptik und Init-Skript im Kern (LLH-1989)`
 
 ### Task 7: Anmeldung im Browser
 
@@ -200,11 +200,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `object Anmeldung { const val ANMELDESEITE = "/login"; const val BESTAETIGUNG = "/app-anmeldung"; const val EREIGNIS = "lifeline:app-anmeldung"; const val RUECKSPRUNG_HOST = "anmeldung"; enum class Ergebnis { ANGEMELDET, ABGELEHNT, FEHLER, ABGEBROCHEN }; sealed interface Ende { data class Ruecksprung(val url: String); data object Abgebrochen; data object Fehler }; sealed interface Folge { data class Einloesen(val code: String); data class Melden(val ergebnis: Ergebnis); data object Nichts }; fun bestaetigungUrl(server: ServerAdresse, challenge: String): URI; fun code(ausRuecksprung: String): String?; fun folge(ende: Ende, seite: URI?, server: ServerAdresse): Folge; fun einloeseSkript(server: ServerAdresse, code: String, verifier: String): String; fun meldungSkript(ergebnis: Ergebnis): String }`
 - Produces: `class Anmeldelauf<W> { val isLaufend: Boolean; fun naechste(): Long; fun merke(generation: Long, wert: W); fun nimm(): W?; fun beende(generation: Long): W? }`
 
-- [ ] **Step 1: Failing tests** nach `AnmeldungTests.swift` (RFC-7636-Vektor: `challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFxWFlXT0") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"`; NIST-Vektoren entfallen, `MessageDigest` ist erprobt), dazu `` `ein Rücksprung ohne laufende Anmeldung bleibt wirkungslos` ``: `Anmeldelauf` leer → `nimm() == null`, die App wertet dann nichts aus (Entwurf D7).
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.**
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Anmeldung im Browser im Kern (LLH-1989)`
+- [x] **Step 1: Failing tests** nach `AnmeldungTests.swift` (RFC-7636-Vektor: `challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFxWFlXT0") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"`; NIST-Vektoren entfallen, `MessageDigest` ist erprobt), dazu `` `ein Rücksprung ohne laufende Anmeldung bleibt wirkungslos` ``: `Anmeldelauf` leer → `nimm() == null`, die App wertet dann nichts aus (Entwurf D7).
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.**
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Anmeldung im Browser im Kern (LLH-1989)`
 
 ### Task 8: Kanal und Updater-Entscheidungen
 
@@ -220,7 +220,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `object Installzeitpunkt { enum class Lage { START_VOR_OBERFLAECHE, VORDERGRUND, HINTERGRUND }; enum class Weg { INSTALLIEREN, HINWEIS, WARTEN }; fun decide(lage: Lage, imHintergrundSeit: Long?, jetzt: Long, brauchtRueckfrage: Boolean): Weg }`
 - Produces: `enum class Updatestand { KEINS, LAEDT, BEREIT, INSTALLIERT_GLEICH, BLOCKIERT, ERLAUBNIS_FEHLT, FEHLER }` (für Einstellungen und Hinweis)
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `` `Kanal folgt dem Vorab-Suffix` ``: `"1.0.0-alpha.196"` → `ALPHA`, `"1.0.0-beta.3"` → `BETA`, `"1.0.0"` → `STABIL`, `"1.0.0-rc.1"`, `"0.0.0-dev"`, `""` → `null`.
   - `` `Manifest-Adressen je Kanal` `` mit den drei URLs oben.
   - `` `nur ein neueres Release mit größerem Code ist ein Update` ``: eigene `1.0.0-alpha.5`/100 gegen `1.0.0-alpha.6`/101 → `true`; gegen `1.0.0-alpha.6`/100 → `false`; gegen `1.0.0`/200 → `true`; gegen `1.0.0-alpha.4`/300 → `false`.
@@ -230,10 +230,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
   - `` `beim Start vor der Oberfläche wird installiert` `` (`START_VOR_OBERFLAECHE`, beide Werte von `brauchtRueckfrage`) → `INSTALLIEREN`.
   - `` `im Hintergrund erst nach 15 Minuten und nur ohne Rückfrage` ``: 14 min → `WARTEN`; 15 min, `brauchtRueckfrage=false` → `INSTALLIEREN`; 15 min, `true` → `HINWEIS`.
   - `Semver.compare` mit Vorrangfällen aus semver.org (`1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-beta < 1.0.0`).
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.**
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Kanal und Updater-Entscheidungen im Kern (LLH-1989)`
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.**
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Kanal und Updater-Entscheidungen im Kern (LLH-1989)`
 
 ### Task 9: Init-Skript der Android-Hülle und Frontend
 
@@ -247,11 +247,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Consumes: Wire-Format aus `ios/App/Huelle/huelle.js` (Befehle, `id`, Antwort `{ id, fehler, wert }`), `Initskript.PLATZHALTER`
 - Produces: Skript erwartet `window.lifeline` mit `postMessage(text: string)` und `onmessage`/`addEventListener('message', …)` (Objekt von `addWebMessageListener`); sendet `JSON.stringify({ cmd, id, … })`; Antworten kommen als `event.data` = JSON-Text aus `Bruecke.replyJson`. Kennung: `platform: 'android'`, `version`, `passkey: false`, `anmeldungImBrowser`, `haptics`, `benachrichtigungZeigen`; ersetzt `window.print`; fängt Klicks auf `<a download href="blob:…">` der eigenen Seite ab, liest den Blob und sendet `download_blob` `{ name, data }` (Base64); ohne `window.lifeline` tut es nichts.
 
-- [ ] **Step 1: Failing tests** in `androidHuelle.test.ts` nach `iosHuelle.test.ts`: Kennung vollständig und ohne `setAppBadge`; `haptics('unknown')` sendet nichts und wirft nie; `benachrichtigungZeigen` erfüllt/lehnt ab nach Antwort; `print` sendet `print`; ohne Brücke keine Kennung; Platzhalter bleibt → `version` fehlt; `` `blob-Download geht als download_blob an die Hülle` `` (Klick auf einen `<a download="liste.csv" href="blob:…">` sendet `{ cmd: 'download_blob', name: 'liste.csv', data }` und verhindert die Standardaktion). `adresse.test.ts`: `platform 'android'` → `oberflaeche=Android-App`.
-- [ ] **Step 2: Lauf rot** — `mise exec -- pnpm -C frontend exec vitest run src/huelle/androidHuelle.test.ts src/rueckmeldung` → FAIL.
-- [ ] **Step 3: Skript und Frontend umsetzen.**
-- [ ] **Step 4: Lauf grün** — dieselben Tests → PASS; `mise exec -- pnpm -C frontend typecheck` und Lint → OK.
-- [ ] **Step 5: Commit** `feat(android): Init-Skript der Android-Hülle mit Vitest (LLH-1989)`
+- [x] **Step 1: Failing tests** in `androidHuelle.test.ts` nach `iosHuelle.test.ts`: Kennung vollständig und ohne `setAppBadge`; `haptics('unknown')` sendet nichts und wirft nie; `benachrichtigungZeigen` erfüllt/lehnt ab nach Antwort; `print` sendet `print`; ohne Brücke keine Kennung; Platzhalter bleibt → `version` fehlt; `` `blob-Download geht als download_blob an die Hülle` `` (Klick auf einen `<a download="liste.csv" href="blob:…">` sendet `{ cmd: 'download_blob', name: 'liste.csv', data }` und verhindert die Standardaktion). `adresse.test.ts`: `platform 'android'` → `oberflaeche=Android-App`.
+- [x] **Step 2: Lauf rot** — `mise exec -- pnpm -C frontend exec vitest run src/huelle/androidHuelle.test.ts src/rueckmeldung` → FAIL.
+- [x] **Step 3: Skript und Frontend umsetzen.**
+- [x] **Step 4: Lauf grün** — dieselben Tests → PASS; `mise exec -- pnpm -C frontend typecheck` und Lint → OK.
+- [x] **Step 5: Commit** `feat(android): Init-Skript der Android-Hülle mit Vitest (LLH-1989)`
 
 ### Task 10: App-Gerüst, Version, Marke, Testzustand und Bildlauf
 
@@ -266,11 +266,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `scripts/android/version.sh [--cargo <Cargo.toml>] [--jetzt <epoch-sekunden>]` gibt zwei Zeilen `LIFELINE_VERSION=<workspace-version>` und `LIFELINE_VERSION_CODE=<minuten seit 2026-01-01T00:00Z>` aus; Gradle liest beide aus der Umgebung, ohne sie `0.0.0-dev` und `1`.
 - Produces: `class AppModell(…)` hält `Ablauf.Seite`, `Onboarding.State`, `Serverliste`, `Updatestand` als Compose-State und führt Effekte aus; `MainActivity` liest `Testzustand.from(intent.getStringExtra(Testzustand.EXTRA))` und zeigt dann die Seite mit Beispieldaten ohne Netz und ohne Speichern.
 
-- [ ] **Step 1: Failing tests** — `version.test.sh`: `--jetzt 1767225600` (2026-01-01T00:00Z) → `LIFELINE_VERSION_CODE=0`; `--jetzt 1767225660` → `1`; Version aus einer Test-Cargo.toml. `BilderTest`: `` `Onboarding als Bild` `` rendert `Testzustand.ONBOARDING` per Robolectric und vergleicht/schreibt mit Roborazzi nach `android/app/build/bilder/onboarding.png`.
-- [ ] **Step 2: Lauf rot** — `scripts/android/version.test.sh`; `android/gradlew -p android :app:testDebugUnitTest` → FAIL.
-- [ ] **Step 3: Umsetzen.** Manifest: `INTERNET`, `CAMERA`, `POST_NOTIFICATIONS`, `REQUEST_INSTALL_PACKAGES`, `RECEIVE_BOOT_COMPLETED` nicht; Intent-Filter `lifeline://verbinden` (exportiert) und `lifeline://anmeldung` (für Custom-Tab-Rückfall); Receiver `ACTION_MY_PACKAGE_REPLACED`; `networkSecurityConfig` mit `system` und `user`, `cleartextTrafficPermitted="false"`. Thema: Kopf-Schwarz aus der Marke, helle Statusleiste-Symbole, randlos mit Insets. Symbol aus der Bildmarke per Skript (wie `scripts/ios/erzeuge-symbol.sh`), Marken-Wächter kennt es.
-- [ ] **Step 4: Lauf grün** — beide Läufe PASS; Bild liegt vor. Android-SDK lokal: `sdkmanager "platforms;android-36" "build-tools;36.0.0"` im Scratchpad, `ANDROID_HOME` gesetzt.
-- [ ] **Step 5: Commit** `feat(android): App-Gerüst mit Version, Marke und Bildlauf (LLH-1989)`
+- [x] **Step 1: Failing tests** — `version.test.sh`: `--jetzt 1767225600` (2026-01-01T00:00Z) → `LIFELINE_VERSION_CODE=0`; `--jetzt 1767225660` → `1`; Version aus einer Test-Cargo.toml. `BilderTest`: `` `Onboarding als Bild` `` rendert `Testzustand.ONBOARDING` per Robolectric und vergleicht/schreibt mit Roborazzi nach `android/app/build/bilder/onboarding.png`.
+- [x] **Step 2: Lauf rot** — `scripts/android/version.test.sh`; `android/gradlew -p android :app:testDebugUnitTest` → FAIL.
+- [x] **Step 3: Umsetzen.** Manifest: `INTERNET`, `CAMERA`, `POST_NOTIFICATIONS`, `REQUEST_INSTALL_PACKAGES`, `RECEIVE_BOOT_COMPLETED` nicht; Intent-Filter `lifeline://verbinden` (exportiert) und `lifeline://anmeldung` (für Custom-Tab-Rückfall); Receiver `ACTION_MY_PACKAGE_REPLACED`; `networkSecurityConfig` mit `system` und `user`, `cleartextTrafficPermitted="false"`. Thema: Kopf-Schwarz aus der Marke, helle Statusleiste-Symbole, randlos mit Insets. Symbol aus der Bildmarke per Skript (wie `scripts/ios/erzeuge-symbol.sh`), Marken-Wächter kennt es.
+- [x] **Step 4: Lauf grün** — beide Läufe PASS; Bild liegt vor. Android-SDK lokal: `sdkmanager "platforms;android-36" "build-tools;36.0.0"` im Scratchpad, `ANDROID_HOME` gesetzt.
+- [x] **Step 5: Commit** `feat(android): App-Gerüst mit Version, Marke und Bildlauf (LLH-1989)`
 
 ### Task 11: Native Seiten: Onboarding mit QR, Serverliste, Einstellungen, Status
 
@@ -282,11 +282,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Consumes: `Onboarding`, `Serverliste`, `Serverentfernung`, `Statusseite.text`, `Updatestand`, `Testzustand`
 - Produces: Compose-Funktionen `OnboardingSeite(state: Onboarding.State, onEvent: (Onboarding.Event) -> Unit, onScan: () -> Unit)`, `ServerlisteSeite(liste: Serverliste, seite: Ablauf.Seite, …)`, `EinstellungenSeite(haptik: Boolean, onHaptik: (Boolean) -> Unit, version: String, kanal: Kanal?, stand: Updatestand, onPruefen: () -> Unit, onInstallieren: () -> Unit)`, `StatusSeite(text: Statustext, onErneut: () -> Unit, onServerliste: () -> Unit, onUpdate: (() -> Unit)?)`, `UpdateSeite()` („Lifeline wird aktualisiert“)
 
-- [ ] **Step 1: Failing tests** — `BilderTest` je Testzustand ein Bild (`onboarding`, `serverliste`, `einstellungen`, `zertifikat`, `nicht-erreichbar`, `zu-alt`, `zu-neu`, `webview-veraltet`, `update-bereit`, `update-laeuft`) in Hoch- (Handy 411×891 dp) und Querformat (Tablet 1280×800 dp); Robolectric-Test `` `Entfernen fragt mit dem Hinweis auf verlorene Einträge` `` (Text `Serverentfernung.HINWEIS` sichtbar), `` `aktiver Server bietet kein Entfernen` ``.
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Seiten umsetzen** im Stil der iOS-Seiten (`ios/App/Seiten/`), Inhaltsbreite auf Tablets begrenzt (max. 560 dp). QR: CameraX + ML Kit Barcode (gebündelt), Kameraberechtigung erst beim Scannen; Inhalt → `Deeplink.adresseAusQrCode` → `Onboarding.Event.Vorbelegen`.
-- [ ] **Step 4: Lauf grün**, Bilder ansehen.
-- [ ] **Step 5: Commit** `feat(android): native Seiten der Hülle (LLH-1989)`
+- [x] **Step 1: Failing tests** — `BilderTest` je Testzustand ein Bild (`onboarding`, `serverliste`, `einstellungen`, `zertifikat`, `nicht-erreichbar`, `zu-alt`, `zu-neu`, `webview-veraltet`, `update-bereit`, `update-laeuft`) in Hoch- (Handy 411×891 dp) und Querformat (Tablet 1280×800 dp); Robolectric-Test `` `Entfernen fragt mit dem Hinweis auf verlorene Einträge` `` (Text `Serverentfernung.HINWEIS` sichtbar), `` `aktiver Server bietet kein Entfernen` ``.
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Seiten umsetzen** im Stil der iOS-Seiten (`ios/App/Seiten/`), Inhaltsbreite auf Tablets begrenzt (max. 560 dp). QR: CameraX + ML Kit Barcode (gebündelt), Kameraberechtigung erst beim Scannen; Inhalt → `Deeplink.adresseAusQrCode` → `Onboarding.Event.Vorbelegen`.
+- [x] **Step 4: Lauf grün**, Bilder ansehen.
+- [x] **Step 5: Commit** `feat(android): native Seiten der Hülle (LLH-1989)`
 
 ### Task 12: WebView je Server, Vertragsabruf, Brücke, Linkweiche, Lebenszyklus
 
@@ -301,11 +301,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `object Fehlerzuordnung { fun netzfehler(e: IOException): Netzfehler; fun netzfehler(webViewErrorCode: Int): Netzfehler }` (`SSLHandshakeException`/`CertPathValidatorException` → `ZERTIFIKAT`; `WebViewClient.ERROR_FAILED_SSL_HANDSHAKE` → `ZERTIFIKAT`; sonst `VERBINDUNG`)
 - Produces: `class Vertragsabruf { suspend fun abrufen(server: ServerAdresse): Pair<ShellAbruf, String?> }` (`GET /api/shell`, bei 404 `GET /api/health`; Weiterleitung nur nach `Vertragspruefung.followsRedirect`; Zeitlimit 10 s)
 
-- [ ] **Step 1: Failing tests** — `FehlerzuordnungTest` (Ausnahmen und Codes); `VertragsabrufTest` mit `MockWebServer` (200 JSON, 404 + health, 302 auf fremde Origin → als Antwort 302); `AppModellTest` (Robolectric): `` `Wechsel baut den WebView mit dem Profil des neuen Servers` `` (Attrappen-Fabrik meldet den Profilnamen), `` `ohne taugliches WebView kein WebView` ``, `` `Zurück geht im WebView zurück, sonst in den Hintergrund` `` (`moveTaskToBack` aufgerufen, Activity nicht beendet).
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.** `HuellenClient`: `shouldOverrideUrlLoading` → `Linkweiche.navigation(…, neuesFenster=false)`; `onCreateWindow` → `neuesFenster=true`; `onReceivedSslError` → `handler.cancel()` und `Event.NavigationFehlgeschlagen(ZERTIFIKAT, url)`; `onReceivedError` nur Hauptframe; `onRenderProcessGone` → `Event.WebProzessBeendet` (WebView neu bauen) und `true`; `onPageCommitVisible` → `SeiteGeladen`. WebView: `overScrollMode = OVER_SCROLL_NEVER`, JS und DOM-Storage an, Insets per `WindowInsetsCompat` als Polster, Hintergrund Kopf-Schwarz. Lebenszyklus → `Rueckkehr`; Vordergrund fragt per `evaluateJavascript("1")` mit Zeitlimit 2 s, ob die Seite antwortet. „Zur Oberfläche“ als kleiner nativer Knopf über dem WebView. Serverliste-Knopf am Rand. Entfernen: WebView zerstören, dann `ProfileStore.getInstance().deleteProfile(id)`.
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): WebView je Server mit Brücke und Vertragsprüfung (LLH-1989)`
+- [x] **Step 1: Failing tests** — `FehlerzuordnungTest` (Ausnahmen und Codes); `VertragsabrufTest` mit `MockWebServer` (200 JSON, 404 + health, 302 auf fremde Origin → als Antwort 302); `AppModellTest` (Robolectric): `` `Wechsel baut den WebView mit dem Profil des neuen Servers` `` (Attrappen-Fabrik meldet den Profilnamen), `` `ohne taugliches WebView kein WebView` ``, `` `Zurück geht im WebView zurück, sonst in den Hintergrund` `` (`moveTaskToBack` aufgerufen, Activity nicht beendet).
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.** `HuellenClient`: `shouldOverrideUrlLoading` → `Linkweiche.navigation(…, neuesFenster=false)`; `onCreateWindow` → `neuesFenster=true`; `onReceivedSslError` → `handler.cancel()` und `Event.NavigationFehlgeschlagen(ZERTIFIKAT, url)`; `onReceivedError` nur Hauptframe; `onRenderProcessGone` → `Event.WebProzessBeendet` (WebView neu bauen) und `true`; `onPageCommitVisible` → `SeiteGeladen`. WebView: `overScrollMode = OVER_SCROLL_NEVER`, JS und DOM-Storage an, Insets per `WindowInsetsCompat` als Polster, Hintergrund Kopf-Schwarz. Lebenszyklus → `Rueckkehr`; Vordergrund fragt per `evaluateJavascript("1")` mit Zeitlimit 2 s, ob die Seite antwortet. „Zur Oberfläche“ als kleiner nativer Knopf über dem WebView. Serverliste-Knopf am Rand. Entfernen: WebView zerstören, dann `ProfileStore.getInstance().deleteProfile(id)`.
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): WebView je Server mit Brücke und Vertragsprüfung (LLH-1989)`
 
 ### Task 13: Systemdienste: Haptik, Meldung, Druck, Downloads, Dialoge, Anmeldung
 
@@ -320,11 +320,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Produces: `class Downloads` — `DownloadListener` für `http(s)` (Cookies aus dem `CookieManager` des Profils, Datei nach `cacheDir/<uuid>/<Downloadablage.dateiname>`, dann Teilen-Intent über `FileProvider`); `saveDownload` für `download_blob` (Task 6/9) legt die Bytes ebenso ab und teilt sie.
 - Produces: `class Anmelder` — startet `AuthTabIntent` (androidx.browser 1.10, Rückruf-Schema `lifeline`) bzw. Custom Tab, merkt `verifier` im `Anmeldelauf`, wertet den Rücksprung nur aus, solange `isLaufend`, sonst nichts; Ergebnis über `Anmeldung.folge` → `evaluateJavascript(einloeseSkript|meldungSkript)`.
 
-- [ ] **Step 1: Failing tests** — `SystemdiensteTest` (Robolectric: Zuordnung je `Feedback` und API-Stufe; Haptik aus → kein Aufruf), `AnmelderTest` (`` `ein Rücksprung ohne laufende Anmeldung bleibt wirkungslos` ``, `` `Abbruch meldet abgebrochen` ``), `DownloadsTest` (Dateiname bereinigt, Datei im eigenen Verzeichnis, `saveDownload` teilt die Datei).
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.** `HuellenChromeClient`: `onJsAlert/Confirm/Prompt` → `Seitendialog` als `AlertDialog`.
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Systemdienste und Anmeldung im Browser (LLH-1989)`
+- [x] **Step 1: Failing tests** — `SystemdiensteTest` (Robolectric: Zuordnung je `Feedback` und API-Stufe; Haptik aus → kein Aufruf), `AnmelderTest` (`` `ein Rücksprung ohne laufende Anmeldung bleibt wirkungslos` ``, `` `Abbruch meldet abgebrochen` ``), `DownloadsTest` (Dateiname bereinigt, Datei im eigenen Verzeichnis, `saveDownload` teilt die Datei).
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.** `HuellenChromeClient`: `onJsAlert/Confirm/Prompt` → `Seitendialog` als `AlertDialog`.
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Systemdienste und Anmeldung im Browser (LLH-1989)`
 
 ### Task 14: Updater
 
@@ -337,11 +337,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Consumes: `Kanal`, `Updatemanifest`, `Updateentscheidung`, `Installzeitpunkt`, `Updatestand`
 - Produces: `class Updater(context, http, uhr)` mit `suspend fun pruefen(erzwingen: Boolean = false): Updatestand`, `fun installieren(lage: Installzeitpunkt.Lage)`, `val stand: StateFlow<Updatestand>`; Kanal in `SharedPreferences("lifeline")` unter `kanal`, beim ersten Start aus `BuildConfig.VERSION_NAME` gesetzt, nie überschrieben. `UpdatePruefung`: `PeriodicWorkRequest` (4 h, Netz nötig) + Prüfung bei Start/Vordergrund; Hintergrund-Installation über `OneTimeWorkRequest` mit 15 min Verzögerung nach `ON_STOP`, abgebrochen bei `ON_START`. `Installation`: `PackageInstaller`-Sitzung, `setRequireUserAction(USER_ACTION_NOT_REQUIRED)` ab API 31, `canRequestPackageInstalls()` sonst → `ERLAUBNIS_FEHLT`; `STATUS_PENDING_USER_ACTION` im Hintergrund → `BEREIT` (Hinweis); `STATUS_FAILURE_BLOCKED` → `BLOCKIERT`. `PaketErsetzt`: Receiver `MY_PACKAGE_REPLACED` → Meldung „Lifeline aktualisiert – zum Öffnen tippen“.
 
-- [ ] **Step 1: Failing tests** (Robolectric, `MockWebServer` statt GitHub über injizierte Basis-URL): `` `Manifest mit neuerer Version lädt und prüft die Prüfsumme` `` (falsche `sha256` → `FEHLER`, Datei gelöscht); `` `Download von fremdem Host wird nicht geladen` ``; `` `Kanal bleibt nach einem Update auf stabil Alpha` `` (Prefs `kanal=alpha`, `VERSION_NAME=1.0.0` → bleibt `ALPHA`); `` `ohne Kanal keine Prüfung` ``; `` `Start mit bereitem Update zeigt die Seite Lifeline wird aktualisiert` ``.
-- [ ] **Step 2: Lauf rot.**
-- [ ] **Step 3: Umsetzen.** Start: liegt ein geprüftes Update bereit, entscheidet `Installzeitpunkt.decide(START_VOR_OBERFLAECHE, …)` vor `Ablauf.Event.Start`; `Updatestand.BEREIT` zeigt einen Punkt am Serverliste-Knopf und einen Eintrag in den Einstellungen.
-- [ ] **Step 4: Lauf grün.**
-- [ ] **Step 5: Commit** `feat(android): Updater mit Installation außerhalb der Arbeit (LLH-1989)`
+- [x] **Step 1: Failing tests** (Robolectric, `MockWebServer` statt GitHub über injizierte Basis-URL): `` `Manifest mit neuerer Version lädt und prüft die Prüfsumme` `` (falsche `sha256` → `FEHLER`, Datei gelöscht); `` `Download von fremdem Host wird nicht geladen` ``; `` `Kanal bleibt nach einem Update auf stabil Alpha` `` (Prefs `kanal=alpha`, `VERSION_NAME=1.0.0` → bleibt `ALPHA`); `` `ohne Kanal keine Prüfung` ``; `` `Start mit bereitem Update zeigt die Seite Lifeline wird aktualisiert` ``.
+- [x] **Step 2: Lauf rot.**
+- [x] **Step 3: Umsetzen.** Start: liegt ein geprüftes Update bereit, entscheidet `Installzeitpunkt.decide(START_VOR_OBERFLAECHE, …)` vor `Ablauf.Event.Start`; `Updatestand.BEREIT` zeigt einen Punkt am Serverliste-Knopf und einen Eintrag in den Einstellungen.
+- [x] **Step 4: Lauf grün.**
+- [x] **Step 5: Commit** `feat(android): Updater mit Installation außerhalb der Arbeit (LLH-1989)`
 
 ### Task 15: CI und Auslieferung
 
@@ -353,11 +353,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Consumes: `scripts/android/version.sh`, `scripts/release/pr-kommentare.mjs` (`kanalVon`, `vergleicheVersion`), Muster von `desktop-kanal.mjs` und `ios.yml`
 - Produces: `node scripts/release/android-kanal.mjs --kanaele-fuer <version>` → je Zeile `android-alpha`/`android-beta` (Alpha: nur alpha; Beta: nur beta; stabil: beide); `--apk-ersetzen <kanal> <version>` → `ja` nur, wenn die Version zum Kanal gehört; `--kanal <k> --neu <android.json> [--alt <android.json>]` → `hochladen` nur bei SemVer-größer, sonst `behalten`.
 
-- [ ] **Step 1: Failing tests** `android-kanal.test.mjs`: die drei Formen, darunter `` `stabil ersetzt die APK im Alpha-Kanal nicht` `` und `` `älteres Release dreht den Kanal nicht zurück` ``.
-- [ ] **Step 2: Lauf rot** — `mise exec -- node --test scripts/release/android-kanal.test.mjs` → FAIL.
-- [ ] **Step 3: Skript und Workflows.** `android-pruefung.yml`: `pull_request` mit Pfadfilter `android/**`, `src-tauri/faelle/**`, `scripts/android/**` und `push` auf `alpha`; JDK per `actions/setup-java` (Version aus `sdk-version.sh`), SDK vorinstalliert; `./android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease` (unsigniert), Bilder als Artefakt `android-bilder`. `suiten.yml`: Job `android` mit `ANDROID_KERN_PFLICHT=1 ./scripts/check-all.sh --nur android`. `android.yml` (`workflow_call` mit `tag`, dazu `workflow_dispatch`): Version per `version.sh`, Keystore aus Geheimnissen (fehlt eins → Job rot mit Hinweis auf `docs/betrieb/android-app.md`), `assembleRelease` signiert, `apksigner verify`, Assets ans Release, `android.json` und feste APK nach `android-kanal.mjs`; Nebenläufigkeit je Kanal. `artefakte.yml`: Job `android` wie `ios` (hängt an `freigeben`, in keinem `needs` davor). Actions per SHA gepinnt wie im Bestand.
-- [ ] **Step 4: Lauf grün** — Test PASS; `actionlint` (falls im Gate) und `./scripts/check-all.sh --nur schnell` → OK.
-- [ ] **Step 5: Commit** `ci(android): Prüfung im PR und APK an jedem freigegebenen Tag (LLH-1989)`
+- [x] **Step 1: Failing tests** `android-kanal.test.mjs`: die drei Formen, darunter `` `stabil ersetzt die APK im Alpha-Kanal nicht` `` und `` `älteres Release dreht den Kanal nicht zurück` ``.
+- [x] **Step 2: Lauf rot** — `mise exec -- node --test scripts/release/android-kanal.test.mjs` → FAIL.
+- [x] **Step 3: Skript und Workflows.** `android-pruefung.yml`: `pull_request` mit Pfadfilter `android/**`, `src-tauri/faelle/**`, `scripts/android/**` und `push` auf `alpha`; JDK per `actions/setup-java` (Version aus `sdk-version.sh`), SDK vorinstalliert; `./android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease` (unsigniert), Bilder als Artefakt `android-bilder`. `suiten.yml`: Job `android` mit `ANDROID_KERN_PFLICHT=1 ./scripts/check-all.sh --nur android`. `android.yml` (`workflow_call` mit `tag`, dazu `workflow_dispatch`): Version per `version.sh`, Keystore aus Geheimnissen (fehlt eins → Job rot mit Hinweis auf `docs/betrieb/android-app.md`), `assembleRelease` signiert, `apksigner verify`, Assets ans Release, `android.json` und feste APK nach `android-kanal.mjs`; Nebenläufigkeit je Kanal. `artefakte.yml`: Job `android` wie `ios` (hängt an `freigeben`, in keinem `needs` davor). Actions per SHA gepinnt wie im Bestand.
+- [x] **Step 4: Lauf grün** — Test PASS; `actionlint` (falls im Gate) und `./scripts/check-all.sh --nur schnell` → OK.
+- [x] **Step 5: Commit** `ci(android): Prüfung im PR und APK an jedem freigegebenen Tag (LLH-1989)`
 
 ### Task 16: Regeln und Doku
 
@@ -365,13 +365,13 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/y1dsr5i98hhgl5s3tvlwedmz
 - Create: `android/AGENTS.md`, `docs/architektur/entscheidungen/ADR-00NN-die-android-huelle-ist-eine-eigene-kotlin-app-ohne-anwendungslogik-und-kommt-als-apk-die-sich-selbst-aktualisiert.md` (nächste freie Nummer, gegen offene PRs geprüft), `docs/betrieb/android-app.md`
 - Modify: `AGENTS.md` (Tabellenzeile), `scripts/check-architektur.sh` (+ Test: Teilprojekt `android`, Teile `android/<teil>`), `docs/architektur/0{5,7,8}-*.md`, `docs/architektur/11-risiken-und-technische-schulden.md`, `docs/betrieb/endgeraete.md`, `src-tauri/AGENTS.md` („Gemeinsame Fälle“: Kotlin-Kern als dritter Leser), `src-tauri/faelle/*.json` (`zweck` nennt `android/kern`)
 
-- [ ] **Step 1: Failing check** — `./scripts/check-architektur.sh` und ADR-Prüfung (`scripts/check-all.sh --nur schnell`) zeigen das fehlende Teilprojekt bzw. die neue ADR ohne Prüfung.
-- [ ] **Step 2: Schreiben.** `android/AGENTS.md` mit den Regeln aus Entwurf D11. ADR mit Regeln (MUST: Kern ohne SDK testbar; MUST: ein Profil je Server, nie Rückfall; MUST: Updater installiert nie bei Oberfläche im Vordergrund; MUST: APK nur über GitHub-Releases; MUST: Signierschlüssel wechselt nie) und Prüfung (`verlange`-Zeilen gegen `Installzeitpunkt.kt`, `WebviewFabrik.kt`, `android.yml`). Betriebsdoku: Installation je Kanal mit Link und QR-Inhalt, „Unbekannte Apps installieren“, Samsung Auto Blocker, CA-Zertifikat, Signierschlüssel anlegen (`keytool -genkeypair -v -keystore lifeline-android.jks -alias lifeline -keyalg RSA -keysize 4096 -validity 36500`, Base64 als Geheimnis, Sicherung außerhalb von GitHub), Verhalten der Updates, Grenzen, Prüfliste für die erste Alpha auf einem Galaxy Tab (Android-, One-UI-, WebView-Version, Auto Blocker, zwei Server getrennt, Flugmodus-Kaltstart, Update ohne Rückfrage ab dem zweiten).
-- [ ] **Step 3: Prüfen** — `./scripts/check-all.sh --nur schnell` → OK.
-- [ ] **Step 4: Commit** `docs(android): Regeln, ADR und Betriebsdoku der Android-Hülle (LLH-1989)`
+- [x] **Step 1: Failing check** — `./scripts/check-architektur.sh` und ADR-Prüfung (`scripts/check-all.sh --nur schnell`) zeigen das fehlende Teilprojekt bzw. die neue ADR ohne Prüfung.
+- [x] **Step 2: Schreiben.** `android/AGENTS.md` mit den Regeln aus Entwurf D11. ADR mit Regeln (MUST: Kern ohne SDK testbar; MUST: ein Profil je Server, nie Rückfall; MUST: Updater installiert nie bei Oberfläche im Vordergrund; MUST: APK nur über GitHub-Releases; MUST: Signierschlüssel wechselt nie) und Prüfung (`verlange`-Zeilen gegen `Installzeitpunkt.kt`, `WebviewFabrik.kt`, `android.yml`). Betriebsdoku: Installation je Kanal mit Link und QR-Inhalt, „Unbekannte Apps installieren“, Samsung Auto Blocker, CA-Zertifikat, Signierschlüssel anlegen (`keytool -genkeypair -v -keystore lifeline-android.jks -alias lifeline -keyalg RSA -keysize 4096 -validity 36500`, Base64 als Geheimnis, Sicherung außerhalb von GitHub), Verhalten der Updates, Grenzen, Prüfliste für die erste Alpha auf einem Galaxy Tab (Android-, One-UI-, WebView-Version, Auto Blocker, zwei Server getrennt, Flugmodus-Kaltstart, Update ohne Rückfrage ab dem zweiten).
+- [x] **Step 3: Prüfen** — `./scripts/check-all.sh --nur schnell` → OK.
+- [x] **Step 4: Commit** `docs(android): Regeln, ADR und Betriebsdoku der Android-Hülle (LLH-1989)`
 
 ### Task 17: Abschluss
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → OK (Ausgabe für „Geprüft“ im PR).
-- [ ] **Step 2:** `android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease` lokal → OK; Bilder für den PR aus `android/app/build/bilder/`.
-- [ ] **Step 3:** Review nach Ermessen (Anlass: Eingaben von außen über Brücke und Deeplink, Größe > 600 Zeilen).
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → OK (Ausgabe für „Geprüft“ im PR).
+- [x] **Step 2:** `android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease` lokal → OK; Bilder für den PR aus `android/app/build/bilder/`.
+- [x] **Step 3:** Review nach Ermessen (Anlass: Eingaben von außen über Brücke und Deeplink, Größe > 600 Zeilen).
