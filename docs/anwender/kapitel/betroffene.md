@@ -350,6 +350,9 @@ Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeiche
 
 Nach dem Bestätigen steht die Vermisstmeldung auf „abgemeldet“, und das Einsatztagebuch vermerkt
 „Vermisstmeldung R-… aufgeklärt — identisch mit R-…“.
+Bestätigen geht nur, solange die vermisste Person auf „vermisst“ und die gefundene auf „betroffen“
+oder „verstorben“ steht und keine von beiden storniert ist. Hat sich das seit dem Vorschlag
+geändert, nennt der Vorschlag den Grund und bleibt offen; „Verwerfen“ räumt ihn ab.
 
 ## Hintergrund
 
