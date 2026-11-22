@@ -595,7 +595,7 @@ export function naechsteMarken(
     beginn?: string | null;
   }[] = [],
   programm: readonly Programmpunkt[] = [],
-  optionen: { meldungenFrei?: boolean } = {},
+  options: { meldungenFrei?: boolean } = {},
 ): MarkenAuswahl {
   const roh: {
     key: string;
@@ -633,7 +633,7 @@ export function naechsteMarken(
     }
     if (e.status === 'offen' && zeitpunkt(e.faellig_at)) {
       const faellig = erinnerungZustand(e, jetzt.valueOf()).wort === ERINNERUNG_FAELLIG.wort;
-      if (auto && e.bezug_typ === 'meldung' && optionen.meldungenFrei) {
+      if (auto && e.bezug_typ === 'meldung' && options.meldungenFrei) {
         roh.push({
           key: `b-${e.bezug_id}`,
           art: 'bestaetigung',
