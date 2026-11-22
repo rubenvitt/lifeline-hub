@@ -2,7 +2,7 @@ import { QueryClientContext, useQuery, useQueryClient } from '@tanstack/react-qu
 import { useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 import { ANTRAG_EREIGNIS } from '../../api/antragEreignis';
 import { einsatzKeys } from '../../api/queryKeys';
-import { subscribeQueryCache } from '../../api/subscribeQueryCache';
+import { subscribeQueryCache } from '../../lib/subscribeQueryCache';
 import { loadAntraege } from '../../api/spiegelAntraege';
 import type { SpiegelAntragAnzeige } from '../../api/types';
 

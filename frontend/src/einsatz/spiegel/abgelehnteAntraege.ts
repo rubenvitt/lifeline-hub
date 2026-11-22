@@ -1,7 +1,7 @@
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 import { globalKeys } from '../../api/queryKeys';
-import { subscribeQueryCache } from '../../api/subscribeQueryCache';
+import { subscribeQueryCache } from '../../lib/subscribeQueryCache';
 import { loadAbgelehnteAntraege } from '../../api/spiegelAntraege';
 import type { AbgelehnterAntragAnzeige } from '../../api/types';
 
