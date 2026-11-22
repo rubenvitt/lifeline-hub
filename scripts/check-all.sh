@@ -305,7 +305,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung und Bildablage (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung, Bildablage und Android-Version (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -353,6 +353,9 @@ schritt_8() {
   # Gründe roter Simulator-Tests (LLH-1978): mit iPhone und iPad hängen die Meldungen eine Ebene
   # tiefer, das Protokoll nannte dann nur die Namen. Ohne Xcode.
   "$ROOT/scripts/ios/fehlgruende.test.sh"
+  # Die Version der Android-App aus [workspace.package] (LLH-1989): ein `versionCode`, der nicht
+  # steigt, installiert Android nicht über die vorhandene App — das fiele erst am Gerät auf.
+  "$ROOT/scripts/android/version.test.sh"
 }
 
 schritt_9() {

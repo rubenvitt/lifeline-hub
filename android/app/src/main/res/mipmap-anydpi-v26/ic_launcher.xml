@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Erzeugt von scripts/android/erzeuge-symbol.sh aus der Bildmarke — nicht von Hand ändern. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/kopf_schwarz" />
+    <foreground android:drawable="@mipmap/ic_launcher_vordergrund" />
+</adaptive-icon>

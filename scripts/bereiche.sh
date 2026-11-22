@@ -85,6 +85,10 @@ bereiche_von() {
     # Vitest führt das Init-Skript der Android-Hülle aus wie das der iOS-Hülle (LLH-1989).
     android/app/src/main/assets/huelle.js)
       echo "frontend android" ;;
+    # Der Marken-Wächter (marke.guard.test.ts) prüft App-Symbol, Farbe Kopf-Schwarz und Thema der
+    # Android-App in ihren Ressourcen (LLH-1989).
+    android/app/src/main/res/*)
+      echo "frontend android" ;;
     # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)
     # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).
     ios/App/Huelle/* | ios/App/Assets.xcassets/*)

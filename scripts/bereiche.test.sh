@@ -66,6 +66,9 @@ fall ios/App/Huelle/huelle.js "frontend ios"
 fall android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Adresse.kt "android"
 fall android/gradle/libs.versions.toml "android"
 fall android/app/src/main/assets/huelle.js "frontend android"
+fall android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml "frontend android"
+fall android/app/src/main/res/values/colors.xml "frontend android"
+fall android/app/src/main/kotlin/dev/rubeen/lifeline/android/MainActivity.kt "android"
 
 ausgabe() { # <name> <erwartet> <pfade…>
   local name="$1" soll="$2" ist
