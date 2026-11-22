@@ -115,4 +115,20 @@ public struct Pushablage: Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(anmeldungen).write(to: datei, options: .atomic)
     }
+
+    var beiseite: URL { verzeichnis.appendingPathComponent("push.defekt.json") }
+
+    /// Beim Start: eine Datei, die sich lesen, aber nicht dekodieren lässt (etwa aus einer
+    /// späteren Version), kommt als `push.defekt.json` beiseite, danach gilt die Ablage als leer.
+    /// Sonst scheiterte jede Anmeldung, und das Entfernen eines Servers merkte keine Abmeldung.
+    /// Ein Lesefehler (Datei gesperrt) lässt sie liegen. `true`, wenn sie beiseitegelegt wurde.
+    @discardableResult
+    public func recoverIfUnreadable() -> Bool {
+        guard FileManager.default.fileExists(atPath: datei.path),
+            let daten = try? Data(contentsOf: datei),
+            (try? JSONDecoder().decode(PushAnmeldungen.self, from: daten)) == nil
+        else { return false }
+        try? FileManager.default.removeItem(at: beiseite)
+        return (try? FileManager.default.moveItem(at: datei, to: beiseite)) != nil
+    }
 }

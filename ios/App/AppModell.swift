@@ -65,10 +65,15 @@ final class AppModell {
             let verzeichnis = URL.applicationSupportDirectory.appendingPathComponent("Lifeline")
             let ablage = Serverablage(verzeichnis: verzeichnis)
             self.ablage = ablage
-            pushablage = Pushablage(verzeichnis: verzeichnis)
+            let pushablage = Pushablage(verzeichnis: verzeichnis)
+            self.pushablage = pushablage
             vorrat = Vorratsdienst(
                 ablage: Vorratsablage(verzeichnis: verzeichnis.appendingPathComponent("Oberflaechen")))
             liste = ablage.loadOrRecover()
+            // Eine unlesbare push.json legte Push sonst für immer still (`recoverIfUnreadable`).
+            if pushablage.recoverIfUnreadable() {
+                protokoll.error("Push-Anmeldungen unlesbar, beiseitegelegt")
+            }
             meldeServerAnzahl()
         }
         anmelder = Anmelder(

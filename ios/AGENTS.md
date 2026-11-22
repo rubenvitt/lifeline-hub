@@ -64,7 +64,9 @@ Entscheidung ADR-0084; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
 - **Kennung und Schlüssel je Server:** die Zuordnung Kennung → Server liegt in `push.json` neben
   der Serverliste (`PushAnmeldungen`, Kern), der Schlüssel im gemeinsamen Schlüsselbund von App und
   Extension (`ios/Gemeinsam/Schluesselbund.swift`, lesbar nach dem ersten Entsperren). Token und
-  Schlüssel stehen in keinem Log.
+  Schlüssel stehen in keinem Log. Eine unlesbare `push.json` legt die App beim Start als
+  `push.defekt.json` beiseite (`Pushablage.recoverIfUnreadable`); der nächste Abgleich der Seite
+  meldet mit neuer Kennung an, der Server ersetzt die alte am selben Token.
 - **Die Extension bleibt dünn** (`ios/Benachrichtigungsdienst`): Schlüssel lesen, öffnen
   (`ios/Gemeinsam/Entschluesseler.swift`), Inhalt setzen; was angezeigt wird, entscheidet
   `PushNutzlast` im Kern. Kein Netz, keine Ablage. Scheitert etwas, bleibt der Rückfalltitel des

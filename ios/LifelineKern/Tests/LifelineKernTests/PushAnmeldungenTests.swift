@@ -127,6 +127,45 @@ final class PushAnmeldungenTests: XCTestCase {
         XCTAssertEqual(gelesen.ausstehend, [])
     }
 
+    /// Eine unlesbare `push.json` (etwa aus einer späteren Version) legte Push sonst dauerhaft
+    /// still: `registerPush` scheiterte immer, das Entfernen eines Servers merkte keine Abmeldung.
+    /// Beim Start kommt sie als `push.defekt.json` beiseite (wie `Serverablage.loadOrRecover`),
+    /// eine ältere dort wird ersetzt; danach gilt die Ablage als leer.
+    func testEineUnlesbareAblageWirdBeiseitegelegt() throws {
+        let verzeichnis = FileManager.default.temporaryDirectory
+            .appendingPathComponent("push-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: verzeichnis) }
+        let ablage = Pushablage(verzeichnis: verzeichnis)
+        let beiseite = verzeichnis.appendingPathComponent("push.defekt.json")
+        try FileManager.default.createDirectory(at: verzeichnis, withIntermediateDirectories: true)
+        try Data("alt".utf8).write(to: beiseite)
+        try Data(#"{"kennungen":7}"#.utf8).write(to: ablage.datei)
+        XCTAssertThrowsError(try ablage.load())
+
+        XCTAssertTrue(ablage.recoverIfUnreadable())
+        XCTAssertEqual(try Data(contentsOf: beiseite), Data(#"{"kennungen":7}"#.utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ablage.datei.path))
+        XCTAssertEqual(try ablage.load(), PushAnmeldungen())
+        XCTAssertFalse(ablage.recoverIfUnreadable())
+    }
+
+    /// Eine lesbare Ablage und eine fehlende bleiben, wie sie sind.
+    func testEineLesbareAblageBleibtLiegen() throws {
+        let verzeichnis = FileManager.default.temporaryDirectory
+            .appendingPathComponent("push-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: verzeichnis) }
+        let ablage = Pushablage(verzeichnis: verzeichnis)
+        XCTAssertFalse(ablage.recoverIfUnreadable())
+        var anmeldungen = PushAnmeldungen()
+        _ = anmeldungen.kennung(fuer: UUID())
+        try ablage.save(anmeldungen)
+        XCTAssertFalse(ablage.recoverIfUnreadable())
+        XCTAssertEqual(try ablage.load(), anmeldungen)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: verzeichnis.appendingPathComponent("push.defekt.json").path))
+    }
+
     func testDieAnmeldungenUeberstehenSpeichernUndLaden() throws {
         let verzeichnis = FileManager.default.temporaryDirectory
             .appendingPathComponent("push-\(UUID().uuidString)")
