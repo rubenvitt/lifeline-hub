@@ -6,6 +6,7 @@
 #   frontend=true|false
 #   e2e=true|false
 #   ios=true|false     (Swift-Kern der iOS-Hülle, LLH-1978)
+#   android=true|false (Kotlin-Kern der Android-Hülle, LLH-1989)
 # im Format von $GITHUB_OUTPUT. Die Schnellprüfungen laufen immer und stehen hier nicht.
 # `check-all.sh --geaendert` fragt dieses Skript (vor dem PR lokal, LLH-1889; die CI wählt seither
 # nicht mehr nach Bereichen); die Zuordnung steht nur hier.
@@ -19,7 +20,7 @@
 # einer hier fehlt: ein vergessener Querbezug ließe eine Suite still aus, die rot geworden wäre.
 set -euo pipefail
 
-# Die Suiten, die eine einzelne Datei braucht (Wörter rust, frontend, e2e, ios; leer = keine).
+# Die Suiten, die eine einzelne Datei braucht (Wörter rust, frontend, e2e, ios, android; leer = keine).
 bereiche_von() {
   case "$1" in
     # ── Querbezüge ────────────────────────────────────────────────────────────────────
@@ -77,9 +78,13 @@ bereiche_von() {
     website/src/daten/module.json)
       echo "frontend" ;;
     # Gemeinsame Fälle der Hüllen (LLH-1978, `src-tauri/AGENTS.md`, „Gemeinsame Fälle“): die
-    # Rust-Tests der Desktop-Hülle und der Swift-Kern der iOS-Hülle lesen sie. Vor `src-tauri/*`.
+    # Rust-Tests der Desktop-Hülle, der Swift-Kern der iOS-Hülle und der Kotlin-Kern der
+    # Android-Hülle (LLH-1989) lesen sie. Vor `src-tauri/*`.
     src-tauri/faelle/*)
-      echo "rust ios" ;;
+      echo "rust ios android" ;;
+    # Vitest führt das Init-Skript der Android-Hülle aus wie das der iOS-Hülle (LLH-1989).
+    android/app/src/main/assets/huelle.js)
+      echo "frontend android" ;;
     # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)
     # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).
     ios/App/Huelle/* | ios/App/Assets.xcassets/*)
@@ -103,15 +108,19 @@ bereiche_von() {
     # App-Target baut nur der macOS-Lauf `ios-pruefung.yml`.
     ios/*)
       echo "ios" ;;
+    # Die Android-Hülle (LLH-1989): `gradlew -p android/kern test` (Schritt `android` von
+    # check-all.sh); die App baut nur der eigene Android-Lauf.
+    android/*)
+      echo "android" ;;
     # Gate-Skripte, Workflows, Werkzeugversionen, Wurzel-Konfiguration und alles Neue.
     *)
-      echo "rust frontend e2e ios" ;;
+      echo "rust frontend e2e ios android" ;;
   esac
 }
 
 # Liest Pfade von stdin, schreibt je Suite eine Zeile.
 bereiche_ausgeben() {
-  local rust=false frontend=false e2e=false ios=false pfad wort gelesen=0
+  local rust=false frontend=false e2e=false ios=false android=false pfad wort gelesen=0
   while IFS= read -r pfad || [ -n "$pfad" ]; do
     [ -n "$pfad" ] || continue
     gelesen=1
@@ -121,20 +130,21 @@ bereiche_ausgeben() {
         frontend) frontend=true ;;
         e2e) e2e=true ;;
         ios) ios=true ;;
+        android) android=true ;;
       esac
     done
   done
   if [ "$gelesen" -eq 0 ]; then
-    rust=true frontend=true e2e=true ios=true
+    rust=true frontend=true e2e=true ios=true android=true
   fi
-  printf 'rust=%s\nfrontend=%s\ne2e=%s\nios=%s\n' "$rust" "$frontend" "$e2e" "$ios"
+  printf 'rust=%s\nfrontend=%s\ne2e=%s\nios=%s\nandroid=%s\n' "$rust" "$frontend" "$e2e" "$ios" "$android"
 }
 
 # Als Bibliothek eingebunden (`. scripts/bereiche.sh`) nur die Funktionen, sonst der Filter.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   case "${1:-}" in
     "") bereiche_ausgeben ;;
-    -h | --help) sed -n '2,11p' "$0" ;;
+    -h | --help) sed -n '2,12p' "$0" ;;
     *) echo "FEHLER: bereiche.sh nimmt keine Argumente, die Pfade kommen über stdin." >&2; exit 2 ;;
   esac
 fi

@@ -242,4 +242,30 @@ if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1
 fi
+# 18 — Schritt 20, der Kotlin-Kern der Android-Hülle (LLH-1989): eigenes Bündel `android`, Teil des
+# vollen Laufs und von `--geaendert`, nicht von `schnell`; ohne Java lokal eine Lücke, in der CI
+# mit ANDROID_KERN_PFLICHT=1 rot; mit Java fährt er den Gradle-Wrapper im Kern.
+rc=0; "$CHECK_ALL" --nur android --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "18 Bündel android ist bekannt" 0 "$rc"
+enthaelt "18 Bündel android fährt nur den Kotlin-Schritt" '^Schritte: 20$'
+rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "18 voller Lauf fährt den Kotlin-Schritt" '^Schritte: .*\b20\b'
+rc=0; "$CHECK_ALL" --nur schnell --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+fehlt "18 schnell fährt den Kotlin-Schritt nicht" '^Schritte: .*\b20\b'
+mkdir -p "$ARBEIT/s20/android" "$ARBEIT/s20/leer" "$ARBEIT/s20/gruen"
+printf '#!/bin/sh\necho "gradlew-lief $* "\n' > "$ARBEIT/s20/android/gradlew"
+printf '#!/bin/sh\necho "openjdk version \\"21.0.1\\" 2026-01-01" >&2\n' > "$ARBEIT/s20/gruen/java"
+chmod +x "$ARBEIT/s20/android/gradlew" "$ARBEIT/s20/gruen/java"
+schritt_20_def="$(sed -n '/^schritt_20() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_20_def" ] || { echo "FAIL 18 schritt_20 fehlt in check-all.sh" >&2; fehler=1; }
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; ANDROID_KERN_PFLICHT=0; $schritt_20_def" 0 20 || rc=$?
+pruefe "18 ohne java → Exit 0" 0 "$rc"
+enthaelt "18 ohne java → übersprungen, nicht grün" '\[20/9\] +übersprungen'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; ANDROID_KERN_PFLICHT=1; $schritt_20_def" 0 20 || rc=$?
+pruefe "18 ohne java mit ANDROID_KERN_PFLICHT=1 → rot" 1 "$rc"
+enthaelt "18 ANDROID_KERN_PFLICHT nennt den Grund" 'ANDROID_KERN_PFLICHT'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/gruen':\"\$PATH\"; $schritt_20_def" 0 20 || rc=$?
+pruefe "18 mit java → grün" 0 "$rc"
+enthaelt "18 mit java → gradlew testet den Kern" "^gradlew-lief -p $ARBEIT/s20/android/kern test"
+
 echo "check-all.test.sh: alle Fälle grün"

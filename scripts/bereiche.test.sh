@@ -50,17 +50,22 @@ fall tests/geraet_kopplung.rs "rust e2e"
 fall migrations/0170_x.sql "rust e2e"
 fall Cargo.lock "rust e2e"
 fall src-tauri/src/main.rs "rust frontend"
-fall scripts/check-all.sh "rust frontend e2e ios"
-fall .github/workflows/ci.yml "rust frontend e2e ios"
-fall mise.toml "rust frontend e2e ios"
-fall gibt-es-noch-nicht/datei "rust frontend e2e ios"
+fall scripts/check-all.sh "rust frontend e2e ios android"
+fall .github/workflows/ci.yml "rust frontend e2e ios android"
+fall mise.toml "rust frontend e2e ios android"
+fall gibt-es-noch-nicht/datei "rust frontend e2e ios android"
 # iOS-Hülle (LLH-1978): der Swift-Kern hat seine eigene Prüfung; die gemeinsamen Fälle prüfen
 # Desktop-Hülle (Rust) und Swift-Kern; das Init-Skript führt Vitest aus wie die Tauri-Skripte.
 fall ios/LifelineKern/Sources/LifelineKern/Adresse.swift "ios"
 fall ios/project.yml "ios"
 fall ios/AGENTS.md ""
-fall src-tauri/faelle/adresse.json "rust ios"
+fall src-tauri/faelle/adresse.json "rust ios android"
 fall ios/App/Huelle/huelle.js "frontend ios"
+# Android-Hülle (LLH-1989): der Kotlin-Kern hat seine eigene Prüfung; das Init-Skript der App
+# führt Vitest aus wie das der iOS-Hülle.
+fall android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Adresse.kt "android"
+fall android/gradle/libs.versions.toml "android"
+fall android/app/src/main/assets/huelle.js "frontend android"
 
 ausgabe() { # <name> <erwartet> <pfade…>
   local name="$1" soll="$2" ist
@@ -68,16 +73,18 @@ ausgabe() { # <name> <erwartet> <pfade…>
   ist="$(printf '%s\n' "$@" | bereiche_ausgeben | tr '\n' ' ')"
   [ "$ist" = "$soll" ] && ok "$name" || rot "$name: '$ist' (Soll '$soll')"
 }
-ausgabe "nur Website und Doku → keine Suite" "rust=false frontend=false e2e=false ios=false " \
+ausgabe "nur Website und Doku → keine Suite" "rust=false frontend=false e2e=false ios=false android=false " \
   website/package.json docs/x.md
-ausgabe "Frontend und Doku → Frontend und e2e" "rust=false frontend=true e2e=true ios=false " \
+ausgabe "Frontend und Doku → Frontend und e2e" "rust=false frontend=true e2e=true ios=false android=false " \
   frontend/src/a.tsx openspec/x.md
-ausgabe "Backend und Hülle → Rust, Frontend, e2e" "rust=true frontend=true e2e=true ios=false " src/a.rs src-tauri/b.rs
-ausgabe "leere Liste → alle (im Zweifel prüfen)" "rust=true frontend=true e2e=true ios=true " ""
-ausgabe "gemeinsame Fälle → Desktop- und iOS-Prüfung" "rust=true frontend=false e2e=false ios=true " \
+ausgabe "Backend und Hülle → Rust, Frontend, e2e" "rust=true frontend=true e2e=true ios=false android=false " src/a.rs src-tauri/b.rs
+ausgabe "leere Liste → alle (im Zweifel prüfen)" "rust=true frontend=true e2e=true ios=true android=true " ""
+ausgabe "gemeinsame Fälle → Desktop-, iOS- und Android-Prüfung" "rust=true frontend=false e2e=false ios=true android=true " \
   src-tauri/faelle/links.json
-ausgabe "nur Swift-Kern → nur iOS" "rust=false frontend=false e2e=false ios=true " \
+ausgabe "nur Swift-Kern → nur iOS" "rust=false frontend=false e2e=false ios=true android=false " \
   ios/LifelineKern/Package.swift
+ausgabe "nur Kotlin-Kern → nur Android" "rust=false frontend=false e2e=false ios=false android=true " \
+  android/kern/build.gradle.kts
 rc=0
 "$SKRIPTE/bereiche.sh" x < /dev/null > /dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && ok "Argument statt stdin → Exit 2" || rot "Argument statt stdin → Exit $rc"
@@ -190,6 +197,10 @@ quellen_pruefen e2e '"' @ frontend -- "${E2E_DATEIEN[@]}"
 # iOS (LLH-1978): der Swift-Kern liest die gemeinsamen Fälle relativ zur Repo-Wurzel
 # (`#filePath`, Tests/LifelineKernTests/GemeinsameFaelle.swift).
 quellen_pruefen ios '"' . -- 'ios/*.swift'
+
+# Android (LLH-1989): der Kotlin-Kern liest die gemeinsamen Fälle relativ zur Repo-Wurzel
+# (`GemeinsameFaelle.VERZEICHNIS`, Tests unter android/kern/src/test).
+quellen_pruefen android '"' . -- 'android/*.kt'
 
 # Ein Glob, der nichts trifft, wäre sonst grün.
 gesamt="$(($(anzahl "${RUST_DATEIEN[@]}") + $(anzahl "${VITEST_DATEIEN[@]}") + $(anzahl "${E2E_DATEIEN[@]}")))"
