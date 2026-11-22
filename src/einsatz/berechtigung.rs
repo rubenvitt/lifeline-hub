@@ -301,7 +301,7 @@ pub fn modul_freigabe(
     }
     let ueberschreibung = overrides.get(modul_key);
     let org_vorgabe = org_defaults.get(modul_key);
-    let sichtbar = !ist_ausgeblendet(overrides, org_defaults, modul_key);
+    let sichtbar = !is_ausgeblendet(overrides, org_defaults, modul_key);
     if benutzer.ist_admin() {
         return ModulFreigabe {
             sichtbar,
@@ -335,8 +335,8 @@ pub fn modul_freigabe(
 /// Ob ein Modul im Einsatz ausgeblendet ist: wirksame Sichtbarkeit `false` (Einsatz-Override,
 /// sonst Org-Vorgabe, LLH-1179). Hängt an keiner Person und keiner Rolle; nicht ausblendbare
 /// Module sind es nie. Die eine Auswertung hinter [`ModulFreigabe::sichtbar`] und
-/// [`ausgeblendete_module`].
-fn ist_ausgeblendet(
+/// [`load_ausgeblendete_module`].
+fn is_ausgeblendet(
     overrides: &HashMap<String, EinsatzModulOverride>,
     org_defaults: &HashMap<String, OrgModulVorgabe>,
     modul_key: &str,
@@ -349,28 +349,28 @@ fn ist_ausgeblendet(
 }
 
 /// Die Modul-Keys ([`super::modul::MODUL_KEYS`]), die im Einsatz ausgeblendet sind
-/// ([`ist_ausgeblendet`]). Rein, gegen die geladenen Override-Maps.
-pub fn ausgeblendete_module_aus(
+/// ([`is_ausgeblendet`]). Rein, gegen die geladenen Override-Maps.
+pub fn ausgeblendete_module_from(
     overrides: &HashMap<String, EinsatzModulOverride>,
     org_defaults: &HashMap<String, OrgModulVorgabe>,
 ) -> HashSet<&'static str> {
     super::modul::MODUL_KEYS
         .iter()
         .copied()
-        .filter(|key| ist_ausgeblendet(overrides, org_defaults, key))
+        .filter(|key| is_ausgeblendet(overrides, org_defaults, key))
         .collect()
 }
 
-/// [`ausgeblendete_module_aus`] aus der Datenbank. Für Anzeigen ohne Person, die zeigen sollen,
+/// [`ausgeblendete_module_from`] aus der Datenbank. Für Anzeigen ohne Person, die zeigen sollen,
 /// was der Einsatz zeigt: die Alarmzeile des Lagemonitors (LLH-1964,
 /// `frontend/src/geraet/AGENTS.md`, Lagemonitor).
-pub async fn ausgeblendete_module(
+pub async fn load_ausgeblendete_module(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
 ) -> Result<HashSet<&'static str>, AppError> {
     let (overrides, org_defaults) = lade_modul_regeln(pool, einsatz_id, org_id).await?;
-    Ok(ausgeblendete_module_aus(&overrides, &org_defaults))
+    Ok(ausgeblendete_module_from(&overrides, &org_defaults))
 }
 
 /// Per-Handler-Guard für die Modul-Berechtigung (LFH-132): `Forbidden`, wenn
@@ -2123,7 +2123,7 @@ mod tests {
         org.extend(org_blendet_aus("erinnerungen"));
         org.extend(org_blendet_aus("einsatzdaten"));
         org.extend(org_defaults_mit("personen", Some("admin")));
-        let aus = ausgeblendete_module_aus(&overrides, &org);
+        let aus = ausgeblendete_module_from(&overrides, &org);
         assert_eq!(aus, HashSet::from(["material", "erinnerungen"]));
     }
 }

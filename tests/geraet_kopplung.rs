@@ -9193,6 +9193,12 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     let (_, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(v["alarm"]["sofort_offen"], json!(1), "{v}");
     assert_eq!(v["alarm"]["auftraege_ueberfaellig"], json!(1), "{v}");
+    assert_eq!(
+        v["alarm"]["abschnitte_kritisch"],
+        json!(["UHS Turnhalle"]),
+        "{v}"
+    );
+    assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
 
     for modul in [
         "auftraege",

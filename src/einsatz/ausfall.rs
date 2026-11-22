@@ -150,11 +150,21 @@ pub struct AusfallListen {
 }
 
 impl AusfallListen {
-    pub const ALLE: Self = Self {
+    pub const ALL: Self = Self {
         personal: true,
         fahrzeuge: true,
         material: true,
     };
+
+    /// Die Listen, deren Modul im Einsatz nicht ausgeblendet ist (`aus` aus
+    /// `berechtigung::load_ausgeblendete_module`).
+    pub fn from_ausgeblendet(aus: &HashSet<&'static str>) -> Self {
+        Self {
+            personal: !aus.contains("personal"),
+            fahrzeuge: !aus.contains("fahrzeuge"),
+            material: !aus.contains("material"),
+        }
+    }
 }
 
 /// Die Eingabe aus der Datenbank: aktive Einheiten mit abgeleitetem Status über
@@ -356,7 +366,7 @@ mod tests {
         id(&pool, material, &[e, None, uhs]).await;
 
         assert_eq!(
-            load_einheiten_mit_ausfall(&pool, einsatz_id, AusfallListen::ALLE)
+            load_einheiten_mit_ausfall(&pool, einsatz_id, AusfallListen::ALL)
                 .await
                 .unwrap(),
             ["Logistiktrupp", "Sanitätszug", OHNE_EINHEIT]
@@ -383,7 +393,6 @@ mod tests {
         );
         let einsatz_id = e.unwrap();
         let p_aus = Some(id(&pool, "INSERT INTO personal_status (org_id, label, kategorie) VALUES (1, 'krank', 'nicht_verfuegbar') RETURNING id", &[]).await);
-        let f_aus = Some(id(&pool, "INSERT INTO fahrzeug_status (org_id, label, kategorie, sortier) VALUES (1, 'außer Dienst', 'nicht_verfuegbar', 90) RETURNING id", &[]).await);
         let einheit =
             "INSERT INTO einsatz_einheit (einsatz_id, name, sortier) VALUES (?, ?, ?) RETURNING id";
         let logistik = Some(
@@ -422,7 +431,7 @@ mod tests {
         let fz = Some(id(&pool, "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) VALUES (?, 'Florian', ?) RETURNING id", &[e, fuehrung]).await);
         id(&pool, "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, status, einsatz_fahrzeug_id) VALUES (?, 'Pumpe', 'geraet', 1, 'defekt', ?) RETURNING id", &[e, fz]).await;
 
-        let lade = |listen: AusfallListen| {
+        let load = |listen: AusfallListen| {
             let pool = pool.clone();
             async move {
                 load_einheiten_mit_ausfall(&pool, einsatz_id, listen)
@@ -431,32 +440,64 @@ mod tests {
             }
         };
         assert_eq!(
-            lade(AusfallListen::ALLE).await,
+            load(AusfallListen::ALL).await,
             ["Logistiktrupp", "Sanitätszug", "Führungstrupp"]
         );
         assert_eq!(
-            lade(AusfallListen {
+            load(AusfallListen {
                 material: false,
-                ..AusfallListen::ALLE
+                ..AusfallListen::ALL
             })
             .await,
             ["Sanitätszug"]
         );
         assert_eq!(
-            lade(AusfallListen {
+            load(AusfallListen {
                 personal: false,
-                ..AusfallListen::ALLE
+                ..AusfallListen::ALL
             })
             .await,
             ["Logistiktrupp", "Führungstrupp"]
         );
         assert_eq!(
-            lade(AusfallListen {
+            load(AusfallListen {
                 fahrzeuge: false,
-                ..AusfallListen::ALLE
+                ..AusfallListen::ALL
             })
             .await,
             ["Logistiktrupp", "Sanitätszug"]
         );
+    }
+
+    /// LLH-1964, Review: je ausgeblendetes Modul entfällt genau seine Liste.
+    #[test]
+    fn listen_folgen_den_ausgeblendeten_modulen() {
+        use std::collections::HashSet;
+        let aus = |m: &[&'static str]| {
+            AusfallListen::from_ausgeblendet(&m.iter().copied().collect::<HashSet<_>>())
+        };
+        assert_eq!(aus(&[]), AusfallListen::ALL);
+        assert_eq!(
+            aus(&["personal"]),
+            AusfallListen {
+                personal: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(
+            aus(&["fahrzeuge"]),
+            AusfallListen {
+                fahrzeuge: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(
+            aus(&["material"]),
+            AusfallListen {
+                material: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(aus(&["einheiten", "etb"]), AusfallListen::ALL);
     }
 }

@@ -205,7 +205,7 @@ pub enum AlarmQuelle {
 impl AlarmQuelle {
     /// Ob die Quelle ausgeblendet ist, wenn `aus` die im Einsatz ausgeblendeten Module nennt. Die
     /// Zuordnung folgt `useWasBrennt` (`frontend/src/geraet/AGENTS.md`, Lagemonitor).
-    fn ist_ausgeblendet(self, aus: &std::collections::HashSet<&'static str>) -> bool {
+    fn is_ausgeblendet(self, aus: &std::collections::HashSet<&'static str>) -> bool {
         let module: &[&str] = match self {
             Self::Meldungen => &["meldungen"],
             Self::Auftraege => &["auftraege"],
@@ -219,7 +219,7 @@ impl AlarmQuelle {
         module.iter().any(|m| aus.contains(m))
     }
 
-    const ALLE: [Self; 8] = [
+    const ALL: [Self; 8] = [
         Self::Meldungen,
         Self::Auftraege,
         Self::Erinnerungen,
@@ -327,10 +327,11 @@ pub async fn alarm(
     org_id: i64,
     jetzt: &str,
 ) -> Result<LagemonitorAlarm, AppError> {
-    let aus = crate::einsatz::berechtigung::ausgeblendete_module(pool, einsatz_id, org_id).await?;
-    let ausgeblendet: Vec<AlarmQuelle> = AlarmQuelle::ALLE
+    let aus =
+        crate::einsatz::berechtigung::load_ausgeblendete_module(pool, einsatz_id, org_id).await?;
+    let ausgeblendet: Vec<AlarmQuelle> = AlarmQuelle::ALL
         .into_iter()
-        .filter(|q| q.ist_ausgeblendet(&aus))
+        .filter(|q| q.is_ausgeblendet(&aus))
         .collect();
     let sichtbar = |q: AlarmQuelle| !ausgeblendet.contains(&q);
 
@@ -382,11 +383,7 @@ pub async fn alarm(
         crate::einsatz::ausfall::load_einheiten_mit_ausfall(
             pool,
             einsatz_id,
-            crate::einsatz::ausfall::AusfallListen {
-                personal: !aus.contains("personal"),
-                fahrzeuge: !aus.contains("fahrzeuge"),
-                material: !aus.contains("material"),
-            },
+            crate::einsatz::ausfall::AusfallListen::from_ausgeblendet(&aus),
         )
         .await?
     } else {
@@ -1224,5 +1221,44 @@ mod tests {
         assert_eq!(karte_etag(&a), karte_etag(&a));
         assert_ne!(karte_etag(&a), karte_etag(&b));
         assert_eq!(karte_etag(&a).len(), 16);
+    }
+
+    /// LLH-1964, Review: jede Quelle hängt an genau den Modulen, die `useWasBrennt` für sie prüft.
+    /// Je Modul einzeln ausgeblendet, damit eine vertauschte Zuordnung auffällt.
+    #[test]
+    fn jede_alarmquelle_haengt_an_ihren_modulen() {
+        use std::collections::HashSet;
+        let erwartet: [(&str, &[AlarmQuelle]); 11] = [
+            (
+                "meldungen",
+                &[AlarmQuelle::Meldungen, AlarmQuelle::Rueckmeldung],
+            ),
+            ("auftraege", &[AlarmQuelle::Auftraege]),
+            ("erinnerungen", &[AlarmQuelle::Erinnerungen]),
+            ("nachforderungen", &[AlarmQuelle::Nachforderungen]),
+            ("personen", &[AlarmQuelle::Vermisst]),
+            ("einsatzabschnitte", &[AlarmQuelle::Kritisch]),
+            (
+                "einheiten",
+                &[AlarmQuelle::Rueckmeldung, AlarmQuelle::Ausfall],
+            ),
+            // Mittel-Listen gehen leer in den Ausfall, blenden aber keine Quelle aus.
+            ("personal", &[]),
+            ("fahrzeuge", &[]),
+            ("material", &[]),
+            ("etb", &[]),
+        ];
+        for (modul, quellen) in erwartet {
+            assert!(
+                crate::einsatz::modul::MODUL_KEYS.contains(&modul),
+                "{modul} ist kein Modul-Key"
+            );
+            let aus = HashSet::from([modul]);
+            let ist: Vec<AlarmQuelle> = AlarmQuelle::ALL
+                .into_iter()
+                .filter(|q| q.is_ausgeblendet(&aus))
+                .collect();
+            assert_eq!(ist, quellen, "{modul} ausgeblendet");
+        }
     }
 }
