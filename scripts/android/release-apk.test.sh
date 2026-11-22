@@ -22,6 +22,10 @@ pruefe() { # <name> <erwartet> <gemessen>
   fi
 }
 ja_nein() { if "$@"; then echo ja; else echo nein; fi; }
+# Auf macOS fehlt `sha256sum` (scripts/check-deps.test.sh), dort rechnet `shasum -a 256`.
+sha256_von() {
+  if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1
+}
 
 PASSWORT="passwort-$RANDOM-geheim"
 KEYSTORE_INHALT="keystore-$RANDOM"
@@ -91,7 +95,8 @@ W="$(wurzel_mit 1.2.0-beta.3)"
 echo "==> release-apk: Erfolg"
 pruefe "Beta-Tag baut" 0 "$(laufe "$W" --tag v1.2.0-beta.3 --ausgabe "$ARBEIT/versand" -- --offline)"
 pruefe "APK unter dem Release-Namen" ja "$(ja_nein test -f "$ARBEIT/versand/lifeline-hub-android-1.2.0-beta.3.apk")"
-pruefe "Prüfsumme stimmt" ja "$(ja_nein sh -c "cd '$ARBEIT/versand' && sha256sum -c --quiet lifeline-hub-android-1.2.0-beta.3.apk.sha256")"
+pruefe "Prüfsumme stimmt" "$(sha256_von "$ARBEIT/versand/lifeline-hub-android-1.2.0-beta.3.apk")  lifeline-hub-android-1.2.0-beta.3.apk" \
+  "$(cat "$ARBEIT/versand/lifeline-hub-android-1.2.0-beta.3.apk.sha256")"
 pruefe "Gradle baut assembleRelease mit den Zusatzargumenten" ja \
   "$(ja_nein grep -q "^gradlew -p $W/android :app:assembleRelease --console=plain --offline$" "$ARBEIT/log")"
 pruefe "Gradle unter UTF-8" "locale C.UTF-8" "$(grep '^locale ' "$ARBEIT/log")"
@@ -107,6 +112,35 @@ pruefe "Fingerabdruck im Log" ja "$(ja_nein grep -q 'certificate SHA-256 digest'
 sha="$(cut -d' ' -f1 "$ARBEIT/versand/lifeline-hub-android-1.2.0-beta.3.apk.sha256")"
 pruefe "GITHUB_OUTPUT: sha256" "sha256=$sha" "$(grep '^sha256=' "$ARBEIT/gh-output")"
 pruefe "GITHUB_OUTPUT: version_code als Zahl" ja "$(ja_nein grep -qE '^version_code=[0-9]+$' "$ARBEIT/gh-output")"
+
+echo "==> release-apk: ohne sha256sum (macOS)"
+# Der PATH dieses Rechners ohne `sha256sum`, wie auf einem Mac ohne GNU coreutils; `shasum` ist
+# dort da. Jeder Eintrag wird einzeln nachgebildet, damit Hüllen, die das nächste gleichnamige
+# Programm im PATH suchen (etwa ein `rm`-Wächter), es weiter finden.
+OHNE_SHA=""
+i=0
+IFS=: read -ra pfade <<< "$PATH"
+for d in "${pfade[@]}"; do
+  i=$((i + 1))
+  kopie="$ARBEIT/ohne-sha256sum/$i"
+  mkdir -p "$kopie"
+  for f in "$d"/*; do
+    n="${f##*/}"
+    if [ "$n" != sha256sum ] && [ -x "$f" ] && [ ! -d "$f" ]; then ln -s "$f" "$kopie/$n"; fi
+  done
+  OHNE_SHA="${OHNE_SHA:+$OHNE_SHA:}$kopie"
+done
+if ! command -v shasum > /dev/null 2>&1; then
+  # Ohne Perl-`shasum` hier eine Attrappe, die wie auf macOS rechnet.
+  printf '#!/usr/bin/env bash\n[ "$1 $2" = "-a 256" ] || exit 2\nshift 2\nexec %q "$@"\n' \
+    "$(command -v sha256sum)" > "$ARBEIT/ohne-sha256sum/1/shasum"
+  chmod +x "$ARBEIT/ohne-sha256sum/1/shasum"
+fi
+pruefe "ohne sha256sum: baut" 0 \
+  "$(PATH="$OHNE_SHA" laufe "$W" --tag v1.2.0-beta.3 --ausgabe "$ARBEIT/mac")"
+pruefe "ohne sha256sum: Prüfsumme im Format von sha256sum" \
+  "$(cat "$ARBEIT/versand/lifeline-hub-android-1.2.0-beta.3.apk.sha256")" \
+  "$(cat "$ARBEIT/mac/lifeline-hub-android-1.2.0-beta.3.apk.sha256" 2> /dev/null || true)"
 
 echo "==> release-apk: rot"
 for geheim in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do

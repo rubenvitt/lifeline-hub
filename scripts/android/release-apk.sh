@@ -114,7 +114,8 @@ badging="$("$WERKZEUGE/aapt2" dump badging "$APK" | sed -n '1p')"
 NAME="lifeline-hub-android-$VERSION.apk"
 mkdir -p "$AUSGABE"
 cp "$APK" "$AUSGABE/$NAME"
-( cd "$AUSGABE" && sha256sum "$NAME" > "$NAME.sha256" )
+# Auf macOS fehlt `sha256sum`; `shasum -a 256` schreibt dasselbe Format („<hex>  <name>“).
+( cd "$AUSGABE" && if command -v sha256sum > /dev/null 2>&1; then sha256sum "$NAME"; else shasum -a 256 "$NAME"; fi > "$NAME.sha256" )
 SHA256="$(cut -d' ' -f1 "$AUSGABE/$NAME.sha256")"
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
