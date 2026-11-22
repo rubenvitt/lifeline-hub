@@ -389,14 +389,13 @@ describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    expect(
-      await screen.findByText('Absicht darf höchstens 2.000 Zeichen lang sein'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Sicherheit darf höchstens 2.000 Zeichen lang sein'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Weg darf höchstens 2.000 Zeichen lang sein')).toBeInTheDocument();
-    expect(screen.getByText('Ziel/Ort darf höchstens 2.000 Zeichen lang sein')).toBeInTheDocument();
+    // antd zeigt die Fehler jedes Felds für sich an; unter Last kommt eine Meldung später als die
+    // andere. Deshalb jede abwarten (LLH-1903).
+    for (const feld of ['Absicht', 'Sicherheit', 'Weg', 'Ziel/Ort']) {
+      expect(
+        await screen.findByText(`${feld} darf höchstens 2.000 Zeichen lang sein`),
+      ).toBeInTheDocument();
+    }
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 

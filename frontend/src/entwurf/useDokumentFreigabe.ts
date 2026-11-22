@@ -34,6 +34,10 @@ interface DokumentFreigabeOptions<W extends object> {
  *   abgewartet, nicht gedoppelt), sonst würde ein eben befüllter Entwurf als „leer“ abgelehnt.
  *   Jede Ablehnung lässt den Dialog offen, ihr Grund steht darin (`speicherFehler`
  *   bzw. `freigabeFehler`).
+ * - **Abbrechen ist gesperrt, solange der Lauf geht** (LLH-1885, `frontend/AGENTS.md`, LFH-1077):
+ *   sonst schlösse der Dialog, und die Freigabe liefe danach trotzdem durch oder ihre Ablehnung
+ *   käme unsichtbar an. `laeuftRun` deckt den ganzen Lauf, auch den Takt zwischen dem Ende des
+ *   Speicherns und dem Start des POST, in dem weder `speichertGerade` noch `isPending` steht.
  * - Kein eigener `sendetRef`-Riegel wie in `Erfassung.tsx`: antds `Button` sperrt seinen Klick
  *   selbst, solange `loading` steht, und der Knopf im Dialog ist der einzige Weg.
  */
@@ -52,6 +56,7 @@ export function useDokumentFreigabe<W extends object>({
   });
 
   const [freigabeWerte, setFreigabeWerte] = useState<W | null>(null);
+  const [laeuftRun, setLaeuftRun] = useState(false);
 
   const freigebenMutation = useMutation({
     mutationFn: gibFrei,
@@ -75,12 +80,11 @@ export function useDokumentFreigabe<W extends object>({
     setFreigabeWerte(werte);
   };
 
-  const run = async () => {
-    if (freigabeWerte === null) return;
+  const speichereUndGibFrei = async (werte: W) => {
     try {
       // Bei Erfolg quittiert der Verlustschutz selbst: sonst fragte der Browser beim Neuladen
       // nach Änderungen an einem nicht mehr editierbaren Dokument.
-      await schutz.speichereJetzt(freigabeWerte);
+      await schutz.speichereJetzt(werte);
     } catch {
       // Kein Toast: der Grund steht als `speicherFehler` im Dialog, der offen bleibt. Der
       // Seiten-Alert bleibt daneben stehen, er überlebt das Schließen des Dialogs.
@@ -93,6 +97,18 @@ export function useDokumentFreigabe<W extends object>({
     }
     setFreigabeWerte(null);
   };
+
+  const run = async () => {
+    if (freigabeWerte === null) return;
+    setLaeuftRun(true);
+    try {
+      await speichereUndGibFrei(freigabeWerte);
+    } finally {
+      setLaeuftRun(false);
+    }
+  };
+
+  const laeuft = laeuftRun || schutz.speichertGerade || freigebenMutation.isPending;
 
   return {
     speichern: (werte: W) => speichernMutation.mutate(werte),
@@ -110,8 +126,10 @@ export function useDokumentFreigabe<W extends object>({
       // Blur-Autosave anhängt. Hier richtig und nicht die Falle von `isSavePending`: dieser
       // Knopf existiert nur bei offenem Dialog, der Vorlauf ist genau der Vorgang, auf den der
       // Dialog wartet.
-      laeuft: schutz.speichertGerade || freigebenMutation.isPending,
-      onAbbrechen: () => setFreigabeWerte(null),
+      laeuft,
+      onAbbrechen: () => {
+        if (!laeuft) setFreigabeWerte(null);
+      },
       onFreigeben: () => void run(),
     },
   };

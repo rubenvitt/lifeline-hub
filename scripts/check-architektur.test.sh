@@ -31,9 +31,12 @@ verbiete "WebSocket" "src/**/*.rs"
 
 baum_neu() { # <name> → Pfad eines grünen Repos
   local b="$ARBEIT/$1"
-  mkdir -p "$b"
+  # Läuft als Befehlsersetzung, dort greift `set -e` nicht: ohne die Prüfungen legte ein
+  # gescheitertes mkdir (volle Platte) die Fixture ins aktuelle Verzeichnis (LLH-1892).
+  mkdir -p "$b" || exit 1
   (
-    cd "$b"
+    cd "$b" || exit 1
+    set -e
     git init -q
     schreibe src/live/mod.rs 'pub fn senden() {}'
     schreibe src/config.rs '// Konfiguration'
@@ -67,7 +70,7 @@ baum_neu() { # <name> → Pfad eines grünen Repos
     schreibe docs/architektur/entscheidungen/ADR-0001-live.md "$(adr_text ADR-0001 akzeptiert 'src/live/**' "$PRUEF_GRUEN")"
     schreibe docs/architektur/entscheidungen/VORLAGE.md 'keine ADR'
     git add -A
-  )
+  ) || exit 1
   printf '%s\n' "$b"
 }
 
@@ -163,6 +166,20 @@ muster ja 'src/[ab].rs' 'src/a.rs'
 muster ja 'frontend/src/offline' 'frontend/src/offline/queue.ts'
 muster ja 'src/config.rs' './src/config.rs'
 muster nein 'src/config.rs' 'src/config.rs.bak'
+
+# LLH-1892: Kann baum_neu sein Verzeichnis nicht anlegen (etwa bei voller Platte), muss es
+# scheitern, statt die Fixture ins aktuelle Verzeichnis zu legen; im Gate ist das der Checkout.
+leer="$ARBEIT/aktuelles-verzeichnis"
+mkdir -p "$leer"
+rc=0
+# shellcheck disable=SC2034 # B bildet den echten Aufruf in fall nach
+(cd "$leer" || exit 99; mkdir() { return 1; }; B="$(baum_neu ohne_platte)") 2> /dev/null || rc=$?
+if [ "$rc" -eq 0 ] || [ -n "$(ls -A "$leer")" ]; then
+  echo "  FEHL ohne Temp-Verzeichnis — Exit $rc, im aktuellen Verzeichnis: $(ls -A "$leer" | tr '\n' ' ')" >&2
+  fehler=$((fehler + 1))
+else
+  echo "  ok   ohne Temp-Verzeichnis: bricht ab und schreibt nichts ins aktuelle Verzeichnis"
+fi
 
 if [ "$fehler" -gt 0 ]; then
   echo "Selbsttest check-architektur: $fehler Fehler." >&2

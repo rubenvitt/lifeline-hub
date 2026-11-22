@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::person::AbgleichStatus;
+use crate::person::{AbgleichStatus, PersonStatus};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -67,7 +67,8 @@ pub async fn laden(
 /// DERSELBEN Transaktion die Vermisstmeldung `→ abgemeldet` gesetzt; der partielle
 /// Unique-Index erzwingt höchstens einen bestätigten Abgleich je Vermisstmeldung
 /// (Verletzung → `Conflict`). Nur aus `verdacht` heraus: ein schon entschiedener Abgleich
-/// endet mit `Conflict`, geprüft im UPDATE selbst (LLH-1686).
+/// endet mit `Conflict`, geprüft im UPDATE selbst (LLH-1686). Vor dem Bestätigen werden beide
+/// Personen erneut geprüft wie beim Anlegen (LLH-1883, `pruefe_person`); Verwerfen geht immer.
 pub async fn entscheide(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -112,20 +113,76 @@ pub async fn entscheide(
             ));
         }
         if entscheidung == "bestaetigt" {
-            sqlx::query(
+            // LLH-1883: Seit dem Verdacht kann eine der Personen storniert oder umgestellt worden
+            // sein. Bestätigt wird nur, was `abgleich_anlegen` auch anlegen ließe; sonst Fehler und
+            // Rollback, der Abgleich bleibt `verdacht` und lässt sich verwerfen.
+            pruefe_person(
+                conn,
+                einsatz_id,
+                abgleich.vermisst_person_id,
+                &[PersonStatus::Vermisst],
+                "Vermisstmeldung ist storniert",
+                "Person ist nicht mehr vermisst",
+            )
+            .await?;
+            pruefe_person(
+                conn,
+                einsatz_id,
+                abgleich.gefunden_person_id,
+                &[PersonStatus::Betroffen, PersonStatus::Verstorben],
+                "Gefundene Person ist storniert",
+                "Gefundene Person muss Status betroffen/verstorben haben",
+            )
+            .await?;
+            let abgemeldet = sqlx::query(
                 "UPDATE einsatz_person SET status = 'abgemeldet', \
                     geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-                 WHERE id = ? AND einsatz_id = ?",
+                 WHERE id = ? AND einsatz_id = ? AND status = 'vermisst' \
+                   AND storniert_at IS NULL",
             )
             .bind(entschieden_von)
             .bind(abgleich.vermisst_person_id)
             .bind(einsatz_id)
             .execute(&mut *conn)
-            .await?;
+            .await?
+            .rows_affected();
+            if abgemeldet == 0 {
+                return Err(AppError::Conflict(
+                    "Vermisstmeldung wurde zwischenzeitlich geändert".into(),
+                ));
+            }
         }
         Ok(())
     })?;
     laden(pool, einsatz_id, id).await
+}
+
+/// Prüft eine am Abgleich beteiligte Person in der laufenden Transaktion (LLH-1883): storniert →
+/// 409 (Lebenszyklus), Status nicht in `erlaubt` → 422 (Zustand), nach `src/AGENTS.md`,
+/// Statuscode-Konvention.
+async fn pruefe_person(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    erlaubt: &[PersonStatus],
+    storniert: &str,
+    falscher_status: &str,
+) -> Result<(), AppError> {
+    let (status, storniert_at): (String, Option<String>) = sqlx::query_as(
+        "SELECT status, storniert_at FROM einsatz_person WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if storniert_at.is_some() {
+        return Err(AppError::Conflict(storniert.into()));
+    }
+    if !PersonStatus::parse(&status).is_some_and(|s| erlaubt.contains(&s)) {
+        return Err(AppError::UnprocessableEntity(falscher_status.into()));
+    }
+    Ok(())
 }
 
 /// Abgleiche, an denen die Person beteiligt ist (als vermisst ODER gefunden),
@@ -275,6 +332,157 @@ mod tests {
             AbgleichStatus::Verworfen
         );
         assert_eq!(status(&pool, v).await, "vermisst");
+    }
+
+    async fn setze(pool: &SqlitePool, person_id: i64, status: &str) {
+        sqlx::query("UPDATE einsatz_person SET status = ? WHERE id = ?")
+            .bind(status)
+            .bind(person_id)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn storniere(pool: &SqlitePool, person_id: i64, von: i64) {
+        sqlx::query(
+            "UPDATE einsatz_person SET storniert_at = '2026-05-27 10:00:00', storniert_von = ? \
+             WHERE id = ?",
+        )
+        .bind(von)
+        .bind(person_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Prüft den Fehler und dass nichts geschrieben wurde: der Abgleich bleibt `verdacht`, die
+    /// vermisste Person behält `erwartet`.
+    async fn abgelehnt_ohne_schreiben(
+        pool: &SqlitePool,
+        e: i64,
+        aid: i64,
+        v: i64,
+        err: AppError,
+        erwartet: &str,
+    ) -> AppError {
+        assert_eq!(
+            laden(pool, e, aid).await.unwrap().status,
+            AbgleichStatus::Verdacht,
+            "Rollback: der Abgleich bleibt offen ({err:?})"
+        );
+        assert_eq!(status(pool, v).await, erwartet, "nicht abgemeldet");
+        err
+    }
+
+    /// LLH-1883: Eine seit dem Verdacht stornierte Vermisstmeldung wird nicht mehr bestätigt (409,
+    /// Lebenszyklus) und nicht abgemeldet.
+    #[tokio::test]
+    async fn bestaetigen_nach_storno_der_vermisstmeldung_ist_409_ohne_schreiben() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        storniere(&pool, v, b).await;
+
+        let err = entscheide(&pool, e, a.id, "bestaetigt", b)
+            .await
+            .unwrap_err();
+        let err = abgelehnt_ohne_schreiben(&pool, e, a.id, v, err, "vermisst").await;
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+    }
+
+    /// LLH-1883: Steht die Vermisstmeldung inzwischen auf `betroffen` oder `verstorben`, ist das
+    /// Bestätigen 422 (Zustand) und ändert ihren Status nicht.
+    #[tokio::test]
+    async fn bestaetigen_nach_statuswechsel_der_vermisstmeldung_ist_422_ohne_schreiben() {
+        for neu in ["betroffen", "verstorben", "abgemeldet", "erfasst"] {
+            let pool = test_pool().await;
+            let (b, e, v, g, _) = setup(&pool).await;
+            let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+            setze(&pool, v, neu).await;
+
+            let err = entscheide(&pool, e, a.id, "bestaetigt", b)
+                .await
+                .unwrap_err();
+            let err = abgelehnt_ohne_schreiben(&pool, e, a.id, v, err, neu).await;
+            assert!(
+                matches!(err, AppError::UnprocessableEntity(_)),
+                "{neu}: {err:?}"
+            );
+        }
+    }
+
+    /// LLH-1883: Auch die gefundene Person wird beim Bestätigen erneut geprüft: storniert → 409.
+    #[tokio::test]
+    async fn bestaetigen_nach_storno_der_gefundenen_person_ist_409_ohne_schreiben() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        storniere(&pool, g, b).await;
+
+        let err = entscheide(&pool, e, a.id, "bestaetigt", b)
+            .await
+            .unwrap_err();
+        let err = abgelehnt_ohne_schreiben(&pool, e, a.id, v, err, "vermisst").await;
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+    }
+
+    /// LLH-1883: Gefundene Person nicht mehr `betroffen`/`verstorben` → 422; `verstorben` bleibt
+    /// eine gültige Fundlage.
+    #[tokio::test]
+    async fn bestaetigen_prueft_status_der_gefundenen_person() {
+        for neu in ["vermisst", "abgemeldet", "erfasst"] {
+            let pool = test_pool().await;
+            let (b, e, v, g, _) = setup(&pool).await;
+            let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+            setze(&pool, g, neu).await;
+
+            let err = entscheide(&pool, e, a.id, "bestaetigt", b)
+                .await
+                .unwrap_err();
+            let err = abgelehnt_ohne_schreiben(&pool, e, a.id, v, err, "vermisst").await;
+            assert!(
+                matches!(err, AppError::UnprocessableEntity(_)),
+                "{neu}: {err:?}"
+            );
+        }
+
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        setze(&pool, g, "verstorben").await;
+        entscheide(&pool, e, a.id, "bestaetigt", b).await.unwrap();
+        assert_eq!(status(&pool, v).await, "abgemeldet");
+    }
+
+    /// LLH-1883: Verwerfen bleibt möglich, wenn die Lage nicht mehr passt — so räumt die
+    /// Einsatzleitung einen veralteten Verdacht ab. Der Status der Person bleibt.
+    #[tokio::test]
+    async fn verwerfen_geht_auch_nach_storno_oder_statuswechsel() {
+        let pool = test_pool().await;
+        let (b, e, v, g, g2) = setup(&pool).await;
+        let a1 = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        let a2 = anlegen_verdacht(&pool, e, v, g2, b).await.unwrap();
+        setze(&pool, v, "betroffen").await;
+        entscheide(&pool, e, a1.id, "verworfen", b).await.unwrap();
+        assert_eq!(status(&pool, v).await, "betroffen");
+        storniere(&pool, v, b).await;
+        let a2 = entscheide(&pool, e, a2.id, "verworfen", b).await.unwrap();
+        assert_eq!(a2.status, AbgleichStatus::Verworfen);
+    }
+
+    /// LLH-1883: Wird die Person zurück auf `vermisst` korrigiert, gilt der offene Verdacht wieder.
+    #[tokio::test]
+    async fn nach_korrektur_zurueck_auf_vermisst_geht_bestaetigen_wieder() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        setze(&pool, v, "betroffen").await;
+        entscheide(&pool, e, a.id, "bestaetigt", b)
+            .await
+            .unwrap_err();
+        setze(&pool, v, "vermisst").await;
+        entscheide(&pool, e, a.id, "bestaetigt", b).await.unwrap();
+        assert_eq!(status(&pool, v).await, "abgemeldet");
     }
 
     #[tokio::test]
