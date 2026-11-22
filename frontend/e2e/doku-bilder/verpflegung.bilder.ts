@@ -2,6 +2,7 @@ import {
   anmelden,
   apiAlsAdmin,
   demoEinsatz,
+  eintreffenVor,
   expect,
   fotografiere,
   fuelle,
@@ -98,7 +99,7 @@ test.describe(KAPITEL, () => {
       for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
         await fuelle(api, 'post', `/api/einsaetze/${demo.id}/einheiten/${e.id}/zeitachse`, {
           art: 'eintreffen',
-          zeitpunkt_at: new Date(jetzt.getTime() - 120 * 60_000).toISOString(),
+          zeitpunkt_at: eintreffenVor(jetzt, 120).toISOString(),
         });
       }
 

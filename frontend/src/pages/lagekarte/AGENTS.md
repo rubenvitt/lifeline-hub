@@ -368,6 +368,9 @@ diese Zusage.
   `keyEvents: { cancel: null }`. Offene antd-Overlays schließen per eigenem `window`-keydown
   **ohne** `preventDefault` → Riegel `escGehoertOverlay`, `defaultPrevented` allein reicht nicht.
   Punktzahl aus terra-draws `history`, nie aus DOM-Klicks (die laufen an terra-draw vorbei).
+  Die verwerfende Stufe beendet vorher jeden Zug an den Griffen (`zugBeenden` am Karten-Handle,
+  LLH-1891): Kreis- und Bearbeitungsgriffe nehmen den gezogenen Marker ab, sonst meldet sein
+  `drag`/`dragend` die Zeigerlage nach dem Verwerfen. Ein neuer ziehbarer Griff braucht dasselbe.
 
 **Abschnittsfokus**
 

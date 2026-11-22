@@ -62,6 +62,7 @@ die Karten deckungsgleich.
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
+| Geheimnis setzen oder ersetzen, nie lesen (Zugangsdaten eines Adapters)                         | `Geheimfeld` (Wert nur im State der Zeile, nie in `Form`, Query- oder Mutations-Cache)                                                           | `Geheimfeld`                       |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
 | Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
@@ -116,6 +117,7 @@ die Karten deckungsgleich.
 - **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
 - **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
 - **Speicherleiste (SpeicherKnopf, Punkt am geänderten Feld)** (`components/Speicherleiste/`, Gruppe Formular)
+- **Geheimfeld (nicht gesetzt, gesetzt, offen, unlesbar, gesperrt, nur lesen)** (`components/Geheimfeld/`, Gruppe Formular)
 - **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)

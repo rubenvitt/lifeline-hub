@@ -86,6 +86,50 @@ describe('useDokumentFreigabe (LLH-1689)', () => {
     expect(result.current.dialog.freigabeFehler).toBeNull();
   });
 
+  /**
+   * LLH-1885 (`frontend/AGENTS.md`, LFH-1077): Solange der Lauf geht, ist Abbrechen wirkungslos,
+   * sonst schlösse der Dialog und das Dokument würde danach trotzdem freigegeben (Fall A) oder
+   * die Ablehnung käme unsichtbar an (Fall B). Der Verlustschutz meldet hier `speichertGerade:
+   * false`: der Hook muss den Lauf selbst kennen, auch zwischen Speichern und POST.
+   */
+  it('Abbrechen während des Speicher-Vorlaufs lässt den Dialog offen (LLH-1885, Fall A)', async () => {
+    let speichern!: () => void;
+    const { optionen, result } = setup({
+      speichereJetzt: () => new Promise<void>((r) => (speichern = r)),
+    });
+    await act(() => result.current.confirmFreigabe());
+    act(() => result.current.dialog.onFreigeben());
+    expect(result.current.dialog.laeuft).toBe(true);
+
+    act(() => result.current.dialog.onAbbrechen());
+    expect(result.current.dialog.offen).toBe(true);
+
+    await act(async () => speichern());
+    await waitFor(() => expect(result.current.dialog.offen).toBe(false));
+    expect(optionen.gibFrei).toHaveBeenCalledTimes(1);
+    expect(result.current.dialog.laeuft).toBe(false);
+  });
+
+  it('Abbrechen während des POST lässt die Ablehnung sichtbar (LLH-1885, Fall B)', async () => {
+    const grund = new Error('leer');
+    let ablehnen!: (e: unknown) => void;
+    const { result } = setup({
+      gibFrei: () => new Promise((_, r) => (ablehnen = r)),
+    });
+    await act(() => result.current.confirmFreigabe());
+    act(() => result.current.dialog.onFreigeben());
+    await waitFor(() => expect(ablehnen).toBeTypeOf('function'));
+    expect(result.current.dialog.laeuft).toBe(true);
+
+    act(() => result.current.dialog.onAbbrechen());
+    expect(result.current.dialog.offen).toBe(true);
+
+    await act(async () => ablehnen(grund));
+    await waitFor(() => expect(result.current.dialog.freigabeFehler).toBe(grund));
+    expect(result.current.dialog.offen).toBe(true);
+    expect(result.current.dialog.laeuft).toBe(false);
+  });
+
   it('speichern ruft speichereJetzt mit den Werten des Formulars', async () => {
     const { optionen, result } = setup();
     act(() => result.current.speichern({ titel: 'Neu' }));
