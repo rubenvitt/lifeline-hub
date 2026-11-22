@@ -1,5 +1,5 @@
 /**
- * AST-Scanner für Query-Key-Fundstellen (LFH-312). Sieht mehrzeilige Literale, ignoriert
+ * AST-Scanner für Query-Key-Fundstellen (LFH-312), AST über `lib/quelltextAst` (oxc-parser, LLH-2020). Sieht mehrzeilige Literale, ignoriert
  * Kommentare strukturell und kennt den Kontext (`['KB','MB']` gegen `queryKey: [...]`).
  *
  * BEWUSST OHNE `import.meta.glob`: der Scanner nimmt Quelltext als String entgegen, das Glob
@@ -12,7 +12,14 @@
  *   ENG (nur Query-Key-Kontexte): für den Allowlist-Guard (f); darf Konstanten wie
  *     `['KB','MB','GB','TB']` nicht anfassen.
  */
-import * as ts from 'typescript';
+import {
+  type AstKnoten,
+  istStringLiteral,
+  parseQuelltext,
+  textVon,
+  walk,
+  zeileVon,
+} from '../lib/quelltextAst';
 
 /**
  * Aufrufe des QueryClient, die einen Query-Key als ERSTES ARGUMENT nehmen (v4-Stil,
@@ -74,29 +81,64 @@ export interface Fund {
 }
 
 /** Name des Callees einer CallExpression (`f()` → 'f', `qc.invalidateQueries()` → 'invalidateQueries'). */
-function calleeName(ausdruck: ts.Expression): string | undefined {
-  if (ts.isIdentifier(ausdruck)) return ausdruck.text;
-  if (ts.isPropertyAccessExpression(ausdruck)) return ausdruck.name.text;
+function calleeName(ausdruck: AstKnoten): string | undefined {
+  if (ausdruck.type === 'Identifier') return ausdruck.name as string;
+  if (ausdruck.type === 'MemberExpression' && !ausdruck.computed) {
+    const eigenschaft = ausdruck.property as AstKnoten;
+    if (eigenschaft.type === 'Identifier') return eigenschaft.name as string;
+  }
   return undefined;
 }
 
+/**
+ * Statischer Text eines String-Literals oder eines Template-Literals ohne Platzhalter (TS:
+ * `isStringLiteralLike`); sonst `undefined`.
+ */
+function statischerText(knoten: AstKnoten | null | undefined): string | undefined {
+  if (istStringLiteral(knoten)) return knoten.value;
+  if (knoten?.type === 'TemplateLiteral' && (knoten.expressions as AstKnoten[]).length === 0) {
+    const [teil] = knoten.quasis as AstKnoten[];
+    return (teil.value as { cooked: string | null }).cooked ?? undefined;
+  }
+  return undefined;
+}
+
+type ElternVon = Map<AstKnoten, AstKnoten>;
+
 /** Ist dieses Array-Literal ein Query-Key — und wenn ja, in welchem Kontext? */
-function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined {
-  const eltern = arr.parent;
+function schluesselKontext(arr: AstKnoten, elternVon: ElternVon): FundArt | undefined {
+  const eltern = elternVon.get(arr);
   if (!eltern) return undefined;
-  if (ts.isPropertyAssignment(eltern) && eltern.initializer === arr) {
+  if (
+    eltern.type === 'Property' &&
+    eltern.kind === 'init' &&
+    !eltern.method &&
+    !eltern.shorthand &&
+    !eltern.computed &&
+    eltern.value === arr
+  ) {
+    const schluessel = eltern.key as AstKnoten;
     const name =
-      ts.isIdentifier(eltern.name) || ts.isStringLiteralLike(eltern.name)
-        ? eltern.name.text
-        : undefined;
+      schluessel.type === 'Identifier' ? (schluessel.name as string) : statischerText(schluessel);
     if (name && SCHLUESSEL_PROPS.has(name)) return name as FundArt;
   }
-  if (ts.isCallExpression(eltern) && eltern.arguments[0] === arr) {
-    const name = calleeName(eltern.expression);
+  if (eltern.type === 'CallExpression' && (eltern.arguments as AstKnoten[])[0] === arr) {
+    const name = calleeName(eltern.callee as AstKnoten);
     if (name && CACHE_CALLS.has(name)) return 'cache-call';
   }
   return undefined;
 }
+
+/** Name eines Parameters, wie TS ihn als `parameter.name` sah (auch mit Vorgabe oder `...`). */
+function parameterName(param: AstKnoten): string | undefined {
+  let kern = param;
+  if (kern.type === 'TSParameterProperty') kern = kern.parameter as AstKnoten;
+  if (kern.type === 'AssignmentPattern') kern = kern.left as AstKnoten;
+  else if (kern.type === 'RestElement') kern = kern.argument as AstKnoten;
+  return kern.type === 'Identifier' ? (kern.name as string) : undefined;
+}
+
+const FUNKTIONSWERTE = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
 
 /**
  * Erkennt Funktionen, deren Parameter i strukturell an Position 0 eines Query-Key-Arrays landet
@@ -106,37 +148,35 @@ function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined 
  * `live/useEinsatzLiveStream.ts`. Hart auf EINEN Schritt in DERSELBEN Datei begrenzt; alles
  * darüber wäre Datenfluss-Analyse.
  */
-function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
+function findeSchluesselHelfer(programm: AstKnoten, elternVon: ElternVon): Map<string, number> {
   const helfer = new Map<string, number>();
 
-  const pruefeFunktion = (name: string | undefined, fn: ts.SignatureDeclaration): void => {
-    if (!name || fn.parameters.length === 0) return;
-    const params = fn.parameters.map((p) => (ts.isIdentifier(p.name) ? p.name.text : undefined));
-    const suche = (knoten: ts.Node): void => {
-      if (ts.isArrayLiteralExpression(knoten) && schluesselKontext(knoten)) {
-        const erstes = knoten.elements[0];
-        if (erstes && ts.isIdentifier(erstes)) {
-          const idx = params.indexOf(erstes.text);
+  const pruefeFunktion = (name: string | undefined, fn: AstKnoten): void => {
+    const parameter = fn.params as AstKnoten[];
+    if (!name || parameter.length === 0) return;
+    const params = parameter.map(parameterName);
+    walk(fn, (knoten) => {
+      if (knoten.type === 'ArrayExpression' && schluesselKontext(knoten, elternVon)) {
+        const erstes = (knoten.elements as (AstKnoten | null)[])[0];
+        if (erstes && erstes.type === 'Identifier') {
+          const idx = params.indexOf(erstes.name as string);
           if (idx >= 0 && !helfer.has(name)) helfer.set(name, idx);
         }
       }
-      ts.forEachChild(knoten, suche);
-    };
-    ts.forEachChild(fn, suche);
+    });
   };
 
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isVariableDeclaration(knoten) && ts.isIdentifier(knoten.name) && knoten.initializer) {
-      const init = knoten.initializer;
-      if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
-        pruefeFunktion(knoten.name.text, init);
+  walk(programm, (knoten) => {
+    if (knoten.type === 'VariableDeclarator') {
+      const id = knoten.id as AstKnoten;
+      const init = knoten.init as AstKnoten | null;
+      if (id.type === 'Identifier' && init && FUNKTIONSWERTE.has(init.type)) {
+        pruefeFunktion(id.name as string, init);
       }
-    } else if (ts.isFunctionDeclaration(knoten) && knoten.name) {
-      pruefeFunktion(knoten.name.text, knoten);
+    } else if (knoten.type === 'FunctionDeclaration' && knoten.id) {
+      pruefeFunktion((knoten.id as AstKnoten).name as string, knoten);
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return helfer;
 }
 
@@ -147,56 +187,52 @@ function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
  * (`[EINSATZ_KEYS.uhs, id]` ist die erwünschte Form) und Spreads.
  */
 export function scanneQueryKeys(pfad: string, quelltext: string): Fund[] {
-  const tsx = pfad.endsWith('.tsx');
-  const quelle = ts.createSourceFile(
-    pfad,
-    quelltext,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  const programm = parseQuelltext(pfad, quelltext);
+  const elternVon: ElternVon = new Map();
+  walk(programm, (knoten, eltern) => {
+    if (eltern) elternVon.set(knoten, eltern);
+  });
   const funde: Fund[] = [];
-  const zeileVon = (knoten: ts.Node): number =>
-    quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1;
+  const zeile = (knoten: AstKnoten): number => zeileVon(quelltext, knoten.start);
 
-  const helfer = findeSchluesselHelfer(quelle);
+  const helfer = findeSchluesselHelfer(programm, elternVon);
 
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isArrayLiteralExpression(knoten)) {
-      const erstes = knoten.elements[0];
-      if (erstes && ts.isStringLiteralLike(erstes)) {
-        // NoSubstitutionTemplateLiteral (`'…'` ohne Platzhalter) zählt als statischer Prefix.
+  walk(programm, (knoten) => {
+    if (knoten.type === 'ArrayExpression') {
+      const erstes = (knoten.elements as (AstKnoten | null)[])[0];
+      const statisch = statischerText(erstes);
+      if (statisch !== undefined) {
+        // Template ohne Platzhalter (`'…'` in Backticks) zählt als statischer Prefix.
         funde.push({
           pfad,
-          zeile: zeileVon(knoten),
-          prefix: erstes.text,
-          art: schluesselKontext(knoten) ?? 'array-literal',
+          zeile: zeile(knoten),
+          prefix: statisch,
+          art: schluesselKontext(knoten, elternVon) ?? 'array-literal',
         });
-      } else if (erstes && ts.isTemplateExpression(erstes) && schluesselKontext(knoten)) {
+      } else if (erstes?.type === 'TemplateLiteral' && schluesselKontext(knoten, elternVon)) {
         funde.push({
           pfad,
-          zeile: zeileVon(knoten),
-          prefix: erstes.getText(quelle),
+          zeile: zeile(knoten),
+          prefix: textVon(quelltext, erstes),
           art: 'dynamischer-prefix',
         });
       }
-    } else if (ts.isCallExpression(knoten)) {
-      const name = calleeName(knoten.expression);
+    } else if (knoten.type === 'CallExpression') {
+      const name = calleeName(knoten.callee as AstKnoten);
       const idx = name === undefined ? undefined : helfer.get(name);
       if (idx !== undefined) {
-        const arg = knoten.arguments[idx];
-        if (arg && ts.isStringLiteralLike(arg)) {
+        const arg = (knoten.arguments as AstKnoten[])[idx];
+        const statisch = statischerText(arg);
+        if (statisch !== undefined) {
           funde.push({
             pfad,
-            zeile: zeileVon(knoten),
-            prefix: arg.text,
+            zeile: zeile(knoten),
+            prefix: statisch,
             art: 'schluessel-helfer-arg',
           });
         }
       }
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return funde;
 }
