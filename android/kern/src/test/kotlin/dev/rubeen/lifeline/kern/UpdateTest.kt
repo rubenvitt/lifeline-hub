@@ -142,6 +142,26 @@ class UpdateTest {
     }
 
     @Test
+    fun `ohne Rückfrage nur ab Android 12 und wenn die App sich selbst installiert hat`() {
+        val paket = "dev.rubeen.lifeline.android"
+        assertFalse(Installzeitpunkt.brauchtRueckfrage(sdk = 31, installateur = paket, paket = paket))
+        assertFalse(Installzeitpunkt.brauchtRueckfrage(sdk = 36, installateur = paket, paket = paket))
+        // Android 11 fragt immer.
+        assertTrue(Installzeitpunkt.brauchtRueckfrage(sdk = 30, installateur = paket, paket = paket))
+        // Erstes Update: installiert hat der Browser oder die Dateiverwaltung.
+        assertTrue(Installzeitpunkt.brauchtRueckfrage(sdk = 36, installateur = "com.android.chrome", paket = paket))
+        assertTrue(Installzeitpunkt.brauchtRueckfrage(sdk = 36, installateur = null, paket = paket))
+    }
+
+    @Test
+    fun `einen Hinweis zeigen nur Stände, bei denen die Person etwas tun kann`() {
+        assertEquals(
+            setOf(Updatestand.BEREIT, Updatestand.ERLAUBNIS_FEHLT, Updatestand.BLOCKIERT),
+            Updatestand.entries.filter { it.isHinweis }.toSet(),
+        )
+    }
+
+    @Test
     fun `die Updatestände sind benannt`() {
         assertEquals(
             listOf("KEINS", "LAEDT", "BEREIT", "INSTALLIERT_GLEICH", "BLOCKIERT", "ERLAUBNIS_FEHLT", "FEHLER"),

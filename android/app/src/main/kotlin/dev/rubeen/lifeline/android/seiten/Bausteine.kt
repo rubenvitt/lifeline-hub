@@ -3,6 +3,7 @@ package dev.rubeen.lifeline.android.seiten
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -225,4 +227,19 @@ fun Symbol(
     farbe: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     Icon(painterResource(id), contentDescription = beschreibung, modifier = modifier, tint = farbe)
+}
+
+/**
+ * Punkt „Update bereit“ (Entwurf D9) am Knopf zur Serverliste und an der Zeile „Einstellungen“:
+ * ein Update wartet auf die Person (`Updatestand.isHinweis`).
+ */
+@Composable
+fun Hinweispunkt(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary)
+            .border(1.5.dp, Farben.kopfSchwarz, CircleShape),
+    )
 }

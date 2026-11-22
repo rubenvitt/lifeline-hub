@@ -158,6 +158,19 @@ object Installzeitpunkt {
             else if (brauchtRueckfrage) Weg.HINWEIS
             else Weg.INSTALLIEREN
     }
+
+    /**
+     * Fragt das System vor der Installation nach (Entwurf D9, Fakt 6)? Ohne Rückfrage nur ab
+     * Android 12 (API 31) und nur, wenn die App selbst die installierende App der laufenden
+     * Fassung ist; das erste Update nach einer Installation aus Browser oder Dateien fragt immer.
+     *
+     * @param installateur installierende App der laufenden Fassung (`InstallSourceInfo`), `null` unbekannt
+     * @param paket eigener Paketname
+     */
+    fun brauchtRueckfrage(sdk: Int, installateur: String?, paket: String): Boolean =
+        !(sdk >= ANDROID_12 && installateur == paket)
+
+    private const val ANDROID_12 = 31
 }
 
 /** Stand des Updaters für Einstellungen und Hinweis. */
@@ -168,5 +181,12 @@ enum class Updatestand {
     INSTALLIERT_GLEICH,
     BLOCKIERT,
     ERLAUBNIS_FEHLT,
-    FEHLER,
+    FEHLER;
+
+    /**
+     * Ein Update wartet auf die Person (installieren, Erlaubnis erteilen, Sperre lösen): Punkt am
+     * Knopf zur Serverliste (Entwurf D9).
+     */
+    val isHinweis: Boolean
+        get() = this == BEREIT || this == ERLAUBNIS_FEHLT || this == BLOCKIERT
 }

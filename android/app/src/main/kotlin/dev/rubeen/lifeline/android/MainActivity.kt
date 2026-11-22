@@ -19,6 +19,7 @@ import dev.rubeen.lifeline.android.dienste.Anmelder
 import dev.rubeen.lifeline.android.dienste.Downloads
 import dev.rubeen.lifeline.android.dienste.Systemdienste
 import dev.rubeen.lifeline.android.ui.LifelineThema
+import dev.rubeen.lifeline.android.update.UpdatePruefung
 import dev.rubeen.lifeline.kern.Rueckkehr
 import dev.rubeen.lifeline.kern.Serverablage
 import dev.rubeen.lifeline.kern.Testzustand
@@ -44,7 +45,11 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         val testzustand = Testzustand.from(intent.getStringExtra(Testzustand.EXTRA))
-        val fabrik = (application as LifelineApp).webviewFabrik
+        val app = application as LifelineApp
+        val fabrik = app.webviewFabrik
+        // Im Testzustand sucht die App keine Updates; der Updater setzt beim Bau den Kanal.
+        val updater = if (testzustand == null) app.updater else null
+        val mitUpdates = updater?.kanal != null
         val einstellungen = getSharedPreferences("lifeline", MODE_PRIVATE)
         // Die Dienste lesen das Modell erst beim Aufruf; ihre Activity-Ergebnisse melden sie hier
         // an, vor dem Start der Activity.
@@ -70,7 +75,9 @@ class MainActivity : ComponentActivity() {
             oeffne = ::oeffne,
             downloads = downloads,
             anmelder = anmelder,
+            updater = updater,
         )
+        if (mitUpdates) UpdatePruefung.planen(this)
         // Zurück (Entwurf D6): native Seite schließen, im WebView zurück, sonst in den Hintergrund;
         // die App endet nicht und führt nicht ins Onboarding. Der QR-Scanner hängt sich davor.
         onBackPressedDispatcher.addCallback(this) {
@@ -79,6 +86,11 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(
             LifecycleEventObserver { _, ereignis ->
                 when (ereignis) {
+                    // Zurück im Vordergrund: keine Installation unter der Hand, Prüfung, wenn fällig.
+                    Lifecycle.Event.ON_START -> if (mitUpdates) {
+                        UpdatePruefung.rueckkehr(this)
+                        modell.imVordergrund()
+                    }
                     Lifecycle.Event.ON_RESUME -> {
                         modell.phase(Rueckkehr.Phase.ACTIVE)
                         anmelder.rueckkehr()
@@ -87,6 +99,8 @@ class MainActivity : ComponentActivity() {
                     Lifecycle.Event.ON_STOP -> {
                         modell.phase(Rueckkehr.Phase.BACKGROUND)
                         anmelder.verlassen()
+                        // Nach 15 Minuten im Hintergrund darf der Updater installieren (Entwurf D9, Fall b).
+                        if (mitUpdates) UpdatePruefung.verlassen(this, System.currentTimeMillis())
                     }
                     else -> Unit
                 }

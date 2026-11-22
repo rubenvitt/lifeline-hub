@@ -3,6 +3,7 @@ package dev.rubeen.lifeline.android.dienste
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -99,9 +100,7 @@ class Systemdienste(
 
     override suspend fun showNotification(title: String, body: String?) {
         val verwaltung = NotificationManagerCompat.from(activity)
-        verwaltung.createNotificationChannel(
-            NotificationChannelCompat.Builder(KANAL, NotificationManagerCompat.IMPORTANCE_DEFAULT).setName(KANAL_NAME).build(),
-        )
+        meldungskanal(activity)
         val oeffnen = PendingIntent.getActivity(
             activity,
             0,
@@ -151,6 +150,13 @@ class Systemdienste(
         /** Kanal der Meldungen der Oberfläche. */
         const val KANAL = "lifeline"
         const val KANAL_NAME = "Lifeline"
+
+        /** Legt den Kanal „Lifeline“ an (auch für die Meldung nach einem Update); mehrfach unschädlich. */
+        fun meldungskanal(context: Context) {
+            NotificationManagerCompat.from(context).createNotificationChannel(
+                NotificationChannelCompat.Builder(KANAL, NotificationManagerCompat.IMPORTANCE_DEFAULT).setName(KANAL_NAME).build(),
+            )
+        }
 
         /** Gespeichert, sobald die App nach `POST_NOTIFICATIONS` gefragt hat. */
         const val MELDUNG_GEFRAGT = "meldung_gefragt"

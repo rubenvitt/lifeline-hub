@@ -1,5 +1,6 @@
 package dev.rubeen.lifeline.android
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
@@ -9,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.rubeen.lifeline.android.dienste.Anmelder
 import dev.rubeen.lifeline.android.dienste.Downloads
+import dev.rubeen.lifeline.android.update.Installation
+import dev.rubeen.lifeline.android.update.Updater
 import dev.rubeen.lifeline.android.web.Brueckenempfang
 import dev.rubeen.lifeline.android.web.HuellenChromeClient
 import dev.rubeen.lifeline.android.web.HuellenClient
@@ -25,6 +28,7 @@ import dev.rubeen.lifeline.kern.Fehlerklasse
 import dev.rubeen.lifeline.kern.Haptik
 import dev.rubeen.lifeline.kern.Huellendienste
 import dev.rubeen.lifeline.kern.Initskript
+import dev.rubeen.lifeline.kern.Installzeitpunkt
 import dev.rubeen.lifeline.kern.Kanal
 import dev.rubeen.lifeline.kern.ListException
 import dev.rubeen.lifeline.kern.Onboarding
@@ -67,6 +71,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param oeffne öffnet eine Adresse im System
  * @param downloads lädt Dateirouten und Downloads des WebViews mit der Sitzung des Profils
  * @param anmelder „Im Browser anmelden“; nimmt den Rücksprung `lifeline://anmeldung` an
+ * @param updater prüft, lädt und installiert Updates (Entwurf D9); im Testzustand `null`
  */
 class AppModell(
     val testzustand: Testzustand?,
@@ -82,12 +87,13 @@ class AppModell(
     private val oeffne: (URI) -> Unit = {},
     private val downloads: Downloads? = null,
     private val anmelder: Anmelder? = null,
+    private val updater: Updater? = null,
 ) : Entfernungsdienste {
     val appVersion: String = if (testzustand != null) BEISPIEL_VERSION else version
     val build: String = (if (testzustand != null) BEISPIEL_BUILD else build).toString()
 
-    /** Kanal des Updaters aus der eigenen Version; gespeichert und geprüft wird er mit dem Updater. */
-    val kanal: Kanal? = Kanal.fromVersion(appVersion)
+    /** Kanal des Updaters; im Testzustand der Kanal der Beispielversion. */
+    val kanal: Kanal? = if (testzustand != null) Kanal.fromVersion(appVersion) else updater?.kanal
 
     var seite: Ablauf.Seite by mutableStateOf(Ablauf.Seite.Onboarding)
         private set
@@ -147,6 +153,9 @@ class AppModell(
     private val rueckkehr = Rueckkehr()
     private var gestartet = false
 
+    /** `Ablauf.Event.Start` ist gesendet; ein Update beim Start schiebt ihn auf. */
+    private var ablaufGestartet = false
+
     private val client = HuellenClient(
         aktiverServer = { liste.aktiv?.adresse },
         melde = ::melde,
@@ -174,6 +183,18 @@ class AppModell(
 
     init {
         testzustand?.let(::zeige)
+        updater?.let { updater ->
+            scope.launch {
+                updater.stand.collect { stand ->
+                    updatestand = stand
+                    // Die Installation kam nicht zustande (abgelehnt, gesperrt, Fehler): weiter wie sonst.
+                    if (zeigtUpdate && stand != Updatestand.INSTALLIERT_GLEICH) {
+                        zeigtUpdate = false
+                        starteAblauf()
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -185,9 +206,27 @@ class AppModell(
         gestartet = true
         if (testzustand != null) {
             zeigeBeispielseite(testzustand)
-        } else {
-            send(Ablauf.Event.Start(liste.aktiv, fabrik.isTauglich()))
+            return
         }
+        // Ein bereites Update installiert die App vor der Oberfläche (Entwurf D9, Fall a), sichtbar
+        // als „Lifeline wird aktualisiert“; ob, entscheidet `Installzeitpunkt` im Updater.
+        if (updater != null && updater.stand.value == Updatestand.BEREIT) {
+            zeigtUpdate = true
+            scope.launch {
+                if (updater.installieren(Installzeitpunkt.Lage.START_VOR_OBERFLAECHE) != Installzeitpunkt.Weg.INSTALLIEREN) {
+                    zeigtUpdate = false
+                    starteAblauf()
+                }
+            }
+            return
+        }
+        starteAblauf()
+    }
+
+    private fun starteAblauf() {
+        if (ablaufGestartet) return
+        ablaufGestartet = true
+        send(Ablauf.Event.Start(liste.aktiv, fabrik.isTauglich()))
     }
 
     /** Die Activity endet: der WebView geht mit. */
@@ -487,11 +526,41 @@ class AppModell(
         if (updatestand == Updatestand.BEREIT) installiereUpdate() else pruefeUpdate()
     }
 
-    /** „Jetzt prüfen“: führt der Updater aus; ohne ihn bleibt der Stand, wie er ist. */
-    fun pruefeUpdate() {}
+    /** „Jetzt prüfen“: sofort, unabhängig vom Abstand der Prüfungen. */
+    fun pruefeUpdate() {
+        val updater = updater ?: return
+        scope.launch { updater.pruefen(erzwingen = true) }
+    }
 
-    /** „Jetzt installieren“: führt der Updater aus; ohne ihn bleibt der Stand, wie er ist. */
-    fun installiereUpdate() {}
+    /**
+     * „Jetzt installieren“ (der Hinweis): die Person entscheidet, die App zeigt „Lifeline wird
+     * aktualisiert“. Fehlt die Erlaubnis, führt der Hinweis in die Systemeinstellung.
+     */
+    fun installiereUpdate() {
+        val updater = updater ?: return
+        when (updatestand) {
+            Updatestand.ERLAUBNIS_FEHLT -> try {
+                context.startActivity(Installation.erlaubnisIntent(context))
+            } catch (e: ActivityNotFoundException) {
+                Log.w(TAG, "Keine Systemeinstellung für unbekannte Apps", e)
+            }
+            Updatestand.BEREIT -> {
+                zeigtUpdate = true
+                scope.launch { updater.installierenAufWunsch() }
+            }
+            else -> Unit
+        }
+    }
+
+    /**
+     * Die Activity ist wieder sichtbar (`ON_START`): Erlaubnis neu lesen (vielleicht aus der
+     * Systemeinstellung zurück) und prüfen, wenn es fällig ist.
+     */
+    fun imVordergrund() {
+        val updater = updater ?: return
+        updater.aktualisiereStand()
+        scope.launch { updater.pruefen() }
+    }
 
     // Entfernungsdienste
 

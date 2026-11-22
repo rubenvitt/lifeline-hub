@@ -46,12 +46,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.rubeen.lifeline.android.seiten.EinstellungenSeite
 import dev.rubeen.lifeline.android.seiten.Fortschritt
+import dev.rubeen.lifeline.android.seiten.Hinweispunkt
 import dev.rubeen.lifeline.android.seiten.INHALT_MAX
 import dev.rubeen.lifeline.android.seiten.MitQrScan
 import dev.rubeen.lifeline.android.seiten.OnboardingSeite
@@ -113,6 +116,7 @@ fun Wurzel(modell: AppModell) {
                 inEntfernung = modell.inEntfernung,
                 entfernenFehler = modell.entfernenFehler,
                 onFehlerGesehen = modell::fehlerGesehen,
+                updateHinweis = modell.updatestand.isHinweis,
             )
             else -> AblaufSeite(modell)
         }
@@ -175,11 +179,19 @@ private fun AblaufSeite(modell: AppModell) {
                     )
                 }
             }
-            Randknopf(onTipp = { modell.zeigtServerliste = true }, modifier = Modifier.align(Alignment.BottomStart))
+            Randknopf(
+                onTipp = { modell.zeigtServerliste = true },
+                updateHinweis = modell.updatestand.isHinweis,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
         }
         is Ablauf.Seite.Web -> Box(modifier = Modifier.fillMaxSize()) {
             modell.webView?.let { WebFlaeche(it) }
-            Randknopf(onTipp = { modell.zeigtServerliste = true }, modifier = Modifier.align(Alignment.BottomStart))
+            Randknopf(
+                onTipp = { modell.zeigtServerliste = true },
+                updateHinweis = modell.updatestand.isHinweis,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
             AnimatedVisibility(
                 visible = modell.zeigtZurOberflaeche,
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -254,10 +266,11 @@ private fun WebFlaeche(webView: WebView) {
 
 /**
  * Kleiner runder Knopf unten links zur Serverliste (Entwurf D2): innerhalb der Systemränder, weg
- * vom Kopf der Oberfläche, halb durchsichtig, damit er die Seite kaum verdeckt.
+ * vom Kopf der Oberfläche, halb durchsichtig, damit er die Seite kaum verdeckt. Wartet ein Update
+ * auf die Person, trägt er einen Punkt (Entwurf D9).
  */
 @Composable
-private fun Randknopf(onTipp: () -> Unit, modifier: Modifier = Modifier) {
+private fun Randknopf(onTipp: () -> Unit, updateHinweis: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -277,6 +290,15 @@ private fun Randknopf(onTipp: () -> Unit, modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Symbol(R.drawable.symbol_serverliste, beschreibung = "Serverliste", modifier = Modifier.size(18.dp))
+        }
+        if (updateHinweis) {
+            Hinweispunkt(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 3.dp, end = 3.dp)
+                    .semantics { contentDescription = "Update bereit" }
+                    .testTag("update-hinweis"),
+            )
         }
     }
 }

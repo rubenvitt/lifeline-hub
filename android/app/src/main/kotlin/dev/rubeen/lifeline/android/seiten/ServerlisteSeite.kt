@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +56,7 @@ import java.util.Locale
  * @param onZurOberflaeche „Zur Oberfläche“ oder Tipp auf den aktiven Server
  * @param inEntfernung Server, dessen Daten gerade gelöscht werden; seine Zeile ruht
  * @param entfernenFehler Meldung, wenn sich ein Server nicht entfernen ließ
+ * @param updateHinweis ein Update wartet auf die Person; die Zeile „Einstellungen“ zeigt es
  */
 @Composable
 fun ServerlisteSeite(
@@ -70,6 +72,7 @@ fun ServerlisteSeite(
     inEntfernung: String? = null,
     entfernenFehler: String? = null,
     onFehlerGesehen: () -> Unit = {},
+    updateHinweis: Boolean = false,
 ) {
     var umbenennen by remember { mutableStateOf<ServerEintrag?>(null) }
     var entfernen by remember { mutableStateOf<ServerEintrag?>(null) }
@@ -136,7 +139,11 @@ fun ServerlisteSeite(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Symbol(R.drawable.symbol_einstellungen, beschreibung = null)
-                Text("Einstellungen")
+                Text("Einstellungen", modifier = Modifier.weight(1f))
+                if (updateHinweis) {
+                    Text("Update", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodyMedium)
+                    Hinweispunkt(modifier = Modifier.semantics { contentDescription = "Update bereit" })
+                }
             }
         }
     }

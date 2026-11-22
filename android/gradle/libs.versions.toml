@@ -18,6 +18,8 @@ mockwebserver = "4.12.0"
 # QR-Code im Onboarding: Kamera über CameraX, Leser von ML Kit mit eingebautem Modell (ohne Play-Dienste).
 camerax = "1.6.2"
 mlkit-barcode = "17.3.0"
+# Updater: Prüfung alle 4 Stunden und Installation nach 15 Minuten im Hintergrund (Entwurf D9).
+work = "2.12.0"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
@@ -44,6 +46,8 @@ camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = 
 camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 camera-mlkit-vision = { module = "androidx.camera:camera-mlkit-vision", version.ref = "camerax" }
 mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
+work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
+work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

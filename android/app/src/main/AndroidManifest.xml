@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Updater: installiert die APK aus dem eigenen Kanal (Entwurf D9). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Ab Android 12 Updates ohne Rückfrage, wenn die App sich selbst installiert hat. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Ab Android 14: andere Installationswege fragen vor dem Ersetzen der App nach. -->
+    <uses-permission android:name="android.permission.ENFORCE_UPDATE_OWNERSHIP" />
 
     <!-- „System-WebView aktualisieren“ fragt, ob ein Store die Seite des WebViews öffnen kann (Entwurf D3). -->
     <queries>
@@ -84,5 +88,10 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Ergebnis einer Installationssitzung des Updaters (nur über das eigene PendingIntent). -->
+        <receiver
+            android:name=".update.Installationsstatus"
+            android:exported="false" />
     </application>
 </manifest>
