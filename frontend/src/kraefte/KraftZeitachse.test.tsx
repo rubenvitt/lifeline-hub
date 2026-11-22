@@ -314,10 +314,12 @@ describe('KraftZeitachse (LFH-552)', () => {
       await user.click(screen.getByRole('button', { name: 'Periode nachtragen' }));
       const dialog = await screen.findByRole('dialog', { name: 'Periode nachtragen: Anna' });
       await user.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      // antd zeigt die Fehler jedes Felds für sich an; unter Last kommt eine Meldung später als die
+      // andere. Deshalb jede abwarten (LLH-1903).
       expect(
         await within(dialog).findByText('Alarmierung oder Eintreffen fehlt'),
       ).toBeInTheDocument();
-      expect(within(dialog).getByText('Entlassung fehlt')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Entlassung fehlt')).toBeInTheDocument();
       expect(rumpf).toBeNull();
 
       await tippeZeit(
