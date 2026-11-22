@@ -95,7 +95,8 @@ async fn wechsel_schluesselt_um_und_adapter_laeuft_weiter() {
         ergebnis,
         Umschluesselt {
             umgeschluesselt: 1,
-            unlesbar: 0
+            unlesbar: 0,
+            uebrig: 0
         }
     );
     for (fp_zeile, ..) in zeilen(&u.pool).await {
@@ -156,7 +157,8 @@ async fn kaputte_zeile_bleibt() {
         umschluesseln(&u.pool, &wechsel).await.unwrap(),
         Umschluesselt {
             umgeschluesselt: 1,
-            unlesbar: 1
+            unlesbar: 1,
+            uebrig: 1
         }
     );
     let fp_kaputt: String =
@@ -171,6 +173,28 @@ async fn kaputte_zeile_bleibt() {
             .unwrap(),
         1
     );
+}
+
+/// Ein falscher alter Schlüssel öffnet nichts: dann darf der Start nicht melden, er könne weg
+/// (Review LLH-2025), sonst wirft der Betreiber den echten weg.
+#[tokio::test]
+async fn falscher_alter_schluessel_laesst_rest() {
+    let (u, _) = umgebung().await;
+    let wechsel = Geheimnisspeicher::new_wechsel(
+        GeheimnisSchluessel::generate(),
+        GeheimnisSchluessel::generate(),
+    )
+    .unwrap();
+    let vorher = zeilen(&u.pool).await;
+    assert_eq!(
+        umschluesseln(&u.pool, &wechsel).await.unwrap(),
+        Umschluesselt {
+            umgeschluesselt: 0,
+            unlesbar: 0,
+            uebrig: 1
+        }
+    );
+    assert_eq!(zeilen(&u.pool).await, vorher);
 }
 
 #[tokio::test]

@@ -80,6 +80,8 @@ impl GeheimnisSchluessel {
 /// (LLH-2025): leere Zeilen und Kommentare (`#`) zählen nicht, genau eine Zeile muss der private
 /// Schlüssel sein. Der Fehler nennt keinen Inhalt.
 pub fn parse_schluesseldatei(inhalt: &str) -> Result<GeheimnisSchluessel, SchluesselFehler> {
+    // Ein Editor unter Windows schreibt gern ein BOM davor; `trim` entfernt es nicht.
+    let inhalt = inhalt.strip_prefix('\u{feff}').unwrap_or(inhalt);
     let mut zeilen = inhalt
         .lines()
         .map(str::trim)
@@ -360,6 +362,18 @@ mod tests {
             Geheimnisspeicher::new(Some(gelesen)).fingerabdruck(),
             Geheimnisspeicher::new(Some(s)).fingerabdruck()
         );
+    }
+
+    #[test]
+    fn schluesseldatei_mit_bom() {
+        let s = GeheimnisSchluessel::generate();
+        let inhalt = format!(
+            "\u{feff}# created: x\n# public key: y\n{}\n",
+            schluesseltext(&s)
+        );
+        assert!(parse_schluesseldatei(&inhalt).is_ok());
+        let nur = format!("\u{feff}{}\n", schluesseltext(&s));
+        assert!(parse_schluesseldatei(&nur).is_ok());
     }
 
     #[test]

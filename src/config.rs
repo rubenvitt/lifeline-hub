@@ -1874,6 +1874,23 @@ mod tests {
             .to_owned()
     }
 
+    /// Eine falsche Schlüsseldatei bricht den Start ab, bevor Datenbank, Bootstrap oder ein
+    /// Hintergrundlauf etwas tun (Review LLH-2025): sonst liefen sie in jeder Runde einer
+    /// Neustartschleife an.
+    #[test]
+    fn geheimnisspeicher_laedt_vor_der_datenbank() {
+        let main = include_str!("main.rs");
+        let server = &main[main.find("async fn run_server").expect("run_server")..];
+        let laden = server
+            .find("load_geheimnisspeicher()")
+            .expect("lädt den Speicher");
+        let db = server.find("db::connect(").expect("öffnet die Datenbank");
+        assert!(
+            laden < db,
+            "load_geheimnisspeicher muss vor db::connect stehen"
+        );
+    }
+
     #[test]
     fn geheimnis_schluessel_aus_datei() {
         let s = crate::adapter::geheimnis::GeheimnisSchluessel::generate();

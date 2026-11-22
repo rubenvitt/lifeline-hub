@@ -100,6 +100,9 @@ pub struct Umschluesselt {
     pub umgeschluesselt: u64,
     /// Geheimnisse am alten Schlüssel, die sich nicht öffnen ließen; sie bleiben, wie sie sind.
     pub unlesbar: u64,
+    /// Geheimnisse, die danach noch nicht am neuen Schlüssel liegen (die unlesbaren und solche an
+    /// einem dritten). Nur bei 0 kann der alte Schlüssel weg.
+    pub uebrig: u64,
 }
 
 /// Schlüsselwechsel (LLH-2025, ADR-0077): Ist ein alter Schlüssel geladen, liegen danach alle
@@ -138,6 +141,8 @@ pub async fn umschluesseln(
         }
     }
     tx.commit().await?;
+    ergebnis.uebrig =
+        u64::try_from(repo::count_fremde_chiffrate(pool, Some(fp_neu)).await?).unwrap_or_default();
     Ok(ergebnis)
 }
 
