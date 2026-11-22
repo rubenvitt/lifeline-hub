@@ -105,9 +105,12 @@ Ein Nebeneffekt, der den Wechsel trägt: Typecheck 60 s → ~10 s, Lint 40 s →
   aktiviert (`no-undef`, `no-unreachable` …), dazu die Globals für `public/**/*.js` und
   `scripts/**/*.{js,mjs}`.
 - `ignorePatterns` wie heute (`dist`, `playwright-report`, `src/api/types.generated.ts` …).
-- `package.json`: `"lint": "oxlint --max-warnings 0"`. Hält oxlint mit `--max-warnings 0` die
-  Warnungen nicht hart genug, dann `--deny-warnings`; der Umsetzer prüft, welche Option eine
-  einzelne `exhaustive-deps`-Warnung rot macht.
+- `package.json`: `"lint": "oxlint --deny-warnings --report-unused-disable-directives"`
+  (Optionen in oxlint 1.94 vorhanden). `--deny-warnings` macht wie heute `--max-warnings 0` jede
+  `exhaustive-deps`-Warnung rot. `--report-unused-disable-directives` hält eine Prüfung, die
+  ESLint 10 heute stillschweigend fährt (`reportUnusedDisableDirectives: "warn"`, mit
+  `--max-warnings 0` rot): eine tote Direktive bricht das Gate. Das ist die Regel „keine toten
+  Direktiven“ aus `frontend/AGENTS.md` und gehört zu den Riegeln mit Mutationsprobe.
 
 ### 2. Riegel-Plugin
 
@@ -140,6 +143,9 @@ Ein Nebeneffekt, der den Wechsel trägt: Typecheck 60 s → ~10 s, Lint 40 s →
   sieht.
 - Er sieht auch die Fehler, die er verhindern soll: eine Plugin-API, die Selektoren nicht mehr
   auflöst, ergibt null Befunde → rot.
+- Damit der Test überhaupt läuft und typgeprüft wird: `lint/**` in das `test.include` von
+  `vite.config.ts` und das `include` von `tsconfig.json` aufnehmen. Heute nimmt Vitest nur
+  `src/**` auf.
 
 Die übrigen Riegel bekommen keinen Dauer-Test, sondern eine einmalige Mutationsprobe im PR
 (Abnahme, Abschnitt 7): Select/Tag-Import samt `import * as antd`, `rules-of-hooks`,
@@ -152,9 +158,9 @@ Alle `eslint-disable-next-line …` werden mechanisch zu `oxlint-disable-next-li
 oxlint-Regelnamen und dem bestehenden Begründungstext. Heute sind es 42: 38×
 `react-hooks/exhaustive-deps`, 2× `no-restricted-imports`, 1× `no-restricted-syntax` → künftig
 `lfh/e2e-riegel`, 1× `@typescript-eslint/no-explicit-any`. Grund (meine Wahl): nach dem Wechsel
-wäre `eslint-disable` ein irreführender Name. Danach meldet `oxlint --report-unused-disable-directives`
-(falls vorhanden) keine toten Direktiven, und der Lauf mit allen Kommentaren entfernt ergibt
-wieder genau die bekannten Stellen.
+wäre `eslint-disable` ein irreführender Name. Danach ist das Gate (mit
+`--report-unused-disable-directives`, Abschnitt 1) grün, und ein Lauf mit allen Kommentaren
+entfernt ergibt wieder genau die bekannten Stellen.
 
 ### 5. Guards auf oxc-parser
 
@@ -186,6 +192,16 @@ Betroffen:
   4. Dazu je Guard die bestehenden Selbstbeweise/Beispiele: sie müssen weiter greifen.
 
   So fällt ein still schwächerer Guard auf (Anti-Ziel 1).
+- **Findet der neue Guard mehr** (echter Verstoß, den der TS-Parser übersah, etwa bei `a?.b()`
+  als `ChainExpression` oder bei `.ts`-Dateien, die heute als TSX geparst werden), entschied der
+  Mensch am 22.11.2026:
+  - Ein bis drei Stellen werden im selben PR behoben, im Code oder als begründeter Eintrag in
+    der Erlaubnisliste des Guards.
+  - Sind es mehr, kommen sie vorerst in die Erlaubnisliste, und für den Abbau entsteht eine
+    Zunder-Aufgabe.
+  - Den Guard absichtlich blind zu bauen, damit er exakt das alte Ergebnis liefert, ist
+    ausgeschlossen.
+  - Jeder Mehrfund wird im PR unter „Geprüft“ genannt.
 - Abbildung der Knotenarten ist Umsetzerarbeit. Bekannte Stolperstellen:
   - JSX-Text → `JSXText`.
   - Template-Teile → `TemplateLiteral.quasis` (`TemplateElement`, `value.cooked`).
@@ -230,6 +246,8 @@ Betroffen:
   - Heap-Abschnitt (s. 7).
 - `frontend/e2e/AGENTS.md`: die zwei Verweise auf `eslint.config.js`.
 - `scripts/AGENTS.md`: Zeile zum Sammel-Gate (`pnpm lint`).
+- `.devcontainer/devcontainer.json`: Die Empfehlung `dbaeumer.vscode-eslint` wird durch die
+  oxc-Erweiterung ersetzt (`oxc.oxc-vscode`), damit die Meldungen im Editor erscheinen.
 - `docs/architektur/02-randbedingungen.md`: „TypeScript 6“ → 7.
 - `08-querschnittliche-konzepte.md`: Codegen-Kette nennt den TS-6-Hook.
 - `11-risiken-und-technische-schulden.md`: zwei Einträge, die Alpha-API des Riegel-Plugins und der
@@ -273,6 +291,7 @@ Schritte 2 bis 4 sind voneinander unabhängig, aber alle vor 5.
   `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 - Gleichheitsprobe der Guards identisch.
 - Mutationsprobe je Riegel im PR unter „Geprüft“ belegt:
+  - eine tote Disable-Direktive macht `pnpm lint` rot;
   - Select, Tag und `import * as antd`;
   - `rules-of-hooks`;
   - eine `exhaustive-deps`-Warnung macht `pnpm lint` rot;
