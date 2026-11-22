@@ -35,6 +35,10 @@ export async function eingeblendet(ziel: Locator): Promise<Locator> {
 }
 
 /** Der Dialog `name`, sobald er ganz eingeblendet ist. */
-export async function dialogSteht(page: Page, name: string): Promise<Locator> {
-  return eingeblendet(page.getByRole('dialog', { name }));
+export async function dialogSteht(
+  page: Page,
+  name: string | RegExp,
+  { exact }: { exact?: boolean } = {},
+): Promise<Locator> {
+  return eingeblendet(page.getByRole('dialog', { name, exact }));
 }
