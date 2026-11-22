@@ -4,7 +4,9 @@
  * Überblick und Lagebild dieselbe Folge und denselben Wortlaut. Den Ausfall zählt der Server nach
  * der Regel des Meldebilds (`einsatz::ausfall`, LLH-1929), in der Folge der Einheitenliste wie
  * `einheitenMitAusfall`. Fehlt das Feld (älterer Server), fehlt die Quelle (`null`), statt als
- * unvollständig zu gelten.
+ * unvollständig zu gelten. Quellen aus Modulen, die im Einsatz ausgeblendet sind, nennt der Server
+ * in `ausgeblendet`; sie stehen hier auf `gesperrt` wie im Überblick (LLH-1964, Regel in
+ * `geraet/AGENTS.md`, Lagemonitor).
  */
 import type { LagemonitorAnzeige } from '../api/types';
 import type { WasBrenntQuellen } from './wasBrennt';
@@ -31,7 +33,8 @@ export function alarmAusMonitor(
       ausfall: null,
     };
   }
-  return {
+  const aus = new Set<keyof WasBrenntQuellen>(a.ausgeblendet ?? []);
+  const quellen: WasBrenntQuellen = {
     meldungen: {
       zustand: 'daten',
       wert: {
@@ -61,4 +64,6 @@ export function alarmAusMonitor(
       ? { zustand: 'daten', wert: a.ausfall.map((name) => ({ id: null, name })) }
       : null,
   };
+  for (const q of aus) quellen[q] = { zustand: 'gesperrt' };
+  return quellen;
 }
