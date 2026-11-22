@@ -19996,9 +19996,17 @@
         "description": "Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`).",
         "required": [
           "version",
-          "shell_contract"
+          "shell_contract",
+          "assets"
         ],
         "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Pfade relativ zur Wurzel (ohne führenden `/`), die die Oberfläche ohne Server braucht:\nalles unter `assets/` außer den Doku-Bildern, sortiert (LLH-1980). Die iOS-Hülle holt sie\nnach jedem Online-Laden in den Cache ihres Webviews. Ohne eingebettetes Frontend leer."
+          },
           "shell_contract": {
             "type": "integer",
             "format": "int32",
