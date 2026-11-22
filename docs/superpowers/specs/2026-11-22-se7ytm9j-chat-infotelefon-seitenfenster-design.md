@@ -110,6 +110,12 @@ Cursor-Adapter die drei Teile, die `useInfiniteQuery` braucht: `initialPageParam
   die aus einem Cursor den Cursor „direkt daneben, ihn selbst einschließend“ machen: Chat
   `id ± 1`, Infotelefon `(zeit, id ± 1)` — die Ordnung ist lexikografisch über
   `(eingang_at, id)`, also schließt `vor (zeit, id + 1)` den Anruf `(zeit, id)` ein.
+- **Eine mehr nach oben** (beim Bauen ergänzt): Eine `neuer`-Seite fragt eine Seitengröße plus
+  eins an (`seitenLimit`) und gilt erst dann als voll. Mit genau einer Seitengröße endet der
+  Rückweg auf denselben Grenzen wie der Hinweg mit einer vollen obersten Seite; „Neuere laden“
+  bliebe stehen und holte beim nächsten Klick eine leere Seite (so heute im ETB, mit der
+  Folgeaufgabe zu beheben). Keine Lücke, keine Doppelten: der nächste Cursor ist der oberste
+  Eintrag der Seite.
 - Kopf im Fenster heißt `!hasPreviousPage`.
 
 Dazu `kopfVerlassen`, `zumKopf` und `useKopfBeimVerlassen` aus `components/listenFenster.ts`:

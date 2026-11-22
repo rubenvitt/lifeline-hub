@@ -286,6 +286,76 @@ describe('ChatPage', () => {
     expect(zweiteSeiteAngefragtMit).toBe('101');
   });
 
+  /*
+   * Seitenfenster in beide Richtungen (LLH-1886): 200 Nachrichten, Seiten zu 100. Das Fenster steht
+   * tief (nur die Seite unter 601, vorbelegt wie nach fünfmal „Ältere laden“, deren Deckel der
+   * Helfer-Test belegt). „Neuere laden“ holt die neueste Seite lückenlos über `after_id` zurück;
+   * solange sie fehlt, markiert der Chat nicht als gelesen, auch nicht nach einem Live-Neuladen.
+   */
+  it('Seitenfenster ohne Kopf: kein Gelesen, „Neuere laden“ holt die neueste Seite', async () => {
+    const alle: ChatNachricht[] = Array.from({ length: 200 }, (_, i) => ({
+      ...nachricht,
+      id: 700 - i,
+      inhalt: `N ${700 - i}`,
+    }));
+    const anfragen: string[] = [];
+    let markiert = 0;
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () =>
+        HttpResponse.json([{ ...kanal, ungelesen_anzahl: 1 }]),
+      ),
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
+        markiert += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        anfragen.push(q.toString());
+        const vor = q.get('before_id');
+        const nach = q.get('after_id');
+        if (nach != null) {
+          const ueber = alle.filter((n) => n.id > Number(nach));
+          const limit = Number(q.get('limit') ?? 100);
+          return HttpResponse.json(ueber.slice(Math.max(0, ueber.length - limit)));
+        }
+        const unter = vor == null ? alle : alle.filter((n) => n.id < Number(vor));
+        return HttpResponse.json(unter.slice(0, 100));
+      }),
+    );
+    const client = neuerQueryClient();
+    client.setQueryData(['einsatz-chat-nachrichten', 7, 1], {
+      pages: [alle.slice(100)],
+      pageParams: [{ aelter: 601 }],
+    });
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/chat', client },
+    );
+
+    const knopf = await screen.findByRole('button', { name: 'Neuere laden' });
+    expect(screen.getByText('N 600')).toBeInTheDocument();
+    expect(screen.queryByText('N 700')).not.toBeInTheDocument();
+    // Ein Live-Ereignis lädt das tiefe Fenster neu: keine Markierung.
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz-chat-nachrichten', 7] }));
+    await waitFor(() => expect(anfragen.filter((a) => a === 'before_id=601').length).toBe(2));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(markiert).toBe(0);
+
+    await userEvent.click(knopf);
+    expect(await screen.findByText('N 700')).toBeInTheDocument();
+    // Eine mehr angefragt: 100 kamen, also ist das die neueste Seite — kein leerer Extraklick.
+    expect(anfragen).toContain('after_id=600&limit=101');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Neuere laden' })).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(markiert).toBeGreaterThan(0));
+  });
+
   it('zeigt keinen „Ältere laden"-Button bei einer kurzen Seite', async () => {
     setup();
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();

@@ -70,6 +70,12 @@ interface Props {
   bezugInfo?: (typ: BezugTyp, id: number) => BezugKurzinfo | null;
   /** Zähler der EIGENEN Absendungen. Jede Erhöhung holt die Sicht ans Ende zurück. */
   eigeneSendungen?: number;
+  /**
+   * Hält das Seitenfenster die neueste Seite (LLH-1886, `components/fensterBeideRichtungen.ts`)?
+   * Ohne sie fügt „Neuere laden“ unten an: das ist Lesen, kein Zufluss — kein Sprung, keine Pille.
+   * Vorgabe `true`.
+   */
+  kopfImFenster?: boolean;
   /** Ob an Bild-Anhängen der Original-Verweis steht (`darfOriginalLaden`, LFH-747). */
   darfOriginal?: boolean;
 }
@@ -106,6 +112,7 @@ export default function NachrichtenStrom({
   bezugInfo,
   eigeneSendungen = 0,
   darfOriginal = false,
+  kopfImFenster = true,
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
@@ -131,6 +138,13 @@ export default function NachrichtenStrom({
    */
   const [markeId, setMarkeId] = useState<number | null>(null);
   /**
+   * Seitenfenster (LLH-1886): Stand des Kopfes beim letzten Wachsen, und ob eine eigene Absendung
+   * ihren Sprung noch nicht bekommen hat. Aus tiefem Fenster ersetzt die Seite erst das Fenster
+   * durch den Kopf; der Sprung gehört zu dem Wachsen, das den Kopf bringt.
+   */
+  const kopfVorher = useRef(kopfImFenster);
+  const sendungOffen = useRef(false);
+  /**
    * Die Nachricht, deren Löschen gerade nachgefragt wird (über ihre ID). Die Rückfrage ist EIN `<Modal>` außerhalb
    * der Zeilenschleife (LFH-365): eine Blase am Menüeintrag hielt das Menü per gestopptem Klick
    * offen und war der Grund für Knoten-Etiketten im Menü (LFH-683).
@@ -151,7 +165,8 @@ export default function NachrichtenStrom({
     setLoeschFrageId(id);
   };
   const namen = useMemo(() => aktionsNamen(nachrichten, zeitKurz), [nachrichten, zeitKurz]);
-  const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
+  const neueAnzahl =
+    markeId === null || !kopfImFenster ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
   /**
    * Aktionen einer Nachricht: EINE Quelle für ihr ⋮ und ihr Kontextmenü (LLH-1598, D4). Gelöschte
@@ -246,6 +261,7 @@ export default function NachrichtenStrom({
   useEffect(() => {
     if (eigeneSendungen === 0) return;
     amBodenRef.current = true;
+    sendungOffen.current = true;
     setMarkeId(null);
   }, [eigeneSendungen]);
 
@@ -258,6 +274,16 @@ export default function NachrichtenStrom({
    */
   useEffect(() => {
     if (juengsteId === null) return;
+    const kopfWar = kopfVorher.current;
+    kopfVorher.current = kopfImFenster;
+    // Ohne Kopf, oder als der Kopf gerade erst durch „Neuere laden“ kam: gelesen, nicht zugeflossen.
+    // Die Pille zählt ab hier, sonst nennte sie alle eben nachgeladenen Nachrichten „neu“.
+    if (!kopfImFenster) return;
+    if (!kopfWar && !sendungOffen.current) {
+      setMarkeId(amBodenRef.current ? null : juengsteId);
+      return;
+    }
+    sendungOffen.current = false;
     const el = behaelter.current;
     // Ohne Überlauf gibt es keine Lesestelle und kein Scroll-Ereignis mehr, das den Merker
     // zurückstellt — ohne Rückstellung bliebe die Pille stehen. Hier ist Messen im Effekt richtig:
@@ -268,6 +294,7 @@ export default function NachrichtenStrom({
     }
     if (!amBodenRef.current) return;
     el?.scrollTo?.({ top: el.scrollHeight });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wächst die jüngste id, nicht der Kopf
   }, [juengsteId]);
 
   return (

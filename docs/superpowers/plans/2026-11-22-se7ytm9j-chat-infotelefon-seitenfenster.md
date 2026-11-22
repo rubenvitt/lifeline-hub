@@ -22,18 +22,19 @@ Ausführung: `executing-plans` im Main-Loop (Plan kurz, Aufgaben eng verzahnt), 
 
 ## Aufgabe 3 — Frontend: Helfer `components/fensterBeideRichtungen.ts` (D2)
 
-- [ ] Tests nach `etb/seitenfenster.test.ts`: Kopf, `aelter`, `neuer` voll/kurz/leer, beide
+- [x] Tests nach `etb/seitenfenster.test.ts`: Kopf, `aelter`, `neuer` voll/kurz/leer, beide
       Cursor-Arten (Zahl, Eingang+Kennung).
-- [ ] Helfer mit Cursor-Adapter (`cursor`, `einschliessendAelter`, `einschliessendNeuer`), Konstante
-      `FENSTER_MAX_SEITEN = 5`, `fensterOptionen(…)` für `useInfiniteQuery`.
+- [x] Helfer mit Cursor-Adapter (`cursor`, `einschliessendAelter`, `einschliessendNeuer`), Konstante
+      `FENSTER_MAX_SEITEN = 5`, `fensterOptionen(…)` für `useInfiniteQuery`, `seitenLimit` (eine
+      mehr nach oben, Design-Doc D2).
 
 ## Aufgabe 4 — Chat (D3)
 
-- [ ] API: `listeNachrichten(einsatzId, kanalId, param)` mit `before_id`/`after_id`.
-- [ ] `ChatPage`: Fenster-Optionen, „Neuere laden“ unten, `useKopfBeimVerlassen`, Gelesen nur mit
+- [x] API: `listeNachrichten(einsatzId, kanalId, param)` mit `before_id`/`after_id`.
+- [x] `ChatPage`: Fenster-Optionen, „Neuere laden“ unten, `useKopfBeimVerlassen`, Gelesen nur mit
       Kopf, eigenes Senden aus tiefem Fenster → `zumKopf` und ans Ende.
-- [ ] `NachrichtenStrom`: `kopfImFenster` — ohne Kopf kein Sprung ans Ende und keine Pille.
-- [ ] Tests: Gelesen ohne Kopf nicht, mit Kopf schon; Strom ohne Kopf springt nicht.
+- [x] `NachrichtenStrom`: `kopfImFenster` — ohne Kopf kein Sprung ans Ende und keine Pille.
+- [x] Tests: Gelesen ohne Kopf nicht, mit Kopf schon; Strom ohne Kopf springt nicht.
 
 ## Aufgabe 5 — Infotelefon (D4)
 
