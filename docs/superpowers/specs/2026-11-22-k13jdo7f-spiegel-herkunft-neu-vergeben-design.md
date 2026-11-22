@@ -5,7 +5,7 @@ Lösungsweg mit Ruben am 22.11.2026 abgestimmt: A (Herkunft beim Neuanlegen räu
 „neu vergeben“ für `kennt: true`) in dieser Aufgabe. Nach dem Review vor dem PR am selben Tag
 ergänzt (D8): Der Merker trägt den fremden Schlüssel der gelöschten Zeile, und `gegen_hinaus`
 nennt ihn für die neue. Damit ist Akzeptanzkriterium 2 der Aufgabe umgekehrt; Entscheidung
-ADR-0080.
+ADR-0081.
 
 ## Problem
 

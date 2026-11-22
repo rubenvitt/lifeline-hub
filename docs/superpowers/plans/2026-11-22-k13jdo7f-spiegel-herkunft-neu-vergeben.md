@@ -117,7 +117,7 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
 
 **Files:** `src/instanz/spiegel/art.rs`, `src/instanz/spiegel/fuehrung.rs`,
 `migrations/0362_spiegel_neu_vergeben.sql`, `src/einsatz/schwaerzung_registry.rs`,
-`tests/instanz_fuehrung.rs`, ADR-0080, `docs/architektur/06-laufzeitsicht.md`
+`tests/instanz_fuehrung.rs`, ADR-0081, `docs/architektur/06-laufzeitsicht.md`
 
 - [x] **Step 1: Failing tests:** `bestaetigte_notuebernahme_ersetzt_am_elw_die_geloeschte_zeile`
   (ersetzt den Test zu Akzeptanzkriterium 2), `merker_bleibt_bis_der_juengste_stand_der_zeile_quittiert_ist`,
@@ -125,7 +125,7 @@ Ersatzschlüssel `id` die alte Herkunft (A) und setzt den Merker `spiegel_neu_ve
   `fremder_schluessel` statt `stand`.
 - [x] **Step 2:** Merker mit `fremder_schluessel` statt `stand`; `gegen_hinaus` mit Merker als
   Rückfall; Aufräumen in `werde_spiegel` nach dem jüngsten Log-Stand. Migration neu erzeugt.
-- [x] **Step 3:** ADR-0080 (Mitänderungsregel, Route `entwurf`, E1) und Kapitel 6.
+- [x] **Step 3:** ADR-0081 (Mitänderungsregel, Route `entwurf`, E1) und Kapitel 6.
 - [x] **Step 4:** Tests grün, Gegenproben gegen Filter und Ablehnung rot.
 
 ### Task 3: Nachzug und Gates

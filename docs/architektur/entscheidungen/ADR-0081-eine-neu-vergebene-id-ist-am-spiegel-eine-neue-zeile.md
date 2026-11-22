@@ -1,5 +1,5 @@
 ---
-id: ADR-0080
+id: ADR-0081
 titel: Eine neu vergebene ID ist am Spiegel eine neue Zeile und trägt den Schlüssel der gelöschten
 status: akzeptiert
 datum: 2026-11-22
@@ -11,7 +11,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-k13jdo7f-spiegel-herkunft-neu-vergeben-design.md
 ---
 
-# ADR-0080: Eine neu vergebene ID ist am Spiegel eine neue Zeile und trägt den Schlüssel der gelöschten
+# ADR-0081: Eine neu vergebene ID ist am Spiegel eine neue Zeile und trägt den Schlüssel der gelöschten
 
 ## Regeln
 

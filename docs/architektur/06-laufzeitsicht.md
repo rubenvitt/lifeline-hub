@@ -478,7 +478,7 @@ sequenceDiagram
   LLH-1854). Vergibt SQLite die ID einer gelöschten Zeile neu, räumt der Log-Trigger ihre
   Herkunft und merkt sich die Neuvergabe in `spiegel_neu_vergeben`: Die neue Zeile geht mit dem
   `gegen` der gelöschten hinaus, und nach einem Rückfall gilt sie als dem Führer unbekannt
-  (`fuehrung::neu_vergeben`, [ADR-0080](entscheidungen/ADR-0080-eine-neu-vergebene-id-ist-am-spiegel-eine-neue-zeile.md),
+  (`fuehrung::neu_vergeben`, [ADR-0081](entscheidungen/ADR-0081-eine-neu-vergebene-id-ist-am-spiegel-eine-neue-zeile.md),
   LLH-1893). Zeilen, die aufeinander zeigen,
   ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
   Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
