@@ -18,18 +18,28 @@ Die App gibt es nur über **TestFlight**, nicht im App Store. Sie läuft auf iPh
 iOS bzw. iPadOS 17.4.
 
 1. Eine Person mit Zugang zu App Store Connect lädt die Testerin oder den Tester ein: unter
-   „TestFlight“ als interne Testerin (Mitglied des Teams in App Store Connect) oder in eine
-   Gruppe externer Tester. Den ersten Build einer neuen Version für externe Tester prüft Apple
-   vorher (Beta-App-Review).
+   „TestFlight“ in die Gruppe **„Intern“** (nur Mitglieder des Teams in App Store Connect, bekommt
+   jeden Kanal samt Alpha) oder in die Gruppe **„Extern“** (beliebige Apple-Accounts, bekommt nur
+   Beta und stabil). Den ersten Build einer neuen Version für externe Tester prüft Apple vorher
+   (Beta-App-Review).
 2. Auf dem Gerät die App **TestFlight** aus dem App Store laden und die Einladung (Mail oder
    öffentlicher Link) annehmen.
 3. In TestFlight „Lifeline“ installieren. Neue Builds bietet TestFlight selbst an; „Automatische
    Updates“ lässt sich dort je App einschalten. Ein Build läuft in TestFlight nach 90 Tagen ab.
 
-**Welche Stände kommen an:** jeder freigegebene Tag der Kanäle `beta` (`vX.Y.Z-beta.N`) und `main`
-(`vX.Y.Z`), nie Alpha (Spec `ios-auslieferung`). TestFlight zeigt die Version ohne Vorab-Suffix
-und dahinter die Build-Nummer, etwa „1.0.0 (202611181200)“: Apple nimmt kein Suffix an. Die
-volle Version (`1.0.0-beta.3`) steht in der App unter Serverliste → Einstellungen → „Über“ und im
+**Welche Stände kommen an** (LLH-1988,
+[ADR-0078](../architektur/entscheidungen/ADR-0078-jeder-freigegebene-tag-geht-zu-testflight-und-alpha-nur-an-die-interne-gruppe.md)):
+
+| Kanal | Tag | Gruppen |
+|---|---|---|
+| Alpha | `vX.Y.Z-alpha.N` | „Intern“ |
+| Beta | `vX.Y.Z-beta.N` | „Intern“, „Extern“ (nach der Beta-Prüfung) |
+| Stabil | `vX.Y.Z` | „Intern“, „Extern“ (nach der Beta-Prüfung) |
+
+TestFlight zeigt die Version ohne Vorab-Suffix und dahinter die Build-Nummer, etwa
+„1.0.0 (202611181200)“: Apple nimmt kein Suffix an. Welcher Kanal es ist, steht deshalb in der
+ersten Zeile von „Was testen“ (`Lifeline 1.0.0-alpha.196`), darunter die Release-Notizen des Tags.
+Die volle Version steht auch in der App unter Serverliste → Einstellungen → „Über“ und im
 Onboarding unten. Die Build-Nummer ist der Zeitstempel des Uploads in UTC (`JJJJMMTTHHMM`,
 `scripts/ios/version.sh`).
 
@@ -195,15 +205,24 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 - Server und App tragen dieselbe Version aus `[workspace.package]`; `ios/` hat keine eigene.
   `scripts/ios/version.sh` schreibt Marketing-Version, `LifelineVersion` und Build-Nummer.
 - `.github/workflows/ios.yml` lädt hoch: aufgerufen aus `artefakte.yml` (Job `ios`, „iOS-App
-  (TestFlight)“) **nach** der Freigabe eines Tags der Kanäle `beta` oder `main`. Der Job hält
-  nichts auf: scheitert er, ist das Release trotzdem veröffentlicht, und der Fehler steht im Lauf
-  von `artefakte.yml`. Den Ablauf trägt `scripts/ios/testflight.sh` (Version gegen den Tag
-  prüfen, `xcodegen generate`, `xcodebuild archive`, Export mit Upload).
+  (TestFlight)“) **nach** der Freigabe jedes Tags der Kanäle `alpha`, `beta` und `main`. Der Job
+  hält nichts auf: scheitert er, ist das Release trotzdem veröffentlicht, und der Fehler steht im
+  Lauf von `artefakte.yml`. Den Upload trägt `scripts/ios/testflight.sh` (Version gegen den Tag
+  prüfen, `xcodegen generate`, `xcodebuild archive`, Export mit Upload) im Job `testflight`.
+- **Verteilen** (Job `verteilen`, auf Ubuntu, `scripts/ios/testflight-verteilen.mjs`): wartet bis
+  zu 45 Minuten, bis Apple den Build verarbeitet hat, setzt „Was testen“, hängt ihn an die Gruppen
+  des Kanals (Tabelle oben) und reicht ihn für „Extern“ zur Beta-Prüfung ein, sofern dafür noch
+  keine läuft. Fehlt eine der beiden Gruppen, legt das Skript sie vor dem Warten an: „Intern“ als
+  interne Gruppe, die nur zugewiesene Builds bekommt, „Extern“ ohne öffentlichen Link. Ist der Job
+  rot, liegt der Build in TestFlight, ist aber nicht (vollständig) verteilt: den Handstart
+  wiederholen oder in App Store Connect von Hand zuweisen.
 - **Handstart** (auch zum Nachholen nach einer Störung bei Apple): Actions → „iOS-App
-  (TestFlight)“ → „Run workflow“ mit dem Tag, etwa `v1.0.0-beta.3`. Alpha-Tags weist das Skript ab.
+  (TestFlight)“ → „Run workflow“ mit dem Tag, etwa `v1.0.0-beta.3`. Andere Vorabkanäle (`-rc.1`)
+  weist das Skript ab, ebenso Alpha-Tags von vor LLH-1988: der Lauf nutzt das Skript des Tags.
 - Nach dem Upload verarbeitet Apple den Build (meist Minuten, selten länger); erst dann erscheint
-  er in TestFlight. Externe Tester sehen ihn nach dem Beta-App-Review und der Freigabe für ihre
-  Gruppe.
+  er in TestFlight. Externe Tester sehen ihn nach dem Beta-App-Review. Fehlen dafür die
+  Testinformationen (siehe Übergaben), scheitert die Einreichung, und Apples Begründung steht im
+  Job `verteilen`.
 - Zwei Uploads derselben Minute trügen dieselbe Build-Nummer; Apple lehnt den zweiten ab. Dann
   den Lauf eine Minute später neu starten.
 - Die Verschlüsselungsfrage beim Upload ist beantwortet (`ITSAppUsesNonExemptEncryption = false`
@@ -252,9 +271,11 @@ Bevor der erste Upload gelingt (Aufgabe 10.1 der Change):
    den Export mit cloud-verwalteter Signierung nur Schlüssel mit der Rolle **Admin** als
    erfolgreich; ein App-Manager-Schlüssel scheitert dort mit „Cloud signing permission error“.
    Scheitert der erste Upload so, den Schlüssel mit der Rolle Admin neu anlegen.
-4. **TestFlight-Gruppen** anlegen und Tester einladen; für externe Tester die Testinformationen
-   (Kontakt, Beschreibung) ausfüllen, die Apple für das Beta-App-Review verlangt.
-5. Erster Handstart von `ios.yml` mit einem Beta-Tag (Aufgabe 10.2).
+4. **Tester einladen:** Die Gruppen „Intern“ und „Extern“ legt der erste Lauf von `verteilen` an.
+   Danach in App Store Connect → TestFlight die Tester eintragen. Für „Extern“ zusätzlich unter
+   „Testinformationen“ Beschreibung, Feedback-Mail und Kontakt ausfüllen, die Apple für das
+   Beta-App-Review verlangt.
+5. Der erste Upload läuft mit dem ersten Alpha-Tag nach LLH-1988.
 
 **Kosten:** im Apple Developer Program enthalten (siehe
 [desktop-app.md](desktop-app.md#signierung-und-notarisierung-macos), „Kosten und Termine“).
