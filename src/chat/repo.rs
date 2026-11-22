@@ -205,6 +205,9 @@ pub struct NachrichtFilter {
     pub kanal_id: i64,
     /// Cursor: nur Nachrichten mit `id <` diesem Wert (ältere Seite).
     pub before_id: Option<i64>,
+    /// Cursor nach oben (LLH-1886): die Seite direkt über diesem Wert, geliefert absteigend wie
+    /// jede Seite. Nie zusammen mit `before_id` (der Handler weist das ab).
+    pub after_id: Option<i64>,
     pub limit: i64,
 }
 
@@ -477,7 +480,7 @@ pub async fn anlegen_mit_erwaehnungen(
 }
 
 /// Fragt Nachrichten eines Kanals ab (inkl. Anhänge). Sortierung: `id DESC`
-/// (neueste zuerst), Cursor über `before_id`.
+/// (neueste zuerst), Cursor über `before_id` (ältere Seite) bzw. `after_id` (neuere Seite).
 pub async fn abfrage(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -492,13 +495,24 @@ pub async fn abfrage(
         qb.push(" AND n.id < ");
         qb.push_bind(cursor);
     }
-    qb.push(" ORDER BY n.id DESC LIMIT ");
+    // Nach oben: aufsteigend lesen, damit die Seite DIREKT über dem Cursor beginnt (absteigend
+    // gelesen käme die neueste Seite, und der Weg zurück nach unten hätte eine Lücke).
+    if let Some(cursor) = filter.after_id {
+        qb.push(" AND n.id > ");
+        qb.push_bind(cursor);
+        qb.push(" ORDER BY n.id ASC LIMIT ");
+    } else {
+        qb.push(" ORDER BY n.id DESC LIMIT ");
+    }
     qb.push_bind(filter.limit);
 
     let mut nachrichten = qb
         .build_query_as::<ChatNachrichtAnzeige>()
         .fetch_all(pool)
         .await?;
+    if filter.after_id.is_some() {
+        nachrichten.reverse();
+    }
     anhaenge_anreichern(pool, &mut nachrichten).await?;
     Ok(nachrichten)
 }
@@ -1012,6 +1026,7 @@ mod tests {
             &NachrichtFilter {
                 kanal_id: kid,
                 before_id: None,
+                after_id: None,
                 limit: STANDARD_LIMIT,
             },
         )
@@ -1043,6 +1058,7 @@ mod tests {
         let f = NachrichtFilter {
             kanal_id: kid,
             before_id: None,
+            after_id: None,
             limit: 1,
         };
         let seite1 = abfrage(&pool, einsatz, &f).await.unwrap();
@@ -1051,6 +1067,7 @@ mod tests {
         let f2 = NachrichtFilter {
             kanal_id: kid,
             before_id: Some(seite1[0].id),
+            after_id: None,
             limit: 1,
         };
         let seite2 = abfrage(&pool, einsatz, &f2).await.unwrap();
@@ -1092,6 +1109,7 @@ mod tests {
             &NachrichtFilter {
                 kanal_id: k1,
                 before_id: None,
+                after_id: None,
                 limit: STANDARD_LIMIT,
             },
         )
@@ -1711,6 +1729,7 @@ mod tests {
             &NachrichtFilter {
                 kanal_id: kid,
                 before_id: None,
+                after_id: None,
                 limit: STANDARD_LIMIT,
             },
         )

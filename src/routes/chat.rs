@@ -120,11 +120,13 @@ pub async fn kanal_gelesen_markieren(
 #[derive(Debug, Deserialize)]
 pub struct NachrichtenParams {
     pub before_id: Option<i64>,
+    pub after_id: Option<i64>,
     pub limit: Option<i64>,
 }
 
 /// GET /api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten — Nachrichten eines Kanals.
-/// Lesezugriff (inkl. Beobachter). Cursor über `before_id`.
+/// Lesezugriff (inkl. Beobachter). Cursor über `before_id` (ältere Seite) oder `after_id`
+/// (die Seite direkt darüber, LLH-1886); beide zugleich → 422.
 pub async fn nachrichten_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Chat>,
@@ -137,6 +139,11 @@ pub async fn nachrichten_liste(
         return Err(AppError::NotFound);
     }
 
+    if params.before_id.is_some() && params.after_id.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "before_id und after_id schließen sich aus".into(),
+        ));
+    }
     let limit = params
         .limit
         .unwrap_or(repo::STANDARD_LIMIT)
@@ -144,6 +151,7 @@ pub async fn nachrichten_liste(
     let filter = repo::NachrichtFilter {
         kanal_id,
         before_id: params.before_id,
+        after_id: params.after_id,
         limit,
     };
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))

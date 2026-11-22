@@ -6,19 +6,19 @@ Ausführung: `executing-plans` im Main-Loop (Plan kurz, Aufgaben eng verzahnt), 
 
 ## Aufgabe 1 — Backend Chat: `after_id` (D1)
 
-- [ ] Test (`tests/chat.rs`): 5 Nachrichten; `?after_id=<2.>&limit=2` liefert die 3. und 4.,
+- [x] Test (`tests/chat.rs`): 5 Nachrichten; `?after_id=<2.>&limit=2` liefert die 3. und 4.,
       absteigend; `before_id` und `after_id` zugleich → 422.
-- [ ] `NachrichtenParams.after_id`, `NachrichtFilter.after_id`; Handler weist beide zugleich ab.
-- [ ] `repo::abfrage`: `id > after_id ORDER BY id ASC`, danach umdrehen.
+- [x] `NachrichtenParams.after_id`, `NachrichtFilter.after_id`; Handler weist beide zugleich ab.
+- [x] `repo::abfrage`: `id > after_id ORDER BY id ASC`, danach umdrehen.
 
 ## Aufgabe 2 — Backend Infotelefon: `nach_zeit` + `nach_id` (D1)
 
-- [ ] Test (`tests/stab_infotelefon.rs`, `parameter_der_liste`): halber `nach`-Cursor → 422,
+- [x] Test (`tests/stab_infotelefon.rs`, `parameter_der_liste`): halber `nach`-Cursor → 422,
       `vor` und `nach` zugleich → 422.
-- [ ] Test (`src/infotelefon/repo/tests.rs`): Seite über einem Cursor bei gleichem Eingang ordnet
+- [x] Test (`src/infotelefon/repo/tests.rs`): Seite über einem Cursor bei gleichem Eingang ordnet
       über die Kennung, absteigend geliefert, direkt über dem Cursor.
-- [ ] `kommunikation::parse_fenster` mit Richtung `Vor`/`Nach` (ZeitCursor), `parse_page` bleibt.
-- [ ] `infotelefon::repo::list_page` liest die Richtung; Route nimmt `nach_zeit`/`nach_id`.
+- [x] `kommunikation::parse_fenster` mit Richtung `Vor`/`Nach` (ZeitCursor), `parse_page` bleibt.
+- [x] `infotelefon::repo::list_page` liest die Richtung; Route nimmt `nach_zeit`/`nach_id`.
 
 ## Aufgabe 3 — Frontend: Helfer `components/fensterBeideRichtungen.ts` (D2)
 
