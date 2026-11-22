@@ -1227,9 +1227,13 @@ export default function EtbPage() {
                     />
                     {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
                         der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
-                    {/* Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): das Raster
-                        streckt die Auswahl, mindestens aber `schmal`. */}
-                    <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+                    {/* Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): Feldstufe
+                        `kurz`, das Raster streckt die Auswahl auf genau diese Breite; ein langer
+                        Name endet mit „…“, die offene Liste zeigt ihn ganz. Mit `schmal` (200 px)
+                        brach die Filterleiste bei 1180 px schon mit zweistelligen Zählern um, und
+                        die Köpfe klebten bei 600 px Höhe nicht mehr (LLH-2037,
+                        `e2e/rahmen-stehen-bleiben.spec.ts`). */}
+                    <div style={{ display: 'grid', width: 'var(--lfh-feld-kurz)' }}>
                       <Select<number>
                         aria-label="Nach Einheit filtern"
                         placeholder="Einheit"
