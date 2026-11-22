@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/android/sdk-version.sh (LLH-1989, Entwurf D10): die CI installiert die
-# Plattform aus dem Skript, Gradle übersetzt gegen `compileSdk` aus android/app/build.gradle.kts.
-# Laufen beide auseinander, scheitert der App-Bau erst auf dem Runner (fehlende Plattform) oder
-# lädt AGP still eine andere nach. Ohne Netz, ohne SDK.
+# Selbsttest für scripts/android/sdk-version.sh und jdk-waehlen.sh (LLH-1989, Entwurf D10): die
+# CI installiert die Plattform aus dem Skript, Gradle übersetzt gegen `compileSdk` aus
+# android/app/build.gradle.kts. Laufen beide auseinander, scheitert der App-Bau erst auf dem Runner
+# (fehlende Plattform) oder lädt AGP still eine andere nach. Und das JDK der CI kommt vom Runner:
+# fehlt die Version, muss der Schritt rot werden, statt mit dem Vorgabe-JDK weiterzubauen. Ohne
+# Netz, ohne SDK.
 set -euo pipefail
 
 HIER="$(cd "$(dirname "$0")" && pwd)"
@@ -37,6 +39,31 @@ gradle_plattform="$(sed -n 's/.*version = release(\([0-9]*\))\( { minorApiLevel 
 pruefe "Plattform passt zu compileSdk in android/app/build.gradle.kts" "$(wert ANDROID_PLATTFORM)" "$gradle_plattform"
 
 pruefe "unbekanntes Argument bricht ab" "1" "$("$HIER/sdk-version.sh" --quatsch > /dev/null 2>&1 && echo 0 || echo $?)"
+
+# jdk-waehlen.sh gegen ein Wegwerf-JDK (nur bin/java) in einer nachgestellten Runner-Umgebung.
+ARBEIT="$(mktemp -d)"
+trap 'rm -rf "$ARBEIT"' EXIT
+jdk="$ARBEIT/jdk"
+mkdir -p "$jdk/bin"
+printf '#!/bin/sh\necho "openjdk version \\"%s\\"" >&2\n' "$(wert ANDROID_JDK)" > "$jdk/bin/java"
+chmod +x "$jdk/bin/java"
+waehle() { # [<VAR=wert>…] → Exit-Code; GITHUB_ENV/GITHUB_PATH unter $ARBEIT
+  : > "$ARBEIT/env"
+  : > "$ARBEIT/path"
+  local rc=0
+  env -u "JAVA_HOME_$(wert ANDROID_JDK)_X64" GITHUB_ENV="$ARBEIT/env" GITHUB_PATH="$ARBEIT/path" "$@" \
+    "$HIER/jdk-waehlen.sh" > "$ARBEIT/aus" 2>&1 || rc=$?
+  printf '%s\n' "$rc"
+}
+var="JAVA_HOME_$(wert ANDROID_JDK)_X64"
+pruefe "JDK vorhanden: grün" 0 "$(waehle "$var=$jdk")"
+pruefe "JDK vorhanden: JAVA_HOME gesetzt" "JAVA_HOME=$jdk" "$(cat "$ARBEIT/env")"
+pruefe "JDK vorhanden: bin vorn im PATH" "$jdk/bin" "$(cat "$ARBEIT/path")"
+pruefe "JDK fehlt: rot" 1 "$(waehle "JAVA_HOME_17_X64=$jdk")"
+pruefe "JDK fehlt: Meldung nennt die Variable" ja "$(grep -q "$var fehlt auf dem Runner" "$ARBEIT/aus" && echo ja || echo nein)"
+pruefe "JDK fehlt: nichts geschrieben" "" "$(cat "$ARBEIT/env" "$ARBEIT/path")"
+pruefe "Variable zeigt ins Leere: rot" 1 "$(waehle "$var=$ARBEIT/gibt-es-nicht")"
+pruefe "ohne GITHUB_ENV: rot" 1 "$(env -u GITHUB_ENV -u GITHUB_PATH "$var=$jdk" "$HIER/jdk-waehlen.sh" > /dev/null 2>&1 && echo 0 || echo $?)"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest android/sdk-version." >&2

@@ -5,14 +5,16 @@
  * Datei im Kanal ersetzt. Dazu das Manifest selbst.
  *
  *   node scripts/release/android-kanal.mjs --kanaele-fuer 1.0.0-beta.2
- *   node scripts/release/android-kanal.mjs --apk-ersetzen android-alpha 1.0.0
+ *   node scripts/release/android-kanal.mjs --apk-ersetzen android-alpha --neu neu/android.json \
+ *     [--alt alt/android.json]
  *   node scripts/release/android-kanal.mjs --kanal android-beta --neu neu/android.json \
  *     [--alt alt/android.json]
  *   node scripts/release/android-kanal.mjs --manifest --version 1.0.0 --version-code 471234 \
  *     --sha256 <hex> --repo <owner/repo>
  *
  * Die erste Form gibt die Kanäle aus, je einer pro Zeile (keine Zeile: kein Kanal). Die zweite
- * gibt `ja` oder `nein` aus, die dritte `hochladen` oder `behalten`, die vierte `android.json`.
+ * gibt `ja` oder `nein` aus (feste APK ersetzen), die dritte `hochladen` oder `behalten`
+ * (Manifest), die vierte `android.json`.
  * Aufgerufen von `.github/workflows/android.yml`; der Selbsttest (`android-kanal.test.mjs`) läuft
  * in Schritt 8 von `scripts/check-all.sh`.
  *
@@ -26,13 +28,14 @@
  * Releases schreiben beide fort, und nur vorwärts nach SemVer (überholte Läufe, Handstart eines
  * älteren Tags).
  *
- * FESTE APK NUR AUS DEM EIGENEN KANAL: Ein QR-Code an der Wand führt über sie immer zu einer
- * Fassung dieses Kanals. Ein stabiles Release schreibt nur das Manifest fort; wer danach über den
- * Alpha-Code installiert, bekommt die letzte Alpha, legt damit den Kanal `alpha` fest und wird
- * über das Manifest auf das stabile Release gehoben (die App leitet den Kanal beim ersten Start
- * aus ihrer Version ab). Ob die APK neuer ist als die im Kanal, prüft das Skript nicht: ein
- * Handstart eines älteren Tags desselben Kanals legt seine APK dorthin, das Manifest hebt sie
- * gleich wieder.
+ * FESTE APK NUR AUS DEM EIGENEN KANAL UND NUR VORWÄRTS: Ein QR-Code an der Wand führt über sie
+ * immer zu einer Fassung dieses Kanals. Ein stabiles Release schreibt nur das Manifest fort; wer
+ * danach über den Alpha-Code installiert, bekommt die letzte Alpha, legt damit den Kanal `alpha`
+ * fest und wird über das Manifest auf das stabile Release gehoben (die App leitet den Kanal beim
+ * ersten Start aus ihrer Version ab). Ersetzt wird sie nur, wenn das Release zum Kanal gehört UND
+ * sein Manifest den Kanal fortschreibt: ein Handstart eines älteren Tags legt keine ältere APK
+ * unter den QR-Code. Folge: eine Alpha, die hinter einem stabilen Stand im Kanal liegt (gleicher
+ * Kern), ersetzt die APK nicht; die nächste Alpha eines höheren Kerns wieder.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -94,6 +97,20 @@ export function apkErsetzen(kanal, version) {
 }
 
 /**
+ * Ob die APK eines Release die feste Datei im Kanal ersetzt: nur ein Tag desselben Kanals (nie ein
+ * stabiler), und nur, wenn sein Manifest den Kanal fortschreibt (`entscheide` → `hochladen`).
+ * @param {{ kanal: string, neu: object, alt: object | null }} e  wie bei `entscheide`
+ * @returns {{ ersetzen: boolean, grund: string }}
+ */
+export function apkEntscheidung({ kanal, neu, alt }) {
+  const { entscheidung, grund } = entscheide({ kanal, neu, alt });
+  if (!apkErsetzen(kanal, neu.version)) {
+    return { ersetzen: false, grund: `${neu.version} ist kein Tag von ${kanal}` };
+  }
+  return { ersetzen: entscheidung === 'hochladen', grund };
+}
+
+/**
  * `android.json` eines Release (Entwurf D9); `url` zeigt auf die APK des versionierten Release.
  * @param {{ version: string, versionCode: number, sha256: string, repo: string }} e
  */
@@ -151,11 +168,10 @@ export function entscheide({ kanal, neu, alt }) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const aufruf =
     'Aufruf: android-kanal.mjs --kanaele-fuer <version>\n' +
-    '        android-kanal.mjs --apk-ersetzen <android-alpha|android-beta> <version>\n' +
+    '        android-kanal.mjs --apk-ersetzen <android-alpha|android-beta> --neu <android.json> [--alt <android.json>]\n' +
     '        android-kanal.mjs --kanal <android-alpha|android-beta> --neu <android.json> [--alt <android.json>]\n' +
     '        android-kanal.mjs --manifest --version <v> --version-code <n> --sha256 <hex> --repo <owner/repo>';
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
+  const { values } = parseArgs({
     options: {
       'kanaele-fuer': { type: 'string' },
       'apk-ersetzen': { type: 'string' },
@@ -173,12 +189,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const kanal of kanaeleFuer(values['kanaele-fuer'])) console.log(kanal);
     process.exit(0);
   }
+  const lies = (pfad) => JSON.parse(readFileSync(pfad, 'utf8'));
+  const altLesen = () => (values.alt && existsSync(values.alt) ? lies(values.alt) : null);
   if (values['apk-ersetzen'] !== undefined) {
-    if (positionals.length !== 1) {
+    if (!values.neu) {
       console.error(aufruf);
       process.exit(2);
     }
-    console.log(apkErsetzen(values['apk-ersetzen'], positionals[0]) ? 'ja' : 'nein');
+    const kanal = values['apk-ersetzen'];
+    const { ersetzen, grund } = apkEntscheidung({ kanal, neu: lies(values.neu), alt: altLesen() });
+    console.error(`${kanal} (feste APK): ${grund}`);
+    console.log(ersetzen ? 'ja' : 'nein');
     process.exit(0);
   }
   if (values.manifest) {
@@ -197,9 +218,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error(aufruf);
     process.exit(2);
   }
-  const lies = (pfad) => JSON.parse(readFileSync(pfad, 'utf8'));
-  const alt = values.alt && existsSync(values.alt) ? lies(values.alt) : null;
-  const { entscheidung, grund } = entscheide({ kanal: values.kanal, neu: lies(values.neu), alt });
+  const { entscheidung, grund } = entscheide({ kanal: values.kanal, neu: lies(values.neu), alt: altLesen() });
   console.error(`${values.kanal}: ${grund}`);
   console.log(entscheidung);
 }

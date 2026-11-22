@@ -87,14 +87,18 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Kern; kein Pflicht-Check. Den Push fängt `android-pruefung-alpha.yml` und ruft dieselben Jobs
     (ein Workflow je Ereignis, ADR-0048). JDK, SDK-Plattform
     und Build-Tools stehen nur in `scripts/android/sdk-version.sh` (Selbsttest gegen `compileSdk`
-    in Schritt 8), fehlende SDK-Pakete lädt `scripts/android/sdk-installieren.sh`.
+    in Schritt 8), fehlende SDK-Pakete lädt `scripts/android/sdk-installieren.sh`. Das JDK ist
+    das vorinstallierte des Runners (`scripts/android/jdk-waehlen.sh`, rot ohne
+    `JAVA_HOME_<n>_X64`), keine Action: eine Action außerhalb der Freigabeliste ließe `ci.yml` und
+    `artefakte.yml` nicht starten.
   - **APK** (LLH-1989, Entwurf D9): `android.yml` baut und signiert die APK
     (`scripts/android/release-apk.sh`: fehlt ein Geheimnis `ANDROID_KEY*`, rot statt unsigniert;
     Version gegen den Tag; Selbsttest in Schritt 8), aufgerufen aus `artefakte.yml` (Job
     `android`, nach `freigeben`, jeder Kanal, in keinem `needs` davor) oder per Handstart. Manifest
     `android.json` und feste APK in den Kanal-Releases `android-alpha`/`android-beta` nach
     `scripts/release/android-kanal.mjs` (nur vorwärts, jeder Vorabkanal nur seine eigenen, die
-    feste APK nur aus dem eigenen Kanal), ein Job je Kanal mit eigener Gruppe; stabile Tags legen
+    feste APK nur aus dem eigenen Kanal und ebenfalls nur vorwärts), ein Job je Kanal mit eigener
+    Gruppe; stabile Tags legen
     beides ans versionierte Release (`releases/latest/download/`). Betrieb und Secrets:
     `docs/betrieb/android-app.md`.
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).

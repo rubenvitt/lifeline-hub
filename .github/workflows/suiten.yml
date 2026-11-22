@@ -181,7 +181,8 @@ jobs:
   # ── Kotlin-Kern der Android-Hülle (LLH-1989) ───────────────────────────────────────
   # `gradlew -p android/kern test` über Schritt 20 von check-all.sh, nur JDK, kein Android-SDK. Die
   # App baut und testet nur `android-pruefung.yml`. ANDROID_KERN_PFLICHT=1 macht ein fehlendes
-  # JDK rot statt zur Lücke. JDK aus scripts/android/sdk-version.sh, wie beim App-Bau.
+  # JDK rot statt zur Lücke. Das vorinstallierte JDK der Version aus scripts/android/sdk-version.sh
+  # (jdk-waehlen.sh, keine Action), wie beim App-Bau.
   android:
     name: Android-Kern
     concurrency:
@@ -191,18 +192,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Werkzeugversionen
-        id: versionen
-        run: ./scripts/android/sdk-version.sh >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: temurin
-          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
-          cache: gradle
-          cache-dependency-path: |
-            android/kern/**/*.gradle.kts
-            android/gradle/libs.versions.toml
-            android/gradle/wrapper/gradle-wrapper.properties
+      - name: JDK (vorinstalliert, Version aus sdk-version.sh)
+        run: ./scripts/android/jdk-waehlen.sh
       - name: Kotlin-Kern
         env:
           ANDROID_KERN_PFLICHT: "1"

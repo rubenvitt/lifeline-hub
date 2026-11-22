@@ -196,7 +196,7 @@ pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-
 pruefe "android: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" android)" "ci-android-$JE_BRANCH|true"
 pruefe "android: Kotlin-Kern über check-all.sh" enthaelt "$(job "$SUITEN" android)" "run: ./scripts/check-all.sh --nur android"
 pruefe "android: JDK Pflicht" enthaelt "$(job "$SUITEN" android)" 'ANDROID_KERN_PFLICHT: "1"'
-pruefe "android: JDK-Version aus sdk-version.sh" enthaelt "$(job "$SUITEN" android)" "./scripts/android/sdk-version.sh"
+pruefe "android: vorinstalliertes JDK über jdk-waehlen.sh" enthaelt "$(job "$SUITEN" android)" "run: ./scripts/android/jdk-waehlen.sh"
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 # Nur GitHub (ADR-0078): jeder Job der Suiten läuft auf `ubuntu-latest`, keine Runner-Wahl.
 for id in rust frontend ios android berichte; do
@@ -346,7 +346,8 @@ pruefe "android.yml: Kanäle aus android-kanal.mjs" \
 k="$(job "$ANDROIDREL" kanal)"
 pruefe "android.yml: kanal je Kanal eine Gruppe ohne Abbruch" \
   gleich "$(job_gruppe "$ANDROIDREL" kanal)" "android-kanal-\${{ matrix.kanal }}|false"
-pruefe "android.yml: feste APK nach android-kanal.mjs" enthaelt "$k" "android-kanal.mjs --apk-ersetzen"
+pruefe "android.yml: feste APK nach android-kanal.mjs, nur vorwärts (gegen den Kanal-Stand)" \
+  enthaelt "$k" 'android-kanal.mjs --apk-ersetzen "$KANAL" --neu neu/android.json --alt alt/android.json'
 pruefe "android.yml: Manifest im Kanal nach android-kanal.mjs" enthaelt "$k" "android-kanal.mjs --kanal"
 pruefe "android.yml: Kanal-Release nie latest" enthaelt "$k" "--prerelease --latest=false"
 pruefe "artefakte.yml: Job android ruft android.yml" enthaelt "$(job "$ART" android)" "uses: ./.github/workflows/android.yml"
@@ -360,6 +361,15 @@ done
 pruefe "artefakte.yml: android für jeden Kanal" fehlt "$android_if" "needs.vorbereiten.outputs.vorab"
 pruefe "artefakte.yml: freigeben wartet nicht auf android" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "android"
+
+# Keine Action fürs JDK: eine Action außerhalb der Freigabeliste ließe `ci.yml` (über suiten.yml)
+# und `artefakte.yml` (über android.yml) gar nicht starten (startup_failure an PR #1483).
+for datei in "$SUITEN" "$ANDROID" "$ANDROIDREL"; do
+  pruefe "$(basename "$datei"): keine Action fürs JDK" fehlt "$(code_ohne_kommentar "$datei")" "setup-java"
+done
+for datei in "$ANDROID" "$ANDROIDREL"; do
+  pruefe "$(basename "$datei"): JDK über jdk-waehlen.sh" enthaelt "$(code_ohne_kommentar "$datei")" "run: ./scripts/android/jdk-waehlen.sh"
+done
 
 echo "==> ci-stufen: ruleset.yml"
 pruefe "ruleset.yml: Push auf alpha, Zeitplan, Anstoß" nur_ausloeser "$RULESET" "push schedule workflow_dispatch "

@@ -19,7 +19,8 @@
 # - In die Kanal-Releases `android-alpha` und `android-beta` (Vorabversion, nie „latest“, Tag ohne
 #   `v`, damit semantic-release und pr-kommentare.mjs sie übergehen; beim ersten Mal angelegt):
 #   `android.json` nur vorwärts, jeder Vorabkanal nur seine eigenen, stabile beide; die feste
-#   `lifeline-hub-android.apk` (QR-Code an der Wand) ersetzen nur Tags des eigenen Kanals. Ein
+#   `lifeline-hub-android.apk` (QR-Code an der Wand) ersetzen nur Tags des eigenen Kanals, und auch
+#   sie nur vorwärts. Ein
 #   Job je Kanal mit eigener Nebenläufigkeitsgruppe, damit zwei Releases einen Kanal nie
 #   gleichzeitig schreiben. Ein Entwurf (Handstart vor der Freigabe) schreibt keinen Kanal: seine
 #   Download-URLs erreichten nur Berechtigte.
@@ -93,13 +94,8 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           persist-credentials: false
-      - name: Werkzeugversionen
-        id: versionen
-        run: ./scripts/android/sdk-version.sh | tee -a "$GITHUB_OUTPUT" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: temurin
-          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
+      - name: JDK (vorinstalliert, Version aus sdk-version.sh)
+        run: ./scripts/android/jdk-waehlen.sh
       - name: Android-SDK ergänzen
         run: ./scripts/android/sdk-installieren.sh
       - name: Bauen, signieren, prüfen
@@ -245,15 +241,17 @@ jobs:
             titel="Alpha"; [ "$KANAL" = android-beta ] && titel="Beta"
             gh release create "$KANAL" --prerelease --latest=false --target "$GITHUB_SHA" \
               --title "Android-App: $titel-Kanal" \
-              --notes "Update-Manifest und APK für Android-Apps im $titel-Kanal (LLH-1989). android.json wird bei jeder Freigabe fortgeschrieben und zeigt auf die APK am versionierten Release; lifeline-hub-android.apk ersetzen nur $titel-Tags."
+              --notes "Update-Manifest und APK für Android-Apps im $titel-Kanal (LLH-1989). android.json wird bei jeder Freigabe fortgeschrieben und zeigt auf die APK am versionierten Release; lifeline-hub-android.apk ersetzen nur neuere $titel-Tags."
           fi
-          # Die feste APK: nur ein Tag desselben Kanals, nie ein stabiles.
-          if [ "$(mise exec -- node scripts/release/android-kanal.mjs --apk-ersetzen "$KANAL" "$VERSION")" = "ja" ]; then
+          # Beide Entscheidungen gegen den Stand VOR dem Hochladen (`alt/`). Die feste APK: nur ein
+          # Tag desselben Kanals, nie ein stabiles, und nur vorwärts wie das Manifest.
+          apk="$(mise exec -- node scripts/release/android-kanal.mjs --apk-ersetzen "$KANAL" --neu neu/android.json --alt alt/android.json)"
+          entscheidung="$(mise exec -- node scripts/release/android-kanal.mjs --kanal "$KANAL" --neu neu/android.json --alt alt/android.json)"
+          if [ "$apk" = "ja" ]; then
             cp "neu/lifeline-hub-android-$VERSION.apk" neu/lifeline-hub-android.apk
             gh release upload "$KANAL" neu/lifeline-hub-android.apk --clobber
             echo "::notice::$KANAL: lifeline-hub-android.apk ist $VERSION."
           fi
-          entscheidung="$(mise exec -- node scripts/release/android-kanal.mjs --kanal "$KANAL" --neu neu/android.json --alt alt/android.json)"
           if [ "$entscheidung" = "hochladen" ]; then
             gh release upload "$KANAL" neu/android.json --clobber
             echo "::notice::$KANAL zeigt auf $TAG."

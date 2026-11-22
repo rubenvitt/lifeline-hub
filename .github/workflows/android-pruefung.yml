@@ -52,18 +52,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Werkzeugversionen
-        id: versionen
-        run: ./scripts/android/sdk-version.sh | tee -a "$GITHUB_OUTPUT" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: temurin
-          java-version: ${{ steps.versionen.outputs.ANDROID_JDK }}
-          cache: gradle
-          cache-dependency-path: |
-            android/**/*.gradle.kts
-            android/gradle/libs.versions.toml
-            android/gradle/wrapper/gradle-wrapper.properties
+      - name: JDK (vorinstalliert, Version aus sdk-version.sh)
+        run: ./scripts/android/jdk-waehlen.sh
       - name: Android-SDK ergänzen
         run: ./scripts/android/sdk-installieren.sh
       - name: App-Tests und Release-APK (ohne Signatur)

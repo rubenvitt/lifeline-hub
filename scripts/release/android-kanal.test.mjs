@@ -9,7 +9,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { apkErsetzen, entscheide as entscheideIn, kanaeleFuer, manifest as manifestFuer } from './android-kanal.mjs';
+import {
+  apkEntscheidung,
+  apkErsetzen,
+  entscheide as entscheideIn,
+  kanaeleFuer,
+  manifest as manifestFuer,
+} from './android-kanal.mjs';
 
 const SHA = 'a'.repeat(64);
 const manifest = (version, version_code = 1000) => ({
@@ -46,6 +52,29 @@ test('stabil ersetzt die APK im Alpha-Kanal nicht', () => {
 test('APK-Entscheidung: unbekannter Kanal und kaputte Version brechen ab', () => {
   assert.throws(() => apkErsetzen('desktop-alpha', '1.0.0-alpha.1'), /Unbekannter Kanal/);
   assert.throws(() => apkErsetzen('android-alpha', 'v1.0.0-alpha.1'), /Keine zulässige Version/);
+});
+
+test('feste APK nur vorwärts: ein Tag des Kanals, der den Kanal fortschreibt', () => {
+  const apk = (kanal, neu, alt) => apkEntscheidung({ kanal, neu: manifest(neu), alt: alt && manifest(alt) }).ersetzen;
+  assert.equal(apk('android-alpha', '1.0.0-alpha.131', '1.0.0-alpha.130'), true);
+  assert.equal(apk('android-alpha', '1.0.0-alpha.1', null), true);
+  assert.equal(apk('android-beta', '1.0.0-beta.2', '1.0.0-beta.1'), true);
+  // Stabil schreibt das Manifest fort, die APK bleibt die des Kanals.
+  assert.equal(apk('android-alpha', '1.0.0', '1.0.0-alpha.140'), false);
+  assert.equal(apk('android-beta', '1.0.0-alpha.141', null), false);
+});
+
+test('Handstart eines älteren Tags ersetzt die feste APK nicht', () => {
+  const e = apkEntscheidung({ kanal: 'android-alpha', neu: manifest('1.0.0-alpha.129', 9000), alt: manifest('1.0.0-alpha.130') });
+  assert.equal(e.ersetzen, false);
+  assert.match(e.grund, /nicht neuer/);
+  // Derselbe Stand noch einmal (Nachbau) ebenso wenig.
+  assert.equal(
+    apkEntscheidung({ kanal: 'android-alpha', neu: manifest('1.0.0-alpha.130', 9000), alt: manifest('1.0.0-alpha.130') }).ersetzen,
+    false,
+  );
+  // Eine Alpha hinter einem stabilen Stand im Kanal ist nicht neuer: die APK bleibt.
+  assert.equal(apkEntscheidung({ kanal: 'android-alpha', neu: manifest('1.0.0-alpha.141'), alt: manifest('1.0.0') }).ersetzen, false);
 });
 
 test('leerer Kanal: hochladen', () => {
