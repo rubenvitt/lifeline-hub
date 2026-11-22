@@ -4653,7 +4653,8 @@ async fn abschnitt_umbenennen_meldet_seine_raeume() {
         "Nordost"
     );
 
-    // Der Name ist gespeichert, bevor die Sprechgruppen-Zuordnung scheitert: gemeldet wird trotzdem.
+    // Eine nicht zuordenbare Sprechgruppe scheitert vor dem ersten Schreiben (LLH-1880): der
+    // Name bleibt, und die Räume bekommen kein Ereignis.
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
@@ -4662,11 +4663,19 @@ async fn abschnitt_umbenennen_meldet_seine_raeume() {
         Some(&json!({"name": "Nordwest", "sprechgruppe_ids": [999_999]})),
     )
     .await;
-    assert!(s.is_client_error(), "unbekannte Sprechgruppe: {s} {v}");
-    assert_eq!(br_ereignisse(&mut rx), vec![a, b], "nach späterem Fehler");
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "unbekannte Sprechgruppe: {v}"
+    );
+    assert_eq!(
+        br_ereignisse(&mut rx),
+        Vec::<i64>::new(),
+        "nichts gespeichert"
+    );
     assert_eq!(
         abschnitt_name_in_liste(&app, &cookie, eid, a).await,
-        "Nordwest"
+        "Nordost"
     );
 }
 
