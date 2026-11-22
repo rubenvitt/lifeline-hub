@@ -63,8 +63,8 @@ Server.
    Wortlaut“ auch der Wortlaut. Apple und das Relais sehen davon nichts.
 3. Alarme sind **zeitkritisch** (`interruption-level: time-sensitive`) und kommen durch den
    Fokus, sofern die Person das für die App nicht abgeschaltet hat.
-4. Wer mehrere Server in der App hat, bekommt Meldungen von **jedem** Server, an dem eine
-   Sitzung mit eingeschaltetem Push besteht. Bei mehr als einem Server nennt die Meldung den
+4. Wer mehrere Server in der App hat, bekommt Meldungen von **jedem** Server, bei dem sie
+   Push eingeschaltet hat, auch wenn die Sitzung dort inzwischen abgelaufen ist. Bei mehr als einem Server nennt die Meldung den
    Server.
 5. Tippen auf die Meldung öffnet den richtigen Server und dort den Pfad der Benachrichtigung
    (wie `alarm-sw.js`). Ist ein anderer Server aktiv, wechselt die App sichtbar.
@@ -128,9 +128,15 @@ Zum Inhalt:
 - Server **registrieren sich selbst** beim Relais; Ruben kann einzelne sperren; Mengenlimit.
 - Inhalt **verschlüsselt**, eine **Notification Service Extension** entschlüsselt.
 - Alarme **zeitkritisch**.
-- **Alle Server mit Sitzung** behalten das Token; Meldung nennt den Server bei mehreren; Tippen
+- **Alle Server, bei denen Push eingeschaltet wurde,** behalten das Token; Meldung nennt den Server bei mehreren; Tippen
   wechselt sichtbar.
 - **Ein Entwurf, vier Subtasks**, ein Branch, ein PR.
+- Die Anmeldung hängt an **Konto und Gerät**, nicht an der Sitzung: sie überlebt den Ablauf der
+  Sitzung (fest 7 Tage, `SITZUNG_TAGE`) und endet erst durch Ausschalten, Abmelden in der App,
+  Entfernen des Servers, „Sitzungen beenden“ oder Sperren/Löschen des Kontos (Nachfrage des
+  Reviewers, Antwort Ruben).
+- **Apple-Einrichtung vor dem Merge**: Ruben richtet App Group, App-IDs, Capabilities, `.p8` und
+  das Relais ein; der PR wartet auf seinen Gerätetest (Debug-Build gegen Sandbox).
 
 ## Entwurf
 
@@ -140,7 +146,7 @@ Zum Inhalt:
 iPhone (App)                 Lifeline-Server (je Betreiber)          Push-Relais (Ruben)        Apple
  ├─ Brücke: push_register ─► PUT /api/ios-push/anmeldung
  │   {token, umgebung,          speichert Token+Geräteschlüssel
- │    schluessel, kennung}      an Konto+Sitzung
+ │    schluessel, kennung}      an Konto+Gerät
  │                            Benachrichtigung entsteht
  │                            ausliefern() → Web Push (wie heute)
  │                                        → iOS-Push: Nutzlast mit
@@ -240,7 +246,7 @@ bei 403 mit Kennung „gesperrt“ nicht neu, sondern Warnung im Log und in der 
 | `id` | Primärschlüssel |
 | `kennung` | UUID, von der App erzeugt, `UNIQUE`; steht verschlüsselt **und** im Klartext-Feld `k` der Nutzlast, damit die Extension den Schlüssel findet |
 | `benutzer_id` | FK `benutzer`, CASCADE |
-| `session_token_hash` | FK `session(token_hash)`, ON DELETE CASCADE |
+| `session_token_hash` | FK `session(token_hash)`, **ON DELETE SET NULL**; die Sitzung, über die zuletzt angemeldet wurde. Nur für „diese Sitzung“ in `GET` und für das Abmelden beim Logout, nie Voraussetzung für den Versand |
 | `token` | APNs-Gerätetoken (hex), `UNIQUE` |
 | `umgebung` | `sandbox` / `production` |
 | `schluessel` | 32 Byte AES-256-GCM, base64url |
@@ -254,16 +260,35 @@ am selben Gerät).
 
 **Routen** (Gerätekonten 403 wie Web Push):
 
-- `GET /api/ios-push` → `{ eingeschaltet: bool (Betreiber), angemeldet: bool (diese Sitzung hat
-  eine Anmeldung), inhalt, stumm, ueber_hub? }`.
+- `GET /api/ios-push?kennung=<uuid>` → `{ eingeschaltet: bool (Betreiber), angemeldet: bool (zu
+  dieser Kennung und diesem Konto gibt es eine Anmeldung), inhalt, stumm, ueber_hub? }`. Die
+  Kennung kommt aus der Hülle (`push_state`), denn nach einer neuen Sitzung ist die alte nicht
+  mehr „diese“ (Claude).
 - `PUT /api/ios-push/anmeldung` → Body `{ kennung, token, umgebung, schluessel, inhalt, stumm }`.
   Prüft Längen und Formate (Token 64–200 Hex-Zeichen, Schlüssel genau 32 Byte, `umgebung` aus
   der Liste). 422 bei Push über den Hub.
-- `DELETE /api/ios-push/anmeldung` → meldet die Anmeldung dieser Sitzung ab, idempotent.
+- `DELETE /api/ios-push/anmeldung` → Body `{ kennung }`, meldet die Anmeldung dieses Kontos mit
+  dieser Kennung ab, idempotent.
 - `POST /api/ios-push/abmelden` → **ohne Sitzung**, Body `{ kennung, nachweis }` mit
   `nachweis = base64url(HMAC-SHA256(schluessel, "abmelden:" + kennung))`. Für die App, wenn
   jemand einen Server aus der App-Liste entfernt (dann gibt es keinen WebView mehr für ihn).
   Antwortet immer 204 (keine Auskunft, ob es die Kennung gab; Claude).
+
+**Lebensdauer** (Konto + Gerät): Die Anmeldung endet durch
+
+- Ausschalten in der Oberfläche (`DELETE`),
+- **Logout**: der Logout-Handler löscht vor dem Löschen der Sitzung die Anmeldungen mit diesem
+  `session_token_hash` (wer sich in der App abmeldet, will dort nichts mehr bekommen); der
+  bloße Ablauf der Sitzung löscht nichts,
+- **„Sitzungen beenden“** (LFH-1092, `frontend/src/auth/AGENTS.md`): löscht alle
+  iOS-Anmeldungen des Kontos (verlorenes Gerät),
+- Sperren oder Löschen des Kontos (Sperren: explizit löschen; Löschen: CASCADE über
+  `benutzer_id`),
+- Entfernen des Servers in der App (`abmelden` ohne Sitzung, unten),
+- `token_ungueltig` vom Relais.
+
+Eine Anmeldung eines Kontos, das sich inzwischen nicht mehr anmelden darf (Rolle entzogen,
+Mitgliedschaft beendet), bekommt nichts, weil die Empfängerauflösung es nicht mehr nennt.
 
 Response-DTOs bekommen Typ-Codegen (`scripts/check-typ-codegen.sh`).
 
@@ -273,10 +298,14 @@ jede Anmeldung der Empfänger:
 
 1. Klartext bauen, JSON:
    `{ v: 1, s: <Servername>, e: einsatz_id, b: benachrichtigung_id, stufe, titel, detail?,
-   pfad, wortlaut? }`. Titel, Detail und Pfad aus denselben Funktionen wie
-   `GET /api/benachrichtigungen/{id}` (`benachrichtigung::text`); `wortlaut` nur bei
-   `inhalt = 1` und so wie der Service Worker ihn holt, gekürzt, sodass der verschlüsselte Teil
-   3 KB nicht überschreitet. `s` ist der Anzeigename der Instanz (Claude: der Name, den die
+   pfad, absender?, wortlaut? }`. Titel, Detail und Pfad aus denselben Funktionen wie
+   `GET /api/benachrichtigungen/{id}` (`benachrichtigung::text`); `absender` und `wortlaut` nur
+   bei `inhalt = 1` und **nur, wenn der Empfänger die Meldung lesen dürfte**: dieselbe Prüfung
+   wie `GET /api/einsaetze/{id}/meldungen/{mid}` (`EinsatzLesezugriff<Meldungen>` samt Filter in
+   `laden_im_einsatz`), je Empfänger auf dem Server wiederholt. Wo die Route 404/403 gäbe, fehlen
+   beide Felder. Den Titel „‹Art› · ‹Absender›“ baut die Extension wie `pushInhalt` in
+   `alarm-sw.js`. Der Wortlaut wird gekürzt, sodass der verschlüsselte Teil 3 KB nicht
+   überschreitet. `s` ist der Anzeigename der Instanz (Claude: der Name, den die
    Instanz in der Kopplung führt bzw. der Hostname).
 2. AES-256-GCM mit dem Schlüssel der Anmeldung, 12 Byte zufällige Nonce, AAD = `kennung`.
    Nutzlast an das Relais: base64url von `{ k: kennung, n: nonce, c: chiffrat }` als kompaktes
@@ -290,9 +319,14 @@ jede Anmeldung der Empfänger:
 Ausgehender Client über `ausgehend::client_builder` mit neuem `Zweck::IosPush` (Kennung,
 Zeitlimit 10 s, keine Weiterleitung, nur HTTPS).
 
-**Kopplung**: Wie Web Push. `MeldenAntwort` bekommt additiv `ios_push: bool`, der Hub füllt es
-aus seinem Zustand, das ELW speichert es bei den Fähigkeiten. Für Konten aus dem Hub pusht der
-Hub, das ELW überspringt iOS-Push für sie und antwortet auf `PUT` mit 422; `GET` liefert
+**Kopplung**: Wie Web Push, aber **je Kanal getrennt** (Claude). `MeldenAntwort` bekommt
+additiv `ios_push: bool`, der Hub füllt es aus seinem Zustand, das ELW speichert es bei den
+Fähigkeiten (`instanz_kopplung` bekommt dafür eine Spalte `gegenueber_ios_push`, Migration).
+`pusht_ueber_hub`/`konten_am_hub`/`push_hub_fuer` werden nach Kanal parametrisiert, und
+`ausliefern` führt zwei `ueber_hub`-Mengen, eine je Kanal. Für Konten aus dem Hub überspringt
+das ELW iOS-Push **nur, wenn der Hub `ios_push` meldet**; kann der Hub kein iOS-Push, pusht das
+ELW diese Konten selbst (so wie heute, wenn das Einreihen beim Hub scheitert). Gleiches gilt
+umgekehrt für Web Push. Das ELW antwortet auf `PUT` nur dann mit 422, und `GET` liefert
 `ueber_hub` mit dem Hub-Namen. Der Hub-Pfad über `hinweis::ausfuehren` → `melden` →
 `ausliefern` deckt iOS dann ohne Sonderweg ab. Damit ein Hub-Konto Pushes bekommt, muss die
 Person den Hub in der App haben und dort Push einschalten; die Oberfläche des ELW sagt das
@@ -316,7 +350,9 @@ Person den Hub in der App haben und dort Push einschalten; die Oberfläche des E
   (unter Linux `swift-crypto`, falls der Kern noch keine Abhängigkeit hat: Claude, prüft der
   Bauende; sonst die Entschlüsselung ins Extension-Target und im Kern nur Parsen und Abbilden),
   liefert `Meldung { titel, untertitel?, text?, thread, pfad, kennung }`. Untertitel = `s`, wenn
-  mehr als ein Server in der Liste steht. Thread = `<kennung>-<e>` (Meldungen eines Einsatzes
+  mehr als ein Server in der Liste steht; die App legt dafür die Zahl der Server bei jeder
+  Änderung der Liste in den `UserDefaults` der App Group, denn die Serverliste selbst liegt im
+  Speicher der App, den die Extension nicht sieht (Claude). Thread = `<kennung>-<e>` (Meldungen eines Einsatzes
   gruppiert, ohne die Einsatz-ID im Klartext an Apple zu geben: der Thread wird erst auf dem
   Gerät gesetzt).
 - `PushAnmeldungen` — Zuordnung `kennung → ServerEintrag.id` samt Schlüssel-Verweis, persistiert
@@ -401,17 +437,35 @@ Servers“ wird ergänzt, wenn der Wechsel einen sichtbaren Zwischenzustand hat.
   `docs/anwender/AGENTS.md`).
 - `docs/betrieb/push-relais.md` neu (siehe 1.).
 
+## Voraussetzungen und Merge
+
+Der PR wird erst gemergt, wenn Ruben das Folgende eingerichtet und einen Gerätetest gemacht hat
+(Entscheidung Ruben). Der Plan endet mit dieser Checkliste; die Umsetzung kann vorher fertig und
+geprüft sein.
+
+1. Apple Developer: App-ID `dev.rubeen.lifeline.ios` mit Push Notifications, Time Sensitive
+   Notifications, App Groups; App-ID `dev.rubeen.lifeline.ios.benachrichtigung` mit App Groups;
+   App Group `group.dev.rubeen.lifeline.ios`. (Ob die automatische Signierung über den API-Schlüssel
+   das selbst anlegt, ist offen; von Hand ist sicher.)
+2. APNs-Schlüssel (`.p8`) anlegen, Key-ID und Team-ID notieren.
+3. Relais deployen (Image aus `artefakte.yml`), Domain `push.rubeen.dev` mit TLS, Umgebung
+   setzen, `GET /v1/status` erreichbar.
+4. Gerätetest: Debug-Build aus Xcode (Sandbox) gegen einen Server mit `--ios-push`, Akzeptanz 1–6.
+5. Danach Merge; der nächste TestFlight-Build läuft gegen Production.
+
 ## Tests
 
 - **Relais**: Integrationstests mit einem APNs-Doppel (lokaler HTTP/2-Server): Registrierung,
   Bearer-Prüfung, Sperre (403), Limit (429), Abbildung der Apple-Antworten auf `ergebnis`,
   Kopfzeilen und Rumpf je Stufe, kein Token im Log.
-- **Server**: Repo-Tests für Upsert, CASCADE mit der Sitzung, `erloschen`; Routen-Tests (404 ohne
+- **Server**: Repo-Tests für Upsert, Sitzungsablauf lässt die Anmeldung stehen (SET NULL),
+  Logout und „Sitzungen beenden“ löschen sie, Sperren des Kontos löscht sie, `erloschen`; Routen-Tests (404 ohne
   Opt-in, 403 Gerätekonto, 422 über Hub, Validierung, `abmelden` mit falschem Nachweis ändert
   nichts und antwortet 204); Versandtest gegen ein Relais-Doppel: Filter wie Web Push, Stumm,
   Alarm trotz Stumm, `token_ungueltig` löscht, Nutzlast ≤ 3 KB mit langem Wortlaut,
   Entschlüsselung im Test ergibt Titel/Detail/Pfad wie `GET /api/benachrichtigungen/{id}`;
-  Kopplung: ELW überspringt Hub-Konten.
+  Kopplung: ELW überspringt Hub-Konten nur für den Kanal, den der Hub kann (Hub mit Web Push ohne
+  iOS-Push → ELW pusht iOS selbst, und umgekehrt).
 - **Krypto-Vertrag**: ein gemeinsamer Testfall (Schlüssel, Nonce, Kennung, Klartext, Chiffrat)
   als JSON unter `src-tauri/faelle/` (oder neben dem Kern, Claude: `faelle/push-nutzlast.json`),
   den Rust und Swift-Kern beide lesen.
@@ -432,7 +486,8 @@ Servers“ wird ergänzt, wenn der Wechsel einen sichtbaren Zwischenzustand hat.
 2. Ein Hinweis einer auf dem Gerät stummen Art kommt nicht; ein Alarm kommt trotz Stumm.
 3. Tippen öffnet den Einsatz auf dem richtigen Server; war ein anderer aktiv, ist der Wechsel
    sichtbar.
-4. Abmelden in der Oberfläche, Abmelden des Kontos, Ende der Sitzung oder Entfernen des Servers
+4. Ausschalten in der Oberfläche, Logout in der App, „Sitzungen beenden“, Sperren des Kontos oder
+   Entfernen des Servers
    aus der App beendet die Zustellung.
 5. Relais-Log und Server-Log enthalten kein Token und keinen Inhalt; ein Mitschnitt der
    Relais-Anfrage enthält keinen Titel.
