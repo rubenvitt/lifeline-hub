@@ -54,9 +54,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/guuku50jetu1zqkmbruioj69
 **Interfaces:**
 - Consumes: Task 1; `setzeOnline` aus `test/utils.tsx`; `NetzFehler` aus `api/client.ts`.
 
-- [ ] **Step 1: Test** `'ohne Netz: zeigt den Grund im Dialog, Abbrechen schließt (LLH-1950)'`: `setzeOnline(false)` (in `try/finally` zurück auf `true`), `lege = vi.fn().mockRejectedValue(new NetzFehler())`, `legeAn()` → `lege` einmal aufgerufen; `findByRole('alert')` enthält `'NICHT abgeschickt'`; Knopf „Abbrechen“ nicht `disabled`; Klick + `bestaetigeVerwerfen()` → Zustand `'zu'`.
-- [ ] **Step 2:** Gegenprobe: Task-1-Änderung vorübergehend zurücknehmen → Test FAIL (Alert erscheint nicht / `lege` nicht aufgerufen); wieder herstellen → PASS. Lauf: `mise exec -- pnpm -C frontend exec vitest run src/components/AnlegenModal.test.tsx`.
-- [ ] **Step 3:** Commit `test(frontend): Anlegedialog ohne Netz bleibt bedienbar (LLH-1950)`.
+- [x] **Step 1: Test** `'ohne Netz: zeigt den Grund im Dialog, Abbrechen schließt (LLH-1950)'`: `setzeOnline(false)` (in `try/finally` zurück auf `true`), `lege = vi.fn().mockRejectedValue(new NetzFehler())`, `legeAn()` → `lege` einmal aufgerufen; `findByRole('alert')` enthält `'NICHT abgeschickt'`; Knopf „Abbrechen“ nicht `disabled`; Klick + `bestaetigeVerwerfen()` → Zustand `'zu'`.
+- [x] **Step 2:** Gegenprobe: Task-1-Änderung vorübergehend zurücknehmen → Test FAIL (Alert erscheint nicht / `lege` nicht aufgerufen); wieder herstellen → PASS. Lauf: `mise exec -- pnpm -C frontend exec vitest run src/components/AnlegenModal.test.tsx`.
+- [x] **Step 3:** Commit `test(frontend): Anlegedialog ohne Netz bleibt bedienbar (LLH-1950)`.
 
 ### Task 3: Regel und Kommentare
 
