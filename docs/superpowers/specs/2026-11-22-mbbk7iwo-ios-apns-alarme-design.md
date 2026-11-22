@@ -183,8 +183,8 @@ Server-APIs, Claude):
 - `POST /v1/senden` — `Authorization: Bearer <server_id>.<geheimnis>`. Body
   `{ nachrichten: [ { token, umgebung: "sandbox"|"production", stufe: "alarm"|"hinweis",
   kollaps?: string, nutzlast: string (base64url, ≤ 3 KB) } ] }`, höchstens 100 je Aufruf.
-  Antwort je Nachricht in Reihenfolge `{ ergebnis: "zugestellt" | "token_ungueltig" |
-  "gedrosselt" | "fehler" }`. 403 für gesperrte Server, 429 bei überschrittenem Limit.
+  Antwort `{ ergebnisse: [ "zugestellt" | "token_ungueltig" | "gedrosselt" | "fehler", … ] }`
+  in der Reihenfolge der Nachrichten. 403 für gesperrte Server, 429 bei überschrittenem Limit.
 - `GET /v1/status` — `{ version }`, für Überwachung.
 
 **APNs-Aufruf** je Nachricht: `POST https://api.push.apple.com` bzw.
