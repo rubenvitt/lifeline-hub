@@ -170,7 +170,7 @@ Rückfrage nur bei gesetztem Platz.
 
 ### Task 7: Abschluss
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün. Ersatzweise `--nur schnell` und `--nur frontend` (die Rust-Suite sprengt das Plattenkontingent der Cloud-Sitzung; der Diff ändert keinen Rust-Code). Rote Wächter (Zahlfeld, Feldbreite, Design System) in 150a1541 behoben.
 - [x] **Step 2:** Review nach Ermessen (Anlass: Geheimnisse/Rechte in der UI, über 600 Zeilen) als ein Agent; Befunde im Nachtrag oben behoben.
-- [ ] **Step 3:** Bilder der Änderung (`pr-bilder/lwc4r0oo/`), PR gegen `alpha`, Zunder `review`.
+- [x] **Step 3:** Bilder der Änderung (`pr-bilder/lwc4r0oo/`), PR gegen `alpha`, Zunder `review`.
 - [ ] **Step 4:** Nach dem Merge: Design System neu veröffentlichen (`frontend/AGENTS.md`).
