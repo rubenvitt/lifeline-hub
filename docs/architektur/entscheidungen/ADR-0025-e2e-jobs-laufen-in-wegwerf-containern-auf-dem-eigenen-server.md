@@ -5,7 +5,6 @@ status: ersetzt
 datum: 2026-11-12
 ersetzt_durch: ADR-0075
 gilt_fuer:
-  - scripts/runner/**
   - .github/workflows/ci.yml
   - .github/workflows/e2e.yml
 herleitung:
