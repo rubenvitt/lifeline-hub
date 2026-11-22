@@ -70,6 +70,13 @@ Ein Branch nach dem anderen; der nächste PR beginnt nach dem Merge des vorigen 
 3. **LLH-2044 Boden 11 px, Seitentitel 16 px** — Werte in `theme/`, Rail, Schuldabbau; neue ADR.
 4. **LLH-2046 `meta` in Textschrift** — Mono-Grenze; neue ADR.
 
+**Plan:** eine Datei `docs/superpowers/plans/2026-11-22-ergjsurw-schrift-lesbarkeit.md`. Jetzt
+entsteht nur der Abschnitt für Teil 1; jeder weitere Teil bekommt seinen Abschnitt zu Beginn
+seines Branches, auf dem dann aktuellen Stand von `alpha` (Zahlen und Fundstellen veralten
+sonst). Dieser Entwurf ist für alle vier Teile freigegeben; ein späterer Abschnitt wird zur
+Kenntnis vorgelegt, ein neuer Freigabe-Halt entsteht nur, wenn ein Teil vom Entwurf abweichen
+muss. Die Zunder-Unteraufgabe trägt den Plan-Pfad in `plan`. *(Meine Wahl nach dem Builder-Check.)*
+
 Feldetikett vor dem Boden, weil der Boden sonst die 10-px-Augenbrauen als Feldetikett erst auf
 11 hebt und LLH-2045 sie danach ersetzt (doppelte Bilder, doppelte e2e-Runde). Die Reihenfolge
 ist meine Wahl.
@@ -90,6 +97,11 @@ ist meine Wahl.
   keine neue Schuld). Ob die Regel in CSS oder über antds Komponenten-Token gesetzt wird,
   entscheidet der Plan; Bedingung ist, dass sie beim ersten Bild greift und nicht von der Dichte,
   sondern vom Zeiger abhängt (`startDichte` liest die Zeigerart nur beim Start).
+- Die Regel gilt auch für Felder mit eigener Inline-Schriftgröße (etwa das Code-Feld in
+  `instanz/InstanzkopplungSeite.tsx` mit `monoStil('monoGross')`): sie setzt sich innerhalb der
+  Media-Query mit `!important` durch, denn das Ziel ist „kein Fokus-Zoom“ ohne Ausnahme. Der Plan
+  sichtet die Eingabefelder mit Inline-Größe und prüft, dass Felder mit Breite in `ch` bei 16 px
+  ihren Inhalt noch zeigen. *(Meine Wahl nach dem Builder-Check.)*
 - Die Feldhöhe folgt weiter `controlHeight` der Dichte. In `kompakt` auf einem Touchgerät
   (30 px, nur auf Wahl) darf ein 16-px-Feld höher werden; das ist hingenommen, muss aber in
   `komfortabel` (48) und `handschuh` (72) die Höhe halten.
@@ -159,9 +171,19 @@ ist meine Wahl.
 - `paneelMetaStil`, `seitenMetaStil` und die Metazeilen der Bausteine wechseln damit zentral.
 - Neue ADR ersetzt die aus Teil 3: Mono-Familie ohne `meta`, mit `monoFein`.
   `frontend/AGENTS.md` („`schriftskala`“, Seitenkopf „`meta` Mono“) nachgezogen.
+- **Die Grenze gilt für jede Mono-Stufe** (Entscheidung Ruben 22.11., nach dem Builder-Check):
+  Mono trägt nur Zahl, Zeit, Kennung und Funkrufname, egal in welcher Stufe. Teil 4 sichtet deshalb
+  auch die übrigen rund 330 Aufrufe von `monoStil` (`mono`, `monoKlein`, `monoGross`,
+  `datenwert*`) nach Wort-Inhalt und stellt Wörter auf die Textschrift um (Beispiel
+  `pages/EinsatzleiterAngabe.tsx`: „seit 14:32“ in `mono` → Textschrift, nur die Zeit bleibt Mono,
+  sofern sie ein eigener Knoten ist; sonst steht der Knoten ganz in Textschrift). Der Kommentar an
+  `schriftskala.mono` („seit …“) wird nachgezogen. Die Regel steht allgemein in der ADR und in
+  `frontend/AGENTS.md`.
 - Durchsetzung: e2e auf Überblick, ETB, Einsatzdaten und Betroffenen prüft jeden Textknoten in
   Mono-Schrift: kein Wort aus vier oder mehr Kleinbuchstaben, außer in einem Element mit
   `data-schrift="kennung"` (Funkrufnamen; die Funkrufnamen-Bausteine setzen es).
+- Teil 4 ist damit der größte Teil (Bilder, Breitenrisiko); er darf beim Planen in zwei PRs
+  geschnitten werden (erst `meta`, dann die übrigen Stufen), wenn der Diff zu groß wird.
 - Breitenwirkung: Archivo ist schmaler als JetBrains Mono. Specs, die einen Umbruch als
   Vorbedingung erwarten (in #1427: `e2e/stab-schmal.spec.ts`, Sichtung am Trenner), werden
   geprüft und mit neuen Daten wieder zum Umbruch gebracht, nicht abgeschwächt.
@@ -197,3 +219,5 @@ ist meine Wahl.
 - `metaKlein` entfällt (fiele mit 11 ohnehin auf `meta`); `meta` bleibt 11 px, nicht 12.
 - Neue Mono-Stufe `monoFein` 11 für Zahlen in Meta-Größe.
 - Zwei neue ADRs (Teil 3 und Teil 4) statt einer, weil jede zum Stand ihres PRs passen muss.
+- Touch-Feldregel mit `!important` auch gegen Inline-Größen (Teil 1).
+- Ein Plan-Dokument, Abschnitt je Teil erst zu Beginn seines Branches.
