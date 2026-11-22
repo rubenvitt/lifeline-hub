@@ -222,6 +222,57 @@ async fn loeschen_fuer_sitzungen_und_benutzer() {
 }
 
 #[tokio::test]
+async fn loeschen_fuer_benutzer_ausser_laesst_nur_die_behaltene_sitzung() {
+    let pool = crate::db::test_pool().await;
+    let b = benutzer(&pool, "a").await;
+    let fremd = benutzer(&pool, "f").await;
+    sitzung(&pool, b, "h1").await;
+    sitzung(&pool, b, "h2").await;
+    sitzung(&pool, b, "h3").await;
+    sitzung(&pool, fremd, "hf").await;
+    let wahl = Wahl::default();
+    for (konto, hash, k, t) in [
+        (b, "h1", "k-1", "t1"),
+        (b, "h2", "k-2", "t2"),
+        (b, "h3", "k-3", "t3"),
+        (fremd, "hf", "k-f", "tf"),
+    ] {
+        repo::anmelden(&pool, konto, hash, &eingabe(k, t, &wahl))
+            .await
+            .unwrap();
+    }
+    // k-3 hat keine Sitzung mehr (abgelaufen und weggeräumt).
+    sqlx::query("DELETE FROM session WHERE token_hash = 'h3'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let kennungen = || async {
+        sqlx::query_scalar::<_, String>("SELECT kennung FROM ios_push_anmeldung ORDER BY kennung")
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+    };
+
+    let mut conn = pool.acquire().await.unwrap();
+    repo::loeschen_fuer_benutzer_ausser(&mut conn, b, Some("h1"))
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(kennungen().await, ["k-1", "k-f"]);
+
+    let mut conn = pool.acquire().await.unwrap();
+    repo::loeschen_fuer_benutzer_ausser(&mut conn, b, None)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(
+        kennungen().await,
+        ["k-f"],
+        "ohne behaltene Sitzung alle des Kontos"
+    );
+}
+
+#[tokio::test]
 async fn relais_zugang_speichern_lesen_sperren_loeschen() {
     let pool = crate::db::test_pool().await;
     assert!(repo::relais_zugang(&pool).await.unwrap().is_none());

@@ -236,8 +236,9 @@ pub async fn beenden(
 ) -> Result<Vec<BeendeteSitzung>, AppError> {
     let bedingung = "benutzer_id = ? AND kopplung_id IS NULL AND kennung IS NOT NULL";
     let rueckgabe = "RETURNING kennung, erstellt_at AS angemeldet_at, geraet, anmeldeweg";
-    // Die iOS-Anmeldungen der beendeten Sitzungen gehen in derselben Transaktion mit (LLH-2040):
-    // ein beendetes Gerät soll nicht weiter pushen.
+    // Die iOS-Anmeldungen gehen in derselben Transaktion mit (LLH-2040): ein beendetes Gerät soll
+    // nicht weiter pushen. „Alle (anderen)“ trifft alle des Kontos außer der behaltenen Sitzung,
+    // auch die ohne Sitzung: das verlorene Gerät hat oft keine gültige mehr.
     let mut tx = pool.begin().await?;
     let beendet = match auswahl {
         Auswahl::Eine(kennung) => {
@@ -258,18 +259,24 @@ pub async fn beenden(
         }
         Auswahl::AlleAusser(ausser) => {
             let filter = "kennung IS NOT COALESCE(?, '')";
-            let hashes: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT token_hash FROM session WHERE {bedingung} AND {filter}"
-            )))
-            .bind(benutzer_id)
-            .bind(ausser)
-            .fetch_all(&mut *tx)
+            let behalten: Option<String> = match ausser {
+                Some(kennung) => {
+                    sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                        "SELECT token_hash FROM session WHERE {bedingung} AND kennung = ?"
+                    )))
+                    .bind(benutzer_id)
+                    .bind(kennung)
+                    .fetch_optional(&mut *tx)
+                    .await?
+                }
+                None => None,
+            };
+            crate::ios_push::repo::loeschen_fuer_benutzer_ausser(
+                &mut tx,
+                benutzer_id,
+                behalten.as_deref(),
+            )
             .await?;
-            if ausser.is_none() {
-                crate::ios_push::repo::loeschen_fuer_benutzer(&mut tx, benutzer_id).await?;
-            } else {
-                crate::ios_push::repo::loeschen_fuer_sitzungen(&mut tx, &hashes).await?;
-            }
             let sql = format!("DELETE FROM session WHERE {bedingung} AND {filter} {rueckgabe}");
             sqlx::query_as::<_, BeendeteSitzung>(sqlx::AssertSqlSafe(sql))
                 .bind(benutzer_id)

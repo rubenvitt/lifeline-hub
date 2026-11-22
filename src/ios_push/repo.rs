@@ -189,6 +189,27 @@ pub async fn loeschen_fuer_benutzer(
     Ok(())
 }
 
+/// Löscht alle Anmeldungen eines Nutzers außer denen an der Sitzung `behaltener_hash` („alle
+/// anderen Sitzungen beenden“: das eigene Gerät pusht weiter). Auch Anmeldungen ohne Sitzung
+/// (abgelaufen, `session_token_hash` NULL) gehen mit: gerade das verlorene Gerät hat oft keine
+/// gültige Sitzung mehr. `None` löscht alle des Nutzers.
+pub async fn loeschen_fuer_benutzer_ausser(
+    conn: &mut SqliteConnection,
+    benutzer_id: i64,
+    behaltener_hash: Option<&str>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM ios_push_anmeldung \
+         WHERE benutzer_id = ? AND (? IS NULL OR session_token_hash IS NOT ?)",
+    )
+    .bind(benutzer_id)
+    .bind(behaltener_hash)
+    .bind(behaltener_hash)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Löscht eine Anmeldung, die APNs als erloschen meldet, nur bei noch gleichem Token.
 pub async fn erloschen(pool: &SqlitePool, id: i64, token: &str) -> Result<(), AppError> {
     sqlx::query("DELETE FROM ios_push_anmeldung WHERE id = ? AND token = ?")

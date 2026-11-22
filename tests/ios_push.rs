@@ -19,6 +19,8 @@ const KENNUNG: &str = "6f1c2a64-3b1e-4a55-9c1d-0d3b5a7e9f10";
 const KENNUNG_2: &str = "0a8f3a6e-52a4-4d0b-8a3c-6b1f6c2d9e11";
 const TOKEN: &str = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 const TOKEN_2: &str = "ff00ee11dd22cc33bb44aa5599668877ff00ee11dd22cc33bb44aa5599668877";
+const KENNUNG_3: &str = "3c9d1e2f-7a6b-4c5d-8e9f-a0b1c2d3e4f5";
+const TOKEN_3: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn schluessel() -> [u8; 32] {
     [7u8; 32]
@@ -376,6 +378,64 @@ async fn eine_sitzung_beenden_loescht_nur_deren_anmeldung() {
     .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(zahl(&pool).await, 1);
+}
+
+#[tokio::test]
+async fn andere_beenden_loescht_alle_anmeldungen_ausser_der_eigenen_auch_ohne_sitzung() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let marlene1 = login_cookie(&app, "marlene", "marlenepw1").await;
+    let marlene2 = login_cookie(&app, "marlene", "marlenepw1").await;
+    let marlene3 = login_cookie(&app, "marlene", "marlenepw1").await;
+    assert_eq!(
+        anmelden(&app, &marlene1, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        anmelden(&app, &marlene2, KENNUNG_2, TOKEN_2).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        anmelden(&app, &marlene3, KENNUNG_3, TOKEN_3).await,
+        StatusCode::NO_CONTENT
+    );
+    // Das verlorene Gerät: seine Sitzung ist längst abgelaufen und weggeräumt, die Anmeldung
+    // steht ohne Sitzung (`session_token_hash` NULL) und pusht weiter.
+    sqlx::query(
+        "DELETE FROM session WHERE token_hash = \
+         (SELECT session_token_hash FROM ios_push_anmeldung WHERE kennung = ?)",
+    )
+    .bind(KENNUNG_3)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let ohne: Option<String> =
+        sqlx::query_scalar("SELECT session_token_hash FROM ios_push_anmeldung WHERE kennung = ?")
+            .bind(KENNUNG_3)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(ohne.is_none());
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/sitzungen/andere-beenden",
+        &marlene1,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let kennungen: Vec<String> = sqlx::query_scalar("SELECT kennung FROM ios_push_anmeldung")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        kennungen,
+        vec![KENNUNG.to_string()],
+        "nur das eigene Gerät pusht weiter"
+    );
 }
 
 #[tokio::test]
