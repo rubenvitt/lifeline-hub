@@ -1,5 +1,5 @@
 ---
-id: ADR-0082
+id: ADR-0084
 titel: iOS-Push läuft über ein Relais mit Ende-zu-Ende-verschlüsselter Nutzlast
 status: akzeptiert
 datum: 2026-11-22
@@ -15,7 +15,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/mbbk7iwoaarmf1z57qc8ffwo
 ---
 
-# ADR-0082: iOS-Push läuft über ein Relais mit Ende-zu-Ende-verschlüsselter Nutzlast
+# ADR-0084: iOS-Push läuft über ein Relais mit Ende-zu-Ende-verschlüsselter Nutzlast
 
 ## Regeln
 

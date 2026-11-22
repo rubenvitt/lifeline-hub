@@ -418,7 +418,7 @@ Servers“ wird ergänzt, wenn der Wechsel einen sichtbaren Zwischenzustand hat.
 
 **Regeln und Doku** (OpenSpec ist eingefroren; die Regeln wandern in ADR und `AGENTS.md`):
 
-- Neue ADR (nächste freie Nummer, derzeit 0082): „iOS-Push läuft über ein Relais, das Ruben
+- Neue ADR (nächste freie Nummer, damals 0082, nach dem Merge von alpha ADR-0084): „iOS-Push läuft über ein Relais, das Ruben
   betreibt, mit Ende-zu-Ende-verschlüsselter Nutzlast“. Sie hebt für iOS die Aussage aus der
   Spec `web-push` auf, der Push-Schalter fehle in jeder Hülle, und die Aussage der Spec
   `ios-huelle`, die App verspreche keine Meldung im Hintergrund.
