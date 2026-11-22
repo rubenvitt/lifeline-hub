@@ -14759,3 +14759,39 @@ async fn migration_0357_koppelt_start_stichworte_behutsam() {
         "nur eigene Organisation"
     );
 }
+
+/// LLH-2007 (Review-Befund 1): Die Migration, mit der eine Instanz aufrüstet, setzt die Grenze
+/// des Mitarbeit-Nachtrags jeder bestehenden Kopplung auf den Stand des Aufrüstens. Was danach an
+/// einer Mitgliedschaft geschieht, wählte jemand, der `mitarbeit` schon kannte.
+#[tokio::test]
+async fn migration_0363_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruesten() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 362).await;
+    sqlx::query(
+        "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+         gegenueber_name, richtung, zustand) VALUES (1, 'gegen', 'x', 'Gegenstelle', \
+         'wird_gemeldet', 'aktiv')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    for s in ["a", "b", "c"] {
+        sqlx::query(
+            "INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (1, 'x', ?)",
+        )
+        .bind(s)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let hoechster: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    migriere_bis(&pool, 363).await;
+    let grenze: Option<i64> =
+        sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(grenze, Some(hoechster));
+}

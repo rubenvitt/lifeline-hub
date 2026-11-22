@@ -2140,6 +2140,8 @@ async fn ohne_faehigkeit_des_spiegels_wartet_der_nachtrag() {
     assert_eq!(rolle(&o, erika).await, "beobachter");
 }
 
+/// Review-Befund 2: Auch hier folgt der Spiegel dem Führer (neu ins Log), statt dauerhaft uneinig
+/// zu bleiben.
 #[tokio::test]
 async fn fuehrung_von_anderer_kopplung_hebt_nicht_an() {
     let (o, _) = zwei_seiten().await;
@@ -2155,10 +2157,9 @@ async fn fuehrung_von_anderer_kopplung_hebt_nicht_an() {
     let a = annehmen(&o, 2, &[nachtrag_n(1, None)]).await;
     assert_eq!(a.quittungen, vec![1]);
     assert_eq!(rolle(&o, erika).await, "beobachter");
-    assert_eq!(
-        stand_der_zeile(&o, einsatz, erika).await,
-        vorher,
-        "kein Neu-Log"
+    assert!(
+        stand_der_zeile(&o, einsatz, erika).await > vorher,
+        "neu im Log, damit der Spiegel dem Führer folgt"
     );
 }
 
@@ -2263,4 +2264,36 @@ async fn erreichter_spiegel_schickt_nachtraege_und_loescht_quittierte() {
         .unwrap();
     assert!(antwort.mitarbeit_nachtraege.is_empty());
     assert!(nachtraege(&s).await.is_empty());
+}
+
+/// Review-Befund 1: Die Grenze gilt ab dem Aufrüsten, nicht erst ab dem ersten Melden danach.
+/// Eine bewusste Wahl dazwischen überstimmt kein Nachtrag.
+#[tokio::test]
+async fn bearbeitung_nach_dem_aufruesten_vor_dem_melden_bleibt() {
+    let (o, _) = zwei_seiten().await;
+    let (_, erika) = fuehrer_nach_rueckgabe(&o).await;
+    exec(
+        &o,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+        ),
+    )
+    .await;
+    // Erst jetzt meldet sich der Spiegel mit der Fähigkeit.
+    exec(
+        &o,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 0",
+    )
+    .await;
+    let mut c = o.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut c, 1, true)
+        .await
+        .unwrap();
+    drop(c);
+    annehmen(&o, 1, &[nachtrag_n(1, None)]).await;
+    assert_eq!(
+        rolle(&o, erika).await,
+        "beobachter",
+        "die bewusste Wahl bleibt"
+    );
 }

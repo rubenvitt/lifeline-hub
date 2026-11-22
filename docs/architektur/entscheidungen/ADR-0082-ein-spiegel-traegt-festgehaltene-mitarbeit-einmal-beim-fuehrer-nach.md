@@ -19,11 +19,16 @@ herleitung:
   Einsätzen, die er über diese Kopplung spiegelt.
 - MUST: Ein Führer hebt auf einen Nachtrag hin nur `beobachter` auf `mitarbeit`, nur wenn er den
   Einsatz führt, die Führung von der Kopplung des Absenders kam (`herkunft_kopplung_id`) und die
-  Zeile seit `instanz_kopplung.mitarbeit_grenze_stand` unverändert ist.
-- MUST NOT: Ein Nachtrag ändert keine andere Spalte, Rolle oder Tabelle.
+  Zeile seit `instanz_kopplung.mitarbeit_grenze_stand` unverändert ist. Die Grenze ist der Stand,
+  ab dem der Führer `mitarbeit` kennt (für Kopplungen von vor dem Aufrüsten die Migration 0363);
+  ein späterer Wechsel der Fähigkeit verschiebt sie nicht.
+- MUST NOT: Ein Nachtrag ändert an der Mitgliedschaft keine andere Spalte und keine andere Rolle
+  und schreibt in keine andere Tabelle als `einsatz_mitgliedschaft` und das Änderungslog
+  `einsatz_aenderung` (Neu-Log, nächste Regel).
 - MUST: Kennt der Führer die Fähigkeit des Absenders noch nicht, quittiert er den Nachtrag nicht.
-- MUST: Ein abgelehnter Nachtrag, dessen Zeile sich auflösen lässt und nicht schon `mitarbeit`
-  ist, legt die Zeile neu ins Log, damit der Spiegel dem Führer folgt.
+- MUST: Ein abgelehnter Nachtrag zu einem hier geführten Einsatz, dessen Zeile sich auflösen
+  lässt und nicht schon `mitarbeit` ist, legt die Zeile neu ins Log, damit der Spiegel dem Führer
+  folgt.
 
 ## Prüfung
 
@@ -45,5 +50,6 @@ des Führers (ADR-0018); dieser Nachtrag ist bewusst die engste Ausnahme.
 
 Die gesetzte Rolle kommt ohne Handgriff zurück, und beide Seiten sind danach einig. Eine
 gekoppelte Instanz kann am Führer höchstens Beobachter zu Mitarbeit anheben, und nur in einem
-Einsatz, den sie vorher geführt hat. Der Nachtrag muss im selben Release wie LLH-1817 ausgeliefert
+Einsatz, den sie vorher geführt hat; dort aber jede Beobachter-Zeile, die seit der Grenze
+unverändert ist, auch eine, die der Führer selbst angelegt hat. Der Nachtrag muss im selben Release wie LLH-1817 ausgeliefert
 werden: Eine Instanz, die vorher aufrüstet, merkt nie etwas vor.

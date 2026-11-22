@@ -233,3 +233,19 @@ Instanz N führt, Mitgliedschaft `mitarbeit`. N gibt die Führung an O zurück, 
 Review nötig (Eingaben von außen: Instanzkopplung; Berechtigung: Rolle am Führer). Er prüft
 besonders die Anti-Ziele: keine Anhebung außer unter D4 0–5, keine Wiederholung, kein
 dauerhaftes Auseinanderlaufen.
+
+## Nachtrag nach dem Review (22.11.2026)
+
+Beim Umsetzen und im Review geändert, im Rahmen der Ziele und Anti-Ziele oben:
+
+- **Grenze (D4):** Sie liegt beim Aufrüsten, nicht beim ersten Melden danach. Die Migration 0363
+  setzt sie für bestehende Kopplungen; der Wechsel der Fähigkeit setzt sie nur, wenn sie noch leer
+  ist. Sonst hätte ein Nachtrag eine Wahl überstimmt, die die Einsatzleitung an O nach dem
+  Aufrüsten und vor dem ersten Melden traf (Anti-Ziel 2).
+- **Bedingung 2 (D4):** Kam die Führung von einer anderen Kopplung, legt O die Zeile trotzdem neu
+  ins Log (ohne anzuheben), damit N folgt (Anti-Ziel 3).
+- **Grenzen (D3):** höchstens 100 Nachträge und Quittungen je Paket, zusammen höchstens 64 KiB aus
+  der Reserve; 500 hätten mit Hinweisen die Reserve überschreiten können.
+- **Abgleich:** Quittungen der meldenden Seite verlängern den Abgleich um eine Runde; sonst gingen
+  sie mit dem Ende des Abgleichs verloren, und N schickte denselben Nachtrag endlos.
+

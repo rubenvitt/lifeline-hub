@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
 /// Höchstzahl Nachträge und Quittungen je Paket.
-pub const NACHTRAEGE_MAX: usize = 500;
+pub const NACHTRAEGE_MAX: usize = 100;
+/// Höchstens so viele Bytes belegen Nachträge und Quittungen in einem Paket. Sie werden nach den
+/// Lieferungen gelesen und kommen wie die Hinweise aus der Reserve ([`super::paket::RESERVE`]).
+pub const NACHTRAEGE_BYTES_MAX: usize = 64 * 1024;
 /// Längster Schlüssel einer Mitgliedschaft in Byte (`[<Einsatz>,<Konto>]` braucht höchstens 43).
 pub const SCHLUESSEL_BYTES_MAX: usize = 64;
 
@@ -69,14 +72,16 @@ pub async fn queue_nachtraege(
     Ok(())
 }
 
-/// Führer: Ab jetzt kennt diese Instanz die Rolle des Gegenübers. Was an einer Mitgliedschaft
-/// danach geschieht, ist eine bewusste Wahl, die kein Nachtrag mehr überstimmt (Design D4). Der
-/// Stand ist ein globaler Zähler (`einsatz_aenderung.stand`, AUTOINCREMENT): Jede spätere
-/// Änderung liegt darüber.
+/// Führer: Was an einer Mitgliedschaft nach der Grenze geschieht, ist eine bewusste Wahl, die kein
+/// Nachtrag mehr überstimmt (Design D4). Die Grenze ist der Stand, ab dem diese Instanz `mitarbeit`
+/// kennt: für eine Kopplung von vor dem Aufrüsten setzt sie die Migration 0363 auf das Aufrüsten,
+/// sonst setzt sie der erste Wechsel der Fähigkeit hier. Ein späterer Wechsel verschiebt sie nicht:
+/// Eine Wahl zwischen Aufrüsten und erstem Melden bliebe sonst überstimmbar. Der Stand ist ein
+/// globaler Zähler (`einsatz_aenderung.stand`, AUTOINCREMENT): Jede spätere Änderung liegt darüber.
 pub async fn save_grenze(conn: &mut SqliteConnection, kopplung_id: i64) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE instanz_kopplung SET mitarbeit_grenze_stand = \
-         (SELECT COALESCE(MAX(stand), 0) FROM einsatz_aenderung) WHERE id = ?",
+        "UPDATE instanz_kopplung SET mitarbeit_grenze_stand = COALESCE(mitarbeit_grenze_stand, \
+         (SELECT COALESCE(MAX(stand), 0) FROM einsatz_aenderung)) WHERE id = ?",
     )
     .bind(kopplung_id)
     .execute(&mut *conn)
@@ -185,7 +190,8 @@ pub struct Annahme {
 
 /// Führer: nimmt die Nachträge eines Spiegels an (Design D4). Angehoben wird nur
 /// `beobachter` → `mitarbeit`, nur wenn dieser Einsatz hier geführt wird, die Führung von dieser
-/// Kopplung kam und die Zeile seit der Grenze unverändert ist. Kennt diese Instanz die Fähigkeit
+/// Kopplung kam und die Zeile seit der Grenze unverändert ist. Kam die Führung von anderswo, wird
+/// nicht angehoben, aber neu geloggt (Review-Befund 2). Kennt diese Instanz die Fähigkeit
 /// des Spiegels noch nicht, bleibt alles unquittiert: Die angehobene Rolle ginge ihm sonst als
 /// `beobachter` zu. Abgelehnt, aber auflösbar: die Zeile neu ins Log, damit der Spiegel dem
 /// Führer folgt; steht sie schon auf `mitarbeit` (wiederholter Nachtrag), nur quittieren.
@@ -208,15 +214,16 @@ pub async fn accept(
             .flatten();
     for n in nachtraege {
         annahme.quittungen.push(n.id);
-        let einsatz_id: Option<i64> = sqlx::query_scalar(
-            "SELECT e.id FROM einsatz e JOIN einsatz_fuehrung f ON f.einsatz_id = e.id \
-             WHERE e.kennung = ? AND e.spiegel = 0 AND f.herkunft_kopplung_id = ?",
+        let einsatz: Option<(i64, bool)> = sqlx::query_as(
+            "SELECT e.id, COALESCE(f.herkunft_kopplung_id = ?, 0) FROM einsatz e \
+             LEFT JOIN einsatz_fuehrung f ON f.einsatz_id = e.id \
+             WHERE e.kennung = ? AND e.spiegel = 0",
         )
-        .bind(&n.kennung)
         .bind(kopplung_id)
+        .bind(&n.kennung)
         .fetch_optional(&mut *conn)
         .await?;
-        let Some(einsatz_id) = einsatz_id else {
+        let Some((einsatz_id, fuehrung_von_ihr)) = einsatz else {
             continue;
         };
         let Some(lokal) = schluessel_lokal(conn, einsatz_id, n).await? else {
@@ -232,7 +239,7 @@ pub async fn accept(
         .await?;
         match rolle.as_deref().map(EinsatzRolle::parse) {
             None | Some(Some(EinsatzRolle::Mitarbeit)) => continue,
-            Some(Some(EinsatzRolle::Beobachter)) => {}
+            Some(Some(EinsatzRolle::Beobachter)) if fuehrung_von_ihr => {}
             Some(_) => {
                 relog_mitgliedschaft(conn, einsatz_id, &lokal).await?;
                 continue;

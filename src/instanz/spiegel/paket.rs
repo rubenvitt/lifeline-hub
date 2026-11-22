@@ -463,6 +463,29 @@ mod tests {
         }
     }
 
+    /// Review-Befund 3: Die Nachträge gehen nach den Lieferungen aus der Reserve ab; auch das
+    /// größte Paket, das `check` zulässt, bleibt in ihrem Anteil.
+    #[test]
+    fn groesste_nachtraege_passen_in_ihren_teil_der_reserve() {
+        use super::super::nachtrag::{NACHTRAEGE_BYTES_MAX, NACHTRAEGE_MAX, SCHLUESSEL_BYTES_MAX};
+        let n = super::super::nachtrag::MitarbeitNachtrag {
+            id: i64::MAX,
+            kennung: "k".repeat(KENNUNG_BYTES_MAX),
+            schluessel: "s".repeat(SCHLUESSEL_BYTES_MAX),
+            gegen: Some("g".repeat(SCHLUESSEL_BYTES_MAX)),
+        };
+        let p = SpiegelPaket {
+            mitarbeit_nachtraege: vec![n; NACHTRAEGE_MAX],
+            mitarbeit_quittungen: vec![i64::MAX; NACHTRAEGE_MAX],
+            ..Default::default()
+        };
+        assert!(p.check().is_ok());
+        let leer = serde_json::to_vec(&SpiegelPaket::default()).unwrap().len();
+        let groesse = serde_json::to_vec(&p).unwrap().len() - leer;
+        assert!(groesse <= NACHTRAEGE_BYTES_MAX, "{groesse} Byte");
+        assert!(NACHTRAEGE_BYTES_MAX + super::super::hinweis::HINWEISE_BYTES_MAX <= RESERVE / 2);
+    }
+
     #[test]
     fn zu_viele_oder_zu_lange_nachtraege_lehnt_check_ab() {
         use super::super::nachtrag::{NACHTRAEGE_MAX, SCHLUESSEL_BYTES_MAX};

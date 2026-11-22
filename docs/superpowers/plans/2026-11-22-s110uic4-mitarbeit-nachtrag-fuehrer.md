@@ -63,20 +63,20 @@ additive Paketfelder in beide Richtungen.
   - `SpiegelPaket.mitarbeit_nachtraege: Vec<nachtrag::MitarbeitNachtrag>`,
     `SpiegelPaket.mitarbeit_quittungen: Vec<i64>`, beide `#[serde(default)]`
 
-- [ ] **Step 1: Failing tests in `paket.rs`** (`mod tests`):
+- [x] **Step 1: Failing tests in `paket.rs`** (`mod tests`):
   - `leeres_paket_und_paket_ohne_neue_felder_sind_lesbar` um
     `assert!(p.mitarbeit_nachtraege.is_empty() && p.mitarbeit_quittungen.is_empty())` ergänzen.
   - `zu_viele_oder_zu_lange_nachtraege_lehnt_check_ab`: `NACHTRAEGE_MAX` Nachträge → `Ok`;
     `NACHTRAEGE_MAX + 1` → `Err`; `NACHTRAEGE_MAX + 1` Quittungen → `Err`; `kennung` mit `"`
     → `Err` (`is_kennung_nennbar`); `schluessel` oder `gegen` mit 65 Byte → `Err`.
-- [ ] **Step 2:** `cargo test --lib instanz::spiegel::paket` → FAIL (Felder fehlen).
-- [ ] **Step 3: Migration, Typ, Felder, `check`.** Die Migration kommentiert Zweck (LLH-2007,
+- [x] **Step 2:** `cargo test --lib instanz::spiegel::paket` → FAIL (Felder fehlen).
+- [x] **Step 3: Migration, Typ, Felder, `check`.** Die Migration kommentiert Zweck (LLH-2007,
   Design D2/D4) wie 0359. `art::AUSGENOMMEN` bekommt `("mitarbeit_nachtrag", "Ausgang der
   Mitarbeit-Nachträge an den Führer; der Nachtrag reist im Paket (LLH-2007)")`; die
   Schwärzungsregel wie `hinweis_ausgang` mit den Spalten der Tabelle und `Z_EINSATZ`.
-- [ ] **Step 4:** `cargo test --lib instanz::spiegel::paket` und die Wächter der Tabellenlisten
+- [x] **Step 4:** `cargo test --lib instanz::spiegel::paket` und die Wächter der Tabellenlisten
   (`cargo test --lib art`, `cargo test --lib schwaerzung`, `cargo test --lib db::tests`) → PASS.
-- [ ] **Step 5: Commit** `feat(spiegel): Paketfelder und Ausgang für Mitarbeit-Nachträge`
+- [x] **Step 5: Commit** `feat(spiegel): Paketfelder und Ausgang für Mitarbeit-Nachträge`
 
 ### Task 2: N vormerkt, schickt und löscht quittierte Nachträge
 
@@ -104,7 +104,7 @@ additive Paketfelder in beide Richtungen.
   - `save_rolle_mitarbeit`: im Zweig `rolle_mitarbeit && geaendert > 0` nach `resend_mitarbeit`
     `nachtrag::save_grenze` und `nachtrag::queue_nachtraege`; Doc-Kommentar nennt LLH-2007.
 
-- [ ] **Step 1: Failing tests** (Aufbau: `zwei_seiten`, dann `s` als Spiegel mit `mitarbeit`
+- [x] **Step 1: Failing tests** (Aufbau: `zwei_seiten`, dann `s` als Spiegel mit `mitarbeit`
   wie `mitarbeit_beim_alten_spiegel`; die Mitarbeit an `s` setzt der Test unter dem Merker
   `spiegel_uebernahme`, wie es `keep_mitarbeit` getan hätte):
   - `wechsel_der_faehigkeit_merkt_festgehaltene_mitarbeit_vor`: `save_rolle_mitarbeit(s, 1, true)`
@@ -116,11 +116,11 @@ additive Paketfelder in beide Richtungen.
     `list_offene` bei Flag 0 → leer.
   - `quittung_loescht_nur_eigene`: `delete_quittiert(…, kopplung 2, ids)` lässt Zeilen von
     Kopplung 1 stehen; mit Kopplung 1 → leer.
-- [ ] **Step 2:** `cargo test --lib instanz::spiegel::tests::` mit den Namen → FAIL.
-- [ ] **Step 3:** Funktionen und Aufruf in `save_rolle_mitarbeit` umsetzen.
-- [ ] **Step 4:** Tests dieses Tasks und die drei bestehenden LLH-1817-Tests
+- [x] **Step 2:** `cargo test --lib instanz::spiegel::tests::` mit den Namen → FAIL.
+- [x] **Step 3:** Funktionen und Aufruf in `save_rolle_mitarbeit` umsetzen.
+- [x] **Step 4:** Tests dieses Tasks und die drei bestehenden LLH-1817-Tests
   (`aufgeruestetes_gegenueber_…`, `zweites_melden_ohne_wechsel_…`, `nachlieferung_nutzt_…`) → PASS.
-- [ ] **Step 5: Commit** `feat(spiegel): festgehaltene Mitarbeit beim Wechsel der Fähigkeit vormerken`
+- [x] **Step 5: Commit** `feat(spiegel): festgehaltene Mitarbeit beim Wechsel der Fähigkeit vormerken`
 
 ### Task 3: O nimmt Nachträge an
 
@@ -150,7 +150,7 @@ additive Paketfelder in beide Richtungen.
   `resend_mitarbeit`); eine private Hilfsfunktion `relog_mitgliedschaft(conn, einsatz_id, schluessel)`
   in `nachtrag.rs`, die `resend_mitarbeit` danach ebenfalls nutzt.
 
-- [ ] **Step 1: Failing tests.** Ein Pool als O: Org, Kopplung 1 mit Flag 1, eigener Einsatz,
+- [x] **Step 1: Failing tests.** Ein Pool als O: Org, Kopplung 1 mit Flag 1, eigener Einsatz,
   Akte in `einsatz_fuehrung` mit `herkunft_kopplung_id = 1`, Konto, Mitgliedschaft `beobachter`,
   `spiegel_herkunft`-Zeile (`fremder_schluessel = '[7,9]'` → lokaler Schlüssel), danach
   `save_grenze`. Ein Nachtrag `{id: 1, kennung, schluessel: "[7,9]", gegen: None}`:
@@ -170,11 +170,11 @@ additive Paketfelder in beide Richtungen.
   - `gegen_aus_einem_anderen_einsatz_hebt_nicht_an`: `gegen` = Schlüssel einer
     Beobachter-Mitgliedschaft eines zweiten eigenen Einsatzes → beide bleiben `beobachter`.
   - `spiegel_nimmt_keinen_nachtrag_an`: Einsatz mit `spiegel = 1` → quittiert, unverändert.
-- [ ] **Step 2:** Tests → FAIL.
-- [ ] **Step 3:** `accept` und `relog_mitgliedschaft` umsetzen, `resend_mitarbeit` auf die
+- [x] **Step 2:** Tests → FAIL.
+- [x] **Step 3:** `accept` und `relog_mitgliedschaft` umsetzen, `resend_mitarbeit` auf die
   Hilfsfunktion umstellen.
-- [ ] **Step 4:** Tests dieses Tasks und die LLH-1817-Tests → PASS.
-- [ ] **Step 5: Commit** `feat(spiegel): Führer trägt Mitarbeit unter engen Bedingungen nach`
+- [x] **Step 4:** Tests dieses Tasks und die LLH-1817-Tests → PASS.
+- [x] **Step 5: Commit** `feat(spiegel): Führer trägt Mitarbeit unter engen Bedingungen nach`
 
 ### Task 4: Abgleich trägt beide Felder
 
@@ -198,16 +198,16 @@ additive Paketfelder in beide Richtungen.
   wiederholte Nachtrag ist harmlos (Task 3, `wiederholter_nachtrag_aendert_nichts`).
 - `takt.rs`: `aktiv` auch, wenn `mitarbeit_nachtrag` Zeilen für die Kopplung hat.
 
-- [ ] **Step 1: Failing test** `nachtrag_kommt_im_abgleich_an` mit `zwei_seiten`: `f` führt (Akte
+- [x] **Step 1: Failing test** `nachtrag_kommt_im_abgleich_an` mit `zwei_seiten`: `f` führt (Akte
   mit `herkunft_kopplung_id = 1`, Mitgliedschaft `beobachter`), `s` spiegelt mit festgehaltener
   `mitarbeit`; Flags beidseitig 0, dann `save_rolle_mitarbeit(…, true)` auf beiden Seiten
   (zuerst `f`, dann `s`); `while abgleichen(&f, &s, 500).await > 0 {}` → `rolle(f) == "mitarbeit"`,
   `rolle(s) == "mitarbeit"`, `mitarbeit_nachtrag` an `s` leer. Zweite Schleife mit vertauschter
   Reihenfolge der Flags (zuerst `s`): erst nach dem Flag an `f` angehoben.
-- [ ] **Step 2:** Test → FAIL.
-- [ ] **Step 3:** Einbau wie oben.
-- [ ] **Step 4:** `cargo test --lib instanz::spiegel` → PASS.
-- [ ] **Step 5: Commit** `feat(spiegel): Mitarbeit-Nachträge reisen im Abgleich`
+- [x] **Step 2:** Test → FAIL.
+- [x] **Step 3:** Einbau wie oben.
+- [x] **Step 4:** `cargo test --lib instanz::spiegel` → PASS.
+- [x] **Step 5: Commit** `feat(spiegel): Mitarbeit-Nachträge reisen im Abgleich`
 
 ### Task 5: Rollentausch mit zwei echten Instanzen
 
@@ -222,7 +222,7 @@ additive Paketfelder in beide Richtungen.
   `auth::oidc::state::platz_fuer_tests` (prozessweit, nur in einem eigenen Test-Binary).
   `melden.rs`-Unit-Test `alte_antwort_ohne_feld_heisst_keine_mitarbeit` bleibt grün.
 
-- [ ] **Step 1: Failing test(s)** in `tests/instanz_mitarbeit_nachtrag.rs` (`mod common;`,
+- [x] **Step 1: Failing test(s)** in `tests/instanz_mitarbeit_nachtrag.rs` (`mod common;`,
   Helfer nach `tests/instanz_fuehrung.rs`: `instanz(true)`, `gekoppelt_mit`, `elw_meldet`,
   `abgleichen`; Konto beider Seiten wie `gemeinsames_konto` in `tests/instanz_spiegel.rs`). Alle
   Tests hinter einem `static NACHEINANDER: tokio::sync::Mutex<()>`. ELW = N, Hub = O.
@@ -239,10 +239,10 @@ additive Paketfelder in beide Richtungen.
     übernimmt mit `hub_uebernimmt_mit_unterschrift` (Setup aus `instanz_fuehrung.rs`
     übernehmen). Gelingt das ohne größeren Umbau nicht, entfällt der Test und der Commit sagt,
     dass `herkunft_kopplung_id` beide Wege setzt (`spiegel::fuehrung::werde_fuehrer`).
-- [ ] **Step 2:** `cargo test --test instanz_mitarbeit_nachtrag` → FAIL (Hook fehlt).
-- [ ] **Step 3:** Hook einbauen.
-- [ ] **Step 4:** `cargo test --test instanz_mitarbeit_nachtrag` und `cargo test --lib instanz::melden` → PASS.
-- [ ] **Step 5: Commit** `test(instanz): Rollentausch mit alter Instanz trägt Mitarbeit nach`
+- [x] **Step 2:** `cargo test --test instanz_mitarbeit_nachtrag` → FAIL (Hook fehlt).
+- [x] **Step 3:** Hook einbauen.
+- [x] **Step 4:** `cargo test --test instanz_mitarbeit_nachtrag` und `cargo test --lib instanz::melden` → PASS.
+- [x] **Step 5: Commit** `test(instanz): Rollentausch mit alter Instanz trägt Mitarbeit nach`
 
 ### Task 6: Regel, ADR, Gates
 
@@ -253,7 +253,7 @@ additive Paketfelder in beide Richtungen.
 - Create: `docs/architektur/entscheidungen/ADR-0082-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md`
   (Nummer vorher mit `git fetch origin alpha` und `scripts/adr-fuer.sh --alle` prüfen)
 
-- [ ] **Step 1: ADR** nach `VORLAGE.md`, `status: akzeptiert`, `gilt_fuer: src/instanz/spiegel/nachtrag.rs`,
+- [x] **Step 1: ADR** nach `VORLAGE.md`, `status: akzeptiert`, `gilt_fuer: src/instanz/spiegel/nachtrag.rs`,
   `herleitung` = Design-Doc. Regeln:
   - MUST: Ein Führer hebt eine Mitgliedschaft auf Nachtrag eines Spiegels nur von `beobachter`
     auf `mitarbeit`, nur wenn die Führung von dessen Kopplung kam und die Zeile seit der Grenze
@@ -262,10 +262,10 @@ additive Paketfelder in beide Richtungen.
   - MUST: Ein abgelehnter, auflösbarer Nachtrag legt die Zeile neu ins Log.
   Prüfung: `verlange 'mitarbeit_grenze_stand' 'src/instanz/spiegel/nachtrag.rs'` und
   `verlange 'herkunft_kopplung_id' 'src/instanz/spiegel/nachtrag.rs'`.
-- [ ] **Step 2:** `src/AGENTS.md` ergänzen: „Hat ein Spiegel `mitarbeit` gegen einen alten Führer
+- [x] **Step 2:** `src/AGENTS.md` ergänzen: „Hat ein Spiegel `mitarbeit` gegen einen alten Führer
   festgehalten, meldet er sie beim Wechsel 0 → 1 einmal nach (`spiegel::nachtrag`, ADR-0082).“
-- [ ] **Step 2b:** arc42 8.2: „Ein Spiegel, der `mitarbeit` gegen einen älteren Führer
+- [x] **Step 2b:** arc42 8.2: „Ein Spiegel, der `mitarbeit` gegen einen älteren Führer
   festgehalten hat, trägt sie nach dessen Aufrüsten einmal nach (ADR-0082).“
-- [ ] **Step 3:** `cargo fmt`, dann `./scripts/check-all.sh --geaendert --ohne-e2e` (ein Aufruf,
+- [x] **Step 3:** `cargo fmt`, dann `./scripts/check-all.sh --geaendert --ohne-e2e` (ein Aufruf,
   ggf. im Hintergrund) → grün. `scripts/check-migrationen.sh` → grün.
-- [ ] **Step 4: Commit** `docs(instanz): Regel und ADR zum Mitarbeit-Nachtrag`
+- [x] **Step 4: Commit** `docs(instanz): Regel und ADR zum Mitarbeit-Nachtrag`

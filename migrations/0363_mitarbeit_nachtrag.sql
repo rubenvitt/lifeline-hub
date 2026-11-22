@@ -16,7 +16,11 @@ CREATE TABLE mitarbeit_nachtrag (
 );
 CREATE INDEX idx_mitarbeit_nachtrag_einsatz ON mitarbeit_nachtrag(einsatz_id);
 
--- Am Führer: höchster Stand des Änderungslogs in dem Moment, in dem diese Instanz lernt, dass das
--- Gegenüber `mitarbeit` kennt. Eine Mitgliedschaft, die danach hier bearbeitet wurde, hebt kein
--- Nachtrag mehr an; NULL = nie gelernt.
+-- Am Führer: höchster Stand des Änderungslogs in dem Moment, ab dem diese Instanz `mitarbeit`
+-- kennt. Eine Mitgliedschaft, die danach hier bearbeitet wurde, hebt kein Nachtrag mehr an.
+-- Bestehende Kopplungen bekommen den Stand dieses Aufrüstens (die Migration kommt mit 0358/0359
+-- im selben Release, Design D4); eine neue Kopplung den Stand, an dem sie die Fähigkeit des
+-- Gegenübers zuerst lernt (`instanz::spiegel::nachtrag::save_grenze`).
 ALTER TABLE instanz_kopplung ADD COLUMN mitarbeit_grenze_stand INTEGER;
+UPDATE instanz_kopplung SET mitarbeit_grenze_stand =
+    (SELECT COALESCE(MAX(stand), 0) FROM einsatz_aenderung);
