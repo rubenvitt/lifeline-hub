@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import Augenbraue from './Augenbraue';
+import Feldetikett from './Feldetikett';
 import { monoStil, useRollen } from './rollenwerte';
 import { datenfeldStil, datenrasterStil } from './datenrasterStil';
 
@@ -45,7 +45,7 @@ export default function Datenraster({
 }
 
 interface DatenfeldProps {
-  /** Begriff — erscheint als Augenbraue. */
+  /** Begriff — erscheint als Feldetikett (LLH-2045). */
   label: ReactNode;
   children: ReactNode;
   /** Wert in Mono (Kennung, Zahl, Zeit, Funkrufname). */
@@ -58,7 +58,7 @@ export function Datenfeld({ label, children, mono = false, breit = false }: Date
   const { token, rollen } = useRollen();
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
-      <Augenbraue als="dt">{label}</Augenbraue>
+      <Feldetikett als="dt">{label}</Feldetikett>
       <dd
         style={{
           margin: 0,
