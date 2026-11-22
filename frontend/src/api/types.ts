@@ -54,6 +54,20 @@ export type WebhookFehler = S['WebhookFehler'];
 export type RuhtGrund = S['RuhtGrund'];
 export type EventType = S['EventType'];
 export type AblehnungGrund = S['AblehnungGrund'];
+// Adapter: Anbindungen, die der Hub selbst abruft (LLH-2017/LLH-2018)
+export type AdapterListe = S['AdapterListe'];
+export type AdapterAnzeige = S['AdapterAnzeige'];
+export type AdapterArtAnzeige = S['AdapterArtAnzeige'];
+export type AdapterFeld = S['Feld'];
+export type AdapterFeldTyp = S['FeldTyp'];
+export type AdapterPlatz = S['Platz'];
+export type AdapterGeheimnisAnzeige = S['AdapterGeheimnisAnzeige'];
+export type AdapterLetzterFehler = S['AdapterLetzterFehler'];
+export type AdapterVersuchAnzeige = S['AdapterVersuchAnzeige'];
+export type AdapterPruefErgebnis = S['AdapterPruefErgebnis'];
+export type AdapterZustand = S['AdapterZustand'];
+export type AdapterFehler = S['AdapterFehler'];
+export type GeheimnisspeicherZustand = S['GeheimnisspeicherZustand'];
 // Lagebild für Externe (LLH-1496)
 export type LagebildStufe = S['LagebildStufe'];
 export type LagebildDauer = S['LagebildDauer'];

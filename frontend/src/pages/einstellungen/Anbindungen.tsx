@@ -34,6 +34,7 @@ import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
 import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import EinwurfZugaenge from './EinwurfZugaenge';
+import AdapterPaneel from './AdapterPaneel';
 import {
   ANBINDUNGEN_ABRUF_MS,
   anbindungPath,
@@ -68,7 +69,8 @@ function eingabe(w: FormWerte): AnbindungEingabe {
  * mit dem Grund zurück, der Betreiber erfährt ihn hier.
  *
  * Darunter das Paneel der Einwurf-Zugänge für Absender ohne Signatur (LLH-1654,
- * `EinwurfZugaenge`), mit eigener Abfrage und eigenen Dialogen.
+ * `EinwurfZugaenge`) und das der Adapter, die der Hub selbst abruft (LLH-2018, `AdapterPaneel`),
+ * je mit eigener Abfrage und eigenen Dialogen.
  */
 export default function Anbindungen() {
   const { benutzer } = useAuth();
@@ -308,6 +310,8 @@ export default function Anbindungen() {
       </Paneel>
 
       <EinwurfZugaenge />
+
+      <AdapterPaneel />
 
       <ErfassungsModal<FormWerte>
         offen={anlegenOffen}

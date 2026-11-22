@@ -254,8 +254,10 @@ describe('StelleDialog anlegen', () => {
   it('verlangt Bezeichnung und Art', async () => {
     const { onErfassen, dialog } = zeigeAnlegen();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    // antd zeigt die Fehler jedes Felds für sich an; unter Last kommt eine Meldung später als die
+    // andere. Deshalb jede abwarten (LLH-1903).
     expect(await within(dialog).findByText('Bezeichnung fehlt')).toBeInTheDocument();
-    expect(within(dialog).getByText('Art fehlt')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Art fehlt')).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
   });
 
@@ -272,7 +274,7 @@ describe('StelleDialog anlegen', () => {
       await within(dialog).findByText('Bezeichnung darf höchstens 200 Zeichen lang sein'),
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText('Standort darf höchstens 500 Zeichen lang sein'),
+      await within(dialog).findByText('Standort darf höchstens 500 Zeichen lang sein'),
     ).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
 

@@ -34,6 +34,14 @@ export const server = setupServer(
    */
   http.get('/api/admin/instanz/letzte-schluessel', () => HttpResponse.json([])),
   /**
+   * Adapter der Org (LLH-2018) — keine Art, kein Adapter als Default, der Stand jedes Servers bis
+   * zur ersten produktiven Art. Die Seite Anbindungen fragt sie beim Mount ab; Tests mit Adaptern
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/admin/adapter', () =>
+    HttpResponse.json({ adapter: [], arten: [], speicher: 'bereit' }),
+  ),
+  /**
    * Verlauf der Eingänge eines Einsatzes (LLH-1143) — leer als Default. Der Knopf „Eingänge“ im
    * Einsatz-Rahmen fragt ihn beim Mount ab; Tests mit Einträgen überschreiben per `server.use()`.
    */

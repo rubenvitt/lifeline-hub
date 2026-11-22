@@ -312,7 +312,8 @@ bleibt eingetragen; ein Esc ohne Mitte beendet das Zeichnen.
 
 Beim Bearbeiten einer Zone, punktweise oder an der Mitte eines Kreises, gilt jede Änderung als
 angefangene Figur: Das erste Esc stellt die gespeicherte Form wieder her, ein Esc ohne Änderung
-beendet das Bearbeiten.
+beendet das Bearbeiten. Das gilt auch mitten im Ziehen eines Griffs: Der Griff lässt los, und
+weder Weiterziehen noch Loslassen ändert die Form danach.
 
 ### Kreise
 
