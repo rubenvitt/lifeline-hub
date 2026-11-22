@@ -7980,6 +7980,12 @@ export interface components {
         /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
         ShellInfo: {
             /**
+             * @description Pfade relativ zur Wurzel (ohne führenden `/`), die die Oberfläche ohne Server braucht:
+             *     alles unter `assets/` außer den Doku-Bildern, sortiert (LLH-1980). Die iOS-Hülle holt sie
+             *     nach jedem Online-Laden in den Cache ihres Webviews. Ohne eingebettetes Frontend leer.
+             */
+            assets: string[];
+            /**
              * Format: int32
              * @description Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).
              */
