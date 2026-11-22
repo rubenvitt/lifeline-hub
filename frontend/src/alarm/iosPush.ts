@@ -24,6 +24,15 @@ import { MERKER_MIT_INHALT, type PushStand, type PushZustand } from './webPush';
 export const RELAIS_GESPERRT_HINWEIS =
   'Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.';
 
+/**
+ * Am gekoppelten ELW (`ueber_hub`) statt des Schalters: in der App führt kein Link zum Hub (der
+ * Webview zeigt nur den aktiven Server), die Person nimmt den Hub als eigenen Server in die App und
+ * schaltet Push dort ein (Entwurf „iOS-Alarme über APNs“, Kopplung).
+ */
+export function iosPushUeberHub(name: string): string {
+  return `Push läuft über ${name}: Hub in der App hinzufügen und dort einschalten.`;
+}
+
 /** Schlüssel des Merkers im Browserspeicher; je Person, damit ein Wechsel ihn nicht erbt. */
 export function iosPushMerker(benutzerId: number): string {
   return `lfh:ios-push:${benutzerId}`;
@@ -100,7 +109,12 @@ async function ladeStand(): Promise<PushStand> {
     throw e;
   }
   if (stand.ueber_hub) {
-    return { zustand: 'ueber_hub', inhalt: false, hub: stand.ueber_hub };
+    return {
+      zustand: 'ueber_hub',
+      inhalt: false,
+      hub: stand.ueber_hub,
+      hinweis: iosPushUeberHub(stand.ueber_hub.name),
+    };
   }
   if (stand.relais_gesperrt) {
     return { zustand: 'fehlt', inhalt: false, hinweis: RELAIS_GESPERRT_HINWEIS };

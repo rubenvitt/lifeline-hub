@@ -1,6 +1,7 @@
 import { Button, Switch, Typography, theme } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import AdminPage from '../components/AdminPage';
+import KopierbarerText from '../components/KopierbarerText';
 import { Paneel, PaneelZeile, PaneelZustand, Stapel, Textstufe } from '../components/instrument';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { ALLE_ARTEN, BENACHRICHTIGUNG_ARTEN } from '../alarm/benachrichtigungKatalog';
@@ -148,11 +149,24 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   }
   if (zustand == null || zustand === 'fehlt' || benutzerId == null) return null;
   if (zustand === 'ueber_hub' && hub != null) {
+    // In der iOS-App (`hinweis`) führt kein Link zum Hub: er kommt als eigener Server in die App,
+    // dafür steht seine Adresse zum Kopieren da.
     return (
       <Paneel titel="Dieses Gerät">
         <PaneelZeile style={zeile}>
-          <Typography.Text>{pushUeberHub(hub.name)}</Typography.Text>
-          <Typography.Link href={`${hub.adresse}/benachrichtigungen`}>{ZUM_HUB}</Typography.Link>
+          {hinweis != null ? (
+            <>
+              <Typography.Text>{hinweis}</Typography.Text>
+              <KopierbarerText text={hub.adresse} bezeichnung="Adresse des Hubs" />
+            </>
+          ) : (
+            <>
+              <Typography.Text>{pushUeberHub(hub.name)}</Typography.Text>
+              <Typography.Link href={`${hub.adresse}/benachrichtigungen`}>
+                {ZUM_HUB}
+              </Typography.Link>
+            </>
+          )}
         </PaneelZeile>
       </Paneel>
     );

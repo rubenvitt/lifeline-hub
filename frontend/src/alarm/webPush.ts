@@ -64,7 +64,8 @@ export type PushStand = {
   zustand: PushZustand;
   inhalt: boolean;
   hub?: PushHub;
-  /** Erklärung, warum es keinen Schalter gibt (iOS-Push: das Relais hat den Server gesperrt). */
+  /** Erklärung, warum es keinen Schalter gibt (iOS-Push: das Relais hat den Server gesperrt,
+   *  oder bei `ueber_hub` der Weg über die App statt des Links zum Hub). */
   hinweis?: string;
 };
 

@@ -181,6 +181,8 @@ describe('iOS-Push in der Seite', () => {
       zustand: 'ueber_hub',
       inhalt: false,
       hub: { name: 'Hub Kreisverband', adresse: 'https://hub.example.org' },
+      // In der App führt kein Link zum Hub: er muss als eigener Server in die App.
+      hinweis: 'Push läuft über Hub Kreisverband: Hub in der App hinzufügen und dort einschalten.',
     });
   });
 
