@@ -74,6 +74,9 @@ const NICHT_ERREICHBAR: &str = "http://tauri.localhost/nicht-erreichbar.html";
 #[cfg(not(windows))]
 const NICHT_ERREICHBAR: &str = "tauri://localhost/nicht-erreichbar.html";
 
+/// Datei der Seite „nicht verträglich“ für `WebviewUrl::App`.
+const SEITE_NICHT_VERTRAEGLICH: &str = "nicht-vertraeglich.html";
+
 /// Lokale Seite „nicht verträglich“ (LLH-1982), in jedem Fenster möglich.
 #[cfg(windows)]
 const NICHT_VERTRAEGLICH: &str = "http://tauri.localhost/nicht-vertraeglich.html";
@@ -190,6 +193,9 @@ struct Zustand {
     ausfaelle: Mutex<HashMap<String, Ausfall>>,
     /// Je Fenster, das die Seite „nicht verträglich“ zeigt (LLH-1982), Ziel und Urteil.
     unvertraeglich: Mutex<HashMap<String, Unvertraeglich>>,
+    /// Je Origin das letzte Urteil „nicht verträglich“ (LLH-1982): Nebenfenster und „Neues
+    /// Fenster“ laden einen so erkannten Server nicht. Eine bestandene Prüfung löscht es.
+    urteile: Mutex<HashMap<String, Unvertraeglich>>,
     /// Zuletzt gezeigte native Meldungen: mehrere Fenster desselben Einsatzes melden dasselbe
     /// Ereignis je einmal (LLH-1281).
     meldungen: Mutex<Vec<(String, Instant)>>,
@@ -282,38 +288,186 @@ fn fuers_protokoll(url: &Url) -> String {
     }
 }
 
-fn lade_server(app: &AppHandle, server: &Url) -> Result<(), String> {
-    // Nebenfenster eines anderen Servers gehören nach dem Wechsel zu keinem mehr. Beim Abbrechen
-    // oder Verbinden mit derselben Adresse bleiben sie — `close()` fragt nicht nach, ein offener
-    // Entwurf verlöre sonst, was der Autosave noch nicht hat. Ein Nebenfenster mit der Anzeige
-    // „nicht erreichbar“ zählt mit dem Server, den es laden wollte.
-    for (label, nebenfenster) in app.webview_windows() {
-        let ausgefallen = app
-            .state::<Zustand>()
-            .ausfaelle
+/// Was das Fenster `label` laden wollte, als es die Anzeige „nicht erreichbar“ oder die Seite
+/// „nicht verträglich“ bekam.
+fn gewolltes_ziel(app: &AppHandle, label: &str) -> Option<Url> {
+    let zustand = app.state::<Zustand>();
+    let ausgefallen = zustand
+        .ausfaelle
+        .lock()
+        .unwrap()
+        .get(label)
+        .map(|ausfall| ausfall.ziel.clone());
+    ausgefallen.or_else(|| {
+        zustand
+            .unvertraeglich
             .lock()
             .unwrap()
-            .get(&label)
-            .map(|ausfall| ausfall.ziel.clone());
-        let bleibt = ausgefallen
+            .get(label)
+            .map(|ausfall| ausfall.ziel.clone())
+    })
+}
+
+/// Nebenfenster eines anderen Servers gehören nach dem Wechsel zu keinem mehr. Beim Abbrechen
+/// oder Verbinden mit derselben Adresse bleiben sie — `close()` fragt nicht nach, ein offener
+/// Entwurf verlöre sonst, was der Autosave noch nicht hat. Ein Nebenfenster mit der Anzeige
+/// „nicht erreichbar“ oder der Seite „nicht verträglich“ zählt mit dem Server, den es laden wollte.
+fn raeume_nebenfenster(app: &AppHandle, server: &Url) {
+    for (label, nebenfenster) in app.webview_windows() {
+        let bleibt = gewolltes_ziel(app, &label)
             .or_else(|| nebenfenster.url().ok())
             .is_some_and(|seite| links::gehoert_zum_server(server, &seite));
         if label.starts_with(NEBENFENSTER_PRAEFIX) && !bleibt {
             let _ = nebenfenster.close();
         }
     }
-    server_freigeben(app, server);
-    match fenster(app) {
-        Some(fenster) => load_in_fenster(app, &fenster, server.clone()),
-        // Das Hauptfenster ist zu (LLH-1281), etwa bei einem Deeplink: neu bauen.
+}
+
+/// Lädt den Server ins Hauptfenster, nach bestandener Vertragsprüfung (LLH-1982).
+async fn lade_server(app: AppHandle, server: Url) -> Result<(), String> {
+    raeume_nebenfenster(&app, &server);
+    pruefe_und_lade(app, FENSTER.to_string(), server).await
+}
+
+// ── Hüllen-Vertrag (LLH-1982) ────────────────────────────────────────────────────────
+
+fn origin_von(url: &Url) -> String {
+    url.origin().ascii_serialization()
+}
+
+/// Fragt den Hüllen-Vertrag des Servers von `ziel`; ohne Verbindung gilt sein gemerkter.
+async fn pruefen(app: &AppHandle, ziel: &Url) -> vertrag::Vertragsergebnis {
+    let letzter = verbindung::letzter_vertrag(&konfig_dir(app), ziel);
+    vertrag::check(ziel, letzter).await
+}
+
+/// Jedes Laden des Servers, das die Hülle selbst anstößt (Start, Maske, Deeplink, „Erneut
+/// versuchen“), geht hierüber: erst prüfen, dann laden oder die Seite „nicht verträglich“.
+async fn pruefe_und_lade(app: AppHandle, label: String, ziel: Url) -> Result<(), String> {
+    let ergebnis = pruefen(&app, &ziel).await;
+    anwenden(&app, &label, ziel, ergebnis)
+}
+
+/// Setzt das Ergebnis der Prüfung im Fenster `label` um.
+fn anwenden(
+    app: &AppHandle,
+    label: &str,
+    ziel: Url,
+    ergebnis: vertrag::Vertragsergebnis,
+) -> Result<(), String> {
+    match ergebnis {
+        vertrag::Vertragsergebnis::Vertraeglich(info) => {
+            if let Err(fehler) =
+                verbindung::merke_vertrag(&konfig_dir(app), &ziel, info.shell_contract)
+            {
+                log::warn!("Hüllen-Vertrag nicht gemerkt: {fehler}");
+            }
+            app.state::<Zustand>()
+                .urteile
+                .lock()
+                .unwrap()
+                .remove(&origin_von(&ziel));
+            lade(app, label, ziel)
+        }
+        // Ohne Verbindung wie bisher: die Wache zeigt „nicht erreichbar“, oder der Service Worker
+        // startet die Oberfläche offline (LFH-720).
+        vertrag::Vertragsergebnis::NichtErreichbar => lade(app, label, ziel),
+        vertrag::Vertragsergebnis::NichtVertraeglich {
+            richtung,
+            server_version,
+        } => {
+            let ausfall = Unvertraeglich {
+                ziel: ziel.clone(),
+                richtung,
+                server_version,
+            };
+            app.state::<Zustand>()
+                .urteile
+                .lock()
+                .unwrap()
+                .insert(origin_von(&ziel), ausfall.clone());
+            if app.get_webview_window(label).is_some() {
+                show_nicht_vertraeglich(app, label, ausfall);
+                return Ok(());
+            }
+            // Das Fenster ist zu (LLH-1281): mit der Seite neu bauen.
+            app.state::<Zustand>()
+                .unvertraeglich
+                .lock()
+                .unwrap()
+                .insert(label.to_string(), ausfall);
+            baue_fenster(
+                app,
+                label,
+                WebviewUrl::App(SEITE_NICHT_VERTRAEGLICH.into()),
+                None,
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(())
+        }
+    }
+}
+
+/// Lädt `ziel` im Fenster `label` mit Wache; ist es zu, entsteht es neu.
+fn lade(app: &AppHandle, label: &str, ziel: Url) -> Result<(), String> {
+    server_freigeben(app, &ziel);
+    match app.get_webview_window(label) {
+        Some(fenster) => load_in_fenster(app, &fenster, ziel),
+        // Das Fenster ist zu (LLH-1281), etwa bei einem Deeplink: neu bauen.
         None => {
             // Die Wache vor dem Bau: eine Seite aus dem Service Worker kann ankommen, bevor
             // `build()` zurückkehrt.
-            start_watch(app, FENSTER, server.clone());
-            baue_fenster(app, FENSTER, WebviewUrl::External(server.clone()), None)
+            start_watch(app, label, ziel.clone());
+            baue_fenster(app, label, WebviewUrl::External(ziel), None)
                 .map_err(|e| e.to_string())?;
             Ok(())
         }
+    }
+}
+
+/// Meldung der Maske (und des Deeplink-Dialogs) für einen unverträglichen Server.
+fn maske_meldung(
+    richtung: vertrag::Richtung,
+    server_version: Option<&str>,
+    app_version: &str,
+) -> String {
+    let server = match server_version {
+        Some(version) => format!("Der Server (Version {version})"),
+        None => "Der Server".to_string(),
+    };
+    match richtung {
+        vertrag::Richtung::ZuAlt => {
+            format!("{server} ist zu alt für diese App (Version {app_version}).")
+        }
+        vertrag::Richtung::ZuNeu => format!(
+            "{server} ist neuer als diese App (Version {app_version}). Aktualisieren Sie die App."
+        ),
+    }
+}
+
+/// Darf eine neue Adresse nach der Prüfung gespeichert werden? Ein heute nicht erreichbarer
+/// Server ja (er kann gleich kommen), ein unverträglicher nicht.
+fn speichern_nach_pruefung(ergebnis: &vertrag::Vertragsergebnis) -> bool {
+    !matches!(
+        ergebnis,
+        vertrag::Vertragsergebnis::NichtVertraeglich { .. }
+    )
+}
+
+/// Womit ein Nebenfenster beginnt.
+enum NebenfensterStart {
+    Server(Url),
+    NichtVertraeglich(Unvertraeglich),
+}
+
+/// Ein Nebenfenster lädt einen als unverträglich erkannten Server nicht, sondern zeigt die Seite.
+fn nebenfenster_seite(urteil: Option<&Unvertraeglich>, ziel: Url) -> NebenfensterStart {
+    match urteil {
+        Some(urteil) => NebenfensterStart::NichtVertraeglich(Unvertraeglich {
+            ziel,
+            ..urteil.clone()
+        }),
+        None => NebenfensterStart::Server(ziel),
     }
 }
 
@@ -341,6 +495,11 @@ pub(crate) fn zeige_maske(app: &AppHandle, adresse: Option<Url>) {
         .remove(FENSTER);
     app.state::<Zustand>()
         .ausfaelle
+        .lock()
+        .unwrap()
+        .remove(FENSTER);
+    app.state::<Zustand>()
+        .unvertraeglich
         .lock()
         .unwrap()
         .remove(FENSTER);
@@ -556,9 +715,30 @@ fn open_nebenfenster(app: &AppHandle, ziel: Url) {
         + 1;
     let label = nebenfenster_label(nummer);
     let platz = platz_neben_front(app);
-    // Die Wache vor dem Bau, wie in `lade_server`.
-    start_watch(app, &label, ziel.clone());
-    match baue_fenster(app, &label, WebviewUrl::External(ziel), platz) {
+    let urteil = app
+        .state::<Zustand>()
+        .urteile
+        .lock()
+        .unwrap()
+        .get(&origin_von(&ziel))
+        .cloned();
+    let start = match nebenfenster_seite(urteil.as_ref(), ziel) {
+        NebenfensterStart::Server(ziel) => {
+            // Die Wache vor dem Bau, wie in `lade`.
+            start_watch(app, &label, ziel.clone());
+            WebviewUrl::External(ziel)
+        }
+        // Ein als unverträglich erkannter Server lädt auch hier nicht (LLH-1982).
+        NebenfensterStart::NichtVertraeglich(ausfall) => {
+            app.state::<Zustand>()
+                .unvertraeglich
+                .lock()
+                .unwrap()
+                .insert(label.clone(), ausfall);
+            WebviewUrl::App(SEITE_NICHT_VERTRAEGLICH.into())
+        }
+    };
+    match baue_fenster(app, &label, start, platz) {
         Ok(fenster) => {
             let _ = fenster.set_focus();
         }
@@ -582,15 +762,9 @@ pub(crate) fn neues_fenster_aus_menue(app: &AppHandle) {
         return;
     };
     let vorn = front_fenster(app).and_then(|fenster| {
-        // Eine Anzeige „nicht erreichbar“ meint das Ziel, das sie laden wollte.
-        let ausfall = app
-            .state::<Zustand>()
-            .ausfaelle
-            .lock()
-            .unwrap()
-            .get(fenster.label())
-            .map(|ausfall| ausfall.ziel.clone());
-        ausfall.or_else(|| fenster.url().ok())
+        // Eine Anzeige „nicht erreichbar“ oder „nicht verträglich“ meint das Ziel, das sie laden
+        // wollte.
+        gewolltes_ziel(app, fenster.label()).or_else(|| fenster.url().ok())
     });
     let ziel = ziel_neues_fenster(&server, vorn.as_ref());
     let app = app.clone();
@@ -672,20 +846,35 @@ fn vorbelegung(zustand: tauri::State<'_, Zustand>) -> Vorbelegung {
     zustand.vorbelegung.lock().unwrap().clone()
 }
 
-/// Nur Maske: Adresse prüfen, speichern, laden. Die Meldung eines Fehlers zeigt die Maske.
+/// Nur Maske: Adresse prüfen, Hüllen-Vertrag prüfen (LLH-1982), speichern, laden. Ein
+/// unverträglicher Server wird nicht gespeichert; die Meldung eines Fehlers zeigt die Maske.
 #[tauri::command]
-fn verbinden(app: AppHandle, adresse: String) -> Result<(), String> {
+async fn verbinden(app: AppHandle, adresse: String) -> Result<(), String> {
     let server = pruefe_adresse(&adresse).map_err(|fehler| fehler.to_string())?;
+    let ergebnis = pruefen(&app, &server).await;
+    if let vertrag::Vertragsergebnis::NichtVertraeglich {
+        richtung,
+        server_version,
+    } = &ergebnis
+    {
+        return Err(maske_meldung(
+            *richtung,
+            server_version.as_deref(),
+            env!("CARGO_PKG_VERSION"),
+        ));
+    }
+    debug_assert!(speichern_nach_pruefung(&ergebnis));
     verbindung::schreiben(&konfig_dir(&app), &server)
         .map_err(|fehler| format!("Die Adresse ließ sich nicht speichern: {fehler}"))?;
-    lade_server(&app, &server)
+    raeume_nebenfenster(&app, &server);
+    anwenden(&app, FENSTER, server, ergebnis)
 }
 
 /// Nur Maske: Wechsel abbrechen, die gespeicherte Adresse wieder laden.
 #[tauri::command]
-fn abbrechen(app: AppHandle) -> Result<(), String> {
+async fn abbrechen(app: AppHandle) -> Result<(), String> {
     let server = verbindung::lesen(&konfig_dir(&app)).ok_or("Es ist keine Adresse gespeichert.")?;
-    lade_server(&app, &server)
+    lade_server(app, server).await
 }
 
 /// Nur Maske (LLH-1282): einen bekannten Server aus der Auswahl nehmen. Gibt die neue Liste.
@@ -736,33 +925,19 @@ async fn check_server(app: AppHandle, fenster: WebviewWindow) -> Result<bool, St
     .map_err(|e| e.to_string())
 }
 
-/// Was das Fenster laden wollte, als es die Anzeige „nicht erreichbar“ oder die Seite „nicht
-/// verträglich“ bekam.
-fn gewolltes_ziel(app: &AppHandle, fenster: &WebviewWindow) -> Option<Url> {
-    ausfall(app, fenster)
-        .map(|ausfall| ausfall.ziel)
-        .or_else(|| {
-            app.state::<Zustand>()
-                .unvertraeglich
-                .lock()
-                .unwrap()
-                .get(fenster.label())
-                .map(|ausfall| ausfall.ziel.clone())
-        })
-}
-
 /// Nur Anzeige „nicht erreichbar“ und Seite „nicht verträglich“: lädt erneut, was das Fenster
 /// laden wollte. Wurde inzwischen auf einen anderen Server gewechselt, dessen Startseite.
+/// Geht wie jedes Laden über die Vertragsprüfung (LLH-1982).
 #[tauri::command]
-fn erneut_versuchen(app: AppHandle, fenster: WebviewWindow) -> Result<(), String> {
+async fn erneut_versuchen(app: AppHandle, fenster: WebviewWindow) -> Result<(), String> {
     let Some(server) = verbundener_server(&app) else {
         zeige_maske(&app, None);
         return Ok(());
     };
-    let ziel = gewolltes_ziel(&app, &fenster)
+    let ziel = gewolltes_ziel(&app, fenster.label())
         .filter(|ziel| links::gehoert_zum_server(&server, ziel))
         .unwrap_or(server);
-    load_in_fenster(&app, &fenster, ziel)
+    pruefe_und_lade(app, fenster.label().to_string(), ziel).await
 }
 
 /// Was die Seite „nicht verträglich“ zeigt (LLH-1982).
@@ -1088,13 +1263,37 @@ fn bestaetige_wechsel(app: &AppHandle, alt: Option<Url>, neu: Url) {
             if !bestaetigt {
                 return;
             }
-            if let Err(fehler) = verbindung::schreiben(&konfig_dir(&handle), &neu)
-                .map_err(|e| e.to_string())
-                .and_then(|()| lade_server(&handle, &neu))
-            {
-                log::error!("Serverwechsel per Deeplink gescheitert: {fehler}");
-            }
+            tauri::async_runtime::spawn(async move {
+                if let Err(fehler) = wechsel_per_deeplink(&handle, neu).await {
+                    log::error!("Serverwechsel per Deeplink gescheitert: {fehler}");
+                }
+            });
         });
+}
+
+/// Nach der Bestätigung: prüfen wie die Maske (LLH-1982); ein unverträglicher Server wird nicht
+/// gespeichert, ein Dialog nennt den Grund.
+async fn wechsel_per_deeplink(app: &AppHandle, neu: Url) -> Result<(), String> {
+    let ergebnis = pruefen(app, &neu).await;
+    if let vertrag::Vertragsergebnis::NichtVertraeglich {
+        richtung,
+        server_version,
+    } = &ergebnis
+    {
+        app.dialog()
+            .message(maske_meldung(
+                *richtung,
+                server_version.as_deref(),
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .title("Server nicht verträglich")
+            .kind(MessageDialogKind::Warning)
+            .show(|_| {});
+        return Ok(());
+    }
+    verbindung::schreiben(&konfig_dir(app), &neu).map_err(|e| e.to_string())?;
+    raeume_nebenfenster(app, &neu);
+    anwenden(app, FENSTER, neu, ergebnis)
 }
 
 fn main() {
@@ -1160,20 +1359,29 @@ fn main() {
                 let _ = app.deep_link().register_all();
             }
 
-            let gespeichert = verbindung::lesen(&konfig_dir(&handle));
-            let start = match &gespeichert {
+            // Mit gespeichertem Server erst „Verbinde…“, dann die Vertragsprüfung (LLH-1982): das
+            // Fenster steht sofort, auch wenn der Abruf bis zum Zeitlimit hängt.
+            match verbindung::lesen(&konfig_dir(&handle)) {
                 Some(server) => {
-                    server_freigeben(&handle, server);
-                    WebviewUrl::External(server.clone())
+                    baue_fenster(
+                        &handle,
+                        FENSTER,
+                        WebviewUrl::App(verbinde_pfad(&server).into()),
+                        None,
+                    )?;
+                    let fuer_start = handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(fehler) =
+                            pruefe_und_lade(fuer_start, FENSTER.to_string(), server).await
+                        {
+                            log::error!("Start mit dem gespeicherten Server gescheitert: {fehler}");
+                        }
+                    });
                 }
-                None => WebviewUrl::App("index.html".into()),
-            };
-
-            // Die Wache vor dem Bau, wie in `lade_server`.
-            if let Some(server) = gespeichert {
-                start_watch(&handle, FENSTER, server);
+                None => {
+                    baue_fenster(&handle, FENSTER, WebviewUrl::App("index.html".into()), None)?;
+                }
             }
-            baue_fenster(&handle, FENSTER, start, None)?;
 
             // Ein Klick auf eine native Meldung holt ihr Fenster nach vorn, auch aus dem Dock
             // (D7): macOS aktiviert die App, holt ein minimiertes Fenster aber nicht zurück. Den
@@ -1463,6 +1671,68 @@ mod tests {
             verbinde_pfad(&server),
             "verbinde.html?server=https%3A%2F%2Felw.local%3A8443"
         );
+    }
+
+    /// Die Maske nennt bei einem unverträglichen Server beide Versionen und die Richtung (LLH-1982).
+    #[test]
+    fn maske_nennt_beide_versionen_und_die_richtung() {
+        use vertrag::Richtung;
+        assert_eq!(
+            maske_meldung(Richtung::ZuAlt, Some("1.0.0-alpha.120"), "1.0.0-alpha.195"),
+            "Der Server (Version 1.0.0-alpha.120) ist zu alt für diese App (Version 1.0.0-alpha.195)."
+        );
+        assert_eq!(
+            maske_meldung(Richtung::ZuNeu, Some("2.0.0"), "1.0.0"),
+            "Der Server (Version 2.0.0) ist neuer als diese App (Version 1.0.0). Aktualisieren Sie die App."
+        );
+        assert_eq!(
+            maske_meldung(Richtung::ZuNeu, None, "1.0.0-alpha.195"),
+            "Der Server ist neuer als diese App (Version 1.0.0-alpha.195). Aktualisieren Sie die App."
+        );
+    }
+
+    /// Nur ein unverträglicher Server bleibt ungespeichert; ein heute nicht erreichbarer lässt
+    /// sich weiter eintragen (LLH-1982).
+    #[test]
+    fn maske_speichert_nicht_erreichbaren_server() {
+        use vertrag::{Richtung, ShellInfo, Vertragsergebnis};
+        assert!(speichern_nach_pruefung(&Vertragsergebnis::NichtErreichbar));
+        assert!(speichern_nach_pruefung(&Vertragsergebnis::Vertraeglich(
+            ShellInfo {
+                version: "1.0.0".into(),
+                shell_contract: 1,
+            }
+        )));
+        assert!(!speichern_nach_pruefung(
+            &Vertragsergebnis::NichtVertraeglich {
+                richtung: Richtung::ZuAlt,
+                server_version: None,
+            }
+        ));
+    }
+
+    /// „Neues Fenster“ und Links öffnen einen als unverträglich erkannten Server nicht, sondern
+    /// zeigen die Seite (LLH-1982).
+    #[test]
+    fn nebenfenster_eines_unvertraeglichen_servers_zeigt_die_seite() {
+        let ziel = Url::parse("https://elw.local:8443/einsatz/1").unwrap();
+        let urteil = Unvertraeglich {
+            ziel: Url::parse("https://elw.local:8443/").unwrap(),
+            richtung: vertrag::Richtung::ZuNeu,
+            server_version: Some("2.0.0".into()),
+        };
+        match nebenfenster_seite(Some(&urteil), ziel.clone()) {
+            NebenfensterStart::NichtVertraeglich(ausfall) => {
+                assert_eq!(ausfall.ziel, ziel);
+                assert_eq!(ausfall.richtung, vertrag::Richtung::ZuNeu);
+                assert_eq!(ausfall.server_version.as_deref(), Some("2.0.0"));
+            }
+            NebenfensterStart::Server(_) => panic!("unverträglicher Server geladen"),
+        }
+        assert!(matches!(
+            nebenfenster_seite(None, ziel.clone()),
+            NebenfensterStart::Server(seite) if seite == ziel
+        ));
     }
 
     /// Ein neues Fenster aus dem Menü beginnt auf der Seite des vorderen Fensters, wenn sie zum
