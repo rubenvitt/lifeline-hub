@@ -1,0 +1,93 @@
+//! `POST /v1/senden`: prüft den Server, begrenzt und reicht Nachrichten an APNs weiter.
+use crate::{
+    api::RelaisState,
+    apns::{Ergebnis, Nachricht},
+    speicher::{self, Pruefung},
+};
+use axum::{
+    extract::State,
+    http::{header, HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::{Deserialize, Serialize};
+
+const MAX_NACHRICHTEN: usize = 100;
+const MAX_NUTZLAST: usize = 4096;
+
+#[derive(Deserialize)]
+pub struct SendenAnfrage {
+    pub nachrichten: Vec<Nachricht>,
+}
+
+#[derive(Serialize)]
+pub struct SendenAntwort {
+    pub ergebnisse: Vec<Ergebnis>,
+}
+
+fn fehler(status: StatusCode, art: &str) -> Response {
+    (status, Json(serde_json::json!({ "fehler": art }))).into_response()
+}
+
+/// `Authorization: Bearer <server_id>.<geheimnis>`
+fn zugang(headers: &HeaderMap) -> Option<(&str, &str)> {
+    let wert = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let (schema, rest) = wert.split_once(' ')?;
+    if !schema.eq_ignore_ascii_case("bearer") {
+        return None;
+    }
+    rest.trim().split_once('.')
+}
+
+pub async fn senden(
+    State(state): State<RelaisState>,
+    headers: HeaderMap,
+    Json(anfrage): Json<SendenAnfrage>,
+) -> Response {
+    let Some((server_id, geheimnis)) = zugang(&headers) else {
+        return fehler(StatusCode::UNAUTHORIZED, "unbekannt");
+    };
+    match speicher::pruefen(&state.pool, server_id, geheimnis).await {
+        Ok(Pruefung::Gueltig) => {}
+        Ok(Pruefung::Unbekannt) => return fehler(StatusCode::UNAUTHORIZED, "unbekannt"),
+        Ok(Pruefung::Gesperrt) => return fehler(StatusCode::FORBIDDEN, "gesperrt"),
+        Err(e) => {
+            tracing::error!(fehler = %e, "Prüfung des Servers fehlgeschlagen");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+    let nachrichten = anfrage.nachrichten;
+    if nachrichten.len() > MAX_NACHRICHTEN
+        || nachrichten.iter().any(|n| n.nutzlast.len() > MAX_NUTZLAST)
+    {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    if !state.minute_zaehlen(server_id, nachrichten.len() as u32) {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+
+    let mut ergebnisse = Vec::with_capacity(nachrichten.len());
+    for n in &nachrichten {
+        ergebnisse.push(state.apns.senden(n).await);
+    }
+
+    // Best effort: ein Fehler beim Vermerken des letzten Aufrufs ändert das Ergebnis nicht.
+    let _ = sqlx::query(
+        "UPDATE server SET zuletzt_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?",
+    )
+    .bind(server_id)
+    .execute(&state.pool)
+    .await;
+
+    let zaehlen = |e: Ergebnis| ergebnisse.iter().filter(|x| **x == e).count();
+    tracing::info!(
+        server_id,
+        anzahl = ergebnisse.len(),
+        zugestellt = zaehlen(Ergebnis::Zugestellt),
+        token_ungueltig = zaehlen(Ergebnis::TokenUngueltig),
+        gedrosselt = zaehlen(Ergebnis::Gedrosselt),
+        fehler = zaehlen(Ergebnis::Fehler),
+        "senden"
+    );
+    Json(SendenAntwort { ergebnisse }).into_response()
+}

@@ -5,6 +5,7 @@ use axum::{
     Router,
 };
 use http_body_util::BodyExt;
+mod gemeinsam;
 use push_relais::{
     api::{router, RelaisState},
     speicher::{self, Pruefung},
@@ -15,7 +16,13 @@ use tower::ServiceExt;
 
 async fn aufbau() -> (Router, SqlitePool) {
     let pool = speicher::oeffnen(":memory:").await.unwrap();
-    let app = router(RelaisState::neu(pool.clone(), 10, false));
+    let app = router(RelaisState::neu(
+        pool.clone(),
+        10,
+        false,
+        gemeinsam::apns_client("http://127.0.0.1:9"),
+        600,
+    ));
     (app, pool)
 }
 
@@ -125,7 +132,13 @@ async fn registrierungen_sind_je_ip_begrenzt() {
 #[tokio::test]
 async fn hinter_proxy_zaehlt_der_erste_forwarded_for_eintrag() {
     let pool = speicher::oeffnen(":memory:").await.unwrap();
-    let app = router(RelaisState::neu(pool, 1, true));
+    let app = router(RelaisState::neu(
+        pool,
+        1,
+        true,
+        gemeinsam::apns_client("http://127.0.0.1:9"),
+        600,
+    ));
     let mit_xff = |xff: &str| {
         let mut r = registrierung("127.0.0.1");
         r.headers_mut()

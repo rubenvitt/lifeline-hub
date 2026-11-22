@@ -25,6 +25,9 @@ base64 = "0.23"
 rand = "0.10"
 subtle = "2"
 anyhow = "1"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "http2"] }
+# Wie im Hauptpaket: ES256 für das Anbieter-Token (`src/web_push/krypto.rs`, `vapid_kopf`).
+openssl = { version = "0.10", features = ["vendored"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

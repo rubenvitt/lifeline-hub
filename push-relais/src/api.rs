@@ -1,4 +1,4 @@
-use crate::speicher;
+use crate::{apns::ApnsClient, senden, speicher};
 use axum::{
     extract::{ConnectInfo, Extension, State},
     http::{HeaderMap, StatusCode},
@@ -16,24 +16,52 @@ use std::{
 
 const FENSTER: Duration = Duration::from_secs(3600);
 
-/// Gemeinsamer Zustand der Routen. Aufgabe 2 hängt APNs-Client und Minutenlimit hier an.
+/// Gemeinsamer Zustand der Routen.
 #[derive(Clone)]
 pub struct RelaisState {
     pub pool: SqlitePool,
     pub registrierungen_stunde: u32,
     pub hinter_proxy: bool,
+    pub apns: Arc<ApnsClient>,
+    /// Nachrichten je Server und Minute.
+    pub limit_minute: u32,
+    /// Nachrichten je Server: Beginn des Minutenfensters und Anzahl.
+    minuten: Arc<Mutex<HashMap<String, (Instant, u32)>>>,
     /// Registrierungen je IP: Beginn des Stundenfensters und Anzahl.
     registrierungen: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
 }
 
 impl RelaisState {
-    pub fn neu(pool: SqlitePool, registrierungen_stunde: u32, hinter_proxy: bool) -> Self {
+    pub fn neu(
+        pool: SqlitePool,
+        registrierungen_stunde: u32,
+        hinter_proxy: bool,
+        apns: ApnsClient,
+        limit_minute: u32,
+    ) -> Self {
         Self {
             pool,
             registrierungen_stunde,
             hinter_proxy,
+            apns: Arc::new(apns),
+            limit_minute,
+            minuten: Arc::default(),
             registrierungen: Arc::default(),
         }
+    }
+
+    /// Zählt `anzahl` Nachrichten des Servers; `false`, wenn das Minutenlimit überschritten
+    /// würde (dann wird nichts gezählt).
+    pub(crate) fn minute_zaehlen(&self, server_id: &str, anzahl: u32) -> bool {
+        let jetzt = Instant::now();
+        let mut karte = self.minuten.lock().unwrap_or_else(|e| e.into_inner());
+        karte.retain(|_, (start, _)| jetzt.duration_since(*start) < Duration::from_secs(60));
+        let eintrag = karte.entry(server_id.to_string()).or_insert((jetzt, 0));
+        if eintrag.1.saturating_add(anzahl) > self.limit_minute {
+            return false;
+        }
+        eintrag.1 += anzahl;
+        true
     }
 
     /// Zählt eine Registrierung der IP; `false`, wenn das Stundenlimit erreicht ist.
@@ -57,6 +85,7 @@ impl RelaisState {
 pub fn router(state: RelaisState) -> Router {
     Router::new()
         .route("/v1/server", post(server_registrieren))
+        .route("/v1/senden", post(senden::senden))
         .route("/v1/status", get(status))
         .with_state(state)
 }

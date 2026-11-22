@@ -1,6 +1,7 @@
 use clap::Parser;
 use push_relais::{
     api::{self, RelaisState},
+    apns::ApnsClient,
     config::{Command, RelaisConfig},
     speicher,
 };
@@ -18,7 +19,14 @@ async fn main() -> anyhow::Result<()> {
     match cfg.command.clone().unwrap_or(Command::Serve) {
         Command::Serve => {
             let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
-            let state = RelaisState::neu(pool, cfg.registrierungen_stunde, cfg.hinter_proxy);
+            let apns = ApnsClient::neu(&cfg)?;
+            let state = RelaisState::neu(
+                pool,
+                cfg.registrierungen_stunde,
+                cfg.hinter_proxy,
+                apns,
+                cfg.limit_minute,
+            );
             tracing::info!(bind = %cfg.bind, "push-relais läuft");
             axum::serve(
                 listener,
