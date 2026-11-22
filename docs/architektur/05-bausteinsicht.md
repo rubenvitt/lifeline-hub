@@ -271,7 +271,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/uhrzeit.rs` | Wanduhrzeit `HH:MM` ohne Datum und Zone | Verpflegungsplan |
 | `src/wire_enum.rs` | Makro `wire_enum!`: Enum, Serde, Schema und `as_str()` aus einer Liste | Live-Ereignisse, Domänen-Enums |
 | `src/datentraeger` | Prüfung der Datenträgerverschlüsselung beim Start und stündlich | `GET /api/system/datentraeger` |
-| `src/versionsstand` | Versionsstand der Instanz, Versionswechsel erkennen | `/api/versionsstand` |
+| `src/versionsstand` | Versionsstand der Instanz, Versionswechsel erkennen | `/api/release-notes` |
 | `src/demo` | Übungseinsatz samt Stammdaten einspielen und entfernen, nur mit `--demo-daten` | `/api/demo-daten` |
 | `src/dev` | Seed-Benutzer für die Entwicklung, nur mit Feature `dev-seeds` (`src/lib.rs`) | `/api/dev/users` |
 | `src/test_log.rs` | Fängt Log-Ausgabe in Tests ein, nur unter `cfg(test)` | Tests |

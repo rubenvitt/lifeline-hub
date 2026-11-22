@@ -9063,7 +9063,7 @@ export interface components {
          * @enum {string}
          */
         VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
-        /** @description Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`. */
+        /** @description Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
             gelesen_bis?: string | null;

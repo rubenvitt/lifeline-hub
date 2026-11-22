@@ -14,7 +14,7 @@ const VORHER = EINTRAEGE[1].version;
 describe('NeuigkeitenHinweis', () => {
   it('nennt nach einem Versionswechsel die Anzahl der neuen Versionen des Kanals', async () => {
     server.use(
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({ laufend: LAUFEND, gelesen_bis: VORHER, zuletzt_gestartet: VORHER }),
       ),
     );
@@ -33,14 +33,14 @@ describe('NeuigkeitenHinweis', () => {
   it('markiert beim Schließen die laufende Version als gelesen und verschwindet', async () => {
     let gelesen = false;
     server.use(
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({
           laufend: LAUFEND,
           gelesen_bis: gelesen ? LAUFEND : VORHER,
           zuletzt_gestartet: VORHER,
         }),
       ),
-      http.post('/api/versionsstand/gelesen', () => {
+      http.post('/api/release-notes/read', () => {
         gelesen = true;
         return HttpResponse.json({ laufend: LAUFEND, gelesen_bis: LAUFEND });
       }),

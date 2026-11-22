@@ -559,8 +559,6 @@
 /api/v1/zugang/redeem
 /api/verpflegung-vorlagen
 /api/verpflegung-vorlagen/{vid}
-/api/versionsstand
-/api/versionsstand/gelesen
 /api/verwaltung/bereitschaft
 /api/web-push/abo
 /api/zugangsprotokoll/anmeldungen
