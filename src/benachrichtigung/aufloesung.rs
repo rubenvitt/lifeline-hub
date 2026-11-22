@@ -3,8 +3,9 @@
 //!
 //! 1. `Funktion` → alle Mitglieder, deren `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt
 //!    (i6k6mzed, design.md D2). Für EL gilt zuerst der Einsatzleiter der Führungsstelle
-//!    (`einsatz_personal` → `personal.benutzer_id`); nur ohne ihn die Mitgliedschaft. Mitglieder
-//!    ohne Schreibrecht (Mitarbeit, Beobachter) erreicht eine Funktion nicht (LLH-2008).
+//!    (`einsatz_personal` → `personal.benutzer_id`); nur ohne ihn die Mitgliedschaft. Wer im
+//!    Einsatz kein Schreibrecht hat (Mitarbeit, Beobachter, keine Mitgliedschaft), den erreicht
+//!    eine Funktion nicht (LLH-2008).
 //! 2. `Person` → `personal.benutzer_id` des Einsatzpersonals; ohne Verknüpfung niemand.
 //! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul; `ModulSchreiber` → nur die mit
 //!    Schreibrecht im Einsatz (Einsatzleitung, Führungspersonal), ebenso mit Zugriff aufs Modul.
@@ -194,15 +195,16 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
 
 /// Die Nutzer einer Funktion (Spec „Meine Funktion“): alle Mitglieder mit dieser Funktion; für
 /// EL zuerst der Einsatzleiter der Führungsstelle, ersatzweise die Mitgliedschaft. Wer im Einsatz
-/// eine Rolle ohne Schreibrecht hat (Mitarbeit, Beobachter), kann nicht handeln und fällt heraus
-/// (LLH-2008, `src/AGENTS.md`, „Erfassungs-Gate“); ein solcher Einsatzleiter gilt als nicht da.
+/// kein Schreibrecht hat, kann nicht handeln und fällt heraus (LLH-2008, `src/AGENTS.md`,
+/// „Erfassungs-Gate“): eine Rolle ohne Schreibrecht (Mitarbeit, Beobachter) oder gar keine
+/// Mitgliedschaft, auch beim Admin (LFH-1118). Ein solcher Einsatzleiter gilt als nicht da.
 async fn funktion_nutzer(
     pool: &SqlitePool,
     recht: &Leserecht,
     funktion: Fuehrungsfunktion,
 ) -> Result<Vec<i64>, AppError> {
     let einsatz_id = recht.einsatz.id;
-    let handelt = |id: &i64| recht.rollen.get(id).is_none_or(|r| r.darf_schreiben());
+    let handelt = |id: &i64| recht.rollen.get(id).is_some_and(|r| r.darf_schreiben());
     if funktion == Fuehrungsfunktion::El {
         let mut einsatzleiter = einsatzleiter_nutzer(pool, einsatz_id).await?;
         einsatzleiter.retain(handelt);
