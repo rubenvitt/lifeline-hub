@@ -187,6 +187,50 @@ pub struct LagemonitorRueckmeldung {
     pub seit_min: i64,
 }
 
+/// Eine Quelle der Alarmzeile, benannt wie in `WasBrenntQuellen` (`lage/wasBrennt.ts`). Für
+/// [`LagemonitorAlarm::ausgeblendet`] (LLH-1964).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AlarmQuelle {
+    Meldungen,
+    Auftraege,
+    Erinnerungen,
+    Nachforderungen,
+    Vermisst,
+    Kritisch,
+    Rueckmeldung,
+    Ausfall,
+}
+
+impl AlarmQuelle {
+    /// Ob die Quelle ausgeblendet ist, wenn `aus` die im Einsatz ausgeblendeten Module nennt. Die
+    /// Zuordnung folgt `useWasBrennt` (`frontend/src/geraet/AGENTS.md`, Lagemonitor).
+    fn ist_ausgeblendet(self, aus: &std::collections::HashSet<&'static str>) -> bool {
+        let module: &[&str] = match self {
+            Self::Meldungen => &["meldungen"],
+            Self::Auftraege => &["auftraege"],
+            Self::Erinnerungen => &["erinnerungen"],
+            Self::Nachforderungen => &["nachforderungen"],
+            Self::Vermisst => &["personen"],
+            Self::Kritisch => &["einsatzabschnitte"],
+            Self::Rueckmeldung => &["meldungen", "einheiten"],
+            Self::Ausfall => &["einheiten"],
+        };
+        module.iter().any(|m| aus.contains(m))
+    }
+
+    const ALLE: [Self; 8] = [
+        Self::Meldungen,
+        Self::Auftraege,
+        Self::Erinnerungen,
+        Self::Nachforderungen,
+        Self::Vermisst,
+        Self::Kritisch,
+        Self::Rueckmeldung,
+        Self::Ausfall,
+    ];
+}
+
 /// Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
 /// Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
 /// überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
@@ -211,6 +255,10 @@ pub struct LagemonitorAlarm {
     /// Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der
     /// Einheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie.
     pub ausfall: Vec<String>,
+    /// Quellen, deren Modul im Einsatz ausgeblendet ist (LLH-1964), in der Folge von
+    /// [`AlarmQuelle`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer. Der
+    /// Monitor lässt sie weg, ohne den Stand unvollständig zu nennen.
+    pub ausgeblendet: Vec<AlarmQuelle>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -259,28 +307,120 @@ pub async fn lagebild(
     // Kachel und Alarmzeile zeigen in einer Antwort dieselbe Zahl (Review LLH-1743): `verdichte`
     // und `alarm` zählen in getrennten Lesevorgängen; dazwischen kann eine Sofortmeldung
     // eingehen oder bestätigt werden. Es gilt die Zählung des Alarm-Blocks.
-    anzeige.sofortmeldungen_offen = alarm.sofort_offen;
+    // Ist Meldungen ausgeblendet, zählt der Alarm-Block nicht; die Kachel behält dann die Zählung
+    // von `verdichte` (LLH-1964, Kacheln eigene Aufgabe).
+    if !alarm.ausgeblendet.contains(&AlarmQuelle::Meldungen) {
+        anzeige.sofortmeldungen_offen = alarm.sofort_offen;
+    }
     anzeige.alarm = Some(alarm);
     Ok(Json(anzeige))
 }
 
 /// Die Werte der Alarmzeile für den Lagemonitor (LLH-1743, design.md D5). Prüft keine Rechte: der
 /// Aufrufer ist der gekoppelte Lagemonitor, und der Block trägt nur Zahlen und Namen von
-/// Einheiten und Abschnitten (wie `sofortmeldungen_offen`, Change `kcjecn9e`, D12).
+/// Einheiten und Abschnitten (wie `sofortmeldungen_offen`, Change `kcjecn9e`, D12). Module, die
+/// im Einsatz ausgeblendet sind, liest er nicht (LLH-1964, [`AlarmQuelle`]; Regel:
+/// `frontend/src/geraet/AGENTS.md`, Lagemonitor).
 pub async fn alarm(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
     jetzt: &str,
 ) -> Result<LagemonitorAlarm, AppError> {
-    let meldungen = crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
-    let auftraege = crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt).await?;
-    let erinnerungen_faellig =
-        crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?;
-    let nachforderungen = crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
+    let aus = crate::einsatz::berechtigung::ausgeblendete_module(pool, einsatz_id, org_id).await?;
+    let ausgeblendet: Vec<AlarmQuelle> = AlarmQuelle::ALLE
+        .into_iter()
+        .filter(|q| q.ist_ausgeblendet(&aus))
+        .collect();
+    let sichtbar = |q: AlarmQuelle| !ausgeblendet.contains(&q);
 
-    // Rückmeldung je Einheit wie der Hinweis „Rückmeldung überfällig“ und das Meldebild
-    // (`meldung::rueckmeldung`): jüngste an die Einheit gebundene Meldung plus wirksame Frist.
+    let meldungen = if sichtbar(AlarmQuelle::Meldungen) {
+        Some(crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt).await?)
+    } else {
+        None
+    };
+    let auftraege_ueberfaellig = if sichtbar(AlarmQuelle::Auftraege) {
+        crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt)
+            .await?
+            .ueberfaellig
+    } else {
+        0
+    };
+    let erinnerungen_faellig = if sichtbar(AlarmQuelle::Erinnerungen) {
+        crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?
+    } else {
+        0
+    };
+    let nachforderungen_ueberfaellig = if sichtbar(AlarmQuelle::Nachforderungen) {
+        crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt)
+            .await?
+            .ueberfaellig
+    } else {
+        0
+    };
+
+    let rueckmeldung_ueberfaellig = if sichtbar(AlarmQuelle::Rueckmeldung) {
+        rueckmeldung_ueberfaellig(pool, einsatz_id, org_id, jetzt).await?
+    } else {
+        Vec::new()
+    };
+
+    let abschnitte_kritisch: Vec<String> = if sichtbar(AlarmQuelle::Kritisch) {
+        sqlx::query_scalar(
+            "SELECT name FROM einsatzabschnitt \
+             WHERE einsatz_id = ? AND lagezustand = 'kritisch' ORDER BY sortier, id",
+        )
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
+
+    // Ausgeblendete Mittel-Listen gehen leer ein, wie im Browser (`leerWennGesperrt`).
+    let ausfall = if sichtbar(AlarmQuelle::Ausfall) {
+        crate::einsatz::ausfall::load_einheiten_mit_ausfall(
+            pool,
+            einsatz_id,
+            crate::einsatz::ausfall::AusfallListen {
+                personal: !aus.contains("personal"),
+                fahrzeuge: !aus.contains("fahrzeuge"),
+                material: !aus.contains("material"),
+            },
+        )
+        .await?
+    } else {
+        Vec::new()
+    };
+
+    Ok(LagemonitorAlarm {
+        sofort_offen: meldungen.as_ref().map_or(0, |m| m.sofort_offen),
+        sofort_aelteste_at: meldungen
+            .as_ref()
+            .and_then(|m| m.sofort_aelteste_at.clone()),
+        dringend_offen: meldungen.as_ref().map_or(0, |m| m.dringend_offen),
+        bestaetigung_ueberfaellig: meldungen
+            .as_ref()
+            .map_or(0, |m| m.bestaetigung_ueberfaellig),
+        auftraege_ueberfaellig,
+        erinnerungen_faellig,
+        nachforderungen_ueberfaellig,
+        rueckmeldung_ueberfaellig,
+        abschnitte_kritisch,
+        ausfall,
+        ausgeblendet,
+    })
+}
+
+/// Rückmeldung je Einheit wie der Hinweis „Rückmeldung überfällig“ und das Meldebild
+/// (`meldung::rueckmeldung`): jüngste an die Einheit gebundene Meldung plus wirksame Frist. Die
+/// längste zuerst.
+async fn rueckmeldung_ueberfaellig(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    jetzt: &str,
+) -> Result<Vec<LagemonitorRueckmeldung>, AppError> {
     let jetzt_utc = crate::zeit::parse_utc(jetzt)
         .ok_or_else(|| AppError::Internal(format!("Zeitpunkt {jetzt}")))?;
     let frist = crate::meldung::rueckmeldung::frist_min(pool, einsatz_id, org_id).await?;
@@ -315,32 +455,7 @@ pub async fn alarm(
             .cmp(&a.seit_min)
             .then_with(|| a.einheit.cmp(&b.einheit))
     });
-
-    let abschnitte_kritisch: Vec<String> = sqlx::query_scalar(
-        "SELECT name FROM einsatzabschnitt \
-         WHERE einsatz_id = ? AND lagezustand = 'kritisch' ORDER BY sortier, id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(LagemonitorAlarm {
-        sofort_offen: meldungen.sofort_offen,
-        sofort_aelteste_at: meldungen.sofort_aelteste_at,
-        dringend_offen: meldungen.dringend_offen,
-        bestaetigung_ueberfaellig: meldungen.bestaetigung_ueberfaellig,
-        auftraege_ueberfaellig: auftraege.ueberfaellig,
-        erinnerungen_faellig,
-        nachforderungen_ueberfaellig: nachforderungen.ueberfaellig,
-        rueckmeldung_ueberfaellig,
-        abschnitte_kritisch,
-        ausfall: crate::einsatz::ausfall::load_einheiten_mit_ausfall(
-            pool,
-            einsatz_id,
-            crate::einsatz::ausfall::AusfallListen::ALLE,
-        )
-        .await?,
-    })
+    Ok(rueckmeldung_ueberfaellig)
 }
 
 /// Die Verdichtung des Lagebilds. Sie trägt den gekoppelten Lagemonitor, das Lagebild für Externe

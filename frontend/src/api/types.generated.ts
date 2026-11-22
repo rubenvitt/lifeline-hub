@@ -624,6 +624,12 @@ export interface components {
             name?: string | null;
             zustand: components["schemas"]["BesetzungsZustand"];
         };
+        /**
+         * @description Eine Quelle der Alarmzeile, benannt wie in `WasBrenntQuellen` (`lage/wasBrennt.ts`). Für
+         *     [`LagemonitorAlarm::ausgeblendet`] (LLH-1964).
+         * @enum {string}
+         */
+        AlarmQuelle: "meldungen" | "auftraege" | "erinnerungen" | "nachforderungen" | "vermisst" | "kritisch" | "rueckmeldung" | "ausfall";
         /** @description Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6). */
         AnbindungAblehnung: {
             /**
@@ -5481,6 +5487,12 @@ export interface components {
              *     Einheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie.
              */
             ausfall: string[];
+            /**
+             * @description Quellen, deren Modul im Einsatz ausgeblendet ist (LLH-1964), in der Folge von
+             *     [`AlarmQuelle`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer. Der
+             *     Monitor lässt sie weg, ohne den Stand unvollständig zu nennen.
+             */
+            ausgeblendet: components["schemas"]["AlarmQuelle"][];
             /** Format: int64 */
             bestaetigung_ueberfaellig: number;
             /** Format: int64 */
