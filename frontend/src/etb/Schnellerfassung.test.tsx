@@ -1099,7 +1099,9 @@ describe('Schnellerfassung – leerer Inhalt (LLH-1771)', () => {
     await userEvent.type(feld, '  ');
     await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
     expect(await screen.findByText('Inhalt fehlt')).toBeVisible();
-    expect(feld).toHaveFocus();
+    // Den Fokus setzt `fokusInsFeld` ein Bild später (`requestAnimationFrame`); unter Last kommt
+    // die Meldung vorher. Darauf warten, nicht sofort fragen (alpha rot am 22.11.2026, LLH-2034).
+    await waitFor(() => expect(feld).toHaveFocus());
     expect(feld).toHaveAttribute('aria-invalid', 'true');
     expect(feld).toHaveAccessibleDescription('Inhalt fehlt');
     expect(p.erfassen).not.toHaveBeenCalled();

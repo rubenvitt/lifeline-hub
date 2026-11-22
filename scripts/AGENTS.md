@@ -11,9 +11,15 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `check-openspec-eingefroren.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
 `swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
-Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot).
+Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
+`cargo build --bin lifeline-hub` (Schritt 19, Bündel `rust` und allein `binaer`, LLH-2033).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
 Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+- **Server-Binary ohne Dev-Abhängigkeiten** (LLH-2033): Jeder Rust-Schritt mit Testzielen, auch
+  `--nur baut` (`--all-targets`), übersetzt mit den Features der Dev-Abhängigkeiten
+  (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, …). Was ein Feature nur über sie
+  hat, ist dort grün und bricht im Release. Schritt 19 baut deshalb nur das Binary, ohne
+  Testziele; nie `--all-targets`, `--tests` oder `cargo test` dort (`check-all.test.sh`, Fall 17).
 - **Leichte PR-Prüfung** (LLH-1889/LLH-1896, ADR-0048; ersetzt die zwei Stufen von LLH-1662):
   - **Ein Workflow je Ereignis:** `pr.yml` läuft nur am PR, `ci.yml` nur bei Push auf `alpha`,
     `beta`, `main`; was nur bei Push läuft (`migrationen-kanal.yml`, `ruleset.yml`), hat keinen
@@ -27,7 +33,8 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Actions). `ruleset.yml` prüft das Ruleset von `alpha` nach jedem Push, alle sechs Stunden und
     auf Anstoß dagegen und wird bei Abweichung rot (LLH-1895). Wer eine Pflicht ändert, ändert
     Liste und Ruleset zusammen.
-  - **Im PR** läuft `schnell` aus `pr.yml`. Ein fremdes Label startet an einem PR ohne `voll` nur die Schnellprüfungen neu, in
+  - **Im PR** laufen `schnell` und daneben `binaer` (Pflicht-Check `Server-Binary`, Schritt 19; eigener
+    Job, damit der Bau die Schnellprüfungen nicht verlängert) aus `pr.yml`. Ein fremdes Label startet an einem PR ohne `voll` nur diese beiden neu, in
     eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
     Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend-, e2e-Suite und der Swift-Kern (`ios`) laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label

@@ -130,10 +130,16 @@ pruefe "kein Start auf Auto-Merge" fehlt "$k" "auto_merge"
 pruefe "Workflow-Gruppe: je Ref, fremdes Label ohne voll je Lauf" \
   enthaelt "$k" "group: pr-\${{ !(github.event.action == 'labeled' && github.event.label.name != 'voll' && !contains(github.event.pull_request.labels.*.name, 'voll')) && github.ref || github.run_id }}"
 pruefe "PR-Lauf bricht den älteren ab" enthaelt "$k" "cancel-in-progress: true"
-pruefe "pr.yml: nur die Jobs schnell und suiten" gleich "$(job_ids "$PR" | tr '\n' ' ')" "schnell suiten"
+pruefe "pr.yml: nur die Jobs schnell, binaer und suiten" gleich "$(job_ids "$PR" | tr '\n' ' ')" "schnell binaer suiten"
 pruefe "schnell läuft immer (kein if: ein übersprungener jüngster Check zählte grün)" \
   test -z "$(job_if "$PR" schnell)"
 pruefe "schnell heißt Schnellprüfungen (Pflicht-Check)" enthaelt "$(job "$PR" schnell)" "    name: Schnellprüfungen"
+# Server-Binary ohne Dev-Abhängigkeiten (LLH-2033): Pflicht-Check neben `schnell`, nicht darin.
+pruefe "binaer läuft immer (Pflicht-Check)" test -z "$(job_if "$PR" binaer)"
+pruefe "binaer heißt Server-Binary (Pflicht-Check)" enthaelt "$(job "$PR" binaer)" "    name: Server-Binary"
+pruefe "binaer über check-all.sh" enthaelt "$(job "$PR" binaer)" "run: ./scripts/check-all.sh --nur binaer"
+pruefe "binaer wartet nicht auf schnell" fehlt "$(job "$PR" binaer)" "needs:"
+pruefe "binaer läuft auf GitHub" enthaelt "$(job "$PR" binaer)" "    runs-on: ubuntu-latest"
 pruefe "Suiten nur mit Label voll" \
   gleich "$(job_if "$PR" suiten)" "\${{ contains(github.event.pull_request.labels.*.name, 'voll') }}"
 pruefe "pr.yml ruft suiten.yml" enthaelt "$(job "$PR" suiten)" "uses: ./.github/workflows/suiten.yml"
