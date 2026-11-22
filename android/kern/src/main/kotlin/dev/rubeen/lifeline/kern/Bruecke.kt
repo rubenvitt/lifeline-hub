@@ -65,6 +65,9 @@ object Bruecke {
      * ganzzahlige `id` trägt: dann gibt es niemanden, dem die Hülle antworten könnte.
      */
     fun parse(nachricht: String): Brueckenbefehl? {
+        // Erst die Länge, dann die teure Arbeit (Review W6): eine zu lange Nachricht wird nicht
+        // geparst, nur ihr Kopf gelesen, damit die Seite eine Ablehnung bekommt.
+        if (nachricht.length > MAX_NACHRICHT) return zuLang(nachricht)
         val objekt = try {
             json.parseToJsonElement(nachricht) as? JsonObject
         } catch (_: Exception) {
@@ -84,9 +87,7 @@ object Bruecke {
             "download_blob" -> {
                 val daten = text(objekt["data"])
                     ?: return Brueckenbefehl.Ungueltig(id, "Dem Download fehlen die Daten.")
-                if (daten.length > MAX_BASE64) {
-                    return Brueckenbefehl.Ungueltig(id, "Der Download ist größer als 50 MB.")
-                }
+                if (daten.length > MAX_BASE64) return Brueckenbefehl.Ungueltig(id, DOWNLOAD_ZU_GROSS)
                 val name = text(objekt["name"])?.takeIf { it.isNotBlank() } ?: "Download"
                 Brueckenbefehl.DownloadBlob(id, name, daten)
             }
@@ -110,6 +111,21 @@ object Bruecke {
 
     /** 50 MB Nutzdaten sind 66,7 Mio. Base64-Zeichen; die Grenze nimmt etwas Luft dazu. */
     private const val MAX_BASE64 = 70_000_000
+
+    /** Längste Nachricht: der größte Download und Platz für Befehl, `id` und Dateinamen. */
+    const val MAX_NACHRICHT = MAX_BASE64 + 64 * 1024
+
+    private const val DOWNLOAD_ZU_GROSS = "Der Download ist größer als 50 MB."
+
+    /** Kopf, wie ihn `huelle.js` schreibt (`JSON.stringify({ cmd, id, ... })`). */
+    private val kopf = Regex("^\\{\"cmd\":\"([a-z_]{1,40})\",\"id\":(\\d{1,9})[,}]")
+
+    /** Eine zu lange Nachricht: Ablehnung an die `id` aus dem Kopf, ohne lesbaren Kopf nichts. */
+    private fun zuLang(nachricht: String): Brueckenbefehl? {
+        val treffer = kopf.find(nachricht.take(80)) ?: return null
+        val (cmd, id) = treffer.destructured
+        return Brueckenbefehl.Ungueltig(id.toInt(), if (cmd == "download_blob") DOWNLOAD_ZU_GROSS else "Die Nachricht ist zu groß.")
+    }
 
     private fun text(element: kotlinx.serialization.json.JsonElement?): String? =
         (element as? JsonPrimitive)?.takeIf { it.isString }?.content

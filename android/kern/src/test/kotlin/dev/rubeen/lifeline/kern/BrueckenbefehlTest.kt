@@ -105,6 +105,21 @@ class BrueckenbefehlTest {
         assertTrue(zuGross is Brueckenbefehl.Ungueltig && zuGross.id == 1, "$zuGross".take(80))
     }
 
+    /**
+     * Die Grenze greift vor dem Parsen der ganzen Nachricht (Review W6): eine zu lange Nachricht
+     * wird nur am Kopf gelesen. Der Rest ist hier absichtlich kein JSON; geparst gäbe es `null`.
+     */
+    @Test
+    fun `eine zu lange Nachricht wird vor dem Parsen abgelehnt`() {
+        val rest = "A".repeat(Bruecke.MAX_NACHRICHT)
+        val blob = Bruecke.parse("""{"cmd":"download_blob","id":4,"name":"a","data":"$rest""")
+        assertEquals(Brueckenbefehl.Ungueltig(4, "Der Download ist größer als 50 MB."), blob)
+        val andere = Bruecke.parse("""{"cmd":"show_notification","id":5,"title":"$rest""")
+        assertEquals(Brueckenbefehl.Ungueltig(5, "Die Nachricht ist zu groß."), andere)
+        // Ohne lesbaren Kopf gibt es niemanden, dem die Hülle antworten könnte.
+        assertNull(Bruecke.parse("""{"data":"$rest","cmd":"download_blob","id":6}"""))
+    }
+
     // Antwort an die Seite
 
     private fun antwort(a: Brueckenantwort): JsonObject = Json.parseToJsonElement(Bruecke.replyJson(a)).jsonObject

@@ -19,7 +19,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
@@ -39,11 +41,22 @@ class BrueckenempfangTest {
     private var aktuell: WebView = alt
 
     private val dienste = Druckattrappe()
+
+    /** Führt sofort aus und merkt sich, dass es gebraucht wurde. */
+    private val rechnen = object : CoroutineDispatcher() {
+        var benutzt = 0
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            benutzt += 1
+            block.run()
+        }
+    }
     private val empfang = Brueckenempfang(
         dienste = dienste,
         aktiverServer = { aktiverServer },
         isAktuell = { it === aktuell },
         scope = CoroutineScope(Dispatchers.Unconfined),
+        rechnen = rechnen,
     )
     private val antworten = mutableListOf<String>()
     private val proxy = object : JavaScriptReplyProxy() {
@@ -81,6 +94,39 @@ class BrueckenempfangTest {
         dienste.gedruckt.complete(true)
 
         assertTrue(antworten.isEmpty())
+    }
+
+    /** Review K7: derselbe WebView und derselbe Server, aber die Seite steht inzwischen beim IdP. */
+    @Test
+    fun `steht derselbe WebView inzwischen auf einer fremden Seite, verfällt die Antwort`() {
+        drucke()
+        alt.loadUrl("https://idp.example/realms/drk/login")
+        dienste.gedruckt.complete(true)
+
+        assertTrue(antworten.isEmpty())
+    }
+
+    /** Review K7: derselbe Server, aber die App hat den WebView neu gebaut (Render-Prozess beendet). */
+    @Test
+    fun `ist der WebView nicht mehr der aktuelle, verfällt die Antwort`() {
+        drucke()
+        aktuell = WebView(context).apply { loadUrl("https://elw.local:8443/etb") }
+        dienste.gedruckt.complete(true)
+
+        assertTrue(antworten.isEmpty())
+    }
+
+    /** Review W6: eine lange Nachricht liest die App außerhalb des Hauptfadens, eine kurze sofort. */
+    @Test
+    fun `lange Nachrichten werden außerhalb des Hauptfadens gelesen`() {
+        drucke()
+        assertEquals(0, rechnen.benutzt)
+
+        val lang = "A".repeat(100_000)
+        empfang.onPostMessage(alt, WebMessageCompat("""{"cmd":"gibt_es_nicht","id":3,"x":"$lang"}"""), Uri.parse("https://elw.local:8443"), true, proxy)
+
+        assertEquals(1, rechnen.benutzt)
+        assertEquals(listOf("""{"id":3,"fehler":"Unbekannter Befehl der Hülle: gibt_es_nicht","wert":null}"""), antworten)
     }
 
     @Test

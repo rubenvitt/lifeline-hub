@@ -2,6 +2,8 @@ package dev.rubeen.lifeline.kern
 
 import java.util.Base64
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Ein Befehl der Seite an die Hülle. Die Wire-Namen sind englisch und fest. */
 sealed interface Brueckenbefehl {
@@ -85,10 +87,13 @@ object Brueckenausfuehrung {
             Antwortwert.Null
         }
         is Brueckenbefehl.DownloadBlob -> antwort(befehl.id) {
-            val bytes = try {
-                Base64.getDecoder().decode(befehl.base64)
-            } catch (_: IllegalArgumentException) {
-                throw IllegalStateException("Der Download ist nicht lesbar.")
+            // Bis zu 50 MB: nicht im Hauptfaden der App entschlüsseln (Review W6).
+            val bytes = withContext(Dispatchers.Default) {
+                try {
+                    Base64.getDecoder().decode(befehl.base64)
+                } catch (_: IllegalArgumentException) {
+                    throw IllegalStateException("Der Download ist nicht lesbar.")
+                }
             }
             dienste.saveDownload(befehl.name, bytes)
             Antwortwert.Null
