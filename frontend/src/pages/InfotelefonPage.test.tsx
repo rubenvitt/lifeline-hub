@@ -17,7 +17,8 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, InfotelefonAnruf, InfotelefonZaehler } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
-import { freigabenFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
 import { modulName } from '../einsatz/modulRegistry';
 import { setzeViewportBreite } from '../test/viewport';
 
@@ -375,6 +376,19 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(banner.textContent).toBe('1 neuer Anruf');
     expect(screen.queryByText(/oben einsortiert/)).toBeNull();
     expect(screen.queryByText('Keller voll')).toBeNull();
+  });
+
+  it('meldet einen Anruf desselben Kontos von einem anderen Gerät im Banner (LLH-1977)', async () => {
+    // Angemeldet ist Konto 1, das auch die geladenen Anrufe erfasst hat. Anruf 3 kommt vom
+    // Zweitgerät desselben Kontos: aus Sicht dieser Liste fremd, er wartet hinter dem Banner.
+    server.use(meHandler(benutzerFixture({ id: 1 })));
+    const { client } = setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    (await within(liste).findAllByRole('button', { name: /^Status von Anruf / }))[0].focus();
+    serve([anruf({ id: 3, angelegt_von_id: 1, notiz: 'vom Zweitgerät' }), ...ANRUFE]);
+    await client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) });
+    expect(await screen.findByText('1 neuer Anruf')).toBeInTheDocument();
+    expect(screen.queryByText('vom Zweitgerät')).toBeNull();
   });
 
   it('hält einen Nachtrag aus „Ältere laden“ nicht als neuen Anruf zurück', async () => {
