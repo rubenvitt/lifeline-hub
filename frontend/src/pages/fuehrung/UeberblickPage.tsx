@@ -81,6 +81,7 @@ import {
   einsatzdatenPfad,
   einsatzabschnittePfad,
   erinnerungenPfad,
+  meldungenPfad,
   etbPfad,
   lageberichtePfad,
   lagebesprechungPfad,
@@ -493,6 +494,7 @@ export default function UeberblickPage() {
         abloesungSichtbar ? (abloesungenQ.data ?? []) : [],
         angekuendigtesUnwetter,
         programmQ.data ?? [],
+        { meldungenFrei: rueckmeldungenFrei },
       ),
     [
       auftraege,
@@ -504,6 +506,7 @@ export default function UeberblickPage() {
       abloesungenQ.data,
       angekuendigtesUnwetter,
       programmQ.data,
+      rueckmeldungenFrei,
     ],
   );
 
@@ -666,19 +669,21 @@ export default function UeberblickPage() {
   const markenZiel = (m: Marke): string | undefined =>
     m.art === 'auftrag'
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
-      : m.art === 'erinnerung'
-        ? erinnerungenPfad(einsatzId, { erinnerung: m.id ?? undefined })
-        : m.art === 'pegelprognose'
-          ? pegelZielPfad(einsatzId, wetterPegelFrei)
-          : m.art === 'abloesung'
-            ? abloesungPfad(einsatzId, { ansicht: 'laufend' })
-            : m.art === 'unwetter'
-              ? wetterPegelPfad(einsatzId)
-              : m.art === 'programmpunkt'
-                ? einsatzdatenPfad(einsatzId)
-                : lagebesprechungGesperrt
-                  ? undefined
-                  : lagebesprechungPfad(einsatzId);
+      : m.art === 'bestaetigung'
+        ? meldungenPfad(einsatzId, { meldung: m.id ?? undefined })
+        : m.art === 'erinnerung'
+          ? erinnerungenPfad(einsatzId, { erinnerung: m.id ?? undefined })
+          : m.art === 'pegelprognose'
+            ? pegelZielPfad(einsatzId, wetterPegelFrei)
+            : m.art === 'abloesung'
+              ? abloesungPfad(einsatzId, { ansicht: 'laufend' })
+              : m.art === 'unwetter'
+                ? wetterPegelPfad(einsatzId)
+                : m.art === 'programmpunkt'
+                  ? einsatzdatenPfad(einsatzId)
+                  : lagebesprechungGesperrt
+                    ? undefined
+                    : lagebesprechungPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 

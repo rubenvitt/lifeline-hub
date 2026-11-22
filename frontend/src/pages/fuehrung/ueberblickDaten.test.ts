@@ -866,3 +866,98 @@ describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1
     });
   });
 });
+
+describe('naechsteMarken: automatische Frist steht am Bezug (LLH-1908)', () => {
+  const autoFrist = (over: Partial<Erinnerung>) =>
+    ({
+      id: 50,
+      status: 'offen',
+      quelle: 'auto_frist',
+      ist_faellig: false,
+      ...over,
+    }) as unknown as Erinnerung;
+  const zeile = (m: {
+    art: string;
+    id: number | null;
+    text: string;
+    ton: string;
+    wort: string;
+  }) => [m.art, m.id, m.text, m.ton, m.wort];
+
+  it('Auftrag mit Frist steht einmal', () => {
+    const r = naechsteMarken(
+      [auftrag({ id: 7, auftrag_text: 'Sandsäcke', frist_at: nach(30) })],
+      [
+        autoFrist({
+          bezug_typ: 'auftrag',
+          bezug_id: 7,
+          titel: 'Auftrag #7 Quittierfrist',
+          faellig_at: nach(30),
+        }),
+      ],
+      null,
+      JETZT,
+    );
+    expect(r.marken.map((m) => [m.art, m.id])).toEqual([['auftrag', 7]]);
+  });
+
+  it('Quittierfrist ohne Auftragsmarke bleibt eine Erinnerung', () => {
+    const r = naechsteMarken(
+      [],
+      [
+        autoFrist({
+          bezug_typ: 'auftrag',
+          bezug_id: 7,
+          titel: 'Auftrag #7 Quittierfrist',
+          faellig_at: nach(30),
+        }),
+      ],
+      null,
+      JETZT,
+    );
+    expect(r.marken.map((m) => [m.art, m.id])).toEqual([['erinnerung', 50]]);
+  });
+
+  it('Bestätigungsfrist wird die Marke der Meldung, verstrichen „überfällig“', () => {
+    const frist = (over: Partial<Erinnerung>) => [
+      autoFrist({
+        bezug_typ: 'meldung',
+        bezug_id: 3,
+        titel: 'Sofortmeldung #3 unbestätigt',
+        ...over,
+      }),
+    ];
+    const marke = (liste: Erinnerung[]) =>
+      naechsteMarken([], liste, null, JETZT, [], [], [], [], { meldungenFrei: true }).marken.map(
+        zeile,
+      );
+    expect(marke(frist({ faellig_at: vor(5) }))).toEqual([
+      ['bestaetigung', 3, 'Sofortmeldung #3 unbestätigt', 'alarm', 'überfällig'],
+    ]);
+    // Der Server meldet sie fällig, die Uhr des Geräts geht nach.
+    expect(marke(frist({ faellig_at: nach(1), ist_faellig: true }))).toEqual([
+      ['bestaetigung', 3, 'Sofortmeldung #3 unbestätigt', 'alarm', 'überfällig'],
+    ]);
+    // Kommend: wie jede Frist, kein Wecker-Wort „fällig“.
+    expect(marke(frist({ faellig_at: nach(20) }))[0]?.[4]).not.toBe('fällig');
+  });
+
+  it('Bestätigungsfrist ohne Modul Meldungen bleibt eine Erinnerung', () => {
+    const r = naechsteMarken(
+      [],
+      [
+        autoFrist({
+          bezug_typ: 'meldung',
+          bezug_id: 3,
+          titel: 'Sofortmeldung #3 unbestätigt',
+          faellig_at: vor(5),
+        }),
+      ],
+      null,
+      JETZT,
+    );
+    expect(r.marken.map(zeile)).toEqual([
+      ['erinnerung', 50, 'Sofortmeldung #3 unbestätigt', 'achtung', 'fällig'],
+    ]);
+  });
+});
