@@ -19,6 +19,7 @@ import dev.rubeen.lifeline.android.web.HuellenClient
 import dev.rubeen.lifeline.android.web.Vertragsabruf
 import dev.rubeen.lifeline.android.web.WebviewFabrik
 import dev.rubeen.lifeline.android.web.Webviewbegleitung
+import dev.rubeen.lifeline.android.web.Webzugriffe
 import dev.rubeen.lifeline.android.web.uri
 import dev.rubeen.lifeline.kern.Ablauf
 import dev.rubeen.lifeline.kern.Anmeldung
@@ -74,6 +75,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param downloads lädt Dateirouten und Downloads des WebViews mit der Sitzung des Profils
  * @param anmelder „Im Browser anmelden“; nimmt den Rücksprung `lifeline://anmeldung` an
  * @param updater prüft, lädt und installiert Updates (Entwurf D9); im Testzustand `null`
+ * @param zugriffe Dateiwahl und Kamera der Oberfläche (`HuellenChromeClient`)
  */
 class AppModell(
     val testzustand: Testzustand?,
@@ -90,6 +92,7 @@ class AppModell(
     private val downloads: Downloads? = null,
     private val anmelder: Anmelder? = null,
     private val updater: Updater? = null,
+    zugriffe: Webzugriffe? = null,
 ) : Entfernungsdienste {
     val appVersion: String = if (testzustand != null) BEISPIEL_VERSION else version
     val build: String = (if (testzustand != null) BEISPIEL_BUILD else build).toString()
@@ -168,7 +171,7 @@ class AppModell(
         oeffne = { oeffne(it) },
         herunterladen = { view, ziel -> downloads?.herunterladen(view, ziel.toString(), null, null) },
     )
-    private val chromeClient = HuellenChromeClient(client::neuesFenster)
+    private val chromeClient = HuellenChromeClient(client::neuesFenster, aktiverServer = { liste.aktiv?.adresse }, zugriffe = zugriffe)
     private val empfang = Brueckenempfang(
         dienste = dienste,
         aktiverServer = { liste.aktiv?.adresse },

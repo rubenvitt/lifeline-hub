@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import dev.rubeen.lifeline.android.dienste.Activityzugriffe
 import dev.rubeen.lifeline.android.dienste.Anmeldebrowser
 import dev.rubeen.lifeline.android.dienste.Anmelder
 import dev.rubeen.lifeline.android.dienste.Downloads
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
         // Die Dienste lesen das Modell erst beim Aufruf; ihre Activity-Ergebnisse melden sie hier
         // an, vor dem Start der Activity.
         val browser = Anmeldebrowser(this) { code, adresse -> anmelder.authTabErgebnis(code, adresse) }
+        val zugriffe = Activityzugriffe(this)
         anmelder = Anmelder(
             webView = { modell.webView },
             aktiverServer = { modell.liste.aktiv?.adresse },
@@ -77,6 +79,7 @@ class MainActivity : ComponentActivity() {
             downloads = downloads,
             anmelder = anmelder,
             updater = updater,
+            zugriffe = zugriffe,
         )
         if (mitUpdates) UpdatePruefung.planen(this)
         // Zurück (Entwurf D6): native Seite schließen, im WebView zurück, sonst in den Hintergrund;

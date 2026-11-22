@@ -3,12 +3,17 @@ package dev.rubeen.lifeline.android.web
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Message
 import android.text.InputType
 import android.util.TypedValue
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
+import android.webkit.MimeTypeMap
+import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -19,16 +24,41 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import dev.rubeen.lifeline.kern.SeitenOrigin
 import dev.rubeen.lifeline.kern.Seitendialog
+import dev.rubeen.lifeline.kern.Seitenzugriff
+import dev.rubeen.lifeline.kern.ServerAdresse
 import java.net.URI
+
+/**
+ * Was der WebView für die Oberfläche von der Activity braucht (Review W4): den Systemdialog der
+ * Dateiwahl und das Recht `CAMERA`. Die App setzt es über Activity-Ergebnisse um
+ * (`dienste/Activityzugriffe.kt`), die Tests mit einer Attrappe.
+ */
+interface Webzugriffe {
+    /**
+     * Öffnet [intent] und meldet die gewählten Dateien (`null`: abgebrochen) genau einmal an
+     * [fertig]. `false`, wenn kein Dialog öffnet; dann meldet es nichts.
+     */
+    fun waehleDateien(intent: Intent, fertig: (Array<Uri>?) -> Unit): Boolean
+
+    /** Hat die App das Recht `CAMERA`? Sonst fragt sie die Person; [fertig] mit dem Ergebnis. */
+    fun kamera(fertig: (Boolean) -> Unit)
+}
 
 /**
  * Rückrufe des Browsers im WebView. Neue Fenster (`target=_blank`, `window.open`) gehen an
  * `Linkweiche` mit `neuesFenster` (Entwurf D8); ein zweiter WebView für die Seite entsteht nie.
- * `alert`, `confirm` und `prompt` zeigt die App als nativen Dialog (`Seitendialog`).
+ * `alert`, `confirm` und `prompt` zeigt die App als nativen Dialog (`Seitendialog`). Dateiwahl
+ * und Kamera der Oberfläche gehen über [zugriffe]; was erlaubt ist, entscheidet `Seitenzugriff`.
  *
  * @param neuesFenster entscheidet über das Ziel (`HuellenClient.neuesFenster`)
+ * @param aktiverServer nur seine Origin bekommt die Kamera
+ * @param zugriffe Dateiwahl und Recht `CAMERA`; ohne sie lehnt der WebView beides ab
  */
-class HuellenChromeClient(private val neuesFenster: (WebView, URI) -> Unit) : WebChromeClient() {
+class HuellenChromeClient(
+    private val neuesFenster: (WebView, URI) -> Unit,
+    private val aktiverServer: () -> ServerAdresse? = { null },
+    private val zugriffe: Webzugriffe? = null,
+) : WebChromeClient() {
     /**
      * Android nennt hier das Ziel nicht. Ein kurzlebiger WebView im selben Profil nimmt das
      * Fenster an, fängt seine erste Adresse ab und wird sofort zerstört; die Adresse geht an die
@@ -64,6 +94,32 @@ class HuellenChromeClient(private val neuesFenster: (WebView, URI) -> Unit) : We
         return true
     }
 
+    /** `<input type="file">` (Anhänge, Dokumente): der Systemdialog mit den Typen aus `accept`. */
+    override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+        val zugriffe = zugriffe ?: return false
+        return zugriffe.waehleDateien(dateiwahlIntent(params)) { callback.onReceiveValue(it) }
+    }
+
+    /**
+     * `getUserMedia` der Oberfläche: nur die Kamera, nur für den aktiven Server, erst wenn die App
+     * selbst das Recht hat; alles andere lehnt die App ab.
+     */
+    override fun onPermissionRequest(request: PermissionRequest) {
+        val zugriffe = zugriffe
+        if (zugriffe == null || kamerafreigabe(request).isEmpty()) {
+            request.deny()
+            return
+        }
+        zugriffe.kamera { erlaubt ->
+            // Während der Rückfrage kann die App den Server gewechselt haben.
+            val freigabe = kamerafreigabe(request)
+            if (erlaubt && freigabe.isNotEmpty()) request.grant(freigabe.toTypedArray()) else request.deny()
+        }
+    }
+
+    private fun kamerafreigabe(request: PermissionRequest): List<String> =
+        Seitenzugriff.kamera(SeitenOrigin.parse(request.origin.toString()), request.resources.orEmpty().toList(), aktiverServer())
+
     override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
         frage(view, url, Seitendialog.Art.Hinweis, message) { result.confirm() }
         return true
@@ -88,6 +144,32 @@ class HuellenChromeClient(private val neuesFenster: (WebView, URI) -> Unit) : We
         val origin = url?.let(SeitenOrigin::parse) ?: SeitenOrigin("", "", -1)
         zeigeSeitendialog(view.context, Seitendialog(art, nachricht ?: "", origin), fertig)
     }
+}
+
+/**
+ * Der Systemdialog für [params]: `createIntent()` des WebViews, dazu die Typen aus `accept`
+ * (`Seitenzugriff.mimeTypen`; der WebView nimmt nur den ersten und kennt keine Endungen) und
+ * Mehrfachwahl, wenn die Seite sie erlaubt.
+ */
+internal fun dateiwahlIntent(params: WebChromeClient.FileChooserParams): Intent {
+    val typen = Seitenzugriff.mimeTypen(params.acceptTypes.orEmpty().toList()) {
+        MimeTypeMap.getSingleton().getMimeTypeFromExtension(it)
+    }
+    return params.createIntent().apply {
+        action = Intent.ACTION_GET_CONTENT
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = typen.singleOrNull() ?: "*/*"
+        if (typen.size > 1) putExtra(Intent.EXTRA_MIME_TYPES, typen.toTypedArray())
+        if (params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+    }
+}
+
+/** Gewählte Dateien aus dem Ergebnis des Dialogs, auch mehrere (`ClipData`); `null`: abgebrochen. */
+internal fun dateiwahlErgebnis(resultCode: Int, data: Intent?): Array<Uri>? {
+    if (resultCode != Activity.RESULT_OK || data == null) return null
+    val clip = data.clipData
+    val adressen = if (clip != null) (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri } else listOfNotNull(data.data)
+    return adressen.takeIf { it.isNotEmpty() }?.toTypedArray()
 }
 
 /** Kennung des Textfeldes im Dialog `prompt` (Tests). */

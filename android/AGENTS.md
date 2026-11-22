@@ -27,7 +27,9 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   `addWebMessageListener` bekommen nur die Origin-Regel des aktiven Servers
   (`Bruecke.allowedOriginRule`); Nachrichten zählen nur aus dem Hauptframe
   (`Bruecke.accepts`), Antworten nur, solange derselbe WebView noch auf dieser Origin steht
-  (`web/Brueckenempfang.kt`).
+  (`web/Brueckenempfang.kt`). Ebenso bekommt nur diese Origin die Kamera der Oberfläche
+  (`getUserMedia`, nur Video, `Seitenzugriff.kamera`); die Dateiwahl (`<input type="file">`) geht
+  über `web/HuellenChromeClient.kt` und `dienste/Activityzugriffe.kt`.
 - **Vertrauen wie das System:** System- und Nutzer-CAs (`res/xml/network_security_config.xml`),
   keine Ausnahme, kein Pinning, kein Klartext; `onReceivedSslError` bricht immer ab. Nur die
   Download-Hosts des Updaters (`Updateentscheidung.ERLAUBTE_HOSTS`) vertrauen allein den CAs des

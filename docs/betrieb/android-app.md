@@ -147,6 +147,10 @@ Link von außen bewirkt nichts. Wer den Tab schließt, landet wieder auf der Anm
 - **Dateien vom eigenen Server** (unter `/api/` außer `/api/auth/`, CSV-Exporte, auch `blob:`)
   lädt die App mit der Sitzung des Profils und bietet sie im **Teilen-Blatt** an. Die Kopie liegt
   bis zu 24 Stunden im Cache der App.
+- **Dateien hochladen** (Anhänge, Dokumente): Das Dateifeld der Oberfläche öffnet die Dateiwahl
+  von Android mit den Typen, die das Feld annimmt, bei Bedarf mit Mehrfachwahl. Die Kamera der
+  Oberfläche bekommt nur die Seite des aktiven Servers, nur als Video (kein Mikrofon); beim ersten
+  Mal fragt Android nach der Kamera.
 - **Drucken** öffnet den Druckdialog von Android (auch „Als PDF speichern“).
 - **Rückfragen der Seite** erscheinen als Dialog von Android; der Titel nennt, wer fragt.
 - **Meldungen:** Bei laufender App zeigt sie eine Benachrichtigung im Kanal „Lifeline“. Ab
