@@ -46,7 +46,14 @@ trap 'rm -rf "$arbeit"' EXIT
 grund="<rect width=\"512\" height=\"512\" fill=\"$KOPF_SCHWARZ\"/>"
 grep -qF "$grund" "$quelle" || { echo "Grund in $quelle nicht gefunden" >&2; exit 1; }
 grep -qF "scale(1)" "$quelle" || { echo "Maßstab in $quelle nicht gefunden" >&2; exit 1; }
-sed -e "s#$grund##" -e "s#scale(1)#scale($SKALA)#" "$quelle" > "$arbeit/vordergrund.svg"
+# Trenner `|`: er steht weder in `grund` (`#` der Farbe) noch in `SKALA`. Mit `#` las GNU sed die
+# Farbe als Ende des Musters und zerstörte das Element nur zufällig, BSD sed brach ab.
+sed -e "s|$grund||" -e "s|scale(1)|scale($SKALA)|" "$quelle" > "$arbeit/vordergrund.svg"
+if grep -qF '<rect width="512"' "$arbeit/vordergrund.svg" || grep -qF "$KOPF_SCHWARZ" "$arbeit/vordergrund.svg" \
+  || ! grep -qF "scale($SKALA)" "$arbeit/vordergrund.svg"; then
+  echo "Vordergrund aus $quelle nicht sauber abgeleitet (Grund oder Maßstab)" >&2
+  exit 1
+fi
 
 rsvg-convert --width "$KANTE" --height "$KANTE" --output "$arbeit/roh.png" "$arbeit/vordergrund.svg"
 "${im[@]}" "$arbeit/roh.png" -strip -define png:exclude-chunks=date,time,tIME \
