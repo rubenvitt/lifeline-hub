@@ -193,7 +193,7 @@ ab. „Entfernen …“ neben „Ersetzen“ löscht ein Geheimnis nach einer R�
 2. Das Ergebnis steht im Paneel „Zustand“, etwa „Verbindung prüfen: erreichbar (200) ·
    4 Einträge“ oder der Grund des Fehlschlags, und als „Prüfung“ unter „Letzte Versuche“.
 
-   ![Ansicht eines gestörten Adapters mit dem Ergebnis der Prüfung](../bilder/anbindungen/adapter-ansicht.png)
+   ![Paneel „Zustand“ eines gestörten Adapters mit dem Ergebnis der Prüfung](../bilder/anbindungen/adapter-pruefung.png)
 
 Die Prüfung ruft einmal ab und übernimmt nichts. Sie ändert weder den Zustand noch den nächsten
 Abruf.

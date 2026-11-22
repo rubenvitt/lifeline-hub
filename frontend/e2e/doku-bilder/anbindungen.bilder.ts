@@ -7,8 +7,8 @@ import { anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep anbindungen`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   adapter-liste.png       frontend/src/pages/einstellungen/AdapterPaneel.tsx
- *   adapter-ansicht.png     frontend/src/pages/einstellungen/AdapterAnsicht.tsx (Kopf, Zustand
- *                           mit Ergebnis von „Verbindung prüfen“)
+ *   adapter-pruefung.png    frontend/src/pages/einstellungen/AdapterAnsicht.tsx (Paneel
+ *                           „Zustand“ mit Ergebnis von „Verbindung prüfen“)
  *   geheimnis-ersetzen.png  frontend/src/components/Geheimfeld.tsx im Paneel „Geheimnisse“ der
  *                           Ansicht
  *
@@ -177,7 +177,11 @@ test.describe('anbindungen', () => {
     await page.getByRole('button', { name: 'Verbindung prüfen' }).click();
     await expect(page.locator('[data-lfh="adapter-pruefung"]')).toBeVisible();
     await expect(page.locator('[data-lfh="adapter-versuch"]').first()).toBeVisible();
-    await fotografiere(page, KAPITEL, 'adapter-ansicht');
+    await fotografiere(
+      page.getByRole('region', { name: 'Zustand', exact: true }),
+      KAPITEL,
+      'adapter-pruefung',
+    );
   });
 
   test('Geheimnis ersetzen', async ({ page }) => {

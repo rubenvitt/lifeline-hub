@@ -377,7 +377,7 @@ export default function AdapterAnsicht() {
         >
           <Datenraster spalten={4} beschriftung="Zustand">
             <Datenfeld label="Zustand">
-              <Stapel abstand="xxs">
+              <Stapel abstand="xxs" ausrichten="start">
                 <Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />
                 <span style={{ color: rollen.gedaempft }}>
                   {adapter.zustand === 'braucht_eingriff' && adapter.angehalten_grund
