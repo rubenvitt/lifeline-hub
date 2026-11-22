@@ -73,12 +73,12 @@ lokalem State und leert ihn nach jedem Senden.
   `isZustandSichtbar(z)` (Liste), `uebernimmAdapter(qc, a)`, `entferneAdapter(qc, id)`,
   `hostWechsel(felder, vorher, nachher)` → `{bisher, neu} | null`, `einstellungenVon(felder, werte)`.
 
-- [ ] **Step 1 (rot):** Tests für `adapterZustandAnzeige` (alle sechs Zustände), `isZustandSichtbar`,
+- [x] **Step 1 (rot):** Tests für `adapterZustandAnzeige` (alle sechs Zustände), `isZustandSichtbar`,
   `hostWechsel` (gleicher Host, anderer Host, erste URL, Groß/Klein, ungültige URL, kein URL-Feld),
   `einstellungenVon` (Zahl als Zahl, leere optionale weg), `adapterFehlerText` mit Status;
   `globalKeys`-Wire-Strings.
-- [ ] **Step 2:** Umsetzen; Keys in `NICHT_LIVE_GLOBAL_KEYS` mit Begründung.
-- [ ] **Step 3:** `vitest run` der berührten Tests grün, `queryKeys.guard.test.ts` grün.
+- [x] **Step 2:** Umsetzen; Keys in `NICHT_LIVE_GLOBAL_KEYS` mit Begründung.
+- [x] **Step 3:** `vitest run` der berührten Tests grün, `queryKeys.guard.test.ts` grün.
 
 ### Task 2: Baustein Geheimfeld
 
@@ -91,25 +91,25 @@ onSetzen(wert): Promise<void>, onEntfernen(): Promise<void>, maxLaenge })`. Zust
 gesperrt (Knopf aus mit Grund), nur lesen (keine Knöpfe). „Entfernen …“ im ⋯-Menü mit roter
 Rückfrage nur bei gesetztem Platz.
 
-- [ ] **Step 1 (rot):** Tests: Anzeige je Zustand; Speichern ruft `onSetzen` mit dem Wert und das
+- [x] **Step 1 (rot):** Tests: Anzeige je Zustand; Speichern ruft `onSetzen` mit dem Wert und das
   Feld ist danach weg und leer, auch wenn `onSetzen` wirft (Fehler bleibt sichtbar, Wert nicht);
   Abbrechen und Escape verwerfen; leerer Wert wird nicht gesendet; `maxLength`; Entfernen nur nach
   Bestätigung; gesperrt und nur lesen ohne aktive Knöpfe.
-- [ ] **Step 2:** Umsetzen (eigener `useState`, kein `Form`); JSDoc als Quelle der Design-System-README.
-- [ ] **Step 3:** Tests grün; Mutationsprobe: Leeren nach Fehler entfernen → Test rot.
+- [x] **Step 2:** Umsetzen (eigener `useState`, kein `Form`); JSDoc als Quelle der Design-System-README.
+- [x] **Step 3:** Tests grün; Mutationsprobe: Leeren nach Fehler entfernen → Test rot.
 
 ### Task 3: Paneel „Adapter“ auf der Seite Anbindungen
 
 **Files:** Create `frontend/src/pages/einstellungen/AdapterPaneel.tsx`,
 `frontend/src/pages/einstellungen/AdapterPaneel.test.tsx`; Modify `frontend/src/pages/einstellungen/Anbindungen.tsx`
 
-- [ ] **Step 1 (rot):** Tests: unsichtbar bei leeren Arten und Adaptern; Zeile mit Name, Art,
+- [x] **Step 1 (rot):** Tests: unsichtbar bei leeren Arten und Adaptern; Zeile mit Name, Art,
   Status nur bei gestört/braucht Eingriff/aus/Art unbekannt, „zuletzt erfolgreich …“ bzw. Grund;
   Speicher-Hinweis bei `fehlt`/`passt_nicht`; Anlegen (Art wählen → Felder der Art, Name, Intervall
   mit Vorschlag) sendet die Eingabe und springt in die Ansicht; Führungskraft ohne Anlegen; ELW
   Anlegen gesperrt.
-- [ ] **Step 2:** Umsetzen (`Liste`, `ErfassungsModal`), unter `<EinwurfZugaenge />` einhängen.
-- [ ] **Step 3:** Tests grün, `Anbindungen.test.tsx` weiter grün.
+- [x] **Step 2:** Umsetzen (`Liste`, `ErfassungsModal`), unter `<EinwurfZugaenge />` einhängen.
+- [x] **Step 3:** Tests grün, `Anbindungen.test.tsx` weiter grün.
 
 ### Task 4: Ansicht eines Adapters
 
@@ -117,7 +117,7 @@ Rückfrage nur bei gesetztem Platz.
 `frontend/src/pages/einstellungen/AdapterAnsicht.test.tsx`; Modify `frontend/src/App.tsx`
 (Route `einstellungen/anbindungen/adapter/:adapterId`)
 
-- [ ] **Step 1 (rot):** Tests: Kopf mit Name, Art, Status; Paneel „Zustand“ (Zustand, zuletzt
+- [x] **Step 1 (rot):** Tests: Kopf mit Name, Art, Status; Paneel „Zustand“ (Zustand, zuletzt
   erfolgreich, letzter Fehler, nächster Versuch, angehalten mit Grund); „Verbindung prüfen“ zeigt
   die Ergebniszeile und ändert die Liste nicht; Anhalten/Fortsetzen übernimmt die Antwort;
   Einstellungen bearbeiten (Felder der Art, Name, Intervall ≥ Minimum) mit CAS; neuer Host →
@@ -125,16 +125,16 @@ Rückfrage nur bei gesetztem Platz.
   Geheimfeld (Setzen lädt die Liste neu); Speicher `fehlt` sperrt die Geheimfelder; Verlauf mit
   „Prüfung“; Löschen mit Rückfrage führt zur Liste; nicht gefunden; Führungskraft ohne
   Einstellungen und Knöpfe; ELW gesperrt.
-- [ ] **Step 2:** Umsetzen nach `AnbindungAnsicht.tsx` und `Main.dc.html`.
-- [ ] **Step 3:** Tests grün; `pnpm typecheck`, `pnpm lint`.
+- [x] **Step 2:** Umsetzen nach `AnbindungAnsicht.tsx` und `Main.dc.html`.
+- [x] **Step 3:** Tests grün; `pnpm typecheck`, `pnpm lint`.
 
 ### Task 5: Design System
 
 **Files:** Modify `frontend/scripts/design-system/previews.tsx`; erzeugt `docs/design/design-system/project/…`
 
-- [ ] **Step 1:** Karte `Geheimfeld` (Gruppe Formular) mit den Zuständen nicht gesetzt, gesetzt,
+- [x] **Step 1:** Karte `Geheimfeld` (Gruppe Formular) mit den Zuständen nicht gesetzt, gesetzt,
   offen, unlesbar, gesperrt, aus dem echten Baustein; Höhe messen.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend design-system`; Wächter `designSystem.guard.test.ts` grün;
+- [x] **Step 2:** `mise exec -- pnpm -C frontend design-system`; Wächter `designSystem.guard.test.ts` grün;
   Erzeugtes mitcommitten.
 
 ### Task 6: Anwenderdoku und Bilder
@@ -142,18 +142,35 @@ Rückfrage nur bei gesetztem Platz.
 **Files:** Modify `docs/anwender/kapitel/anbindungen.md`; Create
 `frontend/e2e/doku-bilder/anbindungen.bilder.ts`, `docs/anwender/bilder/anbindungen/*.png`
 
-- [ ] **Step 1:** Abschnitt „Adapter“: Überblick (erscheint, sobald der Server eine Art kennt),
+- [x] **Step 1:** Abschnitt „Adapter“: Überblick (erscheint, sobald der Server eine Art kennt),
   Abläufe „Adapter anlegen“, „Geheimnis setzen oder ersetzen“, „Verbindung prüfen“, „Anhalten und
   fortsetzen“, „Ziel im eigenen Netz erlauben“; Zustände und Fehler; Hinweis Geheimnisspeicher;
   gekoppelter ELW. `quellen:` um die neuen Dateien ergänzen.
-- [ ] **Step 2:** Bilder-Spec mit `page.route` auf `/api/admin/adapter*` (Liste mit drei Adaptern,
+- [x] **Step 2:** Bilder-Spec mit `page.route` auf `/api/admin/adapter*` (Liste mit drei Adaptern,
   Ansicht gestört mit Prüfergebnis, Geheimfeld offen); höchstens ein Bild je Ablauf; Lauf
   `mise exec -- pnpm doku:bilder --grep anbindungen` nach `cargo build`.
-- [ ] **Step 3:** `vitest run src/hilfe/anwenderdoku.guard.test.ts` grün.
+- [x] **Step 3:** `vitest run src/hilfe/anwenderdoku.guard.test.ts` grün.
+
+## Nachtrag aus Umsetzung und Review (22.11.2026)
+
+- **„Entfernen …“ neben „Ersetzen“** mit roter `Popconfirm` statt hinter ⋯ (Bausteinwahl
+  „Unumkehrbares“; die Zeile hat kein Zeilenmenü). Scheitert es, steht der Grund an der Zeile.
+- **Rückfrage „Neues Ziel“ gegen den Stand des Servers:** vor dem Speichern geänderter
+  Einstellungen lädt die Ansicht die Liste frisch (`fetchQuery`, `staleTime: 0`); nach einem 409
+  oder einem eben gesetzten Geheimnis wäre der Cache bis zu 30 s alt.
+- **Nur `veraltet` fragt** („Zwischenzeitlich geändert“, `isSperrkonflikt={isVeraltet}`); der 409
+  des gekoppelten ELW steht als Grund am Paneel.
+- **LAN-Ausnahme auch beim Anlegen** (Häkchen wie beim Webhook): ohne sie ließ sich ein Adapter mit
+  einer IP-Adresse im LAN gar nicht anlegen.
+- **Bei Erfolg liefert der Server keinen HTTP-Status** (`adapter::lauf`): Text „erreichbar ·
+  4 Einträge“, Fixtures ohne `status`.
+- **Bildlauf:** Ein `cargo build` von `alpha` kompiliert seit 5547fd96 nicht (`Credential` nur
+  mit dem Dev-Feature `danger-credential-internals`, Aufgabe LLH-2027). Die Bilder entstanden mit
+  einem lokal mit diesem Feature gebauten Binary; im Repo ändert dieser Branch daran nichts.
 
 ### Task 7: Abschluss
 
 - [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] **Step 2:** Review nach Ermessen (Anlass: Geheimnisse/Rechte in der UI) als ein Agent.
+- [x] **Step 2:** Review nach Ermessen (Anlass: Geheimnisse/Rechte in der UI, über 600 Zeilen) als ein Agent; Befunde im Nachtrag oben behoben.
 - [ ] **Step 3:** Bilder der Änderung (`pr-bilder/lwc4r0oo/`), PR gegen `alpha`, Zunder `review`.
 - [ ] **Step 4:** Nach dem Merge: Design System neu veröffentlichen (`frontend/AGENTS.md`).
