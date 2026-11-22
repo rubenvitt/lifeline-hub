@@ -9,7 +9,7 @@ ruft, für
 zu `frontend/src/`.
 
 **Was ohne Netz lesbar bleibt, steht in der Registry, nicht im Persister:** `LAGEBILD_OFFLINE`
-und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Meldebild, Betroffene,
+und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Kräfteübersicht, Betroffene,
 Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFreigaben` — seit
 LFH-669 statt der Overrides —, Einstellungen, Zähler,
 Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus) und die Präferenzen der Person:

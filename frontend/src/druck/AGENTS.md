@@ -37,13 +37,13 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
     `druckansichtVon`, `druckansichtNebenweg`) und am `DruckKnopf`; Wächter
     `druck/druckWortlaut.guard.test.ts`.
   - **Zwei Plätze.** Was die ganze Seite druckt, ist ein Nebenweg im Seitenkopf (`weitere` der
-    `EinsatzSeite` bzw. `NebenwegeImKopf`), auch Meldebild, Funkplan, Kommunikationsplan,
+    `EinsatzSeite` bzw. `NebenwegeImKopf`), auch Kräfteübersicht, Funkplan, Kommunikationsplan,
     Organigramm, Schichtplan und Planung; wer vorher aufklappen muss, gibt `useDruckNebenwege` ein
     synchrones `vorDemDruck`. Was ein Objekt in der Seite druckt, steht über `NebenwegeImKopf` im
     `aktion` seines `Paneel` (Auftrag, Registrierung). Nie in einer Werkzeugzeile im Inhalt oder am
     Ende eines Paneels. Auf der Druckseite selbst ist `DruckKnopf` ihre Aktion.
-  - **Bewusst ohne eigenen Druck:** Einheiten und Fahrzeuge (stehen samt Besatzung im Druck des
-    Meldebilds), Meldungen (im ETB), die Liste der Lageberichte (jeder Lagebericht druckt sich auf
+  - **Bewusst ohne eigenen Druck:** Einheiten und Fahrzeuge (stehen samt Besatzung im Druck der
+    Kräfteübersicht), Meldungen (im ETB), die Liste der Lageberichte (jeder Lagebericht druckt sich auf
     seiner Seite). Die Hilfe „Drucken und Export“ nennt diese Wege.
 - **Übung im Druck** (LLH-1725, Regel: `frontend/AGENTS.md`, Rahmen, „Übung“): der Druckkopf zeigt
   „ÜBUNG“, sobald sein `einsatz` (`DruckEinsatz`) die Einsatzart `uebung` trägt. Wer ihn aufruft,
