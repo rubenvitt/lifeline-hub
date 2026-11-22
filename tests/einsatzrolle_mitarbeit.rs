@@ -755,6 +755,65 @@ async fn mitarbeit_berichtigt_berichtigung_einer_meldung_in_der_lage_nicht() {
     assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
 }
 
+/// Die Anzeige sagt, welche Einträge zu einer Meldung in der Lage gehören (LLH-2008), auch über
+/// die Kette der Berichtigungen; so bietet das Frontend der Mitarbeit dort kein „Berichtigen“ an.
+/// Ohne Meldung in der Lage fehlt das Feld.
+#[tokio::test]
+async fn etb_anzeige_nennt_meldung_in_der_lage() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (_, m) = meldung_senden(&app, einsatz, &mit, serde_json::json!({})).await;
+    let mid = m["id"].as_i64().unwrap();
+    let eid: i64 = sqlx::query_scalar("SELECT id FROM etb_eintrag WHERE meldung_id = ?")
+        .bind(mid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (_, b) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    let bid = b["id"].as_i64().unwrap();
+    let (_, frei) = etb_senden(&app, einsatz, &mit, "meldung", serde_json::json!({})).await;
+    let fid = frei["id"].as_i64().unwrap();
+
+    let in_lage = |liste: &serde_json::Value, id: i64| {
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == id)
+            .unwrap()
+            .get("meldung_in_lage")
+            .cloned()
+    };
+    let uri = format!("/api/einsaetze/{einsatz}/etb");
+    let (_, vorher) = anfrage(&app, "GET", &uri, &mit, None).await;
+    assert_eq!(in_lage(&vorher, eid), None, "{vorher:?}");
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let (s, liste) = anfrage(&app, "GET", &uri, &mit, None).await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    let ja = Some(serde_json::Value::Bool(true));
+    assert_eq!(in_lage(&liste, eid), ja);
+    assert_eq!(in_lage(&liste, bid), ja);
+    assert_eq!(in_lage(&liste, fid), None);
+}
+
 /// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
 async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
     let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;

@@ -429,6 +429,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     load_einheiten(pool, std::slice::from_mut(&mut eintrag)).await?;
+    meldung_in_lage_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -606,6 +607,19 @@ pub async fn meldung_in_lage(pool: &SqlitePool, ids: &[i64]) -> Result<HashSet<i
     );
     let treffer: Vec<i64> = qb.build_query_scalar().fetch_all(pool).await?;
     Ok(treffer.into_iter().collect())
+}
+
+/// Füllt `meldung_in_lage` (LLH-2008) für alle übergebenen Einträge mit EINER Abfrage nach.
+async fn meldung_in_lage_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = eintraege.iter().map(|e| e.id).collect();
+    let in_lage = meldung_in_lage(pool, &ids).await?;
+    for e in eintraege.iter_mut() {
+        e.meldung_in_lage = in_lage.contains(&e.id);
+    }
+    Ok(())
 }
 
 /// Füllt `anhaenge` (LFH-117) für alle übergebenen Einträge mit EINER Abfrage nach — das
@@ -904,6 +918,7 @@ pub async fn abfrage(
     anhaenge_nachladen(pool, &mut eintraege).await?;
     berichtigungen_nachladen(pool, &mut eintraege).await?;
     load_einheiten(pool, &mut eintraege).await?;
+    meldung_in_lage_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 

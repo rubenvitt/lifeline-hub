@@ -319,6 +319,14 @@ pub struct EtbEintragAnzeige {
     /// `folgeauftraege`.
     #[sqlx(skip)]
     pub einheiten: Vec<EinheitVerweis>,
+    /// Der Eintrag oder ein Glied seiner Berichtigungs-Kette gehört zu einer Meldung in der Lage
+    /// (LLH-2008, [`repo::meldung_in_lage`]): die Mitarbeit berichtigt ihn nicht. Stand beim
+    /// Lesen; kommt die Meldung später in die Lage, sperrt der Server weiter mit 403. Fehlt bei
+    /// `false`. Nicht Teil des SELECT, wie `folgeauftraege`.
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[schema(required = false)]
+    pub meldung_in_lage: bool,
 }
 
 /// Verweis eines ETB-Eintrags auf eine Einheit (LLH-1266): `id` für den Deeplink auf ihre
