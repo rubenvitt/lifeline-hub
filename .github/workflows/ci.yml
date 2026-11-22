@@ -29,12 +29,13 @@
 # verschobener Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot hält die
 # Pins aktuell.
 #
-# ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
-# ab, der jüngste Lauf deckt alle früheren mit ab. Das geschieht über Concurrency AUF JOB-EBENE in
-# `suiten.yml`, nicht für den ganzen Workflow: der Release-Job hängt am selben Lauf, und ein
-# Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein Tag ohne Release. Der Release
-# hat eine eigene Gruppe ohne Abbruch; seine `needs` lassen ihn entfallen, wenn ein Testjob
-# abgebrochen oder rot ist.
+# NEBENLÄUFIGKEIT AUF KANAL-BRANCHES (LLH-1889, LLH-2035/ADR-0082): Gestartete Testjobs laufen zu
+# Ende; je Job wartet höchstens ein Lauf, ein neuer Push ersetzt nur den wartenden. Das geschieht
+# über Concurrency AUF JOB-EBENE in `suiten.yml`, nicht für den ganzen Workflow: der Release-Job
+# hängt am selben Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein
+# Tag ohne Release. Der Release hat eine eigene Gruppe ohne Abbruch; seine `needs` lassen ihn
+# entfallen, wenn ein Testjob abgebrochen (ersetzt) oder rot ist, und ein überholter Lauf tritt im
+# Ruhefenster zurück.
 name: CI
 
 on:
