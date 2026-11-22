@@ -2,7 +2,7 @@
 
 Zunder: https://zunder.rubeen.dev/#/aufgabe/demuxo3rcnfmof9uvilczsnz
 
-Abgestimmt mit Ruben am 22.11.2026 (Phase-1-Checkpoint). Grundlage: Bestandsaufnahme vom
+Abgestimmt mit Ruben am 22.11.2026 (Phase-1-Checkpoint), freigegeben am selben Tag. Grundlage: Bestandsaufnahme vom
 selben Tag, drei Leser über Backend, Clients und Regeln.
 
 ## Absicht
@@ -169,7 +169,7 @@ ein eigener Schritt 20 hieße, Bündel, Selbstprüfung und beide Workflows `ci.y
 mitzuziehen, für einen Wächter, der unter einer Sekunde läuft.)* `scripts/AGENTS.md` nennt den
 Wächter in der Kette.
 
-## Kern des Glossars (Vorschlag, mit der Freigabe abzunicken)
+## Kern des Glossars (freigegeben 22.11.2026)
 
 | deutsch | englisch | | deutsch | englisch |
 | --- | --- | --- | --- | --- |
@@ -224,12 +224,12 @@ dort, wo er am heikelsten ist. Umfang:
   `ios/LifelineKern/Sources/LifelineKern/LifelineKern.swift`) zeigt dann „Hülle zu alt“ statt
   einer gescheiterten Anmeldung (`Vertragspruefung.richtung` → `.zuNeu`).
 - **Die neue iOS-Hülle kennt nur Vertrag 2** (`bekannteVertraege = [2]`): Ein Server älteren
-  Stands zeigt ihr „Server zu alt“. *(Zur Freigabe: Die Alternative `[1, 2]` mit Pfadwahl nach
+  Stands zeigt ihr „Server zu alt“. *(Ruben, 22.11.2026: nur Vertrag 2. Die Alternative `[1, 2]` mit Pfadwahl nach
   Vertrag wäre neue Logik im Kern, also genau der Alias, den der harte Schnitt vermeidet.)*
 - **Desktop-Hülle:** Sie prüft keinen Vertrag (das bringt LLH-1982). Bei Versionsabstand
   zwischen Hülle und Server scheitert „Im Browser anmelden“ mit 404. Sie aktualisiert sich selbst
-  (`tauri-plugin-updater`), der Abstand ist also kurz. *(Zur Freigabe: als Alpha-Risiko
-  hinnehmen, statt hier eine Vertragsprüfung oder einen Rückfall auf den alten Pfad zu bauen.)*
+  (`tauri-plugin-updater`), der Abstand ist also kurz. *(Ruben, 22.11.2026: als Alpha-Risiko
+  hingenommen; keine Vertragsprüfung und kein Rückfall auf den alten Pfad hier.)*
 
 ## Pakete (Unteraufgaben von LLH-1979)
 
