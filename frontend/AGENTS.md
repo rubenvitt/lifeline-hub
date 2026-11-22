@@ -978,8 +978,8 @@ anwendbar), „nicht geprüft" ist keins.
   zieht die Seite größer. `touch-action: manipulation` auf `html` (`index.css`) sperrt nur den
   Doppeltipp. Damit iOS beim Fokus nicht in ein Feld hineinzoomt (es tut das unter 16 px), tragen
   Eingabefelder auf grobem Zeiger `feldSchriftTouch` (16 px, `theme/tokens.ts`, Regel am Ende von
-  `theme/rollen.css`), auch gegen Inline-Größen; Knöpfe, Etiketten und Lauftext bleiben in der
-  Dichte. Wächter `theme/zoomFrei.guard.test.ts`, Beleg `e2e/zoom-frei.spec.ts`.
+  `theme/rollen.css`), auch gegen Inline-Größen. Die Regel hebt nur an: antds große Felder
+  (`size="large"`, 16 px oder mehr) bleiben, Knöpfe, Etiketten und Lauftext bleiben in der Dichte. Wächter `theme/zoomFrei.guard.test.ts`, Beleg `e2e/zoom-frei.spec.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
   `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
