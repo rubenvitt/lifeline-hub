@@ -205,3 +205,7 @@ vom Server, danach mindestens 30 s warten, bis das Protokoll „Vorgewärmt“ m
 
 Scheitert ein Fall am Cache (Startprüfung `nicht gestartet` im Protokoll), folgt Kandidat 2 als
 eigene Aufgabe mit diesem Protokoll als Herleitung.
+
+Die Startprüfung sieht nur, ob der Einstieg hochfährt. Räumt iOS einzelne selten genutzte Chunks,
+meldet sie trotzdem „gestartet“; deshalb gehört der Fall „nie geöffnete Seite ohne Netz“ in jede
+Messung, nicht nur einmal (Review LLH-1980).
