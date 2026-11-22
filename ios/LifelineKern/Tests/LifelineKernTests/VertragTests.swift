@@ -18,57 +18,64 @@ final class VertragTests: XCTestCase {
     }
 
     func testShellInfoLiestDieWireFelderUndIgnoriertNeue() throws {
-        let json = #"{"version":"1.0.0-alpha.300","shell_contract":1,"assets":["a.js"]}"#
+        let json = #"{"version":"1.0.0-alpha.300","shell_contract":2,"assets":["a.js"]}"#
         let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
-        XCTAssertEqual(info, ShellInfo(version: "1.0.0-alpha.300", shellContract: 1))
+        XCTAssertEqual(info, ShellInfo(version: "1.0.0-alpha.300", shellContract: 2))
     }
 
-    func testDieAppKenntGenauDenErstenVertrag() {
-        XCTAssertEqual(LifelineKern.bekannteVertraege, [1])
+    /// Vertrag 2 (LLH-1979): der Login-Pfad heißt `/api/auth/app-code/redeem`.
+    func testDieAppKenntGenauDenZweitenVertrag() {
+        XCTAssertEqual(LifelineKern.bekannteVertraege, [2])
+    }
+
+    /// Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für die App zu alt.
+    func testEinServerMitVertragEinsIstZuAlt() {
+        XCTAssertEqual(
+            Vertragspruefung.evaluate(shell(1), letzterVertrag: nil).fehlerklasse, .zuAlt)
     }
 
     func testEinBekannterVertragIstVertraeglich() {
         XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(1), letzterVertrag: nil),
-            .vertraeglich(ShellInfo(version: "1.0.0-alpha.300", shellContract: 1)))
+            Vertragspruefung.evaluate(shell(2), letzterVertrag: nil),
+            .vertraeglich(ShellInfo(version: "1.0.0-alpha.300", shellContract: 2)))
     }
 
     func testEinGroessererVertragHeisstAppAktualisieren() {
-        let info = ShellInfo(version: "2.0.0", shellContract: 2)
+        let info = ShellInfo(version: "2.0.0", shellContract: 3)
         XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(2, version: "2.0.0"), letzterVertrag: 1),
+            Vertragspruefung.evaluate(shell(3, version: "2.0.0"), letzterVertrag: 2),
             .nichtVertraeglich(.zuNeu, server: info))
-        XCTAssertEqual(Vertragspruefung.evaluate(shell(2), letzterVertrag: 1).fehlerklasse, .zuNeu)
+        XCTAssertEqual(Vertragspruefung.evaluate(shell(3), letzterVertrag: 2).fehlerklasse, .zuNeu)
     }
 
     func testEinKleinererVertragHeisstServerZuAlt() {
         XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(1), letzterVertrag: nil, bekannt: [2, 3]).fehlerklasse,
+            Vertragspruefung.evaluate(shell(2), letzterVertrag: nil, bekannt: [3, 4]).fehlerklasse,
             .zuAlt)
     }
 
     func testOhneEndpunktIstDerServerZuAlt() {
         XCTAssertEqual(
             Vertragspruefung.evaluate(
-                .antwort(status: 404, body: Data(), contentType: "text/plain"), letzterVertrag: 1),
+                .antwort(status: 404, body: Data(), contentType: "text/plain"), letzterVertrag: 2),
             .nichtVertraeglich(.zuAlt, server: nil))
         // JSON ohne lesbaren Vertrag nennt keinen Vertrag.
         for typ in ["application/json", "application/json; charset=utf-8", "Application/JSON"] {
             XCTAssertEqual(
                 Vertragspruefung.evaluate(
                     .antwort(status: 200, body: Data(#"{"status":"ok"}"#.utf8), contentType: typ),
-                    letzterVertrag: 1),
+                    letzterVertrag: 2),
                 .nichtVertraeglich(.zuAlt, server: nil), typ)
         }
     }
 
     func testDerVertragGiltAuchMitZeichensatzImContentType() {
         let abruf = ShellAbruf.antwort(
-            status: 200, body: Data(#"{"version":"1.0.0","shell_contract":1}"#.utf8),
+            status: 200, body: Data(#"{"version":"1.0.0","shell_contract":2}"#.utf8),
             contentType: "application/json; charset=utf-8")
         XCTAssertEqual(
             Vertragspruefung.evaluate(abruf, letzterVertrag: nil),
-            .vertraeglich(ShellInfo(version: "1.0.0", shellContract: 1)))
+            .vertraeglich(ShellInfo(version: "1.0.0", shellContract: 2)))
     }
 
     /// Ein Captive Portal oder Auth-Proxy antwortet mit 200 und HTML (oder ohne Content-Type):
@@ -78,7 +85,7 @@ final class VertragTests: XCTestCase {
         for typ in ["text/html", "text/html; charset=utf-8", "text/plain", nil] as [String?] {
             XCTAssertEqual(
                 Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 1),
+                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 2),
                 .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
             XCTAssertEqual(
                 Vertragspruefung.evaluate(
@@ -86,14 +93,14 @@ final class VertragTests: XCTestCase {
                 .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
             XCTAssertEqual(
                 Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 2),
+                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 3),
                 .nichtVertraeglich(.zuNeu, server: nil), "\(typ ?? "ohne")")
         }
         // Auch ein Portal, das JSON-ähnlichen Text als HTML schickt, nennt keinen Vertrag.
         XCTAssertEqual(
             Vertragspruefung.evaluate(
                 .antwort(
-                    status: 200, body: Data(#"{"version":"9","shell_contract":1}"#.utf8),
+                    status: 200, body: Data(#"{"version":"9","shell_contract":2}"#.utf8),
                     contentType: "text/html"),
                 letzterVertrag: nil),
             .nichtErreichbar(.nichtErreichbar))
@@ -104,7 +111,7 @@ final class VertragTests: XCTestCase {
         for status in [301, 302, 303, 307, 308] {
             XCTAssertEqual(
                 Vertragspruefung.evaluate(
-                    .antwort(status: status, body: Data(), contentType: "text/html"), letzterVertrag: 1),
+                    .antwort(status: status, body: Data(), contentType: "text/html"), letzterVertrag: 2),
                 .nichtErreichbar(.nichtErreichbar), "\(status)")
         }
     }
@@ -143,17 +150,17 @@ final class VertragTests: XCTestCase {
     /// „nicht verträglich“.
     func testOhneNetzGiltDerZuletztBestaetigteVertrag() {
         XCTAssertEqual(
-            Vertragspruefung.evaluate(.fehler(.notConnectedToInternet), letzterVertrag: 1),
+            Vertragspruefung.evaluate(.fehler(.notConnectedToInternet), letzterVertrag: 2),
             .nichtErreichbar(.nichtErreichbar))
         XCTAssertEqual(
             Vertragspruefung.evaluate(.fehler(.timedOut), letzterVertrag: nil),
             .nichtErreichbar(.nichtErreichbar))
         XCTAssertEqual(
-            Vertragspruefung.evaluate(.fehler(.cannotConnectToHost), letzterVertrag: 2),
+            Vertragspruefung.evaluate(.fehler(.cannotConnectToHost), letzterVertrag: 3),
             .nichtVertraeglich(.zuNeu, server: nil))
         XCTAssertEqual(
             Vertragspruefung.evaluate(
-                .antwort(status: 502, body: Data(), contentType: "text/html"), letzterVertrag: 1),
+                .antwort(status: 502, body: Data(), contentType: "text/html"), letzterVertrag: 2),
             .nichtErreichbar(.nichtErreichbar))
     }
 
@@ -164,12 +171,12 @@ final class VertragTests: XCTestCase {
         ] {
             XCTAssertEqual(Fehlerklasse(code), .zertifikat, "\(code)")
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 1),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
                 .nichtErreichbar(.zertifikat))
             // Auch ein zuletzt unverträglicher Server zeigt zuerst die Anleitung zum Zertifikat:
             // ohne Vertrauen erfährt die App den heutigen Vertrag nicht.
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 3),
                 .nichtErreichbar(.zertifikat))
         }
         for code: URLError.Code in [

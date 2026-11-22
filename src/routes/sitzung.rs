@@ -1,6 +1,6 @@
 //! Sitzungsliste und Beenden ohne Deaktivieren (LFH-1092).
 //!
-//! Eine Person sieht und beendet ihre eigenen Sitzungen (`/api/auth/sitzungen…`), ein Admin die
+//! Eine Person sieht und beendet ihre eigenen Sitzungen (`/api/auth/sessions…`), ein Admin die
 //! einer Person seiner Organisation (`/api/benutzer/{id}/sitzungen…`). Beenden löscht nur
 //! Sitzungszeilen: Konto, Passwort und Zweitfaktor bleiben, Sitzungen gekoppelter Geräte auch
 //! (die haben ihren eigenen Widerruf). Jede beendete Sitzung steht in der Spur und beendet ihre
@@ -29,7 +29,7 @@ pub struct SitzungenBeendet {
 
 const AKTUELLE_SITZUNG: &str = "Die aktuelle Anmeldung endet über Abmelden.";
 
-/// GET /api/auth/sitzungen — die eigenen laufenden Sitzungen, die aktuelle markiert.
+/// GET /api/auth/sessions — die eigenen laufenden Sitzungen, die aktuelle markiert.
 pub async fn eigene_liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -41,7 +41,7 @@ pub async fn eigene_liste(
     ))
 }
 
-/// DELETE /api/auth/sitzungen/{kennung} — eine eigene Sitzung beenden. Die aktuelle → 422
+/// DELETE /api/auth/sessions/{kennung} — eine eigene Sitzung beenden. Die aktuelle → 422
 /// (dafür gibt es Abmelden), eine unbekannte → 404.
 pub async fn eigene_beenden(
     State(state): State<AppState>,
@@ -62,7 +62,7 @@ pub async fn eigene_beenden(
     ))
 }
 
-/// POST /api/auth/sitzungen/andere-beenden — alle eigenen Sitzungen außer der aktuellen.
+/// POST /api/auth/sessions/end-others — alle eigenen Sitzungen außer der aktuellen.
 pub async fn eigene_andere_beenden(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,

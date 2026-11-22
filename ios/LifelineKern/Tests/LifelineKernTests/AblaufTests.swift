@@ -14,7 +14,7 @@ final class AblaufTests: XCTestCase {
     var liste = Serverliste()
     var elw: ServerEintrag!
     var lager: ServerEintrag!
-    let info = ShellInfo(version: "1.0.0-alpha.320", shellContract: 1)
+    let info = ShellInfo(version: "1.0.0-alpha.320", shellContract: 2)
     let eigen = URL(string: "https://elw.local:8443/einsatz/3")
     let idp = URL(string: "https://idp.example/realms/drk/login")
 
@@ -43,12 +43,12 @@ final class AblaufTests: XCTestCase {
 
     func testEinVertraeglicherServerWirdGeladenUndVermerkt() {
         let schritt = step(.pruefung(elw), .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id))
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
-        XCTAssertEqual(schritt.effects, [.markVerbunden(elw.id, vertrag: 1), .load(elw)])
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
+        XCTAssertEqual(schritt.effects, [.markVerbunden(elw.id, vertrag: 2), .load(elw)])
     }
 
     func testBeimWechselPrueftDieAppDenNeuenServer() {
-        for vorher: Ablauf.Seite in [.web(elw, vertrag: 1), .status(elw, .nichtErreichbar), .pruefung(elw)] {
+        for vorher: Ablauf.Seite in [.web(elw, vertrag: 2), .status(elw, .nichtErreichbar), .pruefung(elw)] {
             let schritt = step(vorher, .wechseln(lager))
             XCTAssertEqual(schritt.seite, .pruefung(lager))
             XCTAssertEqual(schritt.effects, [.check(lager)])
@@ -63,14 +63,14 @@ final class AblaufTests: XCTestCase {
 
     func testNachDemOnboardingLaedtDieAppOhneZweitePruefung() {
         let schritt = step(.onboarding, .verbunden(elw, info))
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
-        XCTAssertEqual(schritt.effects, [.markVerbunden(elw.id, vertrag: 1), .load(elw)])
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
+        XCTAssertEqual(schritt.effects, [.markVerbunden(elw.id, vertrag: 2), .load(elw)])
     }
 
     // MARK: Status-Seiten
 
     func testEinUnbekannterVertragZeigtDieRichtungUndLaedtNicht() {
-        let neu = ShellInfo(version: "2.0.0", shellContract: 2)
+        let neu = ShellInfo(version: "2.0.0", shellContract: 3)
         let schritt = step(
             .pruefung(elw), .ergebnis(.nichtVertraeglich(.zuNeu, server: neu), healthVersion: nil, fuer: elw.id))
         XCTAssertEqual(schritt.seite, .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0")))
@@ -101,13 +101,13 @@ final class AblaufTests: XCTestCase {
         let c = step(b.seite, .ergebnis(.nichtErreichbar(.nichtErreichbar), healthVersion: nil, fuer: elw.id))
         XCTAssertEqual(c.effects, [.scheduleRetry])
         let d = step(c.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id))
-        XCTAssertEqual(d.seite, .web(elw, vertrag: 1))
-        XCTAssertEqual(d.effects, [.markVerbunden(elw.id, vertrag: 1), .load(elw)])
+        XCTAssertEqual(d.seite, .web(elw, vertrag: 2))
+        XCTAssertEqual(d.effects, [.markVerbunden(elw.id, vertrag: 2), .load(elw)])
     }
 
     func testWiederholenGiltNurAufDerSeiteNichtErreichbar() {
         for seite: Ablauf.Seite in [
-            .onboarding, .pruefung(elw), .web(elw, vertrag: 1), .status(elw, .zertifikat),
+            .onboarding, .pruefung(elw), .web(elw, vertrag: 2), .status(elw, .zertifikat),
             .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: nil)),
         ] {
             let schritt = step(seite, .wiederholen)
@@ -119,19 +119,19 @@ final class AblaufTests: XCTestCase {
     // MARK: Vordergrund
 
     func testRueckkehrMitLebenderSeitePrueftOhneNeuzuladen() {
-        let schritt = step(.web(elw, vertrag: 1), .vordergrund(seiteAntwortet: true, adresse: eigen, anmeldungLaeuft: false))
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+        let schritt = step(.web(elw, vertrag: 2), .vordergrund(seiteAntwortet: true, adresse: eigen, anmeldungLaeuft: false))
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(schritt.effects, [.check(elw)])
         let ok = step(schritt.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id))
-        XCTAssertEqual(ok.seite, .web(elw, vertrag: 1))
-        XCTAssertEqual(ok.effects, [.markVerbunden(elw.id, vertrag: 1)])
+        XCTAssertEqual(ok.seite, .web(elw, vertrag: 2))
+        XCTAssertEqual(ok.effects, [.markVerbunden(elw.id, vertrag: 2)])
     }
 
     func testRueckkehrOhneNetzLaesstDieGeladeneSeiteStehen() {
         // Die Oberfläche arbeitet ohne Netz weiter (Schreib-Queue); eine Status-Seite verdrängte sie.
         let schritt = step(
-            .web(elw, vertrag: 1), .ergebnis(.nichtErreichbar(.nichtErreichbar), healthVersion: nil, fuer: elw.id))
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+            .web(elw, vertrag: 2), .ergebnis(.nichtErreichbar(.nichtErreichbar), healthVersion: nil, fuer: elw.id))
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(schritt.effects, [])
     }
 
@@ -139,20 +139,20 @@ final class AblaufTests: XCTestCase {
     /// CA-Profil geht vor, auch wenn sie schon geladen war.
     func testRueckkehrMitZertifikatsfehlerZeigtDieAnleitungAuchBeiGeladenerSeite() {
         let schritt = step(
-            .web(elw, vertrag: 1), .ergebnis(.nichtErreichbar(.zertifikat), healthVersion: nil, fuer: elw.id))
+            .web(elw, vertrag: 2), .ergebnis(.nichtErreichbar(.zertifikat), healthVersion: nil, fuer: elw.id))
         XCTAssertEqual(schritt.seite, .status(elw, .zertifikat))
         XCTAssertEqual(schritt.effects, [])
     }
 
     func testRueckkehrZuEinemGehobenenServerZeigtAppAktualisieren() {
-        let neu = ShellInfo(version: "2.0.0", shellContract: 2)
+        let neu = ShellInfo(version: "2.0.0", shellContract: 3)
         let schritt = step(
-            .web(elw, vertrag: 1), .ergebnis(.nichtVertraeglich(.zuNeu, server: neu), healthVersion: nil, fuer: elw.id))
+            .web(elw, vertrag: 2), .ergebnis(.nichtVertraeglich(.zuNeu, server: neu), healthVersion: nil, fuer: elw.id))
         XCTAssertEqual(schritt.seite, .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0")))
     }
 
     func testRueckkehrMitToterSeitePrueftUndLaedtNeu() {
-        let schritt = step(.web(elw, vertrag: 1), .vordergrund(seiteAntwortet: false, adresse: nil, anmeldungLaeuft: false))
+        let schritt = step(.web(elw, vertrag: 2), .vordergrund(seiteAntwortet: false, adresse: nil, anmeldungLaeuft: false))
         XCTAssertEqual(schritt.seite, .pruefung(elw))
         XCTAssertEqual(schritt.effects, [.check(elw)])
     }
@@ -172,8 +172,8 @@ final class AblaufTests: XCTestCase {
     /// Die Linkregel lässt fremde Seiten im Hauptframe zu (Identitätsanbieter); ohne Weg zurück
     /// wäre eine fremde Seite ohne Rücklink eine Sackgasse.
     func testZurOberflaecheLaedtDieStartadresseDesAktivenServersNeu() {
-        let schritt = step(.web(elw, vertrag: 1), .zurOberflaeche)
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+        let schritt = step(.web(elw, vertrag: 2), .zurOberflaeche)
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(schritt.effects, [.hideZurOberflaeche, .load(elw)])
     }
 
@@ -194,7 +194,7 @@ final class AblaufTests: XCTestCase {
     }
 
     func testDieServerlisteBietetZurOberflaecheNurMitServerseite() {
-        XCTAssertTrue(Ablauf.bietetZurOberflaeche(.web(elw, vertrag: 1)))
+        XCTAssertTrue(Ablauf.bietetZurOberflaeche(.web(elw, vertrag: 2)))
         XCTAssertTrue(Ablauf.bietetZurOberflaeche(.status(elw, .nichtErreichbar)))
         XCTAssertFalse(Ablauf.bietetZurOberflaeche(.pruefung(elw)))
         XCTAssertFalse(Ablauf.bietetZurOberflaeche(.onboarding))
@@ -203,45 +203,45 @@ final class AblaufTests: XCTestCase {
     /// Kein Zwang: die fremde Seite bleibt stehen, aber der Weg zurück wird angeboten.
     func testRueckkehrAufEinerFremdenSeiteBietetDenWegZurueck() {
         let schritt = step(
-            .web(elw, vertrag: 1), .vordergrund(seiteAntwortet: true, adresse: idp, anmeldungLaeuft: false))
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+            .web(elw, vertrag: 2), .vordergrund(seiteAntwortet: true, adresse: idp, anmeldungLaeuft: false))
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(schritt.effects, [.check(elw), .showZurOberflaeche])
     }
 
     /// Während „Im Browser anmelden“ läuft, gehört der Umweg zur Anmeldung.
     func testRueckkehrWaehrendEinerAnmeldungBietetNichtsAn() {
         let schritt = step(
-            .web(elw, vertrag: 1), .vordergrund(seiteAntwortet: true, adresse: idp, anmeldungLaeuft: true))
+            .web(elw, vertrag: 2), .vordergrund(seiteAntwortet: true, adresse: idp, anmeldungLaeuft: true))
         XCTAssertEqual(schritt.effects, [.check(elw)])
     }
 
     func testRueckkehrAufDerSeiteDesServersBietetNichtsAn() {
         for adresse in [eigen, URL(string: "https://ELW.local:8443/login"), nil] {
             let schritt = step(
-                .web(elw, vertrag: 1), .vordergrund(seiteAntwortet: true, adresse: adresse, anmeldungLaeuft: false))
+                .web(elw, vertrag: 2), .vordergrund(seiteAntwortet: true, adresse: adresse, anmeldungLaeuft: false))
             XCTAssertEqual(schritt.effects, [.check(elw)], "\(String(describing: adresse))")
         }
         // Eine andere Origin desselben Hosts ist fremd.
         let anderePort = step(
-            .web(elw, vertrag: 1),
+            .web(elw, vertrag: 2),
             .vordergrund(seiteAntwortet: true, adresse: URL(string: "https://elw.local/"), anmeldungLaeuft: false))
         XCTAssertEqual(anderePort.effects, [.check(elw), .showZurOberflaeche])
     }
 
     func testDieSeiteDesServersNimmtDenHinweisZurueck() {
-        let zurueck = step(.web(elw, vertrag: 1), .seiteGeladen(url: eigen))
-        XCTAssertEqual(zurueck.seite, .web(elw, vertrag: 1))
+        let zurueck = step(.web(elw, vertrag: 2), .seiteGeladen(url: eigen))
+        XCTAssertEqual(zurueck.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(zurueck.effects, [.hideZurOberflaeche])
-        XCTAssertEqual(step(.web(elw, vertrag: 1), .seiteGeladen(url: idp)).effects, [])
-        XCTAssertEqual(step(.web(elw, vertrag: 1), .seiteGeladen(url: nil)).effects, [])
+        XCTAssertEqual(step(.web(elw, vertrag: 2), .seiteGeladen(url: idp)).effects, [])
+        XCTAssertEqual(step(.web(elw, vertrag: 2), .seiteGeladen(url: nil)).effects, [])
         XCTAssertEqual(step(.pruefung(elw), .seiteGeladen(url: eigen)).effects, [])
     }
 
     /// Vor einem Ladefehler kann WebKit eine leere Seite übernehmen; sie ändert nichts, der Fehler
     /// danach führt wie sonst zur Seite „nicht erreichbar“.
     func testEineLeereSeiteVorDemLadefehlerBleibtOhneWirkung() {
-        let leer = step(.web(elw, vertrag: 1), .seiteGeladen(url: URL(string: "about:blank")))
-        XCTAssertEqual(leer.seite, .web(elw, vertrag: 1))
+        let leer = step(.web(elw, vertrag: 2), .seiteGeladen(url: URL(string: "about:blank")))
+        XCTAssertEqual(leer.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(leer.effects, [])
         let danach = step(leer.seite, .navigationFehlgeschlagen(.cannotConnectToHost, url: eigen))
         XCTAssertEqual(danach.seite, .status(elw, .nichtErreichbar))
@@ -250,31 +250,31 @@ final class AblaufTests: XCTestCase {
     // MARK: Webview
 
     func testNachDemEndeDesWebProzessesLaedtDieAppNeu() {
-        let schritt = step(.web(elw, vertrag: 1), .webProzessBeendet)
-        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+        let schritt = step(.web(elw, vertrag: 2), .webProzessBeendet)
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(schritt.effects, [.reload])
         XCTAssertEqual(step(.status(elw, .zertifikat), .webProzessBeendet).effects, [])
     }
 
     func testEinNavigationsfehlerDesServersZeigtSeineFehlerklasse() {
         let url = URL(string: "https://elw.local:8443/einsatz/3")
-        let zert = step(.web(elw, vertrag: 1), .navigationFehlgeschlagen(.serverCertificateUntrusted, url: url))
+        let zert = step(.web(elw, vertrag: 2), .navigationFehlgeschlagen(.serverCertificateUntrusted, url: url))
         XCTAssertEqual(zert.seite, .status(elw, .zertifikat))
         XCTAssertEqual(zert.effects, [])
-        let weg = step(.web(elw, vertrag: 1), .navigationFehlgeschlagen(.cannotConnectToHost, url: nil))
+        let weg = step(.web(elw, vertrag: 2), .navigationFehlgeschlagen(.cannotConnectToHost, url: nil))
         XCTAssertEqual(weg.seite, .status(elw, .nichtErreichbar))
         XCTAssertEqual(weg.effects, [.scheduleRetry])
     }
 
     func testEinAbgebrochenerOderFremderLadevorgangBleibtOhneWirkung() {
         let eigen = URL(string: "https://elw.local:8443/")
-        let a = step(.web(elw, vertrag: 1), .navigationFehlgeschlagen(.cancelled, url: eigen))
-        XCTAssertEqual(a.seite, .web(elw, vertrag: 1))
+        let a = step(.web(elw, vertrag: 2), .navigationFehlgeschlagen(.cancelled, url: eigen))
+        XCTAssertEqual(a.seite, .web(elw, vertrag: 2))
         // Der Identitätsanbieter ist nicht der Server; die Seite des Webviews meldet den Fehler.
         let b = step(
-            .web(elw, vertrag: 1),
+            .web(elw, vertrag: 2),
             .navigationFehlgeschlagen(.cannotFindHost, url: URL(string: "https://idp.example/login")))
-        XCTAssertEqual(b.seite, .web(elw, vertrag: 1))
+        XCTAssertEqual(b.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(b.effects, [])
     }
 
@@ -289,7 +289,7 @@ final class AblaufTests: XCTestCase {
             .nichtVertraeglich(.zuAlt, serverVersion: nil))
         // Die Version des Vertrags geht vor der aus /api/health.
         XCTAssertEqual(
-            Statusseite(.nichtVertraeglich(.zuAlt, server: ShellInfo(version: "0.9", shellContract: 0)), healthVersion: "x"),
+            Statusseite(.nichtVertraeglich(.zuAlt, server: ShellInfo(version: "0.9", shellContract: 1)), healthVersion: "x"),
             .nichtVertraeglich(.zuAlt, serverVersion: "0.9"))
     }
 

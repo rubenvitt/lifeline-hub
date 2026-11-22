@@ -60,7 +60,7 @@ pub fn einloese_skript(server: &Url, code: &str, verifier: &str) -> String {
     format!(
         "(() => {{ const melden = (ergebnis) => window.dispatchEvent(new CustomEvent({ereignis}, \
          {{ detail: {{ ergebnis }} }})); if (window.location.origin !== {origin}) return; \
-         fetch('/api/auth/app-code/einloesen', {{ method: 'POST', credentials: 'same-origin', \
+         fetch('/api/auth/app-code/redeem', {{ method: 'POST', credentials: 'same-origin', \
          headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ code: {code}, \
          verifier: {verifier} }}) }}).then((antwort) => melden(antwort.ok ? 'angemeldet' : \
          antwort.status === 401 ? 'abgelehnt' : 'fehler')).catch(() => melden('fehler')); }})();"
@@ -221,7 +221,7 @@ mod tests {
             skript.contains(r#"window.location.origin !== "https://elw.local:8443""#),
             "{skript}"
         );
-        assert!(skript.contains("/api/auth/app-code/einloesen"), "{skript}");
+        assert!(skript.contains("/api/auth/app-code/redeem"), "{skript}");
         assert!(skript.contains(&format!(r#"code: "{CODE}""#)), "{skript}");
         assert!(
             skript.contains(&format!(r#"verifier: "{verifier}""#)),

@@ -85,7 +85,7 @@ export const server = setupServer(
    * Anmeldung). Das Profil fragt sie beim Mount ab; Tests der Liste überschreiben per
    * `server.use()`.
    */
-  http.get('/api/auth/sitzungen', () =>
+  http.get('/api/auth/sessions', () =>
     HttpResponse.json([
       {
         kennung: '0'.repeat(32),

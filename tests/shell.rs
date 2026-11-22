@@ -53,6 +53,8 @@ fn pruefe_pflichtfelder(json: &Value) {
         vertrag >= 1,
         "shell_contract ist mindestens 1, war {vertrag}"
     );
+    // Vertrag 2 (LLH-1979): der Login-Pfad der Hüllen heißt `/api/auth/app-code/redeem`.
+    assert_eq!(vertrag, 2, "shell_contract nach LLH-1979");
 }
 
 #[tokio::test]

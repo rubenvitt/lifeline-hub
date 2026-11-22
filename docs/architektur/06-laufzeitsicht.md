@@ -79,7 +79,7 @@ sequenceDiagram
     FE->>BE: POST /api/auth/totp/finish {code}
   else Einmalpasswort
     BE-->>FE: {passwort_wechsel_erforderlich}
-    FE->>BE: POST /api/auth/passwort/festlegen
+    FE->>BE: POST /api/auth/password/set
   end
   BE->>DB: session::anlegen (Token-Hash, 7 Tage), auth_audit login_ok
   BE-->>FE: Benutzer, Cookie lifeline_sid (HttpOnly, SameSite=Lax)
@@ -99,7 +99,7 @@ sequenceDiagram
   (`src-tauri/src/aswas.rs`). Der Systembrowser holt mit seiner Sitzung über
   `POST /api/auth/app-code` einen Einmalcode (`TTL` 60 s, `src/auth/huelle/state.rs`) und springt
   mit `lifeline://anmeldung?code=…` zurück; die Hülle löst ihn mit dem PKCE-`verifier` im Webview
-  über `POST /api/auth/app-code/einloesen` ein (`src-tauri/src/anmeldung.rs`). Regeln:
+  über `POST /api/auth/app-code/redeem` ein (`src-tauri/src/anmeldung.rs`). Regeln:
   [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md).
 - Jede schreibende Anfrage trägt `X-Erwarteter-Benutzer-Id`; bei Abweichung antwortet
   `CurrentUser` mit 412 und der Client prüft per `/me`. Regeln und Abmeldewege:

@@ -15,7 +15,10 @@ use utoipa::ToSchema;
 /// diesem Server nicht mehr richtig arbeiten kann. Eine Erweiterung, die ältere Hüllen nicht
 /// stört (etwa ein neues Feld in [`ShellInfo`] oder eine neue, optionale Fähigkeit), lässt ihn
 /// unverändert. Bestehende Felder werden nie umbenannt, entfernt oder umgedeutet.
-pub const SHELL_CONTRACT: u32 = 1;
+///
+/// Verlauf: 1 mit LLH-1978; 2 mit LLH-1979, weil der Login-Pfad der Hüllen von
+/// `/api/auth/app-code/einloesen` zu `/api/auth/app-code/redeem` wurde (ADR-0082).
+pub const SHELL_CONTRACT: u32 = 2;
 
 /// Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`).
 #[derive(Debug, Serialize, ToSchema)]

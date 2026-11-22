@@ -51,12 +51,6 @@
 /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege
 /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen
 /api/aufbewahrung/einsaetze/{id}/wiederherstellen
-/api/auth/app-code/einloesen
-/api/auth/passwort
-/api/auth/passwort/festlegen
-/api/auth/sitzungen
-/api/auth/sitzungen/andere-beenden
-/api/auth/sitzungen/{kennung}
 /api/benachrichtigungen
 /api/benachrichtigungen/{id}
 /api/benachrichtigungen/{id}/quittieren
