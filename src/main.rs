@@ -334,14 +334,46 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // jeder Durchgang eine leere Abfrage; das Stoppsignal teilt er mit der Sicherung.
     let webhook_task =
         lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang.clone());
-    // Adapter (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung, Abrufe im
+    // Adapter (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus Umgebung oder Datei, Abrufe im
     // Hintergrund. Ohne Schlüssel läuft der Server; Adapter mit Geheimnissen melden das selbst.
+    let (speicher, warnungen) = config
+        .load_geheimnisspeicher()
+        .map_err(|e| anyhow::anyhow!(e))?;
+    for warnung in warnungen {
+        tracing::warn!("{warnung}");
+    }
     let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
-        lifeline_hub::adapter::geheimnis::Geheimnisspeicher::new(
-            config.geheimnis_schluessel.clone(),
-        ),
+        speicher,
         lifeline_hub::adapter::art::Verzeichnis::produktiv(),
     );
+    // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
+    // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.
+    if let Some(alt) = adapter_rahmen.speicher.fingerabdruck_alt() {
+        let neu = adapter_rahmen.speicher.fingerabdruck().unwrap_or_default();
+        match lifeline_hub::adapter::lauf::umschluesseln(&pool, &adapter_rahmen.speicher).await {
+            Ok(n) if n.unlesbar == 0 => tracing::info!(
+                alt,
+                neu,
+                anzahl = n.umgeschluesselt,
+                "Geheimnisse der Adapter auf den neuen Schlüssel umgeschlüsselt; \
+                 LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT kann entfernt werden"
+            ),
+            Ok(n) => tracing::warn!(
+                alt,
+                neu,
+                anzahl = n.umgeschluesselt,
+                unlesbar = n.unlesbar,
+                "Geheimnisse der Adapter umgeschlüsselt, einige ließen sich mit dem alten \
+                 Schlüssel nicht öffnen: in der Verwaltung neu setzen"
+            ),
+            Err(e) => tracing::warn!(
+                alt,
+                neu,
+                "Umschlüsseln der Adapter-Geheimnisse fehlgeschlagen, der Server liest mit \
+                 beiden Schlüsseln: {e}"
+            ),
+        }
+    }
     // Ohne Schlüssel warnt der Start nur, wenn Geheimnisse liegen; mit Schlüssel, wenn welche
     // nicht zu ihm passen (Wiederherstellung auf einem anderen Rechner). Nie ein Wert im Log.
     let fp = adapter_rahmen.speicher.fingerabdruck();
