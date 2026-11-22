@@ -18,6 +18,9 @@ class FakeMarker {
   // Zugmerker wie bei maplibre: `remove()` setzt sie nicht zurück, nur `_onUp`.
   _isDragging = false;
   _state: 'inactive' | 'pending' | 'active' = 'inactive';
+  // Hängen `_onMove`/`_onUp` an der Karte? maplibre meldet sie mit `remove()` ab: danach erreicht
+  // kein Zeigerereignis des laufenden Zugs den Marker mehr.
+  private zugHoerer = false;
   constructor(opts: { element: HTMLElement }) {
     this.element = opts.element;
     marker.set(opts.element.dataset.lfh ?? '?', this);
@@ -38,6 +41,7 @@ class FakeMarker {
   // Wie bei maplibre: `remove()` meldet die Zug-Hörer ab, ohne `dragend` zu feuern, und lässt
   // `pointer-events` am Element stehen.
   remove() {
+    this.zugHoerer = false;
     return this;
   }
   on(ereignis: string, f: () => void) {
@@ -47,21 +51,36 @@ class FakeMarker {
   fire(ereignis: string) {
     for (const f of this.listeners.get(ereignis) ?? []) f();
   }
-  /** Zug beginnen wie maplibres `_onMove`: Zeiger durch den Griff hindurch, dann `dragstart`. */
-  startDrag(ziel: { lat: number; lon: number }) {
+  /** Druck auf den Griff wie maplibres `_addDragHandler`: der Zug steht an, bewegt ist noch nichts. */
+  press() {
+    this._state = 'pending';
+    this.zugHoerer = true;
+  }
+  /** Zeiger bewegen wie maplibres `_onMove`; nur mit angemeldeten Zug-Hörern. */
+  moveTo(ziel: { lat: number; lon: number }) {
+    if (!this.zugHoerer) return;
     this._isDragging = true;
-    this._state = 'active';
     this.element.style.pointerEvents = 'none';
-    this.fire('dragstart');
     this.setLngLat([ziel.lon, ziel.lat]);
+    if (this._state === 'pending') {
+      this._state = 'active';
+      this.fire('dragstart');
+    }
     this.fire('drag');
   }
-  /** Zug beenden wie maplibres `_onUp`. */
+  /** Zug beginnen: Druck, dann Zeiger durch den Griff hindurch (`dragstart`, `drag`). */
+  startDrag(ziel: { lat: number; lon: number }) {
+    this.press();
+    this.moveTo(ziel);
+  }
+  /** Loslassen wie maplibres `_onUp`; nur mit angemeldeten Zug-Hörern. */
   endDrag() {
+    if (!this.zugHoerer) return;
+    this.zugHoerer = false;
     this._isDragging = false;
-    this._state = 'inactive';
     this.element.style.pointerEvents = 'auto';
-    this.fire('dragend');
+    if (this._state === 'active') this.fire('dragend');
+    this._state = 'inactive';
   }
   /**
    * Greifbar: der Zeiger trifft das Element (maplibre schaltet es nur im Zug durchlässig), und kein
@@ -91,7 +110,8 @@ const noerdlich = (p: GeoPunkt, nordM: number): GeoPunkt => ({
 
 function setup() {
   const onRadius = vi.fn<(radiusM: number, fertig: boolean) => void>();
-  const griff = erzeugeKreisGriff(karte, KONTEXT, onRadius, vi.fn());
+  const onMitte = vi.fn<(mitte: GeoPunkt, fertig: boolean) => void>();
+  const griff = erzeugeKreisGriff(karte, KONTEXT, onRadius, onMitte);
   const rand = marker.get('kreisgriff')!;
   const lage = (): GeoPunkt => {
     const ll = rand.getLngLat()!;
@@ -103,7 +123,7 @@ function setup() {
     rand.endDrag();
     return onRadius.mock.lastCall![0];
   };
-  return { griff, onRadius, lage, dragTo, rand };
+  return { griff, onRadius, onMitte, lage, dragTo, rand };
 }
 
 beforeEach(() => marker.clear());
@@ -243,5 +263,81 @@ describe('Esc mitten im Zug (LLH-1857)', () => {
     const ll = mittenGriff.getLngLat()!;
     expect({ lat: ll.lat, lon: ll.lng }).toEqual(NEU);
     expect(mittenGriff.isGrabbable()).toBe(true);
+  });
+});
+
+describe('Esc mitten im Zug am Kreis einer bestehenden Zone (LLH-1891)', () => {
+  // Esc setzt Mitte und Radius auf den gespeicherten Kreis zurück. Die Mitte bleibt gesetzt, der
+  // Griff hängt also nicht ab: die Seite beendet den Zug über `zugBeenden`, dann kommt `set`.
+  const lageVon = (m: FakeMarker): GeoPunkt => {
+    const ll = m.getLngLat()!;
+    return { lat: ll.lat, lon: ll.lng };
+  };
+
+  it('Randgriff: Weiterziehen und Loslassen melden nichts, der Griff steht auf dem gespeicherten Kreis', () => {
+    const { griff, onRadius, lage, rand } = setup();
+    griff.set(MITTE, 300);
+    rand.startDrag(noerdlich(MITTE, 500));
+    griff.set(MITTE, onRadius.mock.lastCall![0]);
+    onRadius.mockClear();
+
+    griff.zugBeenden();
+    griff.set(MITTE, 300);
+    rand.moveTo(noerdlich(MITTE, 800));
+    rand.endDrag();
+
+    expect(onRadius).not.toHaveBeenCalled();
+    expect(lage()).toEqual(griffLage(MITTE, 300));
+    expect(rand.isGrabbable()).toBe(true);
+  });
+
+  it('Mittengriff: Weiterziehen und Loslassen melden nichts, beide Griffe stehen am gespeicherten Kreis', () => {
+    const { griff, onMitte, onRadius, lage } = setup();
+    const mittenGriff = marker.get('kreisgriff-mitte')!;
+    griff.set(MITTE, 300);
+    const gezogen = noerdlich(MITTE, 400);
+    mittenGriff.startDrag(gezogen);
+    griff.set(gezogen, 300);
+    onMitte.mockClear();
+
+    griff.zugBeenden();
+    griff.set(MITTE, 300);
+    mittenGriff.moveTo(noerdlich(MITTE, 900));
+    mittenGriff.endDrag();
+
+    expect(onMitte).not.toHaveBeenCalled();
+    expect(onRadius).not.toHaveBeenCalled();
+    expect(lageVon(mittenGriff)).toEqual(MITTE);
+    expect(lage()).toEqual(griffLage(MITTE, 300));
+    expect(mittenGriff.isGrabbable()).toBe(true);
+  });
+
+  it('ein Druck ohne Bewegung wird nach Esc nicht mehr zum Zug', () => {
+    const { griff, onRadius, lage, rand } = setup();
+    griff.set(MITTE, 300);
+    rand.press();
+
+    griff.zugBeenden();
+    rand.moveTo(noerdlich(MITTE, 800));
+    rand.endDrag();
+
+    expect(onRadius).not.toHaveBeenCalled();
+    expect(lage()).toEqual(griffLage(MITTE, 300));
+    expect(rand.isGrabbable()).toBe(true);
+  });
+
+  it('ohne laufenden Zug ändert `zugBeenden` nichts, auch nicht an einem gezogenen Radius', () => {
+    const { griff, onRadius, lage, dragTo, rand } = setup();
+    griff.set(MITTE, 300);
+    const ziel = noerdlich(MITTE, 220);
+    const radius = dragTo(ziel);
+    griff.set(MITTE, radius);
+    onRadius.mockClear();
+
+    griff.zugBeenden();
+
+    expect(onRadius).not.toHaveBeenCalled();
+    expect(lage()).toEqual(ziel);
+    expect(rand.isGrabbable()).toBe(true);
   });
 });

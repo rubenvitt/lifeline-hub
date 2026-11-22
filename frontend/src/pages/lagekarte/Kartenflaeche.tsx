@@ -394,6 +394,11 @@ export interface KartenHandle {
   punktZurueck(): boolean;
   /** Angefangene Figur verwerfen, im Zeichenmodus bleiben (erste Esc-Stufe). */
   zeichnungVerwerfen(): void;
+  /**
+   * Einen laufenden Zug an Kreis- oder Bearbeitungsgriffen beenden, ohne ihn zu melden (erste
+   * Esc-Stufe, LLH-1891). No-op ohne Griffe.
+   */
+  zugBeenden(): void;
   /** Laufende Messung abschließen; false bei zu wenigen Punkten. */
   messungAbschliessen(): boolean;
   /** Messung verwerfen und in derselben Form neu beginnen. */
@@ -705,6 +710,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       zeichnungVerwerfen() {
         aktiveZeichnung()?.verwerfen();
+      },
+      zugBeenden() {
+        kreisGriffRef.current?.zugBeenden();
+        bearbeitungRef.current?.zugBeenden();
       },
       messungAbschliessen() {
         return messRef.current?.abschliessen() ?? false;
