@@ -47,6 +47,15 @@ export function ruecknahmeFehlerText(name: string, e: unknown): string {
     : `${name}: ${fehlerText(e, 'Nicht zurückgenommen')}`;
 }
 
+/** Die Antwort eines Wechsels ohne den Beleg, für den Cache: kein späterer Leser findet ihn. */
+export function ohneBeleg<T extends { status_ruecknahme?: unknown }>(
+  antwort: T,
+): Omit<T, 'status_ruecknahme'> {
+  const kopie = { ...antwort };
+  delete kopie.status_ruecknahme;
+  return kopie;
+}
+
 /** Eine Quittung: wer, von was nach was, und der Beleg für den Rückweg. */
 export type StatusQuittung<B> = { id: number; name: string; vorher: string; neu: string; beleg: B };
 

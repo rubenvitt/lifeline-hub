@@ -4,6 +4,7 @@ import { statusQuittungSchluessel, statusQuittungText } from '../kommunikation/r
 import {
   einheitQuittungName,
   materialStatusKurz,
+  ohneBeleg,
   ruecknahmeFehlerText,
   statusKurz,
 } from './useStatusQuittung';
@@ -42,6 +43,12 @@ describe('Statusquittung (LLH-1781, LLH-1986)', () => {
       statusQuittungSchluessel('personal', 7),
     );
     expect(statusQuittungSchluessel('material', 7)).toBe('lfh-status-quittung-material-7');
+  });
+
+  it('ohne Beleg in den Cache', () => {
+    const z = ohneBeleg({ id: 1, status_ruecknahme: { gesetzt_at: 'x' } });
+    expect(z).toEqual({ id: 1 });
+    expect('status_ruecknahme' in z).toBe(false);
   });
 
   it('veraltet heißt „inzwischen geändert“, sonst der Grund des Servers', () => {

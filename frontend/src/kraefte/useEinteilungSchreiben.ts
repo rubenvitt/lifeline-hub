@@ -14,6 +14,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal } from '../api/types';
 import { ausschnitt, ausschnittLeer, ausschnittText } from '../components/feldVermerk';
 import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { ohneBeleg } from './useStatusQuittung';
 
 /** Altwert einer Einzelangabe (Feld-CAS, LLH-1945): Name der Angabe und Wert beim Öffnen. */
 export interface AngabeAltwert {
@@ -123,12 +124,7 @@ export function useEinteilungSchreiben(einsatzId: number) {
           erwartet: alt?.erwartet,
           speichern: async (erwartet) => {
             // Ohne Beleg in den Cache: die Einteilung quittiert keinen Statuswechsel (LLH-1986).
-            const { status_ruecknahme: _beleg, ...neu } = await updateDisposition(
-              einsatzId,
-              epId,
-              felder,
-              erwartet,
-            );
+            const neu = ohneBeleg(await updateDisposition(einsatzId, epId, felder, erwartet));
             qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (liste) =>
               liste?.map((ep) => (ep.id === neu.id ? neu : ep)),
             );
