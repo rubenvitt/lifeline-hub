@@ -4,6 +4,7 @@ import {
   starteAndroidHuelle,
   starteIosHuelle,
   starteMacHuelle,
+  starteWindowsHuelle,
 } from '../test/huelle';
 import type { RouteObject } from 'react-router';
 import { RUECKMELDUNG_FORMULAR, routenMuster, rueckmeldungsAdresse } from './adresse';
@@ -88,8 +89,23 @@ describe('Oberfläche der Rückmeldung je Hülle (t39ltxxi)', () => {
     expect(oberflaeche()).toBe('Android-App');
   });
 
-  it('nennt in der Desktop-Hülle ohne Plattform weiter die Desktop-App', () => {
+  it('nennt in einer Desktop-Hülle ohne Plattform (vor LLH-1982) weiter die Desktop-App', () => {
+    starteMacHuelle(undefined, { ohneKennung: true });
+    expect(oberflaeche()).toBe('Desktop-App');
+  });
+
+  it('nennt in der macOS-Hülle die Desktop-App (macOS)', () => {
     starteMacHuelle();
+    expect(oberflaeche()).toBe('Desktop-App (macOS)');
+  });
+
+  it('nennt in der Windows-Hülle die Desktop-App (Windows)', () => {
+    starteWindowsHuelle();
+    expect(oberflaeche()).toBe('Desktop-App (Windows)');
+  });
+
+  it('nennt in einer Hülle mit unbekannter Plattform die Desktop-App', () => {
+    starteWindowsHuelle(undefined, { platform: 'linux' });
     expect(oberflaeche()).toBe('Desktop-App');
   });
 

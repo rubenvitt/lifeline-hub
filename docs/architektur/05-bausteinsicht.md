@@ -50,7 +50,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Backend `lifeline-hub` | Ein Binary: REST-API unter `/api`, Live-Kanal per SSE, SQLite-Datenbank, Hintergrund-Scheduler (u. a. Erinnerung, Purge, Sicherung) und Auslieferung des Frontends | HTTP(S), `GET /api/einsaetze/{id}/live` und `GET /api/live` (`src/routes/live.rs`), CLI-Subkommandos `backup`/`restore` (`src/config.rs`) | `src/`, Start `src/main.rs` |
 | `frontend` | React-19/antd-6-Oberfläche als PWA (`frontend/package.json`); Stabsoberfläche und Gerätehülle | ruft `/api` über `frontend/src/api/client.ts`, Live über `EventSource` (`frontend/src/live/liveVerbindung.ts`) | `frontend/src/` |
-| Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
+| Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | `GET /api/shell` (`src/routes/shell.rs`), Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
 | iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` ([AGENTS.md](../../ios/AGENTS.md)) |
 | Android-Hülle `android` | Eigene Kotlin-App für Android-Handys und -Tablets (Jetpack Compose + Android-WebView), lädt die Oberfläche des gewählten Servers in einem WebView-Profil je Server, keine Anwendungslogik; testbare Logik im Kotlin-Kern `android/kern` (ohne Android-SDK), App unter `android/app`, Versionskatalog und Gradle-Wrapper unter `android/gradle`; Auslieferung als APK mit eigenem Updater | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `android/app/src/main/assets/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/`, Manifest `android.json` an den GitHub-Releases | `android/` ([AGENTS.md](../../android/AGENTS.md)) |
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
@@ -420,9 +420,10 @@ Crate `lifeline-desktop` (Tauri 2), Regeln in [src-tauri/AGENTS.md](../../src-ta
 `adresse.rs`, `deeplink.rs` und `verbindung.rs` tragen Serveradresse, Deeplink
 `lifeline://verbinden` und gespeicherte Verbindungen; `anmeldung.rs`, `aswas.rs` und `pkce.rs` die
 Anmeldung im Systembrowser; `links.rs` und `erreichbar.rs` neue Fenster, Links und die Wache über
-das Laden des Servers; `kanal.rs` und `update.rs` Update-Kanal und Updater. Die Init-Skripte
-(`faehigkeiten.js`, `benachrichtigung.js`, `druck.js`) liegen daneben, die Rechte unter
-`src-tauri/capabilities/`.
+das Laden des Servers; `vertrag.rs` die Prüfung des Hüllen-Vertrags vor jedem Laden (`GET
+/api/shell`, LLH-1982); `kanal.rs` und `update.rs` Update-Kanal und Updater. Die Init-Skripte
+(`kennung.js`, `faehigkeiten.js`, `benachrichtigung.js`, `druck.js`) liegen daneben, die Rechte
+unter `src-tauri/capabilities/`.
 
 ### `ios`
 

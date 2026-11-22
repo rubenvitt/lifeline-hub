@@ -132,6 +132,31 @@ const depsOhneSourcemap = (aktiv: boolean): Plugin => ({
   },
 });
 
+// Eigene Module im e2e-Lauf mit `no-store` statt `no-cache` (LLH-1932). Vite liefert jedes Modul
+// mit `no-cache` und ETag aus, und jede volle Seitenladung revalidiert so rund 1.200 Module (304).
+// Unter der Last des Gates brach Chromium dabei ab und zu den ganzen Modulgraphen ab: `main.tsx`
+// meldete einen Ladefehler, die Seite blieb schwarz, und ein Layout-Gate fand seinen Datenanker
+// nicht (Prüffläche C10 an wechselnden Stellen). Ohne HTTP-Cache trat das nicht mehr auf.
+// Vorgebündelte Pakete sind `immutable` und bleiben im Cache. Nur im e2e-Lauf (`e2e/lauf-kern.ts`
+// setzt die Variable): im Entwickeln bleibt die Revalidierung. Gemessen wird das in
+// `e2e/dev-server-cache.spec.ts`. Registriert wie `depsOhneSourcemap` immer, geschaltet innen.
+const moduleOhneCache = (aktiv: boolean): Plugin => ({
+  name: 'lifeline-module-ohne-cache',
+  apply: 'serve',
+  configureServer(server) {
+    if (!aktiv) return;
+    server.middlewares.use((_req, res, weiter) => {
+      const setHeader = res.setHeader.bind(res);
+      res.setHeader = (name, wert) =>
+        setHeader(
+          name,
+          name.toLowerCase() === 'cache-control' && wert === 'no-cache' ? 'no-store' : wert,
+        );
+      weiter();
+    });
+  },
+});
+
 // Neuigkeiten (Spec `neuigkeiten`): die CHANGELOG.md des Repos liegt zur Build-Zeit als Modul
 // `virtual:neuigkeiten` vor, damit die Seite ohne Netz läuft. Eine nicht lesbare Überschrift
 // bricht den Build (Zerlegung in `scripts/changelog-zerlegen.mjs`).
@@ -203,6 +228,7 @@ export default defineConfig(({ mode }) => {
       gitkeepBewahren(),
       libheifBibliothek(),
       depsOhneSourcemap(env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1'),
+      moduleOhneCache(env.LIFELINE_MODULE_OHNE_CACHE === '1'),
       neuigkeitenQuelle(),
       precacheGrenzeWarnen(),
       VitePWA({

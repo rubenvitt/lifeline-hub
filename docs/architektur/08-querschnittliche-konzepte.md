@@ -444,11 +444,12 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   `Vertragspruefung` in `Vertrag.swift` daneben), bei Start, Wechsel und Rückkehr in den
   Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Android-Hülle prüft genauso
   (`bekannteVertraege` in `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/LifelineKern.kt`,
-  `Vertragspruefung` in `Vertrag.kt`). Die Desktop-Hülle liest den Endpunkt noch
-  nicht (Zunder LLH-1982).
+  `Vertragspruefung` in `Vertrag.kt`). Die Desktop-Hülle prüft genauso vor jedem
+  Laden, das sie selbst anstößt (`BEKANNTE_VERTRAEGE` und `evaluate` in `src-tauri/src/vertrag.rs`,
+  LLH-1982, [ADR-0083](entscheidungen/ADR-0083-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md)).
 - **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
-  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, bei iOS und Android
-  dazu `platform`, `version` und `haptics`; Android ohne `setAppBadge`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
+  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, `platform` und
+  `version`, bei iOS und Android dazu `haptics`; Android ohne `setAppBadge`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
   das Frontend unterscheidet die Hüllen nur darüber. Gesetzt wird sie von den Init-Skripten der
   Desktop-Hülle (`src-tauri/src/*.js`), von `ios/App/Huelle/huelle.js` und von
   `android/app/src/main/assets/huelle.js`; Vitest führt sie aus (`frontend/src/test/huelle.ts`).

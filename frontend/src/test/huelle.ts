@@ -3,8 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Lässt die Init-Skripte der Hüllen (`src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept
- * D7, `src-tauri/src/faehigkeiten.js`, LFH-817, `ios/App/Huelle/huelle.js`, t39ltxxi, und `android/app/src/main/assets/huelle.js`, LLH-1989) im jsdom
+ * Lässt die Init-Skripte der Hüllen (`src-tauri/src/kennung.js`, LLH-1982,
+ * `src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7, `src-tauri/src/faehigkeiten.js`,
+ * LFH-817, `ios/App/Huelle/huelle.js`, t39ltxxi, und `android/app/src/main/assets/huelle.js`,
+ * LLH-1989) im jsdom
  * laufen, wie der Webview sie vor dem ersten Skript der Seite ausführt. Die Tests setzen die
  * Kennung also nicht von Hand: benennt eine Seite sie um, wird der Test rot, statt still zu driften.
  */
@@ -12,6 +14,7 @@ function liesSkript(pfad: string): string {
   return readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../..', pfad), 'utf8');
 }
 
+const kennungSkript = liesSkript('src-tauri/src/kennung.js');
 const benachrichtigungSkript = liesSkript('src-tauri/src/benachrichtigung.js');
 const faehigkeitenSkript = liesSkript('src-tauri/src/faehigkeiten.js');
 const iosSkript = liesSkript('ios/App/Huelle/huelle.js');
@@ -32,6 +35,16 @@ function replaceVersion(skript: string, pfad: string, version: string | null): s
   return skript.split(VERSION_PLACEHOLDER).join(version);
 }
 
+/** Version, die die Desktop-Hülle in den Tests nennt (in der App: die Version des Workspace). */
+export const DESKTOP_TEST_VERSION = '1.0.0-alpha.test';
+
+/** Wie die Desktop-Hülle gestartet wird: Plattform der Kennung, oder eine Hülle vor LLH-1982. */
+export interface DesktopOptionen {
+  platform?: string;
+  /** Eine ältere Desktop-Hülle ohne `kennung.js` (ohne `platform` und `version`). */
+  ohneKennung?: boolean;
+}
+
 /** Stub der IPC-Brücke, die Tauri vor den Init-Skripten der Hülle einhängt. */
 export interface HuellenIpc {
   invoke: (befehl: string, argumente?: Record<string, unknown>) => Promise<unknown>;
@@ -48,20 +61,37 @@ function fuehreAus(skript: string) {
   new Function(skript)();
 }
 
+/** Setzt die Werte ein, wie `kennung_skript` in `src-tauri/src/main.rs` es tut. */
+function fuehreKennungAus(platform: string) {
+  fuehreAus(
+    kennungSkript
+      .replace('__PLATFORM__', JSON.stringify(platform))
+      .replace('__VERSION__', JSON.stringify(DESKTOP_TEST_VERSION)),
+  );
+}
+
 /**
  * Führt die Init-Skripte der macOS-Hülle in ihrer Reihenfolge aus. Mit `ipc` hängt vorher eine
  * IPC-Brücke im `window`, wie in der echten Hülle; ohne sie bleiben „Im Browser anmelden“ (LFH-818)
  * und die native Meldung aus.
  */
-export function starteMacHuelle(ipc?: HuellenIpc) {
+export function starteMacHuelle(
+  ipc?: HuellenIpc,
+  { platform = 'macos', ohneKennung = false }: DesktopOptionen = {},
+) {
   haengeIpcEin(ipc);
+  if (!ohneKennung) fuehreKennungAus(platform);
   fuehreAus(benachrichtigungSkript);
   fuehreAus(faehigkeitenSkript);
 }
 
 /** Wie {@link starteMacHuelle}, aber nur mit dem Skript, das jede Hülle trägt (Windows). */
-export function starteWindowsHuelle(ipc?: HuellenIpc) {
+export function starteWindowsHuelle(
+  ipc?: HuellenIpc,
+  { platform = 'windows', ohneKennung = false }: DesktopOptionen = {},
+) {
   haengeIpcEin(ipc);
+  if (!ohneKennung) fuehreKennungAus(platform);
   fuehreAus(benachrichtigungSkript);
 }
 

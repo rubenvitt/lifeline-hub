@@ -1,11 +1,14 @@
 //! Gespeicherte Serveradresse: `<app_config_dir>/verbindung.json` mit `{ "server": "…" }`, dazu
 //! seit LLH-1282 `"bekannt": […]`, die zuletzt verbundenen Server (neuester zuerst), aus denen die
-//! Maske wählen lässt. Eine Datei ohne `bekannt` kennt nur ihren `server`.
+//! Maske wählen lässt. Eine Datei ohne `bekannt` kennt nur ihren `server`. Seit LLH-1982 dazu
+//! `"vertraege": { "<origin>": n }`, der zuletzt bestätigte Hüllen-Vertrag je bekanntem Server; er
+//! gilt, wenn der Server nicht erreichbar ist (`vertrag::evaluate`).
 //!
 //! Eine fehlende, unlesbare oder ungültige Datei heißt „keine Adresse“ — die Hülle zeigt dann
 //! die Erststart-Maske, statt an einer kaputten Datei zu scheitern. Beim Lesen wird dieselbe
 //! Prüfung angelegt wie bei der Eingabe: eine von Hand auf `http` geänderte Datei lädt nicht.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -25,6 +28,22 @@ struct Datei {
     server: String,
     #[serde(default)]
     bekannt: Vec<String>,
+    /// Zuletzt bestätigter Hüllen-Vertrag je Origin, nur für bekannte Server.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    vertraege: BTreeMap<String, u32>,
+}
+
+fn origin(url: &Url) -> String {
+    url.origin().ascii_serialization()
+}
+
+/// Nur die Verträge der Server, die noch in `liste` stehen.
+fn vertraege_fuer(vertraege: BTreeMap<String, u32>, liste: &[Url]) -> BTreeMap<String, u32> {
+    let origins: Vec<String> = liste.iter().map(origin).collect();
+    vertraege
+        .into_iter()
+        .filter(|(schluessel, _)| origins.contains(schluessel))
+        .collect()
 }
 
 fn read_datei(konfig_dir: &Path) -> Option<Datei> {
@@ -75,13 +94,41 @@ pub fn schreiben(konfig_dir: &Path, server: &Url) -> io::Result<()> {
     let bisher: Vec<String> = bekannte(konfig_dir).into_iter().map(String::from).collect();
     let bekannt =
         bereinigt(std::iter::once(server.as_str()).chain(bisher.iter().map(String::as_str)));
+    let vertraege = read_datei(konfig_dir)
+        .map(|datei| vertraege_fuer(datei.vertraege, &bekannt))
+        .unwrap_or_default();
     write_datei(
         konfig_dir,
         &Datei {
             server: server.to_string(),
             bekannt: bekannt.into_iter().map(String::from).collect(),
+            vertraege,
         },
     )
+}
+
+/// Der zuletzt bestätigte Hüllen-Vertrag von `server` (gleiche Origin), falls gemerkt.
+pub fn letzter_vertrag(konfig_dir: &Path, server: &Url) -> Option<u32> {
+    read_datei(konfig_dir)?
+        .vertraege
+        .get(&origin(server))
+        .copied()
+}
+
+/// Merkt den bestätigten Hüllen-Vertrag eines bekannten Servers; einen unbekannten nicht.
+pub fn merke_vertrag(konfig_dir: &Path, server: &Url, vertrag: u32) -> io::Result<()> {
+    let Some(mut datei) = read_datei(konfig_dir) else {
+        return Ok(());
+    };
+    let schluessel = origin(server);
+    let bekannt = bekannte(konfig_dir)
+        .iter()
+        .any(|url| origin(url) == schluessel);
+    if !bekannt || datei.vertraege.get(&schluessel) == Some(&vertrag) {
+        return Ok(());
+    }
+    datei.vertraege.insert(schluessel, vertrag);
+    write_datei(konfig_dir, &datei)
 }
 
 /// Nimmt `adresse` aus den bekannten Servern. Der verbundene bleibt: er ist das Ziel von
@@ -93,16 +140,17 @@ pub fn vergessen(konfig_dir: &Path, adresse: &str) -> io::Result<()> {
     if pruefe_adresse(&datei.server).ok().as_ref() == Some(&weg) {
         return Ok(());
     }
-    let bekannt = bekannte(konfig_dir)
+    let bleiben: Vec<Url> = bekannte(konfig_dir)
         .into_iter()
         .filter(|url| *url != weg)
-        .map(String::from)
         .collect();
+    let vertraege = vertraege_fuer(datei.vertraege, &bleiben);
     write_datei(
         konfig_dir,
         &Datei {
             server: datei.server,
-            bekannt,
+            bekannt: bleiben.into_iter().map(String::from).collect(),
+            vertraege,
         },
     )
 }
@@ -236,5 +284,56 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(pfad(dir.path()), r#"{ "server": "http://elw.local:8080" }"#).unwrap();
         assert_eq!(lesen(dir.path()), None);
+    }
+
+    #[test]
+    fn alte_datei_ohne_vertraege_bleibt_lesbar() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            pfad(dir.path()),
+            r#"{ "server": "https://elw.local:8443/" }"#,
+        )
+        .unwrap();
+        let server = url("https://elw.local:8443");
+        assert_eq!(lesen(dir.path()), Some(server.clone()));
+        assert_eq!(letzter_vertrag(dir.path(), &server), None);
+    }
+
+    #[test]
+    fn gemerkter_vertrag_gilt_je_origin() {
+        let dir = tempfile::tempdir().unwrap();
+        let (a, b) = (url("https://a.local"), url("https://b.local"));
+        schreiben(dir.path(), &a).unwrap();
+        merke_vertrag(dir.path(), &a, 1).unwrap();
+        assert_eq!(letzter_vertrag(dir.path(), &a), Some(1));
+        assert_eq!(
+            letzter_vertrag(dir.path(), &url("https://a.local/einsatz/1")),
+            Some(1)
+        );
+        assert_eq!(letzter_vertrag(dir.path(), &b), None);
+    }
+
+    #[test]
+    fn unbekannter_server_wird_nicht_gemerkt() {
+        let dir = tempfile::tempdir().unwrap();
+        schreiben(dir.path(), &url("https://a.local")).unwrap();
+        let c = url("https://c.local");
+        merke_vertrag(dir.path(), &c, 1).unwrap();
+        assert_eq!(letzter_vertrag(dir.path(), &c), None);
+    }
+
+    #[test]
+    fn schreiben_und_vergessen_erhalten_bzw_entfernen_den_vertrag() {
+        let dir = tempfile::tempdir().unwrap();
+        let (a, b) = (url("https://a.local"), url("https://b.local"));
+        schreiben(dir.path(), &a).unwrap();
+        merke_vertrag(dir.path(), &a, 1).unwrap();
+        schreiben(dir.path(), &b).unwrap();
+        assert_eq!(letzter_vertrag(dir.path(), &a), Some(1));
+        vergessen(dir.path(), "https://a.local").unwrap();
+        assert_eq!(letzter_vertrag(dir.path(), &a), None);
+        // Wieder verbunden: kein alter Vertrag lebt auf.
+        schreiben(dir.path(), &a).unwrap();
+        assert_eq!(letzter_vertrag(dir.path(), &a), None);
     }
 }
