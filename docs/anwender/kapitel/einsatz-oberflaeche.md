@@ -551,7 +551,8 @@ erfassen“ …), laufenden Einsätzen, Einstellungen, der „Hilfe“ und, ab z
 Datensätzen des Einsatzes: Personen, Fahrzeuge (auch über Fahrzeugtyp und Kennzeichen), Personal
 (auch über die Funktion), Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
-Rolle schreiben darf.
+Rolle schreiben darf. Die Mitarbeit sieht von ihnen „ETB-Eintrag schreiben“ und „Meldung erfassen“,
+denn diese beiden erfasst sie selbst.
 
 Ein Treffer braucht für jedes getippte Wort einen Wortanfang oder, ab drei Zeichen, einen Teil
 eines Wortes; „rtw“ findet also Fahrzeuge vom Typ RTW, aber nicht die Lagekarte. Umlaute und ihre
