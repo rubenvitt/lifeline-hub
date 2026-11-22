@@ -147,6 +147,15 @@ wire_enum! {
         MaschinenzugangWebhookLanErlaubt => "maschinenzugang_webhook_lan_erlaubt",
         /// LAN-Ausnahme eines Webhooks zurückgenommen.
         MaschinenzugangWebhookLanEntzogen => "maschinenzugang_webhook_lan_entzogen",
+        /// Fingerabdruck des Zielzertifikats an einem Webhook hinterlegt oder gewechselt
+        /// (LLH-1872, Migration 0363); Angaben `fingerabdruck`, beim Wechsel
+        /// `fingerabdruck_vorher`.
+        MaschinenzugangWebhookPinGesetzt => "maschinenzugang_webhook_pin_gesetzt",
+        /// Fingerabdruck eines Webhooks entfernt; Angabe `fingerabdruck_vorher`.
+        MaschinenzugangWebhookPinEntfernt => "maschinenzugang_webhook_pin_entfernt",
+        /// Zertifikat eines Ziels für einen Webhook abgerufen (nur gelesen); Angaben `host` und,
+        /// falls erhalten, `fingerabdruck`.
+        MaschinenzugangWebhookZertifikatAbgerufen => "maschinenzugang_webhook_zertifikat_abgerufen",
         /// Adapter angelegt (LLH-2017, Migration 0361).
         AdapterAngelegt => "adapter_angelegt",
         /// Name, Einstellungen oder Intervall eines Adapters geändert.

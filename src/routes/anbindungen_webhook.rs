@@ -280,6 +280,7 @@ pub async fn create(
         url: check_url(&body.url, body.lan_erlaubt)?,
         arten: check_arten(&body.arten)?,
         lan_erlaubt: body.lan_erlaubt,
+        zertifikat_pin: None,
     };
     let org_id = admin.org_id;
     let (z, w) = crate::write_retry!(&state.pool, |conn| {
@@ -339,6 +340,7 @@ pub async fn update(
             url,
             arten: arten.clone().unwrap_or_else(|| vorher.arten()),
             lan_erlaubt,
+            zertifikat_pin: vorher.zertifikat_pin.clone(),
         };
         let (vorher, nachher) = repo::update(
             &mut *conn,
