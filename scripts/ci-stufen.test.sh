@@ -161,8 +161,8 @@ pruefe "env in ci.yml und pr.yml gleich" \
 pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$PR" "$SUITEN" "$E2E")" "ci-auswahl.sh"
 
 echo "==> ci-stufen: suiten.yml"
-pruefe "suiten.yml: Jobs runner, rust, frontend, e2e, ios, berichte" \
-  gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "runner rust frontend e2e ios berichte"
+pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, berichte" \
+  gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios berichte"
 for id in runner rust frontend e2e ios; do
   pruefe "$id: kein if (der Aufrufer entscheidet)" test -z "$(job_if "$SUITEN" "$id")"
 done
@@ -184,24 +184,12 @@ pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLIC
 pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" 'image: swift@sha256:'
 pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
-# Eigener Server (LLH-2014, ADR-0075): EINE Wahl in `suiten.yml`, jeder schwere Job liest sie mit
-# GitHub als Rückfall. iOS-Kern (Container-Job), Frontend-Anteile (LLH-2016, ADR-0076) und Bericht
-# bleiben gehostet.
-AUF_WAHL="runs-on: \${{ needs.runner.outputs.runner || 'ubuntu-latest' }}"
-pruefe "rust: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" rust)"
-pruefe "rust: läuft auf der Wahl, Rückfall GitHub" enthaelt "$(job "$SUITEN" rust)" "$AUF_WAHL"
-pruefe "e2e: hängt an der Runner-Wahl" grep -qE '^    needs: (runner|\[runner\])$' <<< "$(job "$SUITEN" e2e)"
-pruefe "e2e: reicht die Wahl an e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "runner: \${{ needs.runner.outputs.runner }}"
-for id in frontend ios berichte; do
-  pruefe "$id: bleibt auf GitHub" enthaelt "$(job "$SUITEN" "$id")" "    runs-on: ubuntu-latest"
+# Nur GitHub (ADR-0078): jeder Job der Suiten läuft auf `ubuntu-latest`, keine Runner-Wahl.
+for id in rust frontend ios berichte; do
+  pruefe "$id: läuft auf GitHub" enthaelt "$(job "$SUITEN" "$id")" "    runs-on: ubuntu-latest"
 done
-pruefe "runner: wählt mit select-runner.sh" enthaelt "$(job "$SUITEN" runner)" 'runner="$("$weiche" "$EREIGNIS" "$LABEL")"'
-pruefe "runner: bei einem PR die Weiche aus dem Ziel-Branch" \
-  enthaelt "$(job "$SUITEN" runner)" "git show HEAD^1:scripts/runner/select-runner.sh"
-pruefe "runner: eine gescheiterte Wahl fällt auf GitHub zurück" \
-  enthaelt "$(job "$SUITEN" runner)" "continue-on-error: true"
-pruefe "frontend: wartet nicht auf die Runner-Wahl" fehlt "$(job "$SUITEN" frontend)" "needs.runner"
-pruefe "runner: selbst auf GitHub" enthaelt "$(job "$SUITEN" runner)" "    runs-on: ubuntu-latest"
+pruefe "keine Runner-Wahl mehr" test -z "$(job "$SUITEN" runner)"
+pruefe "suiten.yml: kein eigener Runner" fehlt "$(code_ohne_kommentar "$SUITEN")" "runner.environment"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do
   pruefe "$(basename "$datei"): Aufruf der Suiten darf checks lesen (e2e.yml)" enthaelt "$(job "$datei" suiten)" "checks: read"
@@ -225,12 +213,10 @@ pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(code_ohne_kommentar "$E
 pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
 pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"
 pruefe "Anteile nur nach grünem Binary" enthaelt "$(job_if "$E2E" e2e)" "needs.binaer.result == 'success'"
-pruefe "e2e.yml: Runner als Eingabe" enthaelt "$(kopf_code "$E2E")" "      runner:"
-pruefe "e2e.yml: keine eigene Runner-Wahl mehr" test -z "$(job "$E2E" aenderungen)"
 for id in binaer e2e; do
-  pruefe "e2e.yml: $id läuft auf der Eingabe, Rückfall GitHub" \
-    enthaelt "$(job "$E2E" "$id")" "runs-on: \${{ inputs.runner || 'ubuntu-latest' }}"
+  pruefe "e2e.yml: $id läuft auf GitHub" enthaelt "$(job "$E2E" "$id")" "    runs-on: ubuntu-latest"
 done
+pruefe "e2e.yml: kein eigener Runner" fehlt "$(code_ohne_kommentar "$E2E")" "runner.environment"
 
 echo "==> ci-stufen: ios-pruefung.yml"
 # Der macOS-Lauf der iOS-Hülle (LLH-1978): nur am PR, nur bei Änderungen an der Hülle oder den
@@ -269,11 +255,20 @@ pruefe "artefakte.yml: Job ios ruft ios.yml" enthaelt "$(job "$ART" ios)" "uses:
 pruefe "artefakte.yml: ios erbt die Secrets" enthaelt "$(job "$ART" ios)" "secrets: inherit"
 pruefe "artefakte.yml: ios nach freigeben" enthaelt "$(job "$ART" ios)" "needs: [vorbereiten, freigeben]"
 ios_if="$(job_if "$ART" ios)"
-for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'" \
-  "needs.vorbereiten.outputs.vorab != 'true'" "contains(needs.vorbereiten.outputs.tag, '-beta.')"; do
+for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'"; do
   pruefe "artefakte.yml: ios nur wenn $teil" enthaelt "$ios_if" "$teil"
 done
-pruefe "artefakte.yml: ios nie für Alpha" fehlt "$ios_if" "-alpha."
+# Seit LLH-1988 (ADR-0080) jeder Kanal: welche Gruppe ein Kanal bekommt, entscheidet erst
+# testflight-verteilen.mjs, nicht die Bedingung des Jobs.
+pruefe "artefakte.yml: ios für jeden Kanal" fehlt "$ios_if" "needs.vorbereiten.outputs.vorab"
+pruefe "ios.yml: verteilen nach dem Upload" enthaelt "$(job "$IOSREL" verteilen)" "needs: testflight"
+pruefe "ios.yml: verteilen auf Ubuntu" enthaelt "$(job "$IOSREL" verteilen)" "runs-on: ubuntu-latest"
+pruefe "ios.yml: verteilen fährt testflight-verteilen.mjs" \
+  enthaelt "$(job "$IOSREL" verteilen)" "node scripts/ios/testflight-verteilen.mjs"
+pruefe "ios.yml: verteilen bekommt die Build-Nummer" \
+  enthaelt "$(job "$IOSREL" verteilen)" "needs.testflight.outputs.build"
+pruefe "ios.yml: verteilen löscht den Schlüssel immer" \
+  enthaelt "$(job "$IOSREL" verteilen)" "if: \${{ always() }}"
 pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
 

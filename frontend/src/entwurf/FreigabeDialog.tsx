@@ -24,7 +24,10 @@ interface Props {
   speicherFehler: unknown;
   /** Grund eines gescheiterten `POST …/freigeben` — `freigebenMutation.error`. */
   freigabeFehler: unknown;
-  /** Speicher-Vorlauf ODER Freigabe ist unterwegs. */
+  /**
+   * Speicher-Vorlauf ODER Freigabe ist unterwegs. Dann gibt es keinen Ausgang: Knopf, Kreuz und
+   * Escape sind gesperrt (LLH-1885, `frontend/AGENTS.md`, LFH-1077).
+   */
   laeuft: boolean;
   onAbbrechen: () => void;
   onFreigeben: () => void;
@@ -68,12 +71,16 @@ export default function FreigabeDialog({
       title={titel}
       open={offen}
       onCancel={onAbbrechen}
+      closable={!laeuft}
+      keyboard={!laeuft}
       // Wie bei `Modal.confirm`: ein Fehlklick neben den Dialog darf einen gezeigten Grund nicht
       // wegräumen.
       mask={{ closable: false }}
       footer={
         <Flex gap={token.marginSM} wrap justify="end">
-          <Button onClick={onAbbrechen}>Abbrechen</Button>
+          <Button disabled={laeuft} onClick={onAbbrechen}>
+            Abbrechen
+          </Button>
           <Button type="primary" loading={laeuft} onClick={onFreigeben}>
             Freigeben
           </Button>

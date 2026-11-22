@@ -1,5 +1,5 @@
 import { IconUhr } from '../icons';
-import { Button, Flex, Space, Typography, theme } from 'antd';
+import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
@@ -13,7 +13,8 @@ import {
 import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { Status, Textstufe, monoStil, schriftStil } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
+import { ERINNERUNG_FAELLIG } from './erinnerungZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
@@ -83,13 +84,15 @@ interface ErinnerungKarteProps {
   fehlerGrund?: ZeilenGrund | null;
   /**
    * Deeplink-Hervorhebung (`?erinnerung=`, LLH-1429, Spec `deeplink-hervorhebung`): die Form
-   * trägt `KommKarte`; eine fällige behält ihre Alarmfläche und trägt nur die Linien.
+   * trägt `KommKarte`, auch auf einer fälligen — sie hat keine Alarmfläche (LLH-1911).
    */
   hervorgehoben?: boolean;
 }
 
 /**
- * Erinnerungs-Karte: Fällig-Hervorhebung über den Kartenrand-Vertrag von `KommKarte`.
+ * Erinnerungs-Karte. Eine fällige trägt „fällig“ in Achtung aus {@link ERINNERUNG_FAELLIG}, wie im
+ * Überblick, ohne Kante und ohne Statusfläche: eine Erinnerung ist ein Wecker, keine Frist
+ * (LLH-1911, `frontend/AGENTS.md`, „Linker Kartenrand“).
  * Erübrigt und Erledigt bleiben fachlich getrennt: der Knopf trägt die Abgrenzung in der Klammer,
  * ohne Tooltip (Entscheidung 10, LFH-959). „Quittieren" heißt in der Oberfläche nur Empfang
  * bestätigt; der Drahtwert `quittiert` bleibt.
@@ -103,7 +106,7 @@ export default function ErinnerungKarte({
   fehlerGrund,
   hervorgehoben = false,
 }: ErinnerungKarteProps) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const { id: einsatzId } = useParams();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
   const { zeitpunkt } = useAnzeigeKonventionen();
@@ -127,9 +130,8 @@ export default function ErinnerungKarte({
       : [];
 
   return (
-    // Die Fälligkeit führt links in Mono; eine fällige Erinnerung trägt den Alarmrand.
+    // Die Fälligkeit führt links in Mono; fällig zeigt nur Wort und Zeile, kein Kantenzustand.
     <KommKarte
-      alarm={faellig}
       hervorgehoben={hervorgehoben}
       data-erinnerung-id={e.id}
       zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} rolle="kurz" /> : undefined}
@@ -144,7 +146,9 @@ export default function ErinnerungKarte({
         <Space size={token.marginSM} wrap>
           <Textstufe stufe="kartentitel">{e.titel}</Textstufe>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
-          {faellig && <Status groesse="klein" ton="alarm" wort="fällig" />}
+          {faellig && (
+            <Status groesse="klein" ton={ERINNERUNG_FAELLIG.ton} wort={ERINNERUNG_FAELLIG.wort} />
+          )}
           {e.intervall_minuten && (
             <Status groesse="klein" ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
           )}
@@ -156,7 +160,13 @@ export default function ErinnerungKarte({
         </Space>
         <Space size={token.margin} wrap>
           {e.faellig_at && (
-            <Text type={faellig ? 'danger' : 'secondary'} style={schriftStil('textKlein')}>
+            <Text
+              type={faellig ? undefined : 'secondary'}
+              style={{
+                ...schriftStil('textKlein'),
+                ...(faellig ? { color: rollen.achtungText } : {}),
+              }}
+            >
               {faellig && (
                 <span aria-hidden="true">
                   <IconUhr />

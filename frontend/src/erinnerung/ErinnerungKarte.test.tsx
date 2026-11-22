@@ -7,6 +7,8 @@ import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import type { Erinnerung } from '../api/types';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { ERINNERUNG_FAELLIG } from './erinnerungZustand';
+import { farbenHell } from '../theme/tokens';
 
 function erinnerung(over: Partial<Erinnerung>): Erinnerung {
   return {
@@ -158,9 +160,40 @@ describe('ErinnerungKarte — Deeplink-Hervorhebung (LLH-1429)', () => {
     expect(karte()).toHaveAttribute('data-hervorgehoben', 'true');
   });
 
-  it('eine fällige behält angesprungen ihren Alarm: Gefahr gewinnt', () => {
+  it('eine fällige trägt angesprungen die Markierung wie jede Karte, keinen Alarm (LLH-1911)', () => {
     renderKarte(<ErinnerungKarte erinnerung={erinnerung({ ist_faellig: true })} hervorgehoben />);
     expect(karte()).toHaveAttribute('data-hervorgehoben', 'true');
-    expect(karte()).toHaveAttribute('data-alarm', 'true');
+    expect(karte()).not.toHaveAttribute('data-alarm');
+  });
+});
+
+/**
+ * LLH-1911 (`frontend/AGENTS.md`, „Linker Kartenrand“): eine fällige Erinnerung ist ein Wecker,
+ * keine Frist — im Modul dasselbe Wort und dieselbe Rolle wie im Überblick, ohne Kante und Fläche.
+ */
+describe('ErinnerungKarte — fällig in Achtung wie im Überblick (LLH-1911)', () => {
+  const karte = () => document.querySelector('[data-erinnerung-id="1"]');
+
+  it('trägt „fällig“ in der Rolle aus ERINNERUNG_FAELLIG, ohne Alarmkante', () => {
+    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ ist_faellig: true })} />);
+    const chip = document.querySelector(
+      `[data-lfh="status"][data-ton="${ERINNERUNG_FAELLIG.ton}"]`,
+    );
+    expect(chip).toHaveTextContent(ERINNERUNG_FAELLIG.wort);
+    expect(karte()).not.toHaveAttribute('data-alarm');
+    expect(document.querySelector('[data-ton="alarm"]')).toBeNull();
+  });
+
+  it('färbt die Fälligkeitszeile in achtungText, nicht in Alarmrot', () => {
+    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ ist_faellig: true })} />);
+    const zeile = screen.getByText(/fällig: /);
+    expect(zeile).toHaveStyle({ color: farbenHell.achtungText });
+    expect(zeile).not.toHaveClass('ant-typography-danger');
+  });
+
+  it('eine noch nicht fällige trägt weder Chip noch Achtungsfarbe', () => {
+    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ ist_faellig: false })} />);
+    expect(document.querySelector('[data-lfh="status"][data-ton="achtung"]')).toBeNull();
+    expect(screen.getByText(/fällig: /)).not.toHaveStyle({ color: farbenHell.achtungText });
   });
 });

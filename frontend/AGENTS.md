@@ -468,6 +468,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
+| Geheimnis setzen oder ersetzen, nie lesen (Zugangsdaten eines Adapters)                         | `Geheimfeld` (Wert nur im State der Zeile, nie in `Form`, Query- oder Mutations-Cache)                                                           | `Geheimfeld`                       |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
 | Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
@@ -1497,7 +1498,11 @@ und `pages/personen/`.
 - **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`alarm` vor dem Eingang in `linieStark`,
   sonst `linie`; prüfbar über `data-alarm`/`data-unbearbeitet`; der Eingang ist neutral, Spec
   `statusrollen`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
-  fünfte `KommPhase`.
+  fünfte `KommPhase`. **Eine fällige Erinnerung ist ein Wecker, keine Frist** (LLH-1911): sie
+  trägt weder Kante noch Fläche, nur „fällig“ in Achtung aus `ERINNERUNG_FAELLIG`
+  (`erinnerung/erinnerungZustand.ts`), im Modul wie im Überblick; ihre Gruppe heißt „Fällig“, nie
+  „Überfällig“ (`ERINNERUNG_GRUPPE_LABEL`). Angesprungen trägt sie die Markierung wie jede Karte;
+  das Szenario „Erinnerung“ der eingefrorenen Spec `deeplink-hervorhebung` ist damit überholt.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
   der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder

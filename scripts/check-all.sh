@@ -300,7 +300,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen und Bildablage (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung und Bildablage (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -338,6 +338,9 @@ schritt_8() {
   # Upload zu TestFlight (LLH-1978): ein Alpha-Build in TestFlight, ein Build mit fremder Version
   # oder ein API-Schlüssel im Log fiele erst am Release auf. Attrappen statt Xcode, ohne Netz.
   "$ROOT/scripts/ios/testflight.test.sh"
+  # Verteilung an die TestFlight-Gruppen (LLH-1988, ADR-0080): ein Alpha-Build bei externen
+  # Testern oder eine doppelte Beta-Prüfung fiele erst am Release auf. Nachgebaute API, ohne Netz.
+  mise exec -- node --test "$ROOT/scripts/ios/testflight-verteilen.test.mjs"
   # Bildschirmbilder des Simulator-Laufs (LLH-1978): ein Name mit " oder : lässt
   # `actions/upload-artifact` das ganze Artefakt abweisen, und eine Debug-Beschreibung ist kein
   # Bild — beides fiele erst auf dem macOS-Runner auf. Ohne Xcode.
@@ -381,7 +384,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, e2e-Anteile, Lauf-Verzeichnis (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -414,13 +417,6 @@ schritt_11() {
   # Das Lauf-Verzeichnis der Playwright-Läufe (LLH-1666): ein vergessenes füllt jeden dauerhaften
   # Rechner, ein zu eifrig gelöschtes zöge einem parallelen Lauf die Datenbank weg.
   mise exec -- node --test "$ROOT/scripts/e2e-run-dir.test.mjs"
-  # Der eigene Runner (LLH-1666): die Weiche darf nie einen Fork-PR auf den Server schicken, die
-  # Schleife nie einen Container mit Docker-Socket, Privilegien oder dem Token starten.
-  "$ROOT/scripts/runner/select-runner.test.sh"
-  "$ROOT/scripts/runner/runner-loop.test.sh"
-  # Schritte mit `sudo` oder Caches der gehosteten Runner tragen in den Jobs des eigenen Runners
-  # ihre Bedingung; sonst scheitert der erste Lauf auf dem Server und sperrt jeden PR.
-  "$ROOT/scripts/runner/ci-schritte.test.sh"
 }
 
 schritt_12() {

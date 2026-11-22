@@ -45,6 +45,7 @@ import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
 import AnbindungAnsicht from './pages/einstellungen/AnbindungAnsicht';
+import AdapterAnsicht from './pages/einstellungen/AdapterAnsicht';
 import EinheitVorlageDetailPage from './stammdaten/EinheitVorlageDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
@@ -487,6 +488,11 @@ export const appRouten = createRoutesFromElements(
                 />
                 {/* Ansicht einer Anbindung (LLH-1652); die Seite schützt die Schreibwege selbst. */}
                 <Route path="einstellungen/anbindungen/:zugangId" element={<AnbindungAnsicht />} />
+                {/* Ansicht eines Adapters (LLH-2018); die Seite schützt die Schreibwege selbst. */}
+                <Route
+                  path="einstellungen/anbindungen/adapter/:adapterId"
+                  element={<AdapterAnsicht />}
+                />
               </Route>
             </Route>
           </Route>

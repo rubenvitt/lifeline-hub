@@ -1,0 +1,26 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-22T09:10:00Z" },
+  "title": "Adapter und Geheimfeld (LLH-2018)",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1000, "title": "Ansicht eines Adapters · Desktop · kompakt" },
+    "Geheimfeld.dc.html": { "x": 1360, "y": 0, "w": 880, "h": 1000, "title": "Baustein Geheimfeld · alle Zustände" },
+    "Liste.dc.html": { "x": 0, "y": 1120, "w": 1280, "h": 760, "title": "Paneel „Adapter“ auf Anbindungen · Schlüssel fehlt" },
+    "Rueckfragen.dc.html": { "x": 1360, "y": 1120, "w": 1280, "h": 760, "title": "Rückfrage: neues Ziel entfernt Geheimnisse" }
+  },
+  "order": ["Main.dc.html", "Geheimfeld.dc.html", "Liste.dc.html", "Rueckfragen.dc.html"],
+  "notes": {
+    "titel": { "x": 0, "y": -300, "text": "Adapter: Zustand, Geheimnisse, Verbindung prüfen", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": "1795204392-3268",
+      "copiedAt": "2026-11-22T09:10:00Z"
+    }
+  ]
+}

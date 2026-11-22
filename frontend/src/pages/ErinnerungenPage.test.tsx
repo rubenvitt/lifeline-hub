@@ -155,6 +155,13 @@ describe('ErinnerungenPage', () => {
     expect(screen.queryByRole('button', { name: 'Ältere laden' })).not.toBeInTheDocument();
   });
 
+  it('stellt die fällige Erinnerung unter „Fällig“, nie unter „Überfällig“ (LLH-1911)', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Fällig (1)' })).toBeInTheDocument();
+    expect(screen.queryByText(/Überfällig/)).not.toBeInTheDocument();
+  });
+
   it('lädt ältere abgeschlossene mit dem Cursor der letzten Zeile nach (LFH-940)', async () => {
     const seite = (von: number, n: number) =>
       Array.from({ length: n }, (_, i) => ({

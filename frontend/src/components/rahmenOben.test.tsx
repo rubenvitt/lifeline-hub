@@ -147,6 +147,42 @@ describe('rahmenOben', () => {
   });
 
   /**
+   * LLH-1902: Ein eigener Scrollbereich ohne antd-Hülle (UHS-Detail, die Bereiche Kräfte, Material
+   * und Anhänge rollen in einem Div mit `overflowY: auto`). Ein stehender Kopf klebt dort an der
+   * Oberkante des Bereichs, nicht unter dem Dokument-Rahmen.
+   */
+  it('in einem beliebigen eigenen Scrollbereich ist der Versatz 0, ohne Überlauf die Rahmenhöhe', () => {
+    function Abnehmer({ name }: { name: string }) {
+      const ref = useRef<HTMLSpanElement>(null);
+      const versatz = useRahmenObenFuer(useCallback(() => ref.current, []));
+      return (
+        <span ref={ref} data-testid={name}>
+          {versatz}
+        </span>
+      );
+    }
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <div style={{ overflowY: 'auto' }}>
+          <div>
+            <Abnehmer name="bereich" />
+          </div>
+        </div>
+        <div style={{ overflowY: 'scroll' }}>
+          <Abnehmer name="scroll" />
+        </div>
+        <div style={{ overflowY: 'visible' }}>
+          <Abnehmer name="ohne-ueberlauf" />
+        </div>
+      </>,
+    );
+    expect(screen.getByTestId('bereich').textContent).toBe('0');
+    expect(screen.getByTestId('scroll').textContent).toBe('0');
+    expect(screen.getByTestId('ohne-ueberlauf').textContent).toBe('52');
+  });
+
+  /**
    * Zwei Höhen (zjt7c073 D2): der klebende Seitenkopf zählt zum Rahmen über dem Inhalt, nicht aber
    * zur Kopfhöhe, an der Rail, Modulpanel und Verwaltungsmenü hängen.
    */

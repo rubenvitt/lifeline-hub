@@ -10,8 +10,11 @@
 #
 # EIN WORKFLOW JE EREIGNIS (ADR-0048): nur `pull_request`. Der Ablauf steht in
 # `scripts/ios/simulator-pruefung.sh` (lokal auf einem Mac genauso), die XcodeGen-Version in
-# `scripts/ios/xcodegen-installieren.sh`. Runner und Xcode sind gepinnt: Xcode 16.4 bringt Swift
-# 6.1.2 wie der Linux-Job und kann `xcresulttool export attachments`.
+# `scripts/ios/xcodegen-installieren.sh`. Runner und Xcode sind gepinnt, wie in ios.yml: Xcode 26.6
+# auf macos-26, weil App Store Connect seit dem 28.04.2026 nur Builds mit Xcode 26 und dem
+# iOS-26-SDK annimmt (LLH-1988). Gebaut und getestet wird mit demselben Xcode, das hochlädt. Swift
+# ist hier damit 6.2, der Linux-Job (`suiten.yml`) bleibt bei 6.1.2; `LifelineKern` verlangt nur
+# swift-tools 6.1.
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
 name: iOS-Prüfung
@@ -36,10 +39,10 @@ concurrency:
 jobs:
   simulator:
     name: iOS-Simulator
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     env:
-      XCODE_APP: /Applications/Xcode_16.4.app
+      XCODE_APP: /Applications/Xcode_26.6.app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Xcode wählen

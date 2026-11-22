@@ -218,3 +218,113 @@ test('Mitte verschieben: Tipp setzt die neue Mitte, der Radius bleibt, ETB nennt
     (await etb(page, eid)).some((t) => /^Absperrbereich «Nord»: Mitte um .+ m versetzt$/.test(t)),
   ).toBe(true);
 });
+
+/** Mitte eines Griffs auf dem Bildschirm. */
+async function griffMitte(page: Page, kennung: string) {
+  const box = (await page.locator(`[data-lfh="${kennung}"]`).first().boundingBox())!;
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/**
+ * Einen Griff greifen, ziehen, bei gedrückter Taste Esc, weiterziehen, loslassen (LLH-1891). Nach
+ * Esc darf weder `drag` noch `dragend` den verworfenen Stand zurückbringen.
+ */
+async function ziehenMitEsc(page: Page, kennung: string, versatz: { x: number; y: number }) {
+  const start = await griffMitte(page, kennung);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + versatz.x / 2, start.y + versatz.y / 2, { steps: 5 });
+  await page.mouse.move(start.x + versatz.x, start.y + versatz.y, { steps: 5 });
+  return {
+    start,
+    esc: () => page.keyboard.press('Escape'),
+    weiterUndLoslassen: async () => {
+      await page.mouse.move(start.x + versatz.x * 2, start.y + versatz.y * 2, { steps: 5 });
+      await page.mouse.up();
+    },
+  };
+}
+
+test('Esc mitten im Zug am Kreis einer Zone stellt den gespeicherten Kreis her, der Zug ändert ihn nicht mehr (LLH-1891)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  await lagekarteMitKreis(page);
+  const inspector = await waehleKreis(page);
+  await inspector.getByRole('button', { name: 'Mitte verschieben' }).click();
+  const band = page.locator('[data-lfh="kreis-steuerung"]');
+  const uebernehmen = band.getByRole('button', { name: 'Übernehmen' });
+  const radius = band.getByRole('spinbutton', { name: 'Radius in Metern' });
+  await expect(page.locator('[data-lfh="kreisgriff-mitte"]')).toHaveCount(1);
+  const mitte = await kartenMitte(page);
+
+  for (const [kennung, versatz] of [
+    ['kreisgriff-mitte', { x: 0, y: -80 }],
+    ['kreisgriff', { x: 80, y: 0 }],
+  ] as const) {
+    const vorher = await griffMitte(page, kennung);
+    const zug = await ziehenMitEsc(page, kennung, versatz);
+    await expect(uebernehmen).toBeEnabled();
+    await zug.esc();
+    await expect(page.getByText('Zeichnung verworfen').first()).toBeVisible();
+    await expect(uebernehmen).toBeDisabled();
+    await zug.weiterUndLoslassen();
+
+    // Der Griff steht wieder am gespeicherten Kreis, nicht unter dem Zeiger.
+    await expect
+      .poll(async () => {
+        const jetzt = await griffMitte(page, kennung);
+        return Math.hypot(jetzt.x - vorher.x, jetzt.y - vorher.y);
+      })
+      .toBeLessThan(3);
+    await expect(uebernehmen).toBeDisabled();
+    await expect(radius).toHaveValue('300');
+    await expect(band).toBeVisible();
+  }
+  // Der Mittengriff sitzt auf der Kreismitte in der Kartenmitte.
+  const m = await griffMitte(page, 'kreisgriff-mitte');
+  expect(Math.hypot(m.x - mitte.x, m.y - mitte.y)).toBeLessThan(3);
+
+  // Danach lässt sich der Griff wieder greifen.
+  await ziehenMitEsc(page, 'kreisgriff-mitte', { x: 0, y: -60 });
+  await page.mouse.up();
+  await expect(uebernehmen).toBeEnabled();
+  expect(seitenFehler).toEqual([]);
+});
+
+test('Esc mitten im Punktzug stellt die gespeicherte Form her, Loslassen setzt keinen Punkt (LLH-1891)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  await lagekarteMitKreis(page);
+  const inspector = await waehleKreis(page);
+  await inspector.getByRole('button', { name: 'Punkte bearbeiten' }).click();
+  const band = page.locator('[data-lfh="bearbeiten-steuerung"]');
+  const uebernehmen = band.getByRole('button', { name: 'Übernehmen' });
+  await expect.poll(() => vorschauDa(page)).toBe(true);
+  await expect(uebernehmen).toBeDisabled();
+
+  // Erst eine Änderung: ohne sie beendete Esc das Bearbeiten statt zu verwerfen.
+  await ziehenMitEsc(page, 'zonengriff', { x: -40, y: 0 });
+  await page.mouse.up();
+  await expect(uebernehmen).toBeEnabled();
+
+  const zug = await ziehenMitEsc(page, 'zonengriff', { x: 0, y: 50 });
+  await zug.esc();
+  await expect(page.getByText('Zeichnung verworfen').first()).toBeVisible();
+  await expect(uebernehmen).toBeDisabled();
+  await zug.weiterUndLoslassen();
+
+  await expect(band).toBeVisible();
+  await expect(band).toContainText('64 Punkte');
+  // Kein Nachzügler aus dem Zug: nach zwei Bildern hat React ein `dragend` längst übernommen.
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  await expect(uebernehmen).toBeDisabled();
+  expect(seitenFehler).toEqual([]);
+});

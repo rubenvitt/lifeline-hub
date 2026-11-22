@@ -239,8 +239,8 @@ sie behoben, MUST er sie nicht mehr nennen.
 - **WHEN** auf demselben Kopf-Commit ein Lauf eines Checks abgebrochen wurde, ein späterer grün ist und seit mehr als 20 Minuten nichts mergt
 - **THEN** trägt der PR den Hinweis, dass er von Hand zu mergen ist
 
-#### Scenario: Baut mit Ziel-Branch rechnet noch
-- **WHEN** alle übrigen Checks grün sind, Auto-Merge an ist und der jüngste `Baut mit Ziel-Branch` noch läuft
+#### Scenario: Ein Check rechnet neu
+- **WHEN** alle übrigen Checks grün sind, Auto-Merge an ist und der jüngste Check-Run eines Namens noch läuft, auch wenn ein älterer Lauf desselben Namens grün war
 - **THEN** entsteht kein Hinweis
 
 #### Scenario: Quelle im Ruleset
