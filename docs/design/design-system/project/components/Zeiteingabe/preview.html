@@ -179,6 +179,7 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
   --lfh-schrift-text: 'LFH Archivo', system-ui, -apple-system, sans-serif;
   --lfh-schrift-display: 'LFH Archivo Narrow', 'LFH Archivo', system-ui, sans-serif;
   --lfh-schrift-zahl: 'LFH JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --lfh-touch-feldschrift: 16px;
   --lfh-typo-ueberschrift-groesse: 30px;
   --lfh-typo-ueberschrift-gewicht: 600;
   --lfh-typo-ueberschrift-sperrung: -0.02em;
@@ -321,6 +322,15 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
 @media (min-width: 992px) {
   :root {
     --lfh-kopf-polsterung: 24px;
+  }
+}
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  textarea,
+  select,
+  .ant-select-selection-item,
+  .ant-select-selection-placeholder {
+    font-size: var(--lfh-touch-feldschrift) !important;
   }
 }
 .lfh-zahl {

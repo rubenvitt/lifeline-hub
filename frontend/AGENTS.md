@@ -973,11 +973,13 @@ anwendbar), „nicht geprüft" ist keins.
   (Höhe und Breite) und steht am unteren Rand (LLH-1032, `verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
-- **Kein Zoom wie in einer App** (LLH-1328): der Viewport in `index.html` sperrt den Zoom
-  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
-  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
-  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
-  Wächter `theme/keinZoom.guard.test.ts`.
+- **Zoom frei, Felder 16 px auf Touch** (LLH-2043; umgekehrt 22.11.2026 gegenüber LLH-1328 „Kein
+  Zoom wie in einer App“): der Viewport in `index.html` sperrt den Zoom nicht, wer schlecht liest,
+  zieht die Seite größer. `touch-action: manipulation` auf `html` (`index.css`) sperrt nur den
+  Doppeltipp. Damit iOS beim Fokus nicht in ein Feld hineinzoomt (es tut das unter 16 px), tragen
+  Eingabefelder auf grobem Zeiger `feldSchriftTouch` (16 px, `theme/tokens.ts`, Regel am Ende von
+  `theme/rollen.css`), auch gegen Inline-Größen; Knöpfe, Etiketten und Lauftext bleiben in der
+  Dichte. Wächter `theme/zoomFrei.guard.test.ts`, Beleg `e2e/zoom-frei.spec.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
   `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
