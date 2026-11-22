@@ -389,6 +389,17 @@ async fn deaktivierung_am_hub_beendet_die_sitzung_am_elw() {
         ),
     )
     .await;
+    // Review M1: auch die iOS-Anmeldungen des Kontos gehen mit, mit und ohne Sitzung.
+    exec(
+        &elw.pool,
+        &format!(
+            "INSERT INTO ios_push_anmeldung \
+                 (kennung, benutzer_id, session_token_hash, token, umgebung, schluessel) \
+             VALUES ('k1', {lokal}, 't', 'ab01', 'sandbox', 's'), \
+                    ('k2', {lokal}, NULL, 'ab02', 'sandbox', 's')"
+        ),
+    )
+    .await;
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
@@ -411,6 +422,14 @@ async fn deaktivierung_am_hub_beendet_die_sitzung_am_elw() {
         eine::<i64>(
             &elw.pool,
             &format!("SELECT COUNT(*) FROM session WHERE benutzer_id = {lokal}")
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!("SELECT COUNT(*) FROM ios_push_anmeldung WHERE benutzer_id = {lokal}")
         )
         .await,
         0

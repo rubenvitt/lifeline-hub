@@ -171,6 +171,19 @@ pub async fn alle_loeschen(
     Ok(kennungen.into_iter().flatten().collect())
 }
 
+/// Was ein deaktiviertes Konto nicht behalten darf: alle Sitzungen ([`alle_loeschen`]) und
+/// seine iOS-Anmeldungen (LLH-2040; sonst pushte das alte Gerät nach einer Reaktivierung
+/// wieder). Die eine Stelle für jeden Weg, der `aktiv` auf 0 setzt (`deaktivieren`, `bearbeiten`,
+/// Stammdaten vom Hub), in dessen Transaktion. Liefert die Kennungen der Sitzungen.
+pub async fn konto_deaktiviert(
+    conn: &mut sqlx::SqliteConnection,
+    benutzer_id: i64,
+) -> Result<Vec<String>, AppError> {
+    let beendet = alle_loeschen(conn, benutzer_id).await?;
+    crate::ios_push::repo::loeschen_fuer_benutzer(conn, benutzer_id).await?;
+    Ok(beendet)
+}
+
 /// Eine Personensitzung in der Sitzungsliste (LFH-1092). Zeitpunkte als UTC-`datetime`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct SitzungAnzeige {

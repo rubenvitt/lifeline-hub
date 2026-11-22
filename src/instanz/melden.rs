@@ -991,7 +991,7 @@ async fn melden_einmal_mit(
                 repo::add_stammdaten_hinweise(conn, o.id, &ergebnis.hinweise).await?;
                 for konto in &ergebnis.deaktivierte_konten {
                     sitzungen_beendet
-                        .extend(crate::auth::session::alle_loeschen(conn, *konto).await?);
+                        .extend(crate::auth::session::konto_deaktiviert(conn, *konto).await?);
                 }
                 if ergebnis.geaendert {
                     stammdaten_geaendert.push(o.org_id);

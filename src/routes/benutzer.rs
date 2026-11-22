@@ -305,9 +305,8 @@ pub async fn deaktivieren(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    let beendet = session::alle_loeschen(&mut tx, id).await?;
-    // Mit dem Konto gehen die iOS-Anmeldungen (LLH-2040).
-    crate::ios_push::repo::loeschen_fuer_benutzer(&mut tx, id).await?;
+    // Sitzungen und iOS-Anmeldungen gehen mit dem Konto (LLH-2040).
+    let beendet = session::konto_deaktiviert(&mut tx, id).await?;
     // Unterschriftsschlüssel gehen mit dem Konto (LLH-1490, Spec `org-admin-unterschrift`).
     let schluessel = crate::auth::unterschrift::repo::alle_des_benutzers_widerrufen(
         &mut tx,
@@ -429,11 +428,11 @@ pub async fn bearbeiten(
     .bind(id)
     .execute(&mut *tx)
     .await?;
-    // Beim Deaktivieren die Sessions des Nutzers invalidieren (analog `deaktivieren`).
+    // Beim Deaktivieren Sitzungen und iOS-Anmeldungen des Nutzers beenden (wie `deaktivieren`).
     let beendet = if aktiv {
         Vec::new()
     } else {
-        session::alle_loeschen(&mut tx, id).await?
+        session::konto_deaktiviert(&mut tx, id).await?
     };
     // Wer kein aktiver Admin mehr ist, verliert seine Unterschriftsschlüssel im selben Commit
     // (LLH-1490, Spec `org-admin-unterschrift`).

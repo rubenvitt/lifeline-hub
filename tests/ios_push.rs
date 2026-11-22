@@ -460,6 +460,41 @@ async fn deaktivieren_loescht_die_anmeldungen() {
     assert_eq!(zahl(&pool).await, 0);
 }
 
+/// Review M1: Deaktivieren über `PATCH /api/benutzer/{id}` mit `aktiv: false` nimmt die
+/// Anmeldungen mit wie `deaktivieren`; sonst pushte das alte Gerät nach einer Reaktivierung wieder.
+#[tokio::test]
+async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let marlene_id = benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let marlene = login_cookie(&app, "marlene", "marlenepw1").await;
+    assert_eq!(
+        anmelden(&app, &marlene, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+    // Ohne Deaktivieren bleibt sie.
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{marlene_id}"),
+        &admin,
+        Some(&json!({ "anzeigename": "Marlene M." }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(zahl(&pool).await, 1);
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{marlene_id}"),
+        &admin,
+        Some(&json!({ "aktiv": false }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(zahl(&pool).await, 0);
+}
+
 #[tokio::test]
 async fn ablauf_der_sitzung_laesst_anmeldung_und_versand_bestehen() {
     let (app, pool) = mit_ios_push().await;
