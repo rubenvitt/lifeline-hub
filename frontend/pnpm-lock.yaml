@@ -14,7 +14,6 @@ overrides:
   brace-expansion@>=2.0.0 <2.1.6: ^2.1.6
   brace-expansion@>=5.0.0 <5.0.11: ^5.0.11
   zod@>=4.0.0 <4.6.6: ^4.6.6
-  undici@>=8.0.0 <8.12.2: ^8.12.2
   '@ant-design/cssinjs': ~2.1.2
 
 importers:

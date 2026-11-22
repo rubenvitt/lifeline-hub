@@ -172,17 +172,6 @@ overrides:
   # `zod >=4.6.6` fordert.
   zod@>=4.0.0 <4.6.6: ^4.6.6
 
-  # GHSA-xjj6-f33q-929c (high): DoS über einen unbehandelten Fehler bei übermäßig vielen
-  # Content-Encodings (betrifft >= 8.0.0 < 8.12.2). Fund 2026-10-24, alpha ohne eigenes Zutun
-  # rot. Kette: jsdom → undici (jsdom direkt sowie als Vitest-Umgebung über vitest,
-  # @vitest/coverage-v8 und @testing-library/jest-dom). Reine Test-Zeit — jsdom läuft nur
-  # unter Vitest, kein Laufzeit-Code im Bündel. jsdom 30.0.1 (in package.json exakt
-  # gepinnt) fordert `undici ^8.9.0`, auch die neueste jsdom 30.1.3 nur `^8.12.1`: kein
-  # Upgrade des Direktabhängigen erzwingt den Fix, das Lockfile löste 8.10.2. ^8.12.2
-  # bleibt in jsdoms Range (Same-Major-Minor); verifiziert durch die Vitest-Suite und
-  # check-all.sh. Entfällt, sobald jsdom selbst `undici >=8.12.2` fordert.
-  undici@>=8.0.0 <8.12.2: ^8.12.2
-
   # GHSA-2v37-7h3g-55p8 (high): custom-Generatoren von nanoid loopen unbegrenzt bei size 0.
   # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,
   # @vitest/mocker/vitest, vite-plugin-pwa). Reines Build-/Test-Zeit-Tooling (PostCSS läuft
