@@ -90,9 +90,14 @@ pub struct Unlesbar;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeinSchluessel;
 
-/// Der Speicher: der geladene Schlüssel oder keiner. Billig zu klonen.
+/// Der Speicher: der geladene Schlüssel oder keiner, für einen Schlüsselwechsel (LLH-2025)
+/// zusätzlich der alte. Gelesen wird mit dem Schlüssel des passenden Fingerabdrucks,
+/// geschrieben nur mit dem neuen. Billig zu klonen.
 #[derive(Clone, Default)]
-pub struct Geheimnisspeicher(Option<Arc<Geladen>>);
+pub struct Geheimnisspeicher {
+    neu: Option<Arc<Geladen>>,
+    alt: Option<Arc<Geladen>>,
+}
 
 struct Geladen {
     identitaet: age::x25519::Identity,
@@ -100,51 +105,82 @@ struct Geladen {
     fingerabdruck: String,
 }
 
+impl Geladen {
+    fn aus(GeheimnisSchluessel(identitaet): GeheimnisSchluessel) -> Arc<Self> {
+        let empfaenger = identitaet.to_public();
+        let fingerabdruck = fingerabdruck_von(&empfaenger);
+        Arc::new(Geladen {
+            identitaet,
+            empfaenger,
+            fingerabdruck,
+        })
+    }
+}
+
 impl fmt::Debug for Geheimnisspeicher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.fingerabdruck() {
-            Some(fp) => write!(f, "Geheimnisspeicher({fp})"),
-            None => f.write_str("Geheimnisspeicher(ohne Schlüssel)"),
+        match (self.fingerabdruck(), self.fingerabdruck_alt()) {
+            (Some(fp), Some(alt)) => write!(f, "Geheimnisspeicher({fp}, alt {alt})"),
+            (Some(fp), None) => write!(f, "Geheimnisspeicher({fp})"),
+            _ => f.write_str("Geheimnisspeicher(ohne Schlüssel)"),
         }
     }
 }
 
 impl Geheimnisspeicher {
     pub fn new(schluessel: Option<GeheimnisSchluessel>) -> Self {
-        Geheimnisspeicher(schluessel.map(|GeheimnisSchluessel(identitaet)| {
-            let empfaenger = identitaet.to_public();
-            let fingerabdruck = fingerabdruck_von(&empfaenger);
-            Arc::new(Geladen {
-                identitaet,
-                empfaenger,
-                fingerabdruck,
-            })
-        }))
+        Geheimnisspeicher {
+            neu: schluessel.map(Geladen::aus),
+            alt: None,
+        }
     }
 
-    /// Fingerabdruck des geladenen Schlüssels; `None` ohne Schlüssel.
+    /// Der Speicher während eines Schlüsselwechsels: schreibt mit `neu`, liest zusätzlich, was
+    /// an `alt` verschlüsselt ist. Derselbe Schlüssel zweimal ist ein Bedienfehler.
+    pub fn new_wechsel(
+        neu: GeheimnisSchluessel,
+        alt: GeheimnisSchluessel,
+    ) -> Result<Self, SchluesselFehler> {
+        let neu = Geladen::aus(neu);
+        let alt = Geladen::aus(alt);
+        if neu.fingerabdruck == alt.fingerabdruck {
+            return Err(SchluesselFehler("alter und neuer Schlüssel sind derselbe"));
+        }
+        Ok(Geheimnisspeicher {
+            neu: Some(neu),
+            alt: Some(alt),
+        })
+    }
+
+    /// Fingerabdruck des (neuen) Schlüssels; `None` ohne Schlüssel.
     pub fn fingerabdruck(&self) -> Option<&str> {
-        self.0.as_deref().map(|g| g.fingerabdruck.as_str())
+        self.neu.as_deref().map(|g| g.fingerabdruck.as_str())
+    }
+
+    /// Fingerabdruck des alten Schlüssels während eines Wechsels.
+    pub fn fingerabdruck_alt(&self) -> Option<&str> {
+        self.alt.as_deref().map(|g| g.fingerabdruck.as_str())
     }
 
     pub fn has_schluessel(&self) -> bool {
-        self.0.is_some()
+        self.neu.is_some()
     }
 
-    /// Verschlüsselt an den eigenen Empfänger; liefert Chiffrat und Fingerabdruck.
+    /// Verschlüsselt an den Empfänger des neuen Schlüssels; liefert Chiffrat und Fingerabdruck.
     pub fn encrypt(&self, wert: &SecretString) -> Result<(Vec<u8>, String), KeinSchluessel> {
-        let g = self.0.as_deref().ok_or(KeinSchluessel)?;
+        let g = self.neu.as_deref().ok_or(KeinSchluessel)?;
         let chiffrat = age::encrypt(&g.empfaenger, wert.expose_secret().as_bytes())
             .map_err(|_| KeinSchluessel)?;
         Ok((chiffrat, g.fingerabdruck.clone()))
     }
 
-    /// Öffnet ein Chiffrat, wenn sein Fingerabdruck zum geladenen Schlüssel passt.
+    /// Öffnet ein Chiffrat mit dem Schlüssel, dessen Fingerabdruck passt (neu oder alt).
     pub fn decrypt(&self, chiffrat: &[u8], fingerabdruck: &str) -> Result<SecretString, Unlesbar> {
-        let g = self.0.as_deref().ok_or(Unlesbar)?;
-        if g.fingerabdruck != fingerabdruck {
-            return Err(Unlesbar);
-        }
+        let g = [self.neu.as_deref(), self.alt.as_deref()]
+            .into_iter()
+            .flatten()
+            .find(|g| g.fingerabdruck == fingerabdruck)
+            .ok_or(Unlesbar)?;
         let klartext = age::decrypt(&g.identitaet, chiffrat).map_err(|_| Unlesbar)?;
         String::from_utf8(klartext)
             .map(SecretString::from)
@@ -211,6 +247,62 @@ mod tests {
         assert!(!format!("{s:?}").contains(&text));
         let speicher = Geheimnisspeicher::new(Some(s));
         assert!(!format!("{speicher:?}").contains(&text));
+
+        let neu = GeheimnisSchluessel::generate();
+        let alt = GeheimnisSchluessel::generate();
+        let text_neu = neu.to_secret_string().expose_secret().to_string();
+        let text_alt = alt.to_secret_string().expose_secret().to_string();
+        let w = Geheimnisspeicher::new_wechsel(neu, alt).unwrap();
+        let debug = format!("{w:?}");
+        assert!(!debug.contains(&text_neu) && !debug.contains(&text_alt));
+        assert!(debug.contains(w.fingerabdruck().unwrap()));
+        assert!(debug.contains(w.fingerabdruck_alt().unwrap()));
+    }
+
+    #[test]
+    fn wechsel_liest_alte_und_neue_chiffrate() {
+        let a = GeheimnisSchluessel::generate();
+        let b = GeheimnisSchluessel::generate();
+        let nur_a = Geheimnisspeicher::new(Some(a.clone()));
+        let nur_b = Geheimnisspeicher::new(Some(b.clone()));
+        let (ca, fa) = nur_a.encrypt(&wert("alt-geheim")).unwrap();
+        let (cb, fb) = nur_b.encrypt(&wert("neu-geheim")).unwrap();
+
+        let w = Geheimnisspeicher::new_wechsel(b, a).unwrap();
+        assert_eq!(w.decrypt(&ca, &fa).unwrap().expose_secret(), "alt-geheim");
+        assert_eq!(w.decrypt(&cb, &fb).unwrap().expose_secret(), "neu-geheim");
+        assert_eq!(w.fingerabdruck(), nur_b.fingerabdruck());
+        assert_eq!(w.fingerabdruck_alt(), Some(fa.as_str()));
+        assert!(w.has_schluessel());
+        // Ein fremder Fingerabdruck bleibt unlesbar.
+        assert_eq!(w.decrypt(&ca, "0000000000000000").unwrap_err(), Unlesbar);
+    }
+
+    #[test]
+    fn wechsel_schreibt_nur_mit_dem_neuen() {
+        let a = GeheimnisSchluessel::generate();
+        let b = GeheimnisSchluessel::generate();
+        let nur_a = Geheimnisspeicher::new(Some(a.clone()));
+        let nur_b = Geheimnisspeicher::new(Some(b.clone()));
+        let w = Geheimnisspeicher::new_wechsel(b, a).unwrap();
+        let (c, fp) = w.encrypt(&wert("x")).unwrap();
+        assert_eq!(Some(fp.as_str()), nur_b.fingerabdruck());
+        assert_eq!(nur_a.decrypt(&c, &fp).unwrap_err(), Unlesbar);
+        assert_eq!(nur_b.decrypt(&c, &fp).unwrap().expose_secret(), "x");
+    }
+
+    #[test]
+    fn wechsel_mit_gleichem_schluessel_ist_fehler() {
+        let a = GeheimnisSchluessel::generate();
+        let f = Geheimnisspeicher::new_wechsel(a.clone(), a).unwrap_err();
+        assert!(f.to_string().contains("derselbe"), "{f}");
+    }
+
+    #[test]
+    fn ohne_wechsel_kein_alter_fingerabdruck() {
+        let s = Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate()));
+        assert_eq!(s.fingerabdruck_alt(), None);
+        assert_eq!(Geheimnisspeicher::default().fingerabdruck_alt(), None);
     }
 
     #[test]
