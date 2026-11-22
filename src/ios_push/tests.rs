@@ -280,6 +280,7 @@ async fn relais_zugang_speichern_lesen_sperren_loeschen() {
         server_id: "s".into(),
         geheimnis: "g".into(),
         gesperrt: false,
+        sperre_abgelaufen: false,
     };
     repo::relais_zugang_speichern(&pool, &z).await.unwrap();
     assert_eq!(repo::relais_zugang(&pool).await.unwrap().unwrap(), z);
@@ -464,6 +465,7 @@ mod relais_client {
                 server_id: "alt".into(),
                 geheimnis: "alt".into(),
                 gesperrt: false,
+                sperre_abgelaufen: false,
             },
         )
         .await
@@ -491,6 +493,81 @@ mod relais_client {
         let f = ios.senden(&[nachricht()]).await.unwrap_err();
         assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
         assert_eq!(pfade(&gesehen), ["/v1/server", "/v1/senden"]);
+    }
+
+    /// Ein gespeicherter Zugang, den das Relais vor `stunden` Stunden gesperrt hat.
+    async fn gesperrt_vor(pool: &sqlx::SqlitePool, stunden: i64) {
+        repo::relais_zugang_speichern(
+            pool,
+            &RelaisZugang {
+                server_id: "s0".into(),
+                geheimnis: "g0".into(),
+                gesperrt: true,
+                sperre_abgelaufen: false,
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE ios_push_relais \
+             SET gesperrt_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)",
+        )
+        .bind(format!("-{stunden} hours"))
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Ob die Sperre in der letzten Minute gesetzt oder erneuert wurde.
+    async fn gerade_gesperrt(pool: &sqlx::SqlitePool) -> bool {
+        sqlx::query_scalar(
+            "SELECT datetime(gesperrt_at) > datetime('now', '-1 minute') \
+             FROM ios_push_relais WHERE id = 1",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn sperre_juenger_als_einen_tag_kein_kontakt() {
+        let (pool, ios, gesehen) = aufbau(vec![]).await;
+        gesperrt_vor(&pool, 23).await;
+        let f = ios.senden(&[nachricht()]).await.unwrap_err();
+        assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
+        assert!(pfade(&gesehen).is_empty());
+    }
+
+    #[tokio::test]
+    async fn abgelaufene_sperre_versucht_einmal_und_freigegeben_hebt_sie_auf() {
+        let (pool, ios, gesehen) = aufbau(vec![]).await;
+        gesperrt_vor(&pool, 25).await;
+        let e = ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(e.len(), 1);
+        assert_eq!(pfade(&gesehen), ["/v1/senden"], "keine Neuregistrierung");
+        assert_eq!(
+            gesehen.lock().unwrap()[0].1.as_deref(),
+            Some("Bearer s0.g0"),
+            "mit dem gespeicherten Zugang"
+        );
+        assert!(!repo::relais_zugang(&pool).await.unwrap().unwrap().gesperrt);
+        ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(pfade(&gesehen), ["/v1/senden", "/v1/senden"]);
+    }
+
+    #[tokio::test]
+    async fn abgelaufene_sperre_wieder_gesperrt_erneuert_den_zeitpunkt() {
+        let (pool, ios, gesehen) = aufbau(vec![(403, json!({ "fehler": "gesperrt" }))]).await;
+        gesperrt_vor(&pool, 25).await;
+        let f = ios.senden(&[nachricht()]).await.unwrap_err();
+        assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
+        assert_eq!(pfade(&gesehen), ["/v1/senden"], "keine Neuregistrierung");
+        assert!(repo::relais_zugang(&pool).await.unwrap().unwrap().gesperrt);
+        assert!(gerade_gesperrt(&pool).await, "gesperrt_at erneuert");
+        // Die erneuerte Sperre gilt wieder einen Tag: kein weiterer Kontakt.
+        let f = ios.senden(&[nachricht()]).await.unwrap_err();
+        assert!(matches!(f, RelaisFehler::Gesperrt), "{f:?}");
+        assert_eq!(pfade(&gesehen), ["/v1/senden"]);
     }
 }
 

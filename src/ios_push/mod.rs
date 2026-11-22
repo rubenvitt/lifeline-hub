@@ -34,6 +34,11 @@ use std::time::Duration;
 pub const UMSCHLAG_MAX: usize = 3 * 1024;
 /// Höchstens so viele Nachrichten je `POST /v1/senden` (Limit des Relais).
 const JE_AUFRUF: usize = 100;
+/// So lange gilt eine Sperre des Relais (`403`), ohne dass der Server es erneut fragt. Danach
+/// versucht der nächste Versand es einmal mit dem gespeicherten Zugang: Hat der Betreiber den
+/// Server entsperrt, fällt die Sperre; sonst gilt sie ab jetzt wieder so lange. Ein Tag hält den
+/// Kontakt zu einem gesperrten Server selten, ohne dass ein entsperrter lange stumm bleibt.
+pub const SPERRE_GILT_STUNDEN: i64 = 24;
 
 /// Eine Benachrichtigung für einen Nutzer: an jedes seiner Geräte.
 #[derive(Debug, Clone)]
@@ -271,15 +276,16 @@ impl IosPush {
     }
 
     /// Der gespeicherte Zugang; fehlt er, registriert sich der Server beim Relais
-    /// (`POST /v1/server`) und speichert ihn. `None`, wenn das Relais den Server gesperrt hat:
-    /// dann kein Kontakt mehr.
+    /// (`POST /v1/server`) und speichert ihn. `None`, solange eine Sperre des Relais jünger als
+    /// [`SPERRE_GILT_STUNDEN`] ist: dann kein Kontakt. Eine ältere Sperre liefert den Zugang
+    /// (`gesperrt` gesetzt), damit [`Self::senden`] es einmal versucht.
     async fn zugang(&self) -> Result<Option<RelaisZugang>, RelaisFehler> {
         let _sperre = self.inner.registrierung.lock().await;
         let gespeichert = repo::relais_zugang(&self.inner.pool)
             .await
             .map_err(|e| RelaisFehler::Speicher(e.to_string()))?;
         match gespeichert {
-            Some(z) if z.gesperrt => Ok(None),
+            Some(z) if z.gesperrt && !z.sperre_abgelaufen => Ok(None),
             Some(z) => Ok(Some(z)),
             None => self.registrieren().await.map(Some),
         }
@@ -313,6 +319,7 @@ impl IosPush {
             server_id: a.server_id,
             geheimnis: a.geheimnis,
             gesperrt: false,
+            sperre_abgelaufen: false,
         };
         repo::relais_zugang_speichern(&self.inner.pool, &zugang)
             .await
@@ -348,8 +355,9 @@ impl IosPush {
     /// - Ohne Zugang meldet sich der Server zuerst an (einmalig, dann gespeichert).
     /// - `401` (Zugang dem Relais unbekannt): Zugang verwerfen, einmal neu anmelden und
     ///   wiederholen; weist das Relais auch den neuen ab, `Abgewiesen`.
-    /// - `403` (gesperrt): Sperre merken, warnen, `Gesperrt`; weder Neuanmeldung noch weiterer
-    ///   Kontakt, bis ein neuer Zugang gespeichert wird.
+    /// - `403` (gesperrt): Sperre merken (oder erneuern), warnen, `Gesperrt`; keine Neuanmeldung
+    ///   und [`SPERRE_GILT_STUNDEN`] lang kein Kontakt. Danach versucht der nächste Versand es
+    ///   einmal mit dem gespeicherten Zugang; nimmt das Relais ihn an, fällt die Sperre.
     /// - `429`: `Gedrosselt`, nichts wird wiederholt.
     ///
     /// Der Aufrufer wartet nie darauf, dass dies gelingt (`tokio::spawn`); Token und Nutzlast
@@ -381,6 +389,17 @@ impl IosPush {
                     if a.ergebnisse.len() != nachrichten.len() {
                         return Err(RelaisFehler::Antwort("falsche Anzahl Ergebnisse".into()));
                     }
+                    if zugang.gesperrt {
+                        // Zugestellt ist schon; die Ergebnisse gehen auch ohne Speicher zurück.
+                        match repo::relais_sperre_aufheben(&self.inner.pool, &zugang.server_id)
+                            .await
+                        {
+                            Ok(()) => {
+                                tracing::info!("iOS-Push: das Relais nimmt diesen Server wieder an")
+                            }
+                            Err(e) => fehler_melden("Sperre nicht aufgehoben", &e),
+                        }
+                    }
                     return Ok(a.ergebnisse);
                 }
                 StatusCode::UNAUTHORIZED if !neu_versucht => {
@@ -393,8 +412,8 @@ impl IosPush {
                         .await
                         .map_err(|e| RelaisFehler::Speicher(e.to_string()))?;
                     tracing::warn!(
-                        "iOS-Push: das Relais hat diesen Server gesperrt; es wird nichts mehr \
-                         gesendet"
+                        "iOS-Push: das Relais hat diesen Server gesperrt; bis zum nächsten \
+                         Versuch in {SPERRE_GILT_STUNDEN} Stunden wird nichts gesendet"
                     );
                     return Err(RelaisFehler::Gesperrt);
                 }

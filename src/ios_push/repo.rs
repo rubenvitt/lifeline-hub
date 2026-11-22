@@ -1,6 +1,7 @@
 //! Speicher von iOS-Push (`migrations/0363_ios_push.sql`).
 
 use super::krypto::{b64_lesen, nachweis};
+use super::SPERRE_GILT_STUNDEN;
 use crate::benachrichtigung::BenachrichtigungArt;
 use crate::error::AppError;
 use crate::web_push::repo::{stumm_bereinigt, Wahl};
@@ -225,22 +226,30 @@ pub async fn erloschen(pool: &SqlitePool, id: i64, token: &str) -> Result<(), Ap
 pub struct RelaisZugang {
     pub server_id: String,
     pub geheimnis: String,
+    /// Das Relais hat diesen Server gesperrt (`gesperrt_at` gesetzt).
     pub gesperrt: bool,
+    /// Die Sperre ist älter als [`SPERRE_GILT_STUNDEN`]: der nächste Versand versucht es einmal.
+    /// Beim Speichern ohne Bedeutung.
+    pub sperre_abgelaufen: bool,
 }
 
 pub async fn relais_zugang(pool: &SqlitePool) -> Result<Option<RelaisZugang>, AppError> {
-    let zeile: Option<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT server_id, geheimnis, gesperrt_at FROM ios_push_relais WHERE id = 1",
+    let zeile: Option<(String, String, bool, bool)> = sqlx::query_as(
+        "SELECT server_id, geheimnis, gesperrt_at IS NOT NULL, \
+                COALESCE(datetime(gesperrt_at) <= datetime('now', ?), 0) \
+         FROM ios_push_relais WHERE id = 1",
     )
+    .bind(format!("-{SPERRE_GILT_STUNDEN} hours"))
     .fetch_optional(pool)
     .await?;
-    Ok(
-        zeile.map(|(server_id, geheimnis, gesperrt_at)| RelaisZugang {
+    Ok(zeile.map(
+        |(server_id, geheimnis, gesperrt, sperre_abgelaufen)| RelaisZugang {
             server_id,
             geheimnis,
-            gesperrt: gesperrt_at.is_some(),
-        }),
-    )
+            gesperrt,
+            sperre_abgelaufen,
+        },
+    ))
 }
 
 /// Speichert den Zugang (ersetzt einen vorhandenen und hebt die Sperre auf).
@@ -266,13 +275,23 @@ pub async fn relais_zugang_loeschen(pool: &SqlitePool) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Das Relais hat den Zugang abgewiesen: gesperrt, bis ein neuer gespeichert wird.
+/// Das Relais hat den Zugang gesperrt (`403`): `gesperrt_at` ist jetzt, auch wenn schon eine
+/// ältere Sperre stand. Damit gilt sie wieder [`SPERRE_GILT_STUNDEN`].
 pub async fn relais_gesperrt_setzen(pool: &SqlitePool) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE ios_push_relais SET gesperrt_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
-         WHERE id = 1 AND gesperrt_at IS NULL",
+         WHERE id = 1",
     )
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+/// Das Relais nimmt den Zugang `server_id` wieder an: die Sperre fällt.
+pub async fn relais_sperre_aufheben(pool: &SqlitePool, server_id: &str) -> Result<(), AppError> {
+    sqlx::query("UPDATE ios_push_relais SET gesperrt_at = NULL WHERE id = 1 AND server_id = ?")
+        .bind(server_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
