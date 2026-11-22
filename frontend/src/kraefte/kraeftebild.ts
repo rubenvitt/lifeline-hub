@@ -18,6 +18,7 @@ import {
   filterAktive,
   needsOhneFahrzeugKnoten,
   fremdText,
+  groupByEinheit,
   mittelDerEinheit,
   type MittelDerEinheit,
   type MittelQuelle,
@@ -784,19 +785,12 @@ export function baueKraeftebild(
   const mittelVon: MittelVon = (einheitId) => mittelDerEinheit(einheitId, roh, quelle);
 
   // ── Index nach einheit_id ─────────────────────────────────────────────────
-  const personalByEinheit = new Map<number | null, EinsatzPersonal[]>();
-  for (const ep of personal) {
-    const key = ep.einheit_id ?? null;
-    if (!personalByEinheit.has(key)) personalByEinheit.set(key, []);
-    personalByEinheit.get(key)!.push(ep);
-  }
-
-  const fahrzeugeByEinheit = new Map<number | null, EinsatzFahrzeug[]>();
-  for (const ef of fahrzeuge) {
-    const key = ef.einheit_id ?? null;
-    if (!fahrzeugeByEinheit.has(key)) fahrzeugeByEinheit.set(key, []);
-    fahrzeugeByEinheit.get(key)!.push(ef);
-  }
+  // Dieselbe Zuordnung wie das Meldebild (LLH-1916): eine Einheit, die nicht (mehr) in der Liste
+  // steht, zählt wie keine — sonst fiele ihr Personal im Zwischenstand nach dem Auflösen aus dem
+  // Baum, während der Kopf es zählt.
+  const bekannt = new Set(einheiten.map((e) => e.id));
+  const personalByEinheit = groupByEinheit(personal, bekannt);
+  const fahrzeugeByEinheit = groupByEinheit(fahrzeuge, bekannt);
 
   // ── Einheit-Hierarchie aus dem Kern ───────────────────────────────────────
   // `einheitenBaum` (frontend/AGENTS.md, „Eine Baumlogik der Kräfte“): eine Waise (Obereinheit
@@ -858,12 +852,13 @@ export function baueKraeftebild(
 
   // ── Auffangknoten „Ohne Abschnitt" ───────────────────────────────────────
   const ohneAbschnittEinheiten = wurzelnByAbschnitt.get(null) ?? [];
-  // Mittel ohne `einheit_id`: Pseudo-Einheit „Ohne Einheit".
+  // Mittel ohne (bekannte) Einheit: Pseudo-Einheit „Ohne Einheit".
   const ohneEinheitPersonal = personalByEinheit.get(null) ?? [];
   const ohneEinheitFahrzeuge = fahrzeugeByEinheit.get(null) ?? [];
-  // Nur Material ohne Ort (D14): Beladung steht am Fahrzeug, Material an UHS und
-  // Bereitstellungsraum nicht im Baum.
-  const ohneEinheitMaterial = material.filter((em) => ortVon(em) == null);
+  // Nur Material ohne Ort oder an einer unbekannten Einheit (D14, LLH-1916): Beladung steht am
+  // Fahrzeug, Material an UHS und Bereitstellungsraum nicht im Baum.
+  const ohneEinheitMittel = mittelVon(null);
+  const ohneEinheitMaterial = ohneEinheitMittel.material;
 
   const hasOhne =
     ohneAbschnittEinheiten.length > 0 ||
@@ -896,7 +891,7 @@ export function baueKraeftebild(
       const ohneEinheitStaerke = leereStaerke();
       const ohneEinheitPersonalVert = leereVert();
       const ohneEinheitFahrzeugVert = leereVert();
-      const ohneEinheitChildren = mittelZeilen(mittelVon(null), 'ohne');
+      const ohneEinheitChildren = mittelZeilen(ohneEinheitMittel, 'ohne');
 
       for (const ep of ohneEinheitPersonal) {
         addPosition(ohneEinheitStaerke, ep.staerke_position);
