@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { beendeHuelle, starteIosHuelle, starteMacHuelle } from '../test/huelle';
+import {
+  beendeHuelle,
+  starteAndroidHuelle,
+  starteIosHuelle,
+  starteMacHuelle,
+} from '../test/huelle';
 import type { RouteObject } from 'react-router';
 import { RUECKMELDUNG_FORMULAR, routenMuster, rueckmeldungsAdresse } from './adresse';
 
@@ -76,6 +81,11 @@ describe('Oberfläche der Rückmeldung je Hülle (t39ltxxi)', () => {
   it('nennt in der iOS-Hülle die iOS-App (ausgeliefertes Init-Skript)', () => {
     starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
     expect(oberflaeche()).toBe('iOS-App');
+  });
+
+  it('nennt in der Android-Hülle die Android-App (ausgeliefertes Init-Skript)', () => {
+    starteAndroidHuelle({ bruecke: { postMessage: vi.fn() } });
+    expect(oberflaeche()).toBe('Android-App');
   });
 
   it('nennt in der Desktop-Hülle ohne Plattform weiter die Desktop-App', () => {
