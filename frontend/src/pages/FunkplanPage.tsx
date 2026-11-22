@@ -88,6 +88,7 @@ import FernmeldewesenReiter, {
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './funkplanPrint.css';
 import { isUebung } from '../einsatz/einsatzart';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Funkplan des Sachgebiets S6 (FwDV 100 Anlage 5, LFH-548): eine schreibgeschützte, aus dem
@@ -793,7 +794,7 @@ export default function FunkplanPage() {
   // der Skizze steht ohnehin ganz offen.
   const druckWege = useDruckNebenwege({ vorDemDruck: () => setZugeklappt(new Set()) });
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="fernmeldewesen" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

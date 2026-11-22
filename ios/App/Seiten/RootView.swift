@@ -63,7 +63,7 @@ struct RootView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("pruefung")
             .overlay(alignment: .leading) { Randknopf() }
-        case .web:
+        case .web, .ohneServer:
             if let webView = modell.webView {
                 WebviewHost(webView: webView)
                     .id(ObjectIdentifier(webView))

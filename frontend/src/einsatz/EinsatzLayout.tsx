@@ -313,18 +313,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const [sprungOffen, setSprungOffen] = useState(false);
   const panelEingeklappt = sprungOffen ? false : panelZu(navWahl, weit);
   const [navOffen, setNavOffen] = useState(false);
-  // „Suchen“ im Drawer (LLH-1728, D3): die Palette gibt beim Schließen keinen Fokus zurück (sie
-  // wird ausgehängt), und der Knopf im Drawer ist dann abgebaut (`destroyOnHidden`). Ist die
-  // Palette wieder zu und der Fokus verwaist, geht er auf den Griff (Muster `useFokusRueckgabe`).
-  // Der schließende Drawer holt ihn vorher nicht zurück: er zöge ihn hinter die offene Palette.
+  // „Suchen“ im Drawer (LLH-1728, D3): der Knopf ist nach dem Schließen der Palette abgebaut
+  // (`destroyOnHidden`), also gibt die Palette den Fokus an den Griff zurück (`oeffne(ziel)`,
+  // LLH-1915). Der schließende Drawer holt ihn vorher nicht zurück: er zöge ihn hinter die offene
+  // Palette. Zurückgesetzt wird die Marke beim nächsten Öffnen des Drawers.
   const [sucheAusDrawer, setSucheAusDrawer] = useState(false);
   const navGriff = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!sucheAusDrawer || palette.offen) return;
-    const aktiv = document.activeElement;
-    if (aktiv === document.body || aktiv === null) navGriff.current?.focus();
-    setSucheAusDrawer(false);
-  }, [sucheAusDrawer, palette.offen]);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
   useEffect(() => {
@@ -588,7 +582,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                     color: rahmenFarben.text,
                   }}
                   icon={<IconMenue size={22} />}
-                  onClick={() => setNavOffen(true)}
+                  onClick={() => {
+                    setSucheAusDrawer(false);
+                    setNavOffen(true);
+                  }}
                 />
               </div>
             )}
@@ -875,7 +872,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               onClick={() => {
                 setSucheAusDrawer(true);
                 setNavOffen(false);
-                palette.oeffne();
+                palette.oeffne(navGriff.current);
               }}
               // Dieselbe Trefffläche wie der Griff „Menü“ (A1, LFH-384), wie vorher im Kopf.
               style={{

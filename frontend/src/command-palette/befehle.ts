@@ -111,11 +111,13 @@ export const SCHNELLAKTIONEN: {
   label: string;
   schlagworte: string[];
   /**
-   * Engeres Recht als das Schreibrecht des Blocks (LFH-1170): `leitung` zeigt die Zeile nur der
-   * Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`). Ohne Angabe genügt das
-   * Schreibrecht im Einsatz.
+   * Abweichendes Recht der Zeile. `leitung` (LFH-1170) ist enger als das Schreibrecht: nur die
+   * Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`). `erfassen` (LLH-2006) ist
+   * weiter: wer im Einsatz erfassen oder am Spiegel beantragen darf (`darfErfassungBeantragen`),
+   * also auch die Mitarbeit; nur für ETB und Meldung, die das Erfassungs-Gate des Servers trägt.
+   * Ohne Angabe genügt das Schreibrecht im Einsatz.
    */
-  recht?: 'leitung';
+  recht?: 'leitung' | 'erfassen';
   /**
    * Ein weiteres Modul, dessen Freigabe die Zeile braucht (y3zh5ymv D4): „Lagemeldung erfassen“
    * schreibt eine Meldung, die Seite Lagemeldungen zeigt ohne die Meldungen nur „Nur Ansicht“.
@@ -135,6 +137,7 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => etbPfad(id, { neu: true }),
     label: 'ETB-Eintrag schreiben',
     schlagworte: ['tagebuch', 'eintrag', 'Neuer ETB-Eintrag'],
+    recht: 'erfassen',
   },
   // Neu in y3zh5ymv (D4), mit `kennung`. Leser: `pages/MeldungenPage.tsx`,
   // `pages/LagemeldungenPage.tsx`, `pages/AuftraegePage.tsx`, `pages/NachforderungenPage.tsx`,
@@ -146,6 +149,7 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => meldungenPfad(id, { neu: true }),
     label: 'Meldung erfassen',
     schlagworte: ['meldung', 'eingang', 'Neue Meldung'],
+    recht: 'erfassen',
   },
   {
     modulKey: 'lagemeldungen',
@@ -540,10 +544,13 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       });
     }
 
-    // 4. Schnellaktionen, nur mit Schreibrecht (kein Beobachter, aktiver Einsatz). Modulfilter ist
-    //    die LESEACHSE `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf
-    //    ein unfertiges Modul.
-    if (k.darfSchreibenImEinsatz) {
+    // 4. Schnellaktionen, nur mit Schreibrecht (kein Beobachter, aktiver Einsatz); Zeilen mit
+    //    `recht: 'erfassen'` schon mit Erfassungsrecht (Mitarbeit, Antrag am Spiegel, LLH-2006).
+    //    Wer schreiben darf, darf auch erfassen. Modulfilter ist die LESEACHSE
+    //    `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf ein
+    //    unfertiges Modul.
+    const darfErfassen = k.darfSchreibenImEinsatz || (k.darfErfassen ?? false);
+    if (darfErfassen) {
       // Nach Nutzung geordnet, bei Gleichstand die feste Folge der Tabelle (y3zh5ymv D5). Die
       // Folge gilt in der Startansicht und als Gleichstandsachse der Suche (Eingabeindex).
       const geordnet = ordneNachNutzung(
@@ -552,6 +559,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         k.schnellaktionZaehlung ?? {},
       );
       for (const a of geordnet) {
+        if (a.recht !== 'erfassen' && !k.darfSchreibenImEinsatz) continue;
         if (a.recht === 'leitung' && !k.darfEinsatzLeiten) continue;
         const m = modulRegistry.find((x) => x.key === a.modulKey);
         if (!m || !istModulFreigegeben(m, k.freigaben)) continue;

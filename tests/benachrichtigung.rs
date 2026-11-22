@@ -96,15 +96,17 @@ impl Welt {
     }
 
     async fn funktion_setzen(&self, benutzer_id: i64, funktion: &str) {
+        self.rolle_mit_funktion(benutzer_id, "fuehrungspersonal", funktion)
+            .await;
+    }
+
+    async fn rolle_mit_funktion(&self, benutzer_id: i64, rolle: &str, funktion: &str) {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
             &format!("/api/einsaetze/{}/mitglieder/{benutzer_id}", self.einsatz),
             &self.admin,
-            Some(
-                &json!({ "einsatz_rolle": "fuehrungspersonal", "fuehrungsfunktion": funktion })
-                    .to_string(),
-            ),
+            Some(&json!({ "einsatz_rolle": rolle, "fuehrungsfunktion": funktion }).to_string()),
         )
         .await;
         assert_eq!(s, StatusCode::OK, "{v}");
@@ -262,6 +264,84 @@ async fn el_erreicht_den_einsatzleiter_vor_der_mitgliedschaft() {
         )
         .await;
     assert_eq!(an, vec![w.anna], "EL der Führungsstelle geht vor");
+}
+
+/// Mitarbeit und Beobachter können nicht handeln (kein Schreibrecht): eine Funktion erreicht sie
+/// nicht, auch wenn die Mitgliedschaft sie trägt (LLH-2008, `src/AGENTS.md`, „Erfassungs-Gate“).
+#[tokio::test]
+async fn funktion_erreicht_mitarbeit_und_beobachter_nicht() {
+    let w = welt().await;
+    let carla = benutzer_anlegen(&w.app, &w.admin, "carla", "keine").await;
+    w.rolle_mit_funktion(w.anna, "mitarbeit", "s4").await;
+    w.rolle_mit_funktion(w.bert, "beobachter", "s4").await;
+    w.rolle_mit_funktion(carla, "fuehrungspersonal", "s4").await;
+    let an = w
+        .melden(
+            w.anlass(Art::AuftragErteilt, Typ::Auftrag, 1)
+                .an(Adressat::Funktion(Fuehrungsfunktion::S4)),
+        )
+        .await;
+    assert_eq!(an, vec![carla]);
+}
+
+/// Ist der Einsatzleiter der Führungsstelle ein Beobachter, gilt er für EL als nicht da: die
+/// Funktion EL der Mitgliedschaft springt ein (LLH-2008).
+#[tokio::test]
+async fn el_ohne_schreibrecht_faellt_auf_die_mitgliedschaft_zurueck() {
+    let w = welt().await;
+    w.funktion_setzen(w.bert, "el").await;
+    rolle_setzen(&w.app, &w.admin, w.einsatz, w.anna, "beobachter").await;
+    let ep = w.personal("Anna", Some(w.anna)).await;
+    sqlx::query(
+        "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, einsatzleiter_art, \
+             einsatzleiter_personal_id, einsatzleiter_name, einsatzleiter_seit) \
+         VALUES (?, 'personal', ?, 'Anna', '2026-01-01 00:00:00') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET einsatzleiter_art = 'personal', \
+             einsatzleiter_personal_id = excluded.einsatzleiter_personal_id, \
+             einsatzleiter_name = 'Anna', einsatzleiter_seit = excluded.einsatzleiter_seit",
+    )
+    .bind(w.einsatz)
+    .bind(ep)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let an = w
+        .melden(
+            w.anlass(Art::Befehl, Typ::Befehl, 1)
+                .an(Adressat::Funktion(Fuehrungsfunktion::El)),
+        )
+        .await;
+    assert_eq!(an, vec![w.bert]);
+}
+
+/// Ein Einsatzleiter ohne Mitgliedschaft hat im Einsatz kein Schreibrecht (LFH-1118, auch der
+/// Admin): er gilt für EL als nicht da, die Funktion EL der Mitgliedschaft springt ein (LLH-2008).
+#[tokio::test]
+async fn el_ohne_mitgliedschaft_faellt_auf_die_mitgliedschaft_zurueck() {
+    let w = welt().await;
+    w.funktion_setzen(w.bert, "el").await;
+    let carla = benutzer_anlegen(&w.app, &w.admin, "carla", "keine").await;
+    let ep = w.personal("Carla", Some(carla)).await;
+    sqlx::query(
+        "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, einsatzleiter_art, \
+             einsatzleiter_personal_id, einsatzleiter_name, einsatzleiter_seit) \
+         VALUES (?, 'personal', ?, 'Carla', '2026-01-01 00:00:00') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET einsatzleiter_art = 'personal', \
+             einsatzleiter_personal_id = excluded.einsatzleiter_personal_id, \
+             einsatzleiter_name = 'Carla', einsatzleiter_seit = excluded.einsatzleiter_seit",
+    )
+    .bind(w.einsatz)
+    .bind(ep)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let an = w
+        .melden(
+            w.anlass(Art::Befehl, Typ::Befehl, 1)
+                .an(Adressat::Funktion(Fuehrungsfunktion::El)),
+        )
+        .await;
+    assert_eq!(an, vec![w.bert]);
 }
 
 /// Wer das Modul des Bezugs nicht lesen darf, bekommt nichts — auch wenn seine Funktion

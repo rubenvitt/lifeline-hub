@@ -185,6 +185,9 @@
      einmal — sie ist `--lfh-schrift-text` bzw. `--lfh-schrift-zahl`.
      Modus- und dichteunabhängig: die Grundschrift der Dichte-Achse ist
      `--lfh-schriftgroesse`, diese Skala benennt die Stufen daneben. */
+  /* Eingabefelder auf grobem Zeiger: `feldSchriftTouch` in `tokens.ts`, Regel am Dateiende. */
+  --lfh-touch-feldschrift: 16px;
+
   --lfh-typo-ueberschrift-groesse: 30px;
   --lfh-typo-ueberschrift-gewicht: 600;
   --lfh-typo-ueberschrift-sperrung: -0.02em;
@@ -391,5 +394,41 @@
 @media (min-width: 992px) {
   :root {
     --lfh-kopf-polsterung: 24px;
+  }
+}
+
+/* ── Eingabefelder auf Touch · kein Fokus-Zoom (LLH-2043) ─────────────────
+   Der Zoom ist frei (`index.html`). iOS zoomt beim Fokus in jedes Feld unter
+   16 px Schrift, die Dichte-Grundschrift liegt darunter (13,5 / 15 / 15).
+   Auf grobem Zeiger tragen deshalb alle Elemente, in die getippt wird, die
+   Touch-Feldschrift; antds Select zeigt den Wert in einem `span` neben dem
+   Such-`input`, beide gleich groß, sonst springt die Schrift beim Tippen.
+   `!important` schlägt auch Inline-Größen (`style={monoStil(…)}`): das Ziel
+   ist kein Fokus-Zoom, ohne Ausnahme. Knöpfe, Etiketten und Lauftext bleiben.
+   Kästchen, Radio und Schieber haben keinen Text und bleiben außen vor.
+   antds große Felder (`size="large"`, etwa die Anmeldung) liegen in jeder
+   Dichte bei 16 px oder darüber und bleiben, wie sie sind: die Regel hebt
+   nur an, sie verkleinert nie.
+   ======================================================================== */
+
+@media (pointer: coarse) {
+  :is(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+    textarea,
+    select,
+    .ant-select-selection-item,
+    .ant-select-selection-placeholder
+  ):not(
+    .ant-input-lg,
+    :is(
+        .ant-input-affix-wrapper-lg,
+        .ant-input-number-lg,
+        .ant-input-number-affix-wrapper-lg,
+        .ant-select-lg,
+        .ant-picker-large
+      )
+      *
+  ) {
+    font-size: var(--lfh-touch-feldschrift) !important;
   }
 }

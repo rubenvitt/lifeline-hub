@@ -178,6 +178,7 @@ const headings = () =>
 describe('EinsatzkraftPage – Gerüst (3.1)', () => {
   it('folgt auf den Kopf mit Einteilung, Person, Zeitachse und zuletzt „Aus dem Einsatz“', async () => {
     renderAnsicht();
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
     expect(headings()).toEqual(['Einteilung', 'Person', 'Zeitachse', 'Aus dem Einsatz']);
   });
@@ -216,6 +217,7 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     renderAnsicht('/einsaetze/7/personal/10', {
       aktiv: [kraft({ ist_adhoc: true, personal_id: null })],
     });
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     const kopf = await screen.findByRole('heading', { level: 1 });
     expect(within(kopf).getByText('ad-hoc')).toBeVisible();
   });
@@ -261,6 +263,7 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     'gescheiterter Neuabruf (%s, /api/einsaetze/7%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (_lage, unterpfad, aufbau) => {
       const { client } = renderAnsicht('/einsaetze/7/personal/10', aufbau);
+      await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
       expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
 
       server.use(
@@ -288,12 +291,14 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
   it('eine vorhandene Person setzt die Marke nicht', async () => {
     const marke = { current: false };
     renderAnsicht('/einsaetze/7/personal/10', { marke });
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { level: 1 });
     expect(marke.current).toBe(false);
   });
 
   it('abgeschlossener Einsatz: nur lesen, Grund genannt, keine Bearbeitung', async () => {
     renderAnsicht('/einsaetze/7/personal/10', { einsatz: { status: 'abgeschlossen' } });
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getAllByText('Einsatz abgeschlossen').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /bearbeiten$|eintragen$/ })).toBeNull();

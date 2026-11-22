@@ -82,7 +82,25 @@ async function warteAufModus(seite: Page, modus: Modus) {
   );
 }
 
+/**
+ * Wartet, bis keine Ein- oder Ausblendung von antd (rc-motion, `ant-zoom-appear`,
+ * `ant-fade-leave` …) mehr läuft. `animations: 'disabled'` spult nur laufende Animationen vor;
+ * in der Vorbereitung steht ein Dialog noch statisch auf `scale(0.2)` und käme in Fünftelgröße
+ * ins Bild (LLH-1985: `auftrag-aufheben.png` 104×47 statt 520×231).
+ */
+async function warteAufRuhe(seite: Page) {
+  await seite.waitForFunction(
+    () =>
+      !Array.from(
+        document.querySelectorAll('[class*="-appear"], [class*="-enter"], [class*="-leave"]'),
+      ).some((el) =>
+        Array.from(el.classList).some((k) => /^ant-[a-z-]+-(appear|enter|leave)$/.test(k)),
+      ),
+  );
+}
+
 async function aufnehmen(ziel: Locator | Page, pfad: string) {
+  await warteAufRuhe('goto' in ziel ? ziel : ziel.page());
   await ziel.screenshot({
     path: pfad,
     animations: 'disabled',

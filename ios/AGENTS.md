@@ -19,6 +19,15 @@ Change `t39ltxxi-ios-huelle`.
 - **Wire-Format im Init-Skript:** Kennung `__LIFELINE_HUELLE__` und Befehle der Brücke stehen im
   Kopf von `ios/App/Huelle/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest führt das
   Skript aus (`frontend/src/test/huelle.ts`), eine Änderung zieht die Tests dort mit.
+- **Start ohne Server** (LLH-1980, ADR-0082): ohne erreichbaren Server lädt die App die
+  gespeicherte `index.html` **desselben** Servers per `loadSimulatedRequest` unter seiner
+  Adresse; die Assets kommen aus dem HTTP-Cache seines Datenspeichers. Vorgewärmt wird nach jedem
+  Laden vom Server mit `ios/App/Huelle/vorwaermen.js` und der Liste `assets` aus `/api/shell`;
+  was zu tun ist, entscheiden `Vorrat` und `Ablauf` im Kern, die Ablage hält `Vorratsablage`
+  (eine Datei je Server, gelöscht mit dem Server). Fährt die Oberfläche nicht hoch, gilt sie für
+  diesen App-Lauf nicht mehr. Die App-Tests prüfen das gegen einen https-Testserver, dessen CA
+  `scripts/ios/simulator-pruefung.sh` in jeden Simulator einträgt; der App-Code bekommt keine
+  Ausnahme bei der Zertifikatsprüfung.
 - **Gemeinsame Fälle:** Adressprüfung, Deeplink und Linkregeln prüft der Kern gegen
   `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
   JSON, nie nur in einen Swift-Test.
@@ -61,18 +70,22 @@ Entscheidung ADR-0082; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
   Relais mit „Öffnen, um die Meldung zu sehen“. AES-GCM steht in `ios/Gemeinsam`, weil es unter
   Linux kein CryptoKit gibt; Server und App hält der gemeinsame Fall
   `src-tauri/faelle/push-nutzlast.json` zusammen (Klartext: `push-inhalt.json`).
-- **Native Anfragen an einen Server** gibt es nur zwei: `GET /api/shell` und
+- **Native Anfragen an einen Server** gibt es nur drei: `GET /api/shell`, `GET /` für die
+  `index.html` des Starts ohne Server (`Vorratsdienst`, ADR-0082) und
   `POST /api/ios-push/abmelden` beim Entfernen eines Servers (`Vertragsabruf.meldePushAb`, ohne
   Sitzung). Die Abmeldung liegt in `PushAnmeldungen.ausstehend`, bis sie erledigt ist
   (`AusstehendeAbmeldung.isErledigt`: 2xx oder ein 4xx außer 408/429); erst dann fällt der
   Schlüssel. Versucht wird sie nach dem Entfernen, beim Start und bei jeder Rückkehr in den
-  Vordergrund je einmal, nie in einer Schleife. Eine dritte Anfrage braucht eine neue
+  Vordergrund je einmal, nie in einer Schleife. Eine vierte Anfrage braucht eine neue
   Entscheidung.
 - **Tippen auf eine Meldung** entscheidet `Ablauf` (`meldungAngetippt`): eine unbekannte Kennung
   tut nichts, ein anderer Server wird sichtbar aktiv wie bei einem Wechsel in der Serverliste, der
   Pfad geht durch `Linkregeln.sichererPfad` (Abschnitt `push_pfad` in
-  `src-tauri/faelle/deeplink.json`), sonst die Startseite. Eine Push-Meldung des Servers, dessen
-  Oberfläche gerade läuft, zeigt die App nicht als Banner; die Oberfläche meldet sie selbst.
+  `src-tauri/faelle/deeplink.json`), sonst die Startseite. Auf der gespeicherten Oberfläche
+  (`ohneServer`) gilt dasselbe wie auf einer Status-Seite: erst prüfen, dann den Pfad laden;
+  antwortet der Server nicht, startet sie ohne den Pfad neu. Eine Push-Meldung des Servers, dessen
+  Oberfläche gerade vom Server läuft (`.web`), zeigt die App nicht als Banner; die Oberfläche
+  meldet sie selbst. Die gespeicherte Oberfläche hat keinen Live-Kanal, dort erscheint das Banner.
 - **Umgebung und Berechtigungen:** `aps-environment` steht in `ios/App/LifelineHub.entitlements`
   fest auf `development`, der Export für App Store Connect setzt `production`; dem Server meldet
   die App die Umgebung über `#if DEBUG` (`ios/App/Systemdienste.swift`). App und Extension teilen

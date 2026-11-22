@@ -7,11 +7,19 @@ import { ladeInDichte, SUBPIXEL } from './trefflaeche-kern';
  * „Das Statusmenü liegt ganz im Fenster“): Lage, Höhe und Spalten rechnet `menueLage` in
  * `components/StatusWahl.tsx`; ob das Menü wirklich im Fenster steht, zeigt nur der Browser.
  *
- *  1. Tablet 1024 × 768, oberste Zeile: der erste Eintrag beginnt im Fenster.
+ *  1. Tablet 1024 × 768, oberste Zeile: der erste Eintrag beginnt im Fenster, und das Menü ist
+ *     beim Öffnen nicht weggerollt.
  *  2. Handschuh 1366 × 520: alle Einträge (bis S9 und S0) stehen ohne Rollen im Fenster, das
  *     Menü mehrspaltig (zwei Spalten, oder drei, wenn auch zwei nicht passen).
  *  3. Nach dem Wechsel steht die Quittung „<Rufname>: <alt> → <neu>“ mit „Rückgängig“, und
  *     „Rückgängig“ stellt den alten Status her (echter Server, Spec „Statuswechsel zurücknehmen“).
+ *
+ * NUR DIE FMS-STATUS (LLH-2003): Der Fahrzeugstatus-Katalog gilt für die ganze Organisation, und
+ * andere Specs im selben Backend legen darin Status an (`kraefte-kontrast.spec.ts` je Lauf und
+ * Modus mehrere, mit `sortier` 0, also VOR S1). Das Menü hatte dann 16 bis 28 statt 10 Einträgen,
+ * der erste war nicht S1, und beide Fälle maßen eine Kataloglänge, um die es in der Spec nicht
+ * geht. Fall 1 und 2 zeigen deshalb nur die Einträge mit FMS-Anker (S1 bis S9, S0), wie die
+ * Szenarien der Spec sie nennen; die Grenzen selbst bleiben.
  *
  * Kein `networkidle` (SSE-Strom), gewartet wird auf Inhaltsanker.
  */
@@ -35,6 +43,19 @@ async function seede(page: Page): Promise<number> {
 
 const knopf = (page: Page) => page.getByRole('button', { name: `Status von ${RUFNAME} ändern` });
 const menue = (page: Page) => page.getByRole('menu', { name: `Status von ${RUFNAME}` });
+
+/**
+ * Der Katalog zeigt nur Einträge mit FMS-Anker (S1 bis S9, S0), nicht die, die andere Specs im
+ * selben Backend angelegt haben (siehe Kopf).
+ */
+async function nurFmsStatus(page: Page) {
+  await page.route('**/api/fahrzeug-status', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const antwort = await route.fetch();
+    const katalog = (await antwort.json()) as { fms_anker: number | null }[];
+    await route.fulfill({ response: antwort, json: katalog.filter((s) => s.fms_anker != null) });
+  });
+}
 
 /** Ober- und Unterkante jedes Menüeintrags gegen das Fenster. */
 async function eintraegeImFenster(page: Page) {
@@ -60,13 +81,23 @@ test('Tablet 1024 × 768: das Statusmenü der obersten Zeile beginnt mit dem ers
   await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
   await page.setViewportSize({ width: 1024, height: 768 });
   const einsatzId = await seede(page);
+  await nurFmsStatus(page);
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
   await knopf(page).click();
   await expect(menue(page)).toBeVisible();
   // Der Kopf nennt das Fahrzeug und ist kein Eintrag.
   await expect(menue(page).getByText(RUFNAME, { exact: true })).toBeVisible();
 
+  // Erst messen, wenn die Einblendung steht: im Takt `appear-start` ist das Menü auf null
+  // gestaucht (siehe `kraefte-kontrast.spec.ts`, LFH-536).
+  await expect(page.locator('.ant-dropdown').filter({ has: menue(page) })).not.toHaveClass(
+    /ant-slide-(up|down)-appear/,
+  );
+  // Vorbedingung: genau die zehn FMS-Status, um die es geht.
+  await expect(menue(page).getByRole('menuitem')).toHaveCount(10);
+
   const { lagen, hoehe } = await eintraegeImFenster(page);
+  expect(lagen[0].text, 'der erste Eintrag ist S1').toMatch(/^S1\b/);
   expect(
     lagen[0].oben,
     `erster Eintrag „${lagen[0].text}“ beginnt im Fenster`,
@@ -75,6 +106,10 @@ test('Tablet 1024 × 768: das Statusmenü der obersten Zeile beginnt mit dem ers
     expect(l.oben, `„${l.text}“ beginnt im Fenster`).toBeGreaterThanOrEqual(-SUBPIXEL);
     expect(l.oben, `„${l.text}“ beginnt im Fenster`).toBeLessThan(hoehe);
   }
+  // Nicht weggerollt (LLH-2003): ein scrollender Fokus beim Öffnen rollte ein langes Menü nach
+  // unten. Die Ursache hält `StatusWahl.test.tsx` fest, hier steht die Wirkung.
+  const gerollt = await menue(page).evaluate((m) => m.scrollTop);
+  expect(gerollt, 'das Menü ist beim Öffnen nicht weggerollt').toBeLessThanOrEqual(SUBPIXEL);
 });
 
 test('Handschuh 1366 × 520: alle Statuswerte stehen ohne Rollen im Fenster, das Menü mehrspaltig', async ({
@@ -83,9 +118,15 @@ test('Handschuh 1366 × 520: alle Statuswerte stehen ohne Rollen im Fenster, das
   await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
   await page.setViewportSize({ width: 1366, height: 520 });
   const einsatzId = await seede(page);
+  await nurFmsStatus(page);
   await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, 'handschuh');
   await knopf(page).click();
   await expect(menue(page)).toBeVisible();
+  await expect(page.locator('.ant-dropdown').filter({ has: menue(page) })).not.toHaveClass(
+    /ant-slide-(up|down)-appear/,
+  );
+  // Vorbedingung: genau die zehn FMS-Status, um die es geht.
+  await expect(menue(page).getByRole('menuitem')).toHaveCount(10);
 
   const { lagen, hoehe } = await eintraegeImFenster(page);
   for (const l of lagen) {

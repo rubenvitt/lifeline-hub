@@ -19,7 +19,6 @@ import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser'
 import {
   SeitenFehler,
   SeitenNichtGefunden,
-  SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -33,6 +32,7 @@ import { evakuierungPfad, parseRouteId } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /** Schlüssel eines Menüeintrags im Kopf: ein Räumungsschritt (`raeumung:<ziel>`) oder `stornieren`. */
 type MenueAktion = string;
@@ -102,7 +102,8 @@ export default function EvakuierungsbezirkPage() {
     />
   );
   if (bezirkId == null) return nichtGefunden;
-  if (einsatzQuery.isLoading || evakuierungQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading || evakuierungQuery.isLoading)
+    return <ModulGerippeSeite modulKey="evakuierung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

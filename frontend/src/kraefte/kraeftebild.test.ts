@@ -497,6 +497,40 @@ it('„Ohne Einheit“ nimmt nur Material ohne Ort; Material an UHS oder BR zäh
   expect(mitOhneOrt.baum.map((z) => z.key)).toEqual(['ab-1', OHNE_ABSCHNITT_KEY]);
 });
 
+// LLH-1916: Zwischenstand nach dem Auflösen einer Einheit — die Einheitenliste ist neu geladen,
+// das Personal trägt noch die alte `einheit_id`. Wie das Meldebild (`groupByEinheit`) zählt eine
+// unbekannte Einheit als keine.
+describe('Mittel an einer unbekannten Einheit stehen unter „Ohne Einheit“ (LLH-1916)', () => {
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1)],
+    [p(1, 10, 'fuehrer'), p(2, 99, 'mannschaft', 'nicht_verfuegbar')],
+    [fz(1, 99, 'nicht_verfuegbar')],
+    [mat(1, 99, 'defekt')],
+  );
+  const ohneAbschnitt = bild.baum.find((z) => z.key === OHNE_ABSCHNITT_KEY);
+  const ohneEinheit = ohneAbschnitt?.children?.find((z) => z.bezeichnung === 'Ohne Einheit');
+
+  it('Stärke und Verteilung zählen die Person dort', () => {
+    expect(ohneEinheit?.staerke).toEqual({ fuehrer: 0, unterfuehrer: 0, mannschaft: 1, gesamt: 1 });
+    expect(ohneEinheit?.personalVerteilung?.nicht_verfuegbar).toBe(1);
+    expect(ohneEinheit?.fahrzeugVerteilung?.nicht_verfuegbar).toBe(1);
+  });
+
+  it('die Zeilen des Baums ergeben zusammen die Kopfstärke', () => {
+    const summe = bild.baum.reduce((n, z) => n + z.staerke.gesamt, 0);
+    expect(summe).toBe(bild.verdichtung.staerke.gesamt);
+  });
+
+  it('die Sammelzeile nennt Person, Fahrzeug und Material', () => {
+    const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+    const teil = md.slice(md.indexOf('Ohne Einheit'));
+    expect(teil).toContain('Pers. P2');
+    expect(teil).toContain('Fzg. F1');
+    expect(teil).toContain('Mtl. M1');
+  });
+});
+
 it('Abschnitts-Filter ordnet Material über die Einheit seines Orts (D14)', () => {
   const abschnitte = [ab(1), ab(2)];
   const einheiten = [eh(10, 1), eh(20, 2)];

@@ -76,7 +76,7 @@ import type { Dayjs } from 'dayjs';
 import { berichtigungTitel } from './zeitachseModell';
 import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
-import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { useZeitEingabe, type ZeitHinweis } from '../anzeige/ZeitpunktEingabe';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useMinutenTakt } from '../components/useMinutenTakt';
@@ -446,6 +446,12 @@ export default function Schnellerfassung({
   const [befehlHinweis, setBefehlHinweis] = useState<string | null>(null);
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
+  /**
+   * Was das Feld Zeit zu seiner Eingabe sagt (LLH-1917): Grund oder Deutung. Es steht in der
+   * Fußzeile, weil es im schmalen Feld die Eingabe verdrängte. „gestern“ am geltenden Wert nennt
+   * schon der Nachtrag mit Tag (`nachtragText`).
+   */
+  const [zeitFeldHinweis, setZeitFeldHinweis] = useState<ZeitHinweis | null>(null);
   /**
    * Grund, den das Feld Zeit für eine beim Verlassen verworfene, unlesbare Eingabe nennt (LLH-1866).
    * Zusätzlich als Ref: das Verwerfen geschieht beim `mousedown` auf „Erfassen“, und `absenden`
@@ -1084,6 +1090,8 @@ export default function Schnellerfassung({
         ? `Zeit nicht übernommen: ${zeitDiscarded}`
         : null;
   const nachtragMin = zukunftJetzt ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
+  // Der Hinweis des Felds Zeit geht dem der Zukunft vor: er gilt dem, was gerade im Feld steht.
+  const zeitHinweisFuss = zeitFeldHinweis?.art === 'tag' ? null : zeitFeldHinweis;
   // Heute nur die Uhrzeit, sonst mit Tag, in der Darstellung der Person (`anzeige/zeitDarstellung.ts`).
   const zeitAmKnopf =
     nachtragMin != null ? zeitKurz(metadaten.ereigniszeit, konventionen, jetzt) : null;
@@ -1205,6 +1213,22 @@ export default function Schnellerfassung({
         >
           <IconWarndreieck />
           <span>{unlesbarGrund}</span>
+        </span>
+      ) : zeitHinweisFuss ? (
+        // Höflich wie `/zeit` unten: der Hinweis folgt dem Tippen. Ein Grund rot, die Deutung grau.
+        <span
+          key={`feld-${zeitHinweisFuss.art}`}
+          id={zeitGrundId}
+          role="status"
+          data-lfh="etb-zeit-hinweis"
+          style={grundStil(zeitHinweisFuss.art === 'grund' ? rollen.alarmText : rollen.gedaempft)}
+        >
+          {zeitHinweisFuss.art === 'grund' && <IconWarndreieck />}
+          <span>
+            {zeitHinweisFuss.art === 'grund'
+              ? `Zeit: ${zeitHinweisFuss.text}`
+              : `Zeit ${zeitHinweisFuss.text}`}
+          </span>
         </span>
       ) : zukunftJetzt ? (
         <span
@@ -1471,6 +1495,8 @@ export default function Schnellerfassung({
             zeitGrund={unlesbarGrund ?? zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
             onZeitDiscard={handleZeitDiscard}
+            onZeitHinweis={setZeitFeldHinweis}
+            zeitBeschrieben={zeitHinweisFuss != null}
             zeitFeldKey={zeitFeldKey}
             nachtrag={nachtragMin != null}
             veranlassungOffen={veranlassungOffen}

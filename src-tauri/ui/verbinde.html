@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  Startseite „Verbinde…“ der Desktop-Hülle (LLH-1982): steht im Fenster, während die Hülle vor dem
+  Laden den Hüllen-Vertrag des Servers abfragt (`GET /api/shell`, src-tauri/src/vertrag.rs). Ohne
+  IPC: die Origin kommt als `?server=` (`verbinde_pfad` in main.rs). Gestaltung in stil.css.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lifeline Hub – Verbinde…</title>
+    <link rel="stylesheet" href="stil.css" />
+    <script src="verbinde.js" defer></script>
+  </head>
+  <body>
+    <main class="karte" aria-busy="true">
+      <p class="augenbraue">Lifeline Hub</p>
+      <h1>Verbinde…</h1>
+      <p><code id="adresse"></code></p>
+    </main>
+  </body>
+</html>

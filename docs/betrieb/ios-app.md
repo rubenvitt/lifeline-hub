@@ -52,8 +52,9 @@ Ohne gespeicherten Server zeigt die App nur das Onboarding („Kein Server einge
 Wege:
 
 - **Adresse eingeben**, zum Beispiel `https://elw.local:8443`. Angenommen wird nur `https` mit
-  Hostnamen und ohne Name/Passwort vor „@“; die Regeln und Meldungen sind dieselben wie in der
-  Desktop-App (gemeinsame Fälle unter `src-tauri/faelle/`).
+  Hostnamen und ohne Name/Passwort vor „@“, auf keinem Port, den der Webview sperrt (etwa 6000);
+  die Regeln und Meldungen sind dieselben wie in der Desktop-App (gemeinsame Fälle unter
+  `src-tauri/faelle/`).
 - **QR-Code scannen**: mit der Adresse oder mit dem Deeplink aus „Geräte verbinden“. Die App
   fragt dafür einmal nach der Kamera.
 - **Deeplink** `lifeline://verbinden?server=<https-Adresse, URL-kodiert>` (Vertrag wie in der
@@ -206,9 +207,12 @@ Was ankommt:
   mit „Öffnen, um die Meldung zu sehen“.
 - Mit mehr als einem Server in der App nennt die Meldung den Server.
 - Tippen öffnet den Server der Meldung und dort ihre Seite; war ein anderer Server aktiv, wechselt
-  die App sichtbar dorthin wie in der Serverliste.
+  die App sichtbar dorthin wie in der Serverliste. Läuft gerade die gespeicherte Oberfläche ohne
+  Server (siehe „Daten auf dem Gerät“), prüft die App erst den Server; antwortet er nicht, bleibt
+  es bei der gespeicherten Oberfläche, ohne die Seite der Meldung.
 - Ist die App offen und zeigt den Server der Meldung, erscheint kein zweites Banner; die
-  Oberfläche meldet selbst.
+  Oberfläche meldet selbst. Die gespeicherte Oberfläche ohne Server zählt nicht: ihr fehlt der
+  Live-Kanal, das Banner erscheint.
 
 Die Anmeldung hängt an Konto und Gerät, nicht an der Sitzung: anders als bei Web Push beenden der
 Ablauf der Sitzung und ein Passwortwechsel sie nicht. Sie endet durch den Schalter, Abmelden in der
@@ -230,14 +234,24 @@ nicht an, pusht der ELW selbst.
 ## Daten auf dem Gerät
 
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Datenspeicher des
-Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Die
-Serverliste liegt als `server.json` in Application Support der App, der Schalter „Haptik“ in den
-Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Für den Push
-liegt daneben `push.json` (welche Kennung zu welchem Server gehört), der Schlüssel je Kennung im
-Schlüsselbund, den App und Extension teilen (lesbar nach dem ersten Entsperren), und die Zahl der
-Server in den Einstellungen der App Group. Das Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`)
-erklärt dafür UserDefaults mit den Gründen CA92.1 und 1C8F.1, kein Tracking und keine erhobenen
-Daten. Vorgaben für
+Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Einen
+Service Worker gibt es im Webview nicht; dafür legt die App nach jedem Laden vom Server dessen
+`index.html` ab (`Oberflaechen/<uuid>.json` in Application Support, gelöscht mit dem Server),
+sobald jedes Asset im HTTP-Cache des Webviews liegt. Antwortet der Server beim Start nicht, lädt
+sie diese unter seiner Adresse und startet so die Oberfläche ohne Server (LLH-1980,
+[ADR-0082](../architektur/entscheidungen/ADR-0082-die-ios-huelle-startet-ohne-server-aus-gespeicherter-index-html-und-dem-http-cache.md));
+nie bei einem Zertifikatsfehler oder einem unverträglichen Server. Kommt der Server mit derselben
+Version zurück, arbeitet die Seite einfach weiter. Die
+Serverliste liegt als `server.json` in Application Support der App. Ein Eintrag, dessen Adresse
+die Prüfung inzwischen ablehnt (etwa auf einem gesperrten Port), fällt beim Laden heraus, die
+übrigen bleiben; war er aktiv, wird der erste übrige aktiv. Ist die Datei aus einem anderen Grund
+unlesbar, legt die App sie als `server.defekt.json` beiseite und beginnt leer. Der Schalter „Haptik“
+liegt in den Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`).
+Für den Push liegt neben der Serverliste `push.json` (welche Kennung zu welchem Server gehört), der
+Schlüssel je Kennung im Schlüsselbund, den App und Extension teilen (lesbar nach dem ersten
+Entsperren), und die Zahl der Server in den Einstellungen der App Group. Das Privacy-Manifest
+(`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit den Gründen CA92.1 und 1C8F.1,
+kein Tracking und keine erhobenen Daten. Vorgaben für
 Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 
 ## Grenzen (offen)
@@ -247,15 +261,14 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
   die App wieder vorn ist. Kritische Warnungen (hörbar trotz Stummschaltung) gibt es nicht, und
   eine anderswo quittierte Meldung bleibt auf dem Sperrbildschirm stehen.
 - **Kein Passkey im Webview:** Anmeldung über „Im Browser anmelden“ (siehe „Anmeldung“).
-- **Kein Start ohne Server** (LLH-1980): Ist der Server beim Start nicht erreichbar, zeigt die App
-  „Server nicht erreichbar“ statt der Oberfläche; einen Precache wie im Browser gibt es in der App
-  nicht. Erst eine schon geladene Oberfläche arbeitet ohne Netz weiter. Der Start mit dem letzten
-  Stand kommt nach einem Spike auf echtem Gerät als eigene Änderung.
+- **Start ohne Server nur mit vollem Cache** (LLH-1980): Räumt iOS den HTTP-Cache des Webviews,
+  fährt die gespeicherte Oberfläche nicht hoch, und die App zeigt „Server nicht erreichbar“, bis
+  der Server wieder antwortet.
 - **iPad:** Die Sitzungsliste unter Profil → „Anmeldungen“ nennt ein iPad als Mac, weil sich sein
   Webview so meldet.
 - **Nicht gemessen:** alles auf echten Geräten (Aufgabe 10.3 der Change): Onboarding mit
   `elw.local` und CA-Profil, zwei Server, Anmeldung mit Passkey, Haptik, Meldung, CSV-Export,
-  Drucken, Push im Hintergrund (Gerätetest: [push-relais.md](push-relais.md), „Gerätetest“).
+  Drucken, Start ohne Server, Push im Hintergrund (Gerätetest: [push-relais.md](push-relais.md), „Gerätetest“).
   Bisher belegt sind nur Simulator und Tests (`ios-pruefung.yml`).
 
 ## Release-Ablauf

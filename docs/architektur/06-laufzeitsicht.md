@@ -241,6 +241,14 @@ sequenceDiagram
   Kartenkacheln liegen nicht im Browser; die Lagekarte holt sie vom Server (6.7).
 - Regeln, Fristen, Räumen: [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md).
   Spec: [`openspec/specs/lagebild-offline-lesen/`](../../openspec/specs/lagebild-offline-lesen/spec.md).
+- **iOS-App** (LLH-1980, [ADR-0082](entscheidungen/ADR-0082-die-ios-huelle-startet-ohne-server-aus-gespeicherter-index-html-und-dem-http-cache.md)):
+  Im WKWebView läuft kein Service Worker. Die Hülle wärmt nach jedem Laden vom Server die Liste
+  `assets` aus `GET /api/shell` im Webview vor (`ios/App/Huelle/vorwaermen.js`) und legt danach
+  die `index.html` je Server ab (`ios/LifelineKern/Sources/LifelineKern/Vorratsablage.swift`).
+  Antwortet der Server beim Start nicht, lädt sie diese per `loadSimulatedRequest` unter der
+  Adresse des Servers; ab da läuft der Ablauf oben unverändert. Kommt der Server mit derselben
+  Version zurück, bleibt die Seite stehen, mit einer anderen lädt die Hülle neu
+  (`ios/LifelineKern/Sources/LifelineKern/Ablauf.swift`).
 
 ## 6.6 Gerät koppeln und Funktionsansicht
 
@@ -807,7 +815,10 @@ sequenceDiagram
 - Bei offener App zeigt die App eine Push-Meldung des aktiven Servers nicht als Banner, die
   Oberfläche meldet sie über den Live-Kanal; Meldungen anderer Server erscheinen
   (`Meldungsdelegat` in `ios/App/LifelineHubApp.swift`). Ein Tippen beim Kaltstart wartet, bis der
-  Start steht (`Meldungsweg`).
+  Start steht (`Meldungsweg`). Auf der gespeicherten Oberfläche ohne Server (6.5) prüft die App wie
+  auf jeder Status-Seite erst den Server und lädt den Pfad danach; antwortet er nicht, startet die
+  gespeicherte Oberfläche wieder, ohne den Pfad (`meldungAngetippt` in
+  `ios/LifelineKern/Sources/LifelineKern/Ablauf.swift`).
 - Regeln zu Versand, Ende der Anmeldung und Kopplung je Kanal:
   [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „iOS-Push“; Hülle:
   [`ios/AGENTS.md`](../../ios/AGENTS.md), „Push über APNs“; Betrieb:

@@ -80,7 +80,7 @@ import {
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
@@ -103,6 +103,7 @@ import { ListenRueckweg } from '../components/ListenRueckweg';
 import { ZahlFeld } from '../components/ZahlFeld';
 import { pflicht } from '../components/pflichtRegel';
 import { vorgemerktDauer, vorgemerktText } from '../offline/vorgemerktText';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 
@@ -438,7 +439,8 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     setDialog(null);
   }, [stelleId, resetStatus, resetSpeichern, resetBelegungZurueck]);
 
-  if (einsatzQuery.isLoading || betreuungQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading || betreuungQuery.isLoading)
+    return <ModulGerippeSeite modulKey="betreuung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
