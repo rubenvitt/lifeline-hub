@@ -253,6 +253,32 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
   expect.soft(hoehen.size, `${fall}: Kopfhöhe über das Laden\n${verlauf.join('\n')}`).toBe(1);
 }
 
+/** Ab dieser Breite (`xl`) trägt das Etikett des Benutzermenüs Funktion bzw. Namen, darunter nur Initialen. */
+const ETIKETT_BREITE = 1440;
+
+/**
+ * LLH-1900: Vorbedingung vor der ersten Messung als Beobachter (`frontend/e2e/AGENTS.md`, LFH-435:
+ * der Rollenzweig ist VOR der Messung Vorbedingung). Der Kopf trägt am Benutzermenü die
+ * Einsatzfunktion; die Einsatzleitung hat eine („EL“), der Beobachter keine, dort steht sein
+ * Anzeigename. Das Etikett steht erst ab `xl`, die Messung beginnt bei 1100 px, deshalb eine
+ * eigene Ladung in voller Breite. Zugesichert wird erst, wenn der Einsatz geladen ist (der
+ * Statuspunkt steht): vorher zeigt jedes Etikett den Namen, auch das des Admins.
+ *
+ * Mutationsprobe (22.11.2026): `wechsleZuRolle` ausgelassen, die Sitzung bleibt Admin; rot wird
+ * nur der Beobachter-Test, an dieser Vorbedingung („EL“ statt Anzeigename), der Admin-Test
+ * bleibt grün.
+ */
+async function beobachterZweigSteht(page: Page, einsatzId: string, anzeigename: string) {
+  await page.setViewportSize({ width: ETIKETT_BREITE, height: 800 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  const kopf = page.locator('header');
+  await expect(kopf.getByRole('img', { name: /^Einsatzstatus:/ })).toBeVisible();
+  await expect(
+    kopf.locator('[data-lfh="benutzermenue"]'),
+    'Vorbedingung: der Kopf zeigt den Beobachter-Zweig (Anzeigename statt Einsatzfunktion)',
+  ).toContainText(anzeigename);
+}
+
 /**
  * LLH-1869: Ein Test je Ton und Rolle, jeder mit allen {@link BREITEN}. Zusammen liefen beide
  * Rollen 30 Seitenaufrufe in einem Test und kamen unter CI-Last bis an 600 s. Nach 7f36953b
@@ -278,7 +304,10 @@ test.describe('LLH-1158/LLH-1232 Kopfhöhe über Tonprüfung und Verbindungsaufb
         );
         await stromNachVerbindeFreigeben(page, einsatzId);
         // Der Benutzerkopf trägt die Einsatzfunktion, seine Breite hängt an der Rolle (LFH-435).
-        if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+        if (rolle === 'beobachter') {
+          const beobachter = await wechsleZuRolle(page, 'beobachter', einsatzId);
+          await beobachterZweigSteht(page, einsatzId, beobachter.anzeigename);
+        }
         for (const breite of BREITEN) await messe(page, einsatzId, breite, ton);
       });
     }
