@@ -2,9 +2,9 @@ import { Button, Drawer } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
-import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
-import { einsatzKeys } from '../api/queryKeys';
+import { registrierAnzeige } from '../api/einsatzPerson';
 import PersonVorschau from './PersonVorschau';
+import { personDetailQueryOptions } from './personDetailQuery';
 
 // Schlanker NUR-LESEN-Drawer für Kontexte außerhalb der Personen-Verwaltung (z. B. Klick auf
 // einen Patienten im UHS-Grundriss). Der Inhalt ist `PersonVorschau`; hier liegt nur der
@@ -21,11 +21,7 @@ export default function PersonDetailDrawer({
 }) {
   const navigate = useNavigate();
   const pfade = useEinsatzPfade();
-  const detailQuery = useQuery({
-    queryKey: einsatzKeys.person(einsatzId, personId),
-    queryFn: () => ladePerson(einsatzId, personId!),
-    enabled: personId != null,
-  });
+  const detailQuery = useQuery(personDetailQueryOptions(einsatzId, personId));
   const p = detailQuery.data;
 
   return (

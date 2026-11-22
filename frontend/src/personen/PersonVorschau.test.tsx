@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import { focusManager } from '@tanstack/react-query';
+import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { erzeugeQueryClient } from '../api/queryClient';
 import PersonVorschau from './PersonVorschau';
 import type { PersonDetail } from '../api/types';
 
@@ -129,6 +131,58 @@ describe('PersonVorschau', () => {
       ),
     );
     renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
+    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
+  });
+
+  // Jeder Detail-GET schreibt eine Zeile ins Zugriffsprotokoll (LLH-1984, wie LLH-1832 an der
+  // Detailseite): ein Neuladen ohne neue Öffnung wäre ein Zugriff, den niemand getan hat.
+  it('Fokuswechsel ruft das Detail nicht neu ab (Zugriffsprotokoll)', async () => {
+    let detailAbrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => {
+        detailAbrufe += 1;
+        return HttpResponse.json(detail);
+      }),
+    );
+    renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
+    await screen.findByRole('region', { name: 'Patientenkopf' });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.advanceTimersByTime(60_000);
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      focusManager.setFocused(undefined);
+      vi.useRealTimers();
+    }
+    expect(detailAbrufe).toBe(1);
+  });
+
+  it('wiederholt einen gescheiterten Detailabruf nicht von selbst (Zugriffsprotokoll)', async () => {
+    let detailAbrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => {
+        detailAbrufe += 1;
+        return HttpResponse.error();
+      }),
+    );
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // Produktionsvorgaben: sie wiederholen einen Leitungsfehler sonst zweimal.
+      renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />, {
+        client: erzeugeQueryClient(),
+      });
+      await waitFor(() => expect(detailAbrufe).toBe(1));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(detailAbrufe).toBe(1);
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
   });
 });

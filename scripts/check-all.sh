@@ -33,9 +33,10 @@ set -euo pipefail
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
-#   --nur binaer     nur das Server-Binary wie im Release, ohne Dev-Abhängigkeiten (LLH-2033;
-#                    im PR der Pflicht-Check `Server-Binary`, parallel zu `schnell`; im vollen
-#                    Lauf und auf alpha Teil von `rust`)
+#   --nur binaer     nur das Server-Binary wie im Release, ohne Dev-Abhängigkeiten (LLH-2033),
+#                    dazu der karten-service ebenso (LLH-2038); im PR der Pflicht-Check
+#                    `Server-Binary`, parallel zu `schnell`; im vollen Lauf und auf alpha Teil
+#                    von `rust`)
 #   --nur ios        Swift-Kern der iOS-Hülle (`swift test`, LLH-1978); ohne Swift eine Lücke,
 #                    mit IOS_SWIFT_PFLICHT=1 (CI) rot
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
@@ -539,7 +540,7 @@ schritt_18() {
 }
 
 schritt_19() {
-  echo "==> [19/$SCHRITTE] Server-Binary wie im Release: ohne Dev-Abhängigkeiten übersetzt (LLH-2033)"
+  echo "==> [19/$SCHRITTE] Server-Binary und karten-service wie im Release: ohne Dev-Abhängigkeiten übersetzt (LLH-2033, LLH-2038)"
   # Jeder andere Rust-Schritt übersetzt mit den Dev-Abhängigkeiten, auch `--nur baut`
   # (`--all-targets`): Cargo vereinigt dann deren Features mit denen der Bibliothek
   # (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, `socket2/all`). Code, der ein
@@ -549,6 +550,11 @@ schritt_19() {
   # neben den Schnellprüfungen (`pr.yml`, Job `binaer`), damit er sie nicht verlängert.
   bauziel_pruefen "$ROOT"
   ohne_dev_env cargo build --bin lifeline-hub
+  # Der karten-service hat `tokio/test-util` und `tower/util` nur über Dev-Abhängigkeiten und wird
+  # ohne Testziele sonst erst im Release gebaut (`artefakte.yml`, LLH-2038). Eigener Aufruf: in
+  # einem gemeinsamen vereinigte Cargo die Features beider Pakete. `check` genügt, sein Binary
+  # braucht hier niemand.
+  ohne_dev_env cargo check -p karten-service
 }
 
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────

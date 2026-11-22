@@ -79,7 +79,8 @@ Modulen, Kopfdaten und Einstellungen; „Mitarbeit“ erfasst Meldungen, Chat un
     setzen und Heraufstufen bleiben zu.
   - Im Einsatztagebuch Einträge der Typen Meldung und Lage erfassen (die Lage nicht „in den
     Meldungseingang“) und eigene Einträge berichtigen, solange die Meldung dazu nicht in der Lage
-    steht und keine Lagemeldung ist.
+    steht und keine Lagemeldung ist. Das gilt auch für die Berichtigung einer Berichtigung; an
+    solchen Einträgen bietet das Menü „Berichtigen“ gar nicht an.
   - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
 
   Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,
@@ -115,7 +116,9 @@ Führungsfunktion des Mitglieds im Einsatz, die eine Quelle für „wer ist S2?�
   Funktion heißt „Einsatzleitung“.
 - Aufträge und Erinnerungen an S1 bis S6 zeigen hinter der Funktion die Namen der Mitglieder, die
   sie tragen, sonst „nicht vergeben“. Benachrichtigungen an eine Funktion erreichen diese
-  Mitglieder; für EL zuerst den Einsatzleiter der Führungsstelle.
+  Mitglieder, wenn sie im Einsatz schreiben dürfen (Einsatzleitung, Führungspersonal); für EL
+  zuerst den Einsatzleiter der Führungsstelle, wenn er es darf. Trägt eine Mitarbeit oder ein
+  Beobachter die Funktion, nennt die Anzeige sie, Hinweise bekommen sie aber nicht.
 - Das Organigramm zeigt den Kasten „Stab“ mit den geführten Sachgebieten, die Fernmeldeskizze ihre
   Zeichen im Kasten „Einsatzleitung“, der Kommunikationsplan die Namen in der Spalte „Besetzung“,
   Eigene Lage und Einsatzbericht die „Führungsfunktionen“.

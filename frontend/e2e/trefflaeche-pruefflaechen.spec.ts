@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { navigateInApp } from './navigation-kern';
 import { weitereAusloeser, weitereEintrag } from './nebenweg-kern';
 import {
   FUEKW,
@@ -16,7 +17,6 @@ import {
   kurzeAchseHaelt,
   ruhigeHoehe,
   ladeInDichte,
-  stelleDichte,
 } from './trefflaeche-kern';
 
 /**
@@ -147,18 +147,63 @@ async function messeZiel(page: Page, ziel: Ziel, dichte: 'kompakt' | 'handschuh'
   return kleinstes;
 }
 
+/** Marke der Knoten, die vor einem Wechsel im Router schon standen (s. {@link oeffneFlaeche}). */
+const VORHER = 'data-e2e-vorher';
+/** So lange darf der Wechsel im Router brauchen, bevor die Fläche voll geladen wird. */
+const ROUTER_FRIST = 5_000;
+
+/**
+ * Öffnet eine Fläche und wartet auf ihren Datenanker. Nur die erste Fläche einer Stufe lädt die
+ * App (in der Stufe, `ladeInDichte`), die übrigen wechseln im Router wie das Menü (LLH-1914,
+ * LLH-1943): bis zu 22 volle Ladungen des unbündelten Dev-Servers (je rund 650 Module) je Test
+ * endeten in der Cloud-Sitzung zeitweise in einer Seite, die nie startete — WebSocket und
+ * Modul-Abrufe brachen vor dem ersten Render ab, `main` fehlte, der Anker lief ab.
+ *
+ * Nach einem Wechsel zählt nur ein Anker, der NEU im Baum steht: zwei Flächen teilen sich
+ * Anker („Speichern“ auf Allgemein und Verhalten), und der alte stünde sonst schon, bevor die
+ * neue Fläche montiert ist. Deshalb tragen alle Knoten in `main` vor dem Wechsel {@link VORHER}.
+ *
+ * Voll geladen wird weiter, wo der Router nicht wechselt: dieselbe Adresse wie zuvor (zwei
+ * Flächen einer Seite, die zweite mit anderem Reiter, C8) und eine Seite, die das Verlassen
+ * aufhält (Verlassen-Rückfrage des Lageberichts, C13). Der Rückfall steht im Testbericht.
+ */
+async function oeffneFlaeche(page: Page, f: Flaeche, ersteInStufe: boolean, dichte: string) {
+  const anker = f.anker(page);
+  if (ersteInStufe) {
+    await ladeInDichte(page, f.pfad, dichte);
+  } else if (new URL(page.url()).pathname === f.pfad) {
+    await page.goto(f.pfad);
+  } else {
+    await page.locator('main').evaluate((main, marke) => {
+      for (const knoten of main.querySelectorAll('*')) knoten.setAttribute(marke, '');
+    }, VORHER);
+    await navigateInApp(page, f.pfad);
+    const frisch = anker.and(page.locator(`:not([${VORHER}])`));
+    const gewechselt = await frisch
+      .first()
+      .waitFor({ state: 'visible', timeout: ROUTER_FRIST })
+      .then(() => true)
+      .catch(() => false);
+    if (gewechselt) return;
+    test.info().annotations.push({
+      type: 'voll-geladen',
+      description: `${f.pfad} (${dichte}): kein Wechsel im Router binnen ${ROUTER_FRIST} ms`,
+    });
+    await page.goto(f.pfad);
+  }
+  await expect(anker, `${f.pfad}: Datenanker`).toBeVisible();
+}
+
 /**
  * Misst alle Flächen in `kompakt` und `handschuh` und legt danach die Gegenprobe je Zielsorte
- * fest. Die Stufe wird auf der ersten Fläche gestellt (Neuladen); die übrigen erben sie.
+ * fest. Je Stufe eine Ladung, danach Wechsel im Router ({@link oeffneFlaeche}).
  */
 async function messeFlaechen(page: Page, flaechen: Flaeche[]) {
   const je = new Map<string, number>();
   const notiz: string[] = [];
   for (const { dichte, soll } of STUFEN) {
     for (const [i, f] of flaechen.entries()) {
-      await page.goto(f.pfad);
-      if (i === 0) await stelleDichte(page, dichte);
-      await expect(f.anker(page), `${f.pfad}: Datenanker`).toBeVisible();
+      await oeffneFlaeche(page, f, i === 0, dichte);
       await f.vorbereiten?.(page);
       for (const ziel of f.ziele) {
         const kleinstes = await messeZiel(page, ziel, dichte, soll);
@@ -193,9 +238,7 @@ async function messeImRollenzweig(
   flaechen: (Flaeche & Rollenzweig)[],
 ) {
   for (const [i, f] of flaechen.entries()) {
-    await page.goto(f.pfad);
-    if (i === 0) await stelleDichte(page, 'handschuh');
-    await expect(f.anker(page), `${f.pfad}: Datenanker`).toBeVisible();
+    await oeffneFlaeche(page, f, i === 0, 'handschuh');
     await f.vorbereiten?.(page);
     await expect(
       page.getByRole('button', { name: 'Benutzermenü' }),
@@ -235,7 +278,7 @@ async function seed<T = { id: number }>(page: Page, pfad: string, data: unknown)
 }
 
 test.beforeEach(async ({ page }) => {
-  // Mehrere Flächen in zwei Stufen, je mit Neuladen: das Vorgabebudget reicht nicht.
+  // Mehrere Flächen in zwei Stufen: das Vorgabebudget reicht nicht.
   test.setTimeout(180_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
