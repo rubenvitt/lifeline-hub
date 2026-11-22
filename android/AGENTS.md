@@ -38,7 +38,8 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
   JSON, nie nur in einen Kotlin-Test.
 - **Bildschirmbilder:** jede native Seite hat einen `Testzustand` im Kern (Intent-Extra
-  `lifeline.testzustand`; die App fragt dann kein Netz und speichert nichts) und ein Bild in
+  `lifeline.testzustand`, nur in Debug-Bauten ausgewertet, `Testzustand.fromStart`; die App
+  fragt dann kein Netz und speichert nichts) und ein Bild in
   `android/app/src/test/…/BilderTest.kt` (Roborazzi, Handy und Tablet, nach
   `android/app/build/bilder/`). `android-pruefung.yml` lädt sie als Artefakt `android-bilder` hoch
   (Bilder der Änderung). Ohne grünen Lauf dort ist App-Code nicht fertig.

@@ -36,6 +36,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -155,6 +156,34 @@ class AppModellTest {
         assertEquals(elw.adresse.text, shadowOf(modell.webView!!).lastLoadedUrl)
     }
 
+    /**
+     * Review W2: erste Sitzung nach dem Onboarding, Oberfläche geladen, dann Rückkehr mit toter
+     * Seite ohne Netz. Die App lädt aus dem Profil (Entwurf D5) statt „nicht erreichbar“.
+     */
+    @Test
+    fun `ohne Netz lädt ein eben verbundener Server in derselben Sitzung offline`() {
+        val fabrik = AttrappenFabrik()
+        var abruf: ShellAbruf = vertraeglich
+        ablage.save(Serverliste())
+        val modell = AppModell(
+            testzustand = null, version = "1.0.0", build = 1, einstellungen = null, scope = scope,
+            context = context, fabrik = fabrik, ablage = ablage,
+            abrufen = { _: ServerAdresse -> abruf to null }, dienste = Dienstattrappe(),
+        )
+        modell.start()
+        modell.send(Onboarding.Event.TextChanged("https://elw.local:8443"))
+        modell.send(Onboarding.Event.Verbinden)
+        val webView = modell.webView!!
+        shadowOf(webView).webViewClient.onPageCommitVisible(webView, "https://elw.local:8443/etb")
+
+        abruf = ShellAbruf.Fehler(Netzfehler.VERBINDUNG)
+        modell.send(Ablauf.Event.Vordergrund(seiteAntwortet = false, adresse = null, anmeldungLaeuft = false))
+
+        val seite = modell.seite as Ablauf.Seite.Web
+        assertTrue("aus dem Profil, ohne Netz", seite.offline)
+        assertEquals("https://elw.local:8443/", shadowOf(modell.webView!!).lastLoadedUrl)
+    }
+
     @Test
     fun `die erste geladene Seite des Servers wird in der Ablage vermerkt`() {
         val modell = modell(AttrappenFabrik())
@@ -223,6 +252,52 @@ class AppModellTest {
                 assertFalse(shadowOf(activity).isTaskMovedToBack)
             }
         }
+    }
+
+    /**
+     * Review W1: wer „Server hinzufügen“ während der Prüfung schließt (Zurück-Taste oder Pfeil im
+     * Kopf), dem wechselt ein spätes verträgliches Ergebnis nicht still den Server.
+     */
+    @Test
+    fun `Schließen des Blatts während der Prüfung speichert und wechselt nichts`() {
+        for (schliessen in listOf<(AppModell) -> Unit>({ assertTrue(it.zurueckTaste()) }, { it.schliesseHinzufuegen() })) {
+            val fabrik = AttrappenFabrik()
+            val antwort = CompletableDeferred<ShellAbruf>()
+            ablage.save(liste)
+            val modell = AppModell(
+                testzustand = null, version = "1.0.0", build = 1, einstellungen = null, scope = scope,
+                context = context, fabrik = fabrik, ablage = ablage,
+                abrufen = { adresse: ServerAdresse -> (if (adresse == elw.adresse) vertraeglich else antwort.await()) to null },
+                dienste = Dienstattrappe(),
+            )
+            modell.start()
+            val webView = modell.webView
+            modell.zeigtServerliste = true
+            modell.zeigeHinzufuegen()
+            modell.send(Onboarding.Event.TextChanged("https://neu.example"))
+            modell.send(Onboarding.Event.Verbinden)
+            assertTrue(modell.onboarding is Onboarding.State.Pruefung)
+
+            schliessen(modell)
+            assertFalse(modell.zeigtOnboarding)
+            antwort.complete(vertraeglich)
+
+            assertEquals(elw.id, modell.liste.aktiv?.id)
+            assertNull(modell.liste.eintragFuer(ServerAdresse.parse("https://neu.example")))
+            assertEquals(liste.eintraege.map { it.id }, ablage.load().eintraege.map { it.id })
+            assertSame("die Oberfläche von ELW 1 bleibt", webView, modell.webView)
+            assertEquals(listOf(elw.id), fabrik.profile)
+        }
+    }
+
+    /** Review W3: nur ein Debug-Bau zeigt Testzustände; die Release-App übergeht das Extra. */
+    @Test
+    fun `der Testzustand im Intent gilt nur in einem Debug-Bau`() {
+        val intent = Intent(context, MainActivity::class.java).putExtra(Testzustand.EXTRA, Testzustand.UPDATE_LAEUFT.wert)
+
+        assertEquals(Testzustand.UPDATE_LAEUFT, MainActivity.testzustand(intent, isDebug = true))
+        assertNull(MainActivity.testzustand(intent, isDebug = false))
+        assertEquals("die Tests laufen als Debug-Bau", Testzustand.UPDATE_LAEUFT, MainActivity.testzustand(intent))
     }
 
     // Deeplink `lifeline://verbinden` (Entwurf D2, gemeinsame Fälle) und Rücksprung der Anmeldung

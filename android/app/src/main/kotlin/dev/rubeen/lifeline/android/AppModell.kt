@@ -283,9 +283,19 @@ class AppModell(
     fun zurueck() {
         when {
             zeigtEinstellungen -> zeigtEinstellungen = false
-            zeigtOnboarding -> zeigtOnboarding = false
+            zeigtOnboarding -> schliesseHinzufuegen()
             else -> zeigtServerliste = false
         }
+    }
+
+    /**
+     * Schließt das Blatt „Server hinzufügen“ (Zurück-Taste, Pfeil im Kopf). Eine laufende Prüfung
+     * endet mit `Zurueck`: ihr Ergebnis kommt danach ins Leere und speichert und aktiviert nichts
+     * (Review W1, kein stilles Umlenken auf einen anderen Server).
+     */
+    fun schliesseHinzufuegen() {
+        send(Onboarding.Event.Zurueck)
+        zeigtOnboarding = false
     }
 
     /**

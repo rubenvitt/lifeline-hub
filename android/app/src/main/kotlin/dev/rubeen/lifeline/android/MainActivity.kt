@@ -29,8 +29,9 @@ import java.net.URI
 /**
  * Einzige Activity der Hülle: randlos auf Kopf-Schwarz mit hellen Symbolen in den Systemleisten
  * (Entwurf D6); der Inhalt hält sich an die Insets. Ein Testzustand im Intent
- * ([Testzustand.EXTRA]) zeigt seine Seite mit Beispieldaten. `singleTask`: Deeplinks und der
- * Rücksprung der Anmeldung kommen als neues Intent in dieselbe Activity ([AppModell.open]).
+ * ([Testzustand.EXTRA]) zeigt nur in einem Debug-Bau seine Seite mit Beispieldaten.
+ * `singleTask`: Deeplinks und der Rücksprung der Anmeldung kommen als neues Intent in dieselbe
+ * Activity ([AppModell.open]).
  */
 class MainActivity : ComponentActivity() {
     internal lateinit var modell: AppModell
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        val testzustand = Testzustand.from(intent.getStringExtra(Testzustand.EXTRA))
+        val testzustand = testzustand(intent)
         val app = application as LifelineApp
         val fabrik = app.webviewFabrik
         // Im Testzustand sucht die App keine Updates; der Updater setzt beim Bau den Kanal.
@@ -132,6 +133,12 @@ class MainActivity : ComponentActivity() {
         anmelder.abbrechen()
         modell.beenden()
         super.onDestroy()
+    }
+
+    companion object {
+        /** Testzustand des Starts; die Release-App übergeht das Extra (`Testzustand.fromStart`). */
+        internal fun testzustand(intent: Intent?, isDebug: Boolean = BuildConfig.DEBUG): Testzustand? =
+            Testzustand.fromStart(intent?.getStringExtra(Testzustand.EXTRA), isDebug)
     }
 
     /** Ein Ziel für das System (Browser, Telefon, Mail); ohne passende App geschieht nichts. */

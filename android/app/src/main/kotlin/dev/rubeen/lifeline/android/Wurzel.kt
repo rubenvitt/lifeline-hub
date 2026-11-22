@@ -97,7 +97,7 @@ fun Wurzel(modell: AppModell) {
                     onEvent = { modell.send(it) },
                     onScan = onScan,
                     alsBlatt = true,
-                    onAbbrechen = { modell.zeigtOnboarding = false },
+                    onAbbrechen = modell::schliesseHinzufuegen,
                     appVersion = modell.appVersion,
                     healthVersion = modell.onboardingHealthVersion,
                     scanHinweis = hinweis,

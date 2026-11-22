@@ -196,7 +196,7 @@ object Ablauf {
                     // Auch aus der Offline-Oberfläche: neu laden muss die App nicht, das Frontend
                     // verbindet sich selbst (Entwurf D5).
                     Step(
-                        Seite.Web(eintrag, ergebnis.info.shellContract, offline = false),
+                        Seite.Web(eintrag.verbunden(ergebnis.info), ergebnis.info.shellContract, offline = false),
                         listOf(Effect.MarkVerbunden(eintrag.id, ergebnis.info.shellContract)),
                     )
                 } else {
@@ -223,10 +223,21 @@ object Ablauf {
         }
     }
 
-    private fun loaded(eintrag: ServerEintrag, info: ShellInfo): Step = Step(
-        Seite.Web(eintrag, info.shellContract),
-        listOf(Effect.MarkVerbunden(eintrag.id, info.shellContract), Effect.Load(eintrag)),
-    )
+    private fun loaded(eintrag: ServerEintrag, info: ShellInfo): Step {
+        val verbunden = eintrag.verbunden(info)
+        return Step(
+            Seite.Web(verbunden, info.shellContract),
+            listOf(Effect.MarkVerbunden(eintrag.id, info.shellContract), Effect.Load(verbunden)),
+        )
+    }
+
+    /**
+     * Der Eintrag der Seite zieht mit `MarkVerbunden` mit (wie bei `MarkGeladen`): die Prüfung
+     * nach einer Rückkehr ohne Netz entscheidet über den Eintrag der Seite, und der muss den
+     * bestätigten Vertrag schon in der ersten Sitzung tragen (Entwurf D5, Review W2).
+     */
+    private fun ServerEintrag.verbunden(info: ShellInfo): ServerEintrag =
+        if (bestaetigterVertrag == info.shellContract) this else copy(bestaetigterVertrag = info.shellContract)
 
     private fun status(eintrag: ServerEintrag, status: Statusseite): Step =
         Step(

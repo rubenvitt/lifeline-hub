@@ -28,6 +28,13 @@ enum class Testzustand(val wert: String) {
         fun from(wert: String?): Testzustand? = entries.firstOrNull { it.wert == wert }
 
         /**
+         * Testzustand aus dem Start der Activity: nur in einem Debug-Bau (Robolectric, Bildlauf).
+         * Die Release-App übergeht das Extra; sonst könnte jede App oder Webseite (`intent:`-URL)
+         * sie mit erfundenen Seiten starten (Review W3).
+         */
+        fun fromStart(wert: String?, isDebug: Boolean): Testzustand? = if (isDebug) from(wert) else null
+
+        /**
          * Seite des Testzustands [WEB]: lädt die App ohne Netz unter der Adresse des
          * Beispielservers. Lang genug zum Ziehen, mit Text für die lange Berührung, einem
          * Eingabefeld und einem Knopf, der eine Rückfrage (`confirm`) auslöst.

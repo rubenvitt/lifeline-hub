@@ -43,6 +43,9 @@ class AblaufTest {
     private val zertifikat = Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT)
     private val vertraeglich = Vertragsergebnis.Vertraeglich(info)
 
+    /** Nach einem verträglichen Ergebnis trägt die Seite den bestätigten Vertrag (Entwurf D5). */
+    private val elwVerbunden = elw.copy(bestaetigterVertrag = 1)
+
     private fun vordergrund(antwortet: Boolean, adresse: URI?, anmeldung: Boolean = false) =
         Ablauf.Event.Vordergrund(antwortet, adresse, anmeldung)
 
@@ -94,8 +97,8 @@ class AblaufTest {
     @Test
     fun `ein verträglicher Server wird geladen und vermerkt`() {
         val schritt = step(Ablauf.Seite.Pruefung(elw), ergebnis(vertraeglich))
-        assertEquals(web(), schritt.seite)
-        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elw)), schritt.effects)
+        assertEquals(web(elwVerbunden), schritt.seite)
+        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elwVerbunden)), schritt.effects)
     }
 
     @Test
@@ -117,8 +120,8 @@ class AblaufTest {
     @Test
     fun `nach dem Onboarding lädt die App ohne zweite Prüfung`() {
         val schritt = step(Ablauf.Seite.Onboarding, Ablauf.Event.Verbunden(elw, info))
-        assertEquals(web(), schritt.seite)
-        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elw)), schritt.effects)
+        assertEquals(web(elwVerbunden), schritt.seite)
+        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elwVerbunden)), schritt.effects)
     }
 
     // Status-Seiten
@@ -167,8 +170,8 @@ class AblaufTest {
         val c = step(b.seite, ergebnis(nichtErreichbar))
         assertEquals(listOf(Ablauf.Effect.ScheduleRetry), c.effects)
         val d = step(c.seite, ergebnis(vertraeglich))
-        assertEquals(web(), d.seite)
-        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elw)), d.effects)
+        assertEquals(web(elwVerbunden), d.seite)
+        assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1), Ablauf.Effect.Load(elwVerbunden)), d.effects)
     }
 
     @Test
@@ -197,6 +200,31 @@ class AblaufTest {
         val schritt = step(Ablauf.Seite.Pruefung(elwGeladen), ergebnis(nichtErreichbar, elwGeladen))
         assertEquals(Ablauf.Seite.Web(elwGeladen, 1, offline = true), schritt.seite)
         assertEquals(listOf(Ablauf.Effect.Load(elwGeladen), Ablauf.Effect.ScheduleRetry), schritt.effects)
+    }
+
+    /**
+     * Die Kette der ersten Sitzung (Review W2): Onboarding, Oberfläche geladen, Hintergrund, Netz
+     * weg, Seite tot. Die Seite trägt den bestätigten Vertrag und „geladen“ selbst, damit die
+     * Prüfung nach der Rückkehr offline lädt statt „nicht erreichbar“ zu zeigen.
+     */
+    @Test
+    fun `ohne Netz lädt ein in dieser Sitzung verbundener Server offline`() {
+        val verbunden = step(Ablauf.Seite.Onboarding, Ablauf.Event.Verbunden(elw, info))
+        val geladen = step(verbunden.seite, Ablauf.Event.SeiteGeladen(eigen))
+        val rueckkehr = step(geladen.seite, vordergrund(false, null))
+        assertEquals(Ablauf.Seite.Pruefung(elwGeladen), rueckkehr.seite)
+        val ohneNetz = step(rueckkehr.seite, ergebnis(nichtErreichbar, elwGeladen))
+        assertEquals(Ablauf.Seite.Web(elwGeladen, 1, offline = true), ohneNetz.seite)
+        assertEquals(listOf(Ablauf.Effect.Load(elwGeladen), Ablauf.Effect.ScheduleRetry), ohneNetz.effects)
+    }
+
+    @Test
+    fun `nach einem Wechsel lädt ein in dieser Sitzung verbundener Server ohne Netz offline`() {
+        // Geprüft beim Start, dann geladen; der Eintrag der Liste kam ohne Vertrag in die Seite.
+        val geladen = step(step(Ablauf.Seite.Pruefung(elw), ergebnis(vertraeglich)).seite, Ablauf.Event.SeiteGeladen(eigen))
+        val tot = step(geladen.seite, vordergrund(false, null))
+        val ohneNetz = step(tot.seite, ergebnis(nichtErreichbar, elw))
+        assertEquals(Ablauf.Seite.Web(elwGeladen, 1, offline = true), ohneNetz.seite)
     }
 
     @Test
@@ -284,7 +312,7 @@ class AblaufTest {
         assertEquals(web(), schritt.seite)
         assertEquals(listOf(Ablauf.Effect.Check(elw)), schritt.effects)
         val ok = step(schritt.seite, ergebnis(vertraeglich))
-        assertEquals(web(), ok.seite)
+        assertEquals(web(elwVerbunden), ok.seite)
         assertEquals(listOf(Ablauf.Effect.MarkVerbunden(elw.id, 1)), ok.effects)
     }
 

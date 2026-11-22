@@ -95,6 +95,18 @@ class OnboardingTest {
         assertNull(schritt.effect)
     }
 
+    /**
+     * Wer das Blatt „Server hinzufügen“ während der Prüfung schließt, sendet `Zurueck`; ein
+     * Ergebnis, das danach ankommt, speichert und aktiviert nichts (kein stiller Wechsel).
+     */
+    @Test
+    fun `nach dem Schließen während der Prüfung speichert ein spätes Ergebnis nichts`() {
+        val geschlossen = step(Onboarding.State.Pruefung(elw), Onboarding.Event.Zurueck).state
+        val spaet = step(geschlossen, Onboarding.Event.Ergebnis(Vertragsergebnis.Vertraeglich(info), elw))
+        assertEquals(Onboarding.State.Eingabe(elw.text, null), spaet.state)
+        assertNull(spaet.effect)
+    }
+
     @Test
     fun `während der Prüfung ändern Tippen und Vorbelegen nichts`() {
         val pruefung = Onboarding.State.Pruefung(elw)
