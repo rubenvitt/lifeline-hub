@@ -14780,7 +14780,7 @@
       },
       "MaterialStatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status\n([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.\nBeleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "status",
           "gesetzt_at"

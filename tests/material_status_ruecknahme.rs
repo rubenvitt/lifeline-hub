@@ -193,3 +193,26 @@ async fn materialstatus_nach_elf_minuten_409() {
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
     assert_ne!(json["grund"], "veraltet", "{json}");
 }
+
+/// Status und Menge im selben PATCH: die Rücknahme stellte den alten Status mit der neuen Menge
+/// her, einen Stand, den es nie gab. Also kein Beleg und nichts gemerkt.
+#[tokio::test]
+async fn materialstatus_mit_mengenaenderung_im_selben_patch_ohne_beleg() {
+    let (app, pool, admin, einsatz, em) = welt().await;
+    let json = patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"status":"defekt","menge":12}"#,
+    )
+    .await;
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+    let von: Option<i64> =
+        sqlx::query_scalar("SELECT status_gesetzt_von FROM einsatz_material WHERE id = ?")
+            .bind(em)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(von, None);
+}

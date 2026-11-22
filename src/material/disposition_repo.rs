@@ -597,9 +597,13 @@ pub async fn update_tx(
         return Err(AppError::NotFound);
     }
     // Rücknahme eines Statuswechsels (LLH-1986, Design E1): ein echter Wechsel merkt sich wer,
-    // wann und den Status davor; eine geänderte Menge oder Art überholt ihn, weil die Rücknahme
-    // sonst einen Stand herstellte, den es so nie gab.
-    if patch.status.is_some_and(|neu| neu != status) {
+    // wann und den Status davor; eine geänderte Menge oder Art überholt ihn, auch im selben
+    // Patch, weil die Rücknahme sonst einen Stand herstellte, den es so nie gab.
+    let menge_oder_art =
+        patch.menge.is_some_and(|m| m != menge) || patch.art.is_some_and(|a| a != art);
+    if menge_oder_art {
+        vergiss_statuswechsel_tx(conn, einsatz_id, em_id).await?;
+    } else if patch.status.is_some_and(|neu| neu != status) {
         sqlx::query(
             "UPDATE einsatz_material SET status_gesetzt_von = ?, \
                     status_gesetzt_at = COALESCE(?, datetime('now')), status_vorher = ? \
@@ -612,8 +616,6 @@ pub async fn update_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    } else if patch.menge.is_some_and(|m| m != menge) || patch.art.is_some_and(|a| a != art) {
-        vergiss_statuswechsel_tx(conn, einsatz_id, em_id).await?;
     }
     Ok(())
 }

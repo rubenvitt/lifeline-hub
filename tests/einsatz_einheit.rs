@@ -3278,3 +3278,28 @@ async fn aufgeloeste_einheit_rueckname_409() {
         handstatus_zuruecknehmen(&app, &admin, einsatz, e, &wechsel["status_ruecknahme"]).await;
     assert_eq!(s, StatusCode::CONFLICT);
 }
+
+/// Löschen unter führenden Fahrzeugen ist nicht zurückzunehmen (die Rücknahme hätte einen
+/// Handstatus herzustellen): kein Beleg, also kein „Rückgängig“, das sicher scheitert.
+#[tokio::test]
+async fn handstatus_loeschen_unter_fahrzeugen_ohne_beleg() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, json) = hand_status(&app, &admin, einsatz, e, r#"{"status_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+}

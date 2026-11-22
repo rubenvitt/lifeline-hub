@@ -1050,6 +1050,9 @@ pub struct HandStatusWechsel {
     pub name: String,
     /// Status vor dem Setzen (Beleg für „Rückgängig“, LLH-1986).
     pub vorher_id: Option<i64>,
+    /// Lässt sich der Wechsel zurücknehmen? Nicht beim Löschen unter führenden Fahrzeugen: die
+    /// Rücknahme müsste einen Handstatus herstellen, den die Fahrzeuge verdrängen (LLH-1986).
+    pub zuruecknehmbar: bool,
     pub vorher: Option<String>,
     pub nachher: Option<String>,
     /// Kategorien vor und nach dem Setzen (Benachrichtigung `wieder_verfuegbar`, D11).
@@ -1101,6 +1104,7 @@ pub async fn setze_hand_status_tx(
             "Die Einheit führt ihren Status über ihre Fahrzeuge".into(),
         ));
     }
+    let zuruecknehmbar = fahrzeuge == 0;
     sqlx::query(
         "UPDATE einsatz_einheit SET status_id = ?1, \
          status_seit = CASE WHEN ?1 IS NULL THEN NULL ELSE ?4 END, \
@@ -1112,7 +1116,7 @@ pub async fn setze_hand_status_tx(
     .bind(id)
     .bind(einsatz_id)
     .bind(jetzt)
-    .bind(gesetzt_von)
+    .bind(gesetzt_von.filter(|_| zuruecknehmbar))
     .execute(&mut *conn)
     .await?;
     let (neu_label, neu_kategorie): (Option<String>, Option<StatusKategorie>) = match status_id {
@@ -1128,6 +1132,7 @@ pub async fn setze_hand_status_tx(
     Ok(Some(HandStatusWechsel {
         name,
         vorher_id: alt_id,
+        zuruecknehmbar,
         vorher: alt_label,
         nachher: neu_label,
         vorher_kategorie: alt_kategorie,

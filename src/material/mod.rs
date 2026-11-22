@@ -510,8 +510,6 @@ pub fn etb_text_ort_gewechselt(
     format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
 }
 
-/// System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
-/// ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
 /// Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
 /// PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
 /// Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
@@ -550,6 +548,8 @@ pub fn etb_text_statuswechsel_zurueckgenommen(
     )
 }
 
+/// System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
+/// ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
 pub fn etb_text_status_wechsel(
     bezeichnung: &str,
     vorher: MaterialStatus,

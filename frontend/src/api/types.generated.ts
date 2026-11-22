@@ -5898,9 +5898,7 @@ export interface components {
          */
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
         /**
-         * @description System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
-         *     ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
-         *     Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
+         * @description Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
          *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
          *     Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */

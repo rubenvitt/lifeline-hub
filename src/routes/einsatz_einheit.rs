@@ -1638,7 +1638,7 @@ pub async fn status_setzen(
         .await?
         {
             // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel.
-            beleg = Some(HandStatusRuecknahmeBeleg {
+            beleg = w.zuruecknehmbar.then(|| HandStatusRuecknahmeBeleg {
                 vorher_status_id: w.vorher_id,
                 status_id,
                 gesetzt_at: jetzt.clone(),

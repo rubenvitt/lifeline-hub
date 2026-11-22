@@ -580,9 +580,12 @@ pub async fn update(
     super::etb_verteilen(&state, einsatz_id, etb_ids);
     sse_material(&state, einsatz_id, em_id);
     notify_orte(&state, einsatz_id, &vorher, &nachher);
-    // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel.
-    let status_ruecknahme =
-        (vorher.status != nachher.status).then(|| MaterialStatusRuecknahmeBeleg {
+    // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel ohne geänderte Menge oder
+    // Art (die überholen ihn, `update_tx`).
+    let status_ruecknahme = (vorher.status != nachher.status
+        && vorher.menge == nachher.menge
+        && vorher.art == nachher.art)
+        .then(|| MaterialStatusRuecknahmeBeleg {
             vorher_status: Some(vorher.status),
             status: nachher.status,
             gesetzt_at: jetzt.clone(),
