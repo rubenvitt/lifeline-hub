@@ -578,16 +578,21 @@ schritt_20() {
   # Desktop-Hülle in Schritt 4 und Swift-Kern in Schritt 18). Der Kern ist reines Kotlin/JVM und
   # braucht nur ein JDK ab 17, kein Android-SDK. Ohne Java lokal eine Lücke, nie grün; die CI
   # setzt ANDROID_KERN_PFLICHT=1, dort ist das Fehlen rot.
-  local version=""
-  if command -v java > /dev/null 2>&1; then
-    version="$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -n 1)"
+  # Gefragt wird das JDK, das der Gradle-Wrapper nimmt: `JAVA_HOME`, sonst `java` im PATH. Ein
+  # `java`, das nicht läuft, zählt wie keins: macOS legt `/usr/bin/java` als Platzhalter an, der
+  # ohne JDK mit 1 endet; in einer Pipe hätte `pipefail` den Schritt dann ohne Meldung beendet.
+  # Deshalb die Ausgabe in einer Bedingung holen und ohne Pipe lesen.
+  local java="java" ausgabe="" version=""
+  [ -z "${JAVA_HOME:-}" ] || java="$JAVA_HOME/bin/java"
+  if command -v "$java" > /dev/null 2>&1 && ausgabe="$("$java" -version 2>&1)"; then
+    if [[ "$ausgabe" =~ version\ \"([0-9]+) ]]; then version="${BASH_REMATCH[1]}"; fi
   fi
   if [ -z "$version" ] || [ "$version" -lt 17 ]; then
     if [ "${ANDROID_KERN_PFLICHT:-0}" = 1 ]; then
-      echo "FEHLER: Java 17 oder neuer fehlt im PATH, ANDROID_KERN_PFLICHT=1 verlangt es." >&2
+      echo "FEHLER: Java 17 oder neuer fehlt ($java), ANDROID_KERN_PFLICHT=1 verlangt es." >&2
       return 1
     fi
-    echo "    ÜBERSPRUNGEN: Java 17 oder neuer fehlt im PATH (JDK 17+)." >&2
+    echo "    ÜBERSPRUNGEN: Java 17 oder neuer fehlt ($java; JAVA_HOME oder PATH, JDK 17+)." >&2
     echo "    Die CI prüft den Kotlin-Kern mit ANDROID_KERN_PFLICHT=1." >&2
     return "$UEBERSPRUNGEN_RC"
   fi
