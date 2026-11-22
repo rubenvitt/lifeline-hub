@@ -1304,7 +1304,9 @@ anwendbar), „nicht geprüft" ist keins.
   Nebenweg. Tests tippen über `test/zeitEingabe.ts` (`tippeZeit`, `setzeZeit`), nie über
   Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
   oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
-  Deutung steht deshalb immer im DOM.
+  Deutung steht deshalb immer im DOM. Wo der Hinweis neben der Eingabe keinen Platz hat (ETB-Feldzeile,
+  190 px), meldet das Feld ihn per `onHinweis` und zeigt ihn nicht selbst; der Aufrufer nennt ihn
+  und verweist per `aria-describedby` darauf (LLH-1917).
 - **Unlesbares bleibt stehen und sperrt** (LLH-1768,
   `docs/superpowers/specs/2026-11-20-obmcvm14-stille-korrekturen-sichtbar-design.md`; löst in der
   Spec `zeiteingabe`, „Unlesbare Eingabe wird nicht übernommen“, das „wieder den geltenden Wert

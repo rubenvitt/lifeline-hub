@@ -3,7 +3,7 @@ import type { Dayjs } from 'dayjs';
 import { useState, type ComponentRef, type CSSProperties, type ReactNode, type Ref } from 'react';
 import type { EtbTyp, MeldeWeg } from '../api/types';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
-import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe, type ZeitHinweis } from '../anzeige/ZeitpunktEingabe';
 import { uhrzeit } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
@@ -276,6 +276,13 @@ export interface EtbFeldzeileProps {
   /** Grund am Feld Zeit (Zukunft, unlesbares `/zeit`, angehaltenes Senden) und seine Kennung. */
   zeitGrund: string | null;
   zeitGrundId: string;
+  /** Die Fußzeile nennt unter `zeitGrundId` etwas zum Feld Zeit (Grund oder Hinweis). */
+  zeitBeschrieben?: boolean;
+  /**
+   * Hinweis des Felds Zeit (Grund, Deutung, „gestern“) für die Fußzeile: im 190 px schmalen Feld
+   * verdrängte er die Eingabe (LLH-1917).
+   */
+  onZeitHinweis?: (hinweis: ZeitHinweis | null) => void;
   /** Das Feld Zeit hat eine unlesbare Eingabe verworfen (Grund) oder nicht mehr (`null`), LLH-1866. */
   onZeitDiscard?: (grund: string | null) => void;
   /** Steigt, wenn das Feld Zeit neu einhängen soll (eine Zeit aus `/zeit`, LLH-1866). */
@@ -310,6 +317,8 @@ export default function EtbFeldzeile({
   pflichtId,
   zeitGrund,
   zeitGrundId,
+  zeitBeschrieben = false,
+  onZeitHinweis,
   onZeitDiscard,
   zeitFeldKey = 0,
   nachtrag,
@@ -336,7 +345,7 @@ export default function EtbFeldzeile({
         kalenderOhneTabstopp
         ref={refs.zeit}
         aria-label="Zeit"
-        aria-describedby={zeitGrund ? zeitGrundId : undefined}
+        aria-describedby={zeitGrund || zeitBeschrieben ? zeitGrundId : undefined}
         aria-invalid={zeitGrund ? true : undefined}
         data-lfh="etb-feld-zeit"
         data-nachtrag={nachtrag ? 'ja' : undefined}
@@ -348,6 +357,7 @@ export default function EtbFeldzeile({
         onChange={(v: Dayjs | null) => onFeld('ereigniszeit', v ?? undefined)}
         onOk={() => onFertig()}
         onDiscard={onZeitDiscard}
+        onHinweis={onZeitHinweis}
       />
     </Beschriftet>
   );
