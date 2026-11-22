@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -62,8 +63,8 @@ for (const kontext of [
 
     // Erteilen im Dialog, nicht mehr im Paneel über der Liste.
     await page.getByRole('button', { name: 'Auftrag erteilen' }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Auftrag erteilen' });
-    await expect(dialog).toBeVisible();
+    // Erst in den stehenden Dialog klicken (LLH-2065, `e2e/dialog-kern.ts`).
+    const dialog = await dialogSteht(page, 'Auftrag erteilen');
     const empfaenger = dialog.getByRole('combobox', { name: 'Empfänger' });
     await empfaenger.fill('EA Nord');
     await empfaenger.press('Enter');
@@ -85,12 +86,12 @@ for (const kontext of [
 
     // Quittieren im Detail.
     await detail(page).getByRole('button', { name: 'Empfang für EA Nord quittieren' }).click();
-    await page.getByRole('button', { name: 'Empfang quittieren' }).click();
+    await (await eingeblendet(page.getByRole('button', { name: 'Empfang quittieren' }))).click();
     await expect(page.locator('[data-auftrag-id]').getByText('1/1 quittiert')).toBeVisible();
 
     // Vollzug melden: der Auftrag fällt aus „Offen“, das Detail bleibt mit Hinweis.
     await detail(page).getByRole('button', { name: 'Vollzug melden' }).click();
-    const vollzug = page.getByRole('dialog', { name: 'Vollzug melden' });
+    const vollzug = await dialogSteht(page, 'Vollzug melden');
     await vollzug.getByPlaceholder('Rückmeldung zur Erledigung').fill('Hydrant frei');
     await vollzug.getByRole('button', { name: 'Vollzug melden' }).click();
     await expect(detail(page).getByText('Nicht mehr in dieser Ansicht')).toBeVisible();
@@ -101,7 +102,7 @@ for (const kontext of [
     const abgeschlossen = page.getByRole('button', { name: /: Hydrant H12 freilegen$/ });
     if (kontext.breite < 992) await abgeschlossen.click();
     await detail(page).getByRole('button', { name: 'Abnehmen' }).click();
-    await page.getByRole('button', { name: 'Auftrag abnehmen' }).click();
+    await (await eingeblendet(page.getByRole('button', { name: 'Auftrag abnehmen' }))).click();
     await expect(detail(page).getByRole('list', { name: 'Verlauf' })).toContainText('abgenommen');
     await keinQuerScroll(page);
   });
@@ -115,7 +116,8 @@ for (const kontext of [
     await page.goto(`/einsaetze/${einsatzId}/auftraege?reiter=befehle`);
 
     await page.getByRole('button', { name: 'Befehl entwerfen', exact: true }).first().click();
-    const dialog = page.getByRole('dialog');
+    // Ein Klick in die Einblendung ging unter Last verloren: kein POST, Dialog offen (LLH-2065).
+    const dialog = await dialogSteht(page, 'Neuer Befehlsentwurf');
     await dialog.getByLabel('Titel').fill('Befehl an 2. Zug');
     await dialog.getByRole('button', { name: 'Entwurf anlegen' }).click();
     await expect(page).toHaveURL(/\/auftraege\/befehle\/\d+$/);
@@ -138,7 +140,7 @@ for (const kontext of [
 
     // Freigeben im Detail: Rückfrage mit Folge, dann fällt der Befehl aus „Entwürfe“.
     await detail(page).getByRole('button', { name: 'Freigeben' }).click();
-    const freigabe = page.getByRole('dialog', { name: 'Befehl freigeben?' });
+    const freigabe = await dialogSteht(page, 'Befehl freigeben?');
     await expect(freigabe).toContainText('Endgültig: geht ins ETB');
     await freigabe.getByRole('button', { name: 'Freigeben' }).click();
     await expect(detail(page).getByText('Nicht mehr in dieser Ansicht')).toBeVisible();
