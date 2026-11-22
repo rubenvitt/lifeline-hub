@@ -14774,19 +14774,23 @@ async fn migration_0363_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruest
     .execute(&pool)
     .await
     .unwrap();
-    for s in ["a", "b", "c"] {
-        sqlx::query(
-            "INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (1, 'x', ?)",
-        )
-        .bind(s)
-        .execute(&pool)
-        .await
-        .unwrap();
+    // Einträge im Änderungslog entstehen über dessen Trigger (ADR-0018), nicht von Hand.
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         VALUES (1, 1, 'beobachter')",
+        "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'mitarbeit'",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
     }
     let hoechster: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung")
         .fetch_one(&pool)
         .await
         .unwrap();
+    assert!(hoechster > 0, "die Trigger haben ins Log geschrieben");
     migriere_bis(&pool, 363).await;
     let grenze: Option<i64> =
         sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1")
