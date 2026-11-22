@@ -452,7 +452,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   Kopf von `ios/App/Huelle/huelle.js`. Er nimmt Aufrufe nur aus dem Hauptframe und von der Origin
   des aktiven Servers an (`Bruecke.accepts` in `ios/LifelineKern/Sources/LifelineKern/Bruecke.swift`);
   jeder Server hat einen eigenen Datenspeicher. Die Anmeldung im Systembrowser
-  (`POST /api/auth/app-code[/einloesen]`) nutzen beide Hüllen gleich.
+  (`POST /api/auth/app-code[/redeem]`) nutzen beide Hüllen gleich.
 
 Adressprüfung, Deeplink und Linkregeln stehen einmal in Rust (`src-tauri/src/adresse.rs`,
 `deeplink.rs`, `links.rs`) und einmal im Swift-Kern; zusammengehalten werden sie von den

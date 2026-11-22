@@ -86,12 +86,17 @@ EOF
 }
 
 fall() { # <name> <erwartet: gruen|rot> <befehl, der das Repo $B verändert> [<muster>…]
-  local B name="$1" soll="$2" befehl="$3"
+  local B name="$1" soll="$2" befehl="$3" ARGS=""
   shift 3
   B="$(baum_neu "$(printf '%s' "$name" | tr -c '[:alnum:]' '_')")"
-  (cd "$B" && eval "$befehl")
+  # Der Befehl darf ARGS setzen (zusätzliche Argumente für den Wächter); deshalb nicht in einer
+  # Subshell, sondern mit cd hin und zurück.
+  local vorher="$PWD"
+  cd "$B" && eval "$befehl"
+  cd "$vorher"
   local ist=gruen
-  "$SKRIPT_UNTER_TEST" "$B" > "$ARBEIT/ausgabe" 2>&1 || ist=rot
+  # shellcheck disable=SC2086 # ARGS sind bewusst mehrere Wörter
+  "$SKRIPT_UNTER_TEST" "$B" $ARGS > "$ARBEIT/ausgabe" 2>&1 || ist=rot
   if [ "$ist" != "$soll" ]; then
     echo "  FEHL $name — erwartet $soll, gemessen $ist:" >&2
     sed 's/^/         /' "$ARBEIT/ausgabe" >&2
@@ -119,6 +124,18 @@ fall "neue deutsche Route einzeilig" rot \
 fall "neue deutsche Route mehrzeilig" rot \
   "awk '{ print } /\"\\/api\\/auth\\/login\",/ { print \"            \\\"/api/auth/zaehler\\\",\" }' src/app.rs > x && mv x src/app.rs" \
   "/api/auth/zaehler" "zaehler"
+fall "deutsche Route mitten in der Zeile (router.route)" rot \
+  "awk '{ print } /\"\\/api\\/health\"/ { print \"    let router = router.route(\\\"/api/nur-mit-feature\\\", get(h));\" }' src/app.rs > x && mv x src/app.rs" \
+  "/api/nur-mit-feature"
+fall "Bestand gegen die Merge-Base, nicht gegen die Spitze von origin/alpha" gruen \
+  "route_dazu /api/alt-deutsch && printf '%s\n' '/api/alt-deutsch' '/api/einsaetze/{id}' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && git checkout -q -b paket && grep -v alt-deutsch src/app.rs > x && mv x src/app.rs && printf '%s\n' '/api/einsaetze/{id}' > scripts/api-routen-bestand.txt && git commit -qam paket && git update-ref refs/remotes/origin/alpha HEAD && git checkout -q - && printf '%s\n' '# eigene Änderung' >> src/public_api/routen.rs" \
+  "OK"
+fall "Basis wählbar (--basis origin/beta)" rot \
+  "git update-ref refs/remotes/origin/beta HEAD && git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt; ARGS='--basis origin/beta'" \
+  "origin/beta"
+fall "Glossarzeile ohne zweite Spalte" rot \
+  "glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" 'health' \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\"" \
+  "zwei Spalten"
 fall "deutscher v1-Pfad" rot \
   "printf '%s\n' '#[utoipa::path(get, path = \"/api/v1/lage\")]' >> src/public_api/routen.rs" \
   "/api/v1/lage" "lage"

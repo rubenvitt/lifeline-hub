@@ -28,6 +28,13 @@ final class VertragTests: XCTestCase {
         XCTAssertEqual(LifelineKern.bekannteVertraege, [2])
     }
 
+    /// Eine ältere App (kennt nur Vertrag 1) zeigt einem Server mit Vertrag 2 „App aktualisieren“,
+    /// statt am umbenannten Login-Pfad zu scheitern (LLH-1979).
+    func testEineAppMitVertragEinsSiehtVertragZweiAlsZuNeu() {
+        XCTAssertEqual(
+            Vertragspruefung.evaluate(shell(2), letzterVertrag: 1, bekannt: [1]).fehlerklasse, .zuNeu)
+    }
+
     /// Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für die App zu alt.
     func testEinServerMitVertragEinsIstZuAlt() {
         XCTAssertEqual(

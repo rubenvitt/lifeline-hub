@@ -4,8 +4,8 @@
 # `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
 #
 # Gelesen werden die registrierten Pfade:
-#   - `src/app.rs`: Zeilen, die mit `.route("/api…"` oder mit `"/api…"` beginnen (die
-#     mehrzeilige Form), bis zur ersten Zeile `#[cfg(test)]`;
+#   - `src/app.rs`: `.route("/api…"` irgendwo in der Zeile (auch `router.route(…)`) und Zeilen,
+#     die mit `"/api…"` beginnen (die mehrzeilige Form), bis zur ersten Zeile `#[cfg(test)]`;
 #   - `src/public_api/**/*.rs`: `path = "/api…"` (utoipa);
 #   - `src/**/*.rs`: Konstanten `…_PFAD: &str = "/api…"`.
 # Jedes feste Segment (nicht `{…}`) wird im Glossar `scripts/api-routen-woerter.tsv`
@@ -16,31 +16,41 @@
 #     `scripts/api-routen-bestand.txt` steht;
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
-#   - ein Bestandseintrag, der auf `origin/alpha` fehlt (der Bestand wächst nicht). Ohne den Ref
-#     (flacher Checkout) laut übersprungen; trägt `origin/alpha` die Datei noch nicht, entfällt
-#     der Vergleich;
+#   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
+#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
+#     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
+#     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
+#     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
+#     nicht, entfällt er;
 #   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
 #     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
 #     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
 #
-# Grenze: Eine Route, deren Pfad weder als Literal am Zeilenanfang noch als `…_PFAD`-Konstante
-# steht (etwa aus `format!`), sieht der Wächter nicht. `src/app.rs` hat heute keine.
+# Grenze: Eine Route, deren Pfad weder als Literal noch als `…_PFAD`-Konstante steht (etwa aus
+# `format!`), sieht der Wächter nicht. `src/app.rs` hat heute keine.
 #
 # Abhilfe: das Segment englisch benennen und, falls neu, mit dem deutschen Begriff ins Glossar
 # eintragen. Nach einem Umbenennungspaket den Bestand neu schreiben:
 #   scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt
 #
-# Aufruf: scripts/check-api-routen.sh [<repo-wurzel>] [--bestand]   (Selbsttest: *.test.sh daneben)
+# Aufruf: scripts/check-api-routen.sh [<repo-wurzel>] [--bestand] [--basis <ref>]
+#         (Selbsttest: *.test.sh daneben)
 set -euo pipefail
 export LC_ALL=C
 
 modus=pruefen
 ROOT=""
-for arg in "$@"; do
-  case "$arg" in
+BASIS="origin/alpha"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --bestand) modus=bestand ;;
-    *) ROOT="$arg" ;;
+    --basis)
+      BASIS="${2:?--basis braucht einen Ref}"
+      shift
+      ;;
+    *) ROOT="$1" ;;
   esac
+  shift
 done
 ROOT="${ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 GLOSSAR="$ROOT/scripts/api-routen-woerter.tsv"
@@ -51,7 +61,7 @@ registrierte_pfade() {
   {
     awk '
       /^[[:space:]]*#\[cfg\(test\)\]/ { exit }
-      match($0, /^[[:space:]]*(\.route\()?"\/api[^"]*"/) {
+      match($0, /\.route\([[:space:]]*"\/api[^"]*"/) || match($0, /^[[:space:]]*"\/api[^"]*"/) {
         s = substr($0, RSTART, RLENGTH)
         sub(/^[^"]*"/, "", s)
         sub(/"$/, "", s)
@@ -137,19 +147,20 @@ if [ -n "$veraltet" ]; then
   done <<< "$veraltet"
 fi
 
-# 3. Der Bestand wächst nicht gegenüber origin/alpha.
-if git -C "$ROOT" rev-parse --verify --quiet 'refs/remotes/origin/alpha^{commit}' > /dev/null; then
-  if alt="$(git -C "$ROOT" show "origin/alpha:$BESTAND_REL" 2> /dev/null)"; then
+# 3. Der Bestand wächst nicht gegenüber der Merge-Base mit der Basis.
+if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
+  merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
+  if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
-        melde "$pfad: neu im Bestand gegenüber origin/alpha; der Bestand darf nur schrumpfen" \
+        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
           "(ADR-0082). Die Route englisch benennen."
       done <<< "$neu_zeilen"
     fi
   fi
 else
-  echo "check-api-routen: Bestandsvergleich übersprungen: origin/alpha fehlt."
+  echo "check-api-routen: Bestandsvergleich übersprungen: $BASIS fehlt."
 fi
 
 if [ "$fehler" -gt 0 ]; then

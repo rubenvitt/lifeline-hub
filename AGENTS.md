@@ -73,7 +73,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - **Grenzwerte bleiben:** Wire-Felder und -Werte, Tabellen und Spalten, Migrationen, generierte
   Typen, gespeicherte Schlüssel und Ereignisnamen nicht wegen dieser Regel umbenennen, auch nicht
   per `#[serde(rename)]`; dafür braucht es eine eigene Change mit Übergangsweg. Routen benennen
-  die Pakete von LLH-1979 um (ADR-0082).
+  die Pakete von LLH-1979 um (ADR-0082; `/api/v1/` erst, wenn eine ADR ADR-0022 ersetzt).
 - **Bestand beim Anfassen umstellen, nie in einem Zug:** Neue Bezeichner folgen der Regel sofort.
   Ein bestehender wird umgestellt, wenn der Task Code ändert, der ihn deklariert, und seine
   Verwendungen im Diff liegen oder sich mechanisch mitziehen lassen; eine Namensfamilie in
