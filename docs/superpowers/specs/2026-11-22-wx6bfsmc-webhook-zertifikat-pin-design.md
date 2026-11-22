@@ -79,10 +79,17 @@ hinterlegen können; dann zählt genau dieses Zertifikat, wie bei der Direktkopp
   (`ziel_neu`): die Störung eines aktiven Webhooks wird zurückgesetzt, ein laufender Versuch mit
   dem alten Stand landet wegen des CAS-Stands `geaendert_at` nur im Verlauf.
 - Admin-Spur: neue Aktionen `maschinenzugang_webhook_pin_gesetzt` (beim Anlegen mit Pin, beim
-  Setzen und beim Wechsel) und `maschinenzugang_webhook_pin_entfernt`. Angaben: `host` wie bisher,
-  `fingerabdruck` (neu) und beim Wechsel/Entfernen `fingerabdruck_vorher`. Die Felder gibt es in
-  `ZugangsAngaben` schon. Der aktion-CHECK von `admin_audit` braucht einen Tabellenumbau nach
-  Muster der letzten Umbau-Migration (`migrations/AGENTS.md`).
+  Setzen und beim Wechsel), `maschinenzugang_webhook_pin_entfernt` und
+  `maschinenzugang_webhook_zertifikat_abgerufen` (D4). Angaben: `host` wie bisher,
+  `fingerabdruck` (neu bzw. abgerufen) und beim Wechsel/Entfernen `fingerabdruck_vorher`. Die
+  Felder gibt es in `ZugangsAngaben` schon. Der aktion-CHECK von `admin_audit` braucht einen
+  Tabellenumbau nach Muster der letzten Umbau-Migration (`migrations/AGENTS.md`).
+- **Neuer Server, Pin muss neu** (Entscheidung Ruben 22.11.2026): Bleibt der Host der URL gleich
+  (nur Pfad, Query oder Port ändern sich), bleibt der Pin. Ändert ein PATCH den Host eines
+  Webhooks mit Pin und sagt nichts zu `zertifikat_pin`, antwortet der Server mit 400
+  („Neues Ziel: Fingerabdruck neu holen oder entfernen.“). Die Oberfläche leert das Feld, sobald
+  sich der Host in der eingegebenen URL ändert, und schickt damit `null` oder einen neuen Pin mit.
+  Kein stilles Entfernen.
 - Beides in **einer** neuen Migration mit der nächsten freien Nummer.
 
 ### D2 Eingabe und Prüfung des Pins
@@ -126,8 +133,10 @@ hinterlegen können; dann zählt genau dieses Zertifikat, wie bei der Direktkopp
   vor, der Fehler des Requests wird verworfen.
 - Antwort 200: `{ fingerabdruck?: string, fehler_art?: WebhookFehler }`; kam es nicht bis zum
   Zertifikat (DNS, Ziel intern, Verbindung, Zeitüberschreitung), steht nur `fehler_art` da.
-- Kein Eintrag in der Admin-Spur (liest nur, wie das Testereignis). Zeitlimits wie die
-  Zustellung.
+- **Eintrag in der Admin-Spur** `maschinenzugang_webhook_zertifikat_abgerufen` mit Host und, falls
+  erhalten, Fingerabdruck. Anders als das Testereignis nimmt der Abruf eine beliebige URL samt
+  LAN-Ausnahme aus dem Body; ohne Eintrag wäre er ein ungeloggter Weg, Hosts und Ports im LAN
+  abzutasten (eigene Entscheidung nach dem Builder-Check). Zeitlimits wie die Zustellung.
 - Der erfassende Verifier liegt neben `Verifier` in `instanz::zertifikat`, damit er für Adapter
   wiederverwendbar ist.
 
@@ -146,8 +155,12 @@ hinterlegen können; dann zählt genau dieses Zertifikat, wie bei der Direktkopp
 - `LAN_WARNUNG` endet statt „Das Ziel braucht ein Zertifikat, dem dieser Server vertraut.“ mit
   „… dem dieser Server vertraut, oder einen hinterlegten Fingerabdruck.“
 - `webhookPatch` sendet `zertifikat_pin` nur bei Änderung, leer → `null`.
-- `webhookFehlerText('tls')` lautet bei gesetztem Pin „Das Zertifikat des Ziels passt nicht zum
-  hinterlegten Fingerabdruck.“
+- `webhookFehlerText('tls')` bleibt **ein neutraler Text** für Verlauf und letzten Fehler („Das
+  Zertifikat des Ziels wurde nicht anerkannt.“): Ob beim jeweiligen Versuch schon ein Pin galt,
+  ist nicht gespeichert, und ein alter Fehler von vor dem Pin bliebe sonst falsch beschriftet.
+  Steht der Webhook mit gesetztem Pin in der Störung mit `tls`, zeigt das Paneel „Zustellung“
+  dazu den Hinweis „Hat das Ziel sein Zertifikat gewechselt? Fingerabdruck neu holen.“ (eigene
+  Entscheidung nach dem Builder-Check; kein Pin-Merkmal je Versuch).
 - Zugangsprotokoll: Texte für die zwei neuen Aktionen in `zugangsprotokollText.ts`.
 
 ### D6 Regeln und Doku
@@ -172,7 +185,8 @@ hinterlegen können; dann zählt genau dieses Zertifikat, wie bei der Direktkopp
 - Erfassender Verifier: liefert den Fingerabdruck der Gegenstelle, und die Gegenstelle sieht keine
   HTTP-Anfrage.
 - Integration der Routen: anlegen mit Pin, PATCH setzen/wechseln/entfernen samt Admin-Spur und
-  Zurücksetzen der Störung, ungültiger Pin → 400, Abruf nur für System-Admin, Abruf mit
+  Zurücksetzen der Störung, ungültiger Pin → 400, neuer Host ohne Angabe zum Pin → 400, neuer
+  Pfad am selben Host behält den Pin, Abruf nur für System-Admin und mit Admin-Spur, Abruf mit
   internem Ziel → `fehler_art`.
 - Admin-Spur: der bestehende Test `jede_aktion_passiert_den_db_check` deckt die neuen Aktionen.
 - Frontend: `webhookPatch` mit Pin, Anzeige gruppiert, Bestätigungsdialog übernimmt erst nach
