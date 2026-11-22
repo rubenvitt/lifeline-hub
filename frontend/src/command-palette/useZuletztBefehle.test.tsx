@@ -20,7 +20,7 @@ const nutzerB = { ...nutzer, id: 2, anzeigename: 'S2', benutzername: 's2' };
 /** Was der Server auf PUT entgegennimmt — je Test ausgelesen. */
 let puts: { schluessel: string; wert: string }[];
 /** Wie oft das Fach überhaupt GELESEN wurde (für die Aussage „ohne Sitzung gar nicht"). */
-let gets: number;
+let gets = 0;
 
 function stand(ids: string[]): BenutzerEinstellungen {
   return { eintraege: { [SCHLUESSEL_ZULETZT_BEFEHLE]: JSON.stringify(ids) } };
