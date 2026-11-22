@@ -49,6 +49,7 @@ import {
   adapterZustandAnzeige,
   einstellungenVon,
   einstellungenVonAdapter,
+  einstellungsRegeln,
   entferneAdapter,
   hostWechsel,
   speicherHinweisText,
@@ -278,13 +279,7 @@ export default function AdapterAnsicht() {
             ) : (
               <Input maxLength={f.max > 0 ? f.max : undefined} autoComplete="off" />
             ),
-          regeln: [
-            ...(f.pflicht ? [pflicht(f.bezeichnung, { whitespace: f.typ !== 'zahl' })] : []),
-            ...(f.max > 0 ? [{ max: f.max, message: `Höchstens ${f.max} Zeichen` }] : []),
-            ...(f.typ === 'url'
-              ? [{ pattern: /^\s*https?:\/\//i, message: `${f.bezeichnung} beginnt mit https://` }]
-              : []),
-          ],
+          regeln: einstellungsRegeln(f),
         }))
       : []),
   ];

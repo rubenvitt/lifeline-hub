@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
 ---
 
 ## Überblick
@@ -16,8 +16,13 @@ aufrufen: BOSWatch, FE2 mit „URL öffnen“, der Webhook von Divera oder OsmAn
 den **Einwurf-Zugang**. Seine Adresse enthält einen geheimen Schlüssel. Über sie lässt sich nur
 einliefern, nichts lesen.
 
-Anbindungen und Einwurf-Zugänge legt der System-Admin in der Verwaltung unter „Einstellungen“,
-„Anbindungen“ an. Wie ein Fremdsystem den Zugang technisch nutzt, steht in der Anleitung für
+Ein **Adapter** geht den umgekehrten Weg: Lifeline Hub ruft selbst bei einem Fremdsystem ab, im
+Hintergrund und in einem festen Takt. Seine Zugangsdaten (Geheimnisse) liegen verschlüsselt auf
+dem Server und lassen sich nur setzen, nie wieder lesen. Das Paneel „Adapter“ erscheint, sobald
+der Server eine Adapterart kennt.
+
+Anbindungen, Einwurf-Zugänge und Adapter legt der System-Admin in der Verwaltung unter
+„Einstellungen“, „Anbindungen“ an. Wie ein Fremdsystem den Zugang technisch nutzt, steht in der Anleitung für
 Entwickler (`docs/api/maschinenzugang.md`, für den Einwurf `docs/api/einwurf.md`). Wie ein
 Lagemonitor angebunden wird und seinen Einsatz bekommt, steht unter
 [Externe Lagemonitore](externe-lagemonitore.md).
@@ -151,6 +156,83 @@ Ab sofort werden Einwürfe mit diesem Schlüssel abgelehnt. Der Zugang bleibt mi
 stehen, samt Zeitpunkt und wer widerrufen hat. Name, Zweck und „Gültig bis“ eines Einwurf-Zugangs
 lassen sich nicht nachträglich ändern: Dafür wird der Zugang widerrufen und neu angelegt.
 
+### Adapter anlegen
+
+Für den System-Admin:
+
+1. In der Verwaltung unter „Einstellungen“ „Anbindungen“ wählen. Unter den Einwurf-Zugängen steht
+   das Paneel „Adapter“.
+
+   ![Paneel „Adapter“ mit einem gestörten, einem angehaltenen und einem ausgeschalteten Adapter](../bilder/anbindungen/adapter-liste.png)
+
+2. „Adapter anlegen“ wählen, unter „Art“ die Art des Fremdsystems wählen und einen „Name“
+   eintragen, etwa „Alarmquelle Leitstelle“.
+3. Die Felder der Art ausfüllen, etwa die Adresse, und das „Intervall“ in Sekunden prüfen. Die Art
+   schlägt ein Intervall vor und nennt das kleinste erlaubte.
+4. „Anlegen“ wählen. Danach steht die Ansicht des neuen Adapters.
+
+Ein neuer Adapter ruft sofort ab. Fehlt ihm ein Geheimnis, das seine Art verlangt, hält er mit
+„Geheimnis fehlt“ an, bis es gesetzt ist.
+
+### Geheimnis setzen oder ersetzen
+
+1. In der Ansicht des Adapters im Paneel „Geheimnisse“ an der Zeile „Setzen“ wählen, bei einem
+   schon gesetzten Geheimnis „Ersetzen“.
+2. Den Wert in das Feld eintragen oder einfügen und „Speichern“ wählen; Escape oder „Abbrechen“
+   verwirft ihn.
+
+   ![Geheimnis „API-Schlüssel“ beim Ersetzen, darunter ein noch nicht gesetztes](../bilder/anbindungen/geheimnis-ersetzen.png)
+
+Die Zeile zeigt danach nur „gesetzt“ mit Zeit und Person. Den Wert zeigt die Seite nie wieder,
+auch nicht verdeckt. Ein Adapter, der wegen eines Fehlers angehalten war, ruft danach sofort neu
+ab. „Entfernen …“ neben „Ersetzen“ löscht ein Geheimnis nach einer Rückfrage.
+
+### Verbindung prüfen
+
+1. In der Ansicht des Adapters „Verbindung prüfen“ wählen.
+2. Das Ergebnis steht im Paneel „Zustand“, etwa „Verbindung prüfen: erreichbar (200) ·
+   4 Einträge“ oder der Grund des Fehlschlags, und als „Prüfung“ unter „Letzte Versuche“.
+
+   ![Ansicht eines gestörten Adapters mit dem Ergebnis der Prüfung](../bilder/anbindungen/adapter-ansicht.png)
+
+Die Prüfung ruft einmal ab und übernimmt nichts. Sie ändert weder den Zustand noch den nächsten
+Abruf.
+
+### Adapter bearbeiten
+
+1. In der Ansicht des Adapters im Paneel „Einstellungen“ „Bearbeiten“ wählen.
+2. Name, Intervall oder die Felder der Art ändern und „Speichern“ wählen.
+
+Ändert sich dabei der Server einer Adresse, fragt die Seite „Neues Ziel: Geheimnisse werden
+entfernt“ und nennt den bisherigen und den neuen Server. „Speichern und entfernen“ speichert;
+danach sind alle Geheimnisse des Adapters entfernt und werden neu gesetzt. So geht ein Geheimnis
+nie an einen anderen Server als den, für den es gesetzt wurde.
+
+### Adapter anhalten und fortsetzen
+
+1. In der Ansicht des Adapters „Anhalten“ wählen. Der Adapter ruft nichts mehr ab und steht auf
+   „aus“.
+2. „Fortsetzen“ wählen. Der Adapter ruft sofort wieder ab.
+
+„Fortsetzen“ steht auch bei einem Adapter, der mit „braucht Eingriff“ angehalten ist, etwa nach
+einer Korrektur am Fremdsystem.
+
+### Ziel im eigenen Netz erlauben
+
+1. In der Ansicht des Adapters im Paneel „Netz“ den Schalter „Ziel im eigenen Netz erlauben“
+   einschalten.
+2. Die Rückfrage mit „Erlauben“ bestätigen.
+
+Ausschalten geht ohne Rückfrage. Steht dann noch eine Adresse im eigenen Netz in den
+Einstellungen, lehnt der Server das ab.
+
+### Adapter löschen
+
+1. In der Ansicht des Adapters „Löschen …“ wählen.
+2. Die Rückfrage mit „Löschen“ bestätigen.
+
+Der Adapter ist danach samt Geheimnissen und Verlauf gelöscht.
+
 ## Hintergrund
 
 ### Wer was darf
@@ -161,6 +243,11 @@ ein Testereignis senden. Eine Führungskraft sieht Liste und Ansicht samt Zustel
 Aktionen; vom Ziel eines Webhooks sieht sie nur den Server, nicht die ganze Adresse, weil diese
 einen Schlüssel des Fremdsystems tragen kann. Dasselbe gilt für
 Einwurf-Zugänge.
+
+Bei Adaptern darf nur der System-Admin anlegen, ändern, Geheimnisse setzen und entfernen, prüfen,
+anhalten, fortsetzen und löschen. Eine Führungskraft sieht Liste, Zustand, Geheimnisse (nur ob und
+wann gesetzt) und Verlauf, aber keine Einstellungen: eine Adresse kann einen Hinweis auf den Zugang
+tragen.
 
 ### Rechte
 
@@ -308,6 +395,44 @@ der Absender den Server unter einem anderen Namen, wird dieser Teil beim Eintrag
 der Absender es kann, sendet er per POST: Bei einem Aufruf per GET stehen auch die Alarmdaten in
 der Adresse.
 
+### Zustand eines Adapters
+
+- **„ok“**: Der letzte Abruf war erfolgreich. Die Liste zeigt dann keinen Status, nur „zuletzt
+  erfolgreich“.
+- **„noch nie abgerufen“**: Der Adapter ist neu und hat noch nicht abgerufen.
+- **„gestört“**: Der letzte Abruf scheiterte an etwas Vorübergehendem (keine Verbindung, keine
+  Antwort in 20 s, Fehler des Servers). Der Adapter versucht es von selbst wieder, zuerst nach
+  einer Minute, dann nach jeweils doppelt so langer Pause, höchstens alle 15 Minuten, nie öfter als
+  sein Intervall. Eine Alarmquelle kommt so nach einer Störung von selbst wieder.
+- **„braucht Eingriff“**: Der Abruf scheiterte an etwas, das nur ein Mensch beheben kann: Zugang
+  abgelehnt, Geheimnis fehlt oder ist unlesbar, Einstellung ungültig, Ziel in einem gesperrten Netz
+  oder Weiterleitung. Der Adapter hält an, statt es endlos zu wiederholen. Er läuft wieder, sobald
+  ein Geheimnis oder eine Einstellung geändert ist oder der Admin „Fortsetzen“ wählt.
+- **„aus“**: Der Admin hat den Adapter angehalten.
+- **„Art unbekannt“**: Der Server kennt die Art dieses Adapters nicht mehr. Der Adapter ruft nicht
+  ab; Einstellungen und „Verbindung prüfen“ sind gesperrt, löschen geht.
+
+Unter „Letzte Versuche“ stehen die letzten 50 Abrufe und Prüfungen mit Zeit, Ergebnis und Dauer.
+Was das Fremdsystem geantwortet hat, speichert der Server nicht. Eine Benachrichtigung bei einer
+Störung gibt es nicht: Den Zustand zeigt nur diese Seite.
+
+### Geheimnisse eines Adapters
+
+Ein Geheimnis liegt verschlüsselt in der Datenbank, mit einem Schlüssel, den der Betrieb dem
+Server beim Start mitgibt (`LIFELINE_GEHEIMNIS_SCHLUESSEL`). Entschlüsselt wird es nur im Abruf,
+direkt vor der Anfrage. In keiner Antwort, keinem Protokoll und keiner Sicherung steht es im
+Klartext. Der Hinweis „Geheimnisspeicher“ über den Adaptern nennt zwei Störungen:
+
+- **„Schlüssel fehlt“**: Der Server hat keinen Schlüssel. Geheimnisse lassen sich nicht setzen,
+  Adapter mit Geheimnis halten mit „Geheimnisspeicher ohne Schlüssel“ an.
+- **„Schlüssel passt nicht“**: Mindestens ein Geheimnis wurde mit einem anderen Schlüssel gesetzt,
+  etwa nach dem Einspielen einer Sicherung auf einem anderen Rechner. Seine Zeile nennt es
+  „unlesbar“; „Neu setzen“ behebt es.
+
+Die Ziele eines Adapters prüft der Server wie die Ziele eines Webhooks: nur über https, keine
+Weiterleitung, kein Ziel in einem internen Netz. „Ziel im eigenen Netz erlauben“ öffnet private
+Netze; der Rechner selbst und Adressen wie `169.254.169.254` bleiben gesperrt.
+
 ### Am ELW
 
 Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an. Die
@@ -315,7 +440,9 @@ Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt.
 Anbindungen bleiben stehen und gelten wieder, sobald die Kopplung mit dem Hub endet; solange nennt
 ihre Zeile keinen Einsatz. Eine Freigabe aus der Zeit davor ruht (siehe
 [Externe Lagemonitore](externe-lagemonitore.md)). Bestehende Einwurf-Zugänge lassen sich weiter
-widerrufen, ihre Einwürfe werden abgelehnt.
+widerrufen, ihre Einwürfe werden abgelehnt. Adapter ruft eine solche Instanz nicht ab; die Seite
+zeigt sie mit „Am Hub anbinden“, und alle Aktionen sind gesperrt. Ihre Geheimnisse gehen nicht an
+den Hub: ein Adapter wird am Hub neu angelegt.
 
 Eine Direktkopplung vor Ort mit einem zweiten ELW sperrt nichts davon: Ohne Hub nimmt jeder der
 beiden ELW seine Fremdsysteme selbst an.
@@ -338,3 +465,8 @@ Zählung wird nach 365 Tagen gelöscht.
 Bei einem Einwurf-Zugang stehen Anlegen, Schlüsselwechsel und Widerruf im Zugangsprotokoll, mit
 dem Zweck und nie mit dem Schlüssel. „Zuletzt genutzt“ nennt den letzten angenommenen Einwurf.
 Der Server schreibt den Schlüssel in kein Protokoll.
+
+Bei einem Adapter stehen Anlegen, Ändern, Löschen, Setzen und Entfernen eines Geheimnisses,
+Anhalten, Fortsetzen und das Erlauben und Zurücknehmen eines Ziels im eigenen Netz im
+Zugangsprotokoll, mit Art, Platz und Server des Ziels, nie mit einem Wert. „Verbindung prüfen“
+steht nicht darin.

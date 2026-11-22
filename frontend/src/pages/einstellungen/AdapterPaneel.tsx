@@ -28,6 +28,7 @@ import {
   adapterPath,
   adapterZustandAnzeige,
   einstellungenVon,
+  einstellungsRegeln,
   isZustandSichtbar,
   speicherHinweisText,
   uebernimmAdapter,
@@ -46,15 +47,8 @@ interface AnlegenWerte {
 /** Ein Einstellungsfeld der Art als Formularfeld; Name und Regeln aus dem Verzeichnis. */
 export function EinstellungsFeld({ feld, pfad }: { feld: AdapterFeld; pfad: (string | number)[] }) {
   const max = feld.max > 0 ? feld.max : undefined;
-  const regeln = [
-    ...(feld.pflicht ? [pflicht(feld.bezeichnung, { whitespace: feld.typ !== 'zahl' })] : []),
-    ...(max ? [{ max, message: `Höchstens ${max} Zeichen` }] : []),
-    ...(feld.typ === 'url'
-      ? [{ pattern: /^\s*https?:\/\//i, message: `${feld.bezeichnung} beginnt mit https://` }]
-      : []),
-  ];
   return (
-    <Feld label={feld.bezeichnung} name={pfad} rules={regeln}>
+    <Feld label={feld.bezeichnung} name={pfad} rules={einstellungsRegeln(feld)}>
       {feld.typ === 'zahl' ? (
         <InputNumber style={{ width: '100%' }} />
       ) : (

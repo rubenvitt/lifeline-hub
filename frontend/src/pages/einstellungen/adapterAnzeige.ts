@@ -1,4 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
+import type { FormRule } from 'antd';
+import { pflicht } from '../../components/pflichtRegel';
 import type { AdapterEinstellungen } from '../../api/adapter';
 import { globalKeys } from '../../api/queryKeys';
 import type {
@@ -147,4 +149,18 @@ export function einstellungenVonAdapter(
 ): Record<string, unknown> {
   const e = a.einstellungen as unknown;
   return e != null && typeof e === 'object' ? (e as Record<string, unknown>) : {};
+}
+
+/**
+ * Prüfregeln eines Einstellungsfelds der Art, wie der Server sie anwendet (`art::check_einstellungen`):
+ * Pflicht, Höchstlänge, eine Adresse nur mit https. Anlegen und Bearbeiten teilen sie.
+ */
+export function einstellungsRegeln(feld: AdapterFeld): FormRule[] {
+  return [
+    ...(feld.pflicht ? [pflicht(feld.bezeichnung, { whitespace: feld.typ !== 'zahl' })] : []),
+    ...(feld.max > 0 ? [{ max: feld.max, message: `Höchstens ${feld.max} Zeichen` }] : []),
+    ...(feld.typ === 'url'
+      ? [{ pattern: /^\s*https:\/\//i, message: `${feld.bezeichnung} beginnt mit https://` }]
+      : []),
+  ];
 }
