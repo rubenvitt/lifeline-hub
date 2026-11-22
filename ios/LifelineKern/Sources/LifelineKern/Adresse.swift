@@ -58,6 +58,8 @@ public struct ServerAdresse: Hashable, Sendable, Codable, CustomStringConvertibl
         if eingabe.isEmpty { throw .leer }
         guard let teile = URLComponents(string: eingabe), let schema = teile.scheme?.lowercased()
         else { throw .unlesbar }
+        // `URLComponents` liest auch Port 65536; der URL-Standard (und `adresse.rs`) nicht.
+        if let port = teile.port, !(0...65535).contains(port) { throw .unlesbar }
         let host = (teile.percentEncodedHost ?? "").lowercased()
         // Wer drei Schrägstriche tippt, hat den Hostnamen vergessen; der URL-Standard machte aus
         // `https:///einsatz` still den Host `einsatz`.

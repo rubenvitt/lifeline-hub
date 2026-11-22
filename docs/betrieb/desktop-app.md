@@ -52,7 +52,9 @@ Beim ersten Start fragt die App nach der **Serveradresse**, zum Beispiel
 `https://elw.local:8443`. Angenommen wird nur `https` mit Hostnamen und ohne Name/Passwort vor
 „@“, denn Offline-Betrieb (Service Worker) und Passkeys brauchen eine gesicherte Verbindung.
 Abgelehnt werden auch Ports, die der Webview sperrt (die „bad ports“ der Fetch-Spezifikation wie
-6000 oder 10080, LLH-1987): dorthin lädt er nichts, das Fenster bliebe leer. Das Zertifikat des Servers
+6000 oder 10080, LLH-1987): dorthin lädt er nichts, das Fenster bliebe leer. Steht eine solche
+Adresse schon gespeichert, zeigt die App beim Start die Maske; die übrigen bekannten Server bleiben
+zur Auswahl. Das Zertifikat des Servers
 muss der Rechner kennen, so wie bei einem Browser (mkcert-CA oder ein öffentliches Zertifikat,
 siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst kommt keine Seite an (siehe „Server nicht
 erreichbar“). Nach einem Netzausfall fordert Menü „Lifeline Hub“ → „Neu laden“ (macOS: Menü

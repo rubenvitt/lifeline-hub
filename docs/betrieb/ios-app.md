@@ -176,9 +176,10 @@ im Browser ein, nicht in der App.
 
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Datenspeicher des
 Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Die
-Serverliste liegt als `server.json` in Application Support der App; ein Eintrag, den die
-Adressprüfung inzwischen ablehnt (etwa auf einem gesperrten Port), fällt beim Laden heraus, die
-übrigen bleiben. Der Schalter „Haptik“ liegt in den
+Serverliste liegt als `server.json` in Application Support der App. Ein Eintrag, dessen Adresse
+die Prüfung inzwischen ablehnt (etwa auf einem gesperrten Port), fällt beim Laden heraus, die
+übrigen bleiben; war er aktiv, wird der erste übrige aktiv. Ist die Datei aus einem anderen Grund
+unlesbar, legt die App sie als `server.defekt.json` beiseite und beginnt leer. Der Schalter „Haptik“ liegt in den
 Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Das
 Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit Grund CA92.1,
 kein Tracking und keine erhobenen Daten. Vorgaben für

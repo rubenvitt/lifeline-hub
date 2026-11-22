@@ -67,6 +67,11 @@
       "fehler": "unlesbar"
     },
     {
+      "beschreibung": "ein Port über 65535 ist keine Adresse",
+      "eingabe": "https://elw.local:65536",
+      "fehler": "unlesbar"
+    },
+    {
       "beschreibung": "ein vom Webview gesperrter Port (X11, Fetch „bad port“) wird abgelehnt: die Seite bliebe leer",
       "eingabe": "https://elw.local:6000",
       "fehler": "gesperrter_port"
