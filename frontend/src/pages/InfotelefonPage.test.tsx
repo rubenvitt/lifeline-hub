@@ -552,7 +552,11 @@ describe('InfotelefonPage (LFH-554)', () => {
       );
       const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
       await within(liste).findByText('Anruf 801');
-      act(() => within(liste).getAllByRole('button', { name: /^Status von Anruf / })[0].focus());
+      act(() =>
+        within(liste)
+          .getAllByRole('button', { name: /^Status von Anruf / })[0]
+          .focus(),
+      );
 
       // Ein anderer Platz erledigt Anruf 850: er fällt aus „offene Rückrufe“.
       bestand = bestand.map((a) => (a.id === 850 ? { ...a, status: 'erledigt' as const } : a));
