@@ -2019,7 +2019,7 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 - **Eigene Riegel per AST-Selektor** stehen im Plugin `lfh` (`lint/riegel-plugin.js`, heute die
   e2e-Riegel). Die JS-Plugin-API von oxlint ist Alpha: jeder Riegel bekommt Musterdateien in
   `lint/riegel-plugin.test.ts`, damit ein Update, das Selektoren bricht, rot wird.
-- **Eigene AST-Prüfungen in Guard-Tests** lesen den Quelltext über `lib/quelltextAst.ts`
+- **Eigene AST-Prüfungen in Guard-Tests** lesen den Quelltext über `lib/sourceAst.ts`
   (oxc-parser), nie über `typescript`: TypeScript 7 bringt die Compiler-API nicht mehr mit.
 
 ## Frontend — Typecheck mit TypeScript 7 (LLH-2020)

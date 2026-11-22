@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sichtbareTexte } from '../lib/quelltextAst';
+import { visibleTexts } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -25,9 +25,9 @@ const HILFE = join(SRC, '..', '..', 'docs', 'anwender');
 const MUSTER = /\bErreichbarkeit/;
 
 function treffer(quelle: string, dateiname = 'x.tsx'): number[] {
-  return sichtbareTexte(dateiname, quelle)
+  return visibleTexts(dateiname, quelle)
     .filter(({ text }) => MUSTER.test(text))
-    .map(({ zeile }) => zeile);
+    .map(({ line }) => line);
 }
 
 function dateien(verzeichnis: string, endung: RegExp): string[] {

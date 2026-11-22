@@ -3,7 +3,7 @@
  * `apiResponseTypen.guard.test.ts`. Response-Formen sollen aus `types.generated.ts`
  * re-exportiert werden; eine Handrolle driftet still gegen das Backend.
  *
- * Mechanik wie `queryKeyScan.ts`: AST über `lib/quelltextAst` (oxc-parser, LLH-2020), ohne `import.meta.glob` (das Glob bleibt im
+ * Mechanik wie `queryKeyScan.ts`: AST über `lib/sourceAst` (oxc-parser, LLH-2020), ohne `import.meta.glob` (das Glob bleibt im
  * Guard-Test, sonst landete bei einem Produktiv-Import der Quelltext im Bundle).
  *
  * ERFASST: `export interface X { … }` (art 'interface') und `export type X = { … }` (art
@@ -16,7 +16,7 @@
  *  2. Ob der Re-Export das RICHTIGE Schema trifft (das leistet der Typecheck der Konsumenten).
  *  3. Nicht-exportierte lokale Hilfstypen; sie sind kein Vertrag.
  */
-import { type AstKnoten, parseQuelltext, walk, zeileVon } from '../lib/quelltextAst';
+import { type AstNode, parseSource, walk, lineOf } from '../lib/sourceAst';
 
 export type ApiTypArt = 'interface' | 'objekt-alias';
 
@@ -38,14 +38,14 @@ const dateiname = (pfad: string): string => pfad.split('/').pop() ?? pfad;
 
 /** Meldet jede exportierte Objekt-Typ-Deklaration einer Datei (siehe Kopfkommentar). */
 export function scanneApiTypen(pfad: string, quelltext: string): ApiTypFund[] {
-  const programm = parseQuelltext(pfad, quelltext, 'ts');
+  const programm = parseSource(pfad, quelltext, 'ts');
   const funde: ApiTypFund[] = [];
 
   // Die Zeile zählt ab `export`, wie zuvor `getStart` des exportierten Knotens.
-  const melde = (name: string, art: ApiTypArt, huelle: AstKnoten): void => {
+  const melde = (name: string, art: ApiTypArt, huelle: AstNode): void => {
     funde.push({
       pfad,
-      zeile: zeileVon(quelltext, huelle.start),
+      zeile: lineOf(quelltext, huelle.start),
       name,
       art,
       schluessel: `${dateiname(pfad)}#${name}`,
@@ -54,13 +54,13 @@ export function scanneApiTypen(pfad: string, quelltext: string): ApiTypFund[] {
 
   walk(programm, (knoten, eltern) => {
     if (!eltern || !EXPORT_HUELLEN.has(eltern.type) || eltern.declaration !== knoten) return;
-    const name = (knoten.id as AstKnoten | null)?.name as string | undefined;
+    const name = (knoten.id as AstNode | null)?.name as string | undefined;
     if (!name) return;
     if (knoten.type === 'TSInterfaceDeclaration') {
       melde(name, 'interface', eltern);
     } else if (
       knoten.type === 'TSTypeAliasDeclaration' &&
-      (knoten.typeAnnotation as AstKnoten).type === 'TSTypeLiteral'
+      (knoten.typeAnnotation as AstNode).type === 'TSTypeLiteral'
     ) {
       melde(name, 'objekt-alias', eltern);
     }

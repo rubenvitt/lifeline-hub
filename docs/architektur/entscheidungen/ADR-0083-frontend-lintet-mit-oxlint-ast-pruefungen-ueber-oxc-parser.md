@@ -7,7 +7,7 @@ gilt_fuer:
   - frontend/.oxlintrc.json
   - frontend/lint/**
   - frontend/package.json
-  - frontend/src/lib/quelltextAst.ts
+  - frontend/src/lib/sourceAst.ts
 herleitung:
   - docs/superpowers/specs/2026-11-22-g2gwgpxa-oxlint-typescript-7-design.md
 ---
@@ -17,12 +17,11 @@ herleitung:
 ## Regeln
 
 - MUST NOT: kein ESLint und kein typescript-eslint im Frontend.
-- MUST: `pnpm lint` läuft mit `--deny-warnings` und `--report-unused-disable-directives`, das
-  Regelset steht einzeln in `frontend/.oxlintrc.json` (`frontend/AGENTS.md`, „Lint-Disziplin“).
-- MUST: eigene Lint-Riegel per AST-Selektor stehen im Plugin `lfh` (`frontend/lint/riegel-plugin.js`)
-  und haben Musterdateien im Probe-Test `frontend/lint/riegel-plugin.test.ts`.
-- MUST NOT: Code unter `frontend/src/` importiert `typescript`; eigene AST-Prüfungen nutzen
-  `frontend/src/lib/quelltextAst.ts`.
+- MUST: Lint, Ausnahmen und eigene Riegel wie in `frontend/AGENTS.md`, „Frontend — Lint-Disziplin“
+  (oxlint mit `--deny-warnings` und `--report-unused-disable-directives`, Plugin `lfh` mit
+  Probe-Test).
+- MUST NOT: Code unter `frontend/src/` lädt `typescript` (Import, `require`, `import()` oder
+  Unterpfad); eigene AST-Prüfungen nutzen `frontend/src/lib/sourceAst.ts`.
 - SHOULD: `@typescript/typescript6` nur für den Typ-Codegen (`frontend/scripts/ts6-fuer-codegen.mjs`).
 
 ## Prüfung
@@ -33,7 +32,7 @@ verlange '"lint": "oxlint --deny-warnings --report-unused-disable-directives"' f
 verlange '"typescript": "\^7\.' frontend/package.json
 verlange 'e2e-riegel' frontend/lint/riegel-plugin.js
 verlange 'e2e-anmeldeformular' frontend/lint/riegel-plugin.test.ts
-verbiete "from 'typescript'" 'frontend/src/**/*.ts' 'frontend/src/**/*.tsx'
+verbiete "(from|require\(|import\() *['\"]typescript(/[^'\"]*)?['\"]" 'frontend/src/**/*.ts' 'frontend/src/**/*.tsx'
 ```
 
 ## Kontext

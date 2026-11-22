@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type AstKnoten, parseQuelltext, walk, zeileVon } from '../lib/quelltextAst';
+import { type AstNode, parseSource, walk, lineOf } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -54,24 +54,24 @@ const ERLAUBT: Record<string, { anzahl: number; grund: string }> = {
 const TOAST_OBJEKTE = new Set(['message', 'meldung', 'notification']);
 
 /** Fehler-Toast-Aufrufe einer Quelle als Zeilennummern. */
-export function toastTreffer(quelle: string, dateiname = 'x.tsx'): number[] {
+function toastTreffer(quelle: string, dateiname = 'x.tsx'): number[] {
   const zeilen: number[] = [];
   /** Name einer nicht berechneten Eigenschaft (`a.b` → 'b'). */
-  const eigenschaft = (k: AstKnoten): string | undefined =>
-    k.type === 'MemberExpression' && !k.computed && (k.property as AstKnoten).type === 'Identifier'
-      ? ((k.property as AstKnoten).name as string)
+  const eigenschaft = (k: AstNode): string | undefined =>
+    k.type === 'MemberExpression' && !k.computed && (k.property as AstNode).type === 'Identifier'
+      ? ((k.property as AstNode).name as string)
       : undefined;
-  walk(parseQuelltext(dateiname, quelle), (knoten) => {
+  walk(parseSource(dateiname, quelle), (knoten) => {
     if (knoten.type !== 'CallExpression') return;
-    const ziel = knoten.callee as AstKnoten;
-    const objekt = ziel.object as AstKnoten | undefined;
+    const ziel = knoten.callee as AstNode;
+    const objekt = ziel.object as AstNode | undefined;
     const istToast =
       eigenschaft(ziel) === 'error' &&
       objekt != null &&
       ((objekt.type === 'Identifier' && TOAST_OBJEKTE.has(objekt.name as string)) ||
         TOAST_OBJEKTE.has(eigenschaft(objekt) ?? ''));
     const istHook = ziel.type === 'Identifier' && ziel.name === 'useFehlerMeldung';
-    if (istToast || istHook) zeilen.push(zeileVon(quelle, knoten.start));
+    if (istToast || istHook) zeilen.push(lineOf(quelle, knoten.start));
   });
   return zeilen;
 }

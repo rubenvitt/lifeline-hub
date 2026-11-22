@@ -44,6 +44,8 @@ const MUSTER: Record<string, string> = {
   ].join('\n'),
   // Außerhalb von `e2e/` gilt kein Riegel.
   'src/probe.ts': "await page.waitForLoadState('networkidle');",
+  // Wie unter ESLint: ein führender Unterstrich macht nichts unbenutzt-erlaubt (Review LLH-2020).
+  'src/unbenutzt.ts': ['export function f(_arg: number) {', '  const _x = 1;', '}'].join('\n'),
 };
 
 interface Diagnose {
@@ -65,15 +67,16 @@ beforeAll(() => {
   );
   for (const [pfad, inhalt] of Object.entries(MUSTER)) {
     mkdirSync(dirname(join(wurzel, pfad)), { recursive: true });
-    writeFileSync(join(wurzel, pfad), `declare const page: any;\n${inhalt}\n`);
+    const kopf = inhalt.includes('page.') ? 'declare const page: any;\n' : '';
+    writeFileSync(join(wurzel, pfad), `${kopf}${inhalt}\n`);
   }
   const lauf = spawnSync(OXLINT, ['--format', 'json', '-c', '.oxlintrc.json', '.'], {
     cwd: wurzel,
     encoding: 'utf8',
   });
   expect(lauf.stdout, lauf.stderr).toContain('"diagnostics"');
-  befunde = (JSON.parse(lauf.stdout) as { diagnostics: Diagnose[] }).diagnostics.filter((d) =>
-    d.code.startsWith('lfh('),
+  befunde = (JSON.parse(lauf.stdout) as { diagnostics: Diagnose[] }).diagnostics.filter(
+    (d) => d.code?.startsWith('lfh(') || d.code === 'eslint(no-unused-vars)',
   );
 }, 60_000);
 
@@ -85,7 +88,7 @@ afterAll(() => {
 const von = (pfad: string): string[] =>
   befunde
     .filter((d) => d.filename === pfad)
-    .map((d) => `${d.labels[0].span.line - 1} ${d.code}`)
+    .map((d) => `${d.labels[0].span.line - (MUSTER[pfad].includes('page.') ? 1 : 0)} ${d.code}`)
     .sort();
 
 describe('Riegel-Plugin lfh (LLH-2020)', () => {
@@ -110,5 +113,12 @@ describe('Riegel-Plugin lfh (LLH-2020)', () => {
   it('meldet nichts für andere Werte, Template-Literale, unterdrückte Zeilen und außerhalb von e2e', () => {
     for (const pfad of ['e2e/gegenprobe.spec.ts', 'e2e/unterdrueckt.spec.ts', 'src/probe.ts'])
       expect(von(pfad), pfad).toEqual([]);
+  });
+
+  it('meldet unbenutzte Namen auch mit führendem Unterstrich, wie früher ESLint', () => {
+    expect(von('src/unbenutzt.ts')).toEqual([
+      '1 eslint(no-unused-vars)',
+      '2 eslint(no-unused-vars)',
+    ]);
   });
 });

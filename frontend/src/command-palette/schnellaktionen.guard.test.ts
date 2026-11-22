@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  type AstKnoten,
-  parseQuelltext,
-  statischerText,
-  walk,
-  zeileVon,
-} from '../lib/quelltextAst';
+import { type AstNode, parseSource, staticText, walk, lineOf } from '../lib/sourceAst';
 import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import {
@@ -67,11 +61,11 @@ interface Leser {
  */
 export function findeLeser(pfad: string, quelltext: string, parameter: string): Leser[] {
   const funde: Leser[] = [];
-  walk(parseQuelltext(pfad, quelltext), (knoten) => {
+  walk(parseSource(pfad, quelltext), (knoten) => {
     if (knoten.type !== 'CallExpression') return;
-    const callee = knoten.callee as AstKnoten;
-    const erstes = statischerText((knoten.arguments as AstKnoten[])[0]);
-    const eigenschaft = callee.property as AstKnoten | undefined;
+    const callee = knoten.callee as AstNode;
+    const erstes = staticText((knoten.arguments as AstNode[])[0]);
+    const eigenschaft = callee.property as AstNode | undefined;
     if (
       callee.type === 'MemberExpression' &&
       !callee.computed &&
@@ -79,7 +73,7 @@ export function findeLeser(pfad: string, quelltext: string, parameter: string): 
       (eigenschaft.name === 'get' || eigenschaft.name === 'has') &&
       erstes === parameter
     ) {
-      funde.push({ pfad, zeile: zeileVon(quelltext, knoten.start) });
+      funde.push({ pfad, zeile: lineOf(quelltext, knoten.start) });
     }
     // Ein Hook der Adresse (`routing/useAdressWert.ts`, LLH-1826) mit dem Schlüssel als Literal.
     if (
@@ -87,7 +81,7 @@ export function findeLeser(pfad: string, quelltext: string, parameter: string): 
       (callee.name as string).startsWith('useAdress') &&
       erstes === parameter
     ) {
-      funde.push({ pfad, zeile: zeileVon(quelltext, knoten.start) });
+      funde.push({ pfad, zeile: lineOf(quelltext, knoten.start) });
     }
   });
   return funde;

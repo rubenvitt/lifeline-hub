@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { type AstKnoten, parseQuelltext, textVon, walk, zeileVon } from '../lib/quelltextAst';
+import { type AstNode, parseSource, textOf, walk, lineOf } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -278,19 +278,19 @@ export interface Sichtstelle {
  * Zeichenkettenliterale kommen mit Anführungszeichen zurück, damit `key="a"` und `key={a}`
  * in der Meldung unterscheidbar bleiben.
  */
-function attributVon(element: AstKnoten, name: string, quelltext: string): string | null {
-  for (const attribut of element.attributes as AstKnoten[]) {
+function attributVon(element: AstNode, name: string, quelltext: string): string | null {
+  for (const attribut of element.attributes as AstNode[]) {
     if (attribut.type !== 'JSXAttribute') continue;
-    if (textVon(quelltext, attribut.name as AstKnoten) !== name) continue;
-    const wert = attribut.value as AstKnoten | null;
+    if (textOf(quelltext, attribut.name as AstNode) !== name) continue;
+    const wert = attribut.value as AstNode | null;
     if (wert == null) return name; // bloßes `key` ohne Wert — formal da, praktisch leer
     if (wert.type === 'Literal' && typeof wert.value === 'string')
       return JSON.stringify(wert.value);
     if (wert.type === 'JSXExpressionContainer') {
-      const ausdruck = wert.expression as AstKnoten;
-      return ausdruck.type === 'JSXEmptyExpression' ? `${name}={}` : textVon(quelltext, ausdruck);
+      const ausdruck = wert.expression as AstNode;
+      return ausdruck.type === 'JSXEmptyExpression' ? `${name}={}` : textOf(quelltext, ausdruck);
     }
-    return textVon(quelltext, wert);
+    return textOf(quelltext, wert);
   }
   return null;
 }
@@ -315,23 +315,22 @@ const SICHTSCHALTER: Readonly<Record<string, string>> = {
  * Aufklapp-Umschalter. Die naheliegende „Behebung“ (ein `key` am Umschalter) verwürfe bei jedem
  * Aufklappen Sortierung, Spaltenwahl und Zeilenschleuse.
  */
-function achsenBezeichner(knoten: AstKnoten, attributName: string, quelltext: string): string[] {
-  const attribut = (knoten.attributes as AstKnoten[]).find(
-    (a) => a.type === 'JSXAttribute' && textVon(quelltext, a.name as AstKnoten) === attributName,
+function achsenBezeichner(knoten: AstNode, attributName: string, quelltext: string): string[] {
+  const attribut = (knoten.attributes as AstNode[]).find(
+    (a) => a.type === 'JSXAttribute' && textOf(quelltext, a.name as AstNode) === attributName,
   );
-  const wert = attribut?.value as AstKnoten | null | undefined;
+  const wert = attribut?.value as AstNode | null | undefined;
   if (wert?.type !== 'JSXExpressionContainer') return [];
-  const ausdruck = wert.expression as AstKnoten;
+  const ausdruck = wert.expression as AstNode;
   return ausdruck.type === 'JSXEmptyExpression' ? [] : achsenBezeichnerVon(ausdruck);
 }
 
 /** Die Bezeichner eines Teilausdrucks, mit denselben Regeln wie {@link achsenBezeichner}. */
-function achsenBezeichnerVon(ausdruck: AstKnoten): string[] {
+function achsenBezeichnerVon(ausdruck: AstNode): string[] {
   const gefunden: string[] = [];
   walk(ausdruck, (n) => {
     if (n.type === 'MemberExpression' && !n.computed) {
-      for (const bezeichner of achsenBezeichnerVon(n.object as AstKnoten))
-        gefunden.push(bezeichner);
+      for (const bezeichner of achsenBezeichnerVon(n.object as AstNode)) gefunden.push(bezeichner);
       return false;
     }
     if (n.type === 'Identifier') gefunden.push(n.name as string);
@@ -359,15 +358,15 @@ export function leseDatei(pfad: string, quelltext: string): Dateilage {
   const achsen = new Set<string>();
   const initialisierer = new Map<string, string>();
 
-  walk(parseQuelltext(pfad, quelltext), (knoten) => {
+  walk(parseSource(pfad, quelltext), (knoten) => {
     if (knoten.type === 'VariableDeclarator') {
-      const id = knoten.id as AstKnoten;
-      const init = knoten.init as AstKnoten | null;
+      const id = knoten.id as AstNode;
+      const init = knoten.init as AstNode | null;
       if (id.type === 'Identifier' && init)
-        initialisierer.set(id.name as string, textVon(quelltext, init));
+        initialisierer.set(id.name as string, textOf(quelltext, init));
     }
     if (knoten.type === 'JSXOpeningElement') {
-      const tag = textVon(quelltext, knoten.name as AstKnoten);
+      const tag = textOf(quelltext, knoten.name as AstNode);
       const schalterAttribut = SICHTSCHALTER[tag];
       if (schalterAttribut != null) {
         for (const bezeichner of achsenBezeichner(knoten, schalterAttribut, quelltext))
@@ -375,7 +374,7 @@ export function leseDatei(pfad: string, quelltext: string): Dateilage {
       }
       if (tag === 'Datensicht') {
         stellen.push({
-          zeile: zeileVon(quelltext, knoten.start),
+          zeile: lineOf(quelltext, knoten.start),
           schluessel: attributVon(knoten, 'key', quelltext),
           daten: attributVon(knoten, 'daten', quelltext),
         });

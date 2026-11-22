@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type AstKnoten, parseQuelltext, statischerText, walk } from '../lib/quelltextAst';
+import { type AstNode, parseSource, staticText, walk } from '../lib/sourceAst';
 import { ZIEL_PARAMETER } from './rollGedaechtnis';
 import { MELDEBILD_PARAMETER } from '../kraefte/useMeldebildFilter';
 
@@ -25,11 +25,11 @@ export function literaleDerAufrufe(
   passt: (name: string) => boolean,
 ): string[] {
   const funde: string[] = [];
-  walk(parseQuelltext(pfad, quelltext), (knoten) => {
+  walk(parseSource(pfad, quelltext), (knoten) => {
     if (knoten.type !== 'CallExpression') return;
-    const callee = knoten.callee as AstKnoten;
+    const callee = knoten.callee as AstNode;
     if (callee.type === 'Identifier' && passt(callee.name as string)) {
-      const erstes = statischerText((knoten.arguments as AstKnoten[])[0]);
+      const erstes = staticText((knoten.arguments as AstNode[])[0]);
       if (erstes !== undefined) funde.push(erstes);
     }
   });

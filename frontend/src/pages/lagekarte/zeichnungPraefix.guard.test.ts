@@ -2,13 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  type AstKnoten,
-  parseQuelltext,
-  statischerText,
-  walk,
-  zeileVon,
-} from '../../lib/quelltextAst';
+import { type AstNode, parseSource, staticText, walk, lineOf } from '../../lib/sourceAst';
 import { ZEICHNUNG_PRAEFIX } from './eigenpositionLayer';
 
 /**
@@ -31,21 +25,21 @@ const PRAEFIX_ARGUMENT = 3;
 
 type Fund = { datei: string; zeile: number; wert: string | null };
 
-export function praefixe(): Fund[] {
+function praefixe(): Fund[] {
   const funde: Fund[] = [];
   for (const datei of DATEIEN) {
     const quelle = readFileSync(join(hier, datei), 'utf8');
     if (!quelle.includes('prefixId') && !quelle.includes('createZeichnung')) continue;
-    const melde = (knoten: AstKnoten, wert: AstKnoten | null | undefined) => {
+    const melde = (knoten: AstNode, wert: AstNode | null | undefined) => {
       if (!wert) return;
-      const zeile = zeileVon(quelle, knoten.start);
-      const statisch = statischerText(wert);
+      const zeile = lineOf(quelle, knoten.start);
+      const statisch = staticText(wert);
       if (statisch !== undefined) funde.push({ datei, zeile, wert: statisch });
       else if (!(datei === 'zeichnen.ts' && wert.type === 'Identifier' && wert.name === 'praefix'))
         funde.push({ datei, zeile, wert: null });
     };
-    walk(parseQuelltext(datei, quelle), (n, eltern) => {
-      const schluessel = n.key as AstKnoten | undefined;
+    walk(parseSource(datei, quelle), (n, eltern) => {
+      const schluessel = n.key as AstNode | undefined;
       if (
         n.type === 'Property' &&
         eltern?.type === 'ObjectExpression' &&
@@ -54,23 +48,23 @@ export function praefixe(): Fund[] {
         schluessel?.type === 'Identifier' &&
         schluessel.name === 'prefixId'
       )
-        melde(n, n.value as AstKnoten);
-      const links = n.left as AstKnoten | undefined;
+        melde(n, n.value as AstNode);
+      const links = n.left as AstNode | undefined;
       if (
         n.type === 'AssignmentPattern' &&
         links?.type === 'Identifier' &&
         links.name === 'praefix' &&
         eltern?.type === 'FunctionDeclaration' &&
-        (eltern.id as AstKnoten | null)?.name === 'createZeichnung'
+        (eltern.id as AstNode | null)?.name === 'createZeichnung'
       )
-        melde(n, n.right as AstKnoten);
-      const callee = n.callee as AstKnoten | undefined;
+        melde(n, n.right as AstNode);
+      const callee = n.callee as AstNode | undefined;
       if (
         n.type === 'CallExpression' &&
         callee?.type === 'Identifier' &&
         callee.name === 'createZeichnung'
       )
-        melde(n, (n.arguments as AstKnoten[])[PRAEFIX_ARGUMENT]);
+        melde(n, (n.arguments as AstNode[])[PRAEFIX_ARGUMENT]);
     });
   }
   return funde;

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { type AstKnoten, parseQuelltext, textVon, walk, zeileVon } from '../../lib/quelltextAst';
+import { type AstNode, parseSource, textOf, walk, lineOf } from '../../lib/sourceAst';
 
 /**
  * Jeder Kamera-Aufruf der Lagekarte sagt, wer bewegt (LFH-766, D2 in
@@ -50,13 +50,13 @@ const KAMERA = new Set([
 ]);
 const MARKEN = new Set(['BEDIENUNG', 'AUTOMATISCH']);
 
-export function kameraAufrufe(datei: string) {
+function kameraAufrufe(datei: string) {
   const quelle = readFileSync(join(hier, datei), 'utf8');
   const funde: { datei: string; zeile: number; methode: string; marke: string | null }[] = [];
-  walk(parseQuelltext(datei, quelle), (n) => {
+  walk(parseSource(datei, quelle), (n) => {
     if (n.type !== 'CallExpression') return;
-    const callee = n.callee as AstKnoten;
-    const eigenschaft = callee.property as AstKnoten | undefined;
+    const callee = n.callee as AstNode;
+    const eigenschaft = callee.property as AstNode | undefined;
     if (
       callee.type !== 'MemberExpression' ||
       callee.computed ||
@@ -64,7 +64,7 @@ export function kameraAufrufe(datei: string) {
       !KAMERA.has(eigenschaft.name as string)
     )
       return;
-    const argumente = n.arguments as AstKnoten[];
+    const argumente = n.arguments as AstNode[];
     const letztes = argumente[argumente.length - 1];
     const marke =
       letztes != null && letztes.type === 'Identifier' && MARKEN.has(letztes.name as string)
@@ -72,10 +72,10 @@ export function kameraAufrufe(datei: string) {
         : null;
     const automatischErlaubt =
       datei === 'kamera.ts' ||
-      (argumente[0] != null && textVon(quelle, argumente[0]).includes('startAnsicht'));
+      (argumente[0] != null && textOf(quelle, argumente[0]).includes('startAnsicht'));
     funde.push({
       datei,
-      zeile: zeileVon(quelle, n.start),
+      zeile: lineOf(quelle, n.start),
       methode: eigenschaft.name as string,
       // Was hier stehen muss — die gefundene Marke wird daran gemessen.
       marke: marke === (automatischErlaubt ? 'AUTOMATISCH' : 'BEDIENUNG') ? 'passt' : marke,

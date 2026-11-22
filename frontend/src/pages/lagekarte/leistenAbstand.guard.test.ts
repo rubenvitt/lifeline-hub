@@ -2,14 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  type AstKnoten,
-  parseQuelltext,
-  statischerText,
-  textVon,
-  walk,
-  zeileVon,
-} from '../../lib/quelltextAst';
+import { type AstNode, parseSource, staticText, textOf, walk, lineOf } from '../../lib/sourceAst';
 
 /**
  * Die Abstände der rechten Kartenleiste und der Bausteine über der Karte kommen aus der
@@ -77,46 +70,46 @@ const ZAHL_STUECK = /(^|[^\w$.])(?!0(?![.\d]))\d+(\.\d+)?/;
 
 /** Ein fester Wert: Zahl, Zeichenkette oder Template mit Zahl, Array daraus — auch hinter
  *  `?:`, `as`, `satisfies` und Klammern. `null`, wenn der Wert nicht fest ist. */
-function festerWert(knoten: AstKnoten | null, quelltext: string): string | null {
+function festerWert(knoten: AstNode | null, quelltext: string): string | null {
   if (knoten == null) return null;
   if (
     knoten.type === 'ParenthesizedExpression' ||
     knoten.type === 'TSAsExpression' ||
     knoten.type === 'TSSatisfiesExpression'
   ) {
-    return festerWert(knoten.expression as AstKnoten, quelltext);
+    return festerWert(knoten.expression as AstNode, quelltext);
   }
   if (knoten.type === 'ConditionalExpression') {
     return (
-      festerWert(knoten.consequent as AstKnoten, quelltext) ??
-      festerWert(knoten.alternate as AstKnoten, quelltext)
+      festerWert(knoten.consequent as AstNode, quelltext) ??
+      festerWert(knoten.alternate as AstNode, quelltext)
     );
   }
   if (knoten.type === 'ArrayExpression') {
-    const teile = (knoten.elements as (AstKnoten | null)[]).map((e) => festerWert(e, quelltext));
+    const teile = (knoten.elements as (AstNode | null)[]).map((e) => festerWert(e, quelltext));
     return teile.some((t) => t != null) ? `[${teile.map((t) => t ?? '…').join(', ')}]` : null;
   }
-  const istZahl = (k: AstKnoten) => k.type === 'Literal' && typeof k.value === 'number';
-  if (istZahl(knoten)) {
-    const roh = textVon(quelltext, knoten);
+  const isNumber = (k: AstNode) => k.type === 'Literal' && typeof k.value === 'number';
+  if (isNumber(knoten)) {
+    const roh = textOf(quelltext, knoten);
     return roh === '0' ? null : roh;
   }
   if (
     knoten.type === 'UnaryExpression' &&
     knoten.operator === '-' &&
-    istZahl(knoten.argument as AstKnoten)
+    isNumber(knoten.argument as AstNode)
   ) {
-    return `-${textVon(quelltext, knoten.argument as AstKnoten)}`;
+    return `-${textOf(quelltext, knoten.argument as AstNode)}`;
   }
-  const statisch = statischerText(knoten);
+  const statisch = staticText(knoten);
   if (statisch !== undefined) {
     return ZAHL_STUECK.test(statisch) ? `'${statisch}'` : null;
   }
   if (knoten.type === 'TemplateLiteral') {
-    const stuecke = (knoten.quasis as AstKnoten[]).map(
+    const stuecke = (knoten.quasis as AstNode[]).map(
       (t) => (t.value as { cooked: string | null; raw: string }).cooked ?? '',
     );
-    return stuecke.some((t) => ZAHL_STUECK.test(t)) ? textVon(quelltext, knoten) : null;
+    return stuecke.some((t) => ZAHL_STUECK.test(t)) ? textOf(quelltext, knoten) : null;
   }
   return null;
 }
@@ -128,11 +121,11 @@ interface Fund {
 }
 
 /** Alle festen Abstände einer Quelle, in Baumreihenfolge. */
-export function festeAbstaende(datei: string, quelle: string): Fund[] {
+function festeAbstaende(datei: string, quelle: string): Fund[] {
   const funde: Fund[] = [];
-  const zeile = (k: AstKnoten) => zeileVon(quelle, k.start);
+  const zeile = (k: AstNode) => lineOf(quelle, k.start);
 
-  walk(parseQuelltext(datei, quelle), (k, eltern) => {
+  walk(parseSource(datei, quelle), (k, eltern) => {
     if (
       k.type === 'Property' &&
       eltern?.type === 'ObjectExpression' &&
@@ -140,7 +133,7 @@ export function festeAbstaende(datei: string, quelle: string): Fund[] {
       !k.method &&
       !k.computed
     ) {
-      const schluessel = k.key as AstKnoten;
+      const schluessel = k.key as AstNode;
       const name =
         schluessel.type === 'Identifier'
           ? (schluessel.name as string)
@@ -151,19 +144,18 @@ export function festeAbstaende(datei: string, quelle: string): Fund[] {
         // `{ gap }`: der Wert steht woanders, der Scan kann ihn nicht beurteilen — also Befund.
         if (name && ABSTAND.test(name)) funde.push({ datei, zeile: zeile(k), was: `{ ${name} }` });
       } else {
-        const wert = name && ABSTAND.test(name) ? festerWert(k.value as AstKnoten, quelle) : null;
+        const wert = name && ABSTAND.test(name) ? festerWert(k.value as AstNode, quelle) : null;
         if (name && wert) funde.push({ datei, zeile: zeile(k), was: `${name}: ${wert}` });
       }
     }
     if (k.type === 'JSXOpeningElement') {
-      const tag = textVon(quelle, k.name as AstKnoten);
+      const tag = textOf(quelle, k.name as AstNode);
       const prop = JSX_ABSTAND[tag];
-      for (const attr of prop ? (k.attributes as AstKnoten[]) : []) {
-        if (attr.type !== 'JSXAttribute' || textVon(quelle, attr.name as AstKnoten) !== prop)
-          continue;
-        const init = attr.value as AstKnoten | null;
+      for (const attr of prop ? (k.attributes as AstNode[]) : []) {
+        if (attr.type !== 'JSXAttribute' || textOf(quelle, attr.name as AstNode) !== prop) continue;
+        const init = attr.value as AstNode | null;
         const ausdruck =
-          init?.type === 'JSXExpressionContainer' ? (init.expression as AstKnoten) : null;
+          init?.type === 'JSXExpressionContainer' ? (init.expression as AstNode) : null;
         if (ausdruck && ausdruck.type !== 'JSXEmptyExpression') {
           const wert = festerWert(ausdruck, quelle);
           if (wert) funde.push({ datei, zeile: zeile(attr), was: `<${tag} ${prop}={${wert}}>` });

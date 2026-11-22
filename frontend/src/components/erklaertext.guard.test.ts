@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sichtbareTexte } from '../lib/quelltextAst';
+import { visibleTexts } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -89,7 +89,7 @@ const AUSNAHMEN: ReadonlySet<string> = new Set(['hilfe/rundgang/rundgangTexte.ts
 /** Treffer einer Quelle als „Zeile: Mustername“. */
 function erklaerTreffer(quelle: string, dateiname = 'x.tsx'): string[] {
   const treffer: string[] = [];
-  for (const { text, zeile } of sichtbareTexte(dateiname, quelle)) {
+  for (const { text, line: zeile } of visibleTexts(dateiname, quelle)) {
     // JSX-Text bricht Zeilen um; ein Muster soll über den Umbruch hinweg treffen.
     const flach = text.replace(/\s+/g, ' ');
     for (const { name, muster } of MUSTER)
