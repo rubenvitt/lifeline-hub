@@ -581,6 +581,8 @@ pub async fn handle_abgleich(
             hinweise: Vec::new(),
             hinweis_quittungen,
             akten,
+            mitarbeit_nachtraege: Vec::new(),
+            mitarbeit_quittungen: Vec::new(),
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -674,6 +676,8 @@ pub async fn abgleich_einmal(
                 hinweise,
                 hinweis_quittungen: Vec::new(),
                 akten,
+                mitarbeit_nachtraege: Vec::new(),
+                mitarbeit_quittungen: Vec::new(),
             })
         })
         .map_err(fehler)?;

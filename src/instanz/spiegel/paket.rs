@@ -102,6 +102,13 @@ pub struct SpiegelPaket {
     /// Feld.
     #[serde(default)]
     pub akten: Vec<String>,
+    /// Mitgliedschaften, die ich gegen einen älteren Führer als `mitarbeit` festgehalten habe und
+    /// die der Führer nachtragen soll (LLH-2007).
+    #[serde(default)]
+    pub mitarbeit_nachtraege: Vec<super::nachtrag::MitarbeitNachtrag>,
+    /// Kennungen der Nachträge des Gegenübers, die ich verarbeitet habe.
+    #[serde(default)]
+    pub mitarbeit_quittungen: Vec<i64>,
 }
 
 /// Wie ein Einsatz beim Führer endet (D3).
@@ -380,6 +387,24 @@ impl SpiegelPaket {
                 "Kennung einer Akte über {KENNUNG_BYTES_MAX} Byte oder nicht druckbares ASCII"
             ));
         }
+        let nachtraege = super::nachtrag::NACHTRAEGE_MAX;
+        if self.mitarbeit_nachtraege.len() > nachtraege
+            || self.mitarbeit_quittungen.len() > nachtraege
+        {
+            return Err(format!(
+                "mehr als {nachtraege} Mitarbeit-Nachträge oder Quittungen"
+            ));
+        }
+        let schluessel_max = super::nachtrag::SCHLUESSEL_BYTES_MAX;
+        if self.mitarbeit_nachtraege.iter().any(|n| {
+            !is_kennung_nennbar(&n.kennung)
+                || n.schluessel.len() > schluessel_max
+                || n.gegen.as_ref().is_some_and(|g| g.len() > schluessel_max)
+        }) {
+            return Err(
+                "Mitarbeit-Nachtrag mit ungültiger Kennung oder zu langem Schlüssel".into(),
+            );
+        }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
         }
@@ -416,6 +441,10 @@ mod tests {
             p.akten.is_empty(),
             "ein älteres Gegenüber nennt keine Akten"
         );
+        assert!(
+            p.mitarbeit_nachtraege.is_empty() && p.mitarbeit_quittungen.is_empty(),
+            "ein älteres Gegenüber nennt keine Mitarbeit-Nachträge"
+        );
         let l: Lebensende = serde_json::from_str(r#"{"kennung":"a/1","art":"geloescht"}"#).unwrap();
         assert_eq!((l.stand, l.kategorien.len()), (0, 0));
         let l: EinsatzLieferung = serde_json::from_str(
@@ -423,6 +452,43 @@ mod tests {
         )
         .unwrap();
         assert!(l.zeilen.is_empty() && l.konten.is_empty());
+    }
+
+    fn nachtrag(n: i64) -> super::super::nachtrag::MitarbeitNachtrag {
+        super::super::nachtrag::MitarbeitNachtrag {
+            id: n,
+            kennung: "a/1".into(),
+            schluessel: "[1,2]".into(),
+            gegen: Some("[3,4]".into()),
+        }
+    }
+
+    #[test]
+    fn zu_viele_oder_zu_lange_nachtraege_lehnt_check_ab() {
+        use super::super::nachtrag::{NACHTRAEGE_MAX, SCHLUESSEL_BYTES_MAX};
+        let max = NACHTRAEGE_MAX as i64;
+        let mut p = SpiegelPaket {
+            mitarbeit_nachtraege: (0..max).map(nachtrag).collect(),
+            mitarbeit_quittungen: (0..max).collect(),
+            ..Default::default()
+        };
+        assert!(p.check().is_ok(), "an der Grenze");
+        p.mitarbeit_nachtraege.push(nachtrag(max));
+        assert!(p.check().is_err(), "ein Nachtrag zu viel");
+        p.mitarbeit_nachtraege.pop();
+        p.mitarbeit_quittungen.push(max);
+        assert!(p.check().is_err(), "eine Quittung zu viel");
+        p.mitarbeit_quittungen.pop();
+        p.mitarbeit_nachtraege[0].kennung = "a/\"1".into();
+        assert!(p.check().is_err(), "Kennung nicht nennbar");
+        p.mitarbeit_nachtraege[0] = nachtrag(0);
+        p.mitarbeit_nachtraege[0].schluessel = "x".repeat(SCHLUESSEL_BYTES_MAX + 1);
+        assert!(p.check().is_err(), "Schlüssel zu lang");
+        p.mitarbeit_nachtraege[0] = nachtrag(0);
+        p.mitarbeit_nachtraege[0].gegen = Some("x".repeat(SCHLUESSEL_BYTES_MAX + 1));
+        assert!(p.check().is_err(), "Gegenstück zu lang");
+        p.mitarbeit_nachtraege[0].gegen = Some("x".repeat(SCHLUESSEL_BYTES_MAX));
+        assert!(p.check().is_ok(), "Gegenstück an der Grenze");
     }
 
     #[test]
