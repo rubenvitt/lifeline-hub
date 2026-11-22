@@ -1,17 +1,20 @@
-# iOS-App zu TestFlight (LLH-1978, Spec `ios-auslieferung`, „TestFlight erhält Beta- und stabile
-# Stände“): den Tag auschecken, das Projekt erzeugen, archivieren, automatisch signieren und hochladen.
-# Ablauf in `scripts/ios/testflight.sh` (auf einem Mac genauso), XcodeGen gepinnt in
-# `scripts/ios/xcodegen-installieren.sh`. Betrieb, Secrets und Übergaben: docs/betrieb/ios-app.md.
+# iOS-App zu TestFlight (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0080): den Tag auschecken, das
+# Projekt erzeugen, archivieren, automatisch signieren und hochladen (Job `testflight`, Ablauf in
+# `scripts/ios/testflight.sh`, auf einem Mac genauso; XcodeGen gepinnt in
+# `scripts/ios/xcodegen-installieren.sh`). Danach hängt der Job `verteilen` den Build an die Gruppen
+# seines Kanals (`scripts/ios/testflight-verteilen.mjs`): Alpha nur „Intern“, Beta und stabil
+# „Intern“ und „Extern“. Betrieb, Secrets und Übergaben: docs/betrieb/ios-app.md.
 #
 # Zwei Auslöser, kein PR und kein Push (ADR-0048; dieselbe Form wie deployment.yml):
 #
-# - `workflow_call` aus artefakte.yml (Job `ios`), NACH der Freigabe und nur für Tags der Kanäle
-#   `beta` und `main`. Der Job steht in keinem `needs` von `freigeben`: ein roter Upload oder eine
-#   hängende Verarbeitung bei Apple hält weder Release noch Deployment auf, es fehlt nur der
-#   TestFlight-Build dieses Tags (wie `desktop-alpha`).
-# - `workflow_dispatch` als Handstart, etwa für einen Beta-Tag nach einer Störung bei Apple.
+# - `workflow_call` aus artefakte.yml (Job `ios`), NACH der Freigabe jedes Tags der Kanäle
+#   `alpha`, `beta` und `main`. Der Job steht in keinem `needs` von `freigeben`: ein roter Upload
+#   oder eine hängende Verarbeitung bei Apple hält weder Release noch Deployment auf, es fehlt nur
+#   der TestFlight-Build dieses Tags (wie `desktop-alpha`).
+# - `workflow_dispatch` als Handstart, etwa nach einer Störung bei Apple. Ein Tag von vor LLH-1988
+#   trägt noch das alte Skript, das Alpha abweist.
 #
-# Alpha-Tags lädt das Skript nie hoch, auch nicht per Handstart. Signiert wird über den
+# Andere Vorabkanäle (`-rc.1`) weist das Skript ab. Signiert wird über den
 # App-Store-Connect-API-Schlüssel (APP_STORE_CONNECT_*); auf dem Runner liegt kein Zertifikat.
 # Runner und Xcode wie ios-pruefung.yml: Xcode 16.4 auf macos-15.
 #
@@ -22,13 +25,13 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Freigegebener Release-Tag der Kanäle beta oder main (vorbereiten in artefakte.yml)'
+        description: 'Freigegebener Release-Tag der Kanäle alpha, beta oder main (vorbereiten in artefakte.yml)'
         required: true
         type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release-Tag, dessen App zu TestFlight soll, z. B. v1.0.0-beta.3 oder v1.0.0 (nie Alpha)'
+        description: 'Release-Tag, dessen App zu TestFlight soll, z. B. v1.0.0-alpha.196, v1.0.0-beta.3 oder v1.0.0'
         required: true
         type: string
 
@@ -40,8 +43,10 @@ jobs:
   testflight:
     name: TestFlight
     runs-on: macos-15
-    # Archiv plus Upload; die Verarbeitung bei Apple danach wartet der Lauf nicht ab.
+    # Archiv plus Upload; auf die Verarbeitung bei Apple wartet erst `verteilen` (auf Ubuntu).
     timeout-minutes: 60
+    outputs:
+      build: ${{ steps.hochladen.outputs.build }}
     # Je Tag ein Upload zur Zeit; ein zweiter wartet (zwei Builds derselben Minute trügen dieselbe
     # Build-Nummer, scripts/ios/version.sh).
     concurrency:
@@ -76,6 +81,7 @@ jobs:
       - name: XcodeGen (gepinnt)
         run: ./scripts/ios/xcodegen-installieren.sh
       - name: Archivieren, signieren, hochladen
+        id: hochladen
         env:
           TAG: ${{ inputs.tag }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -95,3 +101,53 @@ jobs:
             ${{ runner.temp }}/testflight/ExportOptions.plist
           if-no-files-found: ignore
           retention-days: 7
+
+  # An die Gruppen des Kanals (LLH-1988, ADR-0080). Wartet auf Apples Verarbeitung (oft 5–15
+  # Minuten), deshalb auf Ubuntu statt auf dem teuren macOS-Runner. Rot heißt: der Build liegt in
+  # TestFlight, ist aber nicht (vollständig) verteilt; nachholen per Handstart oder in App Store
+  # Connect. Hält wie der Upload nichts auf.
+  verteilen:
+    name: An TestFlight-Gruppen verteilen
+    needs: testflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      # Den Tag hat der Job `testflight` schon gegen das Muster geprüft.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+        with:
+          version: 2026.9.1
+          cache: true
+      # Die Release-Notizen werden „Was testen“. Fehlt das Release (Handstart eines Tags ohne
+      # Release), bleibt nur die Versionszeile.
+      - name: Release-Notizen holen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body \
+            > "$RUNNER_TEMP/notizen.md" || : > "$RUNNER_TEMP/notizen.md"
+      - name: Schlüssel ablegen
+        env:
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          geheim="$(mktemp -d)"
+          chmod 700 "$geheim"
+          ( umask 077; printf '%s\n' "$APP_STORE_CONNECT_KEY_P8" > "$geheim/AuthKey.p8" )
+          echo "ASC_KEY_PATH=$geheim/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Verteilen
+        env:
+          TAG: ${{ inputs.tag }}
+          BUILD_NUMMER: ${{ needs.testflight.outputs.build }}
+          NOTIZEN_DATEI: ${{ runner.temp }}/notizen.md
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: mise exec -- node scripts/ios/testflight-verteilen.mjs
+      - name: Schlüssel löschen
+        if: ${{ always() }}
+        run: '[ -z "${ASC_KEY_PATH:-}" ] || rm -rf "$(dirname "$ASC_KEY_PATH")"'

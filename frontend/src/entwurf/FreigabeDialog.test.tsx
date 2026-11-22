@@ -96,4 +96,18 @@ describe('FreigabeDialog (LFH-535)', () => {
     await userEvent.keyboard('{Escape}');
     expect(onAbbrechen).toHaveBeenCalled();
   });
+
+  /**
+   * LLH-1885 (`frontend/AGENTS.md`, LFH-1077): Solange gespeichert oder freigegeben wird, gibt es
+   * keinen Ausgang — weder Knopf noch Kreuz noch Escape. Die Gegenaussage (ohne Lauf bedienbar)
+   * tragen die beiden Tests darüber.
+   */
+  it('sperrt Abbrechen, Kreuz und Escape, solange der Lauf geht (LLH-1885)', async () => {
+    const { onAbbrechen } = renderDialog({ laeuft: true });
+    const dialog = await screen.findByRole('dialog', { name: 'Befehl freigeben?' });
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(within(dialog).queryByRole('button', { name: /close/i })).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
 });

@@ -2,6 +2,7 @@ import { QueryClientContext, useQuery, useQueryClient } from '@tanstack/react-qu
 import { useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 import { ANTRAG_EREIGNIS } from '../../api/antragEreignis';
 import { einsatzKeys } from '../../api/queryKeys';
+import { subscribeQueryCache } from '../../lib/subscribeQueryCache';
 import { loadAntraege } from '../../api/spiegelAntraege';
 import type { SpiegelAntragAnzeige } from '../../api/types';
 
@@ -40,7 +41,7 @@ const KEINE: readonly SpiegelAntragAnzeige[] = [];
 export function useAntraegeAusCache(einsatzId: number): readonly SpiegelAntragAnzeige[] {
   const client = useContext(QueryClientContext);
   const subscribe = useCallback(
-    (notify: () => void) => (client ? client.getQueryCache().subscribe(notify) : () => {}),
+    (notify: () => void) => subscribeQueryCache(client, notify),
     [client],
   );
   const read = useCallback(
@@ -63,7 +64,7 @@ export function useSpiegelAusCache(einsatzId: number | null): {
 } {
   const client = useContext(QueryClientContext);
   const subscribe = useCallback(
-    (notify: () => void) => (client ? client.getQueryCache().subscribe(notify) : () => {}),
+    (notify: () => void) => subscribeQueryCache(client, notify),
     [client],
   );
   const readSpiegel = useCallback(() => {

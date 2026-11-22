@@ -1,6 +1,7 @@
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 import { globalKeys } from '../../api/queryKeys';
+import { subscribeQueryCache } from '../../lib/subscribeQueryCache';
 import { loadAbgelehnteAntraege } from '../../api/spiegelAntraege';
 import type { AbgelehnterAntragAnzeige } from '../../api/types';
 
@@ -41,7 +42,7 @@ export function useAbgelehnteAntraegeAusCache(
   const client = useContext(QueryClientContext);
   const id = benutzerId ?? null;
   const subscribe = useCallback(
-    (notify: () => void) => (client ? client.getQueryCache().subscribe(notify) : () => {}),
+    (notify: () => void) => subscribeQueryCache(client, notify),
     [client],
   );
   const read = useCallback(
