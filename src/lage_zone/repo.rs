@@ -253,16 +253,19 @@ pub async fn aktualisiere(
     benutzer_id: i64,
     daten: ZonePatch<'_>,
 ) -> Result<LageZoneAnzeige, AppError> {
-    let vorher = laden(pool, einsatz_id, id).await?;
-    let neuer_typ = daten.typ.unwrap_or(vorher.typ.as_str());
-    let alt_gebiet = vorher.gefahrengebiet_id;
-
     // Gruppen-INSERT (Split/Neuanlage) und UPDATE laufen atomar, damit nie eine Gruppe ohne Zone
     // zurückbleibt.
     // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): der Zweig „Bezirk setzen“ liest erst
     // (`bezirk_lebt_tx`) und schreibt dann; unter deferred `BEGIN` scheiterte das Hochstufen bei
     // einem fremden Schreiber sofort mit BUSY (503).
-    let ziel_gebiet = crate::write_retry!(pool, |conn| {
+    let (alt_gebiet, ziel_gebiet) = crate::write_retry!(pool, |conn| {
+        // Bestand aus der Zeile unter der Schreibsperre, nicht aus einem Stand vor der Transaktion
+        // (LLH-1882): ein paralleler Schreiber kann Typ oder Gruppe inzwischen geändert und die
+        // alte Gruppe schon aufgeräumt haben.
+        let vorher = laden_tx(&mut *conn, einsatz_id, id).await?;
+        let neuer_typ = daten.typ.unwrap_or(vorher.typ.as_str());
+        let alt_gebiet = vorher.gefahrengebiet_id;
+
         // Gefahrengebiet-Zonen tragen IMMER eine Gruppe: `Some(None)` heißt nicht „NULL“, sondern „in
         // eine neue eigene Gruppe abspalten“.
         let ziel_gebiet: Option<i64> = if neuer_typ != "gefahrengebiet" {
@@ -295,9 +298,8 @@ pub async fn aktualisiere(
         };
 
         // Bezirks-Zuordnung: ein anderer Typ trägt nie einen Bezirk; sonst gewinnt der Patch; sonst
-        // bleibt der Bestand — und zwar aus der ZEILE (CASE im UPDATE), nicht aus dem vorab gelesenen
-        // `vorher`, weil ein paralleler Storno sie schon gelöst haben kann. Beim Setzen zusätzlich die
-        // Wache in derselben Transaktion.
+        // bleibt der Bestand der ZEILE (CASE im UPDATE), den ein paralleler Storno schon gelöst haben
+        // kann. Beim Setzen zusätzlich die Wache in derselben Transaktion.
         let bezirk_weg = neuer_typ != "evakuierungsbezirk";
         if !bezirk_weg {
             if let Some(Some(b)) = daten.evakuierungsbezirk_id {
@@ -360,7 +362,7 @@ pub async fn aktualisiere(
         if betroffen == 0 {
             return Err(AppError::NotFound);
         }
-        Ok(ziel_gebiet)
+        Ok((alt_gebiet, ziel_gebiet))
     })?;
 
     // Verlassene Gruppe aufräumen, falls sie jetzt leer ist (die Matrix kaskadiert mit).
@@ -836,6 +838,116 @@ mod tests {
         .unwrap();
         halter.await.unwrap();
         assert_eq!(n.evakuierungsbezirk_id, Some(b));
+    }
+
+    // ── Gefahrengebiet-Gruppe: Bestand aus der Zeile in der Transaktion (LLH-1882) ──
+
+    fn gefahrenflaeche(von: i64) -> ZoneNeu<'static> {
+        ZoneNeu {
+            typ: "gefahrengebiet",
+            geometrie_typ: "Polygon",
+            geometrie: POLY,
+            label: None,
+            farbe: None,
+            notiz: None,
+            ansicht_id: None,
+            evakuierungsbezirk_id: None,
+            kreis: None,
+            erstellt_von: von,
+        }
+    }
+
+    /// Nacheinander: B verschiebt Z nach G2 (G1 wird aufgeräumt), danach ändert A nur das Label.
+    /// Z bleibt in G2.
+    #[tokio::test]
+    async fn label_patch_nach_verschieben_laesst_die_neue_gruppe_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, gefahrenflaeche(von)).await.unwrap();
+        let andere = anlegen(&pool, einsatz, gefahrenflaeche(von)).await.unwrap();
+        let g1 = z.gefahrengebiet_id.unwrap();
+        let g2 = andere.gefahrengebiet_id.unwrap();
+
+        aktualisiere(
+            &pool,
+            einsatz,
+            z.id,
+            von,
+            ZonePatch {
+                gefahrengebiet_id: Some(Some(g2)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let n = aktualisiere(
+            &pool,
+            einsatz,
+            z.id,
+            von,
+            ZonePatch {
+                label: Some(Some("Nordufer")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.gefahrengebiet_id, Some(g2));
+        assert_eq!(n.label.as_deref(), Some("Nordufer"));
+        assert!(crate::gefahr::repo::gebiet_laden(&pool, einsatz, g1)
+            .await
+            .is_err());
+    }
+
+    /// Gleichzeitig: Während A nur das Label ändert, hält B die Schreibsperre, verschiebt Z nach
+    /// G2 und räumt G1 ab. A darf danach weder G1 zurückschreiben (verlorenes Update) noch am
+    /// Fremdschlüssel der gelöschten G1 scheitern.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn label_patch_schreibt_keine_veraltete_gruppe_zurueck() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, gefahrenflaeche(von)).await.unwrap();
+        let andere = anlegen(&pool, einsatz, gefahrenflaeche(von)).await.unwrap();
+        let g1 = z.gefahrengebiet_id.unwrap();
+        let g2 = andere.gefahrengebiet_id.unwrap();
+
+        // B: Schreibsperre halten, verschieben, alte Gruppe aufräumen — noch nicht committen.
+        let mut b = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        sqlx::query("UPDATE lage_zone SET gefahrengebiet_id = ? WHERE id = ?")
+            .bind(g2)
+            .bind(z.id)
+            .execute(&mut *b)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM gefahrengebiet WHERE id = ?")
+            .bind(g1)
+            .execute(&mut *b)
+            .await
+            .unwrap();
+
+        // A: startet, während B die Sperre hält, und wartet auf sie.
+        let a = tokio::spawn({
+            let pool = pool.clone();
+            async move {
+                aktualisiere(
+                    &pool,
+                    einsatz,
+                    z.id,
+                    von,
+                    ZonePatch {
+                        label: Some(Some("Nordufer")),
+                        ..Default::default()
+                    },
+                )
+                .await
+            }
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        b.commit().await.unwrap();
+
+        let n = a.await.unwrap().unwrap();
+        assert_eq!(n.gefahrengebiet_id, Some(g2));
+        assert_eq!(n.label.as_deref(), Some("Nordufer"));
     }
 
     #[tokio::test]
