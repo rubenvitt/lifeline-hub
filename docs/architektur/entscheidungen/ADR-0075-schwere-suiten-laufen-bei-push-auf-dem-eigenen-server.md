@@ -1,10 +1,10 @@
 ---
 id: ADR-0075
 titel: Die schweren Suiten laufen bei Push in Wegwerf-Containern auf dem eigenen Server, PR-Läufe nie
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-21
+ersetzt_durch: ADR-0078
 gilt_fuer:
-  - scripts/runner/**
   - .github/workflows/ci.yml
   - .github/workflows/pr.yml
   - .github/workflows/suiten.yml
