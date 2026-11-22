@@ -2191,83 +2191,90 @@ pub async fn setze_mitgliedschaft(
         crate::geraet::repo::OHNE_GERAETEKONTEN,
         crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
-    // Lesen und Schreiben in einer Schreibtransaktion (LLH-2064, Entwurf D2): Weicht beim
-    // Rollenwechsel die Funktion, liest der UPDATE-Zweig sie, wandelt sie per
-    // `Funktionsangabe::as_freitext` und schreibt im selben Zug. `BEGIN IMMEDIATE` hält ein
-    // paralleles Setzen der Funktion dazwischen heraus.
-    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
-    let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO einsatz_mitgliedschaft \
-            (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
-         SELECT ?1, ?2, ?3, ?4, ?5 WHERE {guard} \
-         ON CONFLICT(einsatz_id, benutzer_id) DO NOTHING"
-    )))
-    .bind(einsatz_id)
-    .bind(benutzer_id)
-    .bind(rolle.as_str())
-    .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
-    .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    if eingefuegt > 0 {
-        tx.commit().await?;
-        return Ok(true);
-    }
-
-    // Eine Rolle außerhalb der Führung trägt keine Funktion (CHECK aus 0363); ohne Angabe im
-    // Body wird die bestehende zur Bezeichnung.
-    let gewichen = if !rolle.gehoert_zur_fuehrung() && fuehrungsstelle.is_none() {
-        let bestand: Option<(Option<String>, Option<String>, bool)> = sqlx::query_as(
-            "SELECT m.fuehrungsfunktion, m.fuehrungsstelle, e.geschwaerzt_at IS NOT NULL \
-             FROM einsatz_mitgliedschaft m JOIN einsatz e ON e.id = m.einsatz_id \
-             WHERE m.einsatz_id = ? AND m.benutzer_id = ?",
-        )
+    // Lesen und Schreiben in einer Schreibtransaktion (LLH-2064, Entwurf D2; ADR-0002 über
+    // `write_retry!`): Weicht beim Rollenwechsel die Funktion, liest der UPDATE-Zweig sie, wandelt
+    // sie per `Funktionsangabe::as_freitext` und schreibt im selben Zug. `BEGIN IMMEDIATE` hält
+    // ein paralleles Setzen der Funktion dazwischen heraus.
+    crate::write_retry!(pool, |conn| {
+        let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO einsatz_mitgliedschaft \
+                (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
+             SELECT ?1, ?2, ?3, ?4, ?5 WHERE {guard} \
+             ON CONFLICT(einsatz_id, benutzer_id) DO NOTHING"
+        )))
         .bind(einsatz_id)
         .bind(benutzer_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-        match bestand {
-            Some((Some(code), text, geschwaerzt)) => {
-                crate::fuehrung::Fuehrungsfunktion::parse(&code).map(|f| {
-                    crate::fuehrung::Funktionsangabe {
-                        funktion: Some(f),
-                        text,
-                    }
-                    .as_freitext(geschwaerzt)
-                })
-            }
-            _ => None,
+        .bind(rolle.as_str())
+        .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
+        .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+        if eingefuegt > 0 {
+            return Ok(true);
         }
-    } else {
-        None
-    };
-    let fuehrungsstelle = fuehrungsstelle.or(gewichen.as_ref());
 
-    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
-        "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = ?3, \
-             fuehrungsstelle = CASE WHEN ?6 THEN ?4 ELSE fuehrungsstelle END, \
-             fuehrungsfunktion = CASE WHEN ?6 THEN ?5 ELSE fuehrungsfunktion END \
-         WHERE einsatz_id = ?1 AND benutzer_id = ?2 AND {guard}"
-    )))
+        // Eine Rolle außerhalb der Führung trägt keine Funktion (CHECK aus 0363); ohne Angabe
+        // im Body wird die bestehende zur Bezeichnung.
+        let gewichen = if !rolle.gehoert_zur_fuehrung() && fuehrungsstelle.is_none() {
+            gewichene_funktion(&mut *conn, einsatz_id, benutzer_id).await?
+        } else {
+            None
+        };
+        let angabe = fuehrungsstelle.or(gewichen.as_ref());
+
+        let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = ?3, \
+                 fuehrungsstelle = CASE WHEN ?6 THEN ?4 ELSE fuehrungsstelle END, \
+                 fuehrungsfunktion = CASE WHEN ?6 THEN ?5 ELSE fuehrungsfunktion END \
+             WHERE einsatz_id = ?1 AND benutzer_id = ?2 AND {guard}"
+        )))
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(rolle.as_str())
+        .bind(angabe.and_then(|a| a.text.as_deref()))
+        .bind(angabe.and_then(|a| a.funktion).map(|f| f.as_str()))
+        .bind(angabe.is_some())
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+
+        if betroffen == 0 {
+            // `NotFound` statt `Forbidden`: aus Sicht dieses Einsatzes gibt es den Benutzer
+            // nicht — die Existenz org-fremder Konten bleibt so unbeobachtbar (konsistent mit
+            // dem bestehenden „Ziel-Benutzer unbekannt"-Pfad in `mitglied_setzen`).
+            return Err(AppError::NotFound);
+        }
+        Ok(false)
+    })
+}
+
+/// Die bestehende Funktion einer Mitgliedschaft als Bezeichnung (LLH-2064, Entwurf D1/D2), oder
+/// `None`, wenn sie keine Funktion trägt.
+async fn gewichene_funktion(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<crate::fuehrung::Funktionsangabe>, AppError> {
+    let bestand: Option<(Option<String>, Option<String>, bool)> = sqlx::query_as(
+        "SELECT m.fuehrungsfunktion, m.fuehrungsstelle, e.geschwaerzt_at IS NOT NULL \
+         FROM einsatz_mitgliedschaft m JOIN einsatz e ON e.id = m.einsatz_id \
+         WHERE m.einsatz_id = ? AND m.benutzer_id = ?",
+    )
     .bind(einsatz_id)
     .bind(benutzer_id)
-    .bind(rolle.as_str())
-    .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
-    .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
-    .bind(fuehrungsstelle.is_some())
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-
-    if betroffen == 0 {
-        // `NotFound` statt `Forbidden`: aus Sicht dieses Einsatzes gibt es den Benutzer
-        // nicht — die Existenz org-fremder Konten bleibt so unbeobachtbar (konsistent mit
-        // dem bestehenden „Ziel-Benutzer unbekannt"-Pfad in `mitglied_setzen`).
-        return Err(AppError::NotFound);
-    }
-    tx.commit().await?;
-    Ok(false)
+    .fetch_optional(conn)
+    .await?;
+    let Some((Some(code), text, geschwaerzt)) = bestand else {
+        return Ok(None);
+    };
+    Ok(crate::fuehrung::Fuehrungsfunktion::parse(&code).map(|f| {
+        crate::fuehrung::Funktionsangabe {
+            funktion: Some(f),
+            text,
+        }
+        .as_freitext(geschwaerzt)
+    }))
 }
 
 /// Entfernt eine Mitgliedschaft (idempotent).
