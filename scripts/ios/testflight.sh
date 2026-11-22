@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# iOS-App archivieren, signieren und zu TestFlight hochladen (LLH-1978, design.md D9, Spec
-# `ios-auslieferung`, „TestFlight erhält Beta- und stabile Stände“). Läuft nur auf macOS mit Xcode;
-# aufgerufen von `.github/workflows/ios.yml`, auf einem Mac genauso.
+# iOS-App archivieren, signieren und zu TestFlight hochladen (LLH-1978, design.md D9; seit LLH-1988
+# jeder Kanal, ADR-0080). Läuft nur auf macOS mit Xcode; aufgerufen von `.github/workflows/ios.yml`,
+# auf einem Mac genauso. An die TestFlight-Gruppen verteilt danach testflight-verteilen.mjs.
 #
-#   scripts/ios/testflight.sh --tag <vX.Y.Z | vX.Y.Z-beta.N> [--ausgabe <verzeichnis>]
+#   scripts/ios/testflight.sh --tag <vX.Y.Z | vX.Y.Z-beta.N | vX.Y.Z-alpha.N> [--ausgabe <verzeichnis>]
 #
 # Umgebung (Secrets des Repositorys, docs/betrieb/ios-app.md):
 #   APP_STORE_CONNECT_KEY_ID      Schlüssel-ID des App-Store-Connect-API-Schlüssels
 #   APP_STORE_CONNECT_ISSUER_ID   Issuer-ID
 #   APP_STORE_CONNECT_KEY_P8      Inhalt der .p8-Datei
 #
-# Ablauf: Tag prüfen (nur die Kanäle `beta` und `main`; Alpha-Tags nie, Spec) → Version schreiben
+# Ablauf: Tag prüfen (die Kanäle `alpha`, `beta` und `main`, sonst kein Vorabkanal) → Version schreiben
 # (scripts/ios/version.sh) und gegen den Tag prüfen → Projekt erzeugen (`xcodegen`, gepinnt über
 # scripts/ios/xcodegen-installieren.sh, muss im PATH stehen) → `xcodebuild archive` → `xcodebuild
 # -exportArchive` mit `destination` `upload`: der Export lädt den Build selbst zu App Store Connect
-# hoch, TestFlight übernimmt ihn nach Apples Verarbeitung.
+# hoch, TestFlight übernimmt ihn nach Apples Verarbeitung. Steht `GITHUB_OUTPUT` in der Umgebung,
+# geht die Build-Nummer als `build=…` dorthin (für den Verteilschritt in ios.yml).
 #
 # Signiert wird automatisch über den API-Schlüssel (`-allowProvisioningUpdates` mit
 # `-authenticationKey*`): Xcode holt Zertifikat und Profil selbst, auf dem Runner liegt kein
@@ -42,10 +43,10 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$TAG" ] || fehler "--tag fehlt."
-# Nur stabile und Beta-Tags (Spec: Alpha-Tags werden nie hochgeladen). Erst gegen das Muster
-# prüfen, dann verwenden: bei einem Handstart ist der Tag freie Eingabe.
-if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
-  fehler "'$TAG' gehört in keinen TestFlight-Kanal: hochgeladen werden nur Tags der Kanäle beta (vX.Y.Z-beta.N) und main (vX.Y.Z), nie Alpha."
+# Nur die drei Release-Kanäle (ADR-0080); ein anderer Vorabkanal wie `-rc.1` gehört in keinen.
+# Erst gegen das Muster prüfen, dann verwenden: bei einem Handstart ist der Tag freie Eingabe.
+if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+  fehler "'$TAG' gehört in keinen TestFlight-Kanal: hochgeladen werden nur Tags der Kanäle alpha (vX.Y.Z-alpha.N), beta (vX.Y.Z-beta.N) und main (vX.Y.Z)."
 fi
 VERSION="${TAG#v}"
 
@@ -69,6 +70,7 @@ done
 ist="$(awk '$1 == "LIFELINE_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
 [ "$ist" = "$VERSION" ] \
   || fehler "Workspace-Version $ist passt nicht zum Tag $TAG (erwartet $VERSION)."
+BUILD_NUMMER="$(awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
 
 xcodegen generate --spec "$WURZEL/ios/project.yml"
 
@@ -132,4 +134,7 @@ xcodebuild -exportArchive \
   -exportOptionsPlist "$OPTIONEN" \
   "${anmeldung[@]}"
 
-echo "Hochgeladen: Lifeline $VERSION. TestFlight zeigt den Build nach Apples Verarbeitung."
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "build=$BUILD_NUMMER" >> "$GITHUB_OUTPUT"
+fi
+echo "Hochgeladen: Lifeline $VERSION (Build $BUILD_NUMMER). TestFlight zeigt den Build nach Apples Verarbeitung."

@@ -5,8 +5,8 @@
 # Vorab-Hüllen über ihren Kanal …/releases/download/desktop-alpha/ bzw. desktop-beta/
 # (LLH-1280, LLH-1545, Job `desktop-kanal`). Bei stabilen Tags entsteht die Hülle vor der
 # Freigabe und hält sie bei rotem Bau auf, bei Vorab-Tags (Alpha, Beta) erst danach, ohne
-# Release oder Deployment aufzuhalten. Die iOS-App (LLH-1978, ios.yml) geht nach der Freigabe zu
-# TestFlight, nur an Tags der Kanäle `beta` und `main` und ebenfalls ohne aufzuhalten (Job `ios`).
+# Release oder Deployment aufzuhalten. Die iOS-App (LLH-1978, ios.yml) geht nach der Freigabe jedes
+# Tags zu TestFlight, verteilt je Kanal (LLH-1988, ADR-0080) und ebenfalls ohne aufzuhalten (Job `ios`).
 #
 # EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
 # und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
@@ -145,7 +145,7 @@ jobs:
         with:
           key: artefakt-${{ matrix.target }}
 
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
@@ -354,9 +354,9 @@ jobs:
     secrets: inherit
 
   # ── iOS-App (LLH-1978, Upload in ios.yml) ────────────────────────────────────────────
-  # Nach der Freigabe zu TestFlight, nur für Tags der Kanäle `beta` und `main` (Spec
-  # `ios-auslieferung`: Alpha-Tags nie). Wie `desktop-alpha` hängt der Job an `freigeben` und
-  # steht in keinem `needs` davor: ein roter Upload oder eine Störung bei Apple hält weder Release
+  # Nach der Freigabe zu TestFlight, für jeden Kanal; ios.yml verteilt Alpha nur an die interne
+  # Gruppe, Beta und stabil auch extern (LLH-1988, ADR-0080). Wie `desktop-alpha` hängt der Job
+  # an `freigeben` und steht in keinem `needs` davor: ein roter Upload oder eine Störung bei Apple hält weder Release
   # noch Deployment auf, es fehlt nur der TestFlight-Build dieses Tags. Nur aus release.yml
   # (`freigeben`); ein Nachbau startet `ios.yml` per Hand.
   ios:
@@ -364,9 +364,7 @@ jobs:
     needs: [vorbereiten, freigeben]
     if: >-
       ${{ !cancelled() && inputs.freigeben
-      && needs.freigeben.result == 'success'
-      && (needs.vorbereiten.outputs.vorab != 'true'
-      || contains(needs.vorbereiten.outputs.tag, '-beta.')) }}
+      && needs.freigeben.result == 'success' }}
     uses: ./.github/workflows/ios.yml
     with:
       tag: ${{ needs.vorbereiten.outputs.tag }}
@@ -569,7 +567,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
@@ -718,7 +716,7 @@ jobs:
           ref: ${{ needs.vorbereiten.outputs.tag }}
           persist-credentials: false
 
-      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           version: 2026.9.1
           cache: true
