@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { theme } from 'antd';
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import {
@@ -8,7 +8,9 @@ import {
   type FeatureCollection,
 } from '../../api/fachebenen';
 import {
-  energieAusschnittPasst,
+  copernicusAktivierungen,
+  fitsCopernicusAusschnitt,
+  fitsEnergieAusschnitt,
   energieNennung,
   FACHEBENEN,
   fachebeneKeys,
@@ -91,11 +93,21 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     energieMinZoom === undefined || (kartenZoom !== null && kartenZoom >= energieMinZoom);
   // Ohne Ausschnitt ist „zu groß" keine Aussage; dort entscheidet für den Zoom-Hinweis allein der
   // Zoom.
-  const energieBboxZuGross = viewportBbox !== null && !energieAusschnittPasst(viewportBbox);
+  const energieBboxZuGross = viewportBbox !== null && !fitsEnergieAusschnitt(viewportBbox);
   const energiePasst = energieZoomReicht && viewportBbox !== null && !energieBboxZuGross;
   // In Energie-Antworten gesehene Nennungsteile. Gezeigt wird, was die gesammelten Punkte tragen
   // (`energieNennung`), nicht die Nennung der letzten Antwort.
   const [energieTeile, setEnergieTeile] = useState<string[]>([]);
+
+  // Copernicus (LLH-1200): bbox-abhängig wie Energie, mit denselben Riegeln für Zoom und Spanne.
+  // Der Archiv-Schalter lebt nur im Speicher: Wer die Seite neu lädt, sieht wieder nur Aktuelles,
+  // sonst mischte ein vergessener Schalter die Flut von 2024 in eine neue Lage.
+  const [copernicusArchiv, setCopernicusArchiv] = useState(false);
+  const copernicusMinZoom = FACHEBENEN.copernicus.minZoom;
+  const copernicusZoomReicht =
+    copernicusMinZoom === undefined || (kartenZoom !== null && kartenZoom >= copernicusMinZoom);
+  const copernicusBboxZuGross = viewportBbox !== null && !fitsCopernicusAusschnitt(viewportBbox);
+  const copernicusPasst = copernicusZoomReicht && viewportBbox !== null && !copernicusBboxZuGross;
 
   const kritis = useQuery({
     queryKey: globalKeys.fachebeneKritis(viewportBbox),
@@ -130,8 +142,20 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     gcTime: BBOX_ABFRAGE_GC_MS,
   });
 
+  const copernicus = useQuery({
+    queryKey: globalKeys.fachebeneCopernicus(viewportBbox, copernicusArchiv),
+    queryFn: () => ladeFachebene('copernicus', viewportBbox!, copernicusArchiv),
+    enabled: fachebenenSichtbar.copernicus && copernicusPasst,
+    // Wie KRITIS: die Antwort ersetzt das Bild, beim Pannen bleibt das bisherige stehen.
+    placeholderData: keepPreviousData,
+    gcTime: BBOX_ABFRAGE_GC_MS,
+    // Regulär 10 min, solange der kalte Abruf im Hintergrund läuft der Aufwärmtakt.
+    refetchInterval: (q) =>
+      fachebeneTakt('copernicus', q.state.status === 'error' ? 'offline' : q.state.data?.status),
+  });
+
   // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
-  // `fachebeneKeys()` ohne kritis und energie (nicht Panel-Reihenfolge). `byKey` greift
+  // `fachebeneKeys()` ohne kritis, energie und copernicus (nicht Panel-Reihenfolge). `byKey` greift
   // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
     queries: [
@@ -196,6 +220,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         odl: ergebnisse[4],
         kritis,
         energie,
+        copernicus,
         autobahn: ergebnisse[5],
         luftqualitaet: ergebnisse[6],
       } as const;
@@ -304,8 +329,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   for (const k of fachebeneKeys()) {
     const minZoom = FACHEBENEN[k].minZoom;
     if (minZoom === undefined || !fachebenenSichtbar[k] || kartenZoom === null) continue;
-    zoomZuKlein[k] = kartenZoom < minZoom || (k === 'energie' && energieBboxZuGross);
+    zoomZuKlein[k] =
+      kartenZoom < minZoom ||
+      (k === 'energie' && energieBboxZuGross) ||
+      (k === 'copernicus' && copernicusBboxZuGross);
   }
+
+  // EMSR-Nummern im Ausschnitt mit jüngster Aufnahme, für die Zeile im Ebenenbaum.
+  const copernicusFeatures = copernicus.data?.features;
+  const copernicusListe = useMemo(
+    () => (copernicusFeatures ? copernicusAktivierungen(copernicusFeatures) : []),
+    [copernicusFeatures],
+  );
 
   const onFachebeneToggle = (k: FachebeneQuelle, an: boolean) =>
     setFachebenenSichtbar((s) => ({ ...s, [k]: an }));
@@ -319,6 +354,11 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     fachebenenAbgerufen: kombiniert.fachebenenAbgerufen,
     fachebenenAttribution: kombiniert.fachebenenAttribution,
     zoomZuKlein,
+    copernicus: {
+      archiv: copernicusArchiv,
+      onArchiv: setCopernicusArchiv,
+      aktivierungen: copernicusListe,
+    },
     setViewportBbox,
     setKartenZoom,
   };

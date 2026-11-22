@@ -1,0 +1,72 @@
+{
+ "count": 4,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "code": "EMSR937",
+   "countries": [
+    "Portugal"
+   ],
+   "eventTime": "2026-11-18T00:00:00",
+   "name": "Mass Movement in Manteigas, Portugal",
+   "centroid": "POINT (-7.544756649903161 40.40721481681957)",
+   "activationTime": "2026-11-20T14:51:00",
+   "category": "Mass movement",
+   "lastUpdate": "2026-11-20T19:51:53.304205",
+   "closed": false,
+   "gdacsId": null,
+   "n_aois": 1,
+   "n_products": 0
+  },
+  {
+   "code": "EMSR936",
+   "countries": [
+    "Ecuador"
+   ],
+   "eventTime": "2026-11-12T23:00:00",
+   "name": "Flood in Ecuador",
+   "centroid": "POINT (-79.62462476667793 -2.119817476419881)",
+   "activationTime": "2026-11-16T17:02:00",
+   "category": "Flood",
+   "lastUpdate": "2026-11-19T07:16:57.430227",
+   "closed": false,
+   "gdacsId": "FL1104167",
+   "n_aois": 1,
+   "n_products": 3
+  },
+  {
+   "code": "EMSR920",
+   "countries": [
+    "Germany",
+    "Belgium"
+   ],
+   "eventTime": "2026-08-13T12:55:00",
+   "name": "Wildfire in Huertgen Forest, Germany and Belgium",
+   "centroid": "POINT (6.376188560649222 50.75359532631122)",
+   "activationTime": "2026-08-14T09:37:00",
+   "category": "Wildfire",
+   "lastUpdate": "2026-09-11T09:07:00.292325",
+   "closed": true,
+   "gdacsId": null,
+   "n_aois": 3,
+   "n_products": 11
+  },
+  {
+   "code": "EMSR728",
+   "countries": [
+    "Germany"
+   ],
+   "eventTime": "2024-05-31T12:00:00",
+   "name": "Flood in Germany",
+   "centroid": "POINT (10.890198 48.973487)",
+   "activationTime": "2024-05-30T20:09:00",
+   "category": "Flood",
+   "lastUpdate": "2024-09-04T15:58:13.172773",
+   "closed": true,
+   "gdacsId": "FL1102602",
+   "n_aois": 10,
+   "n_products": 37
+  }
+ ]
+}

@@ -1390,10 +1390,13 @@ export const globalKeys = {
   // Externe Fachebenen. `kritis` und `energie` tragen eine BBox im Key und haben einen eigenen
   // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
   // `string | null`, NICHT `undefined`.
-  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis' | 'energie'>) =>
+  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis' | 'energie' | 'copernicus'>) =>
     [GLOBAL_KEYS.fachebene, quelle] as const,
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
   fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
+  /** Copernicus (LLH-1200): je Ausschnitt und Archiv-Schalter ein eigener Stand. */
+  fachebeneCopernicus: (bbox: string | null, archiv: boolean) =>
+    [GLOBAL_KEYS.fachebene, 'copernicus', bbox, archiv] as const,
 } as const;
 
 /**

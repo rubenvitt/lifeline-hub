@@ -574,7 +574,8 @@ export type FachebeneTon =
   | 'odl'
   | 'autobahn'
   | 'kritis'
-  | 'energie';
+  | 'energie'
+  | 'copernicus';
 
 export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   nina: '#cf1322',
@@ -588,6 +589,9 @@ export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   kritis: '#531dab',
   // Gelb liegt nah am DWD-Gold, ist aber unterscheidbar und war die letzte freie Tonlücke (LFH-81).
   energie: '#d4b106',
+  // Braun (LLH-1200): die Satellitenauswertung färbt je Klasse, der Ton ist nur Rückfall und
+  // Panel-Quadrat. Weit genug von DWD-Gold und Energie-Gelb (ΔE ≥ 31).
+  copernicus: '#873800',
 };
 
 export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
@@ -600,6 +604,7 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
   autobahn: '#f759ab',
   kritis: '#9254de',
   energie: '#fadb14',
+  copernicus: '#c48a5a',
 };
 
 /**

@@ -49,7 +49,9 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
   if (ZONEN_EBENEN.has(layerId)) return 'zone';
   if (layerId === ABSCHNITT_KLICK_LAYER) return 'abschnitt';
   // Namensschema aus `fachebenenLayer.ts` (`fachebeneClickLayerIds`).
-  if (/^fachebene-.+-(circle|buendel)$/.test(layerId)) return 'fachebene';
+  // Eine Linie (`-linie`, Copernicus LLH-1200) ist wie ein Punkt ein schmales Ziel: wer sie trifft,
+  // meint sie, kein Auswahlmenü.
+  if (/^fachebene-.+-(circle|buendel|linie)$/.test(layerId)) return 'fachebene';
   // Unsichtbare Trefferzone eines Fachebenen-Punkts oder -Bündels (LFH-600). Die Kantenebenen
   // (`-kante`, `-buendel-kante`) sind Kontur und bleiben ohne Rolle.
   if (/^fachebene-.+-treffer$/.test(layerId)) return 'fachebeneTreffer';

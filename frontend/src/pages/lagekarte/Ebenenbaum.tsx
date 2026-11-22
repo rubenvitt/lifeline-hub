@@ -15,6 +15,7 @@ import { fachebeneFarbe } from '../../theme/statusFarben';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
+import CopernicusZusatz from './CopernicusZusatz';
 import FachebeneStand from './FachebeneStand';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import Klassenlegende from './Klassenlegende';
@@ -257,6 +258,9 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
         <div style={{ padding: token.paddingSM, paddingInlineStart: token.padding }}>
           <Klassenlegende bezeichnung={def.label} eintraege={def.klassenfarben.legende} />
         </div>
+      )}
+      {sichtbar && quelle === 'copernicus' && props.copernicus && (
+        <CopernicusZusatz status={status} {...props.copernicus} />
       )}
     </div>
   );

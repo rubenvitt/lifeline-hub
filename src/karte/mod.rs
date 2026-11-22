@@ -7,6 +7,7 @@ pub mod adressindex;
 pub mod assets;
 pub mod auto_aktualisierung;
 pub mod cache;
+pub mod copernicus;
 pub mod download;
 pub mod katalog;
 pub mod kritis;

@@ -92,6 +92,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // Dasselbe für `energie`.
     energie: o.energie === true,
     autobahn: o.autobahn === true,
+    // Dasselbe für `copernicus` (LLH-1200). Der Archiv-Schalter reist bewusst nicht mit.
+    copernicus: o.copernicus === true,
   };
 }
 

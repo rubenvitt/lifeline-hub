@@ -50,7 +50,7 @@ flowchart LR
     nominatim["Geocoder<br/>(Nominatim-kompatibel)"]
     brightsky["Bright Sky"]
     pegel["PEGELONLINE"]
-    fach["Fachebenen-Quellen<br/>NINA, DWD, LHP, BfS-ODL,<br/>Autobahn, UBA, MaStR, Overpass"]
+    fach["Fachebenen-Quellen<br/>NINA, DWD, LHP, BfS-ODL,<br/>Autobahn, UBA, MaStR, Overpass,<br/>Copernicus EMS"]
     geofabrik["Geofabrik<br/>(OSM-Extrakt)"]
     push["Push-Dienste<br/>Google, Mozilla, Apple, Microsoft"]
     clamd["clamd (ClamAV)"]
@@ -111,7 +111,7 @@ diese nur unter `/api/v1/`.
 | Geocoding und Ortssuche | Server → Geocoder | HTTPS, Nominatim-API; 1 Anfrage/s, Zeitlimit 1,5 s | `src/geocoding/` (`NOMINATIM_DEFAULT`, URL je Organisation überschreibbar) |
 | Wetter | Server → Bright Sky | HTTPS, `/alerts`, `/weather`, `/current_weather` | `src/wetter/abruf.rs`, `BRIGHTSKY_BASIS_URL` in `src/karte/mod.rs` |
 | Pegel | Server → PEGELONLINE | HTTPS, Stationen, Messreihe `W`, Vorhersage `WV` | `src/pegel/abruf.rs`, `src/pegel/vorhersage.rs`, `PEGELONLINE_BASIS_URL` in `src/karte/mod.rs` |
-| Fachebenen | Server → NINA, DWD, LHP, BfS-ODL, Autobahn, UBA, MaStR, Overpass | HTTPS, JSON/GeoJSON/WFS; normalisiert zu GeoJSON | `src/karte/quellen.rs`; Tabelle der Quellen in [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
+| Fachebenen | Server → NINA, DWD, LHP, BfS-ODL, Autobahn, UBA, MaStR, Overpass, Copernicus EMS | HTTPS, JSON/GeoJSON/WFS; normalisiert zu GeoJSON | `src/karte/quellen.rs`, `src/karte/copernicus.rs`; Tabelle der Quellen in [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
 | KRITIS-Extrakt | Server → Geofabrik | HTTPS, `HEAD` und Download einer `.osm.pbf` | `src/karte/kritis/scheduler.rs`; `--kritis-extrakt-url` in `src/config.rs` |
 | Web Push | Server → Push-Dienst | HTTPS, verschlüsselt nach RFC 8291; nur bekannte Dienste (`PUSH_DIENSTE`) | `src/web_push/`; [`docs/betrieb/web-push.md`](../betrieb/web-push.md) |
 | Virenscan der Uploads | Server → clamd | ClamAV `INSTREAM` über TCP oder `unix:`-Socket; ohne Adresse kein Scan | `clamd_verbinden` in `src/anhang/mod.rs`; [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Backend — ClamAV-Upload-Scan“ |

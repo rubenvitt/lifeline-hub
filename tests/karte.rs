@@ -2895,3 +2895,85 @@ async fn loeschen_verwirft_den_reader_der_karte() {
     let (s, d) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
     assert_eq!((s, d), (StatusCode::OK, vec![0xBB]));
 }
+
+/// Copernicus (LLH-1200) ist bbox-pflichtig wie Energie, mit derselben Spannengrenze von 3°.
+#[tokio::test]
+async fn fachebenen_copernicus_ohne_oder_mit_zu_grosser_bbox_ist_400() {
+    let app = app_mit_pool(pool().await);
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/copernicus", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    let fehler = json(res).await["error"].as_str().unwrap().to_string();
+    assert!(fehler.contains("bbox"), "{fehler}");
+    for bbox in ["1,2,3", "9.4,48.7,9.1,48.9", "6.0,47.0,10.0,49.0"] {
+        let uri = format!("/api/karte/fachebenen/copernicus?bbox={bbox}");
+        let res = anfrage(&app, "GET", &uri, None, None).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "bbox {bbox}");
+        let fehler = json(res).await["error"].as_str().unwrap().to_string();
+        assert!(fehler.contains("bbox"), "{bbox}: {fehler}");
+    }
+}
+
+/// Antwort vorher in den Cache (Schlüssel als Literal, netzunabhängig): mit und ohne Archiv
+/// sind es zwei Stände.
+#[tokio::test]
+async fn fachebenen_copernicus_trennt_archiv_im_cache() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = app_mit(pool().await, karten_dir.clone());
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let gebiet = |emsr: &str| {
+        serde_json::json!({ "type": "FeatureCollection", "features": [{
+            "type": "Feature",
+            "geometry": { "type": "Polygon", "coordinates": [[[9.1, 48.7], [9.4, 48.7], [9.4, 48.9], [9.1, 48.7]]] },
+            "properties": { "art": "gebiet", "klasse": "gebiet", "emsr": emsr }
+        }] })
+    };
+    let leer = FachebeneAntwort::ok(
+        "copernicus",
+        "x",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [] }),
+    );
+    let archiv = FachebeneAntwort::ok(
+        "copernicus",
+        "x",
+        Some("2024-06-03 17:16:00".into()),
+        gebiet("EMSR728"),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "copernicus:9.10,48.70,9.40,48.90", &leer).await;
+    lifeline_hub::karte::cache::setze(
+        &cache_pool,
+        "copernicus-archiv:9.10,48.70,9.40,48.90",
+        &archiv,
+    )
+    .await;
+
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/copernicus?bbox=9.1,48.7,9.4,48.9",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(json(res).await["status"], "leer");
+
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/copernicus?bbox=9.1,48.7,9.4,48.9&archiv=1",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["status"], "ok");
+    assert_eq!(
+        v["features"]["features"][0]["properties"]["emsr"],
+        "EMSR728"
+    );
+}

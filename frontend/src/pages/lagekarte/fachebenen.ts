@@ -1,11 +1,13 @@
 import type { GlobalToken } from 'antd';
 import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
 import {
+  copernicusKlasse,
   hochwasserKlasse,
   luftqualitaetIndex,
   odlStufe,
   type StatusDarstellung,
 } from '../../theme/statusFarben';
+import { copernicusDarstellung, copernicusRadius, faerbeCopernicus } from './copernicusStil';
 import { faerbeHochwasser, hochwasserDarstellung, hochwasserRadius } from './hochwasserStil';
 import {
   faerbeLuftqualitaet,
@@ -35,11 +37,27 @@ const ENERGIE_MAX_SPANNE_GRAD = 3;
  * Passt ein Ausschnitt `west,sued,ost,nord` in die Energie-Grenze? Rein und exportiert. Ein
  * nicht lesbarer Ausschnitt gilt als passend — über ihn entscheidet das Backend.
  */
-export function energieAusschnittPasst(bbox: string): boolean {
+export function fitsEnergieAusschnitt(bbox: string): boolean {
+  return fitsAusschnitt(bbox, ENERGIE_MAX_SPANNE_GRAD);
+}
+
+/**
+ * Größte Spanne eines Copernicus-Ausschnitts in Grad je Achse — wie `COPERNICUS_MAX_SPANNE_GRAD`
+ * im Backend (`src/karte/copernicus.rs`, LLH-1200). Ein großes Hochwasser liefert je Gebiet
+ * mehrere MB; ganz Deutschland auf einmal wäre zu viel.
+ */
+const COPERNICUS_MAX_SPANNE_GRAD = 3;
+
+/** Passt ein Ausschnitt in die Copernicus-Grenze? Regeln wie {@link fitsEnergieAusschnitt}. */
+export function fitsCopernicusAusschnitt(bbox: string): boolean {
+  return fitsAusschnitt(bbox, COPERNICUS_MAX_SPANNE_GRAD);
+}
+
+function fitsAusschnitt(bbox: string, maxSpanne: number): boolean {
   const t = bbox.split(',').map(Number);
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
   const [w, s, e, n] = t;
-  return e - w <= ENERGIE_MAX_SPANNE_GRAD && n - s <= ENERGIE_MAX_SPANNE_GRAD;
+  return e - w <= maxSpanne && n - s <= maxSpanne;
 }
 
 /** Eine Zeile der Panel-Legende: Wort und Rolle aus dem Vertrag, Durchmesser wie auf der Karte. */
@@ -140,6 +158,12 @@ export interface FachebeneDef {
    * statt des Ebenenpunkts die Legende.
    */
   klassenfarben?: Klassenfarben;
+  /**
+   * Nur Copernicus (LLH-1200): Die Ebene liefert Flächen, Linien und Punkte gemischt und färbt
+   * jede Fläche nach ihrer `farbe`. `fachebenenLayer.ts` legt dafür zusätzlich einen Linien- und
+   * einen Kreis-Layer an; Features mit `klasse: 'gebiet'` erscheinen nur als gestrichelter Umriss.
+   */
+  gemischteGeometrie?: boolean;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -270,6 +294,29 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // 1,5 × Server-TTL, unter dem Cache-Deckel von 48 h.
     veraltetNachMin: 36 * 60,
   },
+  copernicus: {
+    key: 'copernicus',
+    label: 'Satellitenauswertung (Copernicus EMS)',
+    geometrieTyp: 'polygon',
+    gemischteGeometrie: true,
+    // TTL 1800 s. Bei einer laufenden Aktivierung kommen über Stunden neue Produkte; ein Takt von
+    // einem Drittel der TTL zeigt sie spätestens nach ~50 statt 90 min. Ein Poll ohne neuen
+    // Stand kostet ein 304.
+    pollMs: 600_000,
+    // Ein kalter Abruf holt Liste, Details und bis zu 40 Ebenen und antwortet nach 10 s mit
+    // `offline`, während er im Hintergrund weiterläuft (`COPERNICUS_WARTE`).
+    aufwaermPollMs: 15_000,
+    bboxAbhaengig: true,
+    minZoom: BBOX_MIN_ZOOM,
+    geltung: 'nur wo Copernicus aktiviert wurde, ab 2023',
+    // Alter des Abrufs, nicht des Bildes: vier verpasste Erneuerungen. Das Alter der Aufnahme
+    // zeigt der Inspector.
+    veraltetNachMin: 120,
+    klassenfarben: {
+      legende: legendeAus(klassenVon(copernicusKlasse), copernicusDarstellung, copernicusRadius),
+      faerbe: faerbeCopernicus,
+    },
+  },
 };
 
 /** Alter eines Fachebenen-Stands, wie Panel und Inspector es zeigen (LFH-591). */
@@ -298,6 +345,47 @@ export function fachebeneAlter(
   return { abgerufen, veraltet: alterMin > FACHEBENEN[key].veraltetNachMin };
 }
 
+/** Eine Copernicus-Aktivierung im Ausschnitt, wie die Zeile im Ebenenbaum sie nennt (LLH-1200). */
+export interface CopernicusAktivierung {
+  emsr: string;
+  /** Ein Gebiet der Aktivierung kam ohne alle Ebenen (Quelle lieferte eine nicht). */
+  unvollstaendig: boolean;
+  /** Ein Gebiet wurde an der Obergrenze der Antwort gekürzt: hineinzoomen zeigt mehr. */
+  gekuerzt: boolean;
+  /** Jüngste Aufnahme ihrer gezeigten Gebiete, UTC im Wire-Format; fehlt, wenn die Quelle keine nennt. */
+  aufnahme?: string;
+}
+
+/**
+ * EMSR-Nummern der Antwort, aus den Gebietsumrissen (`klasse: 'gebiet'`), je Aktivierung die
+ * jüngste Aufnahme, die jüngste Aktivierung zuerst. Rein und exportiert.
+ */
+export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivierung[] {
+  const je = new Map<string, CopernicusAktivierung>();
+  for (const f of fc.features) {
+    const p = f.properties;
+    if (p?.klasse !== 'gebiet' || typeof p.emsr !== 'string') continue;
+    const aufnahme = typeof p.aufnahme === 'string' ? p.aufnahme : undefined;
+    const bisher = je.get(p.emsr) ?? {
+      emsr: p.emsr,
+      aufnahme: undefined,
+      unvollstaendig: false,
+      gekuerzt: false,
+    };
+    je.set(p.emsr, {
+      emsr: p.emsr,
+      // Wire-Format `YYYY-MM-DD HH:MM:SS`: Textvergleich ist Zeitvergleich.
+      aufnahme:
+        bisher.aufnahme === undefined || (aufnahme ?? '') > bisher.aufnahme
+          ? aufnahme
+          : bisher.aufnahme,
+      unvollstaendig: bisher.unvollstaendig || p.unvollstaendig === true,
+      gekuerzt: bisher.gekuerzt || p.gekuerzt === true,
+    });
+  }
+  return [...je.values()].sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+}
+
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
   return [
@@ -310,6 +398,7 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'kritis',
     'energie',
     'autobahn',
+    'copernicus',
   ];
 }
 

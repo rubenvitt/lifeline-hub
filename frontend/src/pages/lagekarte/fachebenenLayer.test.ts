@@ -405,7 +405,11 @@ describe('Trefferzone und Kante der Punkt-Fachebenen (LFH-600)', () => {
   });
 
   it('Polygon-Ebenen bekommen weder Trefferzone noch Kante', () => {
-    for (const def of Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'polygon')) {
+    // Ausnahme Copernicus: gemischte Geometrie mit Punkten (eigener Block unten).
+    const reinePolygone = Object.values(FACHEBENEN).filter(
+      (d) => d.geometrieTyp === 'polygon' && !d.gemischteGeometrie,
+    );
+    for (const def of reinePolygone) {
       const m = fakeMap();
       sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
       expect(
@@ -496,5 +500,79 @@ describe('kategorieLabel', () => {
     expect(kategorieLabel('unbekannt')).toBe('unbekannt');
     // Kategorie der Luftqualitätsebene (LFH-79, gesetzt in karte::luftqualitaet).
     expect(kategorieLabel('luftmessstation')).toBe('Luftmessstation');
+  });
+});
+
+describe('gemischte Geometrie (Copernicus, LLH-1200)', () => {
+  const def = FACHEBENEN.copernicus;
+  const anlegen = () => {
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    return m;
+  };
+  const filter = (m: ReturnType<typeof fakeMap>, id: string) => m._specs.get(id)?.filter;
+
+  it('legt Flächen, Gebietsumriss, Linien und Punkte an (idempotent)', () => {
+    const m = anlegen();
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    expect(m._reihenfolge).toEqual([
+      'fachebene-copernicus-fill',
+      'fachebene-copernicus-line',
+      'fachebene-copernicus-gebiet',
+      'fachebene-copernicus-linie',
+      'fachebene-copernicus-treffer',
+      'fachebene-copernicus-kante',
+      'fachebene-copernicus-circle',
+    ]);
+  });
+
+  it('zeichnet das Gebiet nur als Umriss, alle anderen Flächen gefüllt', () => {
+    const m = anlegen();
+    const gebiet = { klasse: 'gebiet', __geometrie: 'Polygon' };
+    const flut = { klasse: 'tiefe_hoch', __geometrie: 'MultiPolygon' };
+    expect(passt(filter(m, 'fachebene-copernicus-fill'), gebiet)).toBe(false);
+    expect(passt(filter(m, 'fachebene-copernicus-fill'), flut)).toBe(true);
+    expect(passt(filter(m, 'fachebene-copernicus-gebiet'), gebiet)).toBe(true);
+    expect(passt(filter(m, 'fachebene-copernicus-gebiet'), flut)).toBe(false);
+    expect(m._specs.get('fachebene-copernicus-gebiet')?.paint?.['line-dasharray']).toEqual([3, 2]);
+  });
+
+  it('trennt Linien und Punkte nach Geometrie', () => {
+    const m = anlegen();
+    const strasse = { klasse: 'beschaedigt', __geometrie: 'LineString' };
+    const haus = { klasse: 'zerstoert', __geometrie: 'Point' };
+    expect(passt(filter(m, 'fachebene-copernicus-linie'), strasse)).toBe(true);
+    expect(passt(filter(m, 'fachebene-copernicus-linie'), haus)).toBe(false);
+    expect(passt(filter(m, 'fachebene-copernicus-circle'), haus)).toBe(true);
+    expect(passt(filter(m, 'fachebene-copernicus-fill'), strasse)).toBe(false);
+  });
+
+  it('färbt je Feature, nie in der Ebenenfarbe', () => {
+    const m = anlegen();
+    const farben = [...m._specs.values()]
+      .filter((l) => !l.id.endsWith('-kante') && !l.id.endsWith('-treffer'))
+      .flatMap((l) =>
+        Object.entries(l.paint ?? {})
+          .filter(([k]) => ['fill-color', 'line-color', 'circle-color'].includes(k))
+          .map(([, v]) => v),
+      );
+    expect(farben.length).toBeGreaterThan(0);
+    for (const f of farben) expect(f).toEqual(['get', 'farbe']);
+  });
+
+  it('klickt Flächen, Linien und Punkte, nicht den Gebietsumriss', () => {
+    expect(fachebeneClickLayerIds(def)).toEqual([
+      'fachebene-copernicus-fill',
+      'fachebene-copernicus-linie',
+      'fachebene-copernicus-circle',
+      'fachebene-copernicus-treffer',
+    ]);
+  });
+
+  it('entfernt alle eigenen Layer', () => {
+    const m = anlegen();
+    entferneFachebeneLayer(m as never, 'copernicus');
+    expect([...m._layers]).toEqual([]);
+    expect(m._sources.size).toBe(0);
   });
 });

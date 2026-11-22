@@ -46,6 +46,7 @@ import type {
   WetterWarnstufe,
 } from '../api/types';
 import type {
+  CopernicusKlasse,
   FachebeneQuelle,
   HochwasserKlasse,
   LuftqualitaetKlasse,
@@ -507,6 +508,30 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
 };
 
 /**
+ * Klasse eines Objekts der Copernicus-Ebene auf der Lagekarte (LLH-1200).
+ *
+ * Beobachtete Fläche und geringe Wassertiefe → `achtung`, ab 0,5 m Tiefe → `alarm`; Schäden
+ * staffeln „möglicherweise“ (`achtung`) gegen „beschädigt“ und „zerstört“ (`alarm`). `neutral`
+ * trägt alles, was keine Aussage über die Lage ist: der Umriss des Auswertungsgebiets, nicht
+ * ausgewertete Flächen und unbekannte Klassen. Zweiter Kanal: Linienbreite bzw. Punktgröße
+ * (`pages/lagekarte/copernicusStil.ts`), im Inspector das Wort.
+ */
+export const copernicusKlasse: Record<CopernicusKlasse, StatusDarstellung> = {
+  gebiet: { rolle: 'neutral', label: 'Auswertungsgebiet' },
+  nicht_ausgewertet: { rolle: 'neutral', label: 'nicht ausgewertet' },
+  beobachtet: { rolle: 'achtung', label: 'betroffene Fläche' },
+  max_ausdehnung: { rolle: 'achtung', label: 'größte Ausdehnung' },
+  tiefe_gering: { rolle: 'achtung', label: 'Wassertiefe unter 0,5 m' },
+  tiefe_mittel: { rolle: 'alarm', label: 'Wassertiefe 0,5 bis 1 m' },
+  tiefe_hoch: { rolle: 'alarm', label: 'Wassertiefe über 1 m' },
+  schaden_moeglich: { rolle: 'achtung', label: 'möglicherweise beschädigt' },
+  beschaedigt: { rolle: 'alarm', label: 'beschädigt' },
+  zerstoert: { rolle: 'alarm', label: 'zerstört' },
+  kein_schaden: { rolle: 'normal', label: 'kein sichtbarer Schaden' },
+  unbekannt: { rolle: 'neutral', label: 'Klasse unbekannt' },
+};
+
+/**
  * Stufe des UBA-Luftqualitätsindex einer Messstation auf der Lagekarte (LFH-79).
  *
  * `sehr_gut`/`gut` → `normal`; `maessig` → `achtung` (das UBA schließt ab „mäßig“ Wirkungen bei
@@ -944,6 +969,7 @@ const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
   autobahn: 'autobahn',
   kritis: 'kritis',
   energie: 'energie',
+  copernicus: 'copernicus',
 };
 
 export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): string {

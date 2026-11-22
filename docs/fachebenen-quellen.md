@@ -56,6 +56,7 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | Luftqualität | 900 s | 300 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
+| Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
 `veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
@@ -112,6 +113,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
 | **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage über einen erweiterten Rand zusammengeführt und auf die `bbox` beschränkt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); kalter Abruf von der Anfrage gelöst, Wartefrist 10 s für beide Teile zusammen; `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
+| **Copernicus EMS Rapid Mapping** (`copernicus`, LLH-1200) | Liste `https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500` · Details `…/dashboard-api/public-activations/?code=EMSRnnn` · Ebenen als GeoJSON unter `https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/…` | WKT (Gebiete) + GeoJSON in CRS84 (Flächen, Linien, Punkte) → einheitliche Features mit `art`, `klasse`, Herkunft und Aufnahmezeit, je Ausschnitt | **Frei mit Quellenangabe** (Copernicus-Datenpolitik der EU). Kein Schlüssel. Die Detail-Schnittstelle ist ein Pfad des Dashboard-Backends ohne Stabilitätszusage; öffentlich erst ab EMSR656 (März 2023). | `© European Union, Copernicus Emergency Management Service` | Antwort, Liste und laufende Aktivierungen 1 800 s, abgeschlossene Aktivierungen und Ebenen-Dateien 24 h; kalter Abruf von der Anfrage gelöst, Wartefrist 10 s (der Client bricht nach 15 s ab); eine unvollständige Antwort geht hinaus, wird aber nicht gespeichert; `stand` = jüngste Aufnahme | ohne Liste oder ohne jede Details leer + ausgegraut; einzelne fehlende Ebene → Gebiet „unvollständig“, in der Ebenenzeile genannt |
 
 ## Hinweise zur Anbindung
 
@@ -137,7 +139,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     Ebene einen **Mindest-Zoom 10** (darunter keine Abfrage, Hinweis „näher heranzoomen")
     und eine **Größengrenze von 3° je Achse** (`karte::quellen::pruefe_energie_bbox`,
     größer → HTTP 400 „bbox zu groß — weiter hineinzoomen"; das Frontend prüft dieselbe
-    Spanne vorab, `energieAusschnittPasst` in `pages/lagekarte/fachebenen.ts`, und zeigt dann
+    Spanne vorab, `fitsEnergieAusschnitt` in `pages/lagekarte/fachebenen.ts`, und zeigt dann
     den Zoom-Hinweis statt eine Anfrage zu schicken). Bis LFH-83 stand eine 1°-Grenze in
     `Bbox::parse` und galt für beide Ebenen; bei Zoom 10 ist ein Grad aber rund 1456 px
     breit, auf einem 1920-px-Schirm lehnte das Backend den Ausschnitt deshalb ab und die
@@ -524,3 +526,32 @@ und Fehlklassifikationen der Quelle werden übernommen (`social_facility=*` ist 
 bewusst unverändert aus der Overpass-Zeit übernommen). Der Geltungshinweis im Panel sagt
 das sichtbar.
 
+## Copernicus EMS (LLH-1200)
+
+Der Copernicus Emergency Management Service wertet auf Anforderung Satellitenbilder aus:
+Abgrenzung (DEL) der Überflutungs- oder Brandfläche mit Wassertiefe, Schadensklassen (GRA) für
+Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je Kartenausschnitt
+(`karte::copernicus`, ADR-0077, Entwurf
+`docs/superpowers/specs/2026-11-21-wqafyn8u-copernicus-ems-fachebene-design.md`).
+
+- **Auswahl:** Aktivierungen mit Produkten, deren Mittelpunkt höchstens 500 km vom Ausschnitt
+  liegt; ohne `archiv=1` nur laufende und solche, die höchstens 30 Tage zuvor geändert wurden. Ein
+  Gebiet zählt, wenn das Rechteck um seinen Umriss den Ausschnitt schneidet. Aktivierungen mit
+  `sensitive: true` bleiben draußen.
+- **Produktwahl:** je Gebiet und Produktart der jüngste gelieferte Stand (`statusCode F`) mit
+  Ebenen, nach Monitoring-Nummer, dann Version. FEP nur, solange es kein DEL gibt. Gezeigt werden
+  beobachtete Fläche, größte Ausdehnung, Wassertiefe, nicht ausgewertete Flächen, Gebäude und
+  Verkehrswege; modellierte Flächen und Referenzdaten nicht.
+- **Umriss:** Jedes Gebiet kommt als Feature `klasse: gebiet` mit. Was außerhalb liegt, hat
+  Copernicus nicht ausgewertet; eine leere Fläche dort heißt nicht „trocken“.
+- **Grenzen:** Ausschnitt höchstens 3° je Achse, Mindest-Zoom 10, höchstens 40 Ebenen-Dateien und
+  6 MiB Features je Antwort (darüber `gekuerzt` am Gebiet, die Ebenenzeile sagt „weiter
+  hineinzoomen“). Fachebenen gehen ungepackt hinaus; 6 MiB kommen auch über eine schmale
+  Funkverbindung vor dem Abbruch des Clients an. Jede Datei liest `http_begrenzt` mit
+  `DECKEL_FACHEBENE`, und nur vom S3-Host der Quelle. WKT wird höchstens drei Ebenen tief
+  gelesen.
+- **Archiv:** Der Schalter „Ältere Aktivierungen“ in der Ebenenzeile gilt nur bis zum Neuladen;
+  er reist weder in gespeicherte Kartenansichten noch in den Browserspeicher.
+- **Nicht angebunden:** Aktivierungen vor März 2023 (die Detail-Schnittstelle verlangt dort eine
+  Anmeldung; die Produkt-ZIPs mit Shapefiles liest Lifeline Hub nicht) und die Rasterbilder
+  (COG). EFAS-Echtzeitdaten gibt es nur für Partner.

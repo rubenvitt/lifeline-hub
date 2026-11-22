@@ -54,8 +54,9 @@ bereiche_von() {
     # (zeichenWerte.guard.test.ts, LFH-836), dazu Fallsammlung und Basis-Richtwerte des
     # Unterkunftsrechners (rechnerFixture.test.ts, richtwerte.ts, LLH-1520), dazu die Fälle der
     # Deckungsregel für Qualifikationen (qualiDeckung.test.ts, LLH-1553), dazu die Frist des
-    # Wiederöffnens (`NACHLAUF_STUNDEN`, schreibrecht.test.ts, LLH-1814).
-    src/karte/quellen.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
+    # Wiederöffnens (`NACHLAUF_STUNDEN`, schreibrecht.test.ts, LLH-1814), dazu TTL und
+    # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200).
+    src/karte/quellen.rs | src/karte/copernicus.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
       | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json \
       | tests/fixtures/quali_deckung_faelle.json | src/einsatz/berechtigung.rs)
       echo "rust frontend e2e" ;;
