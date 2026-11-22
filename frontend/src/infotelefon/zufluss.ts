@@ -55,9 +55,7 @@ export function teileZufluss(
   let zurueckgehalten = 0;
   for (const a of anrufe) {
     const zurueck =
-      !gefroren.ids.has(a.id) &&
-      a.id > gefroren.wassermarke &&
-      !hierErfasst.has(a.id);
+      !gefroren.ids.has(a.id) && a.id > gefroren.wassermarke && !hierErfasst.has(a.id);
     if (zurueck) zurueckgehalten += 1;
     else sichtbar.push(a);
   }
