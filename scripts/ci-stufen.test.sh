@@ -269,11 +269,20 @@ pruefe "artefakte.yml: Job ios ruft ios.yml" enthaelt "$(job "$ART" ios)" "uses:
 pruefe "artefakte.yml: ios erbt die Secrets" enthaelt "$(job "$ART" ios)" "secrets: inherit"
 pruefe "artefakte.yml: ios nach freigeben" enthaelt "$(job "$ART" ios)" "needs: [vorbereiten, freigeben]"
 ios_if="$(job_if "$ART" ios)"
-for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'" \
-  "needs.vorbereiten.outputs.vorab != 'true'" "contains(needs.vorbereiten.outputs.tag, '-beta.')"; do
+for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'"; do
   pruefe "artefakte.yml: ios nur wenn $teil" enthaelt "$ios_if" "$teil"
 done
-pruefe "artefakte.yml: ios nie für Alpha" fehlt "$ios_if" "-alpha."
+# Seit LLH-1988 (ADR-0078) jeder Kanal: welche Gruppe ein Kanal bekommt, entscheidet erst
+# testflight-verteilen.mjs, nicht die Bedingung des Jobs.
+pruefe "artefakte.yml: ios für jeden Kanal" fehlt "$ios_if" "needs.vorbereiten.outputs.vorab"
+pruefe "ios.yml: verteilen nach dem Upload" enthaelt "$(job "$IOSREL" verteilen)" "needs: testflight"
+pruefe "ios.yml: verteilen auf Ubuntu" enthaelt "$(job "$IOSREL" verteilen)" "runs-on: ubuntu-latest"
+pruefe "ios.yml: verteilen fährt testflight-verteilen.mjs" \
+  enthaelt "$(job "$IOSREL" verteilen)" "node scripts/ios/testflight-verteilen.mjs"
+pruefe "ios.yml: verteilen bekommt die Build-Nummer" \
+  enthaelt "$(job "$IOSREL" verteilen)" "needs.testflight.outputs.build"
+pruefe "ios.yml: verteilen löscht den Schlüssel immer" \
+  enthaelt "$(job "$IOSREL" verteilen)" "if: \${{ always() }}"
 pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
 
