@@ -11,7 +11,7 @@ interface Nachricht {
   [feld: string]: unknown;
 }
 
-function brueckeMit() {
+function createBruecke() {
   const nachrichten: Nachricht[] = [];
   const postMessage = vi.fn((text: string) => {
     nachrichten.push(JSON.parse(text) as Nachricht);
@@ -28,7 +28,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('setzt die Kennung vollständig und ohne setAppBadge', () => {
-    starteAndroidHuelle({ bruecke: brueckeMit().bruecke, version: '1.0.0-alpha.42' });
+    starteAndroidHuelle({ bruecke: createBruecke().bruecke, version: '1.0.0-alpha.42' });
     const kennung = window.__LIFELINE_HUELLE__!;
     expect(kennung.platform).toBe('android');
     expect(kennung.version).toBe('1.0.0-alpha.42');
@@ -48,13 +48,13 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('setzt keine Version, wenn die Hülle den Platzhalter nicht ersetzt hat', () => {
-    starteAndroidHuelle({ bruecke: brueckeMit().bruecke, version: null });
+    starteAndroidHuelle({ bruecke: createBruecke().bruecke, version: null });
     expect(window.__LIFELINE_HUELLE__?.platform).toBe('android');
     expect(window.__LIFELINE_HUELLE__?.version).toBeUndefined();
   });
 
   it('„Im Browser anmelden“ fragt die Hülle und wartet auf ihre Antwort', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     let fertig = false;
     const zusage = window.__LIFELINE_HUELLE__!.anmeldungImBrowser!().then(() => {
@@ -69,7 +69,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('`benachrichtigungZeigen` erfüllt oder lehnt ab nach der Antwort und ordnet sie zu', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     const kennung = window.__LIFELINE_HUELLE__!;
     const erste = kennung.benachrichtigungZeigen!('Neuer Auftrag', 'Auftrag #7');
@@ -92,7 +92,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('übergeht Nachrichten, die keine Antwort im Wire-Format sind', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     const zusage = window.__LIFELINE_HUELLE__!.anmeldungImBrowser!();
     const lifeline = (window as unknown as { lifeline: EventTarget }).lifeline;
@@ -115,7 +115,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('meldet Haptik ohne Antwort und nur für die fünf Arten', () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     const haptics = window.__LIFELINE_HUELLE__!.haptics!;
     for (const kind of ARTEN) expect(haptics(kind)).toBeUndefined();
@@ -136,7 +136,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('ersetzt `window.print` durch den Druck der Hülle', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     const konsole = vi.spyOn(console, 'error').mockImplementation(() => {});
     starteAndroidHuelle({ bruecke });
     expect(window.print()).toBeUndefined();
@@ -148,7 +148,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('blob-Download geht als download_blob an die Hülle', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     vi.stubGlobal(
       'fetch',
@@ -172,7 +172,7 @@ describe('Init-Skript der Android-Hülle (LLH-1989)', () => {
   });
 
   it('nennt einen Download ohne Namen „Download“ und lässt andere Anker in Ruhe', async () => {
-    const { bruecke, nachrichten } = brueckeMit();
+    const { bruecke, nachrichten } = createBruecke();
     starteAndroidHuelle({ bruecke });
     vi.stubGlobal(
       'fetch',

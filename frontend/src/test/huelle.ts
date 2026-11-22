@@ -17,8 +17,20 @@ const faehigkeitenSkript = liesSkript('src-tauri/src/faehigkeiten.js');
 const iosSkript = liesSkript('ios/App/Huelle/huelle.js');
 const androidSkript = liesSkript('android/app/src/main/assets/huelle.js');
 
-/** Der Platzhalter, den die iOS-Hülle beim Einspielen durch ihre volle Version ersetzt. */
-export const IOS_VERSION_PLATZHALTER = '__LIFELINE_VERSION__';
+/** Der Platzhalter, den beide Hüllen (iOS und Android) beim Einspielen durch ihre volle Version ersetzen. */
+export const VERSION_PLACEHOLDER = '__LIFELINE_VERSION__';
+
+/**
+ * Ersetzt den Platzhalter wie die Hülle. Fehlt er im Skript (umbenannt), bricht der Test ab, statt
+ * still nichts zu ersetzen und den Fall „ohne Version“ zu prüfen.
+ */
+function replaceVersion(skript: string, pfad: string, version: string | null): string {
+  if (version == null) return skript;
+  if (!skript.includes(VERSION_PLACEHOLDER)) {
+    throw new Error(`${pfad} enthält den Platzhalter ${VERSION_PLACEHOLDER} nicht`);
+  }
+  return skript.split(VERSION_PLACEHOLDER).join(version);
+}
 
 /** Stub der IPC-Brücke, die Tauri vor den Init-Skripten der Hülle einhängt. */
 export interface HuellenIpc {
@@ -89,7 +101,7 @@ export function starteIosHuelle({
       messageHandlers: { lifeline: bruecke },
     };
   }
-  fuehreAus(version == null ? iosSkript : iosSkript.split(IOS_VERSION_PLATZHALTER).join(version));
+  fuehreAus(replaceVersion(iosSkript, 'ios/App/Huelle/huelle.js', version));
 }
 
 /** Antwortet als iOS-Hülle auf die Nachricht mit `id`: `fehler` `null` erfüllt, sonst lehnt ab. */
@@ -129,9 +141,7 @@ export function starteAndroidHuelle({
     androidAntworter.set(objekt, ziel);
     (window as unknown as { lifeline?: unknown }).lifeline = objekt;
   }
-  fuehreAus(
-    version == null ? androidSkript : androidSkript.split(IOS_VERSION_PLATZHALTER).join(version),
-  );
+  fuehreAus(replaceVersion(androidSkript, 'android/app/src/main/assets/huelle.js', version));
 }
 
 /** Antwortet als Android-Hülle auf die Nachricht mit `id`: `fehler` `null` erfüllt, sonst lehnt ab. */
