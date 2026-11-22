@@ -2,7 +2,7 @@ use super::{BerichtigungVerweis, EinheitVerweis, EtbEintragAnzeige, Folgeauftrag
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Eingabedaten für einen neuen ETB-Eintrag. Alle Werte sind bereits
 /// validiert und normalisiert (Zeitformat, Pflichtfelder) — das ist Aufgabe
@@ -570,6 +570,42 @@ async fn berichtigungen_nachladen(
         }
     }
     Ok(())
+}
+
+/// Welche der Einträge `ids` zu einer Meldung in der Lage gehören (LLH-2008): der Eintrag selbst
+/// oder ein Glied seiner Kette `berichtigt_eintrag_id` hängt an einer Meldung desselben Einsatzes,
+/// die lagerelevant oder eine Lagemeldung ist. Die Meldung hängt in beiden Richtungen am Eintrag
+/// (`etb_eintrag.meldung_id`, `meldung.etb_meldung_id`). Eine Abfrage für alle; die IN-Liste ist
+/// durch [`MAX_LIMIT`] begrenzt.
+pub async fn meldung_in_lage(pool: &SqlitePool, ids: &[i64]) -> Result<HashSet<i64>, AppError> {
+    if ids.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "WITH RECURSIVE kette(start, id, einsatz_id) AS ( \
+           SELECT e.id, e.id, e.einsatz_id FROM etb_eintrag e WHERE e.id IN (",
+    );
+    let mut liste = qb.separated(", ");
+    for &id in ids {
+        liste.push_bind(id);
+    }
+    qb.push(
+        ") UNION \
+           SELECT k.start, e.berichtigt_eintrag_id, k.einsatz_id FROM kette k \
+           JOIN etb_eintrag e ON e.id = k.id AND e.einsatz_id = k.einsatz_id \
+           WHERE e.berichtigt_eintrag_id IS NOT NULL \
+         ) \
+         SELECT DISTINCT k.start FROM kette k \
+         JOIN meldung m ON m.einsatz_id = k.einsatz_id \
+          AND (m.lagerelevant = 1 OR m.meldungsart = ",
+    );
+    qb.push_bind(crate::meldung::ART_LAGEMELDUNG);
+    qb.push(
+        ") AND (m.etb_meldung_id = k.id \
+               OR m.id = (SELECT e.meldung_id FROM etb_eintrag e WHERE e.id = k.id))",
+    );
+    let treffer: Vec<i64> = qb.build_query_scalar().fetch_all(pool).await?;
+    Ok(treffer.into_iter().collect())
 }
 
 /// Füllt `anhaenge` (LFH-117) für alle übergebenen Einträge mit EINER Abfrage nach — das

@@ -172,31 +172,21 @@ pub async fn fordere_eigenen_eintrag(
 }
 
 /// Die Lage bleibt der Einsatzleitung (wie beim Korrigieren der Meldung,
-/// `routes::meldung_korrektur::korrigieren`): gehört zum Eintrag eine Meldung, die in der Lage
-/// steht oder eine Lagemeldung ist, berichtigt die Mitarbeit ihn nicht; sonst 403. Die Meldung
-/// hängt in beiden Richtungen am Eintrag (`etb_eintrag.meldung_id`, `meldung.etb_meldung_id`).
+/// `routes::meldung_korrektur::korrigieren`): gehört zum Eintrag oder zu einem Glied seiner
+/// Berichtigungs-Kette eine Meldung, die in der Lage steht oder eine Lagemeldung ist, berichtigt
+/// die Mitarbeit ihn nicht; sonst 403. Welche Meldung zählt, sagt [`repo::meldung_in_lage`]
+/// (LLH-2008), dieselbe Quelle wie das Feld `meldung_in_lage` der Anzeige.
 pub async fn fordere_eintrag_ausserhalb_der_lage(
     pool: &SqlitePool,
-    einsatz_id: i64,
     eintrag_id: i64,
 ) -> Result<(), AppError> {
-    let in_der_lage: Option<i64> = sqlx::query_scalar(
-        "SELECT 1 FROM meldung m \
-         WHERE m.einsatz_id = ? \
-           AND (m.lagerelevant = 1 OR m.meldungsart = ?) \
-           AND (m.etb_meldung_id = ? \
-                OR m.id = (SELECT e.meldung_id FROM etb_eintrag e WHERE e.id = ?))",
-    )
-    .bind(einsatz_id)
-    .bind(crate::meldung::ART_LAGEMELDUNG)
-    .bind(eintrag_id)
-    .bind(eintrag_id)
-    .fetch_optional(pool)
-    .await?;
-    match in_der_lage {
-        Some(_) => Err(AppError::Forbidden),
-        None => Ok(()),
+    if repo::meldung_in_lage(pool, &[eintrag_id])
+        .await?
+        .contains(&eintrag_id)
+    {
+        return Err(AppError::Forbidden);
     }
+    Ok(())
 }
 
 /// Die Mitarbeit hängt nur Dateien an, die sie selbst hochgeladen hat (`hochgeladen_von`) und die

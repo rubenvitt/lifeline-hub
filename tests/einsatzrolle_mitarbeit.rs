@@ -706,6 +706,55 @@ async fn mitarbeit_berichtigt_etb_eintrag_einer_meldung_in_der_lage_nicht() {
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
 }
 
+/// Die Sperre folgt der Kette der Berichtigungen (LLH-2008): auch die Berichtigung einer eigenen
+/// Berichtigung zu einer Meldung in der Lage ist 403, sonst umginge die Kette die Sperre.
+#[tokio::test]
+async fn mitarbeit_berichtigt_berichtigung_einer_meldung_in_der_lage_nicht() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, m) = meldung_senden(&app, einsatz, &mit, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    let mid = m["id"].as_i64().unwrap();
+    let eid: i64 = sqlx::query_scalar("SELECT id FROM etb_eintrag WHERE meldung_id = ?")
+        .bind(mid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, b) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b:?}");
+    let bid = b["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let vorher = etb_anzahl(&pool, einsatz).await;
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": bid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
+}
+
 /// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
 async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
     let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;
