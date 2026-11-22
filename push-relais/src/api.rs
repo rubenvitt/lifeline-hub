@@ -29,6 +29,8 @@ pub struct RelaisState {
     minuten: Arc<Mutex<HashMap<String, (Instant, u32)>>>,
     /// Registrierungen je IP: Beginn des Stundenfensters und Anzahl.
     registrierungen: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
+    /// Gesamtfrist eines `senden`-Aufrufs ([`senden::GESAMTFRIST`]).
+    pub(crate) gesamtfrist: Duration,
 }
 
 impl RelaisState {
@@ -47,7 +49,14 @@ impl RelaisState {
             limit_minute,
             minuten: Arc::default(),
             registrierungen: Arc::default(),
+            gesamtfrist: senden::GESAMTFRIST,
         }
+    }
+
+    /// Andere Gesamtfrist je `senden`-Aufruf (Tests).
+    pub fn mit_gesamtfrist(mut self, frist: Duration) -> Self {
+        self.gesamtfrist = frist;
+        self
     }
 
     /// Zählt `anzahl` Nachrichten des Servers; `false`, wenn das Minutenlimit überschritten

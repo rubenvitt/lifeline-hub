@@ -495,6 +495,34 @@ mod relais_client {
         assert_eq!(pfade(&gesehen), ["/v1/server", "/v1/senden"]);
     }
 
+    /// Review B-I1: das Relais darf für einen Stapel bis zu seiner Gesamtfrist (20 s) brauchen;
+    /// der Server wartet länger und liest die Ergebnisse noch. Vorher gab er nach 10 s auf.
+    #[tokio::test]
+    async fn senden_wartet_laenger_als_das_relais_braucht() {
+        let app = axum::Router::new()
+            .route(
+                "/v1/server",
+                axum::routing::post(|| async {
+                    axum::Json(json!({ "server_id": "s1", "geheimnis": "g1" }))
+                }),
+            )
+            .route(
+                "/v1/senden",
+                axum::routing::post(|| async {
+                    tokio::time::sleep(std::time::Duration::from_secs(11)).await;
+                    axum::Json(json!({ "ergebnisse": ["token_ungueltig"] }))
+                }),
+            );
+        let lauscher = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let adresse = lauscher.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(lauscher, app).await.unwrap() });
+        let pool = crate::db::test_pool().await;
+        let ios = IosPush::einrichten_fuer_test(pool, format!("http://{adresse}").parse().unwrap())
+            .unwrap();
+        let e = ios.senden(&[nachricht()]).await.unwrap();
+        assert_eq!(e, [crate::ios_push::relais::RelaisErgebnis::TokenUngueltig]);
+    }
+
     /// Ein gespeicherter Zugang, den das Relais vor `stunden` Stunden gesperrt hat.
     async fn gesperrt_vor(pool: &sqlx::SqlitePool, stunden: i64) {
         repo::relais_zugang_speichern(

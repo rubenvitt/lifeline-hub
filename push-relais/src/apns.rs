@@ -18,6 +18,9 @@ use std::{
 const TOKEN_GUELTIG_SEKUNDEN: i64 = 50 * 60;
 /// Ablauf der Nachricht bei Apple: 12 Stunden.
 const ABLAUF_SEKUNDEN: i64 = 12 * 3600;
+/// Frist je Anfrage an Apple. Apple antwortet gewöhnlich in Millisekunden; wer länger hängt,
+/// wird `Fehler`, statt den Aufruf aufzuhalten (`senden::GESAMTFRIST` begrenzt den ganzen).
+pub const APNS_FRIST: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -84,8 +87,8 @@ impl ApnsClient {
         let schluessel = PKey::private_key_from_pem(&pem).context("APNs-Schlüssel ist kein PEM")?;
         let bauen = |h2c: bool| -> Result<reqwest::Client> {
             let b = reqwest::Client::builder()
-                .timeout(Duration::from_secs(10))
-                .connect_timeout(Duration::from_secs(5));
+                .timeout(APNS_FRIST)
+                .connect_timeout(APNS_FRIST);
             Ok(if h2c { b.http2_prior_knowledge() } else { b }.build()?)
         };
         Ok(Self {

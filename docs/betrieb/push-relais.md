@@ -81,6 +81,10 @@ docker run -d --name push-relais --restart unless-stopped \
 - Ausgehend braucht das Relais HTTPS (Port 443) zu `api.push.apple.com` und
   `api.sandbox.push.apple.com`.
 - Prüfung: `curl https://push.rubeen.dev/v1/status` liefert `{"version":"…"}`.
+- Ein `senden`-Aufruf stellt bis zu 16 Nachrichten zugleich zu, wartet je Nachricht höchstens 5 s
+  auf Apple und endet spätestens nach 20 s; was bis dahin nicht zugestellt ist, meldet er als
+  `fehler`. Der Lifeline-Server wartet 30 s. Ein Proxy davor darf eine Anfrage also nicht vor 20 s
+  abbrechen.
 
 ## Domain und TLS
 

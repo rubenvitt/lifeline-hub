@@ -5927,6 +5927,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "futures",
  "http-body-util",
  "openssl",
  "rand 0.10.4",

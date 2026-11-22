@@ -10,10 +10,21 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::time::Instant;
 
 const MAX_NACHRICHTEN: usize = 100;
 const MAX_NUTZLAST: usize = 4096;
+/// So viele Anfragen eines Aufrufs laufen zugleich über die HTTP/2-Verbindung zu Apple. Eine
+/// hängende Anfrage hält so die übrigen nicht auf; 100 Nachrichten brauchen sieben Runden.
+const GLEICHZEITIG: usize = 16;
+/// Gesamtfrist eines `senden`-Aufrufs: was bis dahin nicht zugestellt ist, wird `fehler`. Klar
+/// unter der Frist, die der Lifeline-Server dem Aufruf gibt (`RELAIS_SENDEN_FRIST`, 30 s, in
+/// `src/ios_push/mod.rs`), damit er die Ergebnisse noch liest und erloschene Token löscht.
+/// Ohne sie dauerte der schlimmste Fall sieben Runden zu je [`crate::apns::APNS_FRIST`].
+pub const GESAMTFRIST: Duration = Duration::from_secs(20);
 
 #[derive(Deserialize)]
 pub struct SendenAnfrage {
@@ -66,10 +77,24 @@ pub async fn senden(
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
 
-    let mut ergebnisse = Vec::with_capacity(nachrichten.len());
-    for n in &nachrichten {
-        ergebnisse.push(state.apns.senden(n).await);
-    }
+    // Nebenläufig, die Ergebnisse in Eingabe-Reihenfolge (`buffered`). Was nach der Gesamtfrist
+    // noch läuft oder erst beginnen würde, ist `fehler`; was nicht begonnen hat, geht nicht hinaus.
+    let frist = Instant::now() + state.gesamtfrist;
+    let ergebnisse: Vec<Ergebnis> = stream::iter(nachrichten)
+        .map(|n| {
+            let apns = state.apns.clone();
+            async move {
+                if Instant::now() >= frist {
+                    return Ergebnis::Fehler;
+                }
+                tokio::time::timeout_at(frist, apns.senden(&n))
+                    .await
+                    .unwrap_or(Ergebnis::Fehler)
+            }
+        })
+        .buffered(GLEICHZEITIG)
+        .collect()
+        .await;
 
     // Best effort: ein Fehler beim Vermerken des letzten Aufrufs ändert das Ergebnis nicht.
     let _ = sqlx::query(

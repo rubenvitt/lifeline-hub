@@ -50,6 +50,32 @@ async fn doppel(status: u16, antwort: &'static str) -> Doppel {
     Doppel { basis, erfasst }
 }
 
+/// APNs-Ersatz (h2c), der Anfragen an Token aus `haengen` nie beantwortet und alle übrigen mit
+/// 200 zustellt.
+async fn doppel_haengt_bei(haengen: &'static [&'static str]) -> Doppel {
+    let erfasst: Arc<Mutex<Vec<Erfasst>>> = Arc::default();
+    let sammler = erfasst.clone();
+    let app = Router::new().fallback(move |req: Request<Body>| {
+        let sammler = sammler.clone();
+        async move {
+            let pfad = req.uri().path().to_string();
+            if haengen.iter().any(|t| pfad.contains(t)) {
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            }
+            sammler.lock().unwrap().push(Erfasst {
+                pfad,
+                koepfe: req.headers().clone(),
+                rumpf: Value::Null,
+            });
+            (StatusCode::OK, "")
+        }
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let basis = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    Doppel { basis, erfasst }
+}
+
 async fn aufbau(basis: &str, limit: u32) -> (Router, SqlitePool, String) {
     let pool = speicher::oeffnen(":memory:").await.unwrap();
     let zugang = speicher::registrieren(&pool, None, "1.0.0").await.unwrap();
@@ -146,15 +172,23 @@ async fn kollaps_wird_zu_apns_collapse_id() {
     let (app, _, bearer) = aufbau(&d.basis, 600).await;
     let mut mit = nachricht("alarm", "production");
     mit["kollaps"] = json!("abc123");
+    let mut ohne = nachricht("alarm", "production");
+    ohne["token"] = json!("ef56");
     app.oneshot(senden_anfrage(
         Some(&bearer),
-        json!({ "nachrichten": [mit, nachricht("alarm", "production")] }),
+        json!({ "nachrichten": [mit, ohne] }),
     ))
     .await
     .unwrap();
+    // Die Anfragen laufen nebenläufig: zuordnen über das Token im Pfad.
     let e = d.erfasst.lock().unwrap();
-    assert_eq!(e[0].koepfe["apns-collapse-id"], "abc123");
-    assert!(e[1].koepfe.get("apns-collapse-id").is_none());
+    let an = |token: &str| {
+        e.iter()
+            .find(|x| x.pfad == format!("/3/device/{token}"))
+            .unwrap()
+    };
+    assert_eq!(an("ab12cd34").koepfe["apns-collapse-id"], "abc123");
+    assert!(an("ef56").koepfe.get("apns-collapse-id").is_none());
 }
 
 #[tokio::test]
@@ -366,4 +400,80 @@ async fn log_enthaelt_weder_token_noch_nutzlast() {
     assert!(log.contains("senden"), "Log war leer: {log}");
     assert!(!log.contains("deadbeef0123456789"));
     assert!(!log.contains("GEHEIMENUTZLAST"));
+}
+
+fn nachrichten_mit_token(anzahl: usize) -> Vec<Value> {
+    (0..anzahl)
+        .map(|i| {
+            let mut n = nachricht("alarm", "production");
+            n["token"] = json!(format!("ab{i:04}"));
+            n
+        })
+        .collect()
+}
+
+/// Review B-I1: eine hängende Anfrage bei Apple hält die übrigen des Aufrufs nicht auf. Vorher
+/// ging das Relais die Nachrichten der Reihe nach durch und wartete 10 s auf jede; der Server gibt
+/// dem ganzen Aufruf aber nur begrenzt Zeit, und der Rest des Stapels ging verloren.
+#[tokio::test]
+async fn haengende_apns_anfrage_haelt_die_uebrigen_nicht_auf() {
+    let d = doppel_haengt_bei(&["ab0003"]).await;
+    let (app, _, bearer) = aufbau(&d.basis, 600).await;
+    let start = std::time::Instant::now();
+    let a = tokio::time::timeout(
+        std::time::Duration::from_secs(25),
+        app.oneshot(senden_anfrage(
+            Some(&bearer),
+            json!({ "nachrichten": nachrichten_mit_token(20) }),
+        )),
+    )
+    .await
+    .expect("Aufruf endet")
+    .unwrap();
+    let dauer = start.elapsed();
+    assert_eq!(a.status(), StatusCode::OK);
+    let ergebnisse = json_antwort(a).await["ergebnisse"].clone();
+    let erwartet: Vec<&str> = (0..20)
+        .map(|i| if i == 3 { "fehler" } else { "zugestellt" })
+        .collect();
+    assert_eq!(ergebnisse, json!(erwartet), "Reihenfolge wie die Eingabe");
+    assert_eq!(d.erfasst.lock().unwrap().len(), 19);
+    // Frist je Anfrage bei Apple (5 s) plus Spielraum; der Server wartet 30 s.
+    assert!(
+        dauer < std::time::Duration::from_secs(8),
+        "dauerte {dauer:?}"
+    );
+}
+
+/// Review B-I1: hängt Apple ganz, endet der Aufruf mit der Gesamtfrist des Relais, und jede
+/// nicht zugestellte Nachricht ist `fehler`.
+#[tokio::test]
+async fn gesamtfrist_beendet_den_aufruf_mit_fehlern() {
+    let d = doppel_haengt_bei(&["ab"]).await;
+    let pool = speicher::oeffnen(":memory:").await.unwrap();
+    let zugang = speicher::registrieren(&pool, None, "1").await.unwrap();
+    let bearer = format!("Bearer {}.{}", zugang.server_id, zugang.geheimnis);
+    let app = router(
+        RelaisState::neu(pool, 10, false, gemeinsam::apns_client(&d.basis), 600)
+            .mit_gesamtfrist(std::time::Duration::from_secs(1)),
+    );
+    let start = std::time::Instant::now();
+    let a = tokio::time::timeout(
+        std::time::Duration::from_secs(25),
+        app.oneshot(senden_anfrage(
+            Some(&bearer),
+            json!({ "nachrichten": nachrichten_mit_token(100) }),
+        )),
+    )
+    .await
+    .expect("Aufruf endet")
+    .unwrap();
+    let dauer = start.elapsed();
+    assert_eq!(a.status(), StatusCode::OK);
+    let ergebnisse = json_antwort(a).await["ergebnisse"].clone();
+    assert_eq!(ergebnisse, json!(vec!["fehler"; 100]));
+    assert!(
+        dauer < std::time::Duration::from_secs(3),
+        "dauerte {dauer:?}"
+    );
 }

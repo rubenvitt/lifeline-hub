@@ -902,7 +902,8 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
   `server_id` und Benachrichtigung. Höchstens 100 Nachrichten je `POST /v1/senden`, nichts wird
   wiederholt; `token_ungueltig` löscht die Anmeldung nur bei unverändertem Token
   (`repo::erloschen`). Der Client kommt aus `ausgehend::client_builder` (`Zweck::IosPush`, 10 s,
-  keine Weiterleitung, nur `https`).
+  keine Weiterleitung, nur `https`); `senden` wartet `RELAIS_SENDEN_FRIST` (30 s), klar über der
+  Gesamtfrist des Relais (20 s, `push-relais/src/senden.rs`). Beide ziehen zusammen mit.
 - **Zugang zum Relais** in der Einzeilentabelle `ios_push_relais`, angelegt beim ersten Versand
   unter einer Sperre (kein doppelter Zugang bei parallelen Versänden). `401` vom Relais: einmal
   neu anmelden; `403`: `gesperrt_at` auf jetzt setzen, warnen, nie neu anmelden und

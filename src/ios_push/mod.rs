@@ -34,6 +34,14 @@ use std::time::Duration;
 pub const UMSCHLAG_MAX: usize = 3 * 1024;
 /// Höchstens so viele Nachrichten je `POST /v1/senden` (Limit des Relais).
 const JE_AUFRUF: usize = 100;
+/// Frist für Registrierung und Verbindungsaufbau beim Relais.
+const RELAIS_FRIST: Duration = Duration::from_secs(10);
+/// Frist für einen `POST /v1/senden`. Das Relais stellt die Nachrichten eines Aufrufs
+/// nebenläufig zu und beendet ihn spätestens nach seiner Gesamtfrist (`GESAMTFRIST`, 20 s, in
+/// `push-relais/src/senden.rs`); der Server wartet klar länger, damit er die Ergebnisse noch
+/// liest und erloschene Anmeldungen löscht. Der Versand läuft in einem eigenen Task, niemand
+/// wartet sonst darauf.
+const RELAIS_SENDEN_FRIST: Duration = Duration::from_secs(30);
 /// So lange gilt eine Sperre des Relais (`403`), ohne dass der Server es erneut fragt. Danach
 /// versucht der nächste Versand es einmal mit dem gespeicherten Zugang: Hat der Betreiber den
 /// Server entsperrt, fällt die Sperre; sonst gilt sie ab jetzt wieder so lange. Ein Tag hält den
@@ -130,7 +138,7 @@ impl IosPush {
             anyhow::bail!("das Relais verlangt https");
         }
         let client = crate::ausgehend::client_builder(crate::ausgehend::Zweck::IosPush)
-            .timeout(Duration::from_secs(10))
+            .timeout(RELAIS_FRIST)
             .connect_timeout(Duration::from_secs(5))
             .redirect(reqwest::redirect::Policy::none())
             .https_only(nur_https)
@@ -376,6 +384,7 @@ impl IosPush {
                 .client
                 .post(self.url("/v1/senden")?)
                 .bearer_auth(format!("{}.{}", zugang.server_id, zugang.geheimnis))
+                .timeout(RELAIS_SENDEN_FRIST)
                 .json(&SendenAnfrage { nachrichten })
                 .send()
                 .await
