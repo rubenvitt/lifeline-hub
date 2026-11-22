@@ -96,6 +96,14 @@ Ablösung nur „↗ Ablösung“:
 Sie schließen sich selbst, wenn ihr Anlass erledigt ist, etwa wenn die Sofortmeldung bestätigt
 ist oder alle Empfänger den Auftrag quittiert haben.
 
+Im Modul Erinnerungen stehen alle automatischen Erinnerungen. Im [Überblick](ueberblick.md) und in
+der Zahl „Erinnerungen“ fehlen die von Meldungen, Aufträgen und Ablösungen: Sie stehen und zählen an
+ihrem Anlass, etwa als „Bestätigung überfällig“ an der Meldung. So erscheint dieselbe Frist nicht
+doppelt. Der Hinweis auf eine fehlende ablösende Einheit bleibt eine Erinnerung, ebenso eine
+Erinnerung, die jemand selbst zu einer Meldung oder einem Auftrag angelegt hat. Ist das Modul des
+Anlasses für eine Person nicht freigegeben, zählt die automatische Erinnerung für sie weiter als
+Erinnerung.
+
 Die automatischen Erinnerungen melden sich nicht als „Erinnerung fällig“, sondern mit dem Hinweis
 ihres Anlasses: „Bestätigung ausstehend“, „Auftrag überfällig“, „Keine ablösende Einheit
 geplant“, „Ablösung steht an“ oder „Ablösung fällig“. Wer ihn bekommt, steht im Kapitel des

@@ -146,6 +146,9 @@ Erinnerungen und Ablösungen. Die Zahl jedes Abschnitts ist dieselbe wie im Modu
   zugesagte oder unterwegs gemeldete Nachforderung, deren erwartetes Eintreffen verstrichen ist
   (Kapitel [Nachforderungen](nachforderung.md)).
 - **Erinnerungen**: die fälligen; aufgeführt sind die fälligen und die in den nächsten 30 Minuten.
+  Eine automatische Erinnerung einer Meldung, eines Auftrags oder einer Ablösung steht hier nicht,
+  sondern im Abschnitt ihres Anlasses, etwa als „Bestätigung überfällig“ an der Meldung; sie zählt
+  auch nur dort. Ist das Modul des Anlasses für die Person nicht freigegeben, bleibt sie hier.
 - **Ablösungen**: die überfälligen und die bald fälligen Schichten.
 
 Jeder Abschnitt zeigt höchstens drei Einträge, das Überfällige zuerst; ein überfälliger Eintrag
@@ -179,6 +182,11 @@ heraus. Pegelprognose und Unwetterbeginn sind unter 30 Minuten ebenso hervorgeho
 nie. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein
 Klick auf die Marke eines Auftrags oder einer Erinnerung öffnet den Auftrag oder die Erinnerung
 hervorgehoben im Modul, ein Klick auf einen Programmpunkt die Einsatzdaten.
+
+Jede Frist steht nur einmal: Die Quittierfrist eines Auftrags steht als Marke des Auftrags, nicht
+zusätzlich als Erinnerung. Die Bestätigungsfrist einer Meldung, etwa „Sofortmeldung #3
+unbestätigt“, ist eine Frist und kein Wecker: Verstrichen heißt sie „überfällig“ in Rot, und ein
+Klick öffnet die Meldung.
 
 ### Rechte und gesperrte Module
 
