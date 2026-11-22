@@ -334,7 +334,12 @@ pub async fn alarm(
         nachforderungen_ueberfaellig: nachforderungen.ueberfaellig,
         rueckmeldung_ueberfaellig,
         abschnitte_kritisch,
-        ausfall: crate::einsatz::ausfall::load_einheiten_mit_ausfall(pool, einsatz_id).await?,
+        ausfall: crate::einsatz::ausfall::load_einheiten_mit_ausfall(
+            pool,
+            einsatz_id,
+            crate::einsatz::ausfall::AusfallListen::ALLE,
+        )
+        .await?,
     })
 }
 
