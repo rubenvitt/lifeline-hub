@@ -8,7 +8,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` + `ios/testflight.test.sh` + `ios/testflight-verteilen.test.mjs` + `ios/bilder-ablegen.test.sh` + `ios/fehlgruende.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
-`check-openspec-eingefroren.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
+`check-openspec-eingefroren.sh` → `check-schreibweisen.sh` + `check-api-routen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
 `swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
@@ -176,6 +176,11 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   TS/JS-Endung, Verzeichnisse zählen mit). Die CI läuft nur unter Linux; den Konflikt sah erst
   der macOS-Build nach dem Release (LFH-1050)
   (`openspec/changes/archive/2026-10-05-lfh-1053-schreibweisen-waechter/design.md`).
+- **API-Routen englisch** (LLH-1979, Schritt 14, `scripts/check-api-routen.sh`, Regel in der
+  Wurzel-`AGENTS.md`, „Bezeichner-Sprache“, und ADR-0082): jedes Segment einer registrierten Route
+  steht im Glossar `scripts/api-routen-woerter.tsv`; deutsche Pfade nur aus
+  `scripts/api-routen-bestand.txt`, der gegenüber `origin/alpha` nicht wächst. Nach einem
+  Umbenennungspaket: `scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt`.
 - **Der Dev-Seed läuft mit seinem Feature** (LFH-912, Schritt 15, Bündel `rust`): Schritt 4
   baut ohne Features und sieht `src/dev/`, `/api/dev/users`, `tests/dev_present.rs` und den
   Seed-Aufruf in `src/main.rs` nicht. Schritt 15 baut sie mit `dev-seeds` und fährt nur die
