@@ -194,6 +194,27 @@ describe('AdapterPaneel', () => {
     expect(aufrufe).toEqual([]);
   });
 
+  it('sendet kein Intervall unter dem Mindestwert der Art und kappt es nicht', async () => {
+    const aufrufe = stelleBereit(adapterListeFixture({ adapter: [] }));
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adapter anlegen' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'X');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Adresse' }),
+      'https://alarm.example/api',
+    );
+    const intervall = within(dialog).getByRole('spinbutton', { name: 'Intervall' });
+    await user.clear(intervall);
+    await user.type(intervall, '10');
+    await user.tab();
+    expect(await within(dialog).findByText('Mindestens 30 s')).toBeInTheDocument();
+    expect(intervall).toHaveValue('10');
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(aufrufe).toEqual([]);
+  });
+
   it('lässt die Führungskraft nur lesen', async () => {
     vi.mocked(useAuth).mockReturnValue(
       authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),

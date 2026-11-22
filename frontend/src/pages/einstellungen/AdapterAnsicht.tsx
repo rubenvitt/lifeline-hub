@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Button, Input, InputNumber, Modal, Switch } from 'antd';
+import { Button, Input, Modal, Switch } from 'antd';
+import { ZahlFeld } from '../../components/ZahlFeld';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import AdminPage from '../../components/AdminPage';
@@ -280,20 +281,8 @@ export default function AdapterAnsicht() {
       name: 'intervall_s',
       label: 'Intervall',
       anzeige: <span style={monoStil('mono')}>{`${adapter.intervall_s} s`}</span>,
-      eingabe: <InputNumber min={1} precision={0} style={{ width: '100%' }} />,
-      regeln: [
-        pflicht('Intervall'),
-        ...(art
-          ? [
-              {
-                type: 'number' as const,
-                min: art.intervall_min_s,
-                max: INTERVALL_MAX_S,
-                message: `Zwischen ${art.intervall_min_s} und ${INTERVALL_MAX_S} Sekunden`,
-              },
-            ]
-          : []),
-      ],
+      eingabe: <ZahlFeld min={art?.intervall_min_s ?? 1} max={INTERVALL_MAX_S} ganz einheit="s" />,
+      regeln: [pflicht('Intervall')],
     },
     ...(zeigtEinstellungen && art
       ? art.felder.map((f): BearbeitbaresFeld<Werte> => ({
@@ -304,7 +293,7 @@ export default function AdapterAnsicht() {
           anzeige: einstellungen[f.name] != null ? String(einstellungen[f.name]) : '—',
           eingabe:
             f.typ === 'zahl' ? (
-              <InputNumber style={{ width: '100%' }} />
+              <ZahlFeld />
             ) : (
               <Input maxLength={f.max > 0 ? f.max : undefined} autoComplete="off" />
             ),

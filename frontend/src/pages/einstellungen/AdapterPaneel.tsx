@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Checkbox, Form, Input, InputNumber } from 'antd';
+import { Button, Checkbox, Form, Input } from 'antd';
+import { ZahlFeld } from '../../components/ZahlFeld';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
@@ -55,7 +56,7 @@ export function EinstellungsFeld({ feld, pfad }: { feld: AdapterFeld; pfad: (str
   return (
     <Feld label={feld.bezeichnung} name={pfad} rules={einstellungsRegeln(feld)}>
       {feld.typ === 'zahl' ? (
-        <InputNumber style={{ width: '100%' }} />
+        <ZahlFeld />
       ) : (
         <Input
           maxLength={max}
@@ -278,24 +279,13 @@ export default function AdapterPaneel() {
           />
         ))}
         {art && (
-          <Feld
-            label="Intervall"
-            name="intervall_s"
-            rules={[
-              pflicht('Intervall'),
-              {
-                type: 'number',
-                min: art.intervall_min_s,
-                max: INTERVALL_MAX_S,
-                message: `Zwischen ${art.intervall_min_s} und ${INTERVALL_MAX_S} Sekunden`,
-              },
-            ]}
-          >
-            <InputNumber
-              min={1}
-              precision={0}
+          <Feld label="Intervall" name="intervall_s" rules={[pflicht('Intervall')]}>
+            <ZahlFeld
+              min={art.intervall_min_s}
+              max={INTERVALL_MAX_S}
+              ganz
+              einheit="s"
               addonAfter={<span style={monoStil('monoKlein')}>s</span>}
-              style={{ width: '100%' }}
             />
           </Feld>
         )}
