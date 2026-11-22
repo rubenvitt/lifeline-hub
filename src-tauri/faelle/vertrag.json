@@ -19,7 +19,7 @@
       "abruf": {
         "status": 200,
         "content_type": "application/json",
-        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1,\"assets\":[\"a.js\"],\"neu\":true}"
+        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1,\"kuenftig\":[\"a.js\"],\"neu\":true}"
       },
       "letzter_vertrag": null,
       "ergebnis": "vertraeglich",

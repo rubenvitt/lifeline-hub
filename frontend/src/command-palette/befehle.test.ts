@@ -465,6 +465,41 @@ describe('baueBefehle — Schnellaktionen', () => {
       }
     });
   });
+  /**
+   * Erfassen ohne Schreibrecht (LLH-2006): Die Einsatzrolle Mitarbeit erfasst ETB-Einträge und
+   * Meldungen, sonst nichts (LLH-1817). Am Spiegel stellt die Schreibrolle dort einen Antrag. In
+   * beiden Fällen ist `darfErfassen` gesetzt, `darfSchreibenImEinsatz` nicht.
+   */
+  describe('Erfassen ohne Schreibrecht (LLH-2006)', () => {
+    const nurErfassen = () => kontext({ darfSchreibenImEinsatz: false, darfErfassen: true });
+    const aktionen = (k: BefehlKontext) =>
+      baueBefehle(k)
+        .map((x) => x.id)
+        .filter((id) => id.startsWith('aktion:'));
+    it('führt genau „ETB-Eintrag schreiben“ und „Meldung erfassen“', () => {
+      expect(aktionen(nurErfassen())).toEqual(['aktion:etb', 'aktion:meldung-erfassen']);
+    });
+    it('springt in die Erfassung von ETB und Meldungen', () => {
+      const k = nurErfassen();
+      const b = baueBefehle(k);
+      b.find((x) => x.id === 'aktion:etb')!.ausfuehren();
+      expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/5/etb?neu=1');
+      b.find((x) => x.id === 'aktion:meldung-erfassen')!.ausfuehren();
+      expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/5/meldungen?neu=1');
+    });
+    it('folgt weiter dem Modulfilter', () => {
+      const freigaben = freigabenFixture({ meldungen: { zugriff: false } });
+      expect(aktionen({ ...nurErfassen(), freigaben })).toEqual(['aktion:etb']);
+    });
+    it('ohne Erfassungs- und Schreibrecht bleibt die Gruppe leer (Beobachter)', () => {
+      expect(aktionen(kontext({ darfSchreibenImEinsatz: false, darfErfassen: false }))).toEqual([]);
+    });
+    it('mit Schreibrecht stehen beide Zeilen auch ohne gesetztes `darfErfassen`', () => {
+      const ids = aktionen(kontext());
+      expect(ids).toContain('aktion:etb');
+      expect(ids).toContain('aktion:meldung-erfassen');
+    });
+  });
   it('versteckt ALLE Schnellaktionen wenn darfSchreibenImEinsatz=false (Beobachter/abgeschlossen)', () => {
     const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
     expect(b.some((x) => x.id.startsWith('aktion:'))).toBe(false);

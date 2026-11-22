@@ -390,6 +390,7 @@ describe('EinsatzdatenPage', () => {
 describe('EinsatzdatenPage · Gliederung (LFH-1170)', () => {
   /** Das Mono-Meta neben dem Titel. */
   async function kopfMeta() {
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { level: 1 });
     return document.querySelector<HTMLElement>('.lfh-seitenkopf__meta');
   }
@@ -399,6 +400,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-1170)', () => {
     const { container } = setup({
       einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' },
     });
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     const h1 = await screen.findByRole('heading', { level: 1 });
     expect(h1).toHaveTextContent(/^Einsatzdaten$/);
     expect(container.querySelector('.lfh-seitenkopf__pfad')).toHaveTextContent(

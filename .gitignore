@@ -39,3 +39,6 @@ lifeline-tls-*.pem
 
 # Desktop-Hülle (LFH-721): von tauri-build erzeugte Schemata, bei jedem Build neu.
 /src-tauri/gen/
+
+# Wegwerf-Zertifikate des https-Testservers der App-Tests (LLH-1980, scripts/ios/testserver-zertifikat.sh)
+ios/AppTests/Testserver/

@@ -77,14 +77,12 @@ pub fn lesen(konfig_dir: &Path) -> Option<Url> {
     pruefe_adresse(&read_datei(konfig_dir)?.server).ok()
 }
 
-/// Die bekannten Server, der verbundene zuerst. Leer ohne gültige Datei.
+/// Die bekannten Server, der verbundene zuerst. Leer ohne lesbare Datei. Lehnt die Prüfung den
+/// verbundenen inzwischen ab (etwa ein gesperrter Port, LLH-1987), fällt nur er heraus.
 pub fn bekannte(konfig_dir: &Path) -> Vec<Url> {
     let Some(datei) = read_datei(konfig_dir) else {
         return Vec::new();
     };
-    if pruefe_adresse(&datei.server).is_err() {
-        return Vec::new();
-    }
     bereinigt(
         std::iter::once(datei.server.as_str()).chain(datei.bekannt.iter().map(String::as_str)),
     )
@@ -239,6 +237,32 @@ mod tests {
         assert_eq!(
             bekannte(dir.path()),
             [url("https://a.local"), url("https://c.local")]
+        );
+    }
+
+    /// Lehnt die Prüfung den verbundenen Server inzwischen ab (gesperrter Port, LLH-1987), bleiben
+    /// die übrigen bekannt, auch über das nächste Verbinden hinweg.
+    #[test]
+    fn ein_ungueltiger_verbundener_server_nimmt_die_uebrigen_nicht_mit() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            pfad(dir.path()),
+            r#"{ "server": "https://elw.local:10080/", "bekannt": ["https://elw.local:10080/", "https://a.local/", "https://b.local/"] }"#,
+        )
+        .unwrap();
+        assert_eq!(lesen(dir.path()), None);
+        assert_eq!(
+            bekannte(dir.path()),
+            [url("https://a.local"), url("https://b.local")]
+        );
+        schreiben(dir.path(), &url("https://elw.local:8443")).unwrap();
+        assert_eq!(
+            bekannte(dir.path()),
+            [
+                url("https://elw.local:8443"),
+                url("https://a.local"),
+                url("https://b.local")
+            ]
         );
     }
 

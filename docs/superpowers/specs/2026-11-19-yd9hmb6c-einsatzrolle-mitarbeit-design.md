@@ -178,7 +178,8 @@ ergänzen.
   `stammdaten/rechteText.ts`, `components/nurAnsicht.ts`); jede dieser Stellen bekommt den
   Wert. Die Zusammenführung bleibt LLH-1818.
 - Die Kopfzeile „Nur Ansicht“ bzw. der Rechte-Grund (`einsatzRechteGrund`) nennt für Mitarbeit
-  „Du kannst erfassen, aber nichts ändern.“
+  „als Mitarbeit nur erfassen“ (Wortlaut seit LLH-1818, `NUR_ERFASSEN` in
+  `components/nurAnsicht.ts`; nachgezogen mit LLH-2008).
 
 ### D10 Doku und Regeln
 

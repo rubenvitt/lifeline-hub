@@ -15,7 +15,7 @@ import {
   schriftStil,
   useRollen,
 } from '../components/instrument';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import {
@@ -124,6 +124,7 @@ import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import AblaufPaneel from '../programmpunkt/AblaufPaneel';
 import EinsatzAbschlussPaneel from './einsatzdaten/EinsatzAbschlussPaneel';
 import { ZahlFeld } from '../components/ZahlFeld';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -1513,7 +1514,7 @@ export default function EinsatzdatenPage() {
     });
 
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="einsatzdaten" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

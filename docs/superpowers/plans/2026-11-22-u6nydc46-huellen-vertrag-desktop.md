@@ -38,7 +38,7 @@
 **Files:**
 - Create: `src-tauri/src/vertrag.rs`
 - Modify: `src-tauri/Cargo.toml` (Abhängigkeit `reqwest`), `src-tauri/src/main.rs` (`mod vertrag;`)
-- Create: `docs/architektur/entscheidungen/ADR-0082-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md` (Nummer per `scripts/adr-fuer.sh --alle` und `scripts/check-adr-nummern.sh` bestätigen)
+- Create: `docs/architektur/entscheidungen/ADR-0083-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md` (Nummer per `scripts/adr-fuer.sh --alle` und `scripts/check-adr-nummern.sh` bestätigen)
 - Modify: `docs/architektur/entscheidungen/ADR-0009-desktop-huelle-tauri-ohne-anwendungslogik.md` (`status: ersetzt`, `ersetzt_durch` nach `docs/architektur/AGENTS.md`)
 
 **Interfaces:**

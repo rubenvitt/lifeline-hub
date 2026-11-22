@@ -1,8 +1,8 @@
-//! Hüllen-Vertrag in der Desktop-Hülle (LLH-1982, Spec `huellen-vertrag`, ADR-0082): vor jedem
+//! Hüllen-Vertrag in der Desktop-Hülle (LLH-1982, Spec `huellen-vertrag`, ADR-0083): vor jedem
 //! Laden des Servers fragt die Hülle `GET /api/shell` und lädt die Oberfläche nur, wenn sie den
 //! `shell_contract` kennt. Bewertung wie in der iOS-Hülle (`ios/LifelineKern/.../Vertrag.swift`).
 //!
-//! Der einzige eigene Abruf der Hülle (ADR-0082): anonym, ohne Cookies, nur `/api/shell` und bei
+//! Der einzige eigene Abruf der Hülle (ADR-0083): anonym, ohne Cookies, nur `/api/shell` und bei
 //! 404 `/api/health`. Zertifikate prüft `rustls-platform-verifier` über den Vertrauensspeicher des
 //! Systems, wie der Webview. Weiterleitungen nur auf derselben Origin; eine fremde (Captive
 //! Portal, Auth-Proxy) beantwortet nicht der Server und gilt wie ohne Verbindung.

@@ -75,7 +75,9 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
   über den Commit-Status `ADR-Nummern` (`scripts/check-adr-nummern.sh`,
   `.github/workflows/migrationen.yml`, beim Push `migrationen-kanal.yml`): er wird für jeden
   offenen PR neu gesetzt, wenn sich der Ziel-Branch bewegt. Ist er rot, nummeriert der PR um (Dateiname, `id`, Verweise); einen
-  Autofix gibt es nicht.
+  Autofix gibt es nicht. Zwei Merges im Abstand weniger Sekunden rutschen trotzdem durch
+  (Grenze im Kopf von `migrationen.yml`, LLH-2030); dann fällt die Doppelung auf `alpha` auf
+  und der Fix geht über „alpha rot“.
 - **Kapitel 9 listet die ADRs nicht** (LLH-1660): jede Zeile dort kollidierte mit jedem anderen
   PR, der eine ADR anlegt. Das Verzeichnis ist der Ordner, `scripts/adr-fuer.sh --alle` und die
   Website. Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.

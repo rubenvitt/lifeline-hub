@@ -6,6 +6,7 @@ import XCTest
 final class AdresseTests: XCTestCase {
     struct Datei: Decodable {
         let meldungen: [String: String]
+        let gesperrte_ports: [Int]
         let faelle: [Fall]
     }
 
@@ -18,7 +19,7 @@ final class AdresseTests: XCTestCase {
 
     func testJederGemeinsameFallGilt() throws {
         let datei = try GemeinsameFaelle.load("adresse.json", as: Datei.self)
-        XCTAssertGreaterThanOrEqual(datei.faelle.count, 11)
+        XCTAssertGreaterThanOrEqual(datei.faelle.count, 16)
         for fall in datei.faelle {
             switch (fall.adresse, fall.fehler) {
             case (let adresse?, nil):
@@ -39,6 +40,17 @@ final class AdresseTests: XCTestCase {
         XCTAssertEqual(Set(datei.meldungen.keys), Set(AdressError.allCases.map(\.rawValue)))
         for fehler in AdressError.allCases {
             XCTAssertEqual(fehler.meldung, datei.meldungen[fehler.rawValue], "\(fehler)")
+        }
+    }
+
+    func testGesperrtePortsGleichenDenFaellen() throws {
+        let datei = try GemeinsameFaelle.load("adresse.json", as: Datei.self)
+        XCTAssertEqual(ServerAdresse.gesperrtePorts.sorted(), datei.gesperrte_ports)
+        XCTAssertEqual(ServerAdresse.gesperrtePorts.count, datei.gesperrte_ports.count)
+        for port in datei.gesperrte_ports {
+            XCTAssertThrowsError(try ServerAdresse.parse("https://elw.local:\(port)"), "Port \(port)") {
+                XCTAssertEqual($0 as? AdressError, .gesperrterPort, "Port \(port)")
+            }
         }
     }
 

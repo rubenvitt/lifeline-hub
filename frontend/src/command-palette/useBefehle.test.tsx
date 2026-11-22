@@ -10,7 +10,7 @@ import {
   einsatzFixture,
   freigabenFixture,
 } from '../test/fixtures';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { merkeModulBesuch } from '../einsatz/zuletztModule';
 import { useBefehle } from './useBefehle';
 
@@ -57,6 +57,55 @@ describe('useBefehle', () => {
     expect(ladeModulFreigaben).toHaveBeenCalledWith(5);
     expect(result.current.some((b) => b.id === 'modul:schaeden')).toBe(false);
     expect(result.current.some((b) => b.id === 'aktion:schaeden')).toBe(false);
+  });
+  /**
+   * Die Naht zur Rechte-Regel (LLH-2006): Mitarbeit darf nur erfassen. Paar im selben Lauf
+   * („ETB-Eintrag schreiben“ erscheint, „Person erfassen“ nicht).
+   */
+  it('zeigt der Mitarbeit die Erfassungs-Schnellaktionen, sonst keine', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce(
+      einsatzFixture({ id: 5, meine_rolle: 'mitarbeit' }),
+    );
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() => expect(result.current.some((b) => b.id === 'aktion:etb')).toBe(true));
+    expect(result.current.some((b) => b.id === 'aktion:meldung-erfassen')).toBe(true);
+    expect(result.current.some((b) => b.id === 'aktion:personen')).toBe(false);
+  });
+  /**
+   * Am Spiegel (LLH-1492) beantragt die Schreibrolle ETB-Einträge und Meldungen wie über die
+   * Kopf-Knöpfe der Seiten (`darfErfassungBeantragen`, LLH-2006); nach dem Widerruf nichts mehr.
+   */
+  it('zeigt am Spiegel die Erfassungs-Schnellaktionen als Antrag, nach dem Widerruf keine', async () => {
+    const spiegel = (beendet: boolean) =>
+      einsatzFixture({
+        id: 5,
+        meine_rolle: 'einsatzleitung',
+        spiegel: {
+          antraege_abgelehnt: 0,
+          antraege_ausstehend: 0,
+          beendet,
+          bruchstelle: 0,
+          gegenstelle: 'Kreisverband Nord',
+        },
+      });
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce(spiegel(false));
+    const offen = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() => expect(offen.result.current.some((b) => b.id === 'aktion:etb')).toBe(true));
+    expect(offen.result.current.some((b) => b.id === 'aktion:meldung-erfassen')).toBe(true);
+    expect(offen.result.current.some((b) => b.id === 'aktion:personen')).toBe(false);
+
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce(spiegel(true));
+    const beendet = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() =>
+      expect(beendet.result.current.some((b) => b.id === 'modul:etb')).toBe(true),
+    );
+    expect(beendet.result.current.some((b) => b.id.startsWith('aktion:'))).toBe(false);
   });
   it('liefert keine Modul-Befehle außerhalb eines Einsatzes', () => {
     const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {

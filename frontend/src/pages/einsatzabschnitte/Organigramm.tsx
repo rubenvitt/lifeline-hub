@@ -88,6 +88,8 @@ interface BildProps {
   fuehrungsstelle?: WurzelFuehrungsstelle | null;
   /** Führungsstelle oder Mitglieder laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
   kopfLaedt?: boolean;
+  /** Die Aktualisierung der Abschnitte ist gescheitert (LLH-1927): Hinweis in der Standzeile. */
+  veraltet?: { onWiederholen: () => void };
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
 }
@@ -186,6 +188,7 @@ export function OrganigrammBild({
   stab,
   fuehrungsstelle = null,
   kopfLaedt = false,
+  veraltet,
   zugeklappt,
   onUmschalten,
 }: BildProps) {
@@ -205,6 +208,7 @@ export function OrganigrammBild({
         />
       }
       kopfLaedt={kopfLaedt}
+      veraltet={veraltet}
       wurzeln={org.wurzeln}
       zugeklappt={zugeklappt}
       onUmschalten={onUmschalten}
@@ -229,8 +233,19 @@ const OHNE_LEITUNG_PX = 22;
  * Gliederung; ohne Lücke leise der `ruhe`-Text. Sie steht immer da und immer gleich hoch, außerhalb
  * der Schleuse: so folgt sie live, und ihr Wechsel schiebt den Baum unter dem Zeiger nie (Review
  * LLH-1742, Spec „Organigramm hält seine Knoten“).
+ *
+ * Vorne steht leise, warum Einheiten fehlen („Einheiten: lädt“; Spec `fuehrungsorganisation`,
+ * „Einheiten gesperrt“). Als eigene Zeile darüber verschob ihr Verschwinden den Baum (LLH-1927).
  */
-function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: string | null }) {
+function OhneLeitungZeile({
+  einheitenGrund,
+  teile,
+  ruhe,
+}: {
+  einheitenGrund: string | null;
+  teile: readonly string[];
+  ruhe: string | null;
+}) {
   const { token } = useRollen();
   return (
     <div
@@ -245,6 +260,13 @@ function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: str
         marginBlockEnd: token.marginSM,
       }}
     >
+      {einheitenGrund != null && (
+        <span style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
+            {`Einheiten: ${einheitenGrund}`}
+          </Textstufe>
+        </span>
+      )}
       {teile.length > 0
         ? teile.map((teil) => (
             <Status groesse="klein" key={teil} ton="achtung" wort={teil} title={teil} />
@@ -388,6 +410,11 @@ interface Props {
    */
   zugeklappt?: ReadonlySet<string>;
   onZugeklappt?: Dispatch<SetStateAction<ReadonlySet<string>>>;
+  /**
+   * Die Aktualisierung der Abschnitte ist gescheitert, gezeigt wird der Stand aus dem
+   * Zwischenspeicher (LLH-1927): der Hinweis steht in der Standzeile des Organigramms.
+   */
+  veraltet?: { onWiederholen: () => void };
 }
 
 /**
@@ -402,8 +429,9 @@ export default function Organigramm({
   datenstand,
   zugeklappt: zugeklapptVonAussen,
   onZugeklappt,
+  veraltet,
 }: Props) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
   const org = useMemo(
@@ -561,13 +589,12 @@ export default function Organigramm({
           />
         </div>
       )}
-      {einheiten.zustand !== 'daten' && (
-        <div style={{ color: rollen.gedaempft, marginBlockEnd: token.marginSM }}>
-          {`Einheiten: ${ZUSTAND_GRUND[einheiten.zustand]}`}
-        </div>
-      )}
       {/* Gedruckt wie am Bildschirm. */}
-      <OhneLeitungZeile teile={ohneLeitung.teile} ruhe={ohneLeitung.ruhe} />
+      <OhneLeitungZeile
+        einheitenGrund={einheiten.zustand === 'daten' ? null : ZUSTAND_GRUND[einheiten.zustand]}
+        teile={ohneLeitung.teile}
+        ruhe={ohneLeitung.ruhe}
+      />
       <OrganigrammBild
         einsatzId={einsatz.id}
         org={org}
@@ -575,6 +602,7 @@ export default function Organigramm({
         stab={stab}
         fuehrungsstelle={fuehrungsstelle}
         kopfLaedt={kopfLaedt}
+        veraltet={veraltet}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
       />

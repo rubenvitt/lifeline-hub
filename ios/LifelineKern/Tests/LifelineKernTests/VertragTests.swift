@@ -10,7 +10,8 @@ import XCTest
 /// Vertragsprüfung gegen `GET /api/shell` (Spec `ios-huelle`, „Die App lädt nur einen
 /// verträglichen Server“ und „Server ohne Vertrag gelten als zu alt“). Bewertung und
 /// Weiterleitungsregel prüfen die gemeinsamen Fälle (`src-tauri/faelle/vertrag.json`); hier
-/// stehen nur, was allein die iOS-Hülle kennt: Zertifikatsfehler, `HealthInfo`, fehlende URLs.
+/// stehen nur, was allein die iOS-Hülle kennt: Zertifikatsfehler, `HealthInfo`, fehlende URLs,
+/// `assets` (LLH-1980).
 final class VertragTests: XCTestCase {
     struct Datei: Decodable {
         let bekannt: [Int]
@@ -166,5 +167,18 @@ final class VertragTests: XCTestCase {
         ] {
             XCTAssertEqual(Fehlerklasse(code), .nichtErreichbar, "\(code)")
         }
+    }
+
+    /// LLH-1980: ein älterer Server kennt das Feld nicht; dann gibt es keinen Start ohne Server.
+    func testAssetsSindOptional() throws {
+        let json = #"{"version":"1.0.0","shell_contract":1}"#
+        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
+        XCTAssertNil(info.assets)
+    }
+
+    func testAssetsWerdenGelesen() throws {
+        let json = #"{"version":"1.0.0","shell_contract":1,"assets":["assets/a.js"]}"#
+        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
+        XCTAssertEqual(info, ShellInfo(version: "1.0.0", shellContract: 1, assets: ["assets/a.js"]))
     }
 }
