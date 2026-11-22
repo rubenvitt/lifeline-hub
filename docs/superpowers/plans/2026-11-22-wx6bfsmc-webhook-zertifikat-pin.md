@@ -242,7 +242,7 @@ Tests), React + antd + TanStack Query, Vitest.
   - Anzeige ohne Pin: `'kein Fingerabdruck – es gelten die Vertrauensanker des Servers'`
   - Paneel „Zustellung“, Zustand `fehler`/`angehalten` mit `letzter_fehler.art === 'tls'` und Pin:
     `'Hat das Ziel sein Zertifikat gewechselt? Fingerabdruck neu holen.'`
-  - Bestätigung: Titel `'Zertifikat des Ziels'`, Text `'Das Ziel zeigt dieses Zertifikat. Vergleiche den Fingerabdruck mit dem am Zielgerät.'`, Knöpfe `'Übernehmen'`/`'Abbrechen'`.
+  - Bestätigung: Titel `'Zertifikat des Ziels'`, Text `'Das Ziel zeigt dieses Zertifikat. Fingerabdruck mit dem am Zielgerät vergleichen.'` (Anrede-Regel, Review-Fix), Knöpfe `'Übernehmen'`/`'Abbrechen'`.
   - Zugangsprotokoll: `maschinenzugang_webhook_pin_gesetzt: 'Webhook: Fingerabdruck hinterlegt'`,
     `…_pin_entfernt: 'Webhook: Fingerabdruck entfernt'`,
     `…_zertifikat_abgerufen: 'Webhook: Zertifikat vom Ziel abgerufen'`.

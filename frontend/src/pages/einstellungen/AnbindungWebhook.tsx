@@ -89,15 +89,21 @@ function hostVon(url: string | undefined): string | null {
   }
 }
 
-/**
- * Fällt der Fingerabdruck beim Speichern weg? Ja, wenn die URL auf einen anderen Server zeigt und
- * der Fingerabdruck noch der alte ist (Entscheidung Ruben 22.11.2026: neuer Server, neuer Pin).
- */
-function pinFaelltWeg(vorher: WebhookWerte, nachher: WebhookWerte): boolean {
-  const alt = pinNormal(vorher.zertifikat_pin ?? '');
-  if (!alt || pinNormal(nachher.zertifikat_pin ?? '') !== alt) return false;
+/** Zeigt die URL auf einen anderen Server als vorher? */
+function neuerServer(vorher: WebhookWerte, nachher: WebhookWerte): boolean {
   const host = hostVon(nachher.url);
   return host != null && host !== hostVon(vorher.url);
+}
+
+/**
+ * Fällt der Fingerabdruck beim Speichern weg? Ja, wenn die URL auf einen anderen Server zeigt und
+ * das Feld unberührt den alten Fingerabdruck trägt (Entscheidung Ruben 22.11.2026: neuer Server,
+ * neuer Pin). Unberührt heißt: derselbe Text wie geladen; wer ihn vom Ziel holt und übernimmt
+ * oder eintippt, bestätigt ihn für den neuen Server, auch wenn er gleich ist.
+ */
+function pinFaelltWeg(vorher: WebhookWerte, nachher: WebhookWerte): boolean {
+  const alt = vorher.zertifikat_pin ?? '';
+  return !!pinNormal(alt) && (nachher.zertifikat_pin ?? '') === alt && neuerServer(vorher, nachher);
 }
 
 /**
@@ -117,7 +123,9 @@ export function webhookPatch(vorher: WebhookWerte, nachher: WebhookWerte): Webho
   const pinVorher = pinNormal(vorher.zertifikat_pin ?? '');
   const pinNachher = pinNormal(nachher.zertifikat_pin ?? '');
   if (pinFaelltWeg(vorher, nachher)) patch.zertifikat_pin = null;
-  else if (pinNachher !== pinVorher) patch.zertifikat_pin = pinNachher || null;
+  else if (pinNachher !== pinVorher || (pinNachher && neuerServer(vorher, nachher)))
+    // Auf einem neuen Server braucht der Server eine Angabe zum Fingerabdruck, auch die gleiche.
+    patch.zertifikat_pin = pinNachher || null;
   return patch;
 }
 
@@ -531,8 +539,11 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
             )}
             {/* Der Text bleibt neutral: ob beim Versuch schon ein Fingerabdruck galt, steht
                 nirgends (Design-Doc LLH-1872, D5). Nur in der laufenden Störung der Hinweis. */}
+            {/* Nur ein Fehler nach der letzten Änderung kann dem hinterlegten Fingerabdruck
+                gelten; ein angehaltener Webhook behält den Fehler von davor (Review #2). */}
             {webhook.zertifikat_pin &&
               webhook.letzter_fehler?.art === 'tls' &&
+              webhook.letzter_fehler.at >= webhook.geaendert_at &&
               (webhook.zustand === 'fehler' || webhook.zustand === 'angehalten') && (
                 <div data-lfh="webhook-pin-hinweis" style={{ color: rollen.gedaempft }}>
                   Hat das Ziel sein Zertifikat gewechselt? Fingerabdruck neu holen.
@@ -669,7 +680,7 @@ function PinEingabe({
         }}
         onCancel={() => setGefunden(null)}
       >
-        <p>Das Ziel zeigt dieses Zertifikat. Vergleiche den Fingerabdruck mit dem am Zielgerät.</p>
+        <p>Das Ziel zeigt dieses Zertifikat. Fingerabdruck mit dem am Zielgerät vergleichen.</p>
         <p style={monoStil('monoKlein')} data-lfh="webhook-pin-gefunden">
           {gefunden ? fingerabdruckGruppen(gefunden) : ''}
         </p>

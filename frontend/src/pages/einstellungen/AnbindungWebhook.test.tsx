@@ -574,6 +574,46 @@ describe('Webhook · Fingerabdruck (LLH-1872)', () => {
     );
   });
 
+  it('neuer Server mit bestätigtem gleichem Fingerabdruck: er bleibt (Review #1)', async () => {
+    const aufrufe = stelleBereit(zugang({ webhook: webhook({ zertifikat_pin: PIN }) }));
+    abrufBereit({ fingerabdruck: PIN });
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Webhook bearbeiten' }));
+    const url = screen.getByRole('textbox', { name: 'Ziel-URL' });
+    await user.clear(url);
+    await user.type(url, 'https://neu.example/hook');
+    expect(await screen.findByText(NEUER_SERVER)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Vom Ziel holen' }));
+    const bestaetigung = await screen.findByRole('dialog', { name: 'Zertifikat des Ziels' });
+    expect(bestaetigung.textContent).toContain('Fingerabdruck mit dem am Zielgerät vergleichen.');
+    await user.click(within(bestaetigung).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(screen.queryByText(NEUER_SERVER)).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aufrufe).toContainEqual({
+        pfad: 'aendern',
+        body: {
+          url: 'https://neu.example/hook',
+          zertifikat_pin: PIN,
+          basis_geaendert_at: '2026-11-13 09:00:00',
+        },
+      }),
+    );
+  });
+
+  it('angehalten mit tls von vor dem Fingerabdruck: kein Hinweis (Review #2)', async () => {
+    const fehler = { at: '2026-11-13 08:00:00', art: 'tls' };
+    stelleBereit(
+      zugang({
+        webhook: webhook({ zustand: 'angehalten', letzter_fehler: fehler, zertifikat_pin: PIN }),
+      }),
+    );
+    renderAnsicht();
+    await screen.findByText(/Zertifikat des Ziels nicht anerkannt/);
+    expect(screen.queryByText(/Zertifikat gewechselt/)).toBeNull();
+  });
+
   it('gestört mit tls und Fingerabdruck: Hinweis auf einen Zertifikatswechsel', async () => {
     const fehler = { at: '2026-11-13 10:00:00', art: 'tls' };
     stelleBereit(
