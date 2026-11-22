@@ -10,7 +10,7 @@ import {
   einsatzFixture,
   freigabenFixture,
 } from '../test/fixtures';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { merkeModulBesuch } from '../einsatz/zuletztModule';
 import { useBefehle } from './useBefehle';
 
@@ -57,6 +57,21 @@ describe('useBefehle', () => {
     expect(ladeModulFreigaben).toHaveBeenCalledWith(5);
     expect(result.current.some((b) => b.id === 'modul:schaeden')).toBe(false);
     expect(result.current.some((b) => b.id === 'aktion:schaeden')).toBe(false);
+  });
+  /**
+   * Die Naht zur Rechte-Regel (LLH-2006): Mitarbeit darf nur erfassen. Paar im selben Lauf
+   * („ETB-Eintrag schreiben“ erscheint, „Person erfassen“ nicht).
+   */
+  it('zeigt der Mitarbeit die Erfassungs-Schnellaktionen, sonst keine', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce(
+      einsatzFixture({ id: 5, meine_rolle: 'mitarbeit' }),
+    );
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() => expect(result.current.some((b) => b.id === 'aktion:etb')).toBe(true));
+    expect(result.current.some((b) => b.id === 'aktion:meldung-erfassen')).toBe(true);
+    expect(result.current.some((b) => b.id === 'aktion:personen')).toBe(false);
   });
   it('liefert keine Modul-Befehle außerhalb eines Einsatzes', () => {
     const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {

@@ -70,7 +70,9 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   („Person erfassen“); wer eine Beschriftung ändert, legt die alte als Schlagwort ab (LFH-1055).
   Ein engeres Recht als das Schreibrecht trägt die Zeile selbst: `recht: 'leitung'` zeigt sie nur
   der Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`, „Mitglied aufnehmen“,
-  LFH-1170). Liegt das Ziel in einer Sektion der Einstellungen, liest das Layout
+  LFH-1170). Ein weiteres trägt sie ebenso: `recht: 'erfassen'` zeigt sie schon mit
+  `darfErfassungBeantragen` (Mitarbeit, Antrag am Spiegel; LLH-2006), nur an ETB-Eintrag und
+  Meldung, den Erfassungen hinter dem Erfassungs-Gate des Servers. Liegt das Ziel in einer Sektion der Einstellungen, liest das Layout
   `EinsatzEinstellungenPage.tsx` den Parameter (Zuordnung über den Dateinamen) und reicht ihn per
   `Outlet`-Context weiter.
   Funkplan und Kommunikationsplan gehören zum Fernmeldewesen (LLH-1180, `SEITE_MODUL` im Guard).
