@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { scrollbereichVon } from './restHoehe';
 
 /**
  * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen): die
@@ -54,7 +55,11 @@ export const RAHMEN_EBENE = 100;
  */
 export const RAHMEN_KLEBT = { position: 'sticky', top: 0, zIndex: RAHMEN_EBENE } as const;
 
-/** antds Hüllen mit eigenem Scrollbereich, in denen der Dokument-Rahmen nicht gilt. */
+/**
+ * antds Hüllen mit eigenem Scrollbereich, in denen der Dokument-Rahmen nicht gilt. Im Browser
+ * findet sie schon {@link scrollbereichVon} (beide rollen mit `overflow: auto`); die Liste hält
+ * Drawer und Modal bei 0, auch wenn antd seine Überlauf-Stile ändert (LLH-1902, Variante A).
+ */
 const EIGENER_SCROLLBEREICH = '.ant-drawer-body, .ant-modal-wrap';
 
 const anteile = new Map<symbol, { ebene: RahmenEbene; rang: RahmenRang; hoehe: number }>();
@@ -191,16 +196,21 @@ export function useRahmenObenStapel<T extends HTMLElement>(
 }
 
 /**
- * Wie {@link useRahmenOben}, aber 0, wenn das Element in einem eigenen Scrollbereich steht (Drawer,
- * Modal): dort rollt nicht das Dokument, und kein Rahmen klebt über der Tabelle. `element` muss
- * stabil sein (`useCallback`); geprüft wird beim Einhängen im Layout-Effekt, also vor dem ersten
- * Bild. Eine Tabelle wandert nicht zwischen Dokument und Drawer.
+ * Wie {@link useRahmenOben}, aber 0, wenn das Element in einem eigenen Scrollbereich steht: in
+ * einem Vorfahren, der selbst rollt ({@link scrollbereichVon}, etwa die Bereiche der UHS-Detailseite,
+ * LLH-1902), oder in Drawer und Modal. Ein stehender Kopf klebt an der Oberkante seines nächsten
+ * rollenden Vorfahren; dort rollt nicht das Dokument, und kein Rahmen klebt über der Tabelle.
+ * `element` muss stabil sein (`useCallback`); geprüft wird beim Einhängen im Layout-Effekt, also
+ * vor dem ersten Bild. Eine Tabelle wandert nicht zwischen Dokument und Scrollbereich.
  */
 export function useRahmenObenFuer(element: () => HTMLElement | null | undefined): number {
   const rahmenOben = useRahmenOben();
   const [eigenerBereich, setEigenerBereich] = useState(false);
   useLayoutEffect(() => {
-    setEigenerBereich(element()?.closest(EIGENER_SCROLLBEREICH) != null);
+    const el = element();
+    setEigenerBereich(
+      el != null && (el.closest(EIGENER_SCROLLBEREICH) != null || scrollbereichVon(el) != null),
+    );
   }, [element]);
   return eigenerBereich ? 0 : rahmenOben;
 }

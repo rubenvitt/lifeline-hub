@@ -29,6 +29,8 @@ import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 const kartenHandle = vi.hoisted(() => ({
   punktZurueck: vi.fn(() => true),
   zeichnungVerwerfen: vi.fn(),
+  // Esc beendet vor dem Verwerfen einen laufenden Zug an den Griffen (LLH-1891).
+  zugBeenden: vi.fn(),
   // Abschnittsfokus (LLH-1057): Anflug auf einen Rahmen, gibt die Kamera davor zurück.
   fokussiere: vi.fn(() => ({ center: [8.5, 50] as [number, number], zoom: 9, bearing: 0 })),
   stelleKameraHer: vi.fn(),
@@ -3462,10 +3464,13 @@ describe('LLH-1043: Kreis', () => {
     await user.click(await screen.findByText('kontext-kreis'));
     await screen.findByRole('button', { name: 'Übernehmen' });
     expect(JSON.parse(screen.getByTestId('kreis').textContent!).mitte).not.toBeNull();
+    kartenHandle.zugBeenden.mockClear();
     await user.keyboard('{Escape}');
     await waitFor(() =>
       expect(JSON.parse(screen.getByTestId('kreis').textContent!).mitte).toBeNull(),
     );
+    // Ein laufender Zug am Griff endet mit dem Verwerfen und meldet danach nichts (LLH-1891).
+    expect(kartenHandle.zugBeenden).toHaveBeenCalledTimes(1);
     expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(document.querySelector('[data-lfh="kreis-steuerung"]')).toBeNull());

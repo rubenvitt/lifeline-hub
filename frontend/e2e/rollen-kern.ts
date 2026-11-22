@@ -30,6 +30,8 @@ export interface Konto {
   id: number;
   benutzername: string;
   passwort: string;
+  /** Steht im Kopf am Benutzermenü, wo die Rolle keine Einsatzfunktion trägt (LLH-1900). */
+  anzeigename: string;
 }
 
 /** Anmelden über die API (`anmelde-kern.ts`, LLH-1665); das Formular prüfen die Anmelde-Specs. */
@@ -81,7 +83,7 @@ export async function benutzerAnlegen(
     passwort,
     ...(rolle === 'fuehrungskraft' ? { org_rolle: 'fuehrungskraft' as const } : {}),
   });
-  return { id, benutzername, passwort };
+  return { id, benutzername, passwort, anzeigename };
 }
 
 /** Trägt den Benutzer mit Einsatzrolle ein; die Sitzung muss die Einsatzleitung sein. */

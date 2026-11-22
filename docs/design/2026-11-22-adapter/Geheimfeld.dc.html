@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Geheimfeld, Zustände</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.flaeche{width:880px;height:1000px;box-sizing:border-box;padding:32px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;gap:20px}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;margin:0 0 6px}
+.zeit{color:#838b94;font-size:12px}
+.wert{font-size:13px}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.primaer{background:#1f5f99;border-color:#1f5f99}
+.knopf.text{border-color:transparent;color:#7fb6e8;padding:0 6px}
+.knopf[disabled]{color:#5b626a;border-color:#2e343a;cursor:not-allowed}
+.geheim{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#0a0c0e;border:1px solid #2e343a}
+.schloss{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #2e343a;color:#9aa2ab;flex-shrink:0}
+.text{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.eingabe{height:30px;box-sizing:border-box;flex:1;min-width:0;background:#08090b;border:1px solid #4d94d6;color:#e8ebee;font-family:"LFH Mono",monospace;font-size:13px;padding:0 10px}
+.achtung{color:#e8cc3a}
+.hinweis{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:#1c1705;border:1px solid #e8cc3a;font-size:13px}
+.marke{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#e8cc3a;white-space:nowrap;font-weight:600}
+.notiz{font-size:12px;color:#9aa2ab;margin:0;max-width:640px;line-height:1.5}
+</style>
+</helmet>
+<div class="flaeche">
+  <div>
+    <p class="augenbraue">1 · nicht gesetzt</p>
+    <div class="geheim">
+      <div class="schloss" aria-hidden="true" style="border-style:dashed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0"/></svg></div>
+      <div class="text"><span class="wert">API-Schlüssel <span class="zeit">Pflicht</span></span><span class="zeit achtung">nicht gesetzt: der Adapter ruft ohne ihn nicht ab</span></div>
+      <button class="knopf" type="button">Setzen</button>
+    </div>
+  </div>
+
+  <div>
+    <p class="augenbraue">2 · gesetzt</p>
+    <div class="geheim">
+      <div class="schloss" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <div class="text"><span class="wert">API-Schlüssel <span class="zeit">Pflicht</span></span><span class="zeit">gesetzt <span class="mono">21.11.2026 18:04</span> von R. Vitt</span></div>
+      <button class="knopf" type="button">Ersetzen</button>
+      <button class="knopf text" type="button" aria-label="Weitere Aktionen zu API-Schlüssel">⋯</button>
+    </div>
+    <p class="notiz" style="margin-top:6px">⋯ trägt „Entfernen …“ mit roter Rückfrage. Ein Wert wird nie angezeigt, auch nicht verdeckt: es gibt keine Punkte, keine Länge, kein Auge.</p>
+  </div>
+
+  <div>
+    <p class="augenbraue">3 · ersetzen offen</p>
+    <div class="geheim" style="border-color:#4d94d6">
+      <div class="schloss" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <div class="text" style="flex:0 0 160px"><label class="wert" for="neu">API-Schlüssel</label><span class="zeit">neuer Wert</span></div>
+      <input id="neu" class="eingabe" type="password" autocomplete="off" value="xxxxxxxxxxxxxxxxxxxxxx">
+      <button class="knopf primaer" type="button">Speichern</button>
+      <button class="knopf text" type="button">Abbrechen</button>
+    </div>
+    <p class="notiz" style="margin-top:6px">Passwortfeld ohne Autofill. Speichern schickt den Wert und leert das Feld sofort, auch bei Fehler; danach zeigt die Zeile wieder Zustand 2 mit neuer Zeit. Escape bricht ab.</p>
+  </div>
+
+  <div>
+    <p class="augenbraue">4 · mit anderem Schlüssel gesetzt (passt nicht)</p>
+    <div class="geheim" style="border-color:#e8cc3a">
+      <div class="schloss achtung" aria-hidden="true" style="border-color:#e8cc3a"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></svg></div>
+      <div class="text"><span class="wert">API-Schlüssel</span><span class="zeit achtung">unlesbar: gesetzt <span class="mono">02.10.2026</span> mit einem anderen Schlüssel des Servers. Neu setzen.</span></div>
+      <button class="knopf" type="button">Neu setzen</button>
+    </div>
+  </div>
+
+  <div>
+    <p class="augenbraue">5 · gesperrt: Schlüssel fehlt</p>
+    <div class="hinweis" role="status" style="margin-bottom:8px">
+      <span class="marke">Geheimnisspeicher</span>
+      <span>Der Server hat keinen Schlüssel für Geheimnisse. Setzen geht erst, wenn der Betrieb <span class="mono">LIFELINE_GEHEIMNIS_SCHLUESSEL</span> eingerichtet hat.</span>
+    </div>
+    <div class="geheim">
+      <div class="schloss" aria-hidden="true" style="border-style:dashed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0"/></svg></div>
+      <div class="text"><span class="wert">API-Schlüssel</span><span class="zeit">nicht gesetzt</span></div>
+      <button class="knopf" type="button" disabled title="Geheimnisspeicher ohne Schlüssel">Setzen</button>
+    </div>
+  </div>
+
+  <div>
+    <p class="augenbraue">6 · nur lesen (Führungskraft, gekoppelter ELW)</p>
+    <div class="geheim">
+      <div class="schloss" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <div class="text"><span class="wert">API-Schlüssel</span><span class="zeit">gesetzt <span class="mono">21.11.2026 18:04</span> von R. Vitt</span></div>
+    </div>
+    <p class="notiz" style="margin-top:6px">Ohne Schreibrecht keine Knöpfe. Der Grund steht einmal über der Seite (Rechtehinweis bzw. „Am Hub anbinden“), nicht an jeder Zeile.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

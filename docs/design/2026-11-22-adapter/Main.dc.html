@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Adapter, Ansicht</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:1000px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:44px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;box-sizing:border-box;flex-shrink:0}
+.markenzelle{width:56px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.koerper{display:flex;flex:1;min-height:0}
+.nav{width:220px;border-right:1px solid #22262b;background:#0a0c0e;padding:16px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;padding:10px 16px 6px}
+.navlink{display:block;padding:7px 16px;font-size:13px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.navlink.aktiv{background:#16191d;color:#e8ebee;border-left-color:#4d94d6}
+.inhalt{flex:1;min-width:0;padding:0 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.seitenkopf{height:56px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #22262b;flex-shrink:0}
+h1{margin:0;font-size:18px;font-weight:600}
+.meta{font-size:12px;color:#9aa2ab}
+.platz{flex:1}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.primaer{background:#1f5f99;border-color:#1f5f99}
+.knopf.text{border-color:transparent;color:#7fb6e8;padding:0 6px}
+.knopf.gefahr{border-color:#ff6b6b;color:#ff6b6b}
+.paneel{background:#0a0c0e;border:1px solid #2e343a}
+.paneelkopf{height:36px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #22262b;gap:8px}
+h2{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#9aa2ab}
+.raster{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:#22262b}
+.feld{background:#0a0c0e;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-height:52px}
+.etikett{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9aa2ab}
+.wert{font-size:13px}
+.wire{font-family:"LFH Mono",monospace;font-size:11px;color:#838b94}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;font-size:12px;border:1px solid;align-self:flex-start}
+.chip.bedien{background:#0b1724;color:#7fb6e8;border-color:#4d94d6}
+.chip.ok{background:#0d1a0a;color:#7ddc4a;border-color:#52c41a}
+.chip.achtung{background:#1c1705;color:#e8cc3a;border-color:#e8cc3a}
+.zeit{color:#838b94;font-size:12px}
+.spalten{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+.geheim{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #22262b}
+.geheim:last-child{border-bottom:0}
+.schloss{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #2e343a;color:#9aa2ab;flex-shrink:0}
+.ergebnis{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid #22262b;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-weight:600;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9aa2ab;padding:6px 12px;border-bottom:1px solid #22262b}
+td{padding:6px 12px;border-bottom:1px solid #16191d}
+.lan{display:flex;align-items:center;gap:12px;padding:10px 12px}
+.schalter{width:36px;height:20px;border:1px solid #626a73;position:relative;background:transparent;flex-shrink:0}
+.schalter span{position:absolute;left:3px;top:3px;width:12px;height:12px;background:#9aa2ab}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:13px;font-weight:600">Verwaltung</span>
+    <span class="meta">DRK Kreisverband Musterstadt</span>
+  </div>
+  <div class="koerper">
+    <nav class="nav" aria-label="Verwaltung">
+      <div class="augenbraue">Einstellungen</div>
+      <a class="navlink" href="#">Organisation</a>
+      <a class="navlink" href="#">Anmeldewege</a>
+      <a class="navlink" href="#">Lagemonitore</a>
+      <a class="navlink aktiv" href="Liste.dc.html" aria-current="page">Anbindungen</a>
+      <a class="navlink" href="#">Instanzkopplung</a>
+    </nav>
+    <main class="inhalt">
+      <div class="seitenkopf">
+        <a href="Liste.dc.html" class="meta" style="text-decoration:none">Anbindungen ›</a>
+        <h1>Alarmquelle Leitstelle</h1>
+        <span class="meta">Beispiel-Alarmquelle</span>
+        <span class="chip bedien">gestört</span>
+        <div class="platz"></div>
+        <button class="knopf" type="button">Verbindung prüfen</button>
+        <button class="knopf" type="button">Anhalten</button>
+        <button class="knopf gefahr" type="button">Löschen …</button>
+      </div>
+
+      <section class="paneel" aria-labelledby="zustand">
+        <div class="paneelkopf"><h2 id="zustand">Zustand</h2></div>
+        <div class="raster">
+          <div class="feld"><span class="etikett">Zustand</span><span class="chip bedien">gestört</span><span class="zeit">seit <span class="mono">09:42</span>, 3 Fehlversuche</span></div>
+          <div class="feld"><span class="etikett">Zuletzt erfolgreich</span><span class="wert mono">22.11. 09:37</span><span class="zeit">4 Einträge</span></div>
+          <div class="feld"><span class="etikett">Letzter Fehler</span><span class="wert">Zeitüberschreitung</span><span class="wire">zeitueberschreitung · 22.11. 09:51</span></div>
+          <div class="feld"><span class="etikett">Nächster Versuch</span><span class="wert mono">22.11. 09:55</span><span class="zeit">alle 60 s, nach Störung bis 15 min</span></div>
+        </div>
+        <div class="ergebnis" role="status">
+          <span class="chip ok">Verbindung prüfen: erreichbar</span>
+          <span class="zeit">HTTP <span class="mono">200</span> · <span class="mono">412 ms</span> · 4 Einträge, nichts übernommen</span>
+        </div>
+      </section>
+
+      <div class="spalten">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <section class="paneel" aria-labelledby="geheimnisse">
+            <div class="paneelkopf"><h2 id="geheimnisse">Geheimnisse</h2><span class="platz"></span><span class="zeit">Schlüssel <span class="mono">7f3a9c21e04b5d86</span></span></div>
+            <div class="geheim">
+              <div class="schloss" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span class="wert">API-Schlüssel <span class="zeit">Pflicht</span></span>
+                <span class="zeit">gesetzt <span class="mono">21.11. 18:04</span> von R. Vitt</span>
+              </div>
+              <button class="knopf" type="button">Ersetzen</button>
+              <button class="knopf text" type="button" aria-label="Weitere Aktionen zu API-Schlüssel">⋯</button>
+            </div>
+            <div class="geheim">
+              <div class="schloss" aria-hidden="true" style="border-style:dashed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0"/></svg></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span class="wert">Kennwort des Abrufkontos</span>
+                <span class="zeit">nicht gesetzt</span>
+              </div>
+              <button class="knopf" type="button">Setzen</button>
+            </div>
+          </section>
+
+          <section class="paneel" aria-labelledby="versuche">
+            <div class="paneelkopf"><h2 id="versuche">Letzte Versuche</h2></div>
+            <table>
+              <thead><tr><th scope="col">Zeit</th><th scope="col">Ergebnis</th><th scope="col">Dauer</th><th scope="col">Einträge</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">09:51:12</td><td>Zeitüberschreitung</td><td class="mono">20 000 ms</td><td>–</td></tr>
+                <tr><td class="mono">09:50:02</td><td>erreichbar (200) · Prüfung</td><td class="mono">412 ms</td><td class="mono">4</td></tr>
+                <tr><td class="mono">09:46:10</td><td>Zeitüberschreitung</td><td class="mono">20 000 ms</td><td>–</td></tr>
+                <tr><td class="mono">09:42:05</td><td>Verbindung abgebrochen</td><td class="mono">5 003 ms</td><td>–</td></tr>
+                <tr><td class="mono">09:37:00</td><td>abgerufen (200)</td><td class="mono">388 ms</td><td class="mono">4</td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <section class="paneel" aria-labelledby="einstellungen">
+            <div class="paneelkopf"><h2 id="einstellungen">Einstellungen</h2><span class="platz"></span><button class="knopf text" type="button">Bearbeiten</button></div>
+            <div class="raster" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+              <div class="feld"><span class="etikett">Name</span><span class="wert">Alarmquelle Leitstelle</span></div>
+              <div class="feld"><span class="etikett">Intervall</span><span class="wert mono">60 s</span></div>
+              <div class="feld" style="grid-column:span 2"><span class="etikett">Adresse</span><span class="wert mono" style="font-size:12px">https://alarm.leitstelle.example/api</span></div>
+              <div class="feld" style="grid-column:span 2"><span class="etikett">Standort-Kennung</span><span class="wert mono">WA-01</span></div>
+            </div>
+          </section>
+          <section class="paneel" aria-labelledby="lan">
+            <div class="paneelkopf"><h2 id="lan">Netz</h2></div>
+            <div class="lan">
+              <span class="schalter" role="switch" aria-checked="false" aria-label="Ziel im eigenen Netz erlauben"><span></span></span>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span class="wert">Ziel im eigenen Netz erlauben</span>
+                <span class="zeit">Nur für einen Server im LAN der Wache. Fragt vor dem Umschalten nach und steht im Zugangsprotokoll.</span>
+              </div>
+            </div>
+          </section>
+          <section class="paneel" aria-labelledby="angaben">
+            <div class="paneelkopf"><h2 id="angaben">Angelegt</h2></div>
+            <div class="raster" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+              <div class="feld"><span class="etikett">Angelegt</span><span class="wert mono">21.11. 18:02</span></div>
+              <div class="feld"><span class="etikett">Art</span><span class="wert">Beispiel-Alarmquelle <span class="wire">beispiel</span></span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
