@@ -442,7 +442,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   `Vertragspruefung` in `Vertrag.swift` daneben), bei Start, Wechsel und Rückkehr in den
   Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Desktop-Hülle prüft genauso vor jedem
   Laden, das sie selbst anstößt (`BEKANNTE_VERTRAEGE` und `evaluate` in `src-tauri/src/vertrag.rs`,
-  LLH-1982, [ADR-0082](entscheidungen/ADR-0082-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md)).
+  LLH-1982, [ADR-0083](entscheidungen/ADR-0083-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md)).
 - **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
   (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, `platform` und
   `version`, bei iOS dazu `haptics`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;

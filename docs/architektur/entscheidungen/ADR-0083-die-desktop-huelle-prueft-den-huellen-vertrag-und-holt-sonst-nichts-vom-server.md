@@ -1,5 +1,5 @@
 ---
-id: ADR-0082
+id: ADR-0083
 titel: Die Desktop-App ist eine Tauri-Hülle ohne Anwendungslogik, die vor dem Laden nur den Hüllen-Vertrag abfragt
 status: akzeptiert
 datum: 2026-11-22
@@ -15,7 +15,7 @@ herleitung:
   - openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md
 ---
 
-# ADR-0082: Die Desktop-App ist eine Tauri-Hülle ohne Anwendungslogik, die vor dem Laden nur den Hüllen-Vertrag abfragt
+# ADR-0083: Die Desktop-App ist eine Tauri-Hülle ohne Anwendungslogik, die vor dem Laden nur den Hüllen-Vertrag abfragt
 
 ## Regeln
 

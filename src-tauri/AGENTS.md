@@ -4,7 +4,7 @@ Gilt für `src-tauri/`, zusätzlich zur `AGENTS.md` der Wurzel.
 
 `src-tauri/` (Crate `lifeline-desktop`, Tauri 2), Anforderungen `openspec/specs/desktop-huelle/`
 und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
-- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720, ADR-0082): der Webview lädt die
+- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720, ADR-0083): der Webview lädt die
   https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
   Command), nicht ins Frontend.
 - **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`, nur Fenster
@@ -16,7 +16,7 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `anmeldung_im_browser`, `benachrichtigung_zeigen`, `set_app_badge`; `server_freigeben`). Jeder neue Command steht
   im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen. Commands eines Plugins
   (`notification:…`) gibt keine Capability frei.
-- **Hüllen-Vertrag** (LLH-1982, ADR-0082, Spec `huellen-vertrag`): Jedes Laden des Servers, das
+- **Hüllen-Vertrag** (LLH-1982, ADR-0083, Spec `huellen-vertrag`): Jedes Laden des Servers, das
   die Hülle selbst anstößt (Start, Maske, Abbrechen, Deeplink, „Erneut versuchen“), geht über
   `pruefe_und_lade` bzw. `pruefen` + `anwenden`: erst `GET /api/shell` (`vertrag.rs`, der einzige
   eigene Abruf, ohne Cookies, Weiterleitungen nur auf derselben Origin, `reqwest` nur dort), dann

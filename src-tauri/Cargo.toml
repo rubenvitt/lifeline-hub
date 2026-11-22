@@ -42,7 +42,7 @@ getrandom = "0.4"
 sha2 = "0.11"
 base64 = "0.23"
 
-# Der eine eigene Abruf der Hülle: `GET /api/shell` vor dem Laden (LLH-1982, ADR-0082), nur in
+# Der eine eigene Abruf der Hülle: `GET /api/shell` vor dem Laden (LLH-1982, ADR-0083), nur in
 # `src/vertrag.rs`. Dieselben Features wie beim Updater (rustls ohne eigenen Provider,
 # Plattform-Verifier = Vertrauensspeicher des Systems wie der Webview); `rustls` nur, um wie der
 # Updater `ring` zu setzen, wenn kein Provider gesetzt ist — kein zweiter Provider.
