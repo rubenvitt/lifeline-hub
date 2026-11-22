@@ -60,7 +60,13 @@ export const MERKER_MIT_INHALT = 'inhalt';
 export type PushHub = { name: string; adresse: string };
 
 /** Stand für die Schalter: Push auf diesem Gerät, ob er den Inhalt zeigt, und ggf. der Hub. */
-export type PushStand = { zustand: PushZustand; inhalt: boolean; hub?: PushHub };
+export type PushStand = {
+  zustand: PushZustand;
+  inhalt: boolean;
+  hub?: PushHub;
+  /** Erklärung, warum es keinen Schalter gibt (iOS-Push: das Relais hat den Server gesperrt). */
+  hinweis?: string;
+};
 
 /** Wie lange auf den Service Worker gewartet wird; ohne Registrierung löst `ready` nie auf. */
 const WORKER_FRIST_MS = 10_000;

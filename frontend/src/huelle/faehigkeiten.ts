@@ -137,3 +137,47 @@ export function huelleHaptics(kind: HapticsKind): void {
     // Ohne Haptik geht es weiter.
   }
 }
+
+/**
+ * Push über APNs in der iOS-Hülle (Entwurf „iOS-Alarme über APNs“). `register` fragt die
+ * Berechtigung, holt das Token und liefert Kennung (`registration_id`), Umgebung und den Schlüssel
+ * der Nutzlast; die Brücke lehnt mit `denied` (Berechtigung verweigert) oder `unavailable` ab.
+ * `state` fragt nie nach der Berechtigung. Token und Schlüssel gehören in kein Log.
+ */
+export type HuellePush = {
+  register(): Promise<{
+    registration_id: string;
+    token: string;
+    environment: 'sandbox' | 'production';
+    key: string;
+  }>;
+  unregister(): Promise<void>;
+  state(): Promise<{
+    permission: 'granted' | 'denied' | 'undetermined';
+    registration_id?: string;
+  }>;
+};
+
+/** Der Push der Hülle, wenn sie ihn kann (`push === true` und alle drei Funktionen); sonst `null`. */
+export function huellePush(): HuellePush | null {
+  const h = window.__LIFELINE_HUELLE__;
+  if (h?.push !== true) return null;
+  const { pushRegister, pushUnregister, pushState } = h;
+  if (
+    typeof pushRegister !== 'function' ||
+    typeof pushUnregister !== 'function' ||
+    typeof pushState !== 'function'
+  ) {
+    return null;
+  }
+  return {
+    register: async () => {
+      const r = await pushRegister();
+      return { ...r, environment: r.environment === 'production' ? 'production' : 'sandbox' };
+    },
+    unregister: async () => {
+      await pushUnregister();
+    },
+    state: () => pushState(),
+  };
+}

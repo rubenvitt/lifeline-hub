@@ -23,7 +23,12 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   spieleAlarmTon: vi.fn(),
 }));
 
-type Stand = { zustand: string; inhalt: boolean; hub?: { name: string; adresse: string } };
+type Stand = {
+  zustand: string;
+  inhalt: boolean;
+  hub?: { name: string; adresse: string };
+  hinweis?: string;
+};
 const push = vi.hoisted(() => ({
   ladePushStand: vi.fn(async (): Promise<Stand> => ({ zustand: 'fehlt', inhalt: false })),
   pushEinschalten: vi.fn(async () => 'an'),
@@ -147,6 +152,17 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
     zeige();
     await screen.findByRole('region', { name: 'Hinweise' });
     await waitFor(() => expect(push.ladePushStand).toHaveBeenCalled());
+    expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
+  });
+
+  it('zeigt statt des Schalters den Hinweis, wenn das Relais den Server sperrt', async () => {
+    push.ladePushStand.mockResolvedValue({
+      zustand: 'fehlt',
+      inhalt: false,
+      hinweis: 'Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.',
+    });
+    zeige();
+    expect(await screen.findByText(/Der Push-Dienst nimmt diesen Server nicht an/)).toBeVisible();
     expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
   });
 
