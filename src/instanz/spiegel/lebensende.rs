@@ -466,7 +466,12 @@ async fn umwandeln(
     // keine Zeile doppelt anlegt, wenn die Gegenstelle die Verwahrung ablehnt (E3).
     let gewechselt = crate::instanz::fuehrung::repo::verwahren(conn, id).await?;
     if !gewechselt {
-        for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
+        for tabelle in [
+            "spiegel_herkunft",
+            "spiegel_neu_vergeben",
+            "spiegel_anhang",
+            "spiegel_katalog",
+        ] {
             sqlx::query(sqlx::AssertSqlSafe(format!(
                 "DELETE FROM {tabelle} WHERE einsatz_id = ?"
             )))

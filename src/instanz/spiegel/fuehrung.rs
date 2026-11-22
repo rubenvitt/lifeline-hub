@@ -271,6 +271,19 @@ async fn werde_spiegel(conn: &mut SqliteConnection, akte: &AkteZeile) -> Result<
             .fetch_one(&mut *conn)
             .await?;
     let bekannt_bis = bestaetigt.unwrap_or(0).max(uebernommen.unwrap_or(0));
+    // Eine Neuvergabe, deren jüngsten Stand der neue Führer kennt, braucht keinen Merker mehr
+    // (LLH-1893). Maßgeblich ist der Stand im Log, nicht der der Neuvergabe: Eine spätere Änderung
+    // kann auf einer Seite liegen, die er noch nicht hat.
+    sqlx::query(
+        "DELETE FROM spiegel_neu_vergeben WHERE einsatz_id = ? AND NOT EXISTS ( \
+           SELECT 1 FROM einsatz_aenderung a WHERE a.einsatz_id = spiegel_neu_vergeben.einsatz_id \
+           AND a.art = spiegel_neu_vergeben.art \
+           AND a.schluessel = spiegel_neu_vergeben.lokaler_schluessel AND a.stand > ?)",
+    )
+    .bind(einsatz_id)
+    .bind(bekannt_bis)
+    .execute(&mut *conn)
+    .await?;
     let gesichert = sichere_bruchstelle(conn, einsatz_id, bekannt_bis).await?;
     let merker_vorher: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spiegel_uebernahme)")
@@ -504,7 +517,15 @@ async fn uebernimm_bruch_antwort(
         None => offene_bruch_fragen(conn, einsatz_id).await?.pop(),
     };
     let unbekannt: Vec<[String; 2]> = if a.kennt {
-        a.unbekannt.iter().take(BRUCH_MAX).cloned().collect()
+        let mut u: Vec<[String; 2]> = a.unbekannt.iter().take(BRUCH_MAX).cloned().collect();
+        if let Some(b) = &bis {
+            for z in neu_vergeben(conn, einsatz_id, b).await? {
+                if !u.contains(&z) {
+                    u.push(z);
+                }
+            }
+        }
+        u
     } else {
         match &bis {
             Some(b) => nicht_vom_fuehrer(conn, einsatz_id, b).await?,
@@ -664,13 +685,38 @@ async fn uebernimm_bruch_antwort(
     Ok(Some(einsatz_id))
 }
 
+/// Die offenen Zeilen der Bruchstelle bis `bis`, deren ID diese Instanz neu vergeben hat, ohne
+/// dass der Führer es kennt (`spiegel_neu_vergeben`, LLH-1893): Er meint mit dem Schlüssel noch
+/// die alte Zeile und hält ihn deshalb für bekannt. Sie gelten als unbekannt; hat er die neue
+/// Zeile doch schon, kommt sie mit seiner Lieferung zurück und steht zusätzlich in der Liste
+/// „nicht übernommen“ (Entwurf D5).
+async fn neu_vergeben(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bis: &[String; 2],
+) -> Result<Vec<[String; 2]>, AppError> {
+    let zeilen: Vec<(String, String)> = sqlx::query_as(
+        "SELECT DISTINCT b.art, b.schluessel FROM einsatz_bruchstelle b \
+         JOIN spiegel_neu_vergeben n ON n.einsatz_id = b.einsatz_id AND n.art = b.art \
+           AND n.lokaler_schluessel = b.schluessel \
+         WHERE b.einsatz_id = ? AND b.entfernt = 0 AND b.geklaert = 0 \
+         AND (b.art, b.schluessel) <= (?, ?) ORDER BY b.art, b.schluessel LIMIT ?",
+    )
+    .bind(einsatz_id)
+    .bind(&bis[0])
+    .bind(&bis[1])
+    .bind(BRUCH_MAX as i64)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen.into_iter().map(|(a, s)| [a, s]).collect())
+}
+
 /// Die offenen Zeilen der Bruchstelle bis `bis`, die der Führer nicht neu liefert, wenn er den
 /// Einsatz nie von hier gespiegelt hat (`kennt: false`, LLH-1854): alle, die hier entstanden
 /// sind. Eine Zeile mit Eintrag in `spiegel_herkunft` kam von einem Führer und hat dessen
 /// Schlüssel; er liefert sie mit seinem Inhalt neu, sie bleibt. Entfernt würde sie sonst auch
-/// dann, wenn seine Lieferung sie schon überschrieben hat, und fehlte danach. Lücke wie bei
-/// `kennt: true`: Eine hier gelöschte Zeile lässt ihre Herkunft stehen, und eine neue Zeile unter
-/// derselben ID gilt dann als die des Führers (LLH-1893).
+/// dann, wenn seine Lieferung sie schon überschrieben hat, und fehlte danach. Eine neue Zeile
+/// unter einer neu vergebenen ID hat keine Herkunft mehr: Der Log-Trigger räumt sie (LLH-1893).
 async fn nicht_vom_fuehrer(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -840,7 +886,10 @@ pub async fn fordere_abgeglichen(
 
 /// Der Schlüssel einer Zeile beim Empfänger (E3): Kennt diese Instanz die Zeile als Spiegel der
 /// Kopplung `kopplung_id` (sie führt den Einsatz jetzt), ist es der Schlüssel, unter dem der alte
-/// Führer sie geliefert hat.
+/// Führer sie geliefert hat. Steht unter der ID eine neue Zeile (`spiegel_neu_vergeben`, LLH-1893),
+/// ist es der Schlüssel der gelöschten: Ihre Löschung hat die neue Zeile im Log verdrängt, und so
+/// ersetzt die neue sie beim Empfänger, statt dass die alte dort stehen bleibt. Ordnet die
+/// Herkunft den Schlüssel inzwischen einer anderen Zeile zu, gilt die.
 pub async fn gegen_hinaus(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -849,22 +898,28 @@ pub async fn gegen_hinaus(
     schluessel: &str,
 ) -> Result<Option<String>, AppError> {
     Ok(sqlx::query_scalar(
-        "SELECT h.fremder_schluessel FROM spiegel_herkunft h \
-         JOIN einsatz_fuehrung f ON f.einsatz_id = h.einsatz_id \
-         WHERE h.einsatz_id = ? AND h.art = ? AND h.lokaler_schluessel = ? \
-           AND f.herkunft_kopplung_id = ?",
+        "SELECT COALESCE(h.fremder_schluessel, n.fremder_schluessel) FROM einsatz_fuehrung f \
+         LEFT JOIN spiegel_herkunft h ON h.einsatz_id = f.einsatz_id AND h.art = ?1 \
+           AND h.lokaler_schluessel = ?2 \
+         LEFT JOIN spiegel_neu_vergeben n ON n.einsatz_id = f.einsatz_id AND n.art = ?1 \
+           AND n.lokaler_schluessel = ?2 AND NOT EXISTS (SELECT 1 FROM spiegel_herkunft g \
+             WHERE g.einsatz_id = n.einsatz_id AND g.art = n.art \
+             AND g.fremder_schluessel = n.fremder_schluessel) \
+         WHERE f.einsatz_id = ?3 AND f.herkunft_kopplung_id = ?4",
     )
-    .bind(einsatz_id)
     .bind(art)
     .bind(schluessel)
+    .bind(einsatz_id)
     .bind(kopplung_id)
     .fetch_optional(&mut *conn)
-    .await?)
+    .await?
+    .flatten())
 }
 
 /// Übernimmt am Spiegel den Schlüssel beim Empfänger (E3): Die Zeile `fremd` des Führers ist die
 /// eigene Zeile `gegen`. Nur eine Zeile dieses Einsatzes (sie steht in seinem Log) wird so
-/// zugeordnet; eine ältere Zuordnung derselben lokalen Zeile fällt weg.
+/// zugeordnet; eine ältere Zuordnung derselben lokalen Zeile fällt weg. Keine Zuordnung auf eine
+/// ID, die diese Instanz neu vergeben hat (`spiegel_neu_vergeben`, LLH-1893).
 pub async fn uebernimm_gegen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -887,6 +942,20 @@ pub async fn uebernimm_gegen(
     let bisher = super::abbildung::einsatz_lokal(conn, einsatz_id, art, fremd).await?;
     if bisher.as_deref() == Some(gegen) {
         return Ok(true);
+    }
+    // Die ID hat diese Instanz neu vergeben, ohne dass der Führer es kannte (LLH-1893): Er meint
+    // die alte Zeile, und die kommt als neue an.
+    let neu_vergeben: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM spiegel_neu_vergeben WHERE einsatz_id = ? AND art = ? \
+         AND lokaler_schluessel = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(art)
+    .bind(gegen)
+    .fetch_one(&mut *conn)
+    .await?;
+    if neu_vergeben {
+        return Ok(false);
     }
     sqlx::query(
         "DELETE FROM spiegel_herkunft WHERE (einsatz_id = ? AND art = ? AND fremder_schluessel = ?) \
