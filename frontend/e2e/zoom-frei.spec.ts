@@ -26,6 +26,21 @@ async function setzeProbe(page: Page) {
   });
 }
 
+/** Ein antd-Feld in Grundgröße: die Anmeldeseite hat nur große Felder. Geklont wird das echte
+ *  Benutzername-Feld (es trägt antds Klassen samt Hash), ohne die Größenklasse und außerhalb
+ *  seiner großen Hülle; so rechnet antd die Grundschrift der Dichte. */
+async function setzeGrundfeld(page: Page) {
+  const feld = page.getByLabel('Benutzername');
+  await expect(feld).toBeVisible();
+  await feld.evaluate((el) => {
+    const klon = el.cloneNode() as HTMLInputElement;
+    klon.removeAttribute('id');
+    klon.dataset.probe = 'grundfeld';
+    klon.classList.remove('ant-input-lg');
+    document.body.append(klon);
+  });
+}
+
 test.describe('Touch 390 × 844', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
@@ -41,20 +56,23 @@ test.describe('Touch 390 × 844', () => {
     expect(inhalt).toBe('width=device-width, initial-scale=1.0');
   });
 
-  test('Eingabefelder tragen 16 px, der Knopf bleibt in der Dichte-Grundschrift', async ({
+  test('ein Feld in Grundgröße trägt 16 px, der Knopf bleibt in der Dichte-Grundschrift', async ({
     page,
   }) => {
-    await expect.poll(() => groesse(page.getByLabel('Benutzername'))).toBe('16px');
-    expect(await groesse(page.getByLabel('Passwort'))).toBe('16px');
-    expect(await groesse(page.getByRole('button', { name: 'Anmelden', exact: true }))).toBe('15px');
+    await setzeGrundfeld(page);
+    expect(await groesse(page.locator('[data-probe="grundfeld"]'))).toBe('16px');
+    expect(await groesse(page.getByRole('button', { name: 'Anmelden', exact: true }))).toBe('18px');
   });
 
-  test('die Feldhöhe bleibt die Steuerhöhe der Dichte', async ({ page }) => {
+  test('große Felder bleiben größer als 16 px und behalten ihre Höhe', async ({ page }) => {
+    // Die Anmeldefelder sind antd `large`: 18 px in `komfortabel`, Höhe 1,25 × 48.
     const feld = page.getByLabel('Benutzername');
-    await expect(feld).toBeVisible();
-    const hoehe = (await feld.boundingBox())?.height ?? 0;
-    // Das Feld selbst, nicht seine Hülle: 16 px Schrift passen in die 48 px von `komfortabel`.
-    expect(hoehe).toBeLessThanOrEqual(49);
+    await expect.poll(() => groesse(feld)).toBe('18px');
+    expect(await groesse(page.getByLabel('Passwort'))).toBe('18px');
+    const hoehe =
+      (await page.locator('.ant-input-affix-wrapper-lg, .ant-input-lg').first().boundingBox())
+        ?.height ?? 0;
+    expect(hoehe).toBeLessThanOrEqual(61);
   });
 
   test('auch Inline-Größen und antds Select-Anzeige weichen, Kästchen nicht', async ({ page }) => {
@@ -72,7 +90,9 @@ test.describe('Desktop, feiner Zeiger', () => {
     await page.goto('/login');
     expect(await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)).toBe(false);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
-    await expect.poll(() => groesse(page.getByLabel('Benutzername'))).toBe('13.5px');
+    await setzeGrundfeld(page);
+    expect(await groesse(page.locator('[data-probe="grundfeld"]'))).toBe('13.5px');
+    expect(await groesse(page.getByLabel('Benutzername'))).toBe('16px');
     await setzeProbe(page);
     expect(await groesse(page.locator('[data-probe="inline"]'))).toBe('14px');
   });

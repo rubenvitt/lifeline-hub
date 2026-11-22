@@ -325,11 +325,23 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
   }
 }
 @media (pointer: coarse) {
-  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
-  textarea,
-  select,
-  .ant-select-selection-item,
-  .ant-select-selection-placeholder {
+  :is(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+    textarea,
+    select,
+    .ant-select-selection-item,
+    .ant-select-selection-placeholder
+  ):not(
+    .ant-input-lg,
+    :is(
+        .ant-input-affix-wrapper-lg,
+        .ant-input-number-lg,
+        .ant-input-number-affix-wrapper-lg,
+        .ant-select-lg,
+        .ant-picker-large
+      )
+      *
+  ) {
     font-size: var(--lfh-touch-feldschrift) !important;
   }
 }
