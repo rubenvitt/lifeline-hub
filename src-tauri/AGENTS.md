@@ -24,8 +24,11 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `ios/LifelineKern/.../Vertrag.swift`; `BEKANNTE_VERTRAEGE` wächst erst, wenn die Hülle einen Bruch
   mitgeht. Ohne Verbindung gilt der zuletzt bestätigte Vertrag (`verbindung.json`, `vertraege`).
   Maske und Deeplink speichern einen unverträglichen Server nicht. Nebenfenster und „Neues
-  Fenster“ prüfen nicht selbst, folgen aber dem Urteil je Origin (`Zustand.urteile`). Zeitlimits:
-  Verbindung 1,5 s, Abruf 5 s (Offline-Start).
+  Fenster“ folgen dem Urteil je Origin (`Zustand.urteile`) und prüfen selbst nur einen in dieser
+  Sitzung noch nicht bestätigten Server (`Zustand.bestaetigt`). Jede Prüfung trägt die Nummer
+  ihrer Ladung je Fenster (`Zustand.ladungen`): Maske, Deeplink, eine neuere Ladung oder das
+  Schließen des Fensters verwerfen ein älteres Ergebnis. Zeitlimits: Verbindung 1,5 s, je Abruf
+  5 s (Offline-Start).
 - **Kennung** (LLH-1982): `kennung.js` läuft in jeder Hülle als erstes Init-Skript und setzt
   `platform` (`std::env::consts::OS`) und `version` (Workspace), eingesetzt von `kennung_skript`.
 - **Native Meldung** (Benachrichtigungskonzept D7): `benachrichtigung_zeigen` reicht Titel und

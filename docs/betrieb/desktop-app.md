@@ -101,7 +101,7 @@ Hüllen-Vertrag (`shell_contract`) des Servers kennt. Sonst zeigt das Fenster ei
 | App aktualisieren | der Server hat einen neueren Vertrag, als die App kennt | „Nach Update suchen“ (wie im Menü), „Erneut prüfen“, „Server wechseln“ |
 | Server ist zu alt für diese App | der Server antwortet auf `GET /api/shell` mit 404 oder mit JSON ohne lesbaren Vertrag, oder er hat einen älteren Vertrag | Server aktualisieren, dann „Erneut prüfen“; die Seite nennt seine Version (bei 404 aus `GET /api/health`) |
 
-Beide Seiten nennen Adresse, Server-Version und App-Version. Ein neues Fenster (⌘N/Strg+N) oder ein
+Beide Seiten nennen Adresse und App-Version, dazu die Server-Version, sofern der Server eine nannte. Ein neues Fenster (⌘N/Strg+N) oder ein
 Link in ein Nebenfenster zeigt für einen so erkannten Server dieselbe Seite statt der Oberfläche.
 
 - **Ohne Verbindung** lädt die App wie bisher (Anzeige „nicht erreichbar“ oder Offline-Start über
@@ -111,7 +111,10 @@ Link in ein Nebenfenster zeigt für einen so erkannten Server dieselbe Seite sta
   eine fremde Weiterleitung, eine 200 ohne JSON oder ein Serverfehler gelten wie ohne Verbindung.
 - **Zertifikate** prüft die Abfrage über den Vertrauensspeicher des Systems, wie die Seite selbst.
 - **Wartezeit:** Antwortet der Server gar nicht, wartet die Abfrage höchstens 1,5 Sekunden auf die
-  Verbindung, insgesamt höchstens 5 Sekunden.
+  Verbindung; jeder Abruf dauert höchstens 5 Sekunden (bei einem Server ohne Endpunkt folgt
+  `GET /api/health` als zweiter).
+- **Neues Fenster während der Prüfung:** Ein Fenster für einen Server, den die App seit dem Start
+  noch nicht bestätigt hat, zeigt erst „Verbinde…“ und prüft selbst.
 
 ## Deeplink „Geräte verbinden“ (Vertrag für LFH-38)
 

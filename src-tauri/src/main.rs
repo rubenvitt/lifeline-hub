@@ -196,6 +196,13 @@ struct Zustand {
     /// Je Origin das letzte Urteil „nicht verträglich“ (LLH-1982): Nebenfenster und „Neues
     /// Fenster“ laden einen so erkannten Server nicht. Eine bestandene Prüfung löscht es.
     urteile: Mutex<HashMap<String, Unvertraeglich>>,
+    /// Origins, deren Vertrag diese Sitzung bestätigt hat (LLH-1982): Nebenfenster dorthin laden
+    /// ohne eigene Prüfung, alle anderen prüfen erst.
+    bestaetigt: Mutex<HashSet<String>>,
+    /// Je Fenster die Nummer der jüngsten Ladung mit Vertragsprüfung (LLH-1982): eine ältere,
+    /// noch laufende Prüfung wirkt nicht mehr, ebenso keine für ein geschlossenes Fenster.
+    ladungen: Mutex<HashMap<String, u32>>,
+    ladung_nummer: AtomicU32,
     /// Zuletzt gezeigte native Meldungen: mehrere Fenster desselben Einsatzes melden dasselbe
     /// Ereignis je einmal (LLH-1281).
     meldungen: Mutex<Vec<(String, Instant)>>,
@@ -341,10 +348,43 @@ async fn pruefen(app: &AppHandle, ziel: &Url) -> vertrag::Vertragsergebnis {
     vertrag::check(ziel, letzter).await
 }
 
+/// Vergibt dem Fenster `label` eine neue Ladung; jede ältere gilt danach nicht mehr.
+fn neue_ladung_in(ladungen: &mut HashMap<String, u32>, zaehler: &AtomicU32, label: &str) -> u32 {
+    let nummer = zaehler.fetch_add(1, Ordering::Relaxed) + 1;
+    ladungen.insert(label.to_string(), nummer);
+    nummer
+}
+
+/// Ist `nummer` noch die jüngste Ladung des Fensters (und das Fenster nicht geschlossen)?
+fn ladung_gilt_in(ladungen: &HashMap<String, u32>, label: &str, nummer: u32) -> bool {
+    ladungen.get(label) == Some(&nummer)
+}
+
+fn neue_ladung(app: &AppHandle, label: &str) -> u32 {
+    let zustand = app.state::<Zustand>();
+    let mut ladungen = zustand.ladungen.lock().unwrap();
+    neue_ladung_in(&mut ladungen, &zustand.ladung_nummer, label)
+}
+
+fn ladung_gilt(app: &AppHandle, label: &str, nummer: u32) -> bool {
+    ladung_gilt_in(
+        &app.state::<Zustand>().ladungen.lock().unwrap(),
+        label,
+        nummer,
+    )
+}
+
 /// Jedes Laden des Servers, das die Hülle selbst anstößt (Start, Maske, Deeplink, „Erneut
-/// versuchen“), geht hierüber: erst prüfen, dann laden oder die Seite „nicht verträglich“.
+/// versuchen“), geht hierüber: erst prüfen, dann laden oder die Seite „nicht verträglich“. Kam
+/// inzwischen eine neuere Ladung desselben Fensters (Maske, Deeplink) oder ist es zu, verfällt das
+/// Ergebnis.
 async fn pruefe_und_lade(app: AppHandle, label: String, ziel: Url) -> Result<(), String> {
+    let nummer = neue_ladung(&app, &label);
     let ergebnis = pruefen(&app, &ziel).await;
+    if !ladung_gilt(&app, &label, nummer) {
+        log::info!("Veraltete Prüfung verworfen: {}", fuers_protokoll(&ziel));
+        return Ok(());
+    }
     anwenden(&app, &label, ziel, ergebnis)
 }
 
@@ -367,6 +407,11 @@ fn anwenden(
                 .lock()
                 .unwrap()
                 .remove(&origin_von(&ziel));
+            app.state::<Zustand>()
+                .bestaetigt
+                .lock()
+                .unwrap()
+                .insert(origin_von(&ziel));
             lade(app, label, ziel)
         }
         // Ohne Verbindung wie bisher: die Wache zeigt „nicht erreichbar“, oder der Service Worker
@@ -386,6 +431,11 @@ fn anwenden(
                 .lock()
                 .unwrap()
                 .insert(origin_von(&ziel), ausfall.clone());
+            app.state::<Zustand>()
+                .bestaetigt
+                .lock()
+                .unwrap()
+                .remove(&origin_von(&ziel));
             if app.get_webview_window(label).is_some() {
                 show_nicht_vertraeglich(app, label, ausfall);
                 return Ok(());
@@ -456,18 +506,27 @@ fn speichern_nach_pruefung(ergebnis: &vertrag::Vertragsergebnis) -> bool {
 
 /// Womit ein Nebenfenster beginnt.
 enum NebenfensterStart {
+    /// Der Server ist in dieser Sitzung bestätigt: gleich laden.
     Server(Url),
+    /// Noch nicht bestätigt (etwa ⌘N während der Startprüfung): erst „Verbinde…“ und prüfen.
+    Pruefen(Url),
     NichtVertraeglich(Unvertraeglich),
 }
 
-/// Ein Nebenfenster lädt einen als unverträglich erkannten Server nicht, sondern zeigt die Seite.
-fn nebenfenster_seite(urteil: Option<&Unvertraeglich>, ziel: Url) -> NebenfensterStart {
+/// Ein Nebenfenster lädt einen als unverträglich erkannten Server nicht, sondern zeigt die Seite;
+/// einen in dieser Sitzung noch nicht bestätigten prüft es erst.
+fn nebenfenster_seite(
+    urteil: Option<&Unvertraeglich>,
+    bestaetigt: bool,
+    ziel: Url,
+) -> NebenfensterStart {
     match urteil {
         Some(urteil) => NebenfensterStart::NichtVertraeglich(Unvertraeglich {
             ziel,
             ..urteil.clone()
         }),
-        None => NebenfensterStart::Server(ziel),
+        None if bestaetigt => NebenfensterStart::Server(ziel),
+        None => NebenfensterStart::Pruefen(ziel),
     }
 }
 
@@ -487,7 +546,9 @@ pub(crate) fn zeige_maske(app: &AppHandle, adresse: Option<Url>) {
         bekannt: bekannte_server(app),
     };
     *app.state::<Zustand>().vorbelegung.lock().unwrap() = vorbelegung;
-    // Die Maske beendet jede Wache des Hauptfensters: sie ist selbst die Anzeige.
+    // Die Maske beendet jede laufende Prüfung (LLH-1982) und jede Wache des Hauptfensters: sie ist
+    // selbst die Anzeige.
+    neue_ladung(app, FENSTER);
     app.state::<Zustand>()
         .watches
         .lock()
@@ -715,18 +776,31 @@ fn open_nebenfenster(app: &AppHandle, ziel: Url) {
         + 1;
     let label = nebenfenster_label(nummer);
     let platz = platz_neben_front(app);
+    let origin = origin_von(&ziel);
     let urteil = app
         .state::<Zustand>()
         .urteile
         .lock()
         .unwrap()
-        .get(&origin_von(&ziel))
+        .get(&origin)
         .cloned();
-    let start = match nebenfenster_seite(urteil.as_ref(), ziel) {
+    let bestaetigt = app
+        .state::<Zustand>()
+        .bestaetigt
+        .lock()
+        .unwrap()
+        .contains(&origin);
+    let mut zu_pruefen = None;
+    let start = match nebenfenster_seite(urteil.as_ref(), bestaetigt, ziel) {
         NebenfensterStart::Server(ziel) => {
             // Die Wache vor dem Bau, wie in `lade`.
             start_watch(app, &label, ziel.clone());
             WebviewUrl::External(ziel)
+        }
+        NebenfensterStart::Pruefen(ziel) => {
+            let start = WebviewUrl::App(verbinde_pfad(&ziel).into());
+            zu_pruefen = Some(ziel);
+            start
         }
         // Ein als unverträglich erkannter Server lädt auch hier nicht (LLH-1982).
         NebenfensterStart::NichtVertraeglich(ausfall) => {
@@ -741,6 +815,14 @@ fn open_nebenfenster(app: &AppHandle, ziel: Url) {
     match baue_fenster(app, &label, start, platz) {
         Ok(fenster) => {
             let _ = fenster.set_focus();
+            if let Some(ziel) = zu_pruefen {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(fehler) = pruefe_und_lade(app, label, ziel).await {
+                        log::error!("Nebenfenster nach der Prüfung nicht geladen: {fehler}");
+                    }
+                });
+            }
         }
         Err(fehler) => log::error!("Nebenfenster {label} nicht gebaut: {fehler}"),
     }
@@ -851,7 +933,11 @@ fn vorbelegung(zustand: tauri::State<'_, Zustand>) -> Vorbelegung {
 #[tauri::command]
 async fn verbinden(app: AppHandle, adresse: String) -> Result<(), String> {
     let server = pruefe_adresse(&adresse).map_err(|fehler| fehler.to_string())?;
+    let nummer = neue_ladung(&app, FENSTER);
     let ergebnis = pruefen(&app, &server).await;
+    if !ladung_gilt(&app, FENSTER, nummer) {
+        return Ok(());
+    }
     if let vertrag::Vertragsergebnis::NichtVertraeglich {
         richtung,
         server_version,
@@ -1274,7 +1360,11 @@ fn bestaetige_wechsel(app: &AppHandle, alt: Option<Url>, neu: Url) {
 /// Nach der Bestätigung: prüfen wie die Maske (LLH-1982); ein unverträglicher Server wird nicht
 /// gespeichert, ein Dialog nennt den Grund.
 async fn wechsel_per_deeplink(app: &AppHandle, neu: Url) -> Result<(), String> {
+    let nummer = neue_ladung(app, FENSTER);
     let ergebnis = pruefen(app, &neu).await;
+    if !ladung_gilt(app, FENSTER, nummer) {
+        return Ok(());
+    }
     if let vertrag::Vertragsergebnis::NichtVertraeglich {
         richtung,
         server_version,
@@ -1346,6 +1436,7 @@ fn main() {
                     .lock()
                     .unwrap()
                     .remove(fenster.label());
+                zustand.ladungen.lock().unwrap().remove(fenster.label());
                 apply_badge(fenster.app_handle(), fenster.label(), 0);
             }
         })
@@ -1721,16 +1812,49 @@ mod tests {
             richtung: vertrag::Richtung::ZuNeu,
             server_version: Some("2.0.0".into()),
         };
-        match nebenfenster_seite(Some(&urteil), ziel.clone()) {
+        match nebenfenster_seite(Some(&urteil), true, ziel.clone()) {
             NebenfensterStart::NichtVertraeglich(ausfall) => {
                 assert_eq!(ausfall.ziel, ziel);
                 assert_eq!(ausfall.richtung, vertrag::Richtung::ZuNeu);
                 assert_eq!(ausfall.server_version.as_deref(), Some("2.0.0"));
             }
-            NebenfensterStart::Server(_) => panic!("unverträglicher Server geladen"),
+            NebenfensterStart::Server(_) | NebenfensterStart::Pruefen(_) => {
+                panic!("unverträglicher Server geladen")
+            }
         }
         assert!(matches!(
-            nebenfenster_seite(None, ziel.clone()),
+            nebenfenster_seite(None, true, ziel.clone()),
+            NebenfensterStart::Server(seite) if seite == ziel
+        ));
+    }
+
+    /// Eine neuere Ladung desselben Fensters macht eine ältere, noch laufende Prüfung ungültig;
+    /// ein geschlossenes Fenster jede (LLH-1982, Review).
+    #[test]
+    fn aeltere_pruefung_wird_verworfen() {
+        let zaehler = AtomicU32::new(0);
+        let mut ladungen = HashMap::new();
+        let alt = neue_ladung_in(&mut ladungen, &zaehler, FENSTER);
+        let neu = neue_ladung_in(&mut ladungen, &zaehler, FENSTER);
+        let neben = neue_ladung_in(&mut ladungen, &zaehler, "neben-1");
+        assert!(!ladung_gilt_in(&ladungen, FENSTER, alt));
+        assert!(ladung_gilt_in(&ladungen, FENSTER, neu));
+        assert!(ladung_gilt_in(&ladungen, "neben-1", neben));
+        ladungen.remove("neben-1");
+        assert!(!ladung_gilt_in(&ladungen, "neben-1", neben));
+    }
+
+    /// Ein Nebenfenster für einen Server, den diese Sitzung noch nicht bestätigt hat (etwa ⌘N
+    /// während der Startprüfung), prüft erst selbst (LLH-1982, Review).
+    #[test]
+    fn nebenfenster_eines_ungeprueften_servers_prueft_erst() {
+        let ziel = Url::parse("https://elw.local:8443/einsatz/1").unwrap();
+        assert!(matches!(
+            nebenfenster_seite(None, false, ziel.clone()),
+            NebenfensterStart::Pruefen(seite) if seite == ziel
+        ));
+        assert!(matches!(
+            nebenfenster_seite(None, true, ziel.clone()),
             NebenfensterStart::Server(seite) if seite == ziel
         ));
     }

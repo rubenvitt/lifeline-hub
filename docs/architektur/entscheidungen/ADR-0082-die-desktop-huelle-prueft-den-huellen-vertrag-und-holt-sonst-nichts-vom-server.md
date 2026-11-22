@@ -26,7 +26,7 @@ herleitung:
 - MUST NOT: keine Anwendungslogik, keine Datenbank und kein weiterer eigener Abruf in der Hülle.
   Der einzige ist der anonyme Vertragsabruf (`GET /api/shell`, bei 404 `GET /api/health`) ohne
   Cookies in `src-tauri/src/vertrag.rs`.
-- MUST NOT: `src-tauri/ui/` enthält nur lokale Seiten der Hülle: Maske, „nicht erreichbar“,
+- MUST: `src-tauri/ui/` enthält nur lokale Seiten der Hülle: Maske, „nicht erreichbar“,
   „nicht verträglich“ und „Verbinde…“.
 - MUST NOT: kein Tauri-Paket im Frontend; die Seite erkennt Fähigkeiten der Hülle nur über
   `window.__LIFELINE_HUELLE__` (`frontend/src/huelle/faehigkeiten.ts`).
