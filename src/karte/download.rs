@@ -13,6 +13,8 @@ use reqwest::Url;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
+use crate::ausgehend::zieladresse::{klasse, Adressklasse};
+
 /// Transienter Download-Fortschritt, nur im `AppState`. `gesamt = 0` heißt „Größe unbekannt“.
 #[derive(Debug, Default)]
 pub struct Fortschritt {
@@ -137,65 +139,12 @@ impl std::fmt::Display for DownloadFehler {
     }
 }
 
-/// True, wenn eine IP in einem internen/nicht routbaren Bereich liegt (SSRF-Schutz). Auch vom
-/// pinnenden Proxy-Resolver (`karte::proxy`) genutzt.
+/// True, wenn eine IP nicht öffentlich ist (SSRF-Schutz): privat oder gesperrt nach der
+/// gemeinsamen Einordnung [`klasse`] (LLH-1873), also auch
+/// Multicast, reservierte Netze und Benchmark-Netze. Auch vom pinnenden Proxy-Resolver
+/// (`karte::proxy`) genutzt. Eine LAN-Ausnahme wie bei Webhooks gibt es für Karten nicht.
 pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            v4.is_loopback()
-                || v4.is_private()
-                || v4.is_link_local()
-                || v4.is_unspecified()
-                || v4.is_broadcast()
-                || v4.octets()[0] == 0 // 0.0.0.0/8 „this network"
-                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 0x40) // 100.64/10 CGNAT
-        }
-        IpAddr::V6(v6) => {
-            if v6.is_loopback()
-                || v6.is_unspecified()
-                || (v6.segments()[0] & 0xfe00) == 0xfc00 // fc00::/7 unique local
-                || (v6.segments()[0] & 0xffc0) == 0xfe80
-            // fe80::/10 link-local
-            {
-                return true;
-            }
-            // Eingebettetes IPv4 in allen gängigen Formen prüfen; `to_ipv4_mapped` allein deckt nur
-            // `::ffff:a.b.c.d`.
-            let s = v6.segments();
-            // IPv4-mapped (::ffff:a.b.c.d) UND IPv4-compatible (::a.b.c.d).
-            if let Some(v4) = v6.to_ipv4() {
-                if ip_ist_intern(&IpAddr::V4(v4)) {
-                    return true;
-                }
-            }
-            // NAT64 64:ff9b::/96 → eingebettete IPv4 in den letzten 32 Bit.
-            if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0 && s[3] == 0 && s[4] == 0 && s[5] == 0
-            {
-                let v4 = std::net::Ipv4Addr::new(
-                    (s[6] >> 8) as u8,
-                    (s[6] & 0xff) as u8,
-                    (s[7] >> 8) as u8,
-                    (s[7] & 0xff) as u8,
-                );
-                if ip_ist_intern(&IpAddr::V4(v4)) {
-                    return true;
-                }
-            }
-            // 6to4 2002::/16 → eingebettete IPv4 in den Bits 16..48.
-            if s[0] == 0x2002 {
-                let v4 = std::net::Ipv4Addr::new(
-                    (s[1] >> 8) as u8,
-                    (s[1] & 0xff) as u8,
-                    (s[2] >> 8) as u8,
-                    (s[2] & 0xff) as u8,
-                );
-                if ip_ist_intern(&IpAddr::V4(v4)) {
-                    return true;
-                }
-            }
-            false
-        }
-    }
+    klasse(ip) != Adressklasse::Oeffentlich
 }
 
 /// Prüft eine (auch per Redirect erreichte) URL: nur `https`, kein `localhost`, keine internen
@@ -612,6 +561,39 @@ mod tests {
         assert!(!intern("::ffff:8.8.8.8"), "öffentliches IPv4-mapped");
         assert!(!intern("2606:4700::1"), "globales IPv6");
         assert!(!intern("64:ff9b::8.8.8.8"), "NAT64 mit öffentlichem IPv4");
+    }
+
+    /// LLH-1873: Multicast, reservierte und Benchmark-Netze sind kein Ziel für einen Download,
+    /// weder als IP-Literal in der URL noch als eingebettetes IPv4.
+    #[test]
+    fn multicast_reserviert_und_benchmark_sind_intern() {
+        let intern = |s: &str| ip_ist_intern(&s.parse::<IpAddr>().unwrap());
+        for s in [
+            "224.0.0.1",
+            "239.255.255.250",
+            "240.0.0.1",
+            "198.18.0.1",
+            "198.19.255.254",
+            "ff02::1",
+            "ff05::2",
+            "::ffff:224.0.0.1",
+            "64:ff9b::f000:1",
+        ] {
+            assert!(intern(s), "{s} muss intern sein");
+        }
+        // Knapp daneben bleibt öffentlich.
+        assert!(!intern("198.20.0.1"));
+        assert!(!intern("223.255.255.254"));
+
+        let u = |s: &str| Url::parse(s).unwrap();
+        for url in [
+            "https://224.0.0.1/x.mbtiles",
+            "https://240.0.0.1/x.mbtiles",
+            "https://198.18.0.1/x.mbtiles",
+            "https://[ff02::1]/x.mbtiles",
+        ] {
+            assert!(url_ist_sicher_mit(&u(url), false).is_err(), "{url}");
+        }
     }
 
     /// Kleiner Loopback-Fixture-Server, der einen festen Body unter /f.pmtiles ausliefert.

@@ -1339,6 +1339,12 @@ mod rewrite_tests {
         );
         assert!(nur_public(vec![loopback]).is_empty(), "loopback raus");
         assert!(nur_public(vec![]).is_empty());
+        // LLH-1873: Multicast, reserviert, Benchmark und IPv6-Multicast lösen nie auf.
+        for s in ["224.0.0.1:0", "240.0.0.1:0", "198.18.0.1:0", "[ff02::1]:0"] {
+            let a: SocketAddr = s.parse().unwrap();
+            assert!(nur_public(vec![a]).is_empty(), "{s} raus");
+            assert!(nur_public(vec![pub1, a]).is_empty(), "{s} gemischt raus");
+        }
     }
 
     #[test]

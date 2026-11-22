@@ -15,6 +15,8 @@
 
 use std::sync::OnceLock;
 
+pub mod zieladresse;
+
 /// Adresse des Projekts, über die ein Dienstbetreiber die Software und ihre Entwickler findet.
 pub const PROJEKT_ADRESSE: &str = "https://github.com/rubenvitt/lifeline-hub";
 
