@@ -914,8 +914,8 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
 - **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
   anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
-  durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, vor dem Löschen der
-  Sitzung), „Sitzungen beenden“ (eine Sitzung: deren Anmeldungen; alle anderen: alle des Kontos
+  durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, in einer
+  Transaktion mit der Sitzung, `session::abmelden`), „Sitzungen beenden“ (eine Sitzung: deren Anmeldungen; alle anderen: alle des Kontos
   außer denen der behaltenen Sitzung, auch die ohne Sitzung, `repo::loeschen_fuer_benutzer_ausser`;
   ein Admin für eine andere Person: alle des Kontos), Deaktivieren (jeder Weg, der `aktiv` auf 0
   setzt, über `session::konto_deaktiviert`) und Löschen des Kontos,

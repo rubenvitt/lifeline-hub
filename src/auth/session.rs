@@ -139,6 +139,22 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<Option<String>, 
     Ok(kennung.flatten())
 }
 
+/// Logout: die iOS-Anmeldungen dieser Sitzung (LLH-2040) und die Sitzung selbst, in einer
+/// Transaktion. Getrennt könnte ein `PUT /api/ios-push/anmeldung` derselben Sitzung dazwischen
+/// das Gerät neu anmelden, und die Sitzung zu löschen setzte dann nur `session_token_hash` auf
+/// NULL (Review M6). Liefert die Kennung der Sitzung wie [`loeschen`].
+pub async fn abmelden(pool: &SqlitePool, token: &str) -> Result<Option<String>, AppError> {
+    let mut tx = pool.begin().await?;
+    crate::ios_push::repo::loeschen_fuer_sitzungen(&mut tx, &[hash_token(token)]).await?;
+    let kennung: Option<Option<String>> =
+        sqlx::query_scalar("DELETE FROM session WHERE token_hash = ? RETURNING kennung")
+            .bind(hash_token(token))
+            .fetch_optional(&mut *tx)
+            .await?;
+    tx.commit().await?;
+    Ok(kennung.flatten())
+}
+
 /// Löscht alle Sessions eines Benutzers AUSSER der zum übergebenen Token (Passwortwechsel,
 /// LFH-471) und liefert ihre Kennungen. Läuft auf dem Executor des Aufrufers, damit der Wechsel
 /// mit dem neuen Hash in einer Transaktion steht.

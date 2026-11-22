@@ -397,6 +397,35 @@ async fn logout_loescht_die_anmeldung_dieser_sitzung() {
     assert_eq!(kennungen, vec![KENNUNG_2.to_string()]);
 }
 
+/// Review M6: Logout nimmt Anmeldung und Sitzung in einer Transaktion
+/// (`session::abmelden`); ein `PUT` derselben Sitzung kann sich nicht zwischen beide schieben
+/// und das Gerät nach dem Logout wieder anmelden.
+#[tokio::test]
+async fn abmelden_loescht_anmeldung_und_sitzung_zusammen() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    assert_eq!(
+        anmelden(&app, &admin, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+    let token = admin
+        .split(';')
+        .next()
+        .and_then(|c| c.split_once('='))
+        .map(|(_, t)| t.to_string())
+        .unwrap();
+    let kennung = lifeline_hub::auth::session::abmelden(&pool, &token)
+        .await
+        .unwrap();
+    assert!(kennung.is_some(), "die Sitzung hatte eine Kennung");
+    assert_eq!(zahl(&pool).await, 0);
+    let sitzungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(sitzungen, 0);
+}
+
 #[tokio::test]
 async fn sitzungen_beenden_alle_loescht_alle_anmeldungen() {
     let (app, pool) = mit_ios_push().await;

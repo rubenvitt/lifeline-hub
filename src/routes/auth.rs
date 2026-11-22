@@ -457,15 +457,8 @@ pub async fn logout(
         let (benutzer_id, anmeldeweg) =
             session::herkunft_zu_token(&state.pool, cookie.value()).await;
 
-        // Die iOS-Anmeldung dieser Sitzung geht mit (LLH-2040), bevor die Sitzung fällt.
-        let mut conn = state.pool.acquire().await?;
-        crate::ios_push::repo::loeschen_fuer_sitzungen(
-            &mut conn,
-            &[session::hash_token(cookie.value())],
-        )
-        .await?;
-        drop(conn);
-        let beendet = session::loeschen(&state.pool, cookie.value()).await?;
+        // Die iOS-Anmeldung dieser Sitzung geht mit (LLH-2040), in derselben Transaktion.
+        let beendet = session::abmelden(&state.pool, cookie.value()).await?;
         state.live.melde_sitzung_ende(beendet);
 
         tracing::info!(benutzer_id = ?benutzer_id, peer_ip = ?peer_ip, "Abmeldung");
