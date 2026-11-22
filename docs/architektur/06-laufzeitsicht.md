@@ -725,7 +725,7 @@ sequenceDiagram
   (`src/web_push/mod.rs`). Erreicht der Service Worker den Server nicht, zeigt er den Titel der
   Stufe (`frontend/public/alarm-sw.js`).
 - Ohne Einsatz meldet nur der Adapter-Lauf (LLH-2026,
-  [ADR-0082](entscheidungen/ADR-0082-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  [ADR-0083](entscheidungen/ADR-0083-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   `adapter::lauf` setzt in seiner Transaktion den Merker `adapter.gemeldet` und ruft danach
   `melden(Anlass::adapter(…))`; Empfänger, Leserecht und Text stehen in
   `src/benachrichtigung/adapter.rs`, zugestellt wird über den Org-Kanal, nie über den Hub.
