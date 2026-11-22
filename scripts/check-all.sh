@@ -572,7 +572,9 @@ schritt_20() {
     echo "    Die CI prüft den Kotlin-Kern mit ANDROID_KERN_PFLICHT=1." >&2
     return "$UEBERSPRUNGEN_RC"
   fi
-  "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
+  # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an (Testnamen als Satz); unter der
+  # Locale C scheitert das mit `InvalidPathException`. Deshalb immer mit UTF-8.
+  LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
 }
 
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
