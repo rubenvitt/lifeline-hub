@@ -1142,6 +1142,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen",
+            post(routes::einsatz_personal::status_zuruecknehmen),
+        )
+        .route(
             "/api/einsaetze/{id}/personal/{ep_id}/entlassen",
             post(routes::einsatz_personal::entlassen),
         )

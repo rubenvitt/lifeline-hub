@@ -3,7 +3,9 @@
 //! Server beim Wechsel selbst fest; vom Client zählen nur die Prüfwerte des Belegs. Regel:
 //! `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines Statuswechsels“.
 
+use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
+use utoipa::ToSchema;
 
 use crate::error::AppError;
 use crate::zeitachse::repo::{Beruehrt, Kraft};
@@ -18,6 +20,21 @@ pub fn conflict() -> AppError {
          der Person, die gewechselt hat"
             .into(),
     )
+}
+
+/// Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
+/// „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
+/// und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+/// wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct HandStatusRuecknahmeBeleg {
+    /// Status vor dem Wechsel, nur für die Quittung („S2 → S3“).
+    #[serde(default)]
+    pub vorher_status_id: Option<i64>,
+    /// Der gesetzte Status (`null` = gelöscht); die Rücknahme gelingt nur, solange er noch steht.
+    pub status_id: Option<i64>,
+    /// Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt.
+    pub gesetzt_at: String,
 }
 
 /// Was die Zeile über den letzten Wechsel festhält: der aktuelle Status, die Kennung des
