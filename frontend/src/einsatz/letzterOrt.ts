@@ -4,8 +4,13 @@
  * den Seiten der Ebene 1 und in der Hilfe (LLH-1731).
  *
  * Anders als `zuletztModule.ts` zählt hier auch die Ankunft: gefragt ist „wo war ich“, nicht „was
- * habe ich gewählt“. Gemerkt wird die volle Adresse samt Suche, damit der Rückweg an dieselbe
- * Stelle führt, nicht auf die Startseite des Moduls.
+ * habe ich gewählt“. Gemerkt wird der volle Pfad, damit der Rückweg an dieselbe Stelle führt,
+ * nicht auf die Startseite des Moduls, aber ohne die Suche: dort stehen Freitextfilter, und die
+ * gehören nicht für eine Schicht in den Browserspeicher (Spec `seiten-orientierung`).
+ *
+ * Was gemerkt wird, entscheidet der Rahmen (`EinsatzLayout.tsx`, Merk-Effekt und `merkbar`): kein
+ * Ort in einem gesperrten Modul und keiner auf der Auffangseite „Seite nicht gefunden“ (LLH-1729,
+ * `nichtGefundenContext.ts`), sonst führte der Rückweg in die Sperre oder auf „gibt es nicht“.
  *
  * JE BENUTZER und MIT FRIST einer Schicht, aus demselben Grund wie `zuletztModule.ts`: am geteilten
  * Fükw-Rechner führte der Rückweg sonst in den Einsatz der vorigen Schicht.
@@ -18,7 +23,7 @@ export const LETZTER_ORT_FRIST_MS = 12 * 60 * 60 * 1000;
 
 export interface LetzterOrt {
   einsatzId: number;
-  /** Pfad samt Suche, z. B. `/einsaetze/5/personen?sicht=karte`. */
+  /** Pfad ohne Suche, z. B. `/einsaetze/5/personen`. */
   pfad: string;
 }
 
@@ -26,7 +31,8 @@ const schluessel = (benutzerId: number) => `lfh:nav:letzter-ort:${benutzerId}`;
 
 /**
  * Nur Adressen des gemerkten Einsatzes: der Rückweg navigiert dorthin, ein fremder Inhalt im
- * Speicher darf nirgends sonst hinführen.
+ * Speicher darf nirgends sonst hinführen. Eine Suche am Pfad lässt der Rahmen weg; der Zweig für
+ * `?` bleibt, damit ein älterer Speicherstand mit Suche weiter gilt, und schadet nicht.
  */
 function gehoertZumEinsatz(ort: LetzterOrt): boolean {
   const basis = einsatzPfad(ort.einsatzId);

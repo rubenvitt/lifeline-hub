@@ -49,7 +49,7 @@
     "terra-draw-maplibre-gl-adapter": "^1.5.0"
   },
   "devDependencies": {
-    "@ant-design/cssinjs": "~2.1.2",
+    "@ant-design/cssinjs": "~2.2.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.1",
     "@tanstack/react-query-devtools": "^5.108.2",

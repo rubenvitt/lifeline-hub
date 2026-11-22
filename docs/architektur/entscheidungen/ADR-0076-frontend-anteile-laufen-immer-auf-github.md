@@ -1,11 +1,11 @@
 ---
 id: ADR-0076
 titel: Die Frontend-Anteile laufen immer auf GitHub, auf dem eigenen Server nur Rust-Suite und e2e
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-21
+ersetzt_durch: ADR-0078
 gilt_fuer:
   - .github/workflows/suiten.yml
-  - scripts/runner/**
 herleitung:
   - docs/superpowers/specs/2026-11-21-gti2hj00-frontend-gehostet-design.md
   - LLH-2016 (mit Ruben am 21.11.2026 abgestimmt)
