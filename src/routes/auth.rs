@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 use webauthn_rs::prelude::{
-    CreationChallengeResponse, Credential, PublicKeyCredential, RegisterPublicKeyCredential,
+    CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
     RequestChallengeResponse, WebauthnError,
 };
 
@@ -1703,14 +1703,12 @@ async fn webauthn_discoverable_pruefen(
     else {
         return Err(Abgewiesen::anonym());
     };
-    let credential = Credential::from(passkey);
-
-    // Counter-/Klon-Check in der Bibliothek, wie im Passkey-Flow.
-    let auth_result = match webauthn.finish_discoverable_authentication_v2(
-        body,
-        disc_state,
-        &credential,
-    ) {
+    // Counter-/Klon-Check in der Bibliothek, wie im Passkey-Flow. Der `Passkey` geht direkt
+    // hinein (`CredentialRef`); eine Umwandlung in `Credential` bräuchte das Feature
+    // `danger-credential-internals`, das nur die Tests haben (LLH-2027).
+    let auth_result = match webauthn
+        .finish_discoverable_authentication_v2(body, disc_state, &passkey)
+    {
         Ok(r) => r,
         Err(WebauthnError::CredentialPossibleCompromise) => {
             tracing::warn!(
