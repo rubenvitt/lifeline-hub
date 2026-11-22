@@ -42,7 +42,10 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName).first()).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
@@ -146,7 +149,10 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName).first()).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
@@ -251,7 +257,10 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName)).toBeVisible();
 
   // UHS anlegen (frischer Einsatz → Leerzustand mit „Erste UHS anlegen").
@@ -311,7 +320,10 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName).first()).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
@@ -391,7 +403,10 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   await expect(page.getByText(personName)).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);

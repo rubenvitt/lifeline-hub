@@ -600,7 +600,8 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
     {
       pfad: `${R}/chat`,
       anker: (page) => inMain(page).getByText('Funkprobe').first(),
-      hinweis: /nur Einsatzleitung und Führungspersonal$/,
+      // Im Chat erfasst auch die Mitarbeit (LLH-1817).
+      hinweis: /nur Einsatzleitung, Führungspersonal und Mitarbeit$/,
       fehlt: knopf('Senden'),
       // Die Eingabe weicht dem Hinweis; der Zweig wird als Vorbedingung belegt, ein eigenes
       // Bedienziel bleibt im Nachrichtenbereich nicht.

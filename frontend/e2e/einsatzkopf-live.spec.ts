@@ -141,7 +141,7 @@ test('LFH-854: ein Rollenwechsel schaltet das Schreibrecht der betroffenen Perso
     // „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078).
     const hinweis = person
       .locator('[data-lfh="rechte-hinweis"]')
-      .filter({ hasText: 'nur Einsatzleitung und Führungspersonal' });
+      .filter({ hasText: 'nur Einsatzleitung, Führungspersonal und Mitarbeit' });
     const eingabe = person.getByPlaceholder('Nachricht…');
     await expect(hinweis, 'Vorbedingung: als Beobachter steht der Hinweis').toHaveCount(1);
     await expect(eingabe, 'Vorbedingung: als Beobachter keine Eingabe').toHaveCount(0);

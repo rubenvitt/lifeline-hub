@@ -43,7 +43,10 @@ async function suche(page: Page, begriff: string) {
 async function personErfassen(page: Page, einsatzId: string): Promise<string> {
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
   await expect(page.getByRole('dialog', { name: 'Betroffene erfassen' })).toBeVisible();
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Betroffene erfassen' })
+    .getByRole('button', { name: 'Erfassen', exact: true })
+    .click();
   const quittung = page.getByText(/Erfasst als R-\d+/);
   await expect(quittung).toBeVisible();
   return (await quittung.innerText()).match(/R-\d+/)![0];

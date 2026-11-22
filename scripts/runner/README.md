@@ -28,10 +28,11 @@ starten.
 
 ## Einrichten
 
-Voraussetzungen: Linux mit systemd, Docker Engine, `git` und `curl`; für vier Plätze mindestens
-8 Kerne, 16 GB Speicher und rund 60 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, je
-laufendem Job einige GB). Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job,
-der die Platte füllt, trifft dann nur die Runner, nicht den Host.
+Voraussetzungen: Linux mit systemd, Docker Engine, `git` und `curl`; für vier Plätze 12 Kerne,
+rund 62 GB Speicher und rund 110 GB Platte (Image 6–7 GB, Compiler-Cache bis 20 GB, die
+Rust-Suite rund 60 GB, jeder andere laufende Job einige GB); Größenregel unter „Plätze und
+Größe“. Am besten liegt `/var/lib/docker` auf einer eigenen Partition: ein Job, der die Platte
+füllt, trifft dann nur die Runner, nicht den Host.
 
 1. **Dienstnutzer.** Mitglied der Gruppe `docker` heißt auf diesem Host root-gleich; deshalb ein
    eigener Systemnutzer, der sonst nichts tut. Die Jobs selbst sehen den Docker-Socket nie.
@@ -71,8 +72,8 @@ der die Platte füllt, trifft dann nur die Runner, nicht den Host.
 
    `runner-loop.sh` startet nicht, wenn die Datei für andere lesbar ist.
 
-4. **Konfiguration.** Vorgaben passen für 8 Kerne und 16 GB; die Grenzen sind Deckel je
-   Container, keine Reservierung.
+4. **Konfiguration.** Die Grenzen sind Deckel je Container, keine Reservierung; den Speicher
+   bestimmt die Rust-Suite (Abschnitt „Plätze und Größe“).
 
    ```bash
    sudo install -m 640 -o root -g lifeline-runner /opt/lifeline-runner/repo/scripts/runner/runner.env.beispiel /etc/lifeline-runner/runner.env
@@ -147,9 +148,15 @@ vier e2e-Anteile. Mehr Jobs als Plätze warten. Je Platz gelten `RUNNER_CPUS` Ke
 
 - **Kerne nicht überbuchen:** Plätze × `RUNNER_CPUS` höchstens so viele wie `nproc`. Überbucht
   bremsen sich die e2e-Anteile gegenseitig aus und reißen das Zeitlimit von 75 min.
-- **Speicher:** die Rust-Suite linkt große Test-Binaries und braucht rund 10 GB; mit 6 GB brach
-  sie mit „killed by signal 9“ ab. Plätze × `RUNNER_MEMORY` plus einige GB für den Host.
-- **Beispiel** (12 Kerne, 62 GB): vier Plätze, `RUNNER_CPUS=3`, `RUNNER_MEMORY=11g`.
+- **Speicher:** den Bedarf setzt die Rust-Suite. rustc übersetzt das Crate `lifeline_hub` als
+  Bibliothek (gemessen rund 6 GB Spitze) und zugleich als Testbibliothek (rund 10 GB), zusammen
+  rund 13 GB; ohne Debuginfo und mit einem Job sind es immer noch 9,8 GB. Mit 6 GB brach sie mit
+  „Compiler killed by signal 9“ ab (alpha, 21.11.2026). Vorgabe ist deshalb `14g`. Plätze ×
+  `RUNNER_MEMORY` plus einige GB für den Host: die Grenze ist ein Deckel, und reicht der Host
+  nicht, beendet der Kernel denselben Compiler.
+- **Platte:** die Testbinaries der Rust-Suite belegen im Container rund 50 GB, der
+  Inkrementalcache weitere 8 GB.
+- **Beispiel** (12 Kerne, 62 GB): vier Plätze, `RUNNER_CPUS=3`, `RUNNER_MEMORY=14g`.
 
 Einen Platz abschalten: `sudo systemctl disable --now lifeline-runner@5`; einen dazu:
 `sudo systemctl enable --now lifeline-runner@5`. Nach einer Änderung an `runner.env` die Plätze

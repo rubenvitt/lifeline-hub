@@ -94,7 +94,7 @@ test('Chat: der Hinweis ersetzt die Eingabe und bleibt bei langem Strom sichtbar
   // „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078).
   const hinweis = page
     .locator('[data-lfh="rechte-hinweis"]')
-    .filter({ hasText: 'nur Einsatzleitung und Führungspersonal' });
+    .filter({ hasText: 'nur Einsatzleitung, Führungspersonal und Mitarbeit' });
   await expect(hinweis, 'Vorbedingung: der Hinweis steht statt der Eingabe').toHaveCount(1);
   await expect(
     page.getByPlaceholder('Nachricht…'),
@@ -215,7 +215,7 @@ test('Chat: unter md fehlt dem Beobachter die Kanalanlage, die Leiste läuft nic
   await expect(
     page
       .locator('[data-lfh="rechte-hinweis"]')
-      .filter({ hasText: 'nur Einsatzleitung und Führungspersonal' }),
+      .filter({ hasText: 'nur Einsatzleitung, Führungspersonal und Mitarbeit' }),
   ).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Kanal anlegen' })).toHaveCount(0);
 
