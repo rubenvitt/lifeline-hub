@@ -17,7 +17,14 @@ describe('letzterOrt', () => {
     expect(leseLetztenOrt(A, Date.now())).toBeNull();
   });
 
-  it('merkt Einsatz und Adresse samt Suche', () => {
+  it('merkt Einsatz und Pfad', () => {
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/personen' }, 1000);
+    expect(leseLetztenOrt(A, 2000)).toEqual({ einsatzId: 5, pfad: '/einsaetze/5/personen' });
+  });
+
+  it('liest einen älteren Stand mit Suche weiter', () => {
+    // Der Rahmen merkt keine Suche mehr (`EinsatzLayout.tsx`), ältere Speicherstände tragen sie
+    // aber noch.
     merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/personen?sicht=karte' }, 1000);
     expect(leseLetztenOrt(A, 2000)).toEqual({
       einsatzId: 5,
