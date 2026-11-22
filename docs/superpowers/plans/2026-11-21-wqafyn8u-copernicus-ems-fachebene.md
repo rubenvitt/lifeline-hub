@@ -77,6 +77,8 @@ läuft per TDD: erst der rote Test, dann der Code.
 
 ### 9. Abschluss
 - [x] Folgeaufgaben in Zunder (COG LLH-2021, Altbestand vor 2023 LLH-2022).
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Bündel einzeln; Rust in Portionen,
+      weil der volle Testbau das Plattenkontingent der Cloud-Sitzung sprengt; Desktop-Hülle
+      ohne gdk-3.0 im Container nicht baubar).
 - [ ] Bild der Änderung mit Live-Daten EMSR728.
 - [ ] PR gegen `alpha`.
