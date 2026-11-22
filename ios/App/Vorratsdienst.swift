@@ -16,6 +16,8 @@ final class Vorratsdienst {
     /// Server, deren gespeicherte Oberfläche in diesem App-Lauf nicht hochfuhr. Nur im Speicher:
     /// ein langsames Gerät soll die Fähigkeit nicht dauerhaft verlieren.
     private var gescheitert: Set<UUID> = []
+    /// Server, für die gerade vorgewärmt wird; ein zweiter Anstoß wartet nicht, er entfällt.
+    private var laeuft: Set<UUID> = []
     private let protokoll = Logger(subsystem: "dev.rubeen.lifeline.ios", category: "ohne-server")
 
     init(
@@ -66,15 +68,26 @@ final class Vorratsdienst {
         return false
     }
 
+    /// Verwirft eine Ablage, die nicht zu `version` gehört. Die App ruft das sofort, wenn der
+    /// Server eine Version nennt, nicht erst nach dem Laden: die neue Version kann die
+    /// Datenbanken des Frontends schon heben, bevor das Vorwärmen beginnt.
+    func verwirfVeraltete(_ eintrag: ServerEintrag, version: String) {
+        guard let gespeichert = ablage.load(eintrag.id)?.version, gespeichert != version else { return }
+        ablage.remove(eintrag.id)
+        protokoll.info("Gespeicherte Oberfläche verworfen: neue Version \(version, privacy: .public)")
+    }
+
     /// Nach einem Laden vom Server: verwerfen, vorwärmen und ablegen, wie `Vorrat.plan` es sagt.
-    /// Gespeichert wird nur, wenn jedes Asset ankam.
+    /// Gespeichert wird nur, wenn jedes Asset ankam, und nur von einer Seite des Servers.
     func vorwaermen(_ eintrag: ServerEintrag, info: ShellInfo, in webView: WKWebView) async {
+        verwirfVeraltete(eintrag, version: info.version)
         let plan = Vorrat.plan(gespeichert: ablage.load(eintrag.id)?.version, server: info)
-        if plan.verwerfen {
-            ablage.remove(eintrag.id)
-            protokoll.info("Gespeicherte Oberfläche verworfen: neue Version \(info.version, privacy: .public)")
-        }
-        guard let assets = plan.assets else { return }
+        guard let assets = plan.assets, !laeuft.contains(eintrag.id) else { return }
+        // Beim Identitätsanbieter holte das Skript dessen `/assets/…`.
+        guard let seite = webView.url, Linkregeln.belongsToServer(eintrag.adresse.url, seite: seite)
+        else { return }
+        laeuft.insert(eintrag.id)
+        defer { laeuft.remove(eintrag.id) }
         let beginn = ContinuousClock.now
         let rueckgabe = try? await webView.callAsyncJavaScript(
             skript, arguments: ["pfade": assets, "gleichzeitig": Vorrat.gleichzeitig],

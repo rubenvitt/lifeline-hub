@@ -152,6 +152,9 @@ public enum Ablauf {
             return Step(seite, [.check(eintrag)])
         case (.web(let eintrag, _), .vordergrund(seiteAntwortet: false, _, _)):
             return Step(.pruefung(eintrag), [.check(eintrag)])
+        case (.ohneServer(let eintrag, _), .vordergrund(seiteAntwortet: false, _, _)):
+            // Ohne Server ginge ein Neuladen ans Netz; die gespeicherte Oberfläche kommt neu.
+            return Step(seite, [.check(eintrag), .loadVorrat(eintrag)])
         case (.status(let eintrag, _), .vordergrund), (.ohneServer(let eintrag, _), .vordergrund):
             return Step(seite, [.check(eintrag)])
         case (.status(let eintrag, .nichtErreichbar), .wiederholen), (.ohneServer(let eintrag, _), .wiederholen):
@@ -165,8 +168,13 @@ public enum Ablauf {
             return Step(seite, [.hideZurOberflaeche, .loadVorrat(eintrag)])
         case (.status(let eintrag, _), .zurOberflaeche):
             return Step(.pruefung(eintrag), [.check(eintrag)])
-        case (.web(let eintrag, _), .seiteGeladen(let url?)), (.ohneServer(let eintrag, _), .seiteGeladen(let url?)):
-            guard Linkregeln.belongsToServer(eintrag.adresse.url, seite: url) else { return Step(seite) }
+        case (.web(let eintrag, _), .seiteGeladen(let url?))
+        where Linkregeln.belongsToServer(eintrag.adresse.url, seite: url):
+            // Eine neu geladene Seite kann eine neue Version des Servers sein (Neu laden nach
+            // einem Update): prüfen, damit `vorwaermen` die Ablage neu rechnet (LLH-1980).
+            return Step(seite, [.hideZurOberflaeche, .check(eintrag)])
+        case (.ohneServer(let eintrag, _), .seiteGeladen(let url?))
+        where Linkregeln.belongsToServer(eintrag.adresse.url, seite: url):
             return Step(seite, [.hideZurOberflaeche])
 
         case (_, .ergebnis(let ergebnis, let healthVersion, let id)):

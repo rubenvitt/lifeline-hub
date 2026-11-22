@@ -231,7 +231,7 @@ final class AblaufTests: XCTestCase {
     func testDieSeiteDesServersNimmtDenHinweisZurueck() {
         let zurueck = step(.web(elw, vertrag: 1), .seiteGeladen(url: eigen))
         XCTAssertEqual(zurueck.seite, .web(elw, vertrag: 1))
-        XCTAssertEqual(zurueck.effects, [.hideZurOberflaeche])
+        XCTAssertEqual(zurueck.effects, [.hideZurOberflaeche, .check(elw)])
         XCTAssertEqual(step(.web(elw, vertrag: 1), .seiteGeladen(url: idp)).effects, [])
         XCTAssertEqual(step(.web(elw, vertrag: 1), .seiteGeladen(url: nil)).effects, [])
         XCTAssertEqual(step(.pruefung(elw), .seiteGeladen(url: eigen)).effects, [])
@@ -432,5 +432,23 @@ final class AblaufTests: XCTestCase {
             XCTAssertEqual(seite.zeigtWebview, webview, "\(seite)")
             XCTAssertEqual(seite.wiederholt, wiederholt, "\(seite)")
         }
+    }
+
+    // MARK: Nach dem Review (LLH-1980)
+
+    /// Eine neu geladene Seite des Servers (Neu laden nach einem Update) kann eine neue Version
+    /// sein, die die Datenbanken des Frontends hebt: die App prüft und rechnet das Vorwärmen neu.
+    func testEineNeuGeladeneSeiteDesServersPrueftDenVertrag() {
+        let schritt = step(.web(elw, vertrag: 1), .seiteGeladen(url: eigen))
+        XCTAssertTrue(schritt.effects.contains(.check(elw)), "\(schritt.effects)")
+        XCTAssertEqual(step(.web(elw, vertrag: 1), .seiteGeladen(url: idp)).effects, [])
+    }
+
+    /// Ohne Server lädt die App eine tote oder hängende Seite bei der Rückkehr neu.
+    func testRueckkehrOhneServerMitToterSeiteLaedtDieGespeicherteOberflaeche() {
+        let seite = Ablauf.Seite.ohneServer(elw, version: "1.0")
+        let schritt = step(seite, .vordergrund(seiteAntwortet: false, adresse: nil, anmeldungLaeuft: false))
+        XCTAssertEqual(schritt.seite, seite)
+        XCTAssertEqual(schritt.effects, [.check(elw), .loadVorrat(elw)])
     }
 }

@@ -183,7 +183,10 @@ final class AppModell {
 
     /// Nach dem Laden vom Server, sobald die Seite fertig ist: vorwärmen und ablegen.
     private func vorwaermen(_ eintrag: ServerEintrag, _ info: ShellInfo) {
-        guard let vorrat, let webView else { return }
+        guard let vorrat else { return }
+        // Sofort, unabhängig davon, ob das Vorwärmen danach läuft (Review LLH-1980).
+        vorrat.verwirfVeraltete(eintrag, version: info.version)
+        guard let webView else { return }
         Task {
             // `isLoading` steht erst nach dem Start der Navigation; vorher kurz warten.
             try? await Task.sleep(for: .seconds(1))

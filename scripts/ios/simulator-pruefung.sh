@@ -61,7 +61,8 @@ echo "Simulatoren: iPhone $iphone${ipad:+, iPad $ipad}"
 # Gerät; danach wieder aus, die Tests starten es selbst.
 for udid in "$iphone" ${ipad:+"$ipad"}; do
   xcrun simctl boot "$udid" 2> /dev/null || true
-  xcrun simctl bootstatus "$udid" > /dev/null
+  # `-b` startet das Gerät, falls `boot` scheiterte; ohne wartete `bootstatus` unbegrenzt.
+  xcrun simctl bootstatus "$udid" -b > /dev/null
   xcrun simctl keychain "$udid" add-root-cert "$TESTSERVER/ca.pem"
   xcrun simctl shutdown "$udid" 2> /dev/null || true
 done

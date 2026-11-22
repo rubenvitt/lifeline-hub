@@ -104,11 +104,45 @@ final class OhneServerTests: XCTestCase {
         XCTAssertNil(vorrat.ablage.load(eintrag.id))
     }
 
+    /// `holeIndex` fragt jedes Mal den Server (`/`); einmal lädt der Webview, einmal das Ablegen.
     func testGleicheVersionWaermtNichtErneutVor() async throws {
         let online = try await ladeOnline()
         await vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
         await vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
-        XCTAssertEqual(server.abrufe["/assets/spaet-1.js"], 1)
+        XCTAssertEqual(server.abrufe["/"], 2)
+    }
+
+    // MARK: Nach dem Review
+
+    /// Die alte Ablage verschwindet sofort, nicht erst nach dem Laden der neuen Version.
+    func testVerwirfVeralteteLoeschtNurEineAndereVersion() throws {
+        try vorrat.ablage.save(
+            GespeicherteOberflaeche(version: "0.9", html: Self.indexHtml, gespeichertAm: .now), fuer: eintrag.id)
+        vorrat.verwirfVeraltete(eintrag, version: "0.9")
+        XCTAssertNotNil(vorrat.ablage.load(eintrag.id))
+        vorrat.verwirfVeraltete(eintrag, version: "1.0")
+        XCTAssertNil(vorrat.ablage.load(eintrag.id))
+    }
+
+    /// Steht der Webview beim Identitätsanbieter, holte `fetch('/assets/…')` dort.
+    func testAufEinerFremdenSeiteWirdNichtVorgewaermt() async throws {
+        let fremd = webview()
+        fremd.loadHTMLString("<div id='root'><p>Anmeldung</p></div>", baseURL: URL(string: "https://idp.example/"))
+        let geladen = await vorrat.isGestartet(fremd)
+        XCTAssertTrue(geladen)
+        await vorrat.vorwaermen(eintrag, info: info("1.0"), in: fremd)
+        XCTAssertNil(vorrat.ablage.load(eintrag.id))
+        XCTAssertNil(server.abrufe["/"])
+    }
+
+    /// Zwei Anstöße kurz nacheinander (Laden und Prüfen danach) wärmen nur einmal vor.
+    func testGleichzeitigesVorwaermenLaeuftNurEinmal() async throws {
+        let online = try await ladeOnline()
+        async let erstes: Void = vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
+        async let zweites: Void = vorrat.vorwaermen(eintrag, info: info("1.0"), in: online)
+        _ = await (erstes, zweites)
+        XCTAssertEqual(server.abrufe["/"], 2)
+        XCTAssertEqual(vorrat.ablage.load(eintrag.id)?.version, "1.0")
     }
 
     // MARK: Hilfen

@@ -50,7 +50,8 @@ openssl x509 -req -sha256 -days 30 -in "$arbeit/server.csr" \
 # -legacy, LibreSSL (macOS) nimmt sie ohne.
 alt=()
 if openssl version | grep -q '^OpenSSL 3'; then alt=(-legacy); fi
-openssl pkcs12 -export "${alt[@]}" -inkey "$arbeit/server.key" -in "$arbeit/server.pem" \
+# `${alt[@]+…}`: ein leeres Array gilt unter `set -u` in Bash 3.2 (macOS) als ungesetzt.
+openssl pkcs12 -export ${alt[@]+"${alt[@]}"} -inkey "$arbeit/server.key" -in "$arbeit/server.pem" \
   -certfile "$ZIEL/ca.pem" -name testserver -out "$ZIEL/testserver.p12" \
   -passout pass:lifeline-test -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
 
