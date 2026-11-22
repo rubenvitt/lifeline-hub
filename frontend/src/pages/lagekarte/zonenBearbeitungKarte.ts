@@ -90,6 +90,11 @@ const NACHKLICK_MS = 500;
 export interface BearbeitungsGriffe {
   /** Figur und Wahl nachführen; `null` räumt Griffe und Vorschau. */
   setze(v: BearbeitungsVorschau | null): void;
+  /**
+   * Einen laufenden oder anstehenden Zug beenden, ohne ihn zu melden (Esc verwirft, LLH-1891):
+   * Griffe und Vorschau neu aus dem zuletzt gesetzten Stand.
+   */
+  zugBeenden(): void;
   zerstoeren(): void;
 }
 
@@ -218,6 +223,14 @@ export function erzeugeBearbeitungsGriffe(
     setze(neu) {
       v = neu;
       sorgeFuerBearbeitungsVorschau(map, neu);
+      baueAuf();
+    },
+    zugBeenden() {
+      // Abnehmen meldet maplibres Zug-Hörer ab, ohne `dragend` (vgl. `detach` in
+      // `kreisVorschau.ts`): der gezogene Griff meldet nichts mehr. Die neuen Griffe sind frische
+      // Marker ohne Zugmerker.
+      ziehend = false;
+      if (v) sorgeFuerBearbeitungsVorschau(map, v);
       baueAuf();
     },
     zerstoeren() {

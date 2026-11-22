@@ -965,6 +965,9 @@ export default function LagekartePage() {
       onBestaetigungZurueck();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'verwerfen') {
+      // Erst den Zug an den Griffen beenden: sonst meldet er nach dem Verwerfen die Zeigerlage,
+      // und die verworfene Änderung wäre wieder da (LLH-1891).
+      kartenRef.current?.zugBeenden();
       if (zonenBearbeitung) onBearbeitung({ art: 'verwerfen' });
       else if (kreisEntwurf) onKreisVerwerfen();
       else kartenRef.current?.zeichnungVerwerfen();

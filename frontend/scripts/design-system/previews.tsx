@@ -135,6 +135,8 @@ import EinsatzZeichen from '../../src/zeichen/EinsatzZeichen';
 import { useZeichenTheme } from '../../src/zeichen/useZeichenTheme';
 import EinheitZeichen, { FahrzeugZeichen } from '../../src/kraefte/EinheitZeichen';
 import { baueTzProps, schadenTz, type TzProps } from '../../src/pages/lagekarte/taktischesZeichen';
+import Geheimfeld from '../../src/components/Geheimfeld';
+import type { AdapterGeheimnisAnzeige } from '../../src/api/types';
 
 /** Die Vorschauen zeigen die Stufe des Fükw, des primären Kontexts. */
 const DICHTE: Dichte = 'kompakt';
@@ -465,6 +467,84 @@ function StammdatenFeldBeispiel() {
         <StammdatenFeld nurText quellen={STAMMDATEN_QUELLEN} />
       </Form.Item>
     </Form>
+  );
+}
+
+/** Plätze des Geheimfelds: nicht gesetzt (Pflicht), gesetzt, unlesbar (LLH-2018). */
+const GEHEIM_OFFEN: AdapterGeheimnisAnzeige = {
+  name: 'token-offen',
+  bezeichnung: 'API-Schlüssel',
+  pflicht: true,
+  is_gesetzt: true,
+  gesetzt_at: '2026-11-21 17:04:00',
+  gesetzt_von_name: 'R. Vitt',
+  is_unlesbar: false,
+};
+const GEHEIM_LEER: AdapterGeheimnisAnzeige = {
+  name: 'token-leer',
+  bezeichnung: 'API-Schlüssel',
+  pflicht: true,
+  is_gesetzt: false,
+  is_unlesbar: false,
+};
+const GEHEIM_GESETZT: AdapterGeheimnisAnzeige = { ...GEHEIM_OFFEN, name: 'token-gesetzt' };
+const GEHEIM_UNLESBAR: AdapterGeheimnisAnzeige = {
+  ...GEHEIM_OFFEN,
+  name: 'token-unlesbar',
+  is_unlesbar: true,
+};
+const nichtsGesendet = () => Promise.resolve();
+
+function GeheimfeldBeispiel() {
+  return (
+    <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_DATUM}>
+      <div className="ds-stapel">
+        <Geheimfeld
+          platz={GEHEIM_LEER}
+          darfSchreiben
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+        <Geheimfeld
+          platz={GEHEIM_GESETZT}
+          darfSchreiben
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+        <Geheimfeld
+          platz={GEHEIM_OFFEN}
+          darfSchreiben
+          startOffen
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+        <Geheimfeld
+          platz={GEHEIM_UNLESBAR}
+          darfSchreiben
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+        <Geheimfeld
+          platz={{ ...GEHEIM_LEER, name: 'token-gesperrt' }}
+          darfSchreiben
+          gesperrt="Geheimnisspeicher ohne Schlüssel"
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+        <Geheimfeld
+          platz={{ ...GEHEIM_GESETZT, name: 'token-lesen' }}
+          darfSchreiben={false}
+          maxLaenge={4096}
+          onSetzen={nichtsGesendet}
+          onEntfernen={nichtsGesendet}
+        />
+      </div>
+    </AnzeigeKonventionenProvider>
   );
 }
 
@@ -2152,6 +2232,15 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
+  },
+  {
+    name: 'Geheimfeld',
+    title: 'Geheimfeld (nicht gesetzt, gesetzt, offen, unlesbar, gesperrt, nur lesen)',
+    group: 'Formular',
+    height: 830,
+    source: 'components/Geheimfeld.tsx',
+    docAnchor: 'export default function Geheimfeld',
+    content: () => <GeheimfeldBeispiel />,
   },
   {
     name: 'StammdatenFeld',
