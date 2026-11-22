@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  DESKTOP_TEST_VERSION,
   beendeHuelle,
   type IosNachricht,
   starteIosHuelle,
@@ -158,10 +159,20 @@ describe('huellePlatform und huelleVersion (t39ltxxi)', () => {
     expect(huelleVersion()).toBeNull();
   });
 
-  it('liefern in der Desktop-Hülle nichts, die beide Felder nicht setzt', () => {
-    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+  it('liefern in einer Desktop-Hülle vor LLH-1982 nichts, die beide Felder nicht setzt', () => {
+    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) }, { ohneKennung: true });
     expect(huellePlatform()).toBeNull();
     expect(huelleVersion()).toBeNull();
+  });
+
+  it('nennen in der macOS- und der Windows-Hülle Plattform und Version (LLH-1982)', () => {
+    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+    expect(huellePlatform()).toBe('macos');
+    expect(huelleVersion()).toBe(DESKTOP_TEST_VERSION);
+    beendeHuelle();
+    starteWindowsHuelle();
+    expect(huellePlatform()).toBe('windows');
+    expect(huelleVersion()).toBe(DESKTOP_TEST_VERSION);
   });
 
   it('nennen in der iOS-Hülle Plattform und Version (ausgeliefertes Init-Skript)', () => {

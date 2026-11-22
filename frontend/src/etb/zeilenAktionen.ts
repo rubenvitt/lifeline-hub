@@ -20,7 +20,10 @@ export interface ZeilenRechte {
   kannBerichtigen: boolean;
   /** Grund, aus dem „Berichtigen“ gerade gesperrt ist (ein Entwurf sendet noch). */
   berichtigenGesperrt?: string;
-  /** Berichtigen nur an Einträgen dieses Erfassers (Mitarbeit, LLH-1817); fehlt: an jedem. */
+  /**
+   * Berichtigen nur an Einträgen dieses Erfassers (Mitarbeit, LLH-1817), und nicht, wo die
+   * Meldung des Eintrags in der Lage steht (`meldung_in_lage`, LLH-2008); fehlt: an jedem.
+   */
   berichtigenNurErfasserId?: number;
   kannWiedervorlage: boolean;
   kannAuftrag: boolean;
@@ -81,7 +84,7 @@ export function zeilenAktionen(z: EtbZeile, r: ZeilenRechte): MenueEintrag<Zeile
   return [
     ...(r.kannBerichtigen &&
     (r.berichtigenNurErfasserId === undefined ||
-      z.eintrag.erfasser_id === r.berichtigenNurErfasserId)
+      (z.eintrag.erfasser_id === r.berichtigenNurErfasserId && z.eintrag.meldung_in_lage !== true))
       ? [
           {
             key: 'berichtigen' as const,

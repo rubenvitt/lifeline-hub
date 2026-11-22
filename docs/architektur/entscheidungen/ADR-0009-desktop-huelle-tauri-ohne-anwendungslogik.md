@@ -1,7 +1,8 @@
 ---
 id: ADR-0009
 titel: Die Desktop-App ist eine Tauri-Hülle ohne Anwendungslogik, die die Server-Adresse lädt
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0083
 datum: 2026-09-25
 gilt_fuer:
   - src-tauri/**
