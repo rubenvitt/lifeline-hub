@@ -232,6 +232,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("einsatz_aenderung", "Verwaltung des Spiegels selbst"),
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),
     ("spiegel_herkunft", "Verwaltung des Spiegels selbst"),
+    ("spiegel_neu_vergeben", "Verwaltung des Spiegels selbst"),
     ("spiegel_katalog", "Verwaltung des Spiegels selbst"),
     ("spiegel_ziel", "Verwaltung des Spiegels selbst"),
     ("spiegel_anhang", "Verwaltung des Spiegels selbst"),
@@ -352,12 +353,36 @@ pub fn trigger_sql(tabelle: &str, sc: Scoping, k: &Schluessel, mit_schutz: bool)
     let (kn, ko) = (k.ausdruck("NEW"), k.ausdruck("OLD"));
     let gibt = |e: &str| format!("EXISTS (SELECT 1 FROM einsatz WHERE id = {e})");
     let mut sql = String::new();
+    let frei = "NOT EXISTS (SELECT 1 FROM spiegel_uebernahme)";
+    // Eine ID, die SQLite nach dem Löschen neu vergibt, ist eine neue Zeile (LLH-1893): Legt diese
+    // Instanz sie selbst an, fällt eine Herkunft unter dieser ID (in jedem Einsatz, wie das
+    // UNIQUE der Herkunft), und stand die ID in diesem Einsatz schon im Log, merkt sich
+    // `spiegel_neu_vergeben` die Neuvergabe mit dem Stand der neuen Zeile. Nur für den
+    // Ersatzschlüssel `id`; eine neue Einsatz-ID vergibt `einsatz::repo::naechste_id` nie neu.
+    let neu_vergeben = sc != Scoping::SelbstId && *k == Schluessel::Spalte("id".into());
+    let (merken, stempeln) = if neu_vergeben {
+        (
+            format!(
+                "INSERT OR REPLACE INTO spiegel_neu_vergeben (einsatz_id, art, lokaler_schluessel, stand) \
+                 SELECT {en}, '{t}', {kn}, 0 WHERE {frei} AND EXISTS (SELECT 1 FROM einsatz_aenderung \
+                 WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn});\n    \
+                 DELETE FROM spiegel_herkunft WHERE {frei} AND art = '{t}' AND lokaler_schluessel = {kn};\n    "
+            ),
+            format!(
+                "\n    UPDATE spiegel_neu_vergeben SET stand = (SELECT stand FROM einsatz_aenderung \
+                 WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn}) \
+                 WHERE einsatz_id = {en} AND art = '{t}' AND lokaler_schluessel = {kn} AND stand = 0;"
+            ),
+        )
+    } else {
+        (String::new(), String::new())
+    };
     // Das Log ist je Einsatz eindeutig: eine Kennung, die SQLite nach dem Löschen neu vergibt,
     // verdrängt die Löschung in einem anderen Einsatz nicht.
     sql.push_str(&format!(
         "CREATE TRIGGER {t}_spiegellog_i AFTER INSERT ON {t} WHEN {gn} BEGIN\n    \
-         DELETE FROM einsatz_aenderung WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn};\n    \
-         INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES ({en}, '{t}', {kn});\nEND;\n",
+         {merken}DELETE FROM einsatz_aenderung WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn};\n    \
+         INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES ({en}, '{t}', {kn});{stempeln}\nEND;\n",
         gn = gibt(&en)
     ));
     sql.push_str(&format!(
@@ -397,7 +422,6 @@ pub fn trigger_sql(tabelle: &str, sc: Scoping, k: &Schluessel, mit_schutz: bool)
         ));
     }
     if mit_schutz {
-        let frei = "NOT EXISTS (SELECT 1 FROM spiegel_uebernahme)";
         let spiegel =
             |e: &str| format!("EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = {e})");
         let abbruch = format!(
@@ -689,6 +713,112 @@ mod tests {
             1,
             "das Kind loggt seine Löschung beim Einsatz des Elternteils"
         );
+    }
+
+    /// Herkunft und Merker einer Zeile von `uhs_platz` (Ersatzschlüssel `id`).
+    async fn herkunft_und_merker(pool: &sqlx::SqlitePool, platz: i64) -> (i64, Option<(i64, i64)>) {
+        let herkunft: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM spiegel_herkunft WHERE art = 'uhs_platz' \
+             AND lokaler_schluessel = ?",
+        )
+        .bind(platz.to_string())
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let merker = sqlx::query_as(
+            "SELECT einsatz_id, stand FROM spiegel_neu_vergeben WHERE art = 'uhs_platz' \
+             AND lokaler_schluessel = ?",
+        )
+        .bind(platz.to_string())
+        .fetch_optional(pool)
+        .await
+        .unwrap();
+        (herkunft, merker)
+    }
+
+    /// Löscht den Platz, hält eine Herkunft auf ihn fest und legt unter derselben ID einen neuen
+    /// an, auf Wunsch unter dem Merker der Übernahme.
+    async fn platz_neu_vergeben(
+        pool: &sqlx::SqlitePool,
+        einsatz: i64,
+        uhs: i64,
+        platz: i64,
+        unter_merker: bool,
+    ) {
+        sqlx::query(
+            "INSERT INTO spiegel_herkunft (einsatz_id, art, fremder_schluessel, lokaler_schluessel) \
+             VALUES (?, 'uhs_platz', '77', ?)",
+        )
+        .bind(einsatz)
+        .bind(platz.to_string())
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM uhs_platz WHERE id = ?")
+            .bind(platz)
+            .execute(pool)
+            .await
+            .unwrap();
+        let mut tx = pool.begin().await.unwrap();
+        if unter_merker {
+            sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO uhs_platz (id, uhs_id, typ, bezeichnung) VALUES (?, ?, 'bett', 'Neu')",
+        )
+        .bind(platz)
+        .bind(uhs)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM spiegel_uebernahme")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    /// LLH-1893: Eine Zeile, die diese Instanz unter einer schon vergebenen ID anlegt, ist nicht
+    /// die Zeile, auf die eine ältere Herkunft zeigt. Die Herkunft fällt, und der Merker hält die
+    /// Neuvergabe mit dem Stand der neuen Zeile fest.
+    #[tokio::test]
+    async fn neu_vergebene_id_raeumt_die_herkunft_und_setzt_den_merker() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, uhs, platz) = einsatz_mit_uhs(&pool).await;
+        platz_neu_vergeben(&pool, einsatz, uhs, platz, false).await;
+        let (s, _) = stand(&pool, "uhs_platz", platz).await.unwrap();
+        assert_eq!(
+            herkunft_und_merker(&pool, platz).await,
+            (0, Some((einsatz, s)))
+        );
+    }
+
+    /// Unter dem Merker der Übernahme hält die Übernahme die Herkunft selbst nach.
+    #[tokio::test]
+    async fn unter_dem_merker_bleibt_die_herkunft() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, uhs, platz) = einsatz_mit_uhs(&pool).await;
+        platz_neu_vergeben(&pool, einsatz, uhs, platz, true).await;
+        assert_eq!(herkunft_und_merker(&pool, platz).await, (1, None));
+    }
+
+    /// Eine ID, die in diesem Einsatz noch nie vergeben war, setzt keinen Merker; Tabellen mit
+    /// natürlichem Schlüssel und der Einsatz selbst kennen ihn gar nicht.
+    #[tokio::test]
+    async fn erste_vergabe_setzt_keinen_merker() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, _, platz) = einsatz_mit_uhs(&pool).await;
+        assert_eq!(herkunft_und_merker(&pool, platz).await, (0, None));
+        let merker: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM spiegel_neu_vergeben WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(merker, 0);
     }
 
     #[tokio::test]

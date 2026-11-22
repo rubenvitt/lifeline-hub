@@ -3480,6 +3480,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lokaler_schluessel", G_SPIEGEL),
         ],
     },
+    // Neu vergebene IDs am Spiegel (LLH-1893): nur Schlüssel und Stand.
+    TabellenRegel {
+        tabelle: "spiegel_neu_vergeben",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+            retain("stand", G_SPIEGEL),
+        ],
+    },
     // Mitbenutzte Katalogzeilen eines Spiegels (LLH-1629).
     TabellenRegel {
         tabelle: "spiegel_katalog",
