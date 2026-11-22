@@ -100,6 +100,13 @@ targets:
     deploymentTarget: "17.4"
     sources:
       - path: AppTests
+        excludes:
+          - "Testserver/**"
+      # Wegwerf-Zertifikat des https-Testservers (LLH-1980), erzeugt von
+      # scripts/ios/testserver-zertifikat.sh, nie committet.
+      - path: AppTests/Testserver/testserver.p12
+        buildPhase: resources
+        optional: true
     dependencies:
       - target: LifelineHub
     settings:
