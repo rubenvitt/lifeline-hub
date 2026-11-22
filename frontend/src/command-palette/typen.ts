@@ -181,6 +181,12 @@ export interface BefehlKontext {
    * `recht: 'leitung'` (LFH-1170). Fehlt es, gilt es als nicht gegeben.
    */
   darfEinsatzLeiten?: boolean;
+  /**
+   * Erfassen oder am Spiegel beantragen (`darfErfassungBeantragen`, LLH-2006): Schnellaktionen mit
+   * `recht: 'erfassen'` erscheinen auch ohne Schreibrecht, etwa für die Mitarbeit. Fehlt es, gilt
+   * es als nicht gegeben; das Schreibrecht schließt es ein.
+   */
+  darfErfassen?: boolean;
   /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes, jüngstes zuerst
    *  (`einsatz/zuletztModule.ts`). */
   zuletztModulKeys?: string[];
