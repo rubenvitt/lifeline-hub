@@ -68,7 +68,7 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   Mit `--bestand`: gibt die registrierten Pfade mit unbekanntem Segment sortiert aus (Exit 0),
   zum Erzeugen und Kürzen der Bestandsdatei. Vergleichs-Ref fest `origin/alpha`.
 
-- [ ] **Step 1: Selbsttest schreiben** (`check-api-routen.test.sh`, Muster
+- [x] **Step 1: Selbsttest schreiben** (`check-api-routen.test.sh`, Muster
   `check-schreibweisen.test.sh`: `baum_neu` legt ein Wegwerf-Repo mit `src/app.rs`,
   `src/public_api/routen.rs`, `src/instanz/extractor.rs`, Glossar und Bestand an, alles
   committet, `git update-ref refs/remotes/origin/alpha HEAD`; `fall <name> gruen|rot <befehl>
@@ -88,10 +88,10 @@ Pfadzuordnung des ersten Pakets (verbindlich):
     rot: `segment` mit Großbuchstabe.
   - `--bestand` gibt genau `/api/einsaetze/{id}` aus.
 
-- [ ] **Step 2: Selbsttest laufen lassen, rot sehen**
+- [x] **Step 2: Selbsttest laufen lassen, rot sehen**
   Run: `scripts/check-api-routen.test.sh` → Expected: scheitert (Skript fehlt).
 
-- [ ] **Step 3: `check-api-routen.sh` schreiben.** Kopf wie `check-schreibweisen.sh` (Rot ist,
+- [x] **Step 3: `check-api-routen.sh` schreiben.** Kopf wie `check-schreibweisen.sh` (Rot ist,
   Grenzen, Abhilfe, Aufruf; Verweis auf ADR-0082 und Design-Doc). Pfade sammeln mit
   `git -C "$ROOT" grep -h` (versionierte und neue Dateien wie dort):
   - `src/app.rs`: Zeilen `^\s*(\.route\()?"(/api[^"]*)"` — nur bis zur ersten Zeile
@@ -103,10 +103,10 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   Ref, Meldung `Bestandsvergleich übersprungen: origin/alpha fehlt`; fehlt nur die Datei auf
   dem Ref (erster PR), kein Vergleich.
 
-- [ ] **Step 4: Selbsttest grün**
+- [x] **Step 4: Selbsttest grün**
   Run: `scripts/check-api-routen.test.sh` → Expected: `OK` je Fall, Exit 0.
 
-- [ ] **Step 5: Glossar füllen.** Alle heute nicht-deutschen Segmente (`api admin auth uhs
+- [x] **Step 5: Glossar füllen.** Alle heute nicht-deutschen Segmente (`api admin auth uhs
   material v1 status start etb adapter chat code proxy webauthn export finish position totp
   webhook plan providers tiles app-code discoverable download enroll import live matrix me oidc
   register web-push audit backup bulk callback codes config dev events fonts glyphs health
@@ -118,12 +118,12 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   gelesen, `password` Passwort, `set` festlegen, `sessions` Sitzungen, `end-others` andere
   beenden, `redeem` einlösen. Englische Segmente ohne festen deutschen Begriff: `-`.
 
-- [ ] **Step 6: Bestand erzeugen und Wächter auf dem Repo fahren**
+- [x] **Step 6: Bestand erzeugen und Wächter auf dem Repo fahren**
   Run: `scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt && scripts/check-api-routen.sh`
   Expected: Exit 0; `wc -l` des Bestands in der Größenordnung 560–570; kein rein englischer Pfad
   (`/api/health`, `/api/shell`, `/api/auth/login`, `/api/v1/me`) im Bestand.
 
-- [ ] **Step 7: Commit** (`feat(scripts): Wächter für englische API-Routen mit Glossar und Bestand (LLH-1979)`)
+- [x] **Step 7: Commit** (`feat(scripts): Wächter für englische API-Routen mit Glossar und Bestand (LLH-1979)`)
 
 ### Task 2: Wächter ins Gate
 
@@ -133,15 +133,15 @@ Pfadzuordnung des ersten Pakets (verbindlich):
 - Modify: `scripts/bereiche.sh` nur, falls dort Schritt 14 an Pfade gebunden ist, die
   `src/app.rs`/`src/public_api/**` nicht abdecken
 
-- [ ] **Step 1:** `schritt_14` ruft nach `check-schreibweisen` erst
+- [x] **Step 1:** `schritt_14` ruft nach `check-schreibweisen` erst
   `check-api-routen.test.sh`, dann `check-api-routen.sh`; Titel „Keine Namen, die sich nur in der
   Groß-/Kleinschreibung unterscheiden (LFH-1053), API-Routen englisch (LLH-1979)“.
-- [ ] **Step 2: Verifizieren**
+- [x] **Step 2: Verifizieren**
   Run: `scripts/check-all.test.sh && ./scripts/check-all.sh --nur 14`
   (Aufrufform von `--nur` im Skriptkopf nachsehen) → Expected: Schritt 14 grün.
-- [ ] **Step 3:** `bash scripts/bereiche.test.sh` grün; prüfen, dass `--geaendert` bei einer
+- [x] **Step 3:** `bash scripts/bereiche.test.sh` grün; prüfen, dass `--geaendert` bei einer
   Änderung an `src/app.rs` Schritt 14 fährt (Bündel `schnell` läuft ohnehin im PR).
-- [ ] **Step 4: Commit** (`ci: Schritt 14 prüft englische API-Routen (LLH-1979)`)
+- [x] **Step 4: Commit** (`ci: Schritt 14 prüft englische API-Routen (LLH-1979)`)
 
 ### Task 3: Regel und ADR
 
@@ -150,7 +150,7 @@ Pfadzuordnung des ersten Pakets (verbindlich):
 - Modify: `AGENTS.md` (Abschnitt „Bezeichner-Sprache“)
 - Modify: `docs/architektur/12-glossar.md` (ein Satz)
 
-- [ ] **Step 1: ADR schreiben** nach `VORLAGE.md`, `status: akzeptiert`, `datum: 2026-11-22`,
+- [x] **Step 1: ADR schreiben** nach `VORLAGE.md`, `status: akzeptiert`, `datum: 2026-11-22`,
   `gilt_fuer`: `src/app.rs`, `src/public_api/**`, `scripts/api-routen-woerter.tsv`,
   `scripts/api-routen-bestand.txt`, `scripts/check-api-routen.sh`; `herleitung`: Design-Doc.
   Regeln:
@@ -167,19 +167,19 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   verlange '^api	' scripts/api-routen-woerter.tsv
   ```
   Kontext/Konsequenzen je 2–5 Sätze, verweisen auf das Design-Doc.
-- [ ] **Step 2: `AGENTS.md`:** neuer Punkt „**API-Routen englisch** (LLH-1979, ADR-0082)“ nach
+- [x] **Step 2: `AGENTS.md`:** neuer Punkt „**API-Routen englisch** (LLH-1979, ADR-0082)“ nach
   „Fachbegriffe deutsch …“: jedes Segment englisch nach Glossar, auch Fachbegriffe; Abkürzungen
   wie `etb`, `uhs` bleiben; Kleinbuchstaben, `-` verbindet, Sammlungen Plural, Aktion als Verb
   am Ende; Pfadparameter-Namen und Code-Bezeichner bleiben deutsch nach der Regel oben; neue
   Request-/Response-Typen haben englische Wire-Felder (Rust-Feld = Wire-Feld), ein neues Feld in
   einem bestehenden Typ folgt dessen Sprache. „Grenzwerte bleiben“: `Routen` streichen, Verweis
   auf den neuen Punkt. Danach `wc -l AGENTS.md` < 200.
-- [ ] **Step 3: Kapitel 12:** ein Satz, dass das englische Glossar der API-Routen in
+- [x] **Step 3: Kapitel 12:** ein Satz, dass das englische Glossar der API-Routen in
   `scripts/api-routen-woerter.tsv` steht (ADR-0082).
-- [ ] **Step 4: Verifizieren**
+- [x] **Step 4: Verifizieren**
   Run: `scripts/check-architektur.test.sh && scripts/check-architektur.sh && scripts/check-adr-nummern.sh origin/alpha && scripts/adr-fuer.sh src/app.rs`
   Expected: grün; `adr-fuer.sh` nennt ADR-0082.
-- [ ] **Step 5: Commit** (`docs: ADR-0082 und Regel „API-Routen englisch“ (LLH-1979)`)
+- [x] **Step 5: Commit** (`docs: ADR-0082 und Regel „API-Routen englisch“ (LLH-1979)`)
 
 ### Task 4: Paket Neuigkeiten (`versionsstand` → `release-notes`)
 
@@ -193,22 +193,22 @@ Pfadzuordnung des ersten Pakets (verbindlich):
 - Modify: `scripts/api-routen-bestand.txt` (zwei Zeilen weg), Doku-Treffer
   (`docs/architektur/0[56]-*.md`, `docs/betrieb/observability.md`, sofern dort genannt)
 
-- [ ] **Step 1:** In `tests/versionsstand.rs` die Pfade auf `/api/release-notes` und
+- [x] **Step 1:** In `tests/versionsstand.rs` die Pfade auf `/api/release-notes` und
   `/api/release-notes/read` umstellen.
   Run: `cargo test --test versionsstand` → Expected: FAIL (404).
-- [ ] **Step 2:** Routen in `src/app.rs` umbenennen, Doc-Kommentare nachziehen.
+- [x] **Step 2:** Routen in `src/app.rs` umbenennen, Doc-Kommentare nachziehen.
   Run: `cargo test --test versionsstand` → Expected: PASS.
-- [ ] **Step 3:** Bestand kürzen; `scripts/check-api-routen.sh` → Exit 0 (rot, solange die
+- [x] **Step 3:** Bestand kürzen; `scripts/check-api-routen.sh` → Exit 0 (rot, solange die
   Zeilen noch drin stehen: veraltet).
-- [ ] **Step 4:** Frontend: Tests und MSW-Handler zuerst auf die neuen Pfade, `useVersionsstand`
+- [x] **Step 4:** Frontend: Tests und MSW-Handler zuerst auf die neuen Pfade, `useVersionsstand`
   bzw. `api/versionsstand.ts` danach.
   Run: `mise exec -- pnpm -C frontend exec vitest run src/neuigkeiten src/api` → Expected: PASS.
-- [ ] **Step 5:** `scripts/check-typ-codegen.sh` (erzeugte Dateien tragen die Doc-Kommentare);
+- [x] **Step 5:** `scripts/check-typ-codegen.sh` (erzeugte Dateien tragen die Doc-Kommentare);
   geänderte Dateien mit committen.
-- [ ] **Step 6: Rest-Suche**
+- [x] **Step 6: Rest-Suche**
   Run: `git grep -n '/api/versionsstand' -- ':!openspec/changes/archive' ':!docs/superpowers'`
   Expected: keine Treffer (bis auf `openspec/specs/`, eingefroren).
-- [ ] **Step 7: Commit** (`refactor: /api/versionsstand heißt /api/release-notes (LLH-1979)`)
+- [x] **Step 7: Commit** (`refactor: /api/versionsstand heißt /api/release-notes (LLH-1979)`)
 
 ### Task 5: Paket Anmeldung (`auth`) mit Hüllen und Vertrag 2
 
@@ -229,39 +229,39 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   `ios/LifelineKern/Tests/LifelineKernTests/VertragTests.swift`
 - Modify: erzeugte Typen, Bestand (sechs Zeilen weg), Doku-Treffer
 
-- [ ] **Step 1: Rust-Tests zuerst** auf die neuen Pfade (Tabelle oben); in `tests/shell.rs`
+- [x] **Step 1: Rust-Tests zuerst** auf die neuen Pfade (Tabelle oben); in `tests/shell.rs`
   zusätzlich `assert_eq!(vertrag, 2)`.
   Run: `cargo test --test sitzungen --test passwort_aendern --test einmalpasswort --test app_anmeldung --test auth_audit --test fehler_vertrag --test shell`
   Expected: FAIL.
-- [ ] **Step 2:** Routen in `src/app.rs` umbenennen, `SHELL_CONTRACT = 2` (Doc-Kommentar: warum 2,
+- [x] **Step 2:** Routen in `src/app.rs` umbenennen, `SHELL_CONTRACT = 2` (Doc-Kommentar: warum 2,
   Verweis LLH-1979), Doc-Kommentare nachziehen.
   Run: dieselben Tests → Expected: PASS.
-- [ ] **Step 3:** Bestand kürzen, `scripts/check-api-routen.sh` → Exit 0.
-- [ ] **Step 4: Frontend:** Tests/MSW zuerst, dann `api/auth.ts`, `api/sitzungen.ts`; auch
+- [x] **Step 3:** Bestand kürzen, `scripts/check-api-routen.sh` → Exit 0.
+- [x] **Step 4: Frontend:** Tests/MSW zuerst, dann `api/auth.ts`, `api/sitzungen.ts`; auch
   `ME_PFAD`/`OHNE_SPERRE` in `api/client.ts` prüfen (betreffen nur `me`/`providers`, bleiben).
   Run: `mise exec -- pnpm -C frontend exec vitest run src/api src/auth src/pages` → PASS.
-- [ ] **Step 5: e2e-Helfer** `konto-anlegen.ts` und die Bilder-Spec umstellen (kein Lauf nötig,
+- [x] **Step 5: e2e-Helfer** `konto-anlegen.ts` und die Bilder-Spec umstellen (kein Lauf nötig,
   `tsc` deckt Tippfehler nicht ab: Rest-Suche in Step 8 fängt sie).
-- [ ] **Step 6: Desktop-Hülle:** Test `anmeldung.rs:224` auf `/api/auth/app-code/redeem`, dann
+- [x] **Step 6: Desktop-Hülle:** Test `anmeldung.rs:224` auf `/api/auth/app-code/redeem`, dann
   das Skript in Zeile 63.
   Run: `cargo test -p lifeline-desktop anmeldung` (Paketname aus `src-tauri/Cargo.toml`)
   → Expected: PASS. Scheitert der Bau hier an fehlenden Systembibliotheken, Ergebnis notieren;
   die CI des iOS/Desktop-Bündels prüft.
-- [ ] **Step 7: iOS-Kern:** `AnmeldungTests` auf `'/api/auth/app-code/redeem'`,
+- [x] **Step 7: iOS-Kern:** `AnmeldungTests` auf `'/api/auth/app-code/redeem'`,
   `VertragTests` auf `bekannteVertraege == [2]` und einen Fall „Server mit Vertrag 1 ist für
   `bekannt: [2]` zu alt“ (Richtung aus `Vertrag.swift` ablesen), dann `Anmeldung.swift` und
   `LifelineKern.swift`. Swift baut nur auf macOS (`ios/AGENTS.md`): hier nur Rest-Suche,
   gefahren im Bündel `ios` der CI.
-- [ ] **Step 8: Rest-Suche**
+- [x] **Step 8: Rest-Suche**
   Run: `git grep -nE "/api/auth/(sitzungen|passwort)|app-code/einloesen" -- ':!openspec' ':!docs/superpowers'`
   Expected: keine Treffer.
-- [ ] **Step 9:** `scripts/check-typ-codegen.sh`, Doku (`docs/architektur/05/06`,
+- [x] **Step 9:** `scripts/check-typ-codegen.sh`, Doku (`docs/architektur/05/06`,
   `docs/betrieb/*` mit Hüllen-Vertrag, `frontend/src/auth/AGENTS.md`) nachziehen.
-- [ ] **Step 10: Commit** (`refactor!: Anmelde-Routen englisch, Hüllen-Vertrag 2 (LLH-1979)`)
+- [x] **Step 10: Commit** (`refactor!: Anmelde-Routen englisch, Hüllen-Vertrag 2 (LLH-1979)`)
 
 ### Task 6: Gesamtprüfung
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` (einmal, im Hintergrund, wenn
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` (einmal, im Hintergrund, wenn
   er nicht ins Zeitlimit passt) → Expected: alle gefahrenen Schritte grün. Ergebnis für den PR
   unter „Geprüft“ notieren.
-- [ ] **Step 2:** Plan-Kästchen abhaken, Plan und Umsetzung committen.
+- [x] **Step 2:** Plan-Kästchen abhaken, Plan und Umsetzung committen.
