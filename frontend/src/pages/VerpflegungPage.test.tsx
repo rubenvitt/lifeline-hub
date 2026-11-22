@@ -42,6 +42,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { waehle } from '../test/auswahlListe';
+import { warteAufMenueFokus } from '../test/menue';
 
 dayjs.extend(utc);
 
@@ -186,6 +187,9 @@ async function oeffneMenue(zf: VerpflegungZeitfenster) {
   await userEvent.click(
     screen.getByRole('button', { name: `Aktionen zu Zeitfenster ${zeitfensterKennung(zf)}` }),
   );
+  // Erst wenn der späte `autoFocus` des Menüs verbraucht ist: sonst zöge er den Fokus aus dem
+  // danach geöffneten Dialog, und die getippte Menge ginge verloren (LLH-1390, `test/menue.ts`).
+  await warteAufMenueFokus();
   return waitFor(() => {
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',

@@ -57,7 +57,12 @@ async function fuelleErfassung(was: string, details: string) {
   const nutzer = userEvent.setup({ delay: null });
   await nutzer.click(screen.getByLabelText('Was'));
   await nutzer.paste(was);
-  await nutzer.click(screen.getByLabelText('Details / Zweck'));
+  // „Details / Zweck“ liegt hinter „Weitere Angaben“: zugeklappt nimmt es keinen Fokus, in jsdom ab
+  // 31 wie im Browser, und der Text landete in „Was“ (LLH-2023).
+  const feld = screen.getByLabelText('Details / Zweck');
+  const kopf = feld.closest('.ant-collapse-item')?.querySelector<HTMLElement>('[aria-expanded]');
+  if (kopf?.getAttribute('aria-expanded') === 'false') await nutzer.click(kopf);
+  await nutzer.click(feld);
   await nutzer.paste(details);
 }
 /**
