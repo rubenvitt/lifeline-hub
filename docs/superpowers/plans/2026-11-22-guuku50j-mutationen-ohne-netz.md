@@ -1,6 +1,6 @@
 # Mutationen ohne Netz sofort scheitern lassen — Umsetzungsplan (LLH-1950)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Ohne Netz scheitert jede Mutation sofort mit `NetzFehler`, statt zu pausieren; Erfassungsdialoge bleiben bedienbar.
 
@@ -37,14 +37,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/guuku50jetu1zqkmbruioj69
 **Interfaces:**
 - Produces: `erzeugeQueryClient(defaultOptions?)` — Mutationen laufen mit `networkMode: 'always'`, sofern weder `defaultOptions.mutations.networkMode` noch die Mutation selbst etwas anderes setzt.
 
-- [ ] **Step 1: Failing tests** in neuem `describe('erzeugeQueryClient — Mutationen pausieren nie (LLH-1950)')`, je mit `onlineManager.setOnline(false)` und `finally` zurück auf `true`:
+- [x] **Step 1: Failing tests** in neuem `describe('erzeugeQueryClient — Mutationen pausieren nie (LLH-1950)')`, je mit `onlineManager.setOnline(false)` und `finally` zurück auf `true`:
   - `'ruft die mutationFn ohne Netz sofort auf (Prod-Vorgaben)'`: `erzeugeQueryClient()`, Mutation über `getMutationCache().build(...).execute()` mit `mutationFn = vi.fn().mockRejectedValue(new NetzFehler())`; nach `await …catch` → `mutationFn` einmal aufgerufen, `state.isPaused === false`, `state.status === 'error'`.
   - `'… auch mit eigenen Mutations-Vorgaben'`: dasselbe mit `erzeugeQueryClient({ mutations: { retry: false } })`.
   - `'lässt ein ausdrückliches networkMode an der Mutation stehen'`: Mutation mit `networkMode: 'online'`, nach einem Takt → `isPaused === true`, `mutationFn` nicht aufgerufen.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/api/queryClient.test.ts` → die ersten beiden FAIL (pausiert).
-- [ ] **Step 3:** In `erzeugeQueryClient` `defaultOptions: { ...defaultOptions, mutations: { networkMode: 'always', ...defaultOptions.mutations } }` an den `QueryClient` geben; Kommentar am Seam (warum nie pausieren: kein stilles Nachsenden, Erfassungshülle sperrt sonst).
-- [ ] **Step 4:** Lauf wie Step 2 → PASS.
-- [ ] **Step 5:** Commit `fix(frontend): Mutationen ohne Netz scheitern sofort statt zu pausieren (LLH-1950)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/api/queryClient.test.ts` → die ersten beiden FAIL (pausiert).
+- [x] **Step 3:** In `erzeugeQueryClient` `defaultOptions: { ...defaultOptions, mutations: { networkMode: 'always', ...defaultOptions.mutations } }` an den `QueryClient` geben; Kommentar am Seam (warum nie pausieren: kein stilles Nachsenden, Erfassungshülle sperrt sonst).
+- [x] **Step 4:** Lauf wie Step 2 → PASS.
+- [x] **Step 5:** Commit `fix(frontend): Mutationen ohne Netz scheitern sofort statt zu pausieren (LLH-1950)`.
 
 ### Task 2: Anlegedialog ohne Netz bedienbar
 
