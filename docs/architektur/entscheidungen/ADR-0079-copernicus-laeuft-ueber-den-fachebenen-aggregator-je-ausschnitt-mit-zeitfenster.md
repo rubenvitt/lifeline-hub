@@ -1,5 +1,5 @@
 ---
-id: ADR-0077
+id: ADR-0079
 titel: Copernicus EMS läuft als Fachebene je Kartenausschnitt über den Aggregator, Ältere nur auf Wahl
 status: akzeptiert
 datum: 2026-11-21
@@ -13,7 +13,7 @@ herleitung:
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
 
-# ADR-0077: Copernicus EMS läuft als Fachebene je Kartenausschnitt über den Aggregator, Ältere nur auf Wahl
+# ADR-0079: Copernicus EMS läuft als Fachebene je Kartenausschnitt über den Aggregator, Ältere nur auf Wahl
 
 ## Regeln
 
