@@ -6,17 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import dev.rubeen.lifeline.android.ui.LifelineThema
 import dev.rubeen.lifeline.kern.Testzustand
 
@@ -35,33 +25,19 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        modell = AppModell(Testzustand.from(intent.getStringExtra(Testzustand.EXTRA)))
+        val testzustand = Testzustand.from(intent.getStringExtra(Testzustand.EXTRA))
+        modell = AppModell(
+            testzustand = testzustand,
+            version = BuildConfig.VERSION_NAME,
+            build = BuildConfig.VERSION_CODE,
+            // Im Testzustand speichert die App nichts.
+            einstellungen = if (testzustand == null) getSharedPreferences("lifeline", MODE_PRIVATE) else null,
+            scope = lifecycleScope,
+        )
         setContent {
             LifelineThema {
-                Wurzel()
+                Wurzel(modell)
             }
-        }
-    }
-}
-
-@Composable
-private fun Wurzel() {
-    // Die Fläche setzt Grund und Textfarbe des Themas für alles darunter.
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier
-                .safeDrawingPadding()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // Platzhalter, bis die nativen Seiten stehen: jede Seite zeigt vorerst den Kopf des
-            // Onboardings.
-            Text("Kein Server eingerichtet", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Lifeline zeigt die Oberfläche deines Einsatzservers. Gib seine Adresse ein oder " +
-                    "scanne einen QR-Code mit der Adresse.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

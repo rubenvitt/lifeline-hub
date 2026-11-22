@@ -10,6 +10,14 @@
     <!-- Updater: installiert die APK aus dem eigenen Kanal (Entwurf D9). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- „System-WebView aktualisieren“ fragt, ob ein Store die Seite des WebViews öffnen kann (Entwurf D3). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+    </queries>
+
     <!-- Kamera ist kein Muss: ohne sie bleibt die Eingabe der Adresse. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 

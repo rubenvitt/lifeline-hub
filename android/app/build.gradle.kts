@@ -66,6 +66,11 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.webkit)
     implementation(libs.browser)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
+    implementation(libs.camera.mlkit.vision)
+    implementation(libs.mlkit.barcode)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
