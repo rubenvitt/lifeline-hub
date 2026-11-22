@@ -660,7 +660,7 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
   }
 
   /** Rendert den Strom und liefert Container, Scroll-Spion und `rerender`. */
-  function aufbau(nachrichten: ChatNachricht[]) {
+  function aufbau(nachrichten: ChatNachricht[], kopfImFenster = true) {
     const gemeinsam = {
       eigeneBenutzerId: 1,
       darfSchreiben: true,
@@ -670,7 +670,7 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
       onHeraufstufenAuftrag: vi.fn(),
     };
     const { rerender } = renderMitProviders(
-      <NachrichtenStrom nachrichten={nachrichten} {...gemeinsam} />,
+      <NachrichtenStrom nachrichten={nachrichten} kopfImFenster={kopfImFenster} {...gemeinsam} />,
     );
     const strom = screen.getByTestId('nachrichten-strom');
     const scrollTo = vi.fn();
@@ -679,9 +679,14 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     return {
       strom,
       scrollTo,
-      zeige: (neue: ChatNachricht[], eigeneSendungen = 0) =>
+      zeige: (neue: ChatNachricht[], eigeneSendungen = 0, kopf = true) =>
         rerender(
-          <NachrichtenStrom nachrichten={neue} eigeneSendungen={eigeneSendungen} {...gemeinsam} />,
+          <NachrichtenStrom
+            nachrichten={neue}
+            eigeneSendungen={eigeneSendungen}
+            kopfImFenster={kopf}
+            {...gemeinsam}
+          />,
         ),
     };
   }
@@ -783,6 +788,55 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     zeige([A, B, C]);
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
     expect(scrollTo).toHaveBeenCalled();
+  });
+
+  /*
+   * Seitenfenster ohne Kopf (LLH-1886, Entwurf D3): „Neuere laden“ fügt unten an, das ist Lesen,
+   * kein Zufluss. Erst Neues nach dem Kopf zählt die Pille.
+   */
+  it('ohne Kopf im Fenster: Anbau unten springt nicht und zählt nicht', () => {
+    const { strom, scrollTo, zeige } = aufbau([A], false);
+    setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A, B], 0, false);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('erreicht „Neuere laden“ den Kopf, bleibt die Lesestelle; erst danach zählt die Pille', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A], false);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A, B], 0, true);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+
+    zeige([A, B, C], 0, true);
+    expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
+  });
+
+  it('kommt der Kopf ohne neue Nachricht (leere Seite), läuft die nächste Nachricht mit', () => {
+    const { strom, scrollTo, zeige } = aufbau([A], false);
+    setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A], 0, true);
+    zeige([A, B], 0, true);
+    expect(scrollTo).toHaveBeenCalled();
+  });
+
+  it('eigene Absendung aus tiefem Fenster springt, sobald der Kopf da ist', () => {
+    const { strom, scrollTo, zeige } = aufbau([A], false);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    // Erst zählt die Absendung, dann ersetzt `zumKopf` das Fenster.
+    zeige([A], 1, false);
+    zeige([B, C], 1, true);
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
   });
 
   it('„Ältere laden" löst weder Sprung noch Pille aus (Gegenaussage aus C8)', () => {

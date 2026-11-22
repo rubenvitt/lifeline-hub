@@ -870,3 +870,48 @@ async fn heraufstufen_ohne_freigabe_ist_403_vor_404() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
     }
 }
+
+/// LLH-1886: `after_id` liefert die Seite direkt über dem Cursor, absteigend wie jede Seite; mit
+/// `before_id` zusammen ist der Cursor widersprüchlich (422).
+#[tokio::test]
+async fn seite_ueber_dem_cursor_und_beide_cursor_zugleich() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten");
+    let mut ids = Vec::new();
+    for i in 1..=5 {
+        let body = format!(r#"{{"inhalt":"N{i}"}}"#);
+        let (s, m) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::CREATED);
+        ids.push(m["id"].as_i64().unwrap());
+    }
+
+    let (s, seite) = anfrage(
+        &app,
+        "GET",
+        &format!("{pfad}?after_id={}&limit=2", ids[1]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let geliefert: Vec<i64> = seite
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(geliefert, vec![ids[3], ids[2]]);
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{pfad}?after_id={}&before_id={}", ids[0], ids[4]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}

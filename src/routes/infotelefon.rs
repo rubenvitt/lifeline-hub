@@ -31,6 +31,8 @@ pub struct ListParams {
     status: Option<String>,
     vor_zeit: Option<String>,
     vor_id: Option<i64>,
+    nach_zeit: Option<String>,
+    nach_id: Option<i64>,
     limit: Option<i64>,
 }
 
@@ -45,15 +47,22 @@ fn parse_filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
 }
 
 /// GET /api/einsaetze/{id}/stab/infotelefon — immer eine Seite, jüngster Eingang zuerst
-/// (`status`, Cursor `vor_zeit` + `vor_id`, `limit`; LLH-732, design.md D2, Regeln über
-/// [`crate::kommunikation::parse_page`]).
+/// (`status`, Cursor `vor_zeit` + `vor_id` für die Seite darunter oder `nach_zeit` + `nach_id`
+/// für die Seite direkt darüber, `limit`; LLH-732, design.md D2, LLH-1886; Regeln über
+/// [`crate::kommunikation::parse_fenster`]).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Infotelefon>,
     Query(p): Query<ListParams>,
 ) -> Result<Json<Vec<InfotelefonAnrufAnzeige>>, AppError> {
     let filter = parse_filter(p.status.as_deref())?;
-    let seite = crate::kommunikation::parse_page(p.vor_zeit.as_deref(), p.vor_id, p.limit)?;
+    let seite = crate::kommunikation::parse_fenster(
+        p.vor_zeit.as_deref(),
+        p.vor_id,
+        p.nach_zeit.as_deref(),
+        p.nach_id,
+        p.limit,
+    )?;
     Ok(Json(
         repo::list_page(&state.pool, ctx.einsatz.id, &filter, &seite).await?,
     ))

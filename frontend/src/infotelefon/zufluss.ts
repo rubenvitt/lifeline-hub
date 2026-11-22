@@ -23,10 +23,10 @@ export function einfrieren(anrufe: readonly InfotelefonAnruf[]): Einfrierstand |
 }
 
 /**
- * Nimmt nachgeladene Anrufe in den eingefrorenen Stand auf (LLH-732): „Ältere laden“ hängt eine
- * Seite an, während der Fokus in der Liste liegt. Die Wassermarke bleibt, sonst gäbe sie neue
- * fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen Nachtrag (alter Eingang, hohe
- * Kennung) aus der älteren Seite als „neuen Anruf“ zurück.
+ * Nimmt nachgeladene Anrufe in den eingefrorenen Stand auf (LLH-732, LLH-1886): „Ältere laden“
+ * oder „Neuere laden“ holt eine Seite, während der Fokus in der Liste liegt. Die Wassermarke
+ * bleibt, sonst gäbe sie neue fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen
+ * Nachtrag (alter Eingang, hohe Kennung) aus der geholten Seite als „neuen Anruf“ zurück.
  */
 export function extendEinfrierstand(
   gefroren: Einfrierstand | null,

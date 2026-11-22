@@ -133,11 +133,15 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 - Jeder Einsatz hat den Kanal **„Allgemein“**; weitere Kanäle legen Einsatzleitung und
   Führungspersonal an.
 - Kanäle mit ungelesenen Nachrichten stehen oben und tragen ihre Zahl; danach ordnet die jüngste
-  Nachricht. Wer einen Kanal öffnet, hat ihn gelesen. Gelesen wird je Person, nicht je Gerät.
+  Nachricht. Wer einen Kanal öffnet, hat ihn gelesen. Gelesen wird je Person, nicht je Gerät. Wer
+  weit zurückgeblättert hat, liest erst, wenn er wieder bei den neuesten Nachrichten ankommt.
 - Die Summe der ungelesenen Nachrichten steht als Zähler am Modul „Chat“.
 - Neue Nachrichten erscheinen ohne Neuladen. Wer gerade weiter oben liest, bleibt dort; unten
   erscheint „1 neue Nachricht“ oder „n neue Nachrichten“ und führt ans Ende.
-- Lange Verläufe lädt „Ältere laden“ am oberen Ende nach.
+- Lange Verläufe lädt „Ältere laden“ am oberen Ende nach. Der Chat hält dabei höchstens 500
+  Nachrichten; wer weiter zurückblättert, verliert unten die neuesten aus der Ansicht. Dann steht
+  über der Eingabe „Neuere laden“ und führt Stück für Stück zurück nach unten. Wer in dieser Lage
+  eine Nachricht schickt, springt direkt ans Ende zu seiner Nachricht.
 
 ### Erwähnungen
 

@@ -6,8 +6,10 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
+  ANRUF_CURSOR,
   ANRUFE_PAGE_SIZE,
-  anrufCursor,
+  anrufOrdnung,
+  anrufSeite,
   erfasseAnruf,
   loadAnruf,
   loadAnrufe,
@@ -15,7 +17,6 @@ import {
   setzeAnrufStatus,
   type AnrufEingabe,
 } from '../api/infotelefon';
-import type { AbschlussCursor } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { InfotelefonAnruf, InfotelefonStatus } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -44,6 +45,8 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
 import { funkprotokollFolge, useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
+import { fensterOptionen, useKopfAnnehmen } from '../components/fensterBeideRichtungen';
+import { useKopfBeimVerlassen, zumKopf } from '../components/listenFenster';
 import {
   einfrieren,
   extendEinfrierstand,
@@ -127,15 +130,11 @@ export default function InfotelefonPage() {
   const [focusRequest, setFocusRequest] = useState(0);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
-  // `frozenPageCount` merkt die Zahl der Seiten beim Einfrieren: was „Ältere laden“ danach anhängt,
-  // ist alt und wird über `extendEinfrierstand` aufgenommen, nie als „neuer Anruf“ zurückgehalten. Die
-  // Kennungen einer angehängten Seite gelten so, wie sie ZUERST erschien (`appendedPageIds`): ein
+  // Was „Ältere laden“ oder „Neuere laden“ danach holt, antwortet auf eine eigene Handlung und wird
+  // über `extendEinfrierstand` aufgenommen, nie als „neuer Anruf“ zurückgehalten (LLH-1886,
+  // `ladeWeiter`). Aufgenommen werden die Kennungen der geholten Seite so, wie sie kam: ein
   // Live-Nachladen derselben Seite bringt einen fremden Nachtrag sonst unbemerkt in den Stand.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
-  const [frozenPageCount, setFrozenPageCount] = useState(0);
-  const [appendedPageIds, setAppendedPageIds] = useState<ReadonlyMap<number, readonly number[]>>(
-    () => new Map(),
-  );
   const [linkedId, setLinkedId] = useState<number | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   // Ein Deeplink rollt selbst zu seinem Anruf; dann nicht beim Öffnen ans Ende.
@@ -148,15 +147,29 @@ export default function InfotelefonPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  /*
+   * Seitenfenster in beide Richtungen (LLH-1886, `components/fensterBeideRichtungen.ts`):
+   * höchstens fünf Seiten, ein Live-Ereignis lädt nur sie neu. Ohne Kopf steht unten „Neuere
+   * laden“; wer die Ansicht so verlässt, holt beim nächsten Mal frisch die neueste Seite.
+   */
+  const listenSchluessel = einsatzKeys.infotelefonListe(einsatzId, sicht);
   const anrufeQuery = useInfiniteQuery({
-    queryKey: einsatzKeys.infotelefonListe(einsatzId, sicht),
+    queryKey: listenSchluessel,
     queryFn: ({ pageParam }) =>
-      loadAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined, vor: pageParam }),
-    initialPageParam: undefined as AbschlussCursor | undefined,
-    getNextPageParam: (letzte) =>
-      letzte.length < ANRUFE_PAGE_SIZE ? undefined : anrufCursor(letzte[letzte.length - 1]),
+      loadAnrufe(einsatzId, {
+        status: sicht === 'offen' ? 'offen' : undefined,
+        ...anrufSeite(pageParam),
+      }),
+    ...fensterOptionen(ANRUF_CURSOR, ANRUFE_PAGE_SIZE),
     enabled: frei,
   });
+  const kopfImFenster = !anrufeQuery.hasPreviousPage;
+  useKopfAnnehmen(listenSchluessel, anrufeQuery.data, ANRUFE_PAGE_SIZE);
+  useKopfBeimVerlassen(listenSchluessel, frei);
+  const ladeKopf = () =>
+    zumKopf(qc, listenSchluessel, () =>
+      loadAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined }),
+    );
   const zaehlerQuery = useQuery({
     queryKey: einsatzKeys.infotelefonZaehler(einsatzId),
     queryFn: () => loadAnrufZaehler(einsatzId),
@@ -230,15 +243,16 @@ export default function InfotelefonPage() {
     },
   });
 
-  // Der Server filtert; der einzeln geholte Anruf steht hinten (in der Darstellung oben), er ist
-  // älter als das Fenster.
-  const gefiltert = useMemo(
-    () =>
-      linked && sicht === 'alle' && !loaded.some((a) => a.id === linked.id)
-        ? [...loaded, linked]
-        : loaded,
-    [loaded, linked, sicht],
-  );
+  // Der Server filtert; der einzeln geholte Anruf sortiert nach der Ordnung des Servers ein: meist
+  // älter als das Fenster (hinten, in der Darstellung oben), ohne Kopf im Fenster aber womöglich
+  // jünger (LLH-1886, Review).
+  const gefiltert = useMemo(() => {
+    if (!linked || sicht !== 'alle' || loaded.some((a) => a.id === linked.id)) return loaded;
+    const stelle = loaded.findIndex((a) => anrufOrdnung(linked, a) < 0);
+    return stelle < 0
+      ? [...loaded, linked]
+      : [...loaded.slice(0, stelle), linked, ...loaded.slice(stelle)];
+  }, [loaded, linked, sicht]);
   // Erst springen, wenn die Zeile steht: der einzeln geholte Anruf kommt später als die Liste.
   const isHervorgehobenLoaded = gefiltert.some((a) => a.id === hervorgehoben);
   useEffect(() => {
@@ -247,15 +261,31 @@ export default function InfotelefonPage() {
       .querySelector(`[data-anruf="${hervorgehoben}"]`)
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben, isHervorgehobenLoaded]);
-  const pageCount = pages?.length ?? 0;
-  // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
-  const appendedIds = gefroren
-    ? (pages ?? [])
-        .slice(frozenPageCount)
-        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
-    : [];
-  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, benutzer?.id);
+
+  /**
+   * „Ältere laden“ / „Neuere laden“ (LLH-1886): Die geholte Seite antwortet auf eine eigene
+   * Handlung und gehört bei eingefrorener Schleuse zum gezeigten Stand. Erkannt wird sie an der
+   * Referenz: eine Seite, die vorher nicht im Fenster lag. Positionen taugen dafür nicht, denn mit
+   * dem Deckel fällt am anderen Ende eine Seite heraus (Review zu LLH-1687). Scheitert der Abruf
+   * oder gab es nichts zu holen, wird nichts aufgenommen.
+   */
+  async function ladeWeiter(richtung: 'aelter' | 'neuer') {
+    const vorher = new Set(anrufeQuery.data?.pages ?? []);
+    const ergebnis =
+      richtung === 'aelter'
+        ? await anrufeQuery.fetchNextPage()
+        : await anrufeQuery.fetchPreviousPage();
+    const seiten = ergebnis.data?.pages ?? [];
+    const geholt = richtung === 'aelter' ? seiten[seiten.length - 1] : seiten[0];
+    if (geholt == null || vorher.has(geholt)) return;
+    setGefroren((g) =>
+      extendEinfrierstand(
+        g,
+        geholt.map((a) => a.id),
+      ),
+    );
+  }
   /*
    * Funkprotokoll (LLH-1149): Öffnen am Ende, Mitlaufen am Ende, Anker beim Nachladen oben.
    * Die Ränder der GEZEIGTEN Anrufe (Serverordnung, der erste ist der jüngste): erst wenn
@@ -267,6 +297,7 @@ export default function InfotelefonPage() {
     bereit: anrufeQuery.isSuccess && einsatzQuery.data != null,
     juengste: sichtbar[0] != null ? String(sichtbar[0].id) : undefined,
     aelteste: sichtbar.length > 0 ? String(sichtbar[sichtbar.length - 1].id) : undefined,
+    kopfImFenster,
     ohneStartlauf: startMitAnruf,
   });
   // Hochgerollt friert ein wie Fokus in der Liste; zurück am Ende ohne Fokus taut auf.
@@ -275,18 +306,12 @@ export default function InfotelefonPage() {
   if (gesehenAmEnde !== amEnde) {
     setGesehenAmEnde(amEnde);
     if (!amEnde && gefroren == null) {
-      setFrozenPageCount(pageCount);
-      setAppendedPageIds(new Map());
       setGefroren(einfrieren(gefiltert));
     } else if (amEnde && !fokusDrin) setGefroren(null);
   }
   const betreten = useCallback(
     (e: FocusEvent<HTMLDivElement>) => {
       setFokusDrin(true);
-      if (gefroren == null) {
-        setFrozenPageCount(pageCount);
-        setAppendedPageIds(new Map());
-      }
       setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
       // Steht ein per Tastatur erreichtes Ziel schon im Fenster, rollt der Browser nicht und
       // übergeht damit den Fokusabstand: unter `md` steht der erste Anruf beim Öffnen dicht über
@@ -300,7 +325,7 @@ export default function InfotelefonPage() {
         ziel.scrollIntoView?.({ block: 'end' });
       }
     },
-    [gefiltert, gefroren, pageCount],
+    [gefiltert],
   );
   const verlassen = useCallback(
     (e: FocusEvent<HTMLDivElement>) => {
@@ -314,24 +339,6 @@ export default function InfotelefonPage() {
     },
     [amEnde],
   );
-  // Hält die Kennungen jeder nach dem Einfrieren angehängten Seite beim ersten Erscheinen fest.
-  useEffect(() => {
-    if (gefroren == null || pages == null) return;
-    const missing = pages
-      .map((page, i) => [i, page] as const)
-      .filter(([i]) => i >= frozenPageCount && !appendedPageIds.has(i));
-    if (missing.length === 0) return;
-    setAppendedPageIds((previous) => {
-      const next = new Map(previous);
-      for (const [i, page] of missing)
-        if (!next.has(i))
-          next.set(
-            i,
-            page.map((a) => a.id),
-          );
-      return next;
-    });
-  }, [gefroren, pages, frozenPageCount, appendedPageIds]);
   const zaehler = zaehlerQuery.data;
   const jeAnliegen = useMemo(
     () =>
@@ -466,8 +473,10 @@ export default function InfotelefonPage() {
           <div ref={erfassungRef} className="etb-erfassung-sticky" {...leistenFokus}>
             <AnrufErfassung
               // Der eigene Anruf steht unten über der Leiste: nach dem Erfassen ans Ende.
+              // Aus tiefem Fenster läge er außerhalb (LLH-1886): erst die neueste Seite holen.
               onErfassen={async (e) => {
                 const angelegt = await erfassenMutation.mutateAsync(e);
+                if (anrufeQuery.hasPreviousPage) await ladeKopf();
                 zumEnde();
                 return angelegt;
               }}
@@ -524,7 +533,7 @@ export default function InfotelefonPage() {
             {anrufeQuery.hasNextPage && (
               <Flex justify="center" style={{ marginBottom: token.marginSM }}>
                 <Button
-                  onClick={() => void anrufeQuery.fetchNextPage()}
+                  onClick={() => void ladeWeiter('aelter')}
                   loading={anrufeQuery.isFetchingNextPage}
                 >
                   Ältere laden
@@ -581,6 +590,18 @@ export default function InfotelefonPage() {
                 </Zeitachseneintrag>
               ))}
             </ol>
+            {/* Das Fenster steht nicht am jüngsten Anruf (LLH-1886): der Rückweg nach unten,
+                lückenlos über den Cursor. Im Listencontainer wie „Ältere laden“. */}
+            {!kopfImFenster && (
+              <Flex justify="center" style={{ marginTop: token.marginSM }}>
+                <Button
+                  onClick={() => void ladeWeiter('neuer')}
+                  loading={anrufeQuery.isFetchingPreviousPage}
+                >
+                  Neuere laden
+                </Button>
+              </Flex>
+            )}
             {/* Überlagerung mit Nullhöhe am UNTEREN Rand: neue Anrufe kommen unten an, das Banner
                 klebt dort über der angepinnten Erfassung (ihre gemessene Höhe). */}
             <div
@@ -598,8 +619,6 @@ export default function InfotelefonPage() {
                     onKlick: () => {
                       // Der Knopf geht mit dem Banner, und mit ihm der Fokus — ohne Blur.
                       setFokusDrin(false);
-                      setFrozenPageCount(pageCount);
-                      setAppendedPageIds(new Map());
                       setGefroren(amEnde ? null : einfrieren(gefiltert));
                       zumEnde();
                     },

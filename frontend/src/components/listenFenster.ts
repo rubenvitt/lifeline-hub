@@ -12,8 +12,8 @@ import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query'
  * haben keinen Cursor nach vorn (anders als das ETB, `etb/seitenfenster.ts`); den Weg zurück zum
  * Neuesten bietet der Knopf `ZumKopfKnopf`, der das Fenster durch den Kopf ersetzt.
  *
- * Chat und Infotelefon tragen das Fenster bewusst nicht: Zufluss-Schleuse und Gelesen-Stand
- * setzen dort den Kopf im Fenster voraus (Review zu LLH-1687).
+ * Chat und Infotelefon blättern in beide Richtungen (`fensterBeideRichtungen.ts`, LLH-1886) und
+ * nutzen von hier `zumKopf` und `useKopfBeimVerlassen`.
  *
  * Der Kopf ist die Seite mit dem Startparameter `undefined` (alle drei Listen beginnen dort).
  */
