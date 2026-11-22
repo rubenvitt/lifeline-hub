@@ -184,7 +184,7 @@ pub async fn erfassen(
         if ist_mitarbeit {
             crate::etb::fordere_eigenen_eintrag(&state.pool, einsatz_id, ziel, ctx.benutzer.id)
                 .await?;
-            crate::etb::fordere_eintrag_ausserhalb_der_lage(&state.pool, einsatz_id, ziel).await?;
+            crate::etb::fordere_eintrag_ausserhalb_der_lage(&state.pool, ziel).await?;
         }
         if !repo::gehoert_zu_einsatz(&state.pool, ziel, einsatz_id).await? {
             return Err(AppError::Validation(

@@ -3755,6 +3755,13 @@ export interface components {
              */
             meldung_id?: number | null;
             /**
+             * @description Der Eintrag oder ein Glied seiner Berichtigungs-Kette gehört zu einer Meldung in der Lage
+             *     (LLH-2008, [`repo::meldung_in_lage`]): die Mitarbeit berichtigt ihn nicht. Stand beim
+             *     Lesen; kommt die Meldung später in die Lage, sperrt der Server weiter mit 403. Fehlt bei
+             *     `false`. Nicht Teil des SELECT, wie `folgeauftraege`.
+             */
+            meldung_in_lage?: boolean;
+            /**
              * Format: int64
              * @description Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
              *     per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
