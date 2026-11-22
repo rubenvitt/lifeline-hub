@@ -135,27 +135,33 @@ englisches Glossar der API zeigt.
 
 ## Glossar und Wächter
 
-**`scripts/api-routen-woerter.tsv`**: eine Zeile je erlaubtem Wort, Spalten `wort`, `deutsch`
-(der Begriff, den es übersetzt, oder `-` für Wörter ohne deutsches Gegenstück wie `api`, `v1`,
-`json`). Sortiert, keine Dubletten. Das Fundament trägt die heute schon englischen Wörter, die
-Wörter des ersten Pakets und den Kern der Fachbegriffe (unten). Jedes Paket ergänzt die Wörter
-seiner Pfade.
+**`scripts/api-routen-woerter.tsv`** (das Glossar): eine Zeile je erlaubtem **Segment**, nicht
+je Einzelwort, Spalten `segment`, `deutsch`. `segment` ist ein ganzes Pfadsegment, auch
+zusammengesetzt (`command-post`, `resource-requests`, `end-others`); `deutsch` ist der Begriff,
+den es übersetzt (`Führungsstelle`), oder `-` für Segmente ohne deutsches Gegenstück (`api`,
+`v1`, `openapi.json`, `health`). Beide Spalten sind eindeutig (außer `-`): ein deutscher Begriff
+hat genau ein englisches Segment und umgekehrt. *(Meine Wahl nach dem Gegenlesen: Eine reine
+Wortliste hätte das Anti-Ziel „zwei Namen für dasselbe Ding“ nicht prüfen können; Stellen /
+Posten / Plätze werden drei Zeilen.)* Sortiert nach `segment`. Das Fundament trägt die heute schon
+englischen Segmente, die des ersten Pakets und den Kern der Fachbegriffe (unten). Jedes Paket
+ergänzt die Segmente seiner Pfade.
 
-**`scripts/api-routen-bestand.txt`**: die heute registrierten Pfade mit mindestens einem Wort,
-das nicht in der Liste steht, einer je Zeile, sortiert. Darf nur schrumpfen.
+**`scripts/api-routen-bestand.txt`**: die heute registrierten Pfade mit mindestens einem
+Segment, das nicht im Glossar steht, einer je Zeile, sortiert. Darf nur schrumpfen.
 
 **`scripts/check-api-routen.sh`** (+ `.test.sh`, Muster wie `check-schreibweisen.sh`):
 
 1. Pfade sammeln: Literale aus `.route("…"` in `src/app.rs`, `path = "…"` in
    `src/public_api/**`, Konstanten `const …_PFAD: &str = "/api/…"` unter `src/`.
-2. Jedes feste Segment (nicht `{…}`) an `-` und `.` in Wörter teilen. Ein Pfad mit einem Wort
-   außerhalb der Liste muss im Bestand stehen, sonst rot, mit Pfad, Wort und Abhilfe („Wort ins
-   Glossar oder englisch benennen“).
+2. Jedes feste Segment (nicht `{…}`) im Glossar nachschlagen. Ein Pfad mit einem Segment
+   außerhalb des Glossars muss im Bestand stehen, sonst rot, mit Pfad, Segment und Abhilfe
+   („Segment ins Glossar oder englisch benennen“).
 3. Ein Bestandseintrag, der nicht mehr registriert ist, ist rot (veraltet, Zeile löschen); so
    schrumpft die Datei mit jedem Paket.
 4. Mehr Zeilen im Bestand als auf `origin/alpha` (Merge-Base) ist rot. Ohne den Ref laut
    übersprungen, wie `check-adr-nummern.sh`.
-5. Die Wortliste selbst: sortiert, keine Dubletten, nur `[a-z0-9]+` in der Spalte `wort`.
+5. Das Glossar selbst: sortiert, beide Spalten eindeutig (außer `-` in `deutsch`), `segment`
+   nur `[a-z0-9]+([.-][a-z0-9]+)*`.
 
 Eingehängt in **Schritt 14** von `check-all.sh` (Bündel `schnell`, läuft also in jedem PR),
 erst der Selbsttest, dann die Prüfung; der Titel des Schritts nennt beide Wächter. *(Meine Wahl:
@@ -214,10 +220,16 @@ dort, wo er am heikelsten ist. Umfang:
   `frontend/src/auth`, MSW-Handler, e2e, `src-tauri/src/anmeldung.rs` samt Test,
   `ios/LifelineKern` (`Anmeldung.swift`, `AnmeldungTests.swift`), Doku mit diesen Pfaden.
 - **`SHELL_CONTRACT` von 1 auf 2** (`src/routes/shell.rs`): Der Login-Pfad der Hülle bricht, und
-  genau dafür steigt der Vertrag. Eine ältere iOS-Hülle zeigt dann den Hinweis „Hülle zu alt“
-  statt einer gescheiterten Anmeldung. Wie die iOS-Hülle einen höheren Vertrag behandelt, prüft
-  der Plan an `ios/App/Vertragsabruf.swift`; behandelt sie ihn nicht so, wird das ein Blocker,
-  kein stiller Umbau.
+  genau dafür steigt der Vertrag. Eine ältere iOS-Hülle (`bekannteVertraege = [1]` in
+  `ios/LifelineKern/Sources/LifelineKern/LifelineKern.swift`) zeigt dann „Hülle zu alt“ statt
+  einer gescheiterten Anmeldung (`Vertragspruefung.richtung` → `.zuNeu`).
+- **Die neue iOS-Hülle kennt nur Vertrag 2** (`bekannteVertraege = [2]`): Ein Server älteren
+  Stands zeigt ihr „Server zu alt“. *(Zur Freigabe: Die Alternative `[1, 2]` mit Pfadwahl nach
+  Vertrag wäre neue Logik im Kern, also genau der Alias, den der harte Schnitt vermeidet.)*
+- **Desktop-Hülle:** Sie prüft keinen Vertrag (das bringt LLH-1982). Bei Versionsabstand
+  zwischen Hülle und Server scheitert „Im Browser anmelden“ mit 404. Sie aktualisiert sich selbst
+  (`tauri-plugin-updater`), der Abstand ist also kurz. *(Zur Freigabe: als Alpha-Risiko
+  hinnehmen, statt hier eine Vertragsprüfung oder einen Rückfall auf den alten Pfad zu bauen.)*
 
 ## Pakete (Unteraufgaben von LLH-1979)
 
@@ -287,7 +299,8 @@ Fachbegriff im Glossar, legt das Paket ihn Ruben vor, bevor es baut.
 - **Signierte Pfade:** Testvektoren und Kopplungssignaturen enthalten den Pfad; sie werden im
   v1- bzw. Kopplungspaket neu erzeugt, nicht von Hand angepasst.
 - **Nach dem Update** sehen offene Tabs mit altem Bundle 404 auf umbenannten Pfaden, bis neu
-  geladen wird. Bewusst hingenommen (Alpha).
+  geladen wird; ebenso eine Desktop-Hülle mit anderem Stand als der Server bei der Anmeldung.
+  Bewusst hingenommen (Alpha).
 
 ## Dem Planer überlassen
 
