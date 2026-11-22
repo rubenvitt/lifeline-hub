@@ -1,7 +1,7 @@
 # Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)
 
 **Dashboard-Baukasten** (Vorbild Lagebild): jede Fläche, die eine Lage in Zahlen
-zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
+zeigt (Lagebild, Führung · Überblick, Kopf der Kräfteübersicht), baut sich aus denselben Bausteinen in
 `components/instrument/`.
 Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
 Warnstufe ist keine Kennzahl). Darunter, vor Band und Paneelen, auf Überblick, Lagebild und Lagemonitor
@@ -24,7 +24,7 @@ die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen. Bei
 warten die Reihen auf die Quellen der Gliederung und der Marken, sonst rückt alles darunter.
 Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
 `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
-(Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
+(Kräfteübersicht) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
 Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
 „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
 `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, Kopf-Aktion ohne „↗“ für eine

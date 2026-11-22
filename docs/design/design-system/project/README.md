@@ -551,7 +551,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt. Das Häkchen zeigt
-  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Meldebild) hängt ihn dort ein:
+  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Kräfteübersicht) hängt ihn dort ein:
   Zustand aus `useSpaltenSchalterZustand`, an die Sicht als `spaltenSchalterAussen`;
   sein Fokus hält die Zeilenschleuse nicht, die Werkzeugzeile der Sicht bleibt Standzeile des
   Sammelbanners. Sonst bleibt der eingebaute Schalter.
@@ -571,7 +571,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Datensicht`/`KatalogTabelle` reicht; ohne gemerkte Spaltenwahl gilt `spaltenAusVoreinstellung`.
   Spalten, die beim ersten Rendern noch nicht feststehen (Werte aus den Zeilen, Spalte hinter einer
   Freigabe), nennt die Seite als `ausDaten`, sonst fiele ihr Filter aus der Adresse. Eine Sicht im
-  Baummodus sortiert und filtert nicht (Meldebild, Funkplan, Kommunikationsplan; Kommentar an der
+  Baummodus sortiert und filtert nicht (Kräfteübersicht, Funkplan, Kommunikationsplan; Kommentar an der
   Sicht). Ein Filter mit `ohneKartenfeld` hat im Kartenzweig kein Auswahlfeld (Betroffene, Status
   der Tiere: die Seite führt die Achse schon, die erste Karte bleibt im ersten Bild), wirkt aber
   und steht als Chip da. Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen,
@@ -612,7 +612,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Das Aufklappsymbol im Baum der `Datensicht` folgt der Dichte**: antds Symbol steht
   in einem Knopf mit Höhe `controlHeight` und Breite `controlHeightSM` (`baumSymbolZielStil`),
   der Text daneben mittig in derselben Höhe (`baumTextStil`); im Druck fällt der Boden. Nachweis
-  `e2e/gate3-trefflaeche.spec.ts` „Baumtabellen“ (Einheiten, Meldebild, Funkplan).
+  `e2e/gate3-trefflaeche.spec.ts` „Baumtabellen“ (Einheiten, Kräfteübersicht, Funkplan).
 - Stehende Kopfzeile hält Freiraum (`setzeKopfFreiraum`, `scroll-margin-top` in `sprache.css`);
   Fokus-Nachweis darunter auch mit `Shift+Tab` (`fokus-kern.ts`, `taste`). In der ersten Zeile
   beschneidet Chromium den Rand am Scrollcontainer von `scroll.x`; dort rollt
