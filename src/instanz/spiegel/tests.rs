@@ -1861,6 +1861,10 @@ async fn beobachter_mit_funktion_vom_alten_gegenueber_kommt_als_bezeichnung_an()
 async fn strip_funktion_liest_die_schwaerzung_am_lokalen_einsatz() {
     let pool = crate::db::test_pool().await;
     let mut conn = pool.acquire().await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
     let t = super::schema::schema(&mut conn)
         .await
         .unwrap()
