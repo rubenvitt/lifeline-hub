@@ -253,20 +253,20 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
   expect.soft(hoehen.size, `${fall}: Kopfhöhe über das Laden\n${verlauf.join('\n')}`).toBe(1);
 }
 
-/** Ab dieser Breite (`xl`) trägt das Etikett des Benutzermenüs Funktion bzw. Namen, darunter nur Initialen. */
+/** Ab `xl` trägt das Benutzermenü Funktion bzw. Namen, darunter nur Initialen. */
 const ETIKETT_BREITE = 1440;
 
 /**
  * LLH-1900: Vorbedingung vor der ersten Messung als Beobachter (`frontend/e2e/AGENTS.md`, LFH-435:
  * der Rollenzweig ist VOR der Messung Vorbedingung). Der Kopf trägt am Benutzermenü die
- * Einsatzfunktion; die Einsatzleitung hat eine („EL“), der Beobachter keine, dort steht sein
- * Anzeigename. Das Etikett steht erst ab `xl`, die Messung beginnt bei 1100 px, deshalb eine
- * eigene Ladung in voller Breite. Zugesichert wird erst, wenn der Einsatz geladen ist (der
- * Statuspunkt steht): vorher zeigt jedes Etikett den Namen, auch das des Admins.
+ * Einsatzfunktion; die Einsatzleitung hat eine („Einsatzleitung“), der Beobachter keine, dort
+ * steht sein Anzeigename. Das Etikett steht erst ab `xl`, die Messung beginnt bei 1100 px,
+ * deshalb eine eigene Ladung in voller Breite. Zugesichert wird erst, wenn der Einsatz geladen
+ * ist (der Statuspunkt steht): vorher zeigt jedes Etikett den Namen, auch das des Admins.
  *
  * Mutationsprobe (22.11.2026): `wechsleZuRolle` ausgelassen, die Sitzung bleibt Admin; rot wird
- * nur der Beobachter-Test, an dieser Vorbedingung („EL“ statt Anzeigename), der Admin-Test
- * bleibt grün.
+ * nur der Beobachter-Test, an dieser Vorbedingung (Etikett „Einsatzleitung“ statt Anzeigename),
+ * der Admin-Test bleibt grün.
  */
 async function beobachterZweigSteht(page: Page, einsatzId: string, anzeigename: string) {
   await page.setViewportSize({ width: ETIKETT_BREITE, height: 800 });
