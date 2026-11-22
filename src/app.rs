@@ -2612,6 +2612,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/einheiten/{eid}/status",
             put(routes::einsatz_einheit::status_setzen),
         )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+            post(routes::einsatz_einheit::status_zuruecknehmen),
+        )
         // Kräfte-Zeitachse (LFH-552) unter dem Einheiten-Präfix.
         .route(
             "/api/einsaetze/{id}/einheiten/zeitachse",

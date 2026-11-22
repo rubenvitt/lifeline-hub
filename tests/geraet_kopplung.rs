@@ -8033,6 +8033,52 @@ async fn einheitengeraet_setzt_nur_den_eigenen_status() {
     );
 }
 
+/// Das Einheitengerät nimmt den eigenen Wechsel zurück (LLH-1986), auch zu „kein Status“; einen
+/// Wechsel einer fremden Einheit nicht (404).
+#[tokio::test]
+async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
+    let status_id = stati.as_array().unwrap()[0]["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("{basis}/{}/status", l.zug_ost),
+        &geraet,
+        Some(&json!({"status_id": status_id})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let beleg = v["status_ruecknahme"].clone();
+    assert!(beleg["vorher_status_id"].is_null(), "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{}/status/zuruecknehmen", l.zug_nord),
+        &geraet,
+        Some(&beleg),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Einheit: {v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{}/status/zuruecknehmen", l.zug_ost),
+        &geraet,
+        Some(&beleg),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"]["quelle"], "ohne", "zurück auf kein Status: {v}");
+}
+
 /// Absender ist fest die eigene Einheit (Rückmeldung); ein Ort darf an jeder Art Meldung stehen
 /// (F9). Gelesen werden nur die eigenen Meldungen.
 #[tokio::test]
