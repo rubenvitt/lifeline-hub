@@ -109,6 +109,7 @@ import {
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { Marke } from '../components/instrument/Marke';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Der Abschnitt in der Wire-Form des PATCH (LLH-1945): Altwert und Vergleichswert des Feld-CAS
@@ -692,7 +693,7 @@ export default function EinsatzabschnittePage() {
   //
   // Listenzustand — `abschnitteQuery` und alles Weitere entscheidet an der Stelle der Daten, nie
   // als Frühausstieg: sonst risse ein gescheiterter Nebenabruf die ganze Seite weg.
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="einsatzabschnitte" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

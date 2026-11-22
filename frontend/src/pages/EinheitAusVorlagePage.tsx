@@ -37,7 +37,6 @@ import {
   istNichtGefunden,
   SeitenFehler,
   SeitenNichtGefunden,
-  SeitenSkeleton,
   nichtGefundenInhalt,
 } from '../components/SeitenZustand';
 import { RechteHinweis, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -80,6 +79,7 @@ import {
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
 import { pflicht } from '../components/pflichtRegel';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Einheit aus Vorlage bilden (LLH-1049, Spec `einheit-vorlagen`, „Seite zum Bilden aus der
@@ -207,7 +207,8 @@ function EinheitAusVorlage({
     },
   });
 
-  if (einsatzQuery.isLoading || vorschauQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading || vorschauQuery.isLoading)
+    return <ModulGerippeSeite modulKey="einheiten" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
