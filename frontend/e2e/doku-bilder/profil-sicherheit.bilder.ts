@@ -112,7 +112,8 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('Neues Passwort', { exact: true }).fill('kurz');
     await dialog.getByLabel('Neues Passwort wiederholen').fill('kurz');
     await dialog.getByRole('button', { name: 'Passwort ändern' }).click();
-    await expect(dialog.getByText('Mindestens 8 Zeichen')).toBeVisible();
+    // Der Grund steht am Feld und in der Fußzeile der Erfassung (`erfassung-pruefung`).
+    await expect(dialog.getByText('Mindestens 8 Zeichen').first()).toBeVisible();
     await dialog.getByLabel('Neues Passwort', { exact: true }).fill('neues-passwort-456');
     await dialog.getByLabel('Neues Passwort wiederholen').fill('neues-passwort-456');
     await dialog.getByRole('button', { name: 'Passwort ändern' }).click();
