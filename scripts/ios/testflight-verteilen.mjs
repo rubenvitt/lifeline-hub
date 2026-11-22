@@ -56,9 +56,15 @@ export function client({ keyId, issuerId, privateKey, fetch = globalThis.fetch }
       body: body && JSON.stringify(body),
     });
     const text = await res.text();
-    const json = text ? JSON.parse(text) : null;
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch (err) {
+      // Eine HTML-Fehlerseite (502 vom Proxy) soll Status und Pfad nennen, nicht nur „SyntaxError“.
+      if (res.ok) throw new Error(`${method} ${path}: Antwort ist kein JSON (${err.message})`);
+    }
     if (!res.ok) {
-      const grund = json?.errors?.map((e) => e.detail || e.title).join('; ') || text;
+      const grund = json?.errors?.map((e) => e.detail || e.title).join('; ') || text.slice(0, 200);
       throw Object.assign(new Error(`${method} ${path}: ${res.status} ${grund}`), { status: res.status });
     }
     return json;
@@ -160,6 +166,10 @@ export async function verteilen({
       (res) => res?.data,
       (err) => { if (err.status === 404) return null; throw err; },
     );
+    if (laufend?.attributes.betaReviewState === 'REJECTED') {
+      // Apple nimmt denselben Build nicht erneut an; erst ein neuer Tag kommt wieder durch.
+      throw new Error(`Beta-Prüfung abgelehnt (REJECTED): Grund in App Store Connect → TestFlight; extern geht erst ein neuer Build`);
+    }
     if (laufend) {
       log(`Beta-Prüfung läuft schon (${laufend.attributes.betaReviewState})`);
     } else {
@@ -176,7 +186,19 @@ export async function verteilen({
 async function aufBuildWarten({ request, appId, buildNummer, warteMs, pruefMs, schlafe, log }) {
   const pfad = `/v1/builds?${q({ 'filter[app]': appId, 'filter[version]': buildNummer, 'filter[preReleaseVersion.platform]': 'IOS', limit: '1' })}`;
   for (let gewartet = 0; ; gewartet += pruefMs) {
-    const [build] = (await request('GET', pfad)).data;
+    let antwort;
+    try {
+      antwort = await request('GET', pfad);
+    } catch (err) {
+      // Über bis zu 45 Minuten Abfragen soll ein einzelner 5xx, ein 429 oder ein Netzfehler den
+      // Lauf nicht beenden; ein 4xx (Schlüssel, Rechte, Anfrage) ist dagegen endgültig.
+      const voruebergehend = err.status === undefined || err.status === 429 || err.status >= 500;
+      if (!voruebergehend || gewartet >= warteMs) throw err;
+      log(`Abfrage gescheitert (${err.message}), versuche es weiter …`);
+      await schlafe(pruefMs);
+      continue;
+    }
+    const [build] = antwort.data;
     const zustand = build?.attributes.processingState;
     if (zustand === 'VALID') {
       log(`Build ${buildNummer} verarbeitet`);

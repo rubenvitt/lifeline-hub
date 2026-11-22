@@ -158,3 +158,41 @@ test('ungültiger Build und Zeitüberschreitung brechen mit dem Zustand ab', asy
     /nicht verarbeitet \(nicht gefunden\)/,
   );
 });
+
+test('client: Fehler ohne JSON nennt trotzdem Status und Pfad', async () => {
+  const fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502 });
+  const request = client({ keyId: 'KEY', issuerId: 'ISS', privateKey: pem, fetch });
+  await assert.rejects(request('GET', '/v1/builds?x'), (err) => {
+    assert.equal(err.status, 502);
+    assert.match(err.message, /GET \/v1\/builds\?x: 502 <html>Bad Gateway/);
+    return true;
+  });
+});
+
+test('Warten übersteht vorübergehende Fehler (5xx, 429, Netz), bricht aber bei 4xx ab', async () => {
+  const mitFehlern = (fehler) => {
+    const a = api({ gruppen: BEIDE });
+    const echt = a.request;
+    const reihe = [...fehler];
+    a.request = async (method, path, body) => {
+      if (path.startsWith('/v1/builds?') && reihe.length) {
+        a.aufrufe.push({ method, path, body });
+        throw reihe.shift();
+      }
+      return echt(method, path, body);
+    };
+    return a;
+  };
+  const kurz = Object.assign(new Error('503'), { status: 503 });
+  const viel = Object.assign(new Error('429'), { status: 429 });
+  const netz = new TypeError('fetch failed');
+  const build = await lauf(mitFehlern([kurz, viel, netz]));
+  assert.equal(build.id, 'b1');
+  const verboten = Object.assign(new Error('GET /v1/builds: 403 FORBIDDEN'), { status: 403 });
+  await assert.rejects(lauf(mitFehlern([verboten])), /403 FORBIDDEN/);
+});
+
+test('abgelehnte Beta-Prüfung: Abbruch mit dem Zustand statt grün', async () => {
+  const a = api({ gruppen: BEIDE, pruefung: { id: 'r1', attributes: { betaReviewState: 'REJECTED' } } });
+  await assert.rejects(lauf(a), /Beta-Prüfung abgelehnt \(REJECTED\)/);
+});
