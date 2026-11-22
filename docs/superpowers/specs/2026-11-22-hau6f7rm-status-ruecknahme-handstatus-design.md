@@ -71,15 +71,24 @@ das Fahrzeug behält `status_seit` als Kennung.
 
 Gesetzt werden die Spalten bei jedem echten Wechsel in der Schreibfunktion des Status
 (`personal::disposition_repo::update_tx`, `material::disposition_repo::update_tx`,
-`einheit::repo::setze_hand_status_tx`): `gesetzt_von` aus dem Aufruf (`None` bei Wegen ohne
-Person, etwa dem Schichtplan-Vollzug, der `update_tx` mitbenutzt → keine Rücknahme möglich),
-`gesetzt_at` = `jetzt` des Aufrufs, Vorzustand aus der Zeile vor dem UPDATE, `ereignis_id` NULL.
-Das Zeitachsen-Ereignis trägt die Route danach in derselben Transaktion nach (wie
-`merke_status_ereignis_tx`). Der Handstatus der Einheit setzt `status_seit` künftig auf `jetzt`
-des Aufrufs statt `datetime('now')`, damit Seit und Kennung übereinstimmen.
+`einheit::repo::setze_hand_status_tx`). Keine der drei kennt heute Person oder Zeitpunkt: ihre
+Patch-Strukturen bzw. Parameter bekommen `gesetzt_von: Option<i64>` und `jetzt` (wie
+`FahrzeugPatch.gesetzt_von`), die Aufrufer ziehen mit (Routen, `abloesung/schichtplan/vollzug.rs`,
+`demo/import.rs`). `gesetzt_von` kommt aus dem Aufruf (`None` bei Wegen ohne Person, etwa dem
+Schichtplan-Vollzug → keine Rücknahme möglich), `gesetzt_at` = `jetzt`, Vorzustand aus der Zeile
+vor dem UPDATE, `ereignis_id` NULL. Das Zeitachsen-Ereignis trägt die Route danach in derselben
+Transaktion nach (wie `merke_status_ereignis_tx`); die Personal-Route nimmt dafür
+`aus_personalstatus_id_tx` statt `aus_personalstatus_tx`. Der Handstatus der Einheit setzt
+`status_seit` künftig auf `jetzt` des Aufrufs statt `datetime('now')`, damit Seit und Kennung
+übereinstimmen.
 
-Entlassen (Personal, Material) und Auflösen (Einheit) leeren die Spalten; die Rücknahme prüft
-ohnehin, dass die Kraft aktiv ist.
+**Wer die Spalten leert** (sonst bliebe eine Rücknahme stehen, die einen nie dagewesenen Zustand
+herstellt): Entlassen (Personal, Material), Auflösen (Einheit), der rohe Status-UPDATE des
+Schichtplan-Vollzugs (`vollzug.rs`, „leerer Stand“) und beim Material jede Änderung von Menge oder
+Art sowie das Aufteilen einer Zeile (die abgeteilte Zeile bekommt keine Spalten, die verbleibende
+verliert sie). Als Rückhalt prüft die Material-Rücknahme die herzustellende Zeile mit
+`material::check_zeile`; scheitert das, 409 mit Grund. *(Eigene Entscheidung beim Entwurf, folgt
+aus dem Anti-Ziel.)*
 
 Schwärzung: Einträge in `einsatz/schwaerzung_registry.rs` mit denselben Gattungen wie beim
 Fahrzeug (`G_FK`, `G_ZEIT`; `status_vorher` des Materials wie `status`).
@@ -116,7 +125,9 @@ Wire-Formen sind additiv; das Fahrzeug bleibt, wie es ist.
   - `POST /api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen` — `EinsatzSchreibzugriff<Material>`
   - `POST /api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen` — `EinsatzSchreibzugriff<Einheiten>`;
     auch in der Routenliste `EINHEIT` des Einheitengeräts (`src/geraet/mod.rs`), der Handler schneidet
-    wie `status_setzen` über `abschnitt::bereich` zu (fremde Einheit 404).
+    wie `status_setzen` über `abschnitt::bereich` zu (fremde Einheit 404). Der Test
+    `einheitengeraet_meldet_status_und_quittiert_aber_fuehrt_nicht` prüft die Liste genau und
+    nimmt die Route auf.
 - **Ablauf je Route, eine Transaktion:** Kraft aktiv (sonst wie heute), Zeile lesen, `pruefe`,
   Ereignis streichen (Personal `Kraft::Person`, Einheit `Kraft::Einheit`, Material hat keins),
   Status (und bei der Einheit „seit“) aus den gemerkten Spalten herstellen mit CAS auf Status und
@@ -155,7 +166,8 @@ Wire-Formen sind additiv; das Fahrzeug bleibt, wie es ist.
   `MaterialPage`, `MaterialAmOrt` (damit Fahrzeuge, UHS, Bereitstellungsraum, Einheit),
   `KraefteuebersichtPage`, `EinheitDetailPage`/`EinheitKopf` (ersetzt dort „Status gespeichert“),
   `GeraetStatusPage`, dazu wie bisher `FahrzeugePage` und `FahrzeugeBesatzung`. Optimistische
-  Zeilen nehmen `status_ruecknahme` vor dem Cache ab (wie `FahrzeugePage`).
+  Zeilen und jeder, der die PATCH-Antwort direkt in den Cache schreibt (auch
+  `useEinteilungSchreiben.ts`), nehmen `status_ruecknahme` vorher ab (wie `FahrzeugePage`).
 - API-Funktionen geben die neuen Antworttypen zurück; je Art eine Funktion für die Rücknahme.
 
 ### E5 — Regeln (E2 des Routings)
@@ -179,6 +191,8 @@ Wire-Formen sind additiv; das Fahrzeug bleibt, wie es ist.
 - Andere Person → 409; nach elf Minuten → 409; inzwischen weiter gewechselt → 409 `veraltet`, der
   neue Status bleibt; erfundener Beleg stellt trotzdem nur den gemerkten Vorzustand her.
 - Wechsel aus dem Schichtplan-Vollzug ist nicht zurückzunehmen (kein `gesetzt_von`).
+- Material: nach Aufteilen, Mengen- oder Artänderung ist der vorige Statuswechsel nicht mehr
+  zurückzunehmen (409).
 - Einheit: Löschen und Rückgängig stellt den alten Handstatus mit altem „seit“ her; inzwischen
   Fahrzeug zugeordnet → Rücknahme zu einem Handstatus 409.
 - Einheitengerät: Quittung erscheint, Rücknahme der eigenen Einheit gelingt, fremde Einheit 404.
