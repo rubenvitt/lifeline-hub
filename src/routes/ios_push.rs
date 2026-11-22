@@ -155,7 +155,9 @@ pub async fn stand(
     }))
 }
 
-/// PUT /api/ios-push/anmeldung — 400, wenn ein Feld für sich nicht taugt.
+/// PUT /api/ios-push/anmeldung — 400, wenn ein Feld für sich nicht taugt; 422 bei gekoppeltem
+/// ELW oder einer Kennung, die mit anderem Token und Schlüssel einem anderen Konto gehört
+/// ([`repo::anmelden`]).
 pub async fn anmelden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

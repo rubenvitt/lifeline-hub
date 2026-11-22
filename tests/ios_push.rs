@@ -256,6 +256,60 @@ async fn stand_nennt_ob_die_anmeldung_an_dieser_sitzung_haengt() {
     assert_eq!(stand(erste).await, (json!(true), json!(false)));
 }
 
+/// Review M3: wer eine fremde Kennung kennt, meldet die Anmeldung eines anderen Kontos nicht ab.
+/// Dasselbe Gerät (neues Token, anderes Konto) darf sie übernehmen: es beweist sich mit seinem
+/// Schlüssel, der je Kennung auf dem Gerät bleibt.
+#[tokio::test]
+async fn fremde_kennung_uebernimmt_nur_dasselbe_geraet() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let marlene = login_cookie(&app, "marlene", "marlenepw1").await;
+    assert_eq!(
+        anmelden(&app, &admin, KENNUNG, TOKEN).await,
+        StatusCode::NO_CONTENT
+    );
+
+    let mut fremd = body(KENNUNG, TOKEN_2);
+    fremd["schluessel"] = json!(b64(&[9u8; 32]));
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/ios-push/anmeldung",
+        &marlene,
+        Some(&fremd.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let zeilen: Vec<(String, String)> =
+        sqlx::query_as("SELECT kennung, token FROM ios_push_anmeldung")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(zeilen, vec![(KENNUNG.to_string(), TOKEN.to_string())]);
+
+    // Dasselbe Gerät mit neuem Token unter einem anderen Konto: übernimmt die Kennung.
+    assert_eq!(
+        anmelden(&app, &marlene, KENNUNG, TOKEN_2).await,
+        StatusCode::NO_CONTENT
+    );
+    let zeilen: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT a.kennung, a.token, b.benutzername FROM ios_push_anmeldung a \
+         JOIN benutzer b ON b.id = a.benutzer_id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeilen,
+        vec![(
+            KENNUNG.to_string(),
+            TOKEN_2.to_string(),
+            "marlene".to_string()
+        )]
+    );
+}
+
 #[tokio::test]
 async fn validierung_400_je_feld() {
     let (app, pool) = mit_ios_push().await;

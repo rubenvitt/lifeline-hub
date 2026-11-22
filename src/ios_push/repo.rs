@@ -41,6 +41,11 @@ pub struct Eingabe<'a> {
 /// Meldet ein Gerät für die Sitzung `token_hash` an. Ein bekanntes Token (dasselbe Gerät, neuer
 /// Nutzer oder neue Kennung) und eine bekannte Kennung mit anderem Token ersetzen die alte
 /// Anmeldung; es bleibt eine Zeile.
+///
+/// Gehört die Kennung mit anderem Token einem anderen Konto, ersetzt sie nur dasselbe Gerät: es
+/// beweist sich mit seinem Schlüssel, der je Kennung auf dem Gerät bleibt (Vergleich in
+/// konstanter Zeit). Sonst `UnprocessableEntity`, und nichts ändert sich; wer nur eine fremde
+/// Kennung kennt (sie steht unverschlüsselt im Umschlag), meldet so niemanden ab.
 pub async fn anmelden(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -52,6 +57,21 @@ pub async fn anmelden(
         .map(BenachrichtigungArt::as_str)
         .collect();
     let mut tx = pool.begin().await?;
+    let vorhanden: Option<(i64, String, String)> = sqlx::query_as(
+        "SELECT benutzer_id, token, schluessel FROM ios_push_anmeldung WHERE kennung = ?",
+    )
+    .bind(e.kennung)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some((konto, token, schluessel)) = vorhanden {
+        let selbes_geraet = schluessel.len() == e.schluessel.len()
+            && openssl::memcmp::eq(schluessel.as_bytes(), e.schluessel.as_bytes());
+        if konto != benutzer_id && token != e.token && !selbes_geraet {
+            return Err(AppError::UnprocessableEntity(
+                "Die Kennung gehört zu einem anderen Gerät.".into(),
+            ));
+        }
+    }
     sqlx::query("DELETE FROM ios_push_anmeldung WHERE kennung = ? AND token <> ?")
         .bind(e.kennung)
         .bind(e.token)

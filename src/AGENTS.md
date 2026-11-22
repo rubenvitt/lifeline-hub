@@ -911,6 +911,8 @@ Entscheidung [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-ios-push-lae
   demselben Zugang (angenommen: Sperre weg, wieder `403`: erneuert). Solange sie steht, meldet
   `GET /api/ios-push` `relais_gesperrt` (die Oberfläche zeigt statt des Schalters den Hinweis) und
   `GET /api/admin/instanz` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
+- **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
+  anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
   durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, vor dem Löschen der
   Sitzung), „Sitzungen beenden“ (eine Sitzung: deren Anmeldungen; alle anderen: alle des Kontos
