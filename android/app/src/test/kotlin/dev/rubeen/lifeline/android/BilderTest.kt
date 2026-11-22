@@ -35,6 +35,9 @@ class BilderTest(private val zustand: Testzustand, private val format: Format) {
     @Test
     fun `die Seite des Testzustands wird als Bild aufgenommen`() {
         RuntimeEnvironment.setQualifiers(format.qualifiers)
+        // Robolectric kennt keine WebView-Profile; den Inhalt des WebViews malt es nicht, die
+        // nativen Teile darüber (Serverliste-Knopf, Hinweis „Zur Oberfläche“) schon.
+        ApplicationProvider.getApplicationContext<LifelineApp>().webviewFabrik = AttrappenFabrik()
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
             .putExtra(Testzustand.EXTRA, zustand.wert)
         ActivityScenario.launch<MainActivity>(intent).use {
@@ -44,7 +47,7 @@ class BilderTest(private val zustand: Testzustand, private val format: Format) {
     }
 
     companion object {
-        /** Die nativen Seiten; `web` und `fremde-seite` zeigen den WebView (eigener Lauf). */
+        /** Die nativen Seiten und die Bedienteile über dem WebView. */
         private val SEITEN = listOf(
             Testzustand.ONBOARDING,
             Testzustand.SERVERLISTE,
@@ -56,6 +59,8 @@ class BilderTest(private val zustand: Testzustand, private val format: Format) {
             Testzustand.WEBVIEW_VERALTET,
             Testzustand.UPDATE_BEREIT,
             Testzustand.UPDATE_LAEUFT,
+            Testzustand.WEB,
+            Testzustand.FREMDE_SEITE,
         )
 
         @JvmStatic

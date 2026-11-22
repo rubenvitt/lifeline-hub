@@ -47,10 +47,12 @@ import java.util.Locale
  * Serverliste (Entwurf D2, D3; wie `ServerlisteView`): Name, Adresse, zuletzt verbunden und der
  * Zustand des aktiven Servers; wechseln, umbenennen, hinzufügen und entfernen. Entfernen bietet
  * nur `Serverentfernung.isEntfernbar` an, nach einer Rückfrage mit dem Hinweis auf nicht
- * übertragene Einträge.
+ * übertragene Einträge. „Zur Oberfläche“ und ein Tipp auf den aktiven Server laden dessen
+ * Startadresse neu, der Weg zurück von einer fremden Seite im WebView (`Ablauf.ZurOberflaeche`).
  *
- * @param seite die Seite unter der Liste; aus ihr kommt der Zustand des aktiven Servers
- * @param onZurOberflaeche Tipp auf den aktiven Server: lädt seine Startadresse neu
+ * @param seite die Seite unter der Liste; aus ihr kommt der Zustand des aktiven Servers und ob
+ *   die Liste „Zur Oberfläche“ anbietet (`Ablauf.bietetZurOberflaeche`)
+ * @param onZurOberflaeche „Zur Oberfläche“ oder Tipp auf den aktiven Server
  * @param inEntfernung Server, dessen Daten gerade gelöscht werden; seine Zeile ruht
  * @param entfernenFehler Meldung, wenn sich ein Server nicht entfernen ließ
  */
@@ -87,6 +89,23 @@ fun ServerlisteSeite(
             }
         },
     ) {
+        if (Ablauf.bietetZurOberflaeche(seite)) {
+            Abschnitt(fussnote = "Lädt die Startseite von „${liste.aktiv?.name ?: ""}“ neu.") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button, onClick = onZurOberflaeche)
+                        .heightIn(min = 52.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag("zur-oberflaeche"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Symbol(R.drawable.symbol_zurueck, beschreibung = null, farbe = MaterialTheme.colorScheme.primary)
+                    Text("Zur Oberfläche", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
         Abschnitt(fussnote = "Jeder Server hat seine eigene Anmeldung und seine eigenen Offline-Daten.") {
             liste.eintraege.forEachIndexed { index, eintrag ->
                 if (index > 0) {

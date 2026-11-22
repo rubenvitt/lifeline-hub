@@ -1,34 +1,68 @@
 package dev.rubeen.lifeline.android
 
+import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import android.webkit.WebView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.rubeen.lifeline.android.dienste.Platzhalterdienste
+import dev.rubeen.lifeline.android.web.Brueckenempfang
+import dev.rubeen.lifeline.android.web.HuellenChromeClient
+import dev.rubeen.lifeline.android.web.HuellenClient
+import dev.rubeen.lifeline.android.web.Vertragsabruf
+import dev.rubeen.lifeline.android.web.WebviewFabrik
+import dev.rubeen.lifeline.android.web.Webviewbegleitung
+import dev.rubeen.lifeline.android.web.uri
 import dev.rubeen.lifeline.kern.Ablauf
 import dev.rubeen.lifeline.kern.EntfernungException
 import dev.rubeen.lifeline.kern.Entfernungsdienste
 import dev.rubeen.lifeline.kern.Fehlerklasse
 import dev.rubeen.lifeline.kern.Haptik
+import dev.rubeen.lifeline.kern.Huellendienste
+import dev.rubeen.lifeline.kern.Initskript
 import dev.rubeen.lifeline.kern.Kanal
 import dev.rubeen.lifeline.kern.ListException
 import dev.rubeen.lifeline.kern.Onboarding
+import dev.rubeen.lifeline.kern.Rueckkehr
 import dev.rubeen.lifeline.kern.ServerAdresse
 import dev.rubeen.lifeline.kern.ServerEintrag
+import dev.rubeen.lifeline.kern.Serverablage
 import dev.rubeen.lifeline.kern.Serverentfernung
 import dev.rubeen.lifeline.kern.Serverliste
+import dev.rubeen.lifeline.kern.ShellAbruf
 import dev.rubeen.lifeline.kern.Statusseite
 import dev.rubeen.lifeline.kern.Testzustand
 import dev.rubeen.lifeline.kern.Updatestand
+import dev.rubeen.lifeline.kern.Vertragspruefung
+import java.io.IOException
+import java.net.URI
+import java.util.UUID
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Zustand der App als Compose-State (wie `ios/App/AppModell.swift`). Entscheidungen fallen im
- * Kern (`Ablauf`, `Onboarding`, `Serverentfernung`); das Modell hält ihr Ergebnis und führt die
- * Wirkungen aus. In einem [testzustand] fragt es kein Netz und speichert nichts.
+ * Zustand der App als Compose-State und Ausführung der Wirkungen, die die Zustandsfunktionen des
+ * Kerns verlangen (wie `ios/App/AppModell.swift`): `Ablauf` für die Seite, `Onboarding` für die
+ * Eingabe, `Serverentfernung` fürs Entfernen. Entscheidungen fallen im Kern; hier stehen nur Netz,
+ * WebView, Ablage und Zeitgeber. Alles läuft im Hauptfaden ([scope]). In einem [testzustand]
+ * fragt das Modell kein Netz und speichert nichts.
  *
  * @param version volle Version der App (`versionName`), [build] ihr `versionCode`
  * @param einstellungen Ablage der Schalter (`SharedPreferences("lifeline")`); im Testzustand `null`
+ * @param context baut die WebViews (die Activity)
+ * @param fabrik baut den WebView je Server; die Tests setzen eine Attrappe ein
+ * @param ablage Serverliste auf dem Gerät; im Testzustand `null`
+ * @param abrufen `GET /api/shell` (bei 404 dazu `/api/health`), [Vertragsabruf]
+ * @param dienste Systemdienste der Brücke
+ * @param oeffne öffnet eine Adresse im System
+ * @param herunterladen lädt eine Dateiroute des Servers (Downloads)
  */
 class AppModell(
     val testzustand: Testzustand?,
@@ -36,6 +70,13 @@ class AppModell(
     build: Int,
     private val einstellungen: SharedPreferences?,
     private val scope: CoroutineScope,
+    private val context: Context,
+    private val fabrik: WebviewFabrik,
+    private val ablage: Serverablage? = null,
+    private val abrufen: suspend (ServerAdresse) -> Pair<ShellAbruf, String?> = Vertragsabruf()::abrufen,
+    dienste: Huellendienste = Platzhalterdienste,
+    private val oeffne: (URI) -> Unit = {},
+    herunterladen: (WebView, URI) -> Unit = { _, _ -> },
 ) : Entfernungsdienste {
     val appVersion: String = if (testzustand != null) BEISPIEL_VERSION else version
     val build: String = (if (testzustand != null) BEISPIEL_BUILD else build).toString()
@@ -47,7 +88,7 @@ class AppModell(
         private set
     var onboarding: Onboarding.State by mutableStateOf(Onboarding.State.START)
         private set
-    var liste: Serverliste by mutableStateOf(Serverliste())
+    var liste: Serverliste by mutableStateOf(ablage?.loadOrRecover() ?: Serverliste())
         private set
     var updatestand: Updatestand by mutableStateOf(Updatestand.KEINS)
         private set
@@ -72,8 +113,78 @@ class AppModell(
     var entfernenFehler: String? by mutableStateOf(null)
         private set
 
+    /** Der WebView des aktiven Servers; nur solange die Seite `Web` ist. */
+    var webView: WebView? by mutableStateOf(null)
+        private set
+
+    /** Hinweis „Zur Oberfläche“ über dem WebView (`Ablauf`: fremde Seite nach der Rückkehr). */
+    var zeigtZurOberflaeche by mutableStateOf(false)
+        private set
+
+    /** Version aus `/api/health`, wenn ein Server im Onboarding keinen Vertrag kennt. */
+    var onboardingHealthVersion: String? by mutableStateOf(null)
+        private set
+
+    /** Läuft „Im Browser anmelden“? Dann bleibt eine fremde Seite ohne Hinweis stehen. */
+    var anmeldungLaeuft: () -> Boolean = { false }
+
+    /** Profil des [webView] (die Id seines Eintrags). */
+    private var webViewProfil: String? = null
+
+    /** Der Render-Prozess des [webView] ist beendet; neu laden heißt neu bauen. */
+    private var webViewBeendet = false
+
+    private var wiederholung: Job? = null
+    private val rueckkehr = Rueckkehr()
+    private var gestartet = false
+
+    private val client = HuellenClient(
+        aktiverServer = { liste.aktiv?.adresse },
+        melde = ::melde,
+        oeffne = { oeffne(it) },
+        herunterladen = herunterladen,
+    )
+    private val chromeClient = HuellenChromeClient(client::neuesFenster)
+    private val empfang = Brueckenempfang(
+        dienste = dienste,
+        aktiverServer = { liste.aktiv?.adresse },
+        isAktuell = { it === webView },
+        scope = scope,
+    )
+
+    /** `huelle.js` aus den Assets mit der Version der App (Entwurf D4). */
+    private val initskript: String by lazy {
+        val vorlage = try {
+            context.assets.open(INITSKRIPT).bufferedReader(Charsets.UTF_8).use { it.readText() }
+        } catch (e: IOException) {
+            Log.e(TAG, "$INITSKRIPT fehlt in den Assets der App", e)
+            ""
+        }
+        Initskript.render(vorlage, appVersion)
+    }
+
     init {
         testzustand?.let(::zeige)
+    }
+
+    /**
+     * Einmal, sobald die Activity steht: der Start des Ablaufs mit dem aktiven Server; im
+     * Testzustand die Beispielseite.
+     */
+    fun start() {
+        if (gestartet) return
+        gestartet = true
+        if (testzustand != null) {
+            zeigeBeispielseite(testzustand)
+        } else {
+            send(Ablauf.Event.Start(liste.aktiv, fabrik.isTauglich()))
+        }
+    }
+
+    /** Die Activity endet: der WebView geht mit. */
+    fun beenden() {
+        wiederholung?.cancel()
+        closeWebView()
     }
 
     /** Liegt eine native Seite über der Seite des Ablaufs? Dann schließt Zurück sie. */
@@ -89,14 +200,186 @@ class AppModell(
         }
     }
 
-    /** Schritt des Onboardings; die Wirkungen (Prüfen, Speichern) kommen mit dem Vertragsabruf. */
-    fun send(event: Onboarding.Event) {
-        onboarding = Onboarding.next(onboarding, event).state
+    /**
+     * System-Zurück (Entwurf D6): schließt die oberste native Seite, sonst geht der WebView zurück,
+     * solange er kann. `false`: nichts mehr zurück, die App geht in den Hintergrund.
+     */
+    fun zurueckTaste(): Boolean {
+        if (zeigtUpdate) return false
+        if (hatBlatt) {
+            zurueck()
+            return true
+        }
+        val webView = webView
+        if (seite is Ablauf.Seite.Web && webView != null && webView.canGoBack()) {
+            webView.goBack()
+            return true
+        }
+        return false
     }
 
-    /** Schritt des Ablaufs; die Wirkungen (WebView, Prüfen, Zeitgeber) kommen mit dem WebView. */
+    // Onboarding
+
+    fun send(event: Onboarding.Event) {
+        val schritt = Onboarding.next(onboarding, event)
+        onboarding = schritt.state
+        when (val effect = schritt.effect) {
+            is Onboarding.Effect.Check -> {
+                onboardingHealthVersion = null
+                if (testzustand != null) return
+                scope.launch {
+                    val (abruf, health) = abrufen(effect.adresse)
+                    onboardingHealthVersion = health
+                    send(Onboarding.Event.Ergebnis(Vertragspruefung.evaluate(abruf, letzterVertrag = null), effect.adresse))
+                }
+            }
+            is Onboarding.Effect.Save -> {
+                val (mitNeuem, eintrag) = liste.add(effect.adresse) { UUID.randomUUID().toString() }
+                liste = try {
+                    mitNeuem.activate(eintrag.id)
+                } catch (_: ListException) {
+                    mitNeuem
+                }
+                save()
+                zeigtOnboarding = false
+                zeigtServerliste = false
+                onboarding = Onboarding.State.START
+                send(Ablauf.Event.Verbunden(liste.aktiv ?: eintrag, effect.info))
+            }
+            null -> Unit
+        }
+    }
+
+    // Ablauf
+
     fun send(event: Ablauf.Event) {
-        seite = Ablauf.next(seite, event).seite
+        val schritt = Ablauf.next(seite, event)
+        seite = schritt.seite
+        val web = seite as? Ablauf.Seite.Web
+        if (web == null) {
+            closeWebView()
+            zeigtZurOberflaeche = false
+        }
+        // Weiter geprüft wird nur auf „nicht erreichbar“ und in der Offline-Oberfläche.
+        val prueftWeiter = (seite as? Ablauf.Seite.Status)?.status == Statusseite.NichtErreichbar || web?.offline == true
+        if (!prueftWeiter) {
+            wiederholung?.cancel()
+            wiederholung = null
+        }
+        schritt.effects.forEach(::perform)
+    }
+
+    private fun perform(effect: Ablauf.Effect) {
+        // Nur Anzeige: gilt auch im Testzustand, der sonst weder Netz noch Ablage anfasst.
+        when (effect) {
+            Ablauf.Effect.ShowZurOberflaeche -> zeigtZurOberflaeche = true
+            Ablauf.Effect.HideZurOberflaeche -> zeigtZurOberflaeche = false
+            else -> if (testzustand == null) performImBetrieb(effect)
+        }
+    }
+
+    private fun performImBetrieb(effect: Ablauf.Effect) {
+        when (effect) {
+            is Ablauf.Effect.Check -> checkVertrag(effect.eintrag)
+            // Auch offline (Entwurf D5): die Oberfläche kommt dann aus dem Service Worker.
+            is Ablauf.Effect.Load -> load(effect.eintrag)
+            Ablauf.Effect.Reload -> reload()
+            is Ablauf.Effect.MarkVerbunden ->
+                changeListe { it.markVerbunden(effect.id, zeit = System.currentTimeMillis(), vertrag = effect.vertrag) }
+            is Ablauf.Effect.MarkGeladen -> changeListe { it.markGeladen(effect.id) }
+            Ablauf.Effect.ScheduleRetry -> {
+                wiederholung?.cancel()
+                wiederholung = scope.launch {
+                    delay(Ablauf.WIEDERHOL_INTERVALL_MS)
+                    send(Ablauf.Event.Wiederholen)
+                }
+            }
+            Ablauf.Effect.ShowZurOberflaeche, Ablauf.Effect.HideZurOberflaeche -> Unit
+        }
+    }
+
+    private fun checkVertrag(eintrag: ServerEintrag) {
+        val letzterVertrag = aktuell(eintrag).bestaetigterVertrag
+        scope.launch {
+            val (abruf, health) = abrufen(eintrag.adresse)
+            send(Ablauf.Event.Ergebnis(Vertragspruefung.evaluate(abruf, letzterVertrag), health, fuer = eintrag.id))
+        }
+    }
+
+    /** Neuer WebView im Profil des Eintrags (Entwurf D3), dann seine Startadresse. */
+    private fun load(eintrag: ServerEintrag) {
+        closeWebView()
+        build(eintrag).loadUrl(eintrag.adresse.text)
+    }
+
+    private fun reload() {
+        val eintrag = seite.eintrag ?: return
+        val webView = webView
+        when {
+            // Nach dem Ende des Render-Prozesses taugt der alte WebView nicht mehr (Entwurf D6).
+            webView == null || webViewBeendet -> load(eintrag)
+            webView.url != null -> webView.reload()
+            else -> webView.loadUrl(eintrag.adresse.text)
+        }
+    }
+
+    private fun build(eintrag: ServerEintrag): WebView {
+        val neu = fabrik.build(context, eintrag, Webviewbegleitung(initskript, client, chromeClient, empfang))
+        webView = neu
+        webViewProfil = eintrag.id
+        webViewBeendet = false
+        return neu
+    }
+
+    private fun closeWebView() {
+        val alt = webView ?: return
+        webView = null
+        webViewProfil = null
+        webViewBeendet = false
+        fabrik.close(alt)
+    }
+
+    /** Meldungen des WebViews; die eines schon verworfenen zählen nicht. */
+    private fun melde(view: WebView, event: Ablauf.Event) {
+        if (view !== webView) return
+        if (event == Ablauf.Event.WebProzessBeendet) webViewBeendet = true
+        send(event)
+    }
+
+    // Vordergrund
+
+    /**
+     * Phase der Activity. Bei der Rückkehr aus dem Hintergrund fragt die App, ob die Seite noch
+     * antwortet, und meldet `Vordergrund`; `Ablauf` entscheidet, ob neu geprüft oder gebaut wird.
+     */
+    fun phase(phase: Rueckkehr.Phase) {
+        if (!rueckkehr.melde(phase) || testzustand != null) return
+        val gefragt = webView
+        scope.launch {
+            val antwortet = gefragt?.let { isResponsive(it) } ?: false
+            send(Ablauf.Event.Vordergrund(antwortet, gefragt?.url?.let(::uri), anmeldungLaeuft()))
+        }
+    }
+
+    /** Antwortet die Seite binnen [ANTWORT_FRIST_MS]? Ein beendeter Render-Prozess antwortet nie. */
+    private suspend fun isResponsive(webView: WebView): Boolean {
+        if (webView.url == null) return false
+        return withTimeoutOrNull(ANTWORT_FRIST_MS) {
+            suspendCancellableCoroutine { fortsetzung ->
+                webView.evaluateJavascript("1") { wert -> if (fortsetzung.isActive) fortsetzung.resume(wert == "1") }
+            }
+        } ?: false
+    }
+
+    // Zur Oberfläche
+
+    /** Bietet die Serverliste „Zur Oberfläche“ an? Entscheidet `Ablauf`. */
+    val bietetZurOberflaeche: Boolean
+        get() = Ablauf.bietetZurOberflaeche(seite)
+
+    /** Der Hinweis über dem WebView ist weggetippt; die fremde Seite bleibt. */
+    fun verwerfeZurOberflaeche() {
+        zeigtZurOberflaeche = false
     }
 
     // Serverliste
@@ -119,8 +402,10 @@ class AppModell(
         liste = try {
             liste.activate(eintrag.id)
         } catch (_: ListException) {
+            Log.e(TAG, "Wechsel auf einen unbekannten Server")
             return
         }
+        save()
         send(Ablauf.Event.Wechseln(liste.aktiv ?: eintrag))
     }
 
@@ -130,11 +415,7 @@ class AppModell(
     }
 
     fun umbenennen(eintrag: ServerEintrag, name: String) {
-        liste = try {
-            liste.rename(eintrag.id, name)
-        } catch (_: ListException) {
-            liste
-        }
+        changeListe { it.rename(eintrag.id, name) }
     }
 
     /** Nach der Rückfrage: Reihenfolge und Fehler entscheidet `Serverentfernung` im Kern. */
@@ -158,6 +439,25 @@ class AppModell(
 
     /** Der aktuelle Stand eines Eintrags (Name nach Umbenennen, zuletzt verbunden). */
     fun aktuell(eintrag: ServerEintrag): ServerEintrag = liste.eintraege.firstOrNull { it.id == eintrag.id } ?: eintrag
+
+    /** Ändert die Liste und speichert sie; ein unbekannter Eintrag ändert nichts. */
+    private fun changeListe(aenderung: (Serverliste) -> Serverliste) {
+        liste = try {
+            aenderung(liste)
+        } catch (_: ListException) {
+            return
+        }
+        save()
+    }
+
+    private fun save() {
+        val ablage = ablage ?: return
+        try {
+            ablage.save(liste)
+        } catch (e: Exception) {
+            Log.e(TAG, "Serverliste nicht gespeichert", e)
+        }
+    }
 
     // Einstellungen
 
@@ -185,14 +485,20 @@ class AppModell(
     override val serverliste: Serverliste
         get() = liste
 
-    /** Ohne WebView ist nichts zu schließen; den WebView je Server baut die App mit dem Vertragsabruf. */
-    override fun closeWebView(profil: String) {}
+    /** Schließt den WebView, wenn er das Profil benutzt; er gehört immer zum aktiven Server. */
+    override fun closeWebView(profil: String) {
+        if (webViewProfil == profil) closeWebView()
+    }
 
-    /** Ein WebView-Profil entsteht erst mit dem WebView des Servers (Entwurf D3); vorher gibt es keins. */
-    override suspend fun removeProfil(profil: String) {}
+    /** Im Testzustand bleibt jedes Profil, wie es ist. */
+    override suspend fun removeProfil(profil: String) {
+        if (testzustand != null) return
+        fabrik.deleteProfil(profil)
+    }
 
     override fun removeEintrag(id: String) {
         liste = liste.remove(id)
+        save()
     }
 
     // Testzustände der Bilder
@@ -231,11 +537,37 @@ class AppModell(
                 updatestand = Updatestand.INSTALLIERT_GLEICH
                 zeigtUpdate = true
             }
-            Testzustand.WEB, Testzustand.FREMDE_SEITE -> seite = Ablauf.Seite.Web(elw, vertrag = 1)
+            Testzustand.WEB, Testzustand.FREMDE_SEITE -> {
+                // Den WebView baut `start()` (`zeigeBeispielseite`).
+                seite = Ablauf.Seite.Web(elw, vertrag = 1)
+                zeigtZurOberflaeche = testzustand == Testzustand.FREMDE_SEITE
+            }
         }
     }
 
+    /**
+     * Die Beispielseite der Testzustände `web` und `fremde-seite` ohne Netz, mit Brücke und
+     * Begleitern; die fremde Seite liegt unter einer anderen Origin.
+     */
+    private fun zeigeBeispielseite(testzustand: Testzustand) {
+        if (testzustand != Testzustand.WEB && testzustand != Testzustand.FREMDE_SEITE) return
+        val elw = (seite as? Ablauf.Seite.Web)?.eintrag ?: return
+        if (!fabrik.isTauglich()) {
+            seite = Ablauf.Seite.WebviewVeraltet
+            zeigtZurOberflaeche = false
+            return
+        }
+        val basis = if (testzustand == Testzustand.FREMDE_SEITE) "https://idp.example/" else elw.adresse.text
+        build(elw).loadDataWithBaseURL(basis, Testzustand.BEISPIELSEITE, "text/html", "utf-8", null)
+    }
+
     companion object {
+        private const val TAG = "Lifeline"
+        private const val INITSKRIPT = "huelle.js"
+
+        /** Frist, in der eine Seite nach der Rückkehr auf `evaluateJavascript` antworten muss. */
+        const val ANTWORT_FRIST_MS = 2_000L
+
         /** Version und Build der Bilder: eine Alpha, damit Kanal und Updater sichtbar sind. */
         const val BEISPIEL_VERSION = "1.0.0-alpha.7"
         const val BEISPIEL_BUILD = 469_044

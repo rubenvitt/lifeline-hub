@@ -3,15 +3,35 @@ package dev.rubeen.lifeline.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.BackHandler
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.widget.FrameLayout
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -19,17 +39,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import dev.rubeen.lifeline.android.seiten.EinstellungenSeite
 import dev.rubeen.lifeline.android.seiten.Fortschritt
+import dev.rubeen.lifeline.android.seiten.INHALT_MAX
 import dev.rubeen.lifeline.android.seiten.MitQrScan
 import dev.rubeen.lifeline.android.seiten.OnboardingSeite
 import dev.rubeen.lifeline.android.seiten.ServerlisteSeite
 import dev.rubeen.lifeline.android.seiten.StatusSeite
+import dev.rubeen.lifeline.android.seiten.Symbol
 import dev.rubeen.lifeline.android.seiten.UpdateSeite
+import dev.rubeen.lifeline.android.ui.Farben
 import dev.rubeen.lifeline.kern.Ablauf
 import dev.rubeen.lifeline.kern.Fehlerklasse
 import dev.rubeen.lifeline.kern.Statusseite
@@ -38,11 +66,10 @@ import dev.rubeen.lifeline.kern.text
 /**
  * Wurzel der Hülle (wie `RootView`): die Seite, die `Ablauf` festlegt, und darüber die nativen
  * Seiten Serverliste, Onboarding für einen weiteren Server und Einstellungen. Zurück schließt die
- * oberste native Seite (Entwurf D6).
+ * oberste native Seite (Entwurf D6; `MainActivity` mit `AppModell.zurueckTaste`).
  */
 @Composable
 fun Wurzel(modell: AppModell) {
-    BackHandler(enabled = modell.hatBlatt && !modell.zeigtUpdate) { modell.zurueck() }
     // Die Fläche setzt Grund und Textfarbe des Themas für alles darunter.
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when {
@@ -66,6 +93,7 @@ fun Wurzel(modell: AppModell) {
                     alsBlatt = true,
                     onAbbrechen = { modell.zeigtOnboarding = false },
                     appVersion = modell.appVersion,
+                    healthVersion = modell.onboardingHealthVersion,
                     scanHinweis = hinweis,
                 )
             }
@@ -97,27 +125,44 @@ private fun AblaufSeite(modell: AppModell) {
                 onEvent = { modell.send(it) },
                 onScan = onScan,
                 appVersion = modell.appVersion,
+                healthVersion = modell.onboardingHealthVersion,
                 scanHinweis = hinweis,
             )
         }
-        is Ablauf.Seite.Pruefung -> Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .testTag("pruefung"),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Fortschritt()
-                Text(
-                    "Verbinde mit „${modell.aktuell(seite.eintrag).name}“ …",
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    textAlign = TextAlign.Center,
+        is Ablauf.Seite.Pruefung -> Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .testTag("pruefung"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Fortschritt()
+                    Text(
+                        "Verbinde mit „${modell.aktuell(seite.eintrag).name}“ …",
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            Randknopf(onTipp = { modell.zeigtServerliste = true }, modifier = Modifier.align(Alignment.BottomStart))
+        }
+        is Ablauf.Seite.Web -> Box(modifier = Modifier.fillMaxSize()) {
+            modell.webView?.let { WebFlaeche(it) }
+            Randknopf(onTipp = { modell.zeigtServerliste = true }, modifier = Modifier.align(Alignment.BottomStart))
+            AnimatedVisibility(
+                visible = modell.zeigtZurOberflaeche,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = fadeIn() + slideInVertically { -it },
+                exit = fadeOut() + slideOutVertically { -it },
+            ) {
+                ZurOberflaecheHinweis(
+                    onZurOberflaeche = modell::zurOberflaeche,
+                    onSchliessen = modell::verwerfeZurOberflaeche,
                 )
             }
         }
-        // Den WebView je Server zeigt die App mit dem Vertragsabruf; bis dahin bleibt der Grund.
-        is Ablauf.Seite.Web -> Box(modifier = Modifier.fillMaxSize())
         is Ablauf.Seite.Status -> {
             val eintrag = modell.aktuell(seite.eintrag)
             val status = seite.status
@@ -153,4 +198,100 @@ private fun webviewImStore(context: Context): (() -> Unit)? {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.webview"))
     if (intent.resolveActivity(context.packageManager) == null) return null
     return { context.startActivity(intent) }
+}
+
+/**
+ * Der WebView des aktiven Servers innerhalb der Systemränder (Leisten, Ausschnitt, Tastatur;
+ * Entwurf D6). Der Rahmen ist eine `FrameLayout` in Kopf-Schwarz; ein neuer WebView (Wechsel,
+ * Neubau) ersetzt den alten darin.
+ */
+@Composable
+private fun WebFlaeche(webView: WebView) {
+    AndroidView(
+        factory = { context -> FrameLayout(context).apply { setBackgroundColor(Farben.kopfSchwarz.toArgb()) } },
+        update = { rahmen ->
+            if (webView.parent !== rahmen) {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                rahmen.removeAllViews()
+                rahmen.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+        },
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .testTag("webview"),
+    )
+}
+
+/**
+ * Kleiner runder Knopf unten links zur Serverliste (Entwurf D2): innerhalb der Systemränder, weg
+ * vom Kopf der Oberfläche, halb durchsichtig, damit er die Seite kaum verdeckt.
+ */
+@Composable
+private fun Randknopf(onTipp: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(start = 8.dp, bottom = 8.dp)
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = "Serverliste öffnen", onClick = onTipp)
+            .testTag("serverliste-knopf"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Farben.aktiv.copy(alpha = 0.85f))
+                .border(1.dp, Farben.linie, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Symbol(R.drawable.symbol_serverliste, beschreibung = "Serverliste", modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/**
+ * Hinweis über dem WebView, wenn er nach der Rückkehr auf einer fremden Seite steht (`Ablauf`,
+ * `ShowZurOberflaeche`; wie `ZurOberflaecheHinweis` auf iOS). Kein Zwang: die Seite bleibt, bis
+ * die Person „Zur Oberfläche“ wählt oder den Hinweis schließt.
+ */
+@Composable
+private fun ZurOberflaecheHinweis(onZurOberflaeche: () -> Unit, onSchliessen: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .widthIn(max = INHALT_MAX)
+            .clip(CircleShape)
+            .background(Farben.aktiv.copy(alpha = 0.96f))
+            .border(1.dp, Farben.linie, CircleShape)
+            .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+            .testTag("hinweis-fremde-seite"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Symbol(R.drawable.symbol_fremde_seite, beschreibung = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Fremde Seite",
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(12.dp))
+        Button(
+            onClick = onZurOberflaeche,
+            modifier = Modifier
+                .height(36.dp)
+                .testTag("hinweis-zur-oberflaeche"),
+            contentPadding = ButtonDefaults.SmallContentPadding,
+        ) {
+            Text("Zur Oberfläche", style = MaterialTheme.typography.labelLarge)
+        }
+        IconButton(onClick = onSchliessen, modifier = Modifier.testTag("hinweis-schliessen")) {
+            Symbol(R.drawable.symbol_schliessen, beschreibung = "Hinweis schließen", modifier = Modifier.size(18.dp))
+        }
+    }
 }
