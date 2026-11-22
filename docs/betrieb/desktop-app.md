@@ -56,7 +56,12 @@ siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst kommt keine Seite an (siehe �
 erreichbar“). Nach einem Netzausfall fordert Menü „Lifeline Hub“ → „Neu laden“ (macOS: Menü
 „Fenster“) die Seite neu an.
 
-Die Adresse bleibt gespeichert, und jeder weitere Start lädt sie direkt:
+Vor dem Speichern fragt die App `GET /api/shell` des Servers ab (LLH-1982, siehe „Server nicht
+verträglich“). Einen Server, mit dem diese App nicht arbeiten kann, speichert sie nicht; die Maske
+nennt dann beide Versionen. Ein Server, der gerade nicht antwortet, lässt sich trotzdem eintragen.
+
+Die Adresse bleibt gespeichert, und jeder weitere Start lädt sie nach derselben Prüfung; solange
+sie läuft, zeigt das Fenster „Verbinde…“:
 - macOS: `~/Library/Application Support/dev.rubeen.lifeline.desktop/verbindung.json`
 - Windows: `%APPDATA%\dev.rubeen.lifeline.desktop\verbindung.json`
 
@@ -84,6 +89,29 @@ Fenster und jedes Laden, das die App selbst anstößt (Start, Verbinden, Abbrech
 
 Unter Windows zeigt WebView2 bei einem Fehler eine eigene Fehlerseite; dort bleibt es dabei. Ob
 der Server antwortet, prüft die App über eine TCP-Verbindung zu Host und Port, ohne TLS.
+
+### Server nicht verträglich (LLH-1982)
+
+Vor jedem Laden, das die App selbst anstößt (Start, Verbinden, Abbrechen, Wechsel per Deeplink,
+„Erneut versuchen“), fragt sie `GET /api/shell` ab und lädt die Oberfläche nur, wenn sie den
+Hüllen-Vertrag (`shell_contract`) des Servers kennt. Sonst zeigt das Fenster eine eigene Seite:
+
+| Seite | Wann | Weiter |
+|---|---|---|
+| App aktualisieren | der Server hat einen neueren Vertrag, als die App kennt | „Nach Update suchen“ (wie im Menü), „Erneut prüfen“, „Server wechseln“ |
+| Server ist zu alt für diese App | der Server antwortet auf `GET /api/shell` mit 404 oder mit JSON ohne lesbaren Vertrag, oder er hat einen älteren Vertrag | Server aktualisieren, dann „Erneut prüfen“; die Seite nennt seine Version (bei 404 aus `GET /api/health`) |
+
+Beide Seiten nennen Adresse, Server-Version und App-Version. Ein neues Fenster (⌘N/Strg+N) oder ein
+Link in ein Nebenfenster zeigt für einen so erkannten Server dieselbe Seite statt der Oberfläche.
+
+- **Ohne Verbindung** lädt die App wie bisher (Anzeige „nicht erreichbar“ oder Offline-Start über
+  den Service Worker). Dabei gilt der zuletzt bestätigte Vertrag des Servers, gemerkt in
+  `verbindung.json` unter `vertraege`.
+- **Captive Portal oder Auth-Proxy:** Die Prüfung folgt Weiterleitungen nur auf derselben Origin;
+  eine fremde Weiterleitung, eine 200 ohne JSON oder ein Serverfehler gelten wie ohne Verbindung.
+- **Zertifikate** prüft die Abfrage über den Vertrauensspeicher des Systems, wie die Seite selbst.
+- **Wartezeit:** Antwortet der Server gar nicht, wartet die Abfrage höchstens 1,5 Sekunden auf die
+  Verbindung, insgesamt höchstens 5 Sekunden.
 
 ## Deeplink „Geräte verbinden“ (Vertrag für LFH-38)
 

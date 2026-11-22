@@ -4,20 +4,34 @@ Gilt für `src-tauri/`, zusätzlich zur `AGENTS.md` der Wurzel.
 
 `src-tauri/` (Crate `lifeline-desktop`, Tauri 2), Anforderungen `openspec/specs/desktop-huelle/`
 und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
-- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720): der Webview lädt die
+- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720, ADR-0082): der Webview lädt die
   https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
   Command), nicht ins Frontend.
 - **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`, nur Fenster
   `main`); die lokale Anzeige „nicht erreichbar“ (`capabilities/nicht-erreichbar.json`, jedes
-  Fenster) darf nur prüfen, neu laden und zur Maske führen; die Serverseite
+  Fenster) darf nur prüfen, neu laden und zur Maske führen; die Seite „nicht verträglich“
+  (`capabilities/nicht-vertraeglich.json`, jedes Fenster) dazu nur nach Updates suchen; die
+  Startseite „Verbinde…“ braucht keinen Command; die Serverseite
   bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
   `anmeldung_im_browser`, `benachrichtigung_zeigen`, `set_app_badge`; `server_freigeben`). Jeder neue Command steht
   im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen. Commands eines Plugins
   (`notification:…`) gibt keine Capability frei.
+- **Hüllen-Vertrag** (LLH-1982, ADR-0082, Spec `huellen-vertrag`): Jedes Laden des Servers, das
+  die Hülle selbst anstößt (Start, Maske, Abbrechen, Deeplink, „Erneut versuchen“), geht über
+  `pruefe_und_lade` bzw. `pruefen` + `anwenden`: erst `GET /api/shell` (`vertrag.rs`, der einzige
+  eigene Abruf, ohne Cookies, Weiterleitungen nur auf derselben Origin, `reqwest` nur dort), dann
+  laden (mit Wache) oder die Seite „nicht verträglich“. Die Bewertung spiegelt
+  `ios/LifelineKern/.../Vertrag.swift`; `BEKANNTE_VERTRAEGE` wächst erst, wenn die Hülle einen Bruch
+  mitgeht. Ohne Verbindung gilt der zuletzt bestätigte Vertrag (`verbindung.json`, `vertraege`).
+  Maske und Deeplink speichern einen unverträglichen Server nicht. Nebenfenster und „Neues
+  Fenster“ prüfen nicht selbst, folgen aber dem Urteil je Origin (`Zustand.urteile`). Zeitlimits:
+  Verbindung 1,5 s, Abruf 5 s (Offline-Start).
+- **Kennung** (LLH-1982): `kennung.js` läuft in jeder Hülle als erstes Init-Skript und setzt
+  `platform` (`std::env::consts::OS`) und `version` (Workspace), eingesetzt von `kennung_skript`.
 - **Native Meldung** (Benachrichtigungskonzept D7): `benachrichtigung_zeigen` reicht Titel und
   Text an `tauri-plugin-notification` durch; ob und wann, entscheidet das Frontend
-  (`frontend/src/alarm/desktopAlarm.ts`, Kennung über `benachrichtigung.js` in jeder Hülle, vor
-  `faehigkeiten.js`; beide ergänzen `__LIFELINE_HUELLE__`). Das Plugin ersetzt in jeder Seite
+  (`frontend/src/alarm/desktopAlarm.ts`, Kennung über `benachrichtigung.js` in jeder Hülle, nach
+  `kennung.js` und vor `faehigkeiten.js`; alle ergänzen `__LIFELINE_HUELLE__`). Das Plugin ersetzt in jeder Seite
   `window.Notification` durch einen Weg ohne Freigabe; die Seite darf ihn nicht nehmen. Ein Klick
   (`on_action`, `tap`) holt das Fenster der Meldung nach vorn (`klick_fenster`, `nach_vorn`), den
   Sprung trägt der Toast. Schließen kann die Hülle eine Meldung auf macOS und Windows nicht.
