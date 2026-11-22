@@ -11,6 +11,7 @@ import type {
 } from '../../api/types';
 import type { ListenAbschnittZustand } from '../../components/instrument';
 import { einstufungOf } from '../../abloesung/einstufung';
+import { amBezugGetragen, type BezugModul } from '../../erinnerung/amBezug';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
 import { istSofort } from '../../meldungen/meldungKorrekturKern';
 import {
@@ -193,12 +194,21 @@ export function vorgangsNachforderungen(
     );
 }
 
-/** Erinnerungen: offen und fällig oder in den nächsten 30 min; früheste Fälligkeit zuerst. */
-export function vorgangsErinnerungen(liste: readonly Erinnerung[], jetzt: number): Erinnerung[] {
+/**
+ * Erinnerungen: offen und fällig oder in den nächsten 30 min; früheste Fälligkeit zuerst. Eine
+ * automatische Frist, die ihr Bezug schon trägt, fehlt (LLH-1908, `src/AGENTS.md`, „Automatische
+ * Fristen stehen am Bezug“): `frei` sagt, welche Module die Person sieht. Dieselbe Regel zählt der
+ * Server für die Zahl des Abschnitts.
+ */
+export function vorgangsErinnerungen(
+  liste: readonly Erinnerung[],
+  jetzt: number,
+  frei: (modul: BezugModul) => boolean = () => false,
+): Erinnerung[] {
   const grenze = jetzt + ERINNERUNG_FENSTER_MINUTEN * 60_000;
   return liste
     .filter((e) => {
-      if (e.status !== 'offen') return false;
+      if (e.status !== 'offen' || amBezugGetragen(e, frei)) return false;
       const f = ms(e.faellig_at);
       return e.ist_faellig || (f != null && f <= grenze);
     })

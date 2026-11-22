@@ -160,6 +160,22 @@ describe('Folge je Abschnitt (LLH-1145)', () => {
     expect(liste.map((e) => e.id)).toEqual([3, 1]);
   });
 
+  it('Erinnerungen: automatische Frist steht am Bezug (LLH-1908)', () => {
+    const faellig = { faellig_at: um(11, 0), ist_faellig: true };
+    const liste = [
+      erinnerung({ id: 1, quelle: 'auto_frist', bezug_typ: 'meldung', ...faellig }),
+      erinnerung({ id: 2, quelle: 'auto_frist', bezug_typ: 'auftrag', ...faellig }),
+      erinnerung({ id: 3, quelle: 'auto_frist', bezug_typ: 'abloesung', ...faellig }),
+      erinnerung({ id: 4, quelle: 'auto_frist', bezug_typ: 'abloesung_vorwarnung', ...faellig }),
+      erinnerung({ id: 5, quelle: 'auto_frist', bezug_typ: 'abloesung_planung', ...faellig }),
+      erinnerung({ id: 6, quelle: 'manuell', bezug_typ: 'meldung', ...faellig }),
+    ];
+    expect(vorgangsErinnerungen(liste, JETZT, () => true).map((e) => e.id)).toEqual([5, 6]);
+    expect(vorgangsErinnerungen(liste, JETZT, (m) => m !== 'meldungen').map((e) => e.id)).toEqual([
+      1, 5, 6,
+    ]);
+  });
+
   it('Ablösungen: überfällig oder in der Vorwarnzeit, früheste zuerst', () => {
     const liste = vorgangsAbloesungen(
       [
