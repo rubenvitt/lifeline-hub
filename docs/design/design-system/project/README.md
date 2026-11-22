@@ -629,11 +629,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (Höhe und Breite) und steht am unteren Rand (`verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
-- **Kein Zoom wie in einer App**: der Viewport in `index.html` sperrt den Zoom
-  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
-  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
-  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
-  Wächter `theme/keinZoom.guard.test.ts`.
+- **Zoom frei, Felder 16 px auf Touch**: der Viewport in `index.html` sperrt den Zoom nicht, wer schlecht liest,
+  zieht die Seite größer. `touch-action: manipulation` auf `html` (`index.css`) sperrt nur den
+  Doppeltipp. Damit iOS beim Fokus nicht in ein Feld hineinzoomt (es tut das unter 16 px), tragen
+  Eingabefelder auf grobem Zeiger `feldSchriftTouch` (16 px, `theme/tokens.ts`, Regel am Ende von
+  `theme/rollen.css`), auch gegen Inline-Größen. Die Regel hebt nur an: antds große Felder
+  (`size="large"`, 16 px oder mehr) bleiben, Knöpfe, Etiketten und Lauftext bleiben in der Dichte. Wächter `theme/zoomFrei.guard.test.ts`, Beleg `e2e/zoom-frei.spec.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person**: beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
   `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
