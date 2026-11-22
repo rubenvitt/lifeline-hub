@@ -243,7 +243,16 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
   URL), entfernt die Geheimnisse; eine neue Art mit URL-Feldern erbt das, ohne eigenen Code.
 - **Fehlercodes:** ein neuer Code kommt in `AdapterFehler` samt Einteilung in
-  `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert.
+  `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert. Seine
+  Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
+  `frontend/src/api/adapter.ts`.
+- **Störung melden** (LLH-2026,
+  [ADR-0082](../docs/architektur/entscheidungen/ADR-0082-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  nur der Lauf meldet, über den Merker `adapter.gemeldet` (`repo::mark_gemeldet` in seiner
+  Transaktion, `zustand::meldung_nach_fehlschlag` entscheidet: Eingriff sofort, gestört ab 30
+  Minuten, gesperrter Speicher nie). Ein Admin-Schreibweg, der einen Stopp aufhebt oder setzt
+  (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
+  `benachrichtigung::erledigen_adapter` ab; Löschen erledigt vorher.
 
 ## Anhänge
 
@@ -823,6 +832,15 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Client per `GET`.
 - **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
   Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
+- **Zwei Orte** (LLH-2026, ADR-0082): eine Zeile hängt an einem Einsatz oder an einem Adapter
+  (`Ort`, `benachrichtigung.adapter_id`, CHECK genau einer). Am Adapter gilt nur
+  `Adressat::OrgAdmins` (aktive System-Admins seiner Org); Empfänger, Leserecht (`darf_lesen`) und
+  Text stehen nur in `benachrichtigung::adapter`, Erledigen für alle nur über
+  `benachrichtigung::erledigen_adapter`. Der Ort reist nie zum Hub. Die Detailzeile liest dort
+  Org-Stammdaten (`DETAIL_ADAPTER_SPALTEN`, Guard `detail_adapter_liest_nur_adapterspalten`)
+  statt Retain-Spalten der Schwärzung, die nur Einsatzdaten kennt; nie Einstellungen oder
+  Geheimnisse. `einsatz_id` ist auf dem Wire Pflichtfeld und darf `null` sein; jeder Leser
+  beachtet den Ort.
 - Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen
   (quittiert 24 h nach der Quittung, offen 24 h nach dem Entstehen; nachgereicht wird nur 12 h)
   läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen die Zeilen per `ON DELETE CASCADE`.

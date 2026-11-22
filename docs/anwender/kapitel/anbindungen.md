@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
 ---
 
 ## Überblick
@@ -416,8 +416,32 @@ der Adresse.
   ab; Einstellungen und „Verbindung prüfen“ sind gesperrt, löschen geht.
 
 Unter „Letzte Versuche“ stehen die letzten 50 Abrufe und Prüfungen mit Zeit, Ergebnis und Dauer.
-Was das Fremdsystem geantwortet hat, speichert der Server nicht. Eine Benachrichtigung bei einer
-Störung gibt es nicht: Den Zustand zeigt nur diese Seite.
+Was das Fremdsystem geantwortet hat, speichert der Server nicht.
+
+### Benachrichtigung bei einer Störung
+
+Damit eine ausgefallene Quelle nicht erst im Einsatz auffällt, benachrichtigt der Server die
+Admins der Organisation, auch wenn niemand diese Seite offen hat:
+
+- **„Anbindung braucht Eingriff“**: sobald ein Adapter wegen eines Fehlers anhält, den nur ein
+  Mensch beheben kann.
+- **„Anbindung gestört“**: wenn ein Adapter 30 Minuten am Stück gestört ist. Kürzere Aussetzer
+  melden sich nicht.
+- **„Anbindung läuft wieder“**: wenn ein gemeldeter Adapter von selbst wieder abruft. Die offene
+  Störungsmeldung ist dann für alle erledigt.
+
+Jede Störung meldet sich einmal, nicht bei jedem Fehlversuch. Wird sie schlimmer (aus „gestört“
+wird „braucht Eingriff“), kommt die zweite Meldung und ersetzt die erste. Greift ein Admin ein
+(Fortsetzen, Anhalten, neues Geheimnis, geänderte Einstellung, Löschen), ist die Meldung
+erledigt, ohne Entwarnung.
+
+Die Meldung nennt den Namen des Adapters und den Fehler, nie ein Geheimnis oder eine Adresse.
+Sie kommt als Eingang mit dezentem Ton, auf Wunsch auch bei geschlossener App. Ein Klick führt
+zum Adapter. Jede Admin-Person kann die drei Meldungen unter „Benachrichtigungen“ einzeln
+abschalten. Führungskräfte bekommen sie nicht, Admins anderer Organisationen auch nicht.
+
+Läuft der Server ohne Schlüssel für Geheimnisse, halten alle Adapter mit Geheimnis an. Das meldet
+der Server nicht: Beheben kann es nur, wer den Server betreibt.
 
 ### Geheimnisse eines Adapters
 
