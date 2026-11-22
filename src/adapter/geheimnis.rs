@@ -10,6 +10,7 @@
 //! (wie ADR-0051).
 
 use std::fmt;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -70,6 +71,48 @@ impl GeheimnisSchluessel {
     /// Der Schlüssel in der Form, in der er in die Umgebung gehört (für Tests und Werkzeuge).
     pub fn to_secret_string(&self) -> SecretString {
         self.0.to_string()
+    }
+}
+
+/// Liest den Schlüssel aus dem Inhalt einer Schlüsseldatei im Format von `age-keygen -o`
+/// (LLH-2025): leere Zeilen und Kommentare (`#`) zählen nicht, genau eine Zeile muss der private
+/// Schlüssel sein. Der Fehler nennt keinen Inhalt.
+pub fn parse_schluesseldatei(inhalt: &str) -> Result<GeheimnisSchluessel, SchluesselFehler> {
+    let mut zeilen = inhalt
+        .lines()
+        .map(str::trim)
+        .filter(|z| !z.is_empty() && !z.starts_with('#'));
+    let zeile = zeilen
+        .next()
+        .ok_or(SchluesselFehler("keine Schlüsselzeile in der Datei"))?;
+    if zeilen.next().is_some() {
+        return Err(SchluesselFehler(
+            "mehr als eine Schlüsselzeile in der Datei",
+        ));
+    }
+    zeile.parse()
+}
+
+/// Liest eine Schlüsseldatei (`…_DATEI`, LLH-2025). Pfad und Rolle nennt der Aufrufer.
+pub fn read_schluesseldatei(pfad: &Path) -> Result<GeheimnisSchluessel, SchluesselFehler> {
+    let inhalt =
+        std::fs::read_to_string(pfad).map_err(|_| SchluesselFehler("Datei nicht lesbar"))?;
+    parse_schluesseldatei(&inhalt)
+}
+
+/// Der Modus einer Schlüsseldatei, wenn Gruppe oder andere darauf zugreifen dürfen (Unix);
+/// sonst `None`. Folgt Symlinks wie das Lesen selbst.
+pub fn offener_modus(pfad: &Path) -> Option<u32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let modus = std::fs::metadata(pfad).ok()?.permissions().mode() & 0o777;
+        (modus & 0o077 != 0).then_some(modus)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pfad;
+        None
     }
 }
 
@@ -296,6 +339,71 @@ mod tests {
         let a = GeheimnisSchluessel::generate();
         let f = Geheimnisspeicher::new_wechsel(a.clone(), a).unwrap_err();
         assert!(f.to_string().contains("derselbe"), "{f}");
+    }
+
+    fn schluesseltext(s: &GeheimnisSchluessel) -> String {
+        s.to_secret_string().expose_secret().to_string()
+    }
+
+    #[test]
+    fn schluesseldatei_im_format_von_age_keygen() {
+        let s = GeheimnisSchluessel::generate();
+        let oeffentlich = s.0.to_public().to_string();
+        let inhalt = format!(
+            "# created: 2026-11-22T10:00:00+01:00\n# public key: {oeffentlich}\n{}\n",
+            schluesseltext(&s)
+        );
+        let gelesen = parse_schluesseldatei(&inhalt).unwrap();
+        assert_eq!(
+            Geheimnisspeicher::new(Some(gelesen)).fingerabdruck(),
+            Geheimnisspeicher::new(Some(s)).fingerabdruck()
+        );
+    }
+
+    #[test]
+    fn schluesseldatei_mit_crlf_und_leerzeichen() {
+        let s = GeheimnisSchluessel::generate();
+        let inhalt = format!("# x\r\n{}  \r\n\r\n", schluesseltext(&s));
+        assert!(parse_schluesseldatei(&inhalt).is_ok());
+    }
+
+    #[test]
+    fn schluesseldatei_ohne_oder_mit_zwei_schluesseln() {
+        let f = parse_schluesseldatei("# nur ein Kommentar\n\n").unwrap_err();
+        assert!(f.0.contains("keine"), "{f}");
+
+        let a = schluesseltext(&GeheimnisSchluessel::generate());
+        let b = schluesseltext(&GeheimnisSchluessel::generate());
+        let f = parse_schluesseldatei(&format!("{a}\n{b}\n")).unwrap_err();
+        assert!(f.0.contains("mehr als eine"), "{f}");
+        assert!(!f.to_string().contains(&a) && !f.to_string().contains(&b));
+    }
+
+    #[test]
+    fn schluesseldatei_mit_kaputtem_schluessel_nennt_ihn_nicht() {
+        let f = parse_schluesseldatei("AGE-SECRET-KEY-1kaputt\n").unwrap_err();
+        assert!(!f.to_string().contains("kaputt"), "{f}");
+    }
+
+    #[test]
+    fn fehlende_schluesseldatei_ist_nicht_lesbar() {
+        let pfad = std::env::temp_dir().join("lifeline-gibt-es-nicht-z211l8p5.key");
+        let f = read_schluesseldatei(&pfad).unwrap_err();
+        assert!(f.0.contains("nicht lesbar"), "{f}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn offene_rechte_werden_erkannt() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("geheimnis.key");
+        std::fs::write(&pfad, schluesseltext(&GeheimnisSchluessel::generate())).unwrap();
+        std::fs::set_permissions(&pfad, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(offener_modus(&pfad), None);
+        assert!(read_schluesseldatei(&pfad).is_ok());
+        std::fs::set_permissions(&pfad, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(offener_modus(&pfad), Some(0o644));
     }
 
     #[test]
