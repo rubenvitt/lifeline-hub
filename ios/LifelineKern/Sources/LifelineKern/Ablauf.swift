@@ -39,7 +39,9 @@ public enum Ablauf {
         /// Kein Server gespeichert.
         case onboarding
         /// `GET /api/shell` läuft; noch nichts geladen.
-        case pruefung(ServerEintrag)
+        /// `pfad` ist der Pfad einer angetippten Meldung, der nach bestandener Prüfung geladen
+        /// wird (schon durch `Linkregeln.sichererPfad` gelaufen).
+        case pruefung(ServerEintrag, pfad: String? = nil)
         /// Die Oberfläche des Servers im Webview.
         case web(ServerEintrag, vertrag: Int)
         case status(ServerEintrag, Statusseite)
@@ -48,7 +50,7 @@ public enum Ablauf {
         public var eintrag: ServerEintrag? {
             switch self {
             case .onboarding: nil
-            case .pruefung(let e), .web(let e, _), .status(let e, _): e
+            case .pruefung(let e, _), .web(let e, _), .status(let e, _): e
             }
         }
     }
@@ -77,6 +79,10 @@ public enum Ablauf {
         case navigationFehlgeschlagen(URLError.Code, url: URL?)
         /// `webViewWebContentProcessDidTerminate`.
         case webProzessBeendet
+        /// Tipp auf eine Meldung: `eintrag` hat die App aus der Kennung der Meldung aufgelöst
+        /// (`PushAnmeldungen.server(zu:)`), `nil` für eine unbekannte Kennung. `pfad` ist
+        /// ungeprüft und kommt aus der Nutzlast.
+        case meldungAngetippt(ServerEintrag?, pfad: String?)
     }
 
     public enum Effect: Equatable, Sendable {
@@ -85,6 +91,9 @@ public enum Ablauf {
         /// Webview mit dem Datenspeicher des Eintrags bauen und die Adresse laden.
         case load(ServerEintrag)
         case reload
+        /// Den Pfad (schon abgesichert) auf dem Server des Eintrags laden; der Webview des
+        /// Eintrags steht, sonst baut die App ihn.
+        case ladePfad(ServerEintrag, String)
         case markVerbunden(UUID, vertrag: Int)
         /// Nach `wiederholIntervall` `wiederholen` melden.
         case scheduleRetry
@@ -151,6 +160,16 @@ public enum Ablauf {
             return status(eintrag, klasse == .zertifikat ? .zertifikat : .nichtErreichbar)
         case (.web, .webProzessBeendet):
             return Step(seite, [.reload])
+
+        case (_, .meldungAngetippt(nil, _)):
+            return Step(seite)
+        case (.web(let aktiv, _), .meldungAngetippt(let eintrag?, let pfad)) where aktiv.id == eintrag.id:
+            return Step(seite, [.ladePfad(aktiv, Linkregeln.sichererPfad(pfad, server: aktiv.adresse.url))])
+        case (_, .meldungAngetippt(let eintrag?, let pfad)):
+            // Sichtbar prüfen, dann den Pfad laden statt der Startseite.
+            return Step(
+                .pruefung(eintrag, pfad: Linkregeln.sichererPfad(pfad, server: eintrag.adresse.url)),
+                [.check(eintrag)])
         default:
             return Step(seite)
         }
@@ -176,6 +195,12 @@ public enum Ablauf {
             if geladen {
                 return Step(.web(eintrag, vertrag: info.shellContract), [
                     .markVerbunden(eintrag.id, vertrag: info.shellContract)
+                ])
+            }
+            if case .pruefung(_, let pfad?) = seite {
+                return Step(.web(eintrag, vertrag: info.shellContract), [
+                    .markVerbunden(eintrag.id, vertrag: info.shellContract),
+                    .ladePfad(eintrag, pfad),
                 ])
             }
             return loaded(eintrag, info)

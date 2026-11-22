@@ -122,12 +122,14 @@ final class AppModell {
             }
         case .load(let eintrag):
             closeWebView()
-            let webView = Webviewfabrik.make(
-                fuer: eintrag,
-                skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
-                empfang: empfang, navigation: navigation)
-            webView.load(URLRequest(url: eintrag.adresse.url))
-            self.webView = webView
+            makeWebView(fuer: eintrag).load(URLRequest(url: eintrag.adresse.url))
+        case .ladePfad(let eintrag, let pfad):
+            // Nach einem Wechsel ist der Webview weg (`send` schließt ihn außerhalb von `.web`);
+            // ein Pfad aus dem Kern ist schon abgesichert, der Rückgriff auf die Startadresse
+            // gilt nur, falls er sich nicht auflösen ließe.
+            let webView = self.webView ?? makeWebView(fuer: eintrag)
+            let ziel = URL(string: pfad, relativeTo: eintrag.adresse.url)?.absoluteURL
+            webView.load(URLRequest(url: ziel ?? eintrag.adresse.url))
         case .reload:
             guard let webView, let eintrag = seite.eintrag else { return }
             if webView.url != nil {
@@ -148,6 +150,17 @@ final class AppModell {
         case .showZurOberflaeche, .hideZurOberflaeche:
             break
         }
+    }
+
+    /// Baut den Webview mit dem Datenspeicher des Eintrags und merkt ihn als aktuellen.
+    @discardableResult
+    private func makeWebView(fuer eintrag: ServerEintrag) -> WKWebView {
+        let webView = Webviewfabrik.make(
+            fuer: eintrag,
+            skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
+            empfang: empfang, navigation: navigation)
+        self.webView = webView
+        return webView
     }
 
     private func closeWebView() {

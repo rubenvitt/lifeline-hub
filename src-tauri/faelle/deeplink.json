@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle des Deeplinks lifeline://verbinden?server=… (src-tauri/src/deeplink.rs, ios/LifelineKern). „deute“ liest den Link (ziel null: wirkungslos), „entscheide“ legt fest, was ein gültiger Link gegenüber dem gespeicherten Server bewirkt. Adressen stehen in normalisierter Form.",
+  "zweck": "Gemeinsame Fälle des Deeplinks lifeline://verbinden?server=… (src-tauri/src/deeplink.rs, ios/LifelineKern). „deute“ liest den Link (ziel null: wirkungslos), „entscheide“ legt fest, was ein gültiger Link gegenüber dem gespeicherten Server bewirkt. „push_pfad“ (nur iOS-Kern, `Linkregeln.sichererPfad`): welcher Pfad aus einer Push-Meldung geöffnet wird; alles außer einem Pfad des Servers öffnet die Startseite „/“. Adressen stehen in normalisierter Form.",
   "deute": [
     {
       "beschreibung": "verbinden mit Server wird gelesen",
@@ -82,6 +82,134 @@
       "gespeichert": "https://elw.local:8443",
       "neu": "https://ELW.local:8443",
       "aktion": "nichts"
+    }
+  ],
+  "push_pfad": [
+    {
+      "beschreibung": "kein Pfad öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": null,
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein leerer Pfad öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Pfad des Servers bleibt",
+      "server": "https://elw.local:8443",
+      "pfad": "/einsaetze/7",
+      "erwartet": "/einsaetze/7"
+    },
+    {
+      "beschreibung": "Abfrage und Anker bleiben",
+      "server": "https://elw.local:8443",
+      "pfad": "/einsaetze/7?tab=lage#karte",
+      "erwartet": "/einsaetze/7?tab=lage#karte"
+    },
+    {
+      "beschreibung": "die Startseite bleibt",
+      "server": "https://elw.local:8443",
+      "pfad": "/",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein kodierter Schrägstrich bleibt im Pfad",
+      "server": "https://elw.local:8443",
+      "pfad": "/%2F%2Fevil.example",
+      "erwartet": "/%2F%2Fevil.example"
+    },
+    {
+      "beschreibung": "ein kodierter Rückstrich bleibt im Pfad",
+      "server": "https://elw.local:8443",
+      "pfad": "/%5Cevil.example",
+      "erwartet": "/%5Cevil.example"
+    },
+    {
+      "beschreibung": "eine fremde https-Adresse öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "https://evil.example/x",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "eine fremde http-Adresse öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "http://evil.example/x",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Pfad ohne führenden Schrägstrich öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "einsaetze/7",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein schemaloser Host öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "//evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "drei Schrägstriche öffnen die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "///evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "Schrägstrich und Rückstrich öffnen die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "/\\evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "zwei Rückstriche öffnen die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "\\\\evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein javascript-Schema öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "javascript:alert(1)",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein data-Schema öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "data:text/html,x",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Schema mit einem Schrägstrich öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "http:/evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Tabulator, den der Browser entfernt, öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "/\t/evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Zeilenumbruch öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "/\n/evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein Leerzeichen öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "/ /evil.example",
+      "erwartet": "/"
+    },
+    {
+      "beschreibung": "ein kodierter Pfad ohne Schrägstrich öffnet die Startseite",
+      "server": "https://elw.local:8443",
+      "pfad": "%2F%2Fevil.example",
+      "erwartet": "/"
     }
   ]
 }

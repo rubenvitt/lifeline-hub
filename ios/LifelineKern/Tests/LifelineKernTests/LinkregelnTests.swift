@@ -58,4 +58,42 @@ final class LinkregelnTests: XCTestCase {
                 fall.erwartet, fall.beschreibung)
         }
     }
+
+    // MARK: Pfad aus einer Push-Meldung
+
+    struct PushPfadDatei: Decodable {
+        let push_pfad: [PushPfadFall]
+    }
+
+    struct PushPfadFall: Decodable {
+        let beschreibung: String
+        let server: String
+        let pfad: String?
+        let erwartet: String
+    }
+
+    func testJederGemeinsameFallFuerDenPushPfadGilt() throws {
+        let faelle = try GemeinsameFaelle.load("deeplink.json", as: PushPfadDatei.self).push_pfad
+        XCTAssertGreaterThanOrEqual(faelle.count, 20)
+        for fall in faelle {
+            XCTAssertEqual(
+                Linkregeln.sichererPfad(fall.pfad, server: try url(fall.server)), fall.erwartet,
+                fall.beschreibung)
+        }
+    }
+
+    func testEinFremderPfadVerlaesstNieDieOriginDesServers() throws {
+        let server = try url("https://elw.local:8443")
+        let boese = [
+            "https://evil.example", "//evil.example", "/\\evil.example", "///evil.example",
+            "/\t/evil.example", "javascript:alert(1)", "\\\\evil.example", "@evil.example",
+            "evil.example", " /x", "/x\u{0}",
+        ]
+        for pfad in boese {
+            let sicher = Linkregeln.sichererPfad(pfad, server: server)
+            let ziel = try XCTUnwrap(URL(string: sicher, relativeTo: server)?.absoluteURL)
+            XCTAssertTrue(Linkregeln.belongsToServer(server, seite: ziel), pfad)
+            XCTAssertEqual(sicher, "/", pfad)
+        }
+    }
 }

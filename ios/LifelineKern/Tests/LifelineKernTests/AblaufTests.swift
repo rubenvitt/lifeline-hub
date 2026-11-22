@@ -296,4 +296,70 @@ final class AblaufTests: XCTestCase {
     func testDasIntervallDerWiederholungIstKurz() {
         XCTAssertEqual(Ablauf.wiederholIntervall, .seconds(5))
     }
+
+    // MARK: Tippen auf eine Meldung (LLH-2012)
+
+    func testTippenAufAktivenServerLaedtDenPfad() {
+        let schritt = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: "/einsaetze/7"))
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+        XCTAssertEqual(schritt.effects, [.ladePfad(elw, "/einsaetze/7")])
+    }
+
+    func testTippenAufAnderenServerWechseltSichtbarUndLaedtDanachDenPfad() {
+        let tipp = step(.web(elw, vertrag: 1), .meldungAngetippt(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.seite, .pruefung(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.effects, [.check(lager)])
+        let ergebnis = step(
+            tipp.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: lager.id))
+        XCTAssertEqual(ergebnis.seite, .web(lager, vertrag: 1))
+        XCTAssertEqual(
+            ergebnis.effects,
+            [.markVerbunden(lager.id, vertrag: 1), .ladePfad(lager, "/einsaetze/7")])
+    }
+
+    func testTippenOhnePfadOeffnetDieStartseiteDesServers() {
+        let schritt = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: nil))
+        XCTAssertEqual(schritt.effects, [.ladePfad(elw, "/")])
+    }
+
+    func testTippenImOnboardingOderAufEinerStatusseitePrueftErstDenServer() {
+        for vorher: Ablauf.Seite in [.onboarding, .status(elw, .nichtErreichbar), .pruefung(elw)] {
+            let schritt = step(vorher, .meldungAngetippt(elw, pfad: "/lage"))
+            XCTAssertEqual(schritt.seite, .pruefung(elw, pfad: "/lage"))
+            XCTAssertEqual(schritt.effects, [.check(elw)])
+        }
+    }
+
+    func testUnbekannteKennungAendertNichts() {
+        for vorher: Ablauf.Seite in [.onboarding, .web(elw, vertrag: 1), .pruefung(lager)] {
+            let schritt = step(vorher, .meldungAngetippt(nil, pfad: "/einsaetze/7"))
+            XCTAssertEqual(schritt.seite, vorher)
+            XCTAssertEqual(schritt.effects, [])
+        }
+    }
+
+    func testFremderPfadOeffnetDieStartseite() throws {
+        let faelle = try GemeinsameFaelle.load("deeplink.json", as: LinkregelnTests.PushPfadDatei.self)
+            .push_pfad
+        for fall in faelle {
+            let aktiv = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: fall.pfad))
+            XCTAssertEqual(aktiv.effects, [.ladePfad(elw, fall.erwartet)], fall.beschreibung)
+            let anderer = step(.web(elw, vertrag: 1), .meldungAngetippt(lager, pfad: fall.pfad))
+            XCTAssertEqual(
+                anderer.seite, .pruefung(lager, pfad: fall.erwartet), fall.beschreibung)
+        }
+    }
+
+    func testEinFehlschlagenderServerVerwirftDenGemerktenPfad() {
+        let schritt = step(
+            .pruefung(lager, pfad: "/lage"),
+            .ergebnis(.nichtErreichbar(.nichtErreichbar), healthVersion: nil, fuer: lager.id))
+        XCTAssertEqual(schritt.seite, .status(lager, .nichtErreichbar))
+        XCTAssertEqual(step(schritt.seite, .zurOberflaeche).seite, .pruefung(lager))
+    }
+
+    func testEinWechselVerwirftDenGemerktenPfad() {
+        let schritt = step(.pruefung(lager, pfad: "/lage"), .wechseln(elw))
+        XCTAssertEqual(schritt.seite, .pruefung(elw))
+    }
 }

@@ -64,6 +64,10 @@ mod tests {
         zweck: String,
         deute: Vec<DeuteFall>,
         entscheide: Vec<EntscheideFall>,
+        /// Fälle für `Linkregeln.sichererPfad` der iOS-Hülle (Pfad aus einer Push-Meldung);
+        /// die Desktop-Hülle hat keinen Push und liest den Abschnitt nicht.
+        #[allow(dead_code)]
+        push_pfad: serde::de::IgnoredAny,
     }
 
     #[derive(Deserialize)]
