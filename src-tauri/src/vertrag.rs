@@ -14,7 +14,10 @@ use url::Url;
 
 /// Die Hüllen-Verträge, mit denen diese Hülle arbeitet. Ein neuer Wert kommt erst hinzu, wenn die
 /// Hülle den Bruch des Servers mitgeht.
-pub const BEKANNTE_VERTRAEGE: [u32; 1] = [1];
+///
+/// Verlauf: 1 mit LLH-1982; nur 2 mit LLH-1979, weil die Hülle seither
+/// `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0084).
+pub const BEKANNTE_VERTRAEGE: [u32; 1] = [2];
 
 /// Höchstdauer des Verbindungsaufbaus samt Namensauflösung: ein Server, der gar nicht antwortet,
 /// hält den Offline-Start nicht länger auf.
@@ -246,12 +249,12 @@ mod tests {
     fn bekannter_vertrag_ist_vertraeglich() {
         assert_eq!(
             evaluate(
-                &json(r#"{"version":"1.0.0","shell_contract":1,"neu":true}"#),
+                &json(r#"{"version":"1.0.0","shell_contract":2,"neu":true}"#),
                 None
             ),
             Vertragsergebnis::Vertraeglich(ShellInfo {
                 version: "1.0.0".into(),
-                shell_contract: 1,
+                shell_contract: 2,
             })
         );
     }
@@ -259,7 +262,7 @@ mod tests {
     #[test]
     fn groesserer_vertrag_heisst_app_aktualisieren() {
         assert_eq!(
-            evaluate(&json(r#"{"version":"9","shell_contract":2}"#), None),
+            evaluate(&json(r#"{"version":"9","shell_contract":3}"#), None),
             Vertragsergebnis::NichtVertraeglich {
                 richtung: Richtung::ZuNeu,
                 server_version: Some("9".into()),
@@ -270,7 +273,8 @@ mod tests {
     #[test]
     fn kleinerer_vertrag_heisst_server_zu_alt() {
         assert_eq!(richtung(0), Some(Richtung::ZuAlt));
-        assert_eq!(richtung(1), None);
+        assert_eq!(richtung(1), Some(Richtung::ZuAlt));
+        assert_eq!(richtung(2), None);
         assert_eq!(
             evaluate(&json(r#"{"version":"0.1","shell_contract":0}"#), None),
             Vertragsergebnis::NichtVertraeglich {
@@ -294,7 +298,7 @@ mod tests {
     #[test]
     fn status_404_ist_zu_alt() {
         assert_eq!(
-            evaluate(&status(404), Some(1)),
+            evaluate(&status(404), Some(2)),
             Vertragsergebnis::NichtVertraeglich {
                 richtung: Richtung::ZuAlt,
                 server_version: None,
@@ -311,7 +315,7 @@ mod tests {
         };
         assert_eq!(evaluate(&portal, None), Vertragsergebnis::NichtErreichbar);
         assert_eq!(
-            evaluate(&portal, Some(1)),
+            evaluate(&portal, Some(2)),
             Vertragsergebnis::NichtErreichbar
         );
     }
@@ -326,15 +330,31 @@ mod tests {
     #[test]
     fn ohne_verbindung_gilt_der_gemerkte_vertrag() {
         assert_eq!(
-            evaluate(&ShellAbruf::Fehler, Some(2)),
+            evaluate(&ShellAbruf::Fehler, Some(3)),
             Vertragsergebnis::NichtVertraeglich {
                 richtung: Richtung::ZuNeu,
                 server_version: None,
             }
         );
         assert_eq!(
-            evaluate(&ShellAbruf::Fehler, Some(1)),
+            evaluate(&ShellAbruf::Fehler, Some(2)),
             Vertragsergebnis::NichtErreichbar
+        );
+    }
+
+    /// Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für diese Hülle zu
+    /// alt, statt dass die Anmeldung am umbenannten Pfad scheitert (LLH-1979).
+    #[test]
+    fn server_mit_vertrag_eins_ist_zu_alt() {
+        assert_eq!(
+            evaluate(
+                &json(r#"{"version":"1.0.0-alpha.300","shell_contract":1}"#),
+                None
+            ),
+            Vertragsergebnis::NichtVertraeglich {
+                richtung: Richtung::ZuAlt,
+                server_version: Some("1.0.0-alpha.300".into()),
+            }
         );
     }
 
