@@ -1,6 +1,6 @@
 # Webhooks: Zertifikats-Pinning (LLH-1872) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Am Webhook optional einen SHA-256-Fingerabdruck des Zielzertifikats hinterlegen, der
 dann allein über TLS entscheidet; dazu Abruf des Fingerabdrucks vom Ziel, Admin-Spur und Anzeige.
@@ -67,7 +67,7 @@ Tests), React + antd + TanStack Query, Vitest.
   - `pub const ERFASST: &str = "Zertifikat erfasst, Verbindung abgebrochen";`
   - `pub fn erfasser_config(erfasser: Arc<Erfasser>) -> Result<rustls::ClientConfig, String>`
 
-- [ ] **Step 1: Failing tests** in `tests.rs`, mit der vorhandenen `gegenstelle()`:
+- [x] **Step 1: Failing tests** in `tests.rs`, mit der vorhandenen `gegenstelle()`:
   - `tls_config_mit_passendem_fingerabdruck_verbindet`: reqwest-Client mit
     `tls_backend_preconfigured(tls_config(Some(fp)).unwrap())` → GET `/` liefert `"ok"`.
   - `erfasser_liest_den_fingerabdruck_ohne_anfrage`: Gegenstelle zählt Anfragen (Router mit
@@ -76,11 +76,11 @@ Tests), React + antd + TanStack Query, Vitest.
     `e.gesehen() == Some(fp)` und Zähler `== 0`.
   - `erfasser_ohne_tls_liefert_nichts`: `TcpListener` auf Loopback, der Verbindungen annimmt und
     sofort schließt; Anfrage scheitert, `e.gesehen() == None`.
-- [ ] **Step 2:** `cargo test --lib instanz::zertifikat` → die drei Tests scheitern (fehlende Items).
-- [ ] **Step 3:** `tls_config`, `Erfasser`, `ERFASST`, `erfasser_config` implementieren; `gesehen` hält
+- [x] **Step 2:** `cargo test --lib instanz::zertifikat` → die drei Tests scheitern (fehlende Items).
+- [x] **Step 3:** `tls_config`, `Erfasser`, `ERFASST`, `erfasser_config` implementieren; `gesehen` hält
   den Wert in einem `Mutex<Option<String>>`. `build_client` auf `tls_config` umstellen.
-- [ ] **Step 4:** `cargo test --lib instanz::zertifikat` → alle grün (auch die bestehenden).
-- [ ] **Step 5: Commit** `feat: TLS-Konfiguration und Erfasser der Direktkopplung wiederverwendbar (LLH-1872)`
+- [x] **Step 4:** `cargo test --lib instanz::zertifikat` → alle grün (auch die bestehenden).
+- [x] **Step 5: Commit** `feat: TLS-Konfiguration und Erfasser der Direktkopplung wiederverwendbar (LLH-1872)`
 
 ### Task 2: Pin im Webhook-Client und in der Zustellung
 
@@ -109,7 +109,7 @@ Tests), React + antd + TanStack Query, Vitest.
     `baue_client(lan, Some(erfasser_config(..)))`, `POST` ohne Body; ist danach `gesehen()` gesetzt
     → `Ok(fp)`, sonst `Err(fehler_art(&e))`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `normalize_pin_nimmt_schreibweisen_an`: `"AB:CD…"` (64 Hex mit Doppelpunkten, groß),
     mit Leerzeichen, klein ohne Trenner → gleiches `Some(klein)`; `""`/`"  "` → `Ok(None)`;
     63 Zeichen, 65 Zeichen, `"zz…"` → `Err`.
@@ -121,15 +121,15 @@ Tests), React + antd + TanStack Query, Vitest.
     (Muster `loopback_bekommt_keine_verbindung`).
   - `hole_fingerabdruck_internes_ziel`: `hole_fingerabdruck("https://127.0.0.1/", true)` →
     `Err(ZielIntern)`; `"http://x.example/"` → `Err(ZielUngueltig)`.
-- [ ] **Step 2:** `cargo test --lib public_api::webhook` → neue Tests scheitern.
-- [ ] **Step 3:** Implementieren wie unter Interfaces; `HttpZusteller::senden` nimmt
+- [x] **Step 2:** `cargo test --lib public_api::webhook` → neue Tests scheitern.
+- [x] **Step 3:** Implementieren wie unter Interfaces; `HttpZusteller::senden` nimmt
   `client(z.lan_erlaubt, z.zertifikat_pin.as_deref())` (Fehler beim Bauen → `ZielUngueltig`);
   `lauf.rs` (beide Stellen) und der Test in `ziel.rs` füllen `zertifikat_pin` aus
   `webhook.zertifikat_pin` (Feld kommt in Task 3 — bis dahin `None` an den zwei Stellen im Lauf,
   Task 3 stellt um). `adapter::ziel` bleibt unverändert.
-- [ ] **Step 4:** `cargo test --lib public_api::webhook` und `scripts/check-adr.sh` (bzw. der
+- [x] **Step 4:** `cargo test --lib public_api::webhook` und `scripts/check-adr.sh` (bzw. der
   ADR-Schritt aus `check-all.sh --nur adr`, falls so benannt) → grün.
-- [ ] **Step 5: Commit** `feat: Webhook-Client mit Zertifikats-Pin (LLH-1872)`
+- [x] **Step 5: Commit** `feat: Webhook-Client mit Zertifikats-Pin (LLH-1872)`
 
 ### Task 3: Datenmodell — Spalte, Repo, Admin-Aktionen
 
@@ -153,17 +153,17 @@ Tests), React + antd + TanStack Query, Vitest.
 - Migration: `ALTER TABLE maschine_webhook ADD COLUMN …` plus Umbau `admin_audit` nach Muster
   `0361` (Liste aus 0361 übernehmen, drei Werte anhängen, Kopfkommentar mit LLH-1872).
 
-- [ ] **Step 1: Failing tests** (Repo-Tests mit In-Memory-DB wie die vorhandenen, sonst als
+- [x] **Step 1: Failing tests** (Repo-Tests mit In-Memory-DB wie die vorhandenen, sonst als
   Integrationstest in `tests/anbindungen_webhook.rs`):
   - `pin_wechsel_setzt_die_stoerung_zurueck`: Webhook mit `fehler_seit`/`fehlversuche` gesetzt,
     `update` mit anderem Pin → `fehler_seit == None`, `fehlversuche == 0`, `geaendert_at` steigt.
   - `gleicher_pin_schreibt_nicht`: `update` mit identischer Eingabe → vorher == nachher.
   - DB-CHECK: `UPDATE maschine_webhook SET zertifikat_pin = 'XYZ'` scheitert.
-- [ ] **Step 2:** `cargo test public_api::webhook::repo` / betroffene Tests → scheitern.
-- [ ] **Step 3:** Migration, Repo, Enum; in `lauf.rs` `zertifikat_pin: webhook.zertifikat_pin.clone()`.
-- [ ] **Step 4:** `cargo test --lib admin_audit` und Repo-Tests → grün; `scripts/check-migrationen.sh`
+- [x] **Step 2:** `cargo test public_api::webhook::repo` / betroffene Tests → scheitern.
+- [x] **Step 3:** Migration, Repo, Enum; in `lauf.rs` `zertifikat_pin: webhook.zertifikat_pin.clone()`.
+- [x] **Step 4:** `cargo test --lib admin_audit` und Repo-Tests → grün; `scripts/check-migrationen.sh`
   → grün.
-- [ ] **Step 5: Commit** `feat: Fingerabdruck am Webhook speichern (LLH-1872)`
+- [x] **Step 5: Commit** `feat: Fingerabdruck am Webhook speichern (LLH-1872)`
 
 ### Task 4: Routen — Pin setzen, Host-Regel, Abruf, Anzeige
 
@@ -195,7 +195,7 @@ Tests), React + antd + TanStack Query, Vitest.
     dann `hole_fingerabdruck`; Spur `…_zertifikat_abgerufen` mit Host und ggf. `fingerabdruck`,
     auch bei Fehlschlag.
 
-- [ ] **Step 1: Failing tests** in `tests/anbindungen_webhook.rs`:
+- [x] **Step 1: Failing tests** in `tests/anbindungen_webhook.rs`:
   - `pin_beim_einrichten_wird_normalisiert_und_protokolliert`: POST mit `"AB:…"` (64 Hex,
     Doppelpunkte) → 201, `zertifikat_pin` klein ohne Trenner; Spur endet mit
     `…_angelegt`, `…_pin_gesetzt`; `detail` enthält den Fingerabdruck.
@@ -212,12 +212,12 @@ Tests), React + antd + TanStack Query, Vitest.
     Führungskraft → 403; Spur-Eintrag nur bei bestandener URL-Prüfung. Für einen 200-Pfad mit
     `fehler_art`: URL `https://nicht-aufloesbar.invalid/` → 200 mit `fehler_art` (`dns` oder
     `verbindung`) und Spur `…_zertifikat_abgerufen`.
-- [ ] **Step 2:** `cargo test --test anbindungen_webhook` → neue Tests scheitern.
-- [ ] **Step 3:** Implementieren; Route in `app.rs` neben `/webhook/test`; Codegen
+- [x] **Step 2:** `cargo test --test anbindungen_webhook` → neue Tests scheitern.
+- [x] **Step 3:** Implementieren; Route in `app.rs` neben `/webhook/test`; Codegen
   `scripts/check-typ-codegen.sh` (schreibt die generierten Dateien neu).
-- [ ] **Step 4:** `cargo test --test anbindungen_webhook --test public_api_webhook` und
+- [x] **Step 4:** `cargo test --test anbindungen_webhook --test public_api_webhook` und
   `scripts/check-typ-codegen.sh` → grün.
-- [ ] **Step 5: Commit** `feat: Fingerabdruck über die Anbindungsverwaltung setzen und abrufen (LLH-1872)`
+- [x] **Step 5: Commit** `feat: Fingerabdruck über die Anbindungsverwaltung setzen und abrufen (LLH-1872)`
 
 ### Task 5: Frontend — Feld, Abruf, Hinweise
 
@@ -254,7 +254,7 @@ Tests), React + antd + TanStack Query, Vitest.
   `dependencies`). `webhookPatch`: `zertifikat_pin` nur bei Änderung (normalisiert verglichen),
   leer → `null`. Client-Regel: leer oder `pinNormal(v)` ist 64 Hex, sonst Text aus Task 2.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `webhookPatch` mit Pin: unverändert (auch andere Schreibweise) → kein Feld; geleert → `null`;
     neu → normalisiert.
   - `fingerabdruckGruppen('ab12…')` → `'AB:12:…'`.
@@ -264,11 +264,11 @@ Tests), React + antd + TanStack Query, Vitest.
   - Abruf mit `fehler_art: 'dns'` → Fehlertext aus `webhookFehlerText`.
   - Hinweis „Hat das Ziel sein Zertifikat gewechselt? …“ nur bei Pin **und** `tls`.
   - Zugangsprotokoll-Texte der drei Aktionen.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend vitest run src/pages/einstellungen/AnbindungWebhook.test.tsx src/zugangsprotokoll` → scheitert.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** Tests grün; `mise exec -- pnpm -C frontend lint` und `tsc` (Skript `typecheck`
+- [x] **Step 2:** `mise exec -- pnpm -C frontend vitest run src/pages/einstellungen/AnbindungWebhook.test.tsx src/zugangsprotokoll` → scheitert.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** Tests grün; `mise exec -- pnpm -C frontend lint` und `tsc` (Skript `typecheck`
   o. ä. aus `package.json`) grün.
-- [ ] **Step 5: Commit** `feat: Fingerabdruck im Webhook-Paneel erfassen und zeigen (LLH-1872)`
+- [x] **Step 5: Commit** `feat: Fingerabdruck im Webhook-Paneel erfassen und zeigen (LLH-1872)`
 
 ### Task 6: Regeln und Doku
 
@@ -280,17 +280,17 @@ Tests), React + antd + TanStack Query, Vitest.
   `docs/anwender/kapitel/anbindungen.md` (Abschnitt „Fingerabdruck hinterlegen“, `quellen` um
   `src/instanz/zertifikat.rs` ergänzen)
 
-- [ ] **Step 1:** ADR-0082 nach `docs/architektur/AGENTS.md` (Kopf, `status: akzeptiert`,
+- [x] **Step 1:** ADR-0082 nach `docs/architektur/AGENTS.md` (Kopf, `status: akzeptiert`,
   `gilt_fuer` = `src/public_api/webhook/**`, `src/routes/anbindungen_webhook.rs`,
   `src/instanz/zertifikat.rs`; `herleitung` = Design-Doc). Regeln: MUST „mit Fingerabdruck nur
   dieses Zertifikat, Kette/Name/Anker zählen nicht“; MUST „Zielschutz unverändert, TLS nur über
   `instanz::zertifikat::tls_config`“; MUST NOT „Abruf sendet eine HTTP-Anfrage“; MUST „neuer
   Host verlangt eine Angabe zum Fingerabdruck“. Prüfung: `verlange 'tls_config' src/public_api/webhook/ziel.rs`,
   `verlange 'erfasser_config' src/public_api/webhook/ziel.rs`.
-- [ ] **Step 2:** `src/AGENTS.md`, „Webhooks“: ein Punkt „Pin: ein Client je `(lan, pin)` aus
+- [x] **Step 2:** `src/AGENTS.md`, „Webhooks“: ein Punkt „Pin: ein Client je `(lan, pin)` aus
   `baue_client`, TLS nur über `instanz::zertifikat::tls_config`, Abruf nur mit `Erfasser`“, Verweis
   auf ADR-0082.
-- [ ] **Step 3:** Anwenderkapitel: Schritte „Fingerabdruck hinterlegen“ (Vom Ziel holen →
+- [x] **Step 3:** Anwenderkapitel: Schritte „Fingerabdruck hinterlegen“ (Vom Ziel holen →
   vergleichen → Übernehmen → Speichern), Hinweis zu Zertifikatswechsel und neuem Server.
-- [ ] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf).
-- [ ] **Step 5: Commit** `docs: ADR-0082, Regeln und Anwenderdoku zum Webhook-Fingerabdruck (LLH-1872)`
+- [x] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf).
+- [x] **Step 5: Commit** `docs: ADR-0082, Regeln und Anwenderdoku zum Webhook-Fingerabdruck (LLH-1872)`
