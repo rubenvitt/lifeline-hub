@@ -252,6 +252,18 @@ pub async fn relais_zugang(pool: &SqlitePool) -> Result<Option<RelaisZugang>, Ap
     ))
 }
 
+/// Seit wann das Relais diese Instanz sperrt (zuletzt bestätigt), als UTC in `zeit::FORMAT`;
+/// `None` ohne Sperre. Für die Warnung in der Verwaltung der Instanz.
+pub async fn relais_gesperrt_seit(pool: &SqlitePool) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT strftime('%Y-%m-%d %H:%M:%S', gesperrt_at) FROM ios_push_relais \
+         WHERE id = 1 AND gesperrt_at IS NOT NULL",
+    )
+    .fetch_optional(pool)
+    .await?
+    .flatten())
+}
+
 /// Speichert den Zugang (ersetzt einen vorhandenen und hebt die Sperre auf).
 pub async fn relais_zugang_speichern(pool: &SqlitePool, z: &RelaisZugang) -> Result<(), AppError> {
     sqlx::query(

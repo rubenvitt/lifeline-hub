@@ -12007,6 +12007,13 @@
           "fingerabdruck": {
             "type": "string"
           },
+          "ios_push_relais_gesperrt_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Das Push-Relais nimmt diese Instanz nicht an (`403`, LLH-2040): seit wann, UTC. Nur mit\n`--ios-push`; die Verwaltung zeigt dann die Warnung."
+          },
           "kennung": {
             "type": "string"
           },

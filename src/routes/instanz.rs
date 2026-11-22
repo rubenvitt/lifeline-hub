@@ -83,6 +83,10 @@ pub struct InstanzUebersicht {
     /// (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
     /// Kontogeheimnisse (LLH-1493, D6).
     pub datentraeger_bestaetigt: bool,
+    /// Das Push-Relais nimmt diese Instanz nicht an (`403`, LLH-2040): seit wann, UTC. Nur mit
+    /// `--ios-push`; die Verwaltung zeigt dann die Warnung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ios_push_relais_gesperrt_seit: Option<String>,
     pub kopplungen: Vec<InstanzKopplungAnzeige>,
     pub schluessel: Vec<UnterschriftSchluesselAnzeige>,
 }
@@ -122,6 +126,10 @@ pub async fn uebersicht(
             &state.pool,
         )
         .await?,
+        ios_push_relais_gesperrt_seit: match state.live.ios_push() {
+            Some(_) => crate::ios_push::repo::relais_gesperrt_seit(&state.pool).await?,
+            None => None,
+        },
         kopplungen: repo::list_fuer_org(&state.pool, admin.org_id).await?,
         schluessel: unterschrift::list_fuer_org(&state.pool, admin.org_id, admin.id).await?,
     }))

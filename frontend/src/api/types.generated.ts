@@ -4784,6 +4784,11 @@ export interface components {
              */
             eigener_schluessel: boolean;
             fingerabdruck: string;
+            /**
+             * @description Das Push-Relais nimmt diese Instanz nicht an (`403`, LLH-2040): seit wann, UTC. Nur mit
+             *     `--ios-push`; die Verwaltung zeigt dann die Warnung.
+             */
+            ios_push_relais_gesperrt_seit?: string | null;
             kennung: string;
             kopplungen: components["schemas"]["InstanzKopplungAnzeige"][];
             /** @description Die LAN-Entdeckung ist eingeschaltet (`--lan-entdeckung`, design.md D6). */

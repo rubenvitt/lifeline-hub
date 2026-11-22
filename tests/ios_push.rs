@@ -498,6 +498,56 @@ async fn ablauf_der_sitzung_laesst_anmeldung_und_versand_bestehen() {
     assert_eq!(a.len(), 1, "der Versand findet die Anmeldung weiter");
 }
 
+/// Sperrt den Zugang dieser Instanz am Relais seit einem festen Zeitpunkt.
+async fn relais_gesperrt_seit(pool: &sqlx::SqlitePool, seit: &str) {
+    lifeline_hub::ios_push::repo::relais_zugang_speichern(
+        pool,
+        &lifeline_hub::ios_push::repo::RelaisZugang {
+            server_id: "s1".into(),
+            geheimnis: "g1".into(),
+            gesperrt: true,
+            sperre_abgelaufen: false,
+        },
+    )
+    .await
+    .unwrap();
+    sqlx::query("UPDATE ios_push_relais SET gesperrt_at = ?")
+        .bind(seit)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
+    let (app, pool) = mit_ios_push().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(!v
+        .as_object()
+        .unwrap()
+        .contains_key("ios_push_relais_gesperrt_seit"));
+
+    relais_gesperrt_seit(&pool, "2026-11-20T08:15:00Z").await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ios_push_relais_gesperrt_seit"], "2026-11-20 08:15:00");
+}
+
+#[tokio::test]
+async fn ohne_ios_push_zeigt_die_verwaltung_keine_sperre() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    relais_gesperrt_seit(&pool, "2026-11-20T08:15:00Z").await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(!v
+        .as_object()
+        .unwrap()
+        .contains_key("ios_push_relais_gesperrt_seit"));
+}
+
 // ── Versand aus `melden` (Aufgabe 7) ─────────────────────────────────────────────────────────
 
 use lifeline_hub::benachrichtigung::{

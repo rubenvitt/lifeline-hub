@@ -147,6 +147,15 @@ export function codeAusstellenSperre(u: InstanzUebersicht): string | undefined {
   return undefined;
 }
 
+/** Warnung, wenn das Push-Relais diese Instanz sperrt (`ios_push_relais_gesperrt_seit`, LLH-2040);
+ *  `seit` ist schon in der Anzeigezone formatiert. */
+export function iosPushGesperrtText(seit: string): string {
+  return (
+    `iOS-Push: Das Relais nimmt diesen Server nicht an (gesperrt seit ${seit}). ` +
+    'Bitte den Betreiber des Relais informieren.'
+  );
+}
+
 /** Grund, warum kein Code „vor Ort“ geht; sonst `undefined` (LLH-1497, design.md D3). */
 export function codeVorOrtSperre(u: InstanzUebersicht): string | undefined {
   return (
