@@ -69,6 +69,28 @@
         "pfad": "/einsaetze/5",
         "einsatz_id": 5
       }
+    },
+    {
+      "beschreibung": "Einsatz 1 und Benachrichtigung 0: Zahlen, kein Wahrheitswert",
+      "klartext": {
+        "v": 1,
+        "s": "Kreis Nord",
+        "e": 1,
+        "b": 0,
+        "stufe": "alarm",
+        "titel": "Alarm",
+        "pfad": "/einsaetze/1"
+      },
+      "server_anzahl": 1,
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "erwartet": {
+        "titel": "Alarm",
+        "untertitel": null,
+        "text": null,
+        "thread": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07-1",
+        "pfad": "/einsaetze/1",
+        "einsatz_id": 1
+      }
     }
   ],
   "zweck": "Gemeinsamer Fall des Klartexts der iOS-Push-Nutzlast: Rust serialisiert `klartext` (src/ios_push/inhalt.rs, Test klartext_passt_zu_den_gemeinsamen_faellen), Swift baut daraus die Meldung (PushNutzlast.meldung) und erwartet `erwartet`."

@@ -65,7 +65,7 @@ final class PushNutzlastTests: XCTestCase {
 
     func testMeldungPasstZuDenGemeinsamenFaellenDesKlartexts() throws {
         let faelle = try GemeinsameFaelle.load("push-inhalt.json", as: InhaltFaelle.self).faelle
-        XCTAssertEqual(faelle.count, 3)
+        XCTAssertEqual(faelle.count, 4)
         for fall in faelle {
             let daten = try JSONEncoder().encode(fall.klartext)
             let m = try XCTUnwrap(
@@ -141,6 +141,24 @@ final class PushNutzlastTests: XCTestCase {
     func testFehlenderPfadFaelltAufDenEinsatzZurueck() throws {
         let m = try XCTUnwrap(PushNutzlast.meldung(aus: klartext(["titel": "Alarm"]), serverAnzahl: 1))
         XCTAssertEqual(m.pfad, "/einsaetze/42")
+    }
+
+    /// Einsatz 1 (der erste auf jedem Server) und Benachrichtigung 0 sind Zahlen. Auf Darwin
+    /// brückt `JSONSerialization` jede `NSNumber` mit 0 oder 1 auch zu `Bool`; ein Bool-Test dort
+    /// verwarf die Meldung, unter Linux fiel es nicht auf. Ein echtes `true` bleibt kein Einsatz.
+    func testEinsatzEinsIstEineZahlKeinWahrheitswert() throws {
+        let m = try XCTUnwrap(
+            PushNutzlast.meldung(
+                aus: Data(
+                    #"{"v":1,"s":"Kreis Nord","e":1,"b":0,"stufe":"alarm","titel":"Alarm"}"#.utf8),
+                serverAnzahl: 1, kennung: "k-1"))
+        XCTAssertEqual(m.einsatzId, 1)
+        XCTAssertEqual(m.thread, "k-1-1")
+        XCTAssertEqual(m.pfad, "/einsaetze/1")
+        XCTAssertNil(
+            PushNutzlast.meldung(aus: Data(#"{"e":true,"titel":"Alarm"}"#.utf8), serverAnzahl: 1))
+        XCTAssertNil(
+            PushNutzlast.meldung(aus: Data(#"{"e":"1","titel":"Alarm"}"#.utf8), serverAnzahl: 1))
     }
 
     func testKaputterKlartextGibtNil() {

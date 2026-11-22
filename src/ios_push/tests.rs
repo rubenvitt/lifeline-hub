@@ -730,7 +730,7 @@ fn klartext_passt_zu_den_gemeinsamen_faellen() {
     let datei: serde_json::Value =
         serde_json::from_str(include_str!("../../src-tauri/faelle/push-inhalt.json")).unwrap();
     let faelle = datei["faelle"].as_array().unwrap();
-    assert_eq!(faelle.len(), 3);
+    assert_eq!(faelle.len(), 4);
     for fall in faelle {
         let k = &fall["klartext"];
         let text = |f: &str| k.get(f).map(|v| v.as_str().unwrap().to_owned());
