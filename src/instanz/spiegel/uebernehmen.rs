@@ -14,6 +14,7 @@ use super::schema::{self, Tabelle, Ziel, SKIZZE_ELEMENTE};
 use super::{Freigabestufe, SpiegelKategorie};
 use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
+use crate::fuehrung::Fuehrungsfunktion;
 use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
 use sqlx::SqliteConnection;
@@ -335,6 +336,7 @@ async fn uebernehme_zeilen(
                 }
                 Abgebildet::Fertig(mut werte, spaeter) => {
                     keep_mitarbeit(conn, t, e, &mut werte).await?;
+                    strip_funktion(conn, t, einsatz_id, &mut werte).await?;
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
@@ -759,6 +761,65 @@ async fn keep_mitarbeit(
         }
     }
     Ok(())
+}
+
+/// Eine Mitgliedschaft außerhalb der Führung trägt keine Führungsfunktion (LLH-2064, Entwurf
+/// `docs/superpowers/specs/2026-11-22-u195f4et-funktion-nur-mit-schreibrecht-design.md` D4; CHECK
+/// aus 0363). Ein älteres Gegenüber kennt die Regel nicht und liefert etwa Beobachter + `s4`; die
+/// Zeile wird vor dem Schreiben nach `Funktionsangabe::as_freitext` zur Bezeichnung, sonst bliebe
+/// der Abgleich an ihr hängen. Der Spiegel weicht damit bewusst vom Gegenüber ab, wie bei
+/// [`keep_mitarbeit`]. Ob der Einsatz geschwärzt ist, gilt am lokalen Einsatz.
+async fn strip_funktion(
+    conn: &mut SqliteConnection,
+    t: &Tabelle,
+    einsatz_id: i64,
+    werte: &mut [(String, Value)],
+) -> Result<(), AppError> {
+    if t.name != "einsatz_mitgliedschaft" || !hat_funktion_ausserhalb_der_fuehrung(werte) {
+        return Ok(());
+    }
+    let geschwaerzt: bool = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT geschwaerzt_at IS NOT NULL FROM einsatz WHERE id = ?), 0)",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    normalize_funktion(werte, geschwaerzt);
+    Ok(())
+}
+
+fn wert_str<'a>(werte: &'a [(String, Value)], name: &str) -> Option<&'a str> {
+    werte
+        .iter()
+        .find(|(s, _)| s == name)
+        .and_then(|(_, w)| w.as_str())
+}
+
+fn hat_funktion_ausserhalb_der_fuehrung(werte: &[(String, Value)]) -> bool {
+    let Some(rolle) = wert_str(werte, "einsatz_rolle").and_then(EinsatzRolle::parse) else {
+        return false;
+    };
+    !rolle.gehoert_zur_fuehrung() && wert_str(werte, "fuehrungsfunktion").is_some()
+}
+
+/// Der reine Teil von [`strip_funktion`]: Code weg, Angabe als Freitext. Ohne Rollenspalte oder
+/// mit einer Rolle der Führung bleibt `werte` unverändert.
+pub(super) fn normalize_funktion(werte: &mut [(String, Value)], geschwaerzt: bool) {
+    if !hat_funktion_ausserhalb_der_fuehrung(werte) {
+        return;
+    }
+    let angabe = crate::fuehrung::Funktionsangabe {
+        funktion: wert_str(werte, "fuehrungsfunktion").and_then(Fuehrungsfunktion::parse),
+        text: wert_str(werte, "fuehrungsstelle").map(str::to_string),
+    }
+    .as_freitext(geschwaerzt);
+    for (s, w) in werte.iter_mut() {
+        match s.as_str() {
+            "fuehrungsfunktion" => *w = Value::Null,
+            "fuehrungsstelle" => *w = angabe.text.clone().map_or(Value::Null, Value::from),
+            _ => {}
+        }
+    }
 }
 
 /// Lokaler Schlüssel der Zeile `fremd` in `ziel` (der Einsatz selbst ist immer bekannt).

@@ -1744,3 +1744,66 @@ async fn nachlieferung_nutzt_das_frische_flag() {
         .collect();
     assert_eq!(rollen, ["\"mitarbeit\""]);
 }
+
+// ---------- Funktion nur in der Führung (LLH-2064, Entwurf D4) ----------
+
+fn mitgliedschaft_werte(
+    rolle: Option<&str>,
+    funktion: Option<&str>,
+    stelle: Option<&str>,
+) -> Vec<(String, serde_json::Value)> {
+    let mut werte = vec![
+        ("einsatz_id".to_string(), serde_json::json!(7)),
+        ("benutzer_id".to_string(), serde_json::json!(9)),
+        ("fuehrungsfunktion".to_string(), serde_json::json!(funktion)),
+        ("fuehrungsstelle".to_string(), serde_json::json!(stelle)),
+    ];
+    if let Some(r) = rolle {
+        werte.push(("einsatz_rolle".to_string(), serde_json::json!(r)));
+    }
+    werte
+}
+
+fn wert<'a>(werte: &'a [(String, serde_json::Value)], name: &str) -> &'a serde_json::Value {
+    &werte.iter().find(|(s, _)| s == name).unwrap().1
+}
+
+#[test]
+fn normalize_funktion_macht_beobachter_s4_zu_freitext() {
+    let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert_eq!(wert(&werte, "fuehrungsstelle"), "S4");
+}
+
+#[test]
+fn normalize_funktion_macht_mitarbeit_fachberater_zu_freitext() {
+    let mut werte = mitgliedschaft_werte(Some("mitarbeit"), Some("fachberater"), Some("THW"));
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert_eq!(wert(&werte, "fuehrungsstelle"), "Fachberater: THW");
+}
+
+#[test]
+fn normalize_funktion_laesst_fuehrung_stehen() {
+    let mut werte = mitgliedschaft_werte(Some("fuehrungspersonal"), Some("s4"), None);
+    let vorher = werte.clone();
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert_eq!(werte, vorher);
+}
+
+#[test]
+fn normalize_funktion_geschwaerzt_nur_code_weg() {
+    let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+    uebernehmen::normalize_funktion(&mut werte, true);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert!(wert(&werte, "fuehrungsstelle").is_null());
+}
+
+#[test]
+fn normalize_funktion_ohne_rollenspalte_unveraendert() {
+    let mut werte = mitgliedschaft_werte(None, Some("s4"), None);
+    let vorher = werte.clone();
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert_eq!(werte, vorher);
+}
