@@ -207,6 +207,21 @@ class UpdaterTest {
     }
 
     @Test
+    fun `ein Kanal ohne Manifest (404) ist kein Update und kein Fehler`() {
+        // Ein Kanal-Release, das es noch nicht gibt (etwa vor dem ersten stabilen Release), oder
+        // ein Manifest, das gerade fehlt: die App zeigt keinen Fehler.
+        assertEquals(Updatestand.KEINS, runBlocking { updater().pruefen() })
+        assertEquals(listOf(alphaManifest), pfade())
+    }
+
+    @Test
+    fun `ein Fehler des Servers bleibt ein Fehler`() {
+        antworten[alphaManifest] = { MockResponse().setResponseCode(500) }
+
+        assertEquals(Updatestand.FEHLER, runBlocking { updater().pruefen() })
+    }
+
+    @Test
     fun `geprüft wird höchstens alle vier Stunden, Jetzt prüfen sofort`() {
         manifest(version = "1.0.0-alpha.5", code = 100)
         val updater = updater()

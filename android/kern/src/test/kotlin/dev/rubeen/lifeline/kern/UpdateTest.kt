@@ -85,6 +85,14 @@ class UpdateTest {
         }
     }
 
+    @Test
+    fun `ein Kanal ohne Manifest ist leer, kein Fehler`() {
+        // Ein Kanal-Release, das es noch nicht gibt oder dem `android.json` noch fehlt, antwortet
+        // mit 404: dann gibt es kein Update, aber auch keine Störung.
+        assertTrue(Updateentscheidung.isKanalLeer(404))
+        for (status in listOf(200, 301, 403, 410, 429, 500, 503)) assertFalse(Updateentscheidung.isKanalLeer(status), "$status")
+    }
+
     // Prüfabstand
 
     @Test

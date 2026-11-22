@@ -121,8 +121,10 @@ class Updater internal constructor(
     }
 
     private fun suche(kanal: Kanal): Updatestand {
-        val manifest = Updatemanifest.parse(http.text(kanal.manifestUrl))
-            ?: throw IOException("android.json ist kein Manifest")
+        // Ein leerer Kanal (`Updateentscheidung.isKanalLeer`) ist kein Fehler; ein schon geprüftes
+        // Update bleibt bereit.
+        val text = http.text(kanal.manifestUrl) ?: return if (bereit() != null) bereitStand() else Updatestand.KEINS
+        val manifest = Updatemanifest.parse(text) ?: throw IOException("android.json ist kein Manifest")
         if (!Updateentscheidung.isNeuer(version, versionCode, manifest)) {
             verwirf()
             return Updatestand.KEINS
@@ -319,8 +321,8 @@ class Updater internal constructor(
 class Updateabruf internal constructor(private val verbinden: (URI) -> URI) {
     constructor() : this({ it })
 
-    /** Text des Manifests, höchstens [MAX_MANIFEST] Bytes. */
-    fun text(url: String): String = oeffne(url).let { verbindung ->
+    /** Text des Manifests, höchstens [MAX_MANIFEST] Bytes; `null`, wenn der Kanal keins trägt. */
+    fun text(url: String): String? = oeffne(url)?.let { verbindung ->
         try {
             val puffer = ByteArrayOutputStream()
             verbindung.inputStream.use { ein -> kopiere(ein, puffer::write, MAX_MANIFEST.toLong(), pruefsumme = null) }
@@ -331,7 +333,7 @@ class Updateabruf internal constructor(private val verbinden: (URI) -> URI) {
     }
 
     /** Lädt nach [ziel] und gibt die `sha256` des Geladenen (klein, hex) zurück. */
-    fun laden(url: String, ziel: File): String = oeffne(url).let { verbindung ->
+    fun laden(url: String, ziel: File): String = (oeffne(url) ?: throw IOException("APK fehlt: $url")).let { verbindung ->
         try {
             val pruefsumme = MessageDigest.getInstance("SHA-256")
             verbindung.inputStream.use { ein -> ziel.outputStream().use { aus -> kopiere(ein, aus::write, MAX_APK, pruefsumme) } }
@@ -355,7 +357,8 @@ class Updateabruf internal constructor(private val verbinden: (URI) -> URI) {
         }
     }
 
-    private fun oeffne(url: String): HttpURLConnection {
+    /** `null`: die Adresse antwortet mit `Updateentscheidung.isKanalLeer`. */
+    private fun oeffne(url: String): HttpURLConnection? {
         var ziel = url
         repeat(MAX_WEITERLEITUNGEN + 1) {
             if (!Updateentscheidung.isErlaubterDownload(ziel)) throw IOException("Adresse nicht erlaubt: $ziel")
@@ -379,6 +382,7 @@ class Updateabruf internal constructor(private val verbinden: (URI) -> URI) {
                 }
                 else -> {
                     verbindung.disconnect()
+                    if (Updateentscheidung.isKanalLeer(status)) return null
                     throw IOException("HTTP $status für $ziel")
                 }
             }

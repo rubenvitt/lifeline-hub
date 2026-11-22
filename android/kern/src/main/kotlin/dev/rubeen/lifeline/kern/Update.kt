@@ -120,6 +120,12 @@ object Updateentscheidung {
             uri.host?.lowercase() in ERLAUBTE_HOSTS
     }
 
+    /**
+     * Antwortet die Adresse des Manifests so, trägt der Kanal (noch) keins: das Kanal-Release gibt
+     * es noch nicht, oder `android.json` fehlt gerade. Dann gibt es kein Update, aber keinen Fehler.
+     */
+    fun isKanalLeer(httpStatus: Int): Boolean = httpStatus == 404
+
     /** 64 Hexziffern. */
     fun isSha256(text: String): Boolean =
         text.length == 64 && text.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
