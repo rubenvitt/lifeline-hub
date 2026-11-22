@@ -1,5 +1,5 @@
 ---
-id: ADR-0083
+id: ADR-0084
 titel: Störungen einer Anbindung melden sich am Ort Adapter einmal an die Admins der Org
 status: vorgeschlagen
 datum: 2026-11-22
@@ -13,7 +13,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/k5fdiw6n15wrlvkgqdn0dlpw
 ---
 
-# ADR-0083: Störungen einer Anbindung melden sich am Ort Adapter einmal an die Admins der Org
+# ADR-0084: Störungen einer Anbindung melden sich am Ort Adapter einmal an die Admins der Org
 
 ## Regeln
 
