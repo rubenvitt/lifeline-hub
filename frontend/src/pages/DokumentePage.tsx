@@ -11,7 +11,7 @@ import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrec
 import { isBildMime, originalPfad } from '../api/anhangFassung';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -24,6 +24,7 @@ import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import Knopfreihe from '../components/instrument/Knopfreihe';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -323,7 +324,7 @@ export default function DokumentePage() {
 
   // Seitenzustand — nur `einsatzQuery`: ohne Einsatz gibt es keinen Rahmen.
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="dokumente" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

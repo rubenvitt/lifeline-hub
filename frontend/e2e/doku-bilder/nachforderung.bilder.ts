@@ -180,7 +180,15 @@ async function einheitNachforderung(
   return nf.id;
 }
 
-/** Öffnet die Nachforderungen des Demo-Einsatzes. */
+/**
+ * Öffnet die Nachforderungen des Demo-Einsatzes und wartet, bis das Board fertig gelayoutet ist.
+ *
+ * Die Materialliste und die Namen der Orte kommen nach den Karten (LLH-1925). Mit ihnen wächst die
+ * Karte „Sandsäcke für Deich Nord“ um ihren Posten und schiebt die Karten darunter weg. Lag das
+ * zwischen `mousedown` und `mouseup` eines Klicks, traf der `mouseup` den Nachbarknopf („Als
+ * Einheit übernehmen“ statt „Als Material übernehmen“), und kein Dialog ging auf. Der Anker
+ * belegt beide späten Abrufe: den Posten samt Ortsnamen und die übernommene Menge.
+ */
 async function nachforderungenOeffnen(page: Page) {
   await anmelden(page);
   const demo = await demoEinsatz(page);
@@ -188,6 +196,11 @@ async function nachforderungenOeffnen(page: Page) {
   await page.goto(`/einsaetze/${demo.id}/nachforderungen`);
   await expect(page.getByRole('button', { name: 'Nachforderung anlegen' })).toBeVisible();
   await expect(page.getByText('Transport aus der UHS Turnhalle').first()).toBeVisible();
+  const saeckePosten = page
+    .locator('[data-nachforderung-id]', { hasText: 'Sandsäcke für Deich Nord' })
+    .locator('[data-lfh="nachforderung-posten"]');
+  await expect(saeckePosten).toContainText('Sandsäcke · 1200 · Rettungsstaffel');
+  await expect(saeckePosten).toContainText('übernommen 1200 von 2000');
 }
 
 /** Leert den Fokus, damit kein Fokusring und kein Cursor im Bild steht. */

@@ -79,5 +79,5 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   Vorgabe, Radius 0, Fugenraster, Rot bedient nichts, Zahlen in Mono. Schriften nur lokal,
   kein CDN.
 - **Nichts versprechen, was das Produkt nicht kann.** Aussagen stützen sich auf `README.md`,
-  die Bereichsdateien und `docs/betrieb/`. Beispieldaten (Einsatz, ETB, Meldebild) tragen
+  die Bereichsdateien und `docs/betrieb/`. Beispieldaten (Einsatz, ETB, Kräfteübersicht) tragen
   sichtbar „Beispiel“; keine Kundenstimmen, Nutzerzahlen oder Preise ohne Quelle.

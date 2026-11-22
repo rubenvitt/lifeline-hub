@@ -54,7 +54,7 @@ import NachforderungFormular, {
   type NachforderungBezug,
   type NachforderungPersonBezug,
 } from '../nachforderungen/NachforderungFormular';
-import { ladePerson } from '../api/einsatzPerson';
+import { personDetailQueryOptions } from '../personen/personDetailQuery';
 import { prioritaetAusTransport } from '../nachforderungen/personBezug';
 import type { KartenFormular, StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
@@ -297,15 +297,14 @@ export default function NachforderungenPage() {
    */
   const personenFrei = istKeyFreigegeben('personen', freigaben);
   const personQuery = useQuery({
-    queryKey: einsatzKeys.person(einsatzId, personBezugId),
-    queryFn: () => ladePerson(einsatzId, personBezugId as number),
+    ...personDetailQueryOptions(einsatzId, personBezugId),
     enabled: personenFrei && personBezugId != null,
     // Jeder Abruf des Details schreibt „Detail geöffnet“ ins Zugriffsprotokoll, und das Detail ist
     // nicht live (`queryKeys`, Ereignis `person`): genau ein Abruf beim Öffnen der Erfassung, auch
     // wenn die Personenseite einen (womöglich älteren) Stand hält, damit UHS und Priorität stimmen.
-    // Kein Nachladen bei Fokus; eine neue Verbindung holt nur einen gescheiterten Abruf nach.
+    // Kein Nachladen bei Fokus und kein Retry (`personDetailQueryOptions`); eine neue Verbindung
+    // holt nur einen gescheiterten Abruf nach.
     staleTime: 0,
-    refetchOnWindowFocus: false,
     refetchOnReconnect: (q) => q.state.status === 'error',
   });
   const personNeuLaden = personQuery.refetch;

@@ -9,12 +9,13 @@ import BezirkTabelle from '../betreuung/BezirkTabelle';
 import EvakuierungKennzahlen from '../betreuung/EvakuierungKennzahlen';
 import { useBezirkHandlungen } from '../betreuung/useBezirkHandlungen';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { evakuierungsbezirkPfad, parseRouteId } from '../routing/deeplinks';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Fachmodul Evakuierung (LLH-1034, bis dahin der obere Block der Betreuungsseite): Räumungsbezirke
@@ -56,7 +57,7 @@ export default function EvakuierungPage() {
     return <Navigate to={evakuierungsbezirkPfad(einsatzId, altBezirk)} replace />;
   }
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="evakuierung" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

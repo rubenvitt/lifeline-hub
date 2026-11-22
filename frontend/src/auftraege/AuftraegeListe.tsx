@@ -613,7 +613,14 @@ export default function AuftraegeListe({
             { wert: 'abgeschlossen', label: segmentLabel('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
-        <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
+        {/* Die Suche gibt nach, nicht die Zeile (LLH-2005): Kommen die Mengen in „Offen (n)“ und
+            „Abgeschlossen (n)“ an, wird die Ansicht breiter. Mit 320 px als Basis brach die Zeile
+            bei 1024 px dann um, und der Empfängerfilter samt Liste rückte eine Zeile tiefer (CLS
+            0,14 beim Erstaufruf). Basis „schmal“, wachsen bis „mittel“. */}
+        <div
+          className={FELD_KLASSE}
+          style={{ flex: '1 1 var(--lfh-feld-schmal)', maxWidth: 'var(--lfh-feld-mittel)' }}
+        >
           <Input
             allowClear
             aria-label="Aufträge durchsuchen"

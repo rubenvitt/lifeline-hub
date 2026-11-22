@@ -47,6 +47,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import type { EinheitVorlage } from '../api/types';
 import { Status } from '../components/instrument/Status';
 import { pflicht } from '../components/pflichtRegel';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
@@ -277,7 +278,7 @@ export default function EinheitenPage() {
   // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
   // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden.
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="einheiten" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

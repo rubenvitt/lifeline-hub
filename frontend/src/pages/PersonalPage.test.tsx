@@ -205,6 +205,7 @@ describe('PersonalPage', () => {
   it('am Handschirm steht „Ad-hoc-Person“ hinter „Weitere“ (LLH-1786)', async () => {
     setzeViewportBreite(390);
     render(einsatz());
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     const kopf = await waitFor(() => {
       const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]');
       expect(k).not.toBeNull();

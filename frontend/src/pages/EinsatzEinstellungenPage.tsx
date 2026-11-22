@@ -12,7 +12,7 @@ import {
 } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
@@ -30,6 +30,7 @@ import {
 } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { modulName } from '../einsatz/modulRegistry';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Datenkontext der Einstellungs-Sektionen.
@@ -160,7 +161,7 @@ export default function EinsatzEinstellungenPage() {
     clearAuftrag,
   };
 
-  if (daten.laedt) return <SeitenSkeleton />;
+  if (daten.laedt) return <ModulGerippeSeite modulKey="einsatz-einstellungen" />;
   if (!daten.einsatz) {
     return (
       <SeitenFehler
