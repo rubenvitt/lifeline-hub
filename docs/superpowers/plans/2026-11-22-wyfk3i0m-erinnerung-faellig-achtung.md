@@ -55,5 +55,5 @@
 
 ### Task 4: Verifikation
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 - [x] Bilder vorher/nachher für den PR.
