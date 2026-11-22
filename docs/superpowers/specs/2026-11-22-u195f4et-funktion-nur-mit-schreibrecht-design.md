@@ -41,8 +41,9 @@ an einer der beiden Stellen nach Rolle gefiltert wird.
 
 - Die Funktion verschwindet still: ein Rollenwechsel ohne Hinweis vorher, oder eine Migration,
   die eine sichtbare Angabe ersatzlos löscht.
-- Der Abgleich mit einem älteren gekoppelten Gegenüber bricht ab, weil eine Zeile von dort gegen
-  den neuen CHECK verstößt.
+- Der Abgleich mit einem älteren gekoppelten Gegenüber bleibt an einer Zeile hängen, weil sie gegen
+  den neuen CHECK verstößt. `uebernehme_zeilen` fängt den Datenbankfehler ab, meldet „nicht
+  übernommen“ und setzt `nachholen_ab`, und die Zeile käme nie an.
 - Eine zweite Filterstelle „nur Schreibrecht“ in der Anzeige, die neben der Mitgliedschaft eine
   zweite Wahrheit bildet.
 
@@ -110,8 +111,14 @@ wird sie zur Bezeichnung ohne Code (**„als Freitext behalten“**):
 
 | Code | Freitext danach |
 | --- | --- |
-| `el`, `s1` … `s7` | Kürzel (`EL`, `S1` … `S7`), wenn kein Freitext gesetzt ist; sonst bleibt der Freitext |
-| `fuehrungshilfspersonal`, `fachberater` | `„<Standardlabel>: <Bezeichnung>“`, also „Fachberater: THW“ |
+| `el`, `s1` … `s7` | Kürzel (`EL`, `S1` … `S7`). Neben diesen Codes steht nie ein Text (`pruefe_funktion`, 0128). |
+| `fuehrungshilfspersonal`, `fachberater` | `„<Standardlabel>: <Bezeichnung>“`, also „Fachberater: THW“; ohne Bezeichnung nur das Standardlabel |
+| jeder Code in einem **geschwärzten** Einsatz (`einsatz.geschwaerzt_at IS NOT NULL`) | nichts: nur der Code wird `NULL`, `fuehrungsstelle` bleibt, wie die Schwärzung sie ließ (`NULL`) |
+
+Die letzte Zeile ist eine Datenschutzregel: Die Schwärzung nullt `fuehrungsstelle`
+(`schwaerzung_registry.rs`, `scrub`) und lässt den Code stehen. Eine Bereinigung schreibt nie wieder
+Text in eine geschwärzte Spalte. Eine Bezeichnung fehlt bei FHP und FB nur in geschwärzten
+Einsätzen; der Fall „ohne Bezeichnung“ gehört trotzdem in den Gleichheitstest.
 
 Begründung: Das Kürzel ist das, was im Einsatz gesprochen wird. Bei FHP und FB stünde die
 Bezeichnung allein („THW“) ohne Zusammenhang. Mandantenlabels (`org_fuehrungsfunktion`) werden
@@ -119,9 +126,10 @@ dabei bewusst nicht gelesen, damit Rust und SQL dasselbe Ergebnis liefern. Das E
 `fuehrung::TEXT_MAX` (200 Zeichen) gekürzt.
 
 Eine Rust-Funktion in `src/fuehrung/` (Name nach LLH-1312, etwa
-`Funktionsangabe::as_freitext`) bildet das ab. Rollenwechsel (D2) und Spiegel (D4) rufen sie auf;
-die Migration (D3) bildet dieselbe Tabelle in SQL nach, und ein Test hält fest, dass beide für
-jeden Katalogcode dasselbe liefern.
+`Funktionsangabe::as_freitext`, mit `geschwaerzt: bool`) bildet das ab. Sie ist die einzige Quelle
+im laufenden Code: Rollenwechsel (D2) und Spiegel (D4) rufen sie auf. Die Migration (D3) ist die
+einzige SQL-Kopie und bleibt eingefroren. Ein Test spielt die Migration auf Zeilen mit jedem
+Katalogcode (mit und ohne Bezeichnung, geschwärzt und nicht) und vergleicht mit der Rust-Funktion.
 
 ### D2 Mitgliederroute
 
@@ -132,9 +140,12 @@ jeden Katalogcode dasselbe liefern.
    Führungsfunktion“). Das gilt, wenn der Body `fuehrungsfunktion` mit einem Code trägt und die
    neue Rolle nicht zur Führung gehört. Eine reine Freitext-Angabe ist erlaubt.
 2. **Rollenwechsel ohne Angabe im Body:** Gehört die neue Rolle nicht zur Führung und trägt die
-   bestehende Mitgliedschaft einen Code, wird die Angabe nach D1 zu Freitext. Das passiert im
-   selben UPDATE wie der Rollenwechsel, also in einer Anweisung, ohne Lesen und Schreiben getrennt
-   (der CHECK aus D3 würde ein getrenntes Schreiben ohnehin ablehnen).
+   bestehende Mitgliedschaft einen Code, wird die Angabe nach D1 zu Freitext. Dafür liest
+   `setze_mitgliedschaft` Code, Text und Schwärzung **in einer Schreibtransaktion**
+   (`BEGIN IMMEDIATE`) und schreibt Rolle und umgewandelte Angabe im selben UPDATE. Der Org-Guard
+   bleibt im UPDATE. So gibt es kein Fenster, in dem ein paralleles Setzen der Funktion
+   dazwischenkäme, und die Rust-Funktion bleibt die eine Quelle (Entscheidung des Entwurfs gegen
+   ein `CASE` im UPDATE, das eine zweite SQL-Kopie wäre).
 
 Statuscode nach `src/AGENTS.md`, Statuscode-Konvention: 422 für eine fachlich unzulässige
 Kombination. Live-Verteilung (`mitglieder_geaendert`) bleibt unverändert. Die Liste aus der
@@ -151,7 +162,11 @@ CHECK (fuehrungsfunktion IS NULL OR einsatz_rolle IN ('einsatzleitung', 'fuehrun
 
 Das `INSERT … SELECT` in die neue Tabelle bereinigt dabei: Für Zeilen mit `mitarbeit` oder
 `beobachter` und einem Code setzt es `fuehrungsfunktion = NULL` und `fuehrungsstelle` nach D1
-(per `CASE`, gekürzt mit `substr(…, 1, 200)`). Alle übrigen Zeilen werden unverändert kopiert.
+(per `CASE` mit Join auf `einsatz.geschwaerzt_at`, gekürzt mit `substr(…, 1, 200)`). Alle übrigen
+Zeilen werden unverändert kopiert.
+
+Das Archiv-Einspielen bringt eine Archivdatei vorher per `db::migrate` auf den aktuellen Stand
+(`einsatz::archiv::einspielen::migrieren`); diese Migration bereinigt ein altes Archiv also selbst.
 
 Zum Spiegel: Der Neubau läuft über `INSERT` in die neue Tabelle, bevor die Trigger neu angelegt
 sind. Er schreibt deshalb nichts ins Änderungslog, und ein Gegenüber erfährt von der Bereinigung
@@ -167,9 +182,11 @@ dass der CHECK eine verbotene Zeile ablehnt.
 
 In `instanz/spiegel/uebernehmen.rs` kommt neben `keep_mitarbeit` ein Schritt für
 `einsatz_mitgliedschaft`: Trägt die ankommende Zeile (nach `keep_mitarbeit`) eine Rolle außerhalb
-der Führung und einen Code, wird sie vor dem `upsert` nach D1 zu Freitext. Damit geht ein Abgleich
-mit einem älteren Gegenüber oder ein altes Archiv nie am CHECK zu Bruch. Das Gegenüber selbst
-behält seinen Stand; der Spiegel weicht hier bewusst ab, so wie bei `keep_mitarbeit`.
+der Führung und einen Code, wird sie vor dem `upsert` nach D1 zu Freitext. Ob der Einsatz
+geschwärzt ist, liest der Schritt am lokalen Einsatz. So bleibt der Abgleich mit einem älteren
+Gegenüber nie an einer Zeile hängen. Das Gegenüber behält seinen Stand, und der Spiegel weicht hier
+bewusst davon ab, so wie bei `keep_mitarbeit`. Für das Archiv ist der Schritt nur eine zweite
+Absicherung (D3).
 
 Beim Liefern (`liefern.rs`) ändert sich nichts: Nach D3 verlässt keine Zeile mit verbotener
 Kombination diese Instanz.
@@ -213,9 +230,10 @@ Kombination diese Instanz.
 - Backend, Auflösung: Nach dem Wechsel zeigt der Auftrag an S4 „nicht vergeben“, und kein Hinweis
   geht hinaus. Anzeige und Hinweise stimmen überein (`fuehrung::aufloesung` und
   `benachrichtigung::aufloesung` mit demselben Bestand).
-- Spiegel: Eine eingehende Zeile Beobachter + `s4` wird zu Freitext und schreibt ohne Fehler;
-  dasselbe für das Archiv-Einspielen, falls ein bestehender Test den Weg schon fährt.
-- Migration: wie D3.
+- Spiegel: Eine eingehende Zeile Beobachter + `s4` wird zu Freitext und schreibt ohne Fehler; in
+  einem geschwärzten Spiegel-Einsatz nur der Code weg. Keinen eigenen Archiv-Test: Nach der
+  Migration lässt sich kein Archiv mit verbotener Zeile mehr bauen.
+- Migration: wie D3, einschließlich des Gleichheitstests aus D1 und eines geschwärzten Einsatzes.
 - Frontend (Vitest): Der Dialog bietet für Mitarbeit keinen Katalog; die Bestätigung erscheint
   nur bei Code und Zielrolle außerhalb der Führung.
 
@@ -223,7 +241,7 @@ Kombination diese Instanz.
 
 - Name und Ort der D1-Funktion und die genaue SQL-Form des `CASE`.
 - Wortlaut der Fehlermeldung (D2) und der UI-Texte (D5), nach `design:ux-copy`.
-- Ob D2 Regel 2 im bestehenden UPDATE von `setze_mitgliedschaft` als `CASE` steckt oder als
-  eigener Zweig; Bedingung: eine Anweisung, Org-Guard unverändert.
+- Wie `setze_mitgliedschaft` die Transaktion aus D2 aufbaut (INSERT-Zweig und UPDATE-Zweig);
+  Bedingung: Org-Guard unverändert im SQL, die Rückgabe „neu aufgenommen“ bleibt.
 - Ob der Filter aus LLH-2008 in `funktion_nutzer` nach dem Merge bleibt (er ist dann wirkungslos,
   aber harmlos). Empfehlung: bleiben lassen und im Kommentar auf den CHECK verweisen.
