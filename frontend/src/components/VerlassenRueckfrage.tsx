@@ -187,7 +187,7 @@ export function VerwerfenDialog({
       wrapProps={{
         ...MASKE_HAELT_FOKUS,
         onFocus: (e: FocusEvent<HTMLDivElement>) => {
-          if (oeffnet.current && e.target !== weiterRef.current) fokusZurueck();
+          if (oeffnet.current && !weiterRef.current?.contains(e.target)) fokusZurueck();
         },
         onPointerDown: () => {
           oeffnet.current = false;
