@@ -2226,3 +2226,41 @@ async fn spiegel_nimmt_keinen_nachtrag_an() {
     assert_eq!(a.quittungen, vec![1]);
     assert_eq!(rolle(&s, erika).await, "beobachter");
 }
+
+/// Der Spiegel als erreichte Seite: seine offenen Nachträge gehen in der Antwort hinaus, die
+/// Quittungen der Anfrage löschen sie (LLH-2007, Design D3).
+#[tokio::test]
+async fn erreichter_spiegel_schickt_nachtraege_und_loescht_quittierte() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_am_spiegel_festgehalten(&f, &s).await;
+    let mut sc = s.acquire().await.unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut sc, 1, true)
+        .await
+        .unwrap();
+    drop(sc);
+    let live = crate::live::LiveHub::new();
+    let eigen = crate::instanz::identitaet::load_or_create(&s)
+        .await
+        .unwrap();
+    let kopplung = crate::instanz::repo::load_kopplung(&s, 1).await.unwrap();
+    let antwort = super::abgleich::handle_abgleich(
+        &s,
+        &live,
+        None,
+        &eigen,
+        &kopplung,
+        &super::paket::SpiegelPaket::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(antwort.mitarbeit_nachtraege.len(), 1);
+    let quittiert = super::paket::SpiegelPaket {
+        mitarbeit_quittungen: vec![antwort.mitarbeit_nachtraege[0].id],
+        ..Default::default()
+    };
+    let antwort = super::abgleich::handle_abgleich(&s, &live, None, &eigen, &kopplung, &quittiert)
+        .await
+        .unwrap();
+    assert!(antwort.mitarbeit_nachtraege.is_empty());
+    assert!(nachtraege(&s).await.is_empty());
+}
