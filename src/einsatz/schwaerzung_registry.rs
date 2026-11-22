@@ -3480,7 +3480,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lokaler_schluessel", G_SPIEGEL),
         ],
     },
-    // Neu vergebene IDs am Spiegel (LLH-1893): nur Schlüssel und Stand.
+    // Neu vergebene IDs am Spiegel (LLH-1893): nur Schlüssel.
     TabellenRegel {
         tabelle: "spiegel_neu_vergeben",
         scoping: Scoping::EinsatzId,
@@ -3490,7 +3490,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("art", G_SPIEGEL),
             retain("lokaler_schluessel", G_SPIEGEL),
-            retain("stand", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
         ],
     },
     // Mitbenutzte Katalogzeilen eines Spiegels (LLH-1629).

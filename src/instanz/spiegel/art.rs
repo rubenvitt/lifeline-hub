@@ -356,33 +356,30 @@ pub fn trigger_sql(tabelle: &str, sc: Scoping, k: &Schluessel, mit_schutz: bool)
     let frei = "NOT EXISTS (SELECT 1 FROM spiegel_uebernahme)";
     // Eine ID, die SQLite nach dem Löschen neu vergibt, ist eine neue Zeile (LLH-1893): Legt diese
     // Instanz sie selbst an, fällt eine Herkunft unter dieser ID (in jedem Einsatz, wie das
-    // UNIQUE der Herkunft), und stand die ID in diesem Einsatz schon im Log, merkt sich
-    // `spiegel_neu_vergeben` die Neuvergabe mit dem Stand der neuen Zeile. Nur für den
+    // UNIQUE der Herkunft). Stand die ID in diesem Einsatz schon im Log, merkt sich
+    // `spiegel_neu_vergeben` die Neuvergabe samt dem fremden Schlüssel der alten Zeile: Ihre
+    // Löschung hat die neue Zeile im Log verdrängt, und nur so ersetzt die neue sie beim
+    // Gegenüber (`fuehrung::gegen_hinaus`). Eine weitere Neuvergabe behält ihn. Nur für den
     // Ersatzschlüssel `id`; eine neue Einsatz-ID vergibt `einsatz::repo::naechste_id` nie neu.
-    let neu_vergeben = sc != Scoping::SelbstId && *k == Schluessel::Spalte("id".into());
-    let (merken, stempeln) = if neu_vergeben {
-        (
-            format!(
-                "INSERT OR REPLACE INTO spiegel_neu_vergeben (einsatz_id, art, lokaler_schluessel, stand) \
-                 SELECT {en}, '{t}', {kn}, 0 WHERE {frei} AND EXISTS (SELECT 1 FROM einsatz_aenderung \
-                 WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn});\n    \
-                 DELETE FROM spiegel_herkunft WHERE {frei} AND art = '{t}' AND lokaler_schluessel = {kn};\n    "
-            ),
-            format!(
-                "\n    UPDATE spiegel_neu_vergeben SET stand = (SELECT stand FROM einsatz_aenderung \
-                 WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn}) \
-                 WHERE einsatz_id = {en} AND art = '{t}' AND lokaler_schluessel = {kn} AND stand = 0;"
-            ),
+    let merken = if sc != Scoping::SelbstId && *k == Schluessel::Spalte("id".into()) {
+        format!(
+            "INSERT OR REPLACE INTO spiegel_neu_vergeben (einsatz_id, art, lokaler_schluessel, \
+             fremder_schluessel) SELECT {en}, '{t}', {kn}, COALESCE((SELECT fremder_schluessel \
+             FROM spiegel_herkunft WHERE einsatz_id = {en} AND art = '{t}' AND lokaler_schluessel = {kn}), \
+             (SELECT fremder_schluessel FROM spiegel_neu_vergeben WHERE einsatz_id = {en} AND art = '{t}' \
+             AND lokaler_schluessel = {kn})) WHERE {frei} AND EXISTS (SELECT 1 FROM einsatz_aenderung \
+             WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn});\n    \
+             DELETE FROM spiegel_herkunft WHERE {frei} AND art = '{t}' AND lokaler_schluessel = {kn};\n    "
         )
     } else {
-        (String::new(), String::new())
+        String::new()
     };
     // Das Log ist je Einsatz eindeutig: eine Kennung, die SQLite nach dem Löschen neu vergibt,
     // verdrängt die Löschung in einem anderen Einsatz nicht.
     sql.push_str(&format!(
         "CREATE TRIGGER {t}_spiegellog_i AFTER INSERT ON {t} WHEN {gn} BEGIN\n    \
          {merken}DELETE FROM einsatz_aenderung WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn};\n    \
-         INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES ({en}, '{t}', {kn});{stempeln}\nEND;\n",
+         INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES ({en}, '{t}', {kn});\nEND;\n",
         gn = gibt(&en)
     ));
     sql.push_str(&format!(
@@ -716,7 +713,10 @@ mod tests {
     }
 
     /// Herkunft und Merker einer Zeile von `uhs_platz` (Ersatzschlüssel `id`).
-    async fn herkunft_und_merker(pool: &sqlx::SqlitePool, platz: i64) -> (i64, Option<(i64, i64)>) {
+    async fn herkunft_und_merker(
+        pool: &sqlx::SqlitePool,
+        platz: i64,
+    ) -> (i64, Option<(i64, Option<String>)>) {
         let herkunft: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM spiegel_herkunft WHERE art = 'uhs_platz' \
              AND lokaler_schluessel = ?",
@@ -726,7 +726,7 @@ mod tests {
         .await
         .unwrap();
         let merker = sqlx::query_as(
-            "SELECT einsatz_id, stand FROM spiegel_neu_vergeben WHERE art = 'uhs_platz' \
+            "SELECT einsatz_id, fremder_schluessel FROM spiegel_neu_vergeben WHERE art = 'uhs_platz' \
              AND lokaler_schluessel = ?",
         )
         .bind(platz.to_string())
@@ -783,17 +783,29 @@ mod tests {
 
     /// LLH-1893: Eine Zeile, die diese Instanz unter einer schon vergebenen ID anlegt, ist nicht
     /// die Zeile, auf die eine ältere Herkunft zeigt. Die Herkunft fällt, und der Merker hält die
-    /// Neuvergabe mit dem Stand der neuen Zeile fest.
+    /// Neuvergabe mit dem fremden Schlüssel der alten Zeile fest; eine weitere Neuvergabe behält
+    /// ihn.
     #[tokio::test]
     async fn neu_vergebene_id_raeumt_die_herkunft_und_setzt_den_merker() {
         let pool = crate::db::test_pool().await;
         let (einsatz, uhs, platz) = einsatz_mit_uhs(&pool).await;
         platz_neu_vergeben(&pool, einsatz, uhs, platz, false).await;
-        let (s, _) = stand(&pool, "uhs_platz", platz).await.unwrap();
-        assert_eq!(
-            herkunft_und_merker(&pool, platz).await,
-            (0, Some((einsatz, s)))
-        );
+        let erwartet = (0, Some((einsatz, Some("77".to_string()))));
+        assert_eq!(herkunft_und_merker(&pool, platz).await, erwartet);
+        sqlx::query("DELETE FROM uhs_platz WHERE id = ?")
+            .bind(platz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO uhs_platz (id, uhs_id, typ, bezeichnung) VALUES (?, ?, 'bett', 'Neu 2')",
+        )
+        .bind(platz)
+        .bind(uhs)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(herkunft_und_merker(&pool, platz).await, erwartet);
     }
 
     /// Unter dem Merker der Übernahme hält die Übernahme die Herkunft selbst nach.

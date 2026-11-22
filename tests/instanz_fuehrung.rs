@@ -5693,10 +5693,17 @@ async fn nach_widerspruch_steht_die_neue_zeile_unter_alter_id_in_der_bruchstelle
     assert!(zeichen_entfernt(&hub, h, "N vom Hub").await);
 }
 
-/// Akzeptanz LLH-1893: Für N nennt der Hub als Führer keinen Schlüssel des ELW.
+/// LLH-1893: Die Löschung von Z verdrängt im Log die neue Zeile N unter derselben ID. Deshalb nennt
+/// der Hub als Führer für N den Schlüssel von Z (aus dem Merker, die Herkunft ist fort), und am ELW
+/// ersetzt N das gelöschte Z, statt dass Z dort stehen bleibt (Review vor dem PR).
 #[tokio::test]
-async fn gegen_hinaus_nennt_fuer_die_neue_zeile_keinen_fremden_schluessel() {
-    let (hub, _elw, _, h, n) = neue_zeile_unter_alter_id_am_hub().await;
+async fn bestaetigte_notuebernahme_ersetzt_am_elw_die_geloeschte_zeile() {
+    let (hub, elw, e, h, n) = neue_zeile_unter_alter_id_am_hub().await;
+    let z_elw: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
     let kopplung: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung")
         .fetch_one(&hub.pool)
         .await
@@ -5711,7 +5718,65 @@ async fn gegen_hinaus_nennt_fuer_die_neue_zeile_keinen_fremden_schluessel() {
     )
     .await
     .unwrap();
-    assert_eq!(gegen, None);
+    drop(conn);
+    assert_eq!(gegen, Some(z_elw.to_string()));
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await, "der ELW spiegelt");
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None);
+    }
+    assert_eq!(zeichen_labels(&hub, h).await, ["N vom Hub"]);
+    assert_eq!(zeichen_labels(&elw, e).await, ["N vom Hub"]);
+}
+
+/// LLH-1893: Ordnet die Herkunft den Schlüssel der gelöschten Zeile inzwischen einer anderen Zeile
+/// zu, nennt `gegen_hinaus` ihn nicht auch noch für die neue; sonst ersetzten zwei Zeilen beim
+/// Empfänger dieselbe.
+#[tokio::test]
+async fn gegen_hinaus_nennt_den_schluessel_der_geloeschten_nur_einmal() {
+    let (hub, elw, e, h, n) = neue_zeile_unter_alter_id_am_hub().await;
+    let z_elw: i64 = sqlx::query_scalar("SELECT id FROM freies_zeichen WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    let kopplung: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO spiegel_herkunft (einsatz_id, art, fremder_schluessel, lokaler_schluessel) \
+         VALUES (?, 'freies_zeichen', ?, '999')",
+    )
+    .bind(h)
+    .bind(z_elw.to_string())
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    let mut gegen = Vec::new();
+    for schluessel in [n.to_string(), "999".to_string()] {
+        gegen.push(
+            lifeline_hub::instanz::spiegel::fuehrung::gegen_hinaus(
+                &mut conn,
+                h,
+                kopplung,
+                "freies_zeichen",
+                &schluessel,
+            )
+            .await
+            .unwrap(),
+        );
+    }
+    assert_eq!(gegen, [None, Some(z_elw.to_string())]);
 }
 
 /// Der ELW zeichnet Z und übergibt an den Hub; der ELW spiegelt danach und ordnet die Zeile des
@@ -5776,6 +5841,53 @@ async fn nach_notuebernahme_durch_den_elw_steht_die_neue_zeile_unter_alter_id_in
     assert_geklaert(&hub, h).await;
     assert_eq!(zeichen_labels(&hub, h).await, ["Z vom ELW"]);
     assert!(zeichen_entfernt(&hub, h, "N vom Hub").await);
+}
+
+/// LLH-1893: Ändert der Hub N nach der Neuvergabe, und hat der ELW (etwa bei einer abgeschnittenen
+/// Seite) bis zur Neuvergabe quittiert, ohne N zu bekommen, bleibt der Merker: Er folgt dem
+/// jüngsten Stand des Schlüssels, nicht dem der Neuvergabe (Review vor dem PR).
+#[tokio::test]
+async fn merker_bleibt_bis_der_juengste_stand_der_zeile_quittiert_ist() {
+    let (hub, elw, _, h) = neue_zeile_unter_alter_id_nach_uebergabe().await;
+    let (n, stand): (String, i64) = sqlx::query_as(
+        "SELECT a.schluessel, a.stand FROM spiegel_neu_vergeben m JOIN einsatz_aenderung a \
+         ON a.einsatz_id = m.einsatz_id AND a.art = m.art AND a.schluessel = m.lokaler_schluessel \
+         WHERE m.einsatz_id = ?",
+    )
+    .bind(h)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        &format!("/api/einsaetze/{h}/freie-zeichen/{n}"),
+        &hub.admin,
+        Some(&json!({"label": "N geändert"})),
+    )
+    .await;
+    assert!(s.is_success(), "{s}: {v}");
+    sqlx::query("UPDATE spiegel_ziel SET stand = ? WHERE einsatz_id = ?")
+        .bind(stand)
+        .bind(h)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        json!({"grund": "Hub nicht erreichbar"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None);
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    assert_eq!(zeichen_labels(&hub, h).await, ["Z vom ELW"]);
+    assert!(zeichen_entfernt(&hub, h, "N geändert").await);
 }
 
 /// LLH-1893: Kennt der ELW die Neuvergabe schon, räumt die reguläre Rückgabe den Merker, und N

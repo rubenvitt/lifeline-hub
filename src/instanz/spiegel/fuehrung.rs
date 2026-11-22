@@ -271,12 +271,19 @@ async fn werde_spiegel(conn: &mut SqliteConnection, akte: &AkteZeile) -> Result<
             .fetch_one(&mut *conn)
             .await?;
     let bekannt_bis = bestaetigt.unwrap_or(0).max(uebernommen.unwrap_or(0));
-    // Eine Neuvergabe, die der neue Führer schon kennt, braucht keinen Merker mehr (LLH-1893).
-    sqlx::query("DELETE FROM spiegel_neu_vergeben WHERE einsatz_id = ? AND stand <= ?")
-        .bind(einsatz_id)
-        .bind(bekannt_bis)
-        .execute(&mut *conn)
-        .await?;
+    // Eine Neuvergabe, deren jüngsten Stand der neue Führer kennt, braucht keinen Merker mehr
+    // (LLH-1893). Maßgeblich ist der Stand im Log, nicht der der Neuvergabe: Eine spätere Änderung
+    // kann auf einer Seite liegen, die er noch nicht hat.
+    sqlx::query(
+        "DELETE FROM spiegel_neu_vergeben WHERE einsatz_id = ? AND NOT EXISTS ( \
+           SELECT 1 FROM einsatz_aenderung a WHERE a.einsatz_id = spiegel_neu_vergeben.einsatz_id \
+           AND a.art = spiegel_neu_vergeben.art \
+           AND a.schluessel = spiegel_neu_vergeben.lokaler_schluessel AND a.stand > ?)",
+    )
+    .bind(einsatz_id)
+    .bind(bekannt_bis)
+    .execute(&mut *conn)
+    .await?;
     let gesichert = sichere_bruchstelle(conn, einsatz_id, bekannt_bis).await?;
     let merker_vorher: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spiegel_uebernahme)")
@@ -879,7 +886,10 @@ pub async fn fordere_abgeglichen(
 
 /// Der Schlüssel einer Zeile beim Empfänger (E3): Kennt diese Instanz die Zeile als Spiegel der
 /// Kopplung `kopplung_id` (sie führt den Einsatz jetzt), ist es der Schlüssel, unter dem der alte
-/// Führer sie geliefert hat.
+/// Führer sie geliefert hat. Steht unter der ID eine neue Zeile (`spiegel_neu_vergeben`, LLH-1893),
+/// ist es der Schlüssel der gelöschten: Ihre Löschung hat die neue Zeile im Log verdrängt, und so
+/// ersetzt die neue sie beim Empfänger, statt dass die alte dort stehen bleibt. Ordnet die
+/// Herkunft den Schlüssel inzwischen einer anderen Zeile zu, gilt die.
 pub async fn gegen_hinaus(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -888,17 +898,22 @@ pub async fn gegen_hinaus(
     schluessel: &str,
 ) -> Result<Option<String>, AppError> {
     Ok(sqlx::query_scalar(
-        "SELECT h.fremder_schluessel FROM spiegel_herkunft h \
-         JOIN einsatz_fuehrung f ON f.einsatz_id = h.einsatz_id \
-         WHERE h.einsatz_id = ? AND h.art = ? AND h.lokaler_schluessel = ? \
-           AND f.herkunft_kopplung_id = ?",
+        "SELECT COALESCE(h.fremder_schluessel, n.fremder_schluessel) FROM einsatz_fuehrung f \
+         LEFT JOIN spiegel_herkunft h ON h.einsatz_id = f.einsatz_id AND h.art = ?1 \
+           AND h.lokaler_schluessel = ?2 \
+         LEFT JOIN spiegel_neu_vergeben n ON n.einsatz_id = f.einsatz_id AND n.art = ?1 \
+           AND n.lokaler_schluessel = ?2 AND NOT EXISTS (SELECT 1 FROM spiegel_herkunft g \
+             WHERE g.einsatz_id = n.einsatz_id AND g.art = n.art \
+             AND g.fremder_schluessel = n.fremder_schluessel) \
+         WHERE f.einsatz_id = ?3 AND f.herkunft_kopplung_id = ?4",
     )
-    .bind(einsatz_id)
     .bind(art)
     .bind(schluessel)
+    .bind(einsatz_id)
     .bind(kopplung_id)
     .fetch_optional(&mut *conn)
-    .await?)
+    .await?
+    .flatten())
 }
 
 /// Übernimmt am Spiegel den Schlüssel beim Empfänger (E3): Die Zeile `fremd` des Führers ist die
