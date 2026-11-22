@@ -271,10 +271,22 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     let faellig = anzahl(&liste, |e| {
         e["ist_faellig"] == json!(true) && e["status"] == "offen"
     });
-    // Drei: die eigene plus die Quittierfristen, die die beiden Aufträge mit abgelaufener Frist
-    // selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
+    // Drei in der Liste: die eigene plus die Quittierfristen, die die beiden Aufträge mit
+    // abgelaufener Frist selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
     assert_eq!(faellig, 3, "Erwartung aus der Liste: {liste:?}");
-    assert_eq!(v["erinnerungen"], json!({ "faellig": faellig }), "{v:?}");
+    // Der Zähler lässt die Fristen aus, die am Auftrag stehen (`src/AGENTS.md`, „Automatische
+    // Fristen stehen am Bezug“, LLH-1908): der Admin sieht Aufträge, also bleibt die eigene.
+    let nicht_am_bezug = anzahl(&liste, |e| {
+        e["ist_faellig"] == json!(true)
+            && e["status"] == "offen"
+            && !(e["quelle"] == "auto_frist" && e["bezug_typ"] == "auftrag")
+    });
+    assert_eq!(nicht_am_bezug, 1, "Erwartung aus der Liste: {liste:?}");
+    assert_eq!(
+        v["erinnerungen"],
+        json!({ "faellig": nicht_am_bezug }),
+        "{v:?}"
+    );
 }
 
 /// Delta-Spec `modul-zaehler`, „Sofort- und dringende Meldungen im Zähler“ und „Eingang der
