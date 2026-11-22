@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import { sichtbareTexte } from '../lib/quelltextAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -86,29 +86,10 @@ const OFFEN: Record<string, number> = {};
  */
 const AUSNAHMEN: ReadonlySet<string> = new Set(['hilfe/rundgang/rundgangTexte.ts']);
 
-/** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */
-function texteAus(quelle: string, dateiname = 'x.tsx'): { text: string; zeile: number }[] {
-  const datei = ts.createSourceFile(dateiname, quelle, ts.ScriptTarget.Latest, true);
-  const texte: { text: string; zeile: number }[] = [];
-  const merke = (knoten: ts.Node, text: string) =>
-    texte.push({ text, zeile: datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1 });
-  const besuche = (knoten: ts.Node) => {
-    if (ts.isImportDeclaration(knoten) || ts.isExportDeclaration(knoten)) return;
-    if (ts.isStringLiteral(knoten) || ts.isNoSubstitutionTemplateLiteral(knoten))
-      merke(knoten, knoten.text);
-    else if (ts.isTemplateHead(knoten) || ts.isTemplateMiddle(knoten) || ts.isTemplateTail(knoten))
-      merke(knoten, knoten.text);
-    else if (ts.isJsxText(knoten)) merke(knoten, knoten.text);
-    ts.forEachChild(knoten, besuche);
-  };
-  besuche(datei);
-  return texte;
-}
-
 /** Treffer einer Quelle als „Zeile: Mustername“. */
 function erklaerTreffer(quelle: string, dateiname = 'x.tsx'): string[] {
   const treffer: string[] = [];
-  for (const { text, zeile } of texteAus(quelle, dateiname)) {
+  for (const { text, zeile } of sichtbareTexte(dateiname, quelle)) {
     // JSX-Text bricht Zeilen um; ein Muster soll über den Umbruch hinweg treffen.
     const flach = text.replace(/\s+/g, ' ');
     for (const { name, muster } of MUSTER)

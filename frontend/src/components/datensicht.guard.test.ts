@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import * as ts from 'typescript';
+import { type AstKnoten, parseQuelltext, textVon, walk, zeileVon } from '../lib/quelltextAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -278,18 +278,19 @@ export interface Sichtstelle {
  * Zeichenkettenliterale kommen mit Anführungszeichen zurück, damit `key="a"` und `key={a}`
  * in der Meldung unterscheidbar bleiben.
  */
-function attributVon(
-  element: ts.JsxOpeningLikeElement,
-  name: string,
-  quelle: ts.SourceFile,
-): string | null {
-  for (const attribut of element.attributes.properties) {
-    if (!ts.isJsxAttribute(attribut) || attribut.name.getText(quelle) !== name) continue;
-    const wert = attribut.initializer;
+function attributVon(element: AstKnoten, name: string, quelltext: string): string | null {
+  for (const attribut of element.attributes as AstKnoten[]) {
+    if (attribut.type !== 'JSXAttribute') continue;
+    if (textVon(quelltext, attribut.name as AstKnoten) !== name) continue;
+    const wert = attribut.value as AstKnoten | null;
     if (wert == null) return name; // bloßes `key` ohne Wert — formal da, praktisch leer
-    if (ts.isStringLiteral(wert)) return JSON.stringify(wert.text);
-    if (ts.isJsxExpression(wert)) return wert.expression?.getText(quelle) ?? `${name}={}`;
-    return wert.getText(quelle);
+    if (wert.type === 'Literal' && typeof wert.value === 'string')
+      return JSON.stringify(wert.value);
+    if (wert.type === 'JSXExpressionContainer') {
+      const ausdruck = wert.expression as AstKnoten;
+      return ausdruck.type === 'JSXEmptyExpression' ? `${name}={}` : textVon(quelltext, ausdruck);
+    }
+    return textVon(quelltext, wert);
   }
   return null;
 }
@@ -314,25 +315,27 @@ const SICHTSCHALTER: Readonly<Record<string, string>> = {
  * Aufklapp-Umschalter. Die naheliegende „Behebung“ (ein `key` am Umschalter) verwürfe bei jedem
  * Aufklappen Sortierung, Spaltenwahl und Zeilenschleuse.
  */
-function achsenBezeichner(
-  knoten: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
-  attributName: string,
-): string[] {
-  const attribut = knoten.attributes.properties.find(
-    (a): a is ts.JsxAttribute => ts.isJsxAttribute(a) && a.name.getText() === attributName,
+function achsenBezeichner(knoten: AstKnoten, attributName: string, quelltext: string): string[] {
+  const attribut = (knoten.attributes as AstKnoten[]).find(
+    (a) => a.type === 'JSXAttribute' && textVon(quelltext, a.name as AstKnoten) === attributName,
   );
-  const wert = attribut?.initializer;
-  if (wert == null || !ts.isJsxExpression(wert) || wert.expression == null) return [];
+  const wert = attribut?.value as AstKnoten | null | undefined;
+  if (wert?.type !== 'JSXExpressionContainer') return [];
+  const ausdruck = wert.expression as AstKnoten;
+  return ausdruck.type === 'JSXEmptyExpression' ? [] : achsenBezeichnerVon(ausdruck);
+}
+
+/** Die Bezeichner eines Teilausdrucks, mit denselben Regeln wie {@link achsenBezeichner}. */
+function achsenBezeichnerVon(ausdruck: AstKnoten): string[] {
   const gefunden: string[] = [];
-  const sammle = (n: ts.Node): void => {
-    if (ts.isPropertyAccessExpression(n)) {
-      sammle(n.expression); // NUR links vom Punkt — `n.name` ist der Property-Name.
-      return;
+  walk(ausdruck, (n) => {
+    if (n.type === 'MemberExpression' && !n.computed) {
+      for (const bezeichner of achsenBezeichnerVon(n.object as AstKnoten))
+        gefunden.push(bezeichner);
+      return false;
     }
-    if (ts.isIdentifier(n)) gefunden.push(n.text);
-    ts.forEachChild(n, sammle);
-  };
-  sammle(wert.expression);
+    if (n.type === 'Identifier') gefunden.push(n.name as string);
+  });
   return gefunden;
 }
 
@@ -352,38 +355,33 @@ export interface Dateilage {
  * AST-Knoten.
  */
 export function leseDatei(pfad: string, quelltext: string): Dateilage {
-  const quelle = ts.createSourceFile(
-    pfad,
-    quelltext,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
   const stellen: Sichtstelle[] = [];
   const achsen = new Set<string>();
   const initialisierer = new Map<string, string>();
 
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isVariableDeclaration(knoten) && ts.isIdentifier(knoten.name) && knoten.initializer) {
-      initialisierer.set(knoten.name.text, knoten.initializer.getText(quelle));
+  walk(parseQuelltext(pfad, quelltext), (knoten) => {
+    if (knoten.type === 'VariableDeclarator') {
+      const id = knoten.id as AstKnoten;
+      const init = knoten.init as AstKnoten | null;
+      if (id.type === 'Identifier' && init)
+        initialisierer.set(id.name as string, textVon(quelltext, init));
     }
-    if (ts.isJsxOpeningElement(knoten) || ts.isJsxSelfClosingElement(knoten)) {
-      const tag = knoten.tagName.getText(quelle);
+    if (knoten.type === 'JSXOpeningElement') {
+      const tag = textVon(quelltext, knoten.name as AstKnoten);
       const schalterAttribut = SICHTSCHALTER[tag];
       if (schalterAttribut != null) {
-        for (const bezeichner of achsenBezeichner(knoten, schalterAttribut)) achsen.add(bezeichner);
+        for (const bezeichner of achsenBezeichner(knoten, schalterAttribut, quelltext))
+          achsen.add(bezeichner);
       }
       if (tag === 'Datensicht') {
         stellen.push({
-          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
-          schluessel: attributVon(knoten, 'key', quelle),
-          daten: attributVon(knoten, 'daten', quelle),
+          zeile: zeileVon(quelltext, knoten.start),
+          schluessel: attributVon(knoten, 'key', quelltext),
+          daten: attributVon(knoten, 'daten', quelltext),
         });
       }
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return { stellen, achsen, initialisierer };
 }
 

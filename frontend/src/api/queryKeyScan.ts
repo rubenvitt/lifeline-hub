@@ -14,8 +14,8 @@
  */
 import {
   type AstKnoten,
-  istStringLiteral,
   parseQuelltext,
+  statischerText,
   textVon,
   walk,
   zeileVon,
@@ -86,19 +86,6 @@ function calleeName(ausdruck: AstKnoten): string | undefined {
   if (ausdruck.type === 'MemberExpression' && !ausdruck.computed) {
     const eigenschaft = ausdruck.property as AstKnoten;
     if (eigenschaft.type === 'Identifier') return eigenschaft.name as string;
-  }
-  return undefined;
-}
-
-/**
- * Statischer Text eines String-Literals oder eines Template-Literals ohne Platzhalter (TS:
- * `isStringLiteralLike`); sonst `undefined`.
- */
-function statischerText(knoten: AstKnoten | null | undefined): string | undefined {
-  if (istStringLiteral(knoten)) return knoten.value;
-  if (knoten?.type === 'TemplateLiteral' && (knoten.expressions as AstKnoten[]).length === 0) {
-    const [teil] = knoten.quasis as AstKnoten[];
-    return (teil.value as { cooked: string | null }).cooked ?? undefined;
   }
   return undefined;
 }

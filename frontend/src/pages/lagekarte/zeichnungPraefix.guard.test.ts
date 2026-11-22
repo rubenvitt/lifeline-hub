@@ -1,8 +1,14 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import {
+  type AstKnoten,
+  parseQuelltext,
+  statischerText,
+  walk,
+  zeileVon,
+} from '../../lib/quelltextAst';
 import { ZEICHNUNG_PRAEFIX } from './eigenpositionLayer';
 
 /**
@@ -25,37 +31,47 @@ const PRAEFIX_ARGUMENT = 3;
 
 type Fund = { datei: string; zeile: number; wert: string | null };
 
-function praefixe(): Fund[] {
+export function praefixe(): Fund[] {
   const funde: Fund[] = [];
   for (const datei of DATEIEN) {
     const quelle = readFileSync(join(hier, datei), 'utf8');
     if (!quelle.includes('prefixId') && !quelle.includes('createZeichnung')) continue;
-    const sf = ts.createSourceFile(datei, quelle, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    const melde = (knoten: ts.Node, wert: ts.Expression | undefined) => {
+    const melde = (knoten: AstKnoten, wert: AstKnoten | null | undefined) => {
       if (!wert) return;
-      const zeile = sf.getLineAndCharacterOfPosition(knoten.getStart()).line + 1;
-      if (ts.isStringLiteralLike(wert)) funde.push({ datei, zeile, wert: wert.text });
-      else if (!(datei === 'zeichnen.ts' && ts.isIdentifier(wert) && wert.text === 'praefix'))
+      const zeile = zeileVon(quelle, knoten.start);
+      const statisch = statischerText(wert);
+      if (statisch !== undefined) funde.push({ datei, zeile, wert: statisch });
+      else if (!(datei === 'zeichnen.ts' && wert.type === 'Identifier' && wert.name === 'praefix'))
         funde.push({ datei, zeile, wert: null });
     };
-    const besuche = (n: ts.Node) => {
-      if (ts.isPropertyAssignment(n) && n.name.getText(sf) === 'prefixId') melde(n, n.initializer);
+    walk(parseQuelltext(datei, quelle), (n, eltern) => {
+      const schluessel = n.key as AstKnoten | undefined;
       if (
-        ts.isParameter(n) &&
-        n.name.getText(sf) === 'praefix' &&
-        ts.isFunctionDeclaration(n.parent) &&
-        n.parent.name?.text === 'createZeichnung'
+        n.type === 'Property' &&
+        eltern?.type === 'ObjectExpression' &&
+        !n.shorthand &&
+        !n.computed &&
+        schluessel?.type === 'Identifier' &&
+        schluessel.name === 'prefixId'
       )
-        melde(n, n.initializer);
+        melde(n, n.value as AstKnoten);
+      const links = n.left as AstKnoten | undefined;
       if (
-        ts.isCallExpression(n) &&
-        ts.isIdentifier(n.expression) &&
-        n.expression.text === 'createZeichnung'
+        n.type === 'AssignmentPattern' &&
+        links?.type === 'Identifier' &&
+        links.name === 'praefix' &&
+        eltern?.type === 'FunctionDeclaration' &&
+        (eltern.id as AstKnoten | null)?.name === 'createZeichnung'
       )
-        melde(n, n.arguments[PRAEFIX_ARGUMENT]);
-      ts.forEachChild(n, besuche);
-    };
-    besuche(sf);
+        melde(n, n.right as AstKnoten);
+      const callee = n.callee as AstKnoten | undefined;
+      if (
+        n.type === 'CallExpression' &&
+        callee?.type === 'Identifier' &&
+        callee.name === 'createZeichnung'
+      )
+        melde(n, (n.arguments as AstKnoten[])[PRAEFIX_ARGUMENT]);
+    });
   }
   return funde;
 }

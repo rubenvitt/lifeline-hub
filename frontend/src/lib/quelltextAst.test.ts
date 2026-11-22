@@ -4,6 +4,8 @@ import {
   istStringLiteral,
   ohneHuelle,
   parseQuelltext,
+  sichtbareTexte,
+  statischerText,
   textVon,
   walk,
   zeileVon,
@@ -82,5 +84,63 @@ describe('quelltextAst', () => {
     const [s, z] = alle(programm, 'CallExpression')[0].arguments as AstKnoten[];
     expect(istStringLiteral(s)).toBe(true);
     expect(istStringLiteral(z)).toBe(false);
+  });
+
+  it('steigt nicht ab, wenn der Besuch false liefert', () => {
+    const programm = parseQuelltext('x.ts', 'f(a); g(b);');
+    const namen: string[] = [];
+    walk(programm, (knoten) => {
+      if (knoten.type === 'Identifier') namen.push(knoten.name as string);
+      if (knoten.type === 'CallExpression' && (knoten.callee as AstKnoten).name === 'f')
+        return false;
+    });
+    expect(namen).toEqual(['g', 'b']);
+  });
+
+  it('liest statischen Text aus String- und platzhalterlosen Template-Literalen', () => {
+    const programm = parseQuelltext('x.ts', "f('a', `b`, `c${d}`, 1);");
+    const args = alle(programm, 'CallExpression')[0].arguments as AstKnoten[];
+    expect(args.map(statischerText)).toEqual(['a', 'b', undefined, undefined]);
+  });
+
+  it('sammelt sichtbare Texte mit Zeilen, ohne Importe und Re-Exporte', () => {
+    const text = [
+      "import { x } from 'modul';",
+      "export { y } from 'anderes';",
+      "export * from 'alles';",
+      "export const z = 'Hallo';",
+      'const t = `Kopf ${a} Mitte ${b} Ende`;',
+      'const j = <p title="Titel">Text</p>;',
+    ].join('\n');
+    expect(sichtbareTexte('x.tsx', text)).toEqual([
+      { text: 'Hallo', zeile: 4 },
+      { text: 'Kopf ', zeile: 5 },
+      { text: ' Mitte ', zeile: 5 },
+      { text: ' Ende', zeile: 5 },
+      { text: 'Titel', zeile: 6 },
+      { text: 'Text', zeile: 6 },
+    ]);
+  });
+
+  it('zählt die Zeile eines Template-Teils ab Backtick bzw. schließender Klammer', () => {
+    expect(sichtbareTexte('x.ts', 'const t = `\nA${b}\nC`;')).toEqual([
+      { text: '\nA', zeile: 1 },
+      { text: '\nC', zeile: 2 },
+    ]);
+  });
+
+  it('besucht Template-Teile und Platzhalter verschränkt in Quelltext-Reihenfolge', () => {
+    expect(sichtbareTexte('x.ts', "const t = `A${'b'}C${'d'}E`;").map((t) => t.text)).toEqual([
+      'A',
+      'b',
+      'C',
+      'd',
+      'E',
+    ]);
+  });
+
+  it('zählt die Zeile eines JSX-Texts ab seinem ersten sichtbaren Zeichen', () => {
+    const text = ['const j = (', '  <p>', '    Hallo', '  </p>', ');'].join('\n');
+    expect(sichtbareTexte('x.tsx', text)).toEqual([{ text: '\n    Hallo\n  ', zeile: 3 }]);
   });
 });
