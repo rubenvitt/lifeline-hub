@@ -113,7 +113,7 @@ const ZIEL_NICHT_BESTAETIGT = 'Nicht gespeichert: das neue Ziel ist nicht bestä
 export default function AdapterAnsicht() {
   const { adapterId } = useParams();
   const { benutzer } = useAuth();
-  const istAdmin = benutzer?.system_rolle === 'admin';
+  const isAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -215,8 +215,8 @@ export default function AdapterAnsicht() {
 
   const art = liste.arten.find((x) => x.code === adapter.art);
   const gesperrt = liste.gesperrt_grund ?? null;
-  const darfSchreiben = istAdmin && gesperrt == null;
-  const grund = !istAdmin ? NUR_ADMIN : gesperrt != null ? 'am Hub anbinden' : undefined;
+  const darfSchreiben = isAdmin && gesperrt == null;
+  const grund = !isAdmin ? NUR_ADMIN : gesperrt != null ? 'am Hub anbinden' : undefined;
   const zeit = (w: string) => zeitKurz(w, konv);
   const zustand = adapterZustandAnzeige(adapter);
   // „Art unbekannt“ überdeckt „angehalten“ im Zustand; der Zeitpunkt sagt es trotzdem.
@@ -320,7 +320,7 @@ export default function AdapterAnsicht() {
         </span>
       }
       aktionen={
-        istAdmin && (
+        isAdmin && (
           <Knopfreihe>
             <Button
               disabled={gesperrt != null || art == null}
@@ -351,7 +351,7 @@ export default function AdapterAnsicht() {
       }
       hinweis={
         <SeitenHinweise
-          rechteFehlt={!istAdmin}
+          rechteFehlt={!isAdmin}
           rechteText={NUR_ADMIN}
           fehler={nebenFehler}
           fehlerTitel="Nicht ausgeführt"

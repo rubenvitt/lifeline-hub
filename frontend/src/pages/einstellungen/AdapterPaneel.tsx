@@ -95,7 +95,7 @@ function nebenangaben(a: AdapterAnzeige, zeit: (w: string) => string): string {
  */
 export default function AdapterPaneel() {
   const { benutzer } = useAuth();
-  const istAdmin = benutzer?.system_rolle === 'admin';
+  const isAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -164,7 +164,7 @@ export default function AdapterPaneel() {
       meta={liste.adapter.length}
       koerperPolster
       aktion={
-        istAdmin &&
+        isAdmin &&
         liste.arten.length > 0 && (
           <Button
             icon={<IconPlus />}
