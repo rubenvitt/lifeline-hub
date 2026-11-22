@@ -87,7 +87,7 @@ SQLite wird als mitgelieferte C-Amalgamation **ins Binary kompiliert**
 Entscheidung — reproduzierbarer Build, exakt bekannte Version, kein System-`libsqlite`
 nötig. Sie hat aber eine Betriebsfolge, die man kennen muss:
 
-**Aktuell eingebacken: SQLite 3.51.3**
+**Aktuell eingebacken: SQLite 3.54.1** (`libsqlite3-sys` 0.40, seit 21.11.2026; schließt CVE-2026-119375 / RUSTSEC-2026-0459)
 
 Abfragbar am gebauten Binary — das liest die tatsächlich geladene Bibliothek, nicht
 eine gepflegte Konstante:

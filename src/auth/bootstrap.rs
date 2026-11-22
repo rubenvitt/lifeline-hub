@@ -7,7 +7,6 @@ use crate::personal::{
     PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, PERSONAL_STATUS_STARTPAUSE,
     QUALIFIKATION_EINSCHLUSS_STARTLISTE, QUALIFIKATION_STARTLISTE,
 };
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
 /// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier), jeweils mit dem
@@ -43,7 +42,7 @@ pub struct BootstrapErgebnis {
 /// Erzeugt ein gut lesbares Zufalls-Passwort (Hex, 24 Zeichen).
 fn zufalls_passwort() -> String {
     let mut bytes = [0u8; 12];
-    OsRng.fill_bytes(&mut bytes);
+    getrandom::fill(&mut bytes).expect("Zufallsquelle des Systems");
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 

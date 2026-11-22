@@ -252,10 +252,7 @@ pub(super) fn zwischendatei(
     einsatz_id: i64,
     teil: &str,
 ) -> Result<(Zwischendatei, std::fs::File), AppError> {
-    let zufall: u64 = {
-        use argon2::password_hash::rand_core::{OsRng, RngCore};
-        OsRng.next_u64()
-    };
+    let zufall: u64 = getrandom::u64().expect("Zufallsquelle des Systems");
     Zwischendatei::anlegen(verzeichnis.join(format!(
         "{ZWISCHEN_PRAEFIX}{einsatz_id}-{teil}-{zufall:016x}.sqlite"
     )))

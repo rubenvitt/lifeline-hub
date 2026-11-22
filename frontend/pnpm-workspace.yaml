@@ -204,6 +204,15 @@ overrides:
   # verweisen. Kehrt der Fund zurück (neue Schwelle über postcss' Range), wird der Override
   # mit BEIDEN Grenzen neu gesetzt.
 
+  # KEIN ADVISORY, sondern eine Instanz-Klammer (LLH-1617, 21.11.2026): antd 6.7.1 verlangt
+  # `@ant-design/cssinjs ~2.1.2`, sein `@ant-design/cssinjs-utils` 2.1.2 aber nur `^2.1.2` und
+  # bekam damit 2.2.0. Zwei Kopien nebeneinander teilen keinen Style-Cache: `extractStyle` im
+  # Design-System-Generator (`scripts/design-system/`) fand antds Stile nicht, und 14 Vorschauen
+  # standen ohne antd-CSS da (Wächter `designSystem.guard.test.ts`). Bereich wie bei antd;
+  # entfällt, sobald antd selbst cssinjs 2.2 verlangt (dann `pnpm why @ant-design/cssinjs`
+  # prüfen: genau eine Version).
+  '@ant-design/cssinjs': ~2.1.2
+
 # Advisories OHNE Fix, bewertet nach Regel 3 oben (Muster: .cargo/audit.toml). Hier steht nur,
 # was weder ein Override noch ein Upgrade erreicht; jeder Eintrag sagt, warum kein Upgrade
 # möglich ist, warum das Risiko in DIESEM Code nicht trägt und woran man merkt, dass sich

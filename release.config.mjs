@@ -131,10 +131,12 @@ export default {
     ],
     /*
      * `conventionalcommits` als Preset, dessen Version gepinnt ist: Version 10 setzt
-     * `conventional-changelog-writer@9` voraus, semantic-release 25 bringt aber `@8` mit, und
-     * der Lauf bräche mitten in `generateNotes` („Missing helper"). Deshalb `^9.3.1` in
-     * package.json und eine Major-Sperre in .github/dependabot.yml, bis semantic-release
-     * seinen Writer hebt.
+     * `conventional-changelog-writer@9` voraus, `@semantic-release/release-notes-generator`
+     * 14.1.1 (der konventionelle Generator in `scripts/release/ki-notizen.mjs`) bringt aber `@8`
+     * mit, und der Lauf bräche mitten in `generateNotes` („Missing helper"). semantic-release 26
+     * führt Writer 9 nur in seinem eigenen release-notes-generator 15-beta (Stand 21.11.2026).
+     * Deshalb `^9.3.1` in package.json und eine Major-Sperre in .github/dependabot.yml, bis ein
+     * stabiler release-notes-generator Writer 9 mitbringt.
      */
     /*
      * DIE NOTIZEN SCHREIBT CLAUDE, die konventionellen bleiben Rückfallebene und Quelle der
