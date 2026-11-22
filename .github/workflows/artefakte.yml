@@ -185,6 +185,11 @@ jobs:
         if: runner.os == 'Linux' && !matrix.mingw
         run: cargo build --release -p karten-service --target ${{ matrix.target }}
 
+      # Das Relais betreibt Ruben auf einem Server (LLH-2040): ebenfalls nur Linux-Ziele.
+      - name: push-relais bauen
+        if: runner.os == 'Linux' && !matrix.mingw
+        run: cargo build --release -p push-relais --target ${{ matrix.target }}
+
       - name: Artefakt einsammeln
         env:
           VERSION: ${{ needs.vorbereiten.outputs.version }}
@@ -201,7 +206,10 @@ jobs:
             *)         cp "$ausgabe/lifeline-hub"     "versand/lifeline-hub-$VERSION-$ZIEL" ;;
           esac
           case "$ZIEL" in
-            *linux*) cp "$ausgabe/karten-service" "versand/karten-service-$VERSION-$ZIEL" ;;
+            *linux*)
+              cp "$ausgabe/karten-service" "versand/karten-service-$VERSION-$ZIEL"
+              cp "$ausgabe/push-relais" "versand/push-relais-$VERSION-$ZIEL"
+              ;;
           esac
           # NUR der SBOM-Eintrag der Matrix packt ein Zip, und nur mit geprüftem INHALT:
           # `[ -d … ]` kann nicht rot werden (build-release.sh legt das Verzeichnis selbst an),
@@ -508,6 +516,72 @@ jobs:
           docker run --rm --platform linux/amd64 "$bild" --help > /dev/null
           docker run --rm --platform linux/amd64 --entrypoint sh "$bild" -c 'docker --version && make --version > /dev/null && sqlite3 --version > /dev/null'
 
+  # Drittes Abbild, selbes Muster wie `docker` oben: fertige Binaries, kein Build aus Quelle.
+  # Eigener Job statt eines weiteren Schritts dort, damit ein Fehler hier das Hauptabbild
+  # nicht mitreißt — ohne push-relais läuft lifeline-hub weiter, nur ohne iOS-Push.
+  docker-relais:
+    name: Container-Abbild push-relais
+    needs: [vorbereiten, bauen]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: versand-linux-*
+          merge-multiple: true
+          path: versand
+
+      - name: Kontext für das Abbild bauen
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/linux-amd64 dist/linux-arm64
+          cp "versand/push-relais-$VERSION-x86_64-unknown-linux-gnu" dist/linux-amd64/push-relais
+          cp "versand/push-relais-$VERSION-aarch64-unknown-linux-gnu" dist/linux-arm64/push-relais
+          chmod +x dist/linux-*/push-relais
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Wie beim Hauptabbild: `latest` erst nach der Freigabe.
+      - name: Abbild-Tag bestimmen
+        id: tags
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: echo "tags=ghcr.io/${GITHUB_REPOSITORY,,}-push-relais:$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: push-relais/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          provenance: true
+          sbom: true
+
+      # Wie beim Hauptabbild: startet es?
+      - name: Starttest (amd64)
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          bild="ghcr.io/${GITHUB_REPOSITORY,,}-push-relais:$VERSION"
+          docker run --rm --platform linux/amd64 "$bild" --help > /dev/null
+
   # ── Freigabe (LFH-1054) ───────────────────────────────────────────────────────────
   # Der einzige Weg zu einem veröffentlichten Release. `!cancelled()` plus Einzelprüfung statt
   # der Vorgabe „alle needs grün“, weil `desktop` bei Vorabversionen `skipped` ist. `desktop`
@@ -517,7 +591,7 @@ jobs:
   # da — alles kein Fehler.
   freigeben:
     name: Release freigeben
-    needs: [vorbereiten, bauen, windows-smoke, veroeffentlichen, desktop, docker, docker-karten]
+    needs: [vorbereiten, bauen, windows-smoke, veroeffentlichen, desktop, docker, docker-karten, docker-relais]
     if: >-
       ${{ !cancelled() && inputs.freigeben
       && needs.vorbereiten.result == 'success'
@@ -526,6 +600,7 @@ jobs:
       && needs.veroeffentlichen.result == 'success'
       && needs.docker.result == 'success'
       && needs.docker-karten.result == 'success'
+      && needs.docker-relais.result == 'success'
       && (needs.vorbereiten.outputs.desktop != 'true' || needs.desktop.result == 'success') }}
     runs-on: ubuntu-latest
     # Das erste stabile Release kommentiert die ganze Historie; die Kommentare laufen der Reihe
@@ -634,7 +709,7 @@ jobs:
           set -euo pipefail
           ziel="$TAG"
           while :; do
-            for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
+            for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service" "ghcr.io/${GITHUB_REPOSITORY,,}-push-relais"; do
               ./scripts/wiederholen.sh 3 120 -- \
                 docker buildx imagetools create --tag "$bild:$NAME" "$bild:${ziel#v}"
             done

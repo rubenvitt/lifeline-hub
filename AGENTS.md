@@ -37,6 +37,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Bauen nur auf macOS |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
+| `push-relais/AGENTS.md` | APNs-Relais: keine Inhalte, nie Token/Nutzlast loggen, Wire deutsch und additiv, Sperren nur per Unterbefehl, APNs-Doppel in Tests |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |
 
 - **Vor einer Änderung `scripts/adr-fuer.sh <pfad>…`**: nennt die Architekturentscheidungen
