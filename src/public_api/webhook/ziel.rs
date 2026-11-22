@@ -12,20 +12,22 @@
 //! - Die Clients setzen `.no_proxy()`: Mit einem Proxy aus der Umgebung löste der Resolver nur den
 //!   Proxy auf, und das Ziel bliebe ungeprüft. Weiterleitungen folgen sie nie.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Url;
 
-use super::{WebhookFehler, EVENT_ID_KOPF, VERBINDUNG_ZEITLIMIT, ZEITLIMIT};
+use super::{WebhookFehler, EVENT_ID_KOPF, PIN_LAENGE, VERBINDUNG_ZEITLIMIT, ZEITLIMIT};
 use crate::ausgehend::zieladresse::{klasse, Adressklasse};
 use crate::ausgehend::{client_builder, Zweck};
 use crate::http_begrenzt::{lies_begrenzt, DECKEL_WEBHOOK};
 use crate::instanz::signatur::EVENT_KOPF;
+use crate::instanz::zertifikat::{erfasser_config, tls_config, Erfasser};
 
 /// Ist die Adresse als Ziel erlaubt?
 pub fn is_erlaubt(ip: &IpAddr, lan_erlaubt: bool) -> bool {
@@ -157,27 +159,102 @@ impl Resolve for WebhookResolver {
     }
 }
 
-fn baue_client(lan_erlaubt: bool) -> reqwest::Client {
-    client_builder(Zweck::Webhook)
+/// Der Fingerabdruck am Webhook besteht die Prüfung nicht (LLH-1872, D2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PinFehler;
+
+impl PinFehler {
+    /// Meldung für die Verwaltung (400).
+    pub fn text(self) -> &'static str {
+        "Der Fingerabdruck besteht aus 64 Hex-Zeichen (SHA-256), mit oder ohne Doppelpunkte."
+    }
+}
+
+/// Normalisiert einen eingegebenen Fingerabdruck: Doppelpunkte, Leerzeichen und Bindestriche
+/// fallen weg, Kleinbuchstaben. Leer heißt „kein Fingerabdruck“.
+pub fn normalize_pin(roh: &str) -> Result<Option<String>, PinFehler> {
+    let pin: String = roh
+        .chars()
+        .filter(|c| !matches!(c, ':' | '-') && !c.is_whitespace())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    if pin.is_empty() {
+        return Ok(None);
+    }
+    if pin.len() == PIN_LAENGE && pin.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Ok(Some(pin))
+    } else {
+        Err(PinFehler)
+    }
+}
+
+/// Die einzige Stelle mit den Schutzeinstellungen der Webhooks (ADR-0046); `tls` ersetzt die
+/// Vertrauensanker des Systems (Fingerabdruck oder Erfassung, ADR-0082).
+fn baue_client(lan_erlaubt: bool, tls: Option<rustls::ClientConfig>) -> reqwest::Client {
+    let mut builder = client_builder(Zweck::Webhook)
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .https_only(true)
         .no_gzip()
         .connect_timeout(VERBINDUNG_ZEITLIMIT)
         .timeout(ZEITLIMIT)
-        .dns_resolver(Arc::new(WebhookResolver { lan_erlaubt }))
-        .build()
-        .expect("Webhook-Client baubar")
+        .dns_resolver(Arc::new(WebhookResolver { lan_erlaubt }));
+    if let Some(tls) = tls {
+        builder = builder.tls_backend_preconfigured(tls);
+    }
+    builder.build().expect("Webhook-Client baubar")
 }
 
-/// Der Client für ein Ziel, mit oder ohne LAN-Ausnahme (je ein Prozess-Singleton).
-pub fn client(lan_erlaubt: bool) -> &'static reqwest::Client {
+/// Der Client für ein Ziel, mit oder ohne LAN-Ausnahme und Fingerabdruck. Ohne Fingerabdruck je
+/// ein Prozess-Singleton, mit einer je `(lan_erlaubt, pin)` (Verbindungen bleiben im Pool).
+pub fn client(lan_erlaubt: bool, pin: Option<&str>) -> Result<reqwest::Client, String> {
     static OEFFENTLICH: OnceLock<reqwest::Client> = OnceLock::new();
     static MIT_LAN: OnceLock<reqwest::Client> = OnceLock::new();
-    if lan_erlaubt {
-        MIT_LAN.get_or_init(|| baue_client(true))
-    } else {
-        OEFFENTLICH.get_or_init(|| baue_client(false))
+    static GEPINNT: OnceLock<Mutex<HashMap<(bool, String), reqwest::Client>>> = OnceLock::new();
+    let Some(pin) = pin else {
+        let c = if lan_erlaubt {
+            MIT_LAN.get_or_init(|| baue_client(true, None))
+        } else {
+            OEFFENTLICH.get_or_init(|| baue_client(false, None))
+        };
+        return Ok(c.clone());
+    };
+    let cache = GEPINNT.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut c = cache
+        .lock()
+        .map_err(|_| "Webhook-Client-Cache".to_string())?;
+    let schluessel = (lan_erlaubt, pin.to_string());
+    if let Some(client) = c.get(&schluessel) {
+        return Ok(client.clone());
+    }
+    let neu = baue_client(lan_erlaubt, Some(tls_config(Some(pin.to_string()))?));
+    // Klein halten: ein Wechsel lässt den alten Eintrag zurück.
+    if c.len() >= 64 {
+        c.clear();
+    }
+    c.insert(schluessel, neu.clone());
+    Ok(neu)
+}
+
+/// Liest den Fingerabdruck des Zertifikats, das ein Ziel zeigt (LLH-1872, D4). Die URL besteht
+/// vorher [`check_url`], der Client hat alle Schutzeinstellungen, und der [`Erfasser`] bricht den
+/// Handshake ab, sobald er das Zertifikat gelesen hat: es geht nie eine HTTP-Anfrage hinaus.
+pub async fn hole_fingerabdruck(url: &str, lan_erlaubt: bool) -> Result<String, WebhookFehler> {
+    let url = match check_url(url, lan_erlaubt) {
+        Ok(url) => url,
+        Err(ZielFehler::Intern) => return Err(WebhookFehler::ZielIntern),
+        Err(_) => return Err(WebhookFehler::ZielUngueltig),
+    };
+    let erfasser = Arc::new(Erfasser::new());
+    let tls = erfasser_config(erfasser.clone()).map_err(|_| WebhookFehler::Tls)?;
+    let ergebnis = baue_client(lan_erlaubt, Some(tls)).post(url).send().await;
+    if let Some(fp) = erfasser.gesehen() {
+        return Ok(fp);
+    }
+    match ergebnis {
+        Err(e) => Err(fehler_art(&e)),
+        // Ohne Zertifikat kann keine Antwort kommen; zur Sicherheit als TLS-Fehler.
+        Ok(_) => Err(WebhookFehler::Tls),
     }
 }
 
@@ -191,6 +268,8 @@ pub struct Zustellung {
     /// Nummer des Ereignisses; `None` beim Testereignis.
     pub ereignis_id: Option<i64>,
     pub body: Vec<u8>,
+    /// Fingerabdruck des Zielzertifikats; gesetzt zählt nur dieses Zertifikat (LLH-1872).
+    pub zertifikat_pin: Option<String>,
 }
 
 /// Ausgang eines Versuchs.
@@ -228,7 +307,10 @@ impl Zusteller for HttpZusteller {
             Err(ZielFehler::Intern) => return fehlschlag(None, WebhookFehler::ZielIntern, 0),
             Err(_) => return fehlschlag(None, WebhookFehler::ZielUngueltig, 0),
         };
-        let mut anfrage = client(z.lan_erlaubt)
+        let Ok(client) = client(z.lan_erlaubt, z.zertifikat_pin.as_deref()) else {
+            return fehlschlag(None, WebhookFehler::ZielUngueltig, 0);
+        };
+        let mut anfrage = client
             .post(url)
             .header(CONTENT_TYPE, "application/json")
             .header(EVENT_KOPF, z.signatur);
@@ -266,6 +348,22 @@ fn fehlschlag(status: Option<u16>, fehler: WebhookFehler, dauer_ms: i64) -> Erge
     }
 }
 
+/// Ob in einem `io::Error` (auch mehrfach verschachtelt, wie hyper ihn beim Verbindungsaufbau
+/// liefert) ein Fehler von rustls steckt. Der Fehler des pinnenden Verifiers kommt so an
+/// (LLH-1872).
+fn is_rustls_in_io(io: &std::io::Error) -> bool {
+    let mut inner = io.get_ref();
+    while let Some(i) = inner {
+        if i.downcast_ref::<rustls::Error>().is_some() {
+            return true;
+        }
+        inner = i
+            .downcast_ref::<std::io::Error>()
+            .and_then(std::io::Error::get_ref);
+    }
+    false
+}
+
 /// Ordnet einen Fehler von reqwest ein, über seine Ursachenkette.
 pub fn fehler_art(e: &reqwest::Error) -> WebhookFehler {
     if e.is_timeout() {
@@ -280,10 +378,7 @@ pub fn fehler_art(e: &reqwest::Error) -> WebhookFehler {
             return WebhookFehler::Tls;
         }
         if let Some(io) = q.downcast_ref::<std::io::Error>() {
-            if io
-                .get_ref()
-                .is_some_and(|inner| inner.downcast_ref::<rustls::Error>().is_some())
-            {
+            if is_rustls_in_io(io) {
                 return WebhookFehler::Tls;
             }
         }
@@ -410,12 +505,14 @@ mod tests {
             signatur: "x".into(),
             ereignis_id: Some(1),
             body: b"{}".to_vec(),
+            zertifikat_pin: None,
         };
         let e = HttpZusteller.senden(z).await;
         assert_eq!(e.fehler, Some(WebhookFehler::ZielIntern));
 
         // Über den Namen: die Vorprüfung ist umgangen, der Resolver im Client fängt es.
-        let fehler = client(true)
+        let fehler = client(true, None)
+            .unwrap()
             .post(format!("https://localhost:{port}/hook"))
             .send()
             .await
@@ -428,3 +525,7 @@ mod tests {
         assert!(angenommen.is_err(), "keine Verbindung erwartet");
     }
 }
+
+#[cfg(test)]
+#[path = "ziel_tls_tests.rs"]
+mod tls_tests;

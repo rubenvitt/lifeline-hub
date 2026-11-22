@@ -234,6 +234,7 @@ async fn beliefern<Z: Zusteller>(
                         signatur,
                         ereignis_id: Some(ereignis.id),
                         body,
+                        zertifikat_pin: None,
                     })
                     .await;
                 // Festgehalten wird mit der Zeit nach dem Versuch.
@@ -319,6 +320,7 @@ pub async fn testereignis<Z: Zusteller>(
             signatur,
             ereignis_id: None,
             body,
+            zertifikat_pin: None,
         })
         .await;
     crate::write_retry!(pool, |conn| {

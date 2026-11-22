@@ -277,4 +277,4 @@ pub fn is_zertifikat_fehler(e: &reqwest::Error) -> bool {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
