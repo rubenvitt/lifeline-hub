@@ -271,6 +271,46 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     expect(await within(neu).findByText('Erinnerung fällig: Pegel prüfen')).toBeInTheDocument();
   });
 
+  it('Neu: Nachforderung und Gefahr nennen ihren Gegenstand (LLH-1909)', async () => {
+    serverMit({
+      eintraege: [
+        eintrag(9, {
+          art: 'nachforderung_status',
+          bezug_typ: 'nachforderung_zugesagt',
+          bezug_id: 3,
+          titel: 'Nachforderung zugesagt',
+          detail: '2× an Leitstelle',
+        }),
+        eintrag(10, {
+          art: 'gefahr',
+          bezug_typ: 'gefahrengebiet',
+          bezug_id: 9,
+          titel: 'Neue Gefahr',
+          detail: undefined,
+        }),
+      ],
+      ungelesen: 2,
+    });
+    server.use(
+      http.get('/api/einsaetze/:id/nachforderungen', () =>
+        HttpResponse.json([{ id: 3, anzahl: 2, art: 'RTW', bezeichnung: 'Transport aus der UHS' }]),
+      ),
+      http.get('/api/einsaetze/:id/zonen', () =>
+        HttpResponse.json([{ id: 2, gefahrengebiet_id: 9, label: 'Gasaustritt Halle 3' }]),
+      ),
+    );
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: /^Eingänge, 2 ungelesen/ }));
+    const neu = within(await screen.findByRole('region', { name: 'Eingänge' })).getByRole('list', {
+      name: 'Neu',
+    });
+    expect(
+      await within(neu).findByText('Nachforderung zugesagt: RTW — Transport aus der UHS'),
+    ).toBeInTheDocument();
+    expect(within(neu).getByText('2× an Leitstelle')).toBeInTheDocument();
+    expect(await within(neu).findByText('Neue Gefahr: Gasaustritt Halle 3')).toBeInTheDocument();
+  });
+
   it('ein Eintrag springt zum Objekt und quittiert ihn', async () => {
     const zaehler = serverMit({ eintraege: [eintrag(5)], ungelesen: 1 });
     rendern();

@@ -37,8 +37,7 @@ import {
   quittiert,
   vergissAusgeblendet,
 } from './benachrichtigungGedaechtnis';
-import { ladeErinnerungTitel } from './erinnerungInhalt';
-import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
+import { ladeHinweisInhalt, titelMit, type HinweisInhalt } from './hinweisInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 import { markVerlaufQuittiert } from './useBenachrichtigungVerlauf';
 import {
@@ -146,24 +145,13 @@ function ersatzAnzeige(e: BenachrichtigungEreignis): BenachrichtigungAnzeige {
 }
 
 /**
- * Der Titel einer fälligen Erinnerung (LLH-1737, `erinnerungInhalt.ts`) hinter dem Titel des
- * Servers: „Erinnerung fällig: Pegel prüfen“. Ohne Titel bleibt der Text des Servers.
- */
-function mitErinnerungTitel(
-  a: BenachrichtigungAnzeige,
-  titel: string | null,
-): BenachrichtigungAnzeige {
-  return titel ? { ...a, titel: `${a.titel}: ${titel}` } : a;
-}
-
-/**
- * Der Eintrag einer Benachrichtigung in der Alarmzone. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
- * Detailzeile des Servers durch Absender und Wortlautanfang der Meldung; was fehlt, bleibt beim
- * Server.
+ * Der Eintrag einer Benachrichtigung in der Alarmzone. `inhalt` (`hinweisInhalt.ts`: Meldung
+ * LLH-1052, Erinnerung LLH-1737, weitere Arten LLH-1909) ergänzt oder ersetzt Titel und
+ * Detailzeile des Servers; was fehlt, bleibt beim Server.
  */
 function eintragVon(
   a: BenachrichtigungAnzeige,
-  opts: { uhrzeit: string | null; desktop: boolean; inhalt?: MeldungInhalt | null },
+  opts: { uhrzeit: string | null; desktop: boolean; inhalt?: HinweisInhalt | null },
 ): AlarmToastEintrag {
   const schluessel = toastSchluessel({ ...a, benachrichtigung_id: a.id });
   const anfang = opts.inhalt?.anfang ?? null;
@@ -171,7 +159,7 @@ function eintragVon(
   return {
     schluessel,
     art: a.stufe === 'alarm' ? 'warning' : 'info',
-    titel: opts.inhalt?.titel ?? a.titel,
+    titel: titelMit(a.titel, opts.inhalt),
     beschreibung,
     beschreibungVoll: anfang ? (opts.inhalt?.wortlaut ?? undefined) : undefined,
     pfad: a.pfad,
@@ -194,11 +182,11 @@ function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean
 
 /**
  * Der Eintrag im Eingangshinweis: bei einer Meldung Absender und Wortlaut aus der Meldung, sonst
- * Titel und Detailzeile des Servers.
+ * Titel und Detailzeile des Servers mit dem Inhalt (`hinweisInhalt.ts`).
  */
 function eingangVon(
   a: BenachrichtigungAnzeige,
-  opts: { uhrzeit: string | null; inhalt: MeldungInhalt | null },
+  opts: { uhrzeit: string | null; inhalt: HinweisInhalt | null },
 ): EingangEintrag {
   const inhalt = opts.inhalt;
   const meldung = a.art === 'meldung';
@@ -210,8 +198,8 @@ function eingangVon(
     bezug: a.bezug_typ,
     bezugId: a.bezug_id,
     ziel: zielVon(a),
-    titel: inhalt?.titel ?? a.titel,
-    zeile: meldung ? (inhalt?.absender ?? a.detail ?? a.titel) : a.titel,
+    titel: titelMit(a.titel, inhalt),
+    zeile: meldung ? (inhalt?.absender ?? a.detail ?? a.titel) : titelMit(a.titel, inhalt),
     anfang: inhalt?.anfang ?? (meldung ? undefined : (a.detail ?? undefined)),
     wortlaut: inhalt?.wortlaut ?? undefined,
     uhrzeit: opts.uhrzeit ?? undefined,
@@ -248,7 +236,7 @@ export function useBenachrichtigungen(
   konvRef.current = useAnzeigeKonventionen().konventionen;
   const benutzerIdRef = useRef<number | undefined>(undefined);
   benutzerIdRef.current = useAuthOptional()?.benutzer?.id;
-  // Für den Titel einer Erinnerung aus dem Cache (LLH-1737); optional wie in den Tests.
+  // Für Inhalte aus dem Cache (LLH-1737, LLH-1909); optional wie in den Tests.
   const qcRef = useRef<QueryClient | undefined>(undefined);
   qcRef.current = useContext(QueryClientContext);
 
@@ -288,21 +276,26 @@ export function useBenachrichtigungen(
       }
       if (!unbekannt(id)) return;
       inArbeit.add(id);
-      // Der Inhalt der Meldung (LLH-1052) und der Titel einer Erinnerung (LLH-1737) kommen
-      // parallel und mit eigener Frist; sie werfen nie.
-      const inhaltZusage = ladeMeldungInhalt(e);
-      const erinnerungZusage = ladeErinnerungTitel(e, qcRef.current);
+      // Text und Inhalt (`hinweisInhalt.ts`) kommen parallel, der Inhalt mit eigener Frist; er
+      // wirft nie. Quittung und Erwähnung brauchen den Sprungpfad aus dem Text.
+      const anzeigeZusage = ladeBenachrichtigung(id);
+      const inhaltZusage = ladeHinweisInhalt(e, {
+        pfad: anzeigeZusage.then(
+          (a) => a.pfad,
+          () => null,
+        ),
+        qc: qcRef.current,
+      });
       let anzeige: BenachrichtigungAnzeige;
-      let inhalt: MeldungInhalt | null;
+      let inhalt: HinweisInhalt | null;
       try {
         try {
-          anzeige = await ladeBenachrichtigung(id);
+          anzeige = await anzeigeZusage;
         } catch (fehler) {
           if (fehler instanceof ApiError && fehler.status < 500) return;
           anzeige = ersatzAnzeige(e);
         }
         inhalt = await inhaltZusage;
-        anzeige = mitErinnerungTitel(anzeige, await erinnerungZusage);
       } finally {
         inArbeit.delete(id);
       }
@@ -348,17 +341,15 @@ export function useBenachrichtigungen(
           const offen = [...liste]
             .reverse()
             .filter((a) => !a.quittiert_at && passt(a, einsatzId) && unbekannt(a.id));
-          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm. Die
-          // Titel der Erinnerungen (LLH-1737) teilen sich über den Cache einen Abruf.
-          const [inhalte, erinnerungTitel] = await Promise.all([
-            Promise.all(offen.map((a) => ladeMeldungInhalt(a))),
-            Promise.all(offen.map((a) => ladeErinnerungTitel(a, qcRef.current))),
-          ]);
+          // Die Inhalte zusammen holen, je mit Frist: ein Abruf je offenem Hinweis. Listen
+          // (Erinnerungen, Nachforderungen, Zonen) teilen sich über den Cache einen Abruf.
+          const inhalte = await Promise.all(
+            offen.map((a) => ladeHinweisInhalt(a, { pfad: a.pfad, qc: qcRef.current })),
+          );
           if (!aktiv) return;
           let ton = false;
           let eingangNeu = false;
-          for (const [i, roh] of offen.entries()) {
-            const a = mitErinnerungTitel(roh, erinnerungTitel[i]);
+          for (const [i, a] of offen.entries()) {
             // Während der Inhalte kann sie live gekommen oder quittiert worden sein.
             if (!unbekannt(a.id)) continue;
             const wiederholt = gezeigt.has(a.id);
