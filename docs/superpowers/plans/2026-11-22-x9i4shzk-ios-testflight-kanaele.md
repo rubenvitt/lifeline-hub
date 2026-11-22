@@ -6,7 +6,7 @@
 
 **Architecture:** `testflight.sh` nimmt Alpha an und meldet die Build-Nummer; neues Node-Skript
 `testflight-verteilen.mjs` spricht die App-Store-Connect-API; `ios.yml` bekommt einen Ubuntu-Job
-`verteilen`, `artefakte.yml` startet `ios.yml` für jeden Kanal. Regel in ADR-0078.
+`verteilen`, `artefakte.yml` startet `ios.yml` für jeden Kanal. Regel in ADR-0080.
 
 **Tech Stack:** Bash, Node (aus `mise.toml`, `node:test`), GitHub Actions.
 
@@ -76,9 +76,9 @@ Ausführung: `executing-plans` im Main-Loop (vier kleine, aufeinander aufbauende
 
 ### Task 4: Regel und Doku
 
-**Files:** Create `docs/architektur/entscheidungen/ADR-0078-…md`; Modify `docs/betrieb/ios-app.md`, `docs/anwender/kapitel/einsatztagebuch.md`, `docs/anwender/kapitel/einsatz-oberflaeche.md`
+**Files:** Create `docs/architektur/entscheidungen/ADR-0080-…md`; Modify `docs/betrieb/ios-app.md`, `docs/anwender/kapitel/einsatztagebuch.md`, `docs/anwender/kapitel/einsatz-oberflaeche.md`
 
-- [x] ADR-0078 nach `VORLAGE.md` mit Prüfung (`verlange` Alpha im Muster von `testflight.sh`, `verbiete` Kanal-Einschränkung im Job `ios`).
+- [x] ADR-0080 nach `VORLAGE.md` mit Prüfung (`verlange` Alpha im Muster von `testflight.sh`, `verbiete` Kanal-Einschränkung im Job `ios`).
 - [x] Betriebsdoku: „Welche Stände kommen an“, Gruppen, Verteilung, Übergaben (Tester einladen, Testinformationen), Release-Ablauf.
 - [x] Haptik in den beiden Anwenderkapiteln, nur Ist-Stand (iPhone-App, Schalter „Haptik“).
 - [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.

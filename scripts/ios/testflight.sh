@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # iOS-App archivieren, signieren und zu TestFlight hochladen (LLH-1978, design.md D9; seit LLH-1988
-# jeder Kanal, ADR-0078). Läuft nur auf macOS mit Xcode; aufgerufen von `.github/workflows/ios.yml`,
+# jeder Kanal, ADR-0080). Läuft nur auf macOS mit Xcode; aufgerufen von `.github/workflows/ios.yml`,
 # auf einem Mac genauso. An die TestFlight-Gruppen verteilt danach testflight-verteilen.mjs.
 #
 #   scripts/ios/testflight.sh --tag <vX.Y.Z | vX.Y.Z-beta.N | vX.Y.Z-alpha.N> [--ausgabe <verzeichnis>]
@@ -43,7 +43,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$TAG" ] || fehler "--tag fehlt."
-# Nur die drei Release-Kanäle (ADR-0078); ein anderer Vorabkanal wie `-rc.1` gehört in keinen.
+# Nur die drei Release-Kanäle (ADR-0080); ein anderer Vorabkanal wie `-rc.1` gehört in keinen.
 # Erst gegen das Muster prüfen, dann verwenden: bei einem Handstart ist der Tag freie Eingabe.
 if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
   fehler "'$TAG' gehört in keinen TestFlight-Kanal: hochgeladen werden nur Tags der Kanäle alpha (vX.Y.Z-alpha.N), beta (vX.Y.Z-beta.N) und main (vX.Y.Z)."

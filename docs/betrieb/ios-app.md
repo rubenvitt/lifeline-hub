@@ -28,7 +28,7 @@ iOS bzw. iPadOS 17.4.
    Updates“ lässt sich dort je App einschalten. Ein Build läuft in TestFlight nach 90 Tagen ab.
 
 **Welche Stände kommen an** (LLH-1988,
-[ADR-0078](../architektur/entscheidungen/ADR-0078-jeder-freigegebene-tag-geht-zu-testflight-und-alpha-nur-an-die-interne-gruppe.md)):
+[ADR-0080](../architektur/entscheidungen/ADR-0080-jeder-freigegebene-tag-geht-zu-testflight-und-alpha-nur-an-die-interne-gruppe.md)):
 
 | Kanal | Tag | Gruppen |
 |---|---|---|

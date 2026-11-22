@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/ios/testflight.sh (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0078).
+# Selbsttest für scripts/ios/testflight.sh (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0080).
 #
 # Ein Fehler fiele erst an einem echten Release auf: ein fremder Vorabkanal in TestFlight, ein Build mit
 # einer anderen Version als der Tag, ein API-Schlüssel, der im Log steht oder auf dem Runner liegen
@@ -127,7 +127,7 @@ w="$(wurzel_mit 1.2.0)"
 pruefe "stabil: Exit 0" 0 "$(laufe "$w" --tag v1.2.0 --ausgabe "$w/aus")"
 pruefe "stabil: hochgeladen" 1 "$(aufrufe_mit '^xcodebuild -exportArchive')"
 
-echo "==> ios/testflight.sh: Alpha-Tag (LLH-1988, ADR-0078)"
+echo "==> ios/testflight.sh: Alpha-Tag (LLH-1988, ADR-0080)"
 w="$(wurzel_mit 1.0.0-alpha.200)"
 pruefe "Alpha: Exit 0" 0 "$(laufe "$w" --tag v1.0.0-alpha.200 --ausgabe "$w/aus")"
 pruefe "Alpha: hochgeladen" 1 "$(aufrufe_mit '^xcodebuild -exportArchive')"

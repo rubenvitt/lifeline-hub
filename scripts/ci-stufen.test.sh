@@ -258,7 +258,7 @@ ios_if="$(job_if "$ART" ios)"
 for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'"; do
   pruefe "artefakte.yml: ios nur wenn $teil" enthaelt "$ios_if" "$teil"
 done
-# Seit LLH-1988 (ADR-0078) jeder Kanal: welche Gruppe ein Kanal bekommt, entscheidet erst
+# Seit LLH-1988 (ADR-0080) jeder Kanal: welche Gruppe ein Kanal bekommt, entscheidet erst
 # testflight-verteilen.mjs, nicht die Bedingung des Jobs.
 pruefe "artefakte.yml: ios für jeden Kanal" fehlt "$ios_if" "needs.vorbereiten.outputs.vorab"
 pruefe "ios.yml: verteilen nach dem Upload" enthaelt "$(job "$IOSREL" verteilen)" "needs: testflight"

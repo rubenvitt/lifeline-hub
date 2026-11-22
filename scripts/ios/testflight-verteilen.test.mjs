@@ -1,5 +1,5 @@
 /**
- * Selbsttest der TestFlight-Verteilung (`testflight-verteilen.mjs`, LLH-1988, ADR-0078) — läuft in
+ * Selbsttest der TestFlight-Verteilung (`testflight-verteilen.mjs`, LLH-1988, ADR-0080) — läuft in
  * Schritt 8 des Gates. Gegen eine nachgebaute App-Store-Connect-API, ohne Netz. Ein Alpha-Build bei
  * externen Testern, eine doppelte Beta-Prüfung oder ein Tippfehler im Gruppennamen fielen sonst
  * erst nach einer halben Stunde Warten am echten Release auf.

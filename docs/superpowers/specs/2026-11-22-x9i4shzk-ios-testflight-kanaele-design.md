@@ -83,7 +83,7 @@ mit dem nächsten Alpha-Tag nach dem Merge. Das ist Punkt 1 von LLH-1988.
     Minute sind schon dokumentiert („eine Minute später neu starten“).
 - `.github/workflows/artefakte.yml`, Job `ios`: die Bedingung auf Beta/Stabil entfällt, jeder
   freigegebene Tag startet `ios.yml`. Weiterhin in keinem `needs` vor `freigeben`.
-- Regel: neue ADR-0078 („Jeder freigegebene Tag geht zu TestFlight; die CI verteilt je Kanal,
+- Regel: neue ADR-0080 („Jeder freigegebene Tag geht zu TestFlight; die CI verteilt je Kanal,
   Alpha nur intern“), gilt für `scripts/ios/**` und `.github/workflows/ios.yml`. Sie löst die
   Alpha-Zeile der eingefrorenen Spec `ios-auslieferung` ab. Die Spec selbst bleibt unverändert.
 - Doku: `docs/betrieb/ios-app.md` (welche Stände ankommen, Gruppen, Release-Ablauf, Übergaben).

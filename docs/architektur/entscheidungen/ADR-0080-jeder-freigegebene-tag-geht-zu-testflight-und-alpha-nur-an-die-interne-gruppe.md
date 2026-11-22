@@ -1,5 +1,5 @@
 ---
-id: ADR-0078
+id: ADR-0080
 titel: Jeder freigegebene Tag geht zu TestFlight, und die CI verteilt je Kanal, Alpha nur an die interne Gruppe
 status: akzeptiert
 datum: 2026-11-22
@@ -12,7 +12,7 @@ herleitung:
   - LLH-1988 (mit Ruben am 22.11.2026 abgestimmt)
 ---
 
-# ADR-0078: Jeder freigegebene Tag geht zu TestFlight, und die CI verteilt je Kanal, Alpha nur an die interne Gruppe
+# ADR-0080: Jeder freigegebene Tag geht zu TestFlight, und die CI verteilt je Kanal, Alpha nur an die interne Gruppe
 
 ## Regeln
 

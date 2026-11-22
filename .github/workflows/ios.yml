@@ -1,4 +1,4 @@
-# iOS-App zu TestFlight (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0078): den Tag auschecken, das
+# iOS-App zu TestFlight (LLH-1978; seit LLH-1988 jeder Kanal, ADR-0080): den Tag auschecken, das
 # Projekt erzeugen, archivieren, automatisch signieren und hochladen (Job `testflight`, Ablauf in
 # `scripts/ios/testflight.sh`, auf einem Mac genauso; XcodeGen gepinnt in
 # `scripts/ios/xcodegen-installieren.sh`). Danach hängt der Job `verteilen` den Build an die Gruppen
@@ -102,7 +102,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # An die Gruppen des Kanals (LLH-1988, ADR-0078). Wartet auf Apples Verarbeitung (oft 5–15
+  # An die Gruppen des Kanals (LLH-1988, ADR-0080). Wartet auf Apples Verarbeitung (oft 5–15
   # Minuten), deshalb auf Ubuntu statt auf dem teuren macOS-Runner. Rot heißt: der Build liegt in
   # TestFlight, ist aber nicht (vollständig) verteilt; nachholen per Handstart oder in App Store
   # Connect. Hält wie der Upload nichts auf.

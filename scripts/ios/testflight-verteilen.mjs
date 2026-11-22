@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Verteilt einen hochgeladenen Build der iOS-App an die TestFlight-Gruppen seines Kanals
- * (LLH-1988, ADR-0078). Übernommen aus Vault Cockpit (`ios/scripts/testflight-distribute.js`).
+ * (LLH-1988, ADR-0080). Übernommen aus Vault Cockpit (`ios/scripts/testflight-distribute.js`).
  *
  *   TAG=v1.0.0-alpha.196 BUILD_NUMMER=202611221005 ASC_KEY_PATH=… node scripts/ios/testflight-verteilen.mjs
  *

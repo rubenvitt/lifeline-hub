@@ -6,7 +6,7 @@
 # (LLH-1280, LLH-1545, Job `desktop-kanal`). Bei stabilen Tags entsteht die Hülle vor der
 # Freigabe und hält sie bei rotem Bau auf, bei Vorab-Tags (Alpha, Beta) erst danach, ohne
 # Release oder Deployment aufzuhalten. Die iOS-App (LLH-1978, ios.yml) geht nach der Freigabe jedes
-# Tags zu TestFlight, verteilt je Kanal (LLH-1988, ADR-0078) und ebenfalls ohne aufzuhalten (Job `ios`).
+# Tags zu TestFlight, verteilt je Kanal (LLH-1988, ADR-0080) und ebenfalls ohne aufzuhalten (Job `ios`).
 #
 # EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
 # und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
@@ -355,7 +355,7 @@ jobs:
 
   # ── iOS-App (LLH-1978, Upload in ios.yml) ────────────────────────────────────────────
   # Nach der Freigabe zu TestFlight, für jeden Kanal; ios.yml verteilt Alpha nur an die interne
-  # Gruppe, Beta und stabil auch extern (LLH-1988, ADR-0078). Wie `desktop-alpha` hängt der Job
+  # Gruppe, Beta und stabil auch extern (LLH-1988, ADR-0080). Wie `desktop-alpha` hängt der Job
   # an `freigeben` und steht in keinem `needs` davor: ein roter Upload oder eine Störung bei Apple hält weder Release
   # noch Deployment auf, es fehlt nur der TestFlight-Build dieses Tags. Nur aus release.yml
   # (`freigeben`); ein Nachbau startet `ios.yml` per Hand.
