@@ -108,11 +108,12 @@ export function fensterOptionen<T, C>(adapter: CursorAdapter<T, C>, seitengroess
  * vorn, oder `null`, wenn nichts umzuschreiben ist. Das nächste Neuladen holt dann die neuesten
  * Einträge und rechnet die Folgeseiten aus ihnen neu (TanStack: `getNextPageParam`), ohne Doppelte.
  */
-export function kopfAngenommen<T, C>(
-  daten: InfiniteData<T[], FensterParam<C>> | undefined,
+export function kopfAngenommen<T>(
+  daten: InfiniteData<T[], unknown> | undefined,
   seitengroesse: number,
-): InfiniteData<T[], FensterParam<C>> | null {
-  const param = daten?.pageParams[0];
+): InfiniteData<T[], unknown> | null {
+  // `useInfiniteQuery` tippt die Parameter als `unknown`; hier stehen nur `FensterParam`e.
+  const param = daten?.pageParams[0] as FensterParam<unknown>;
   const erste = daten?.pages[0];
   if (daten == null || erste == null || param == null || !('neuer' in param)) return null;
   if (erste.length >= seitenLimit(seitengroesse, param)) return null;
@@ -120,9 +121,9 @@ export function kopfAngenommen<T, C>(
 }
 
 /** Schreibt {@link kopfAngenommen} in den Cache, sobald die Daten es verlangen. */
-export function useKopfAnnehmen<T, C>(
+export function useKopfAnnehmen<T>(
   schluessel: QueryKey,
-  daten: InfiniteData<T[], FensterParam<C>> | undefined,
+  daten: InfiniteData<T[], unknown> | undefined,
   seitengroesse: number,
 ) {
   const qc = useQueryClient();

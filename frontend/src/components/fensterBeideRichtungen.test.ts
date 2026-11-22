@@ -119,7 +119,7 @@ describe('Seitenfenster in beide Richtungen', () => {
   it('eine nicht volle `neuer`-Seite vorn wird zum Kopf (Parameter `undefined`)', () => {
     const daten = {
       pages: [nachrichten(10, 3), nachrichten(7, 3)],
-      pageParams: [{ neuer: 7 }, { aelter: 8 }] as const,
+      pageParams: [{ neuer: 7 }, { aelter: 8 }],
     };
     expect(kopfAngenommen(daten, GROESSE)).toEqual({
       pages: daten.pages,
