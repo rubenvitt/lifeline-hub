@@ -22,6 +22,8 @@ export interface GeheimfeldProps {
    */
   onSetzen: (wert: string) => Promise<void>;
   onEntfernen: () => Promise<void>;
+  /** Mit offenem Feld beginnen (Vorschau im Design System); sonst öffnet erst „Setzen“. */
+  startOffen?: boolean;
 }
 
 /**
@@ -41,10 +43,11 @@ export default function Geheimfeld({
   maxLaenge,
   onSetzen,
   onEntfernen,
+  startOffen = false,
 }: GeheimfeldProps) {
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
-  const [offen, setOffen] = useState(false);
+  const [offen, setOffen] = useState(startOffen);
   const [wert, setWert] = useState('');
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<unknown>(null);

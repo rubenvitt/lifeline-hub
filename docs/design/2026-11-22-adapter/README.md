@@ -27,8 +27,10 @@ mit Divera (LLH-1193).
 - **Ersetzen öffnet das Passwortfeld in der Zeile**, nicht in einem Dialog: der Platz bleibt
   sichtbar, wofür der Wert ist. Speichern leert das Feld sofort, auch bei einem Fehler; der Wert
   steht nie im Query-Cache.
-- **Entfernen liegt hinter ⋯** mit roter Rückfrage; die Rückfrage nennt die Folge für einen
-  Pflichtplatz (Adapter hält beim nächsten Abruf an).
+- **„Entfernen …“ steht neben „Ersetzen“** mit roter Rückfrage (`Popconfirm`, Bausteinwahl
+  „Unumkehrbares“; in der Umsetzung statt des ⋯ der Zeichenfläche, weil die Zeile kein
+  Zeilenmenü hat); die Rückfrage nennt die Folge für einen Pflichtplatz (Adapter hält beim
+  nächsten Abruf an).
 - **„Passt nicht“ je Platz:** ein Geheimnis, das mit einem anderen Schlüssel des Servers gesetzt
   wurde, steht als „unlesbar … Neu setzen“ in der Zeile. Fehlt der Schlüssel ganz, steht der
   Hinweis einmal über dem Paneel, und die Knöpfe sind gesperrt.
