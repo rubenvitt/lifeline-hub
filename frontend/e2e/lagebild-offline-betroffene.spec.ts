@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { anmeldenPerApi } from './anmelde-kern';
+import { navigateInApp } from './navigation-kern';
 
 // Betroffene ohne Freitexte auf dem Gerät (LFH-1095, Bedrohungsmodell 5 a).
 //
@@ -65,14 +66,6 @@ async function serviceWorkerZustaendig(page: Page) {
       { timeout: 30_000, message: 'Service Worker wird nie aktiv/zuständig' },
     )
     .toBe('aktiv und zuständig');
-}
-
-/** Navigation innerhalb der App, ohne Dokument-Abruf (die Drosselung soll durchlaufen). */
-async function innerhalbNavigieren(page: Page, pfad: string) {
-  await page.evaluate((ziel) => {
-    window.history.pushState({}, '', ziel);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }, pfad);
 }
 
 /** Der vorgehaltene Stand, roh als JSON-Text (leer = kein Datensatz). */
@@ -139,7 +132,8 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     await expect(page.getByText(NAME).first()).toBeVisible();
     await expect(page.getByText(FREITEXTE.zustand).first()).toBeVisible();
     await expect(page.getByText(`UHS ${UHS}`).first()).toBeVisible();
-    await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/unfallhilfsstellen/liste`);
+    // Ohne Dokument-Abruf: die Drosselung soll durchlaufen.
+    await navigateInApp(page, `/einsaetze/${einsatzId}/unfallhilfsstellen/liste`);
     await expect(page.getByText(UHS).first()).toBeVisible();
 
     // (2) Die Platte, roh: Personen und UHS liegen dort, kein Freitext und keine Koordinate.

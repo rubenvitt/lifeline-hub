@@ -3,6 +3,7 @@ import { etbVonSetzen } from './etb-kern';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { anmeldenPerApi } from './anmelde-kern';
+import { navigateInApp } from './navigation-kern';
 import { abmeldenUeberMenue } from './menue-kern';
 
 // Lagebild ohne Netz lesen (LFH-723, design.md D10).
@@ -67,14 +68,6 @@ async function serviceWorkerZustaendig(page: Page) {
       { timeout: 30_000, message: 'Service Worker wird nie aktiv/zuständig' },
     )
     .toBe('aktiv und zuständig');
-}
-
-/** Navigation innerhalb der App (Data Router hört auf `popstate`), ohne Dokument-Abruf. */
-async function innerhalbNavigieren(page: Page, pfad: string) {
-  await page.evaluate((ziel) => {
-    window.history.pushState({}, '', ziel);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }, pfad);
 }
 
 /** Die ersten Elemente der Query-Keys im vorgehaltenen Stand (leer = kein Datensatz). */
@@ -202,7 +195,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     const standOnline = new Map<string, string>();
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     for (const route of ROUTEN) {
-      await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/${route.modul}`);
+      await navigateInApp(page, `/einsaetze/${einsatzId}/${route.modul}`);
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
       if (route.inhalt) await expect(page.getByText(route.inhalt).first()).toBeVisible();
       else await expect(kopf).toContainText('1 verortet');

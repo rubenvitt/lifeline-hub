@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 import { benutzermenueAusloeser } from './menue-kern';
+import { navigateInApp } from './navigation-kern';
 
 /**
  * Orientierung (LFH-954, Spec `seiten-orientierung`): Tab-Titel, Ortspfad, Einsatzstatus und
@@ -45,8 +46,16 @@ test.describe('Orientierung (LFH-954)', () => {
     await anmeldenAlsAdmin(page);
     const name = `Orientierung ${Date.now()}`;
     const id = await einsatzAnlegen(page, name);
+    // Nur das erste Modul lädt die App, danach wechselt der Fall im Router wie das Menü
+    // (LLH-1914): 34 volle Ladungen des unbündelten Dev-Servers (je rund 600 Module) endeten
+    // unter Last zeitweise in einer leeren Seite, deren Titel „lifeline-hub“ aus `index.html`
+    // blieb. So prüft der Fall auch, dass der Titel beim Modulwechsel nachzieht.
+    let ersteLadung = true;
     for (const { route, label } of registryModule()) {
-      await page.goto(`/einsaetze/${id}/${route}`);
+      const pfad = `/einsaetze/${id}/${route}`;
+      if (ersteLadung) await page.goto(pfad);
+      else await navigateInApp(page, pfad);
+      ersteLadung = false;
       await expect(page, route).toHaveTitle(`${label} · ${name} · lifeline-hub`);
       // Ein Name je Modul: das h1 ist der Menüname (LFH-965, Spec `modul-benennung`).
       if (!DIREKTEINSTIEG.has(route)) {
