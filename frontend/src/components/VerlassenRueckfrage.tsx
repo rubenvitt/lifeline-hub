@@ -2,8 +2,10 @@ import { Button, Modal, type ModalProps } from 'antd';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
@@ -131,6 +133,16 @@ export function VerlassenDialog({
  * `frontend/AGENTS.md`, „Erfassungs-Norm“). Dieselbe Form wie {@link VerlassenDialog}, eigener
  * Wortlaut: „beim Verlassen“ passt nicht, wenn nur ein Dialog schließt. Escape und Kreuz heißen
  * „Weiter bearbeiten“, die Maske schließt nicht; der Fokus steht auf „Weiter bearbeiten“.
+ *
+ * **Der Fokus beim Öffnen** (LLH-2013): `autoFocus` allein trägt im Browser nicht. antd ließe den
+ * Inhalt nach dem Schließen eingehängt, und React fokussiert nur beim Einhängen; ab dem zweiten
+ * Öffnen setzte rc-dialog den Fokus nach der Einblendung auf den Rahmen, Enter tat nichts. Deshalb
+ * `destroyOnHidden`. Und rc-dialogs Fokusfalle (`useLockFocus`) zieht ihn gleich nach dem
+ * `autoFocus` weg: erst die des Dialogs dahinter auf dessen Kreuz, dann die der Rückfrage auf ihr
+ * erstes fokussierbares Element, ihr Kreuz. Bis die Einblendung endet oder die Person selbst eine
+ * Taste oder den Zeiger benutzt, holt die Rückfrage jeden solchen Fokus deshalb auf „Weiter
+ * bearbeiten“ zurück. jsdom kennt die Falle nicht; den Browser hält
+ * `e2e/dialog-rueckfrage.spec.ts` fest.
  */
 export function VerwerfenDialog({
   offen,
@@ -144,6 +156,15 @@ export function VerwerfenDialog({
   onWeiter: () => void;
   onVerwerfen: () => void;
 }) {
+  const weiterRef = useRef<HTMLButtonElement>(null);
+  // Die Einblendung, in der die Fokusfallen noch ziehen: vom Öffnen bis `afterOpenChange` oder
+  // bis die Person selbst eine Taste oder den Zeiger benutzt.
+  const oeffnet = useRef(false);
+  const fokusZurueck = () => weiterRef.current?.focus({ preventScroll: true });
+  useLayoutEffect(() => {
+    oeffnet.current = offen;
+  }, [offen]);
+
   return (
     <Modal
       title="Eingaben verwerfen?"
@@ -151,6 +172,12 @@ export function VerwerfenDialog({
       // Mittig, damit sie den Kopf des Erfassungsdialogs nicht verdeckt.
       centered
       onCancel={onWeiter}
+      destroyOnHidden
+      // rc-dialog setzt den Fokus am Ende der Einblendung noch auf den Rahmen, falls er außerhalb
+      // steht; `onFocus` unten holt ihn zurück, danach endet die Einblendung.
+      afterOpenChange={(geoeffnet) => {
+        if (geoeffnet) oeffnet.current = false;
+      }}
       mask={{ closable: false }}
       // antd hört Escape global: dasselbe Escape, das die Rückfrage öffnet, schlösse sie sofort
       // wieder. Escape gilt deshalb am Rahmen der Rückfrage, wo immer der Fokus darin steht. Keine
@@ -159,7 +186,14 @@ export function VerwerfenDialog({
       keyboard={false}
       wrapProps={{
         ...MASKE_HAELT_FOKUS,
+        onFocus: (e: FocusEvent<HTMLDivElement>) => {
+          if (oeffnet.current && e.target !== weiterRef.current) fokusZurueck();
+        },
+        onPointerDown: () => {
+          oeffnet.current = false;
+        },
         onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+          oeffnet.current = false;
           e.stopPropagation();
           if (e.key !== 'Escape' || e.nativeEvent.isComposing) return;
           e.preventDefault();
@@ -171,7 +205,7 @@ export function VerwerfenDialog({
           <Button danger onClick={onVerwerfen}>
             Verwerfen
           </Button>
-          <Button type="primary" autoFocus onClick={onWeiter}>
+          <Button ref={weiterRef} type="primary" autoFocus onClick={onWeiter}>
             Weiter bearbeiten
           </Button>
         </Knopfreihe>
