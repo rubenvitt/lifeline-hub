@@ -239,7 +239,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
     im selben Modul. Beim ersten Aufruf zeigt `ModulWechselGerippe` kein Vorab-Gerippe; lädt der
     Einsatz dann noch, gibt die Seite in ihrem Frühausstieg selbst `ModulGerippeSeite` zurück
-    (Kopf sofort, Einsatz im Ortspfad als „…“), nie ein nacktes `SeitenSkeleton`. Was
+    (Kopf sofort, Einsatz im Ortspfad als „…“), nie ein nacktes `SeitenSkeleton`; ebenso
+    der Ladefall von `modulFreigabeAnzeige` und die Detailseiten im Einsatz mit dem Namen ihres
+    Moduls, bis ihr eigener Titel kommt (Nachweis `pages/Erstaufruf.test.tsx`). Was
     erst mit den Daten kommt, reserviert seine Zeile vorher (unsichtbar, ohne Nullen) oder steht
     unter allem, was schon steht; Nachweis: `e2e/erstaufruf-cls.spec.ts` (Erstaufruf mit langsamem
     Server, CLS < 0,1). Eine Seite baut kein eigenes Vorab-Gerippe für den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
