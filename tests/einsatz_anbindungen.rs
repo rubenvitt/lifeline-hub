@@ -35,7 +35,7 @@ async fn freigeben(
     anfrage(
         app,
         "PUT",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
@@ -51,7 +51,7 @@ async fn beenden(
     anfrage(
         app,
         "DELETE",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
