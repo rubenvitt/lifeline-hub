@@ -25,12 +25,13 @@ und reicht Pushes der Lifeline-Server an APNs weiter; Ruben betreibt ihn selbst 
   höchstens 100 Nachrichten je `senden`-Aufruf, Körper- und Feldgrenzen, Fristen) stehen im Code
   und in der Betriebsdoku; eine Änderung zieht beide mit. Was Apple ohnehin ablehnte, weist das
   Relais vorher ab.
-- **Client-IP kommt nur aus `client_ip::client_ip`** (LLH-2080). Mit Liste
+- **Client-IP kommt nur aus `client_ip::client_ip`** (LLH-2080), Zwilling von
+  `src/extract.rs::client_ip` im Hauptpaket; beide gleich halten. Mit Liste
   (`PUSH_RELAIS_TRUSTED_PROXIES`) gilt `X-Forwarded-For` nur, wenn die Gegenstelle darin liegt,
-  und dann von rechts der erste Eintrag außerhalb der Liste, wie `src/extract.rs::client_ip` im
-  Hauptpaket; mit dem Schalter (`PUSH_RELAIS_HINTER_PROXY`) genau ein Proxy, der rechte Eintrag.
-  Was der Client links davon selbst setzt, zählt nie. Keine Cloudflare-Bereiche im Code: sie
-  stehen in `docs/betrieb/push-relais.md`.
+  dann von rechts: Proxy-Einträge werden übersprungen, ein Eintrag aus `PUSH_RELAIS_CDN_PROXIES`
+  genau einmal, der nächste ist der Client. Mit dem Schalter (`PUSH_RELAIS_HINTER_PROXY`) genau
+  ein Proxy, der rechte Eintrag. Was der Client links davon selbst setzt, zählt nie. Keine
+  Cloudflare-Bereiche im Code: sie stehen in `docs/betrieb/push-relais.md`.
 - **`senden` blockiert nie auf eine einzelne Nachricht:** nebenläufig über die HTTP/2-Verbindung,
   Frist je Anfrage an Apple und Gesamtfrist je Aufruf klar unter der Frist des Servers
   (`RELAIS_SENDEN_FRIST` in `src/ios_push/mod.rs`); die Ergebnisse in Eingabe-Reihenfolge.

@@ -45,7 +45,8 @@ Release-Builds in der Produktion).
 | `PUSH_RELAIS_LIMIT_MINUTE` | `600` | Nachrichten je Server und Minute; darüber antwortet das Relais mit 429. |
 | `PUSH_RELAIS_REGISTRIERUNGEN_STUNDE` | `10` | Registrierungen (`POST /v1/server`) je IP und Stunde; IPv6 zählt je /64. |
 | `PUSH_RELAIS_HINTER_PROXY` | `false` | Hinter genau einem TLS-Proxy ohne CDN davor `true`: dann zählt der letzte (rechte) Eintrag von `X-Forwarded-For` als Client-IP, den der Proxy anhängt, sonst die Peer-Adresse. Nicht zusammen mit `PUSH_RELAIS_TRUSTED_PROXIES`. |
-| `PUSH_RELAIS_TRUSTED_PROXIES` | leer | Vertraute Proxys als Komma-Liste aus Netzen (CIDR) und Adressen, z. B. das Docker-Netz von Traefik und die Bereiche eines CDN. Liegt die Gegenstelle darin, wird `X-Forwarded-For` von rechts gelesen, und der erste Eintrag außerhalb der Liste ist die Client-IP; sonst zählt die Gegenstelle. Regeln wie `LIFELINE_TRUSTED_PROXIES`: ein Hostname, ein leerer Eintrag oder ein IPv4-gemapptes Netz bricht den Start ab, ebenso beide Variablen zugleich. |
+| `PUSH_RELAIS_TRUSTED_PROXIES` | ungesetzt | Vertraute Proxys als Komma-Liste aus Netzen (CIDR) und Adressen, z. B. das Docker-Netz von Traefik. Liegt die Gegenstelle darin, wird `X-Forwarded-For` von rechts gelesen, und der erste Eintrag außerhalb der Liste ist die Client-IP; sonst zählt die Gegenstelle. Regeln wie `LIFELINE_TRUSTED_PROXIES`: ein Hostname, ein leerer Eintrag (auch leer gesetzt) oder ein IPv4-gemapptes Netz bricht den Start ab, ebenso zusammen mit `PUSH_RELAIS_HINTER_PROXY`. Die Bereiche eines CDN gehören nicht hierher. |
+| `PUSH_RELAIS_CDN_PROXIES` | ungesetzt | Bereiche eines CDN vor dem Proxy, nur zusammen mit `PUSH_RELAIS_TRUSTED_PROXIES` (sonst bricht der Start ab). Ein Eintrag daraus wird **einmal** übersprungen, der nächste ist die Client-IP. Siehe [Hinter einem CDN](#hinter-einem-cdn-r-server-cloudflare). |
 | `RUST_LOG` | `info` | Log-Stufe. |
 
 Zwei weitere Variablen (`PUSH_RELAIS_APNS_BASIS_PRODUCTION`, `PUSH_RELAIS_APNS_BASIS_SANDBOX`)
@@ -84,9 +85,13 @@ docker run -d --name push-relais --restart unless-stopped \
   -e PUSH_RELAIS_APNS_KEY_ID=ABC123DEFG \
   -e PUSH_RELAIS_APNS_TEAM_ID=TEAM123456 \
   -e PUSH_RELAIS_TRUSTED_PROXIES=<Netz des Proxys> \
+  -e PUSH_RELAIS_CDN_PROXIES=<Bereiche des CDN, falls eins davor steht> \
   ghcr.io/<eigentümer>/<repo>-push-relais:<version>
 ```
 
+- Steht ein CDN vor dem Proxy (auf r-server Cloudflare), gehören seine Bereiche in
+  `PUSH_RELAIS_CDN_PROXIES`, siehe [Hinter einem CDN](#hinter-einem-cdn-r-server-cloudflare); ohne
+  CDN die Zeile weglassen.
 - Das Abbild läuft als `nonroot` (UID 65532); die `.p8`-Datei muss für diesen Nutzer lesbar sein
   (`chmod 644` oder Besitzer 65532, Modus 400).
 - `/data` ist ein Volume mit der SQLite-Datei. Ohne Volume verliert ein neuer Container alle
@@ -113,16 +118,24 @@ Auf r-server stehen zwei Proxys vor dem Relais: Cloudflare (orange Wolke, die Ad
 r-server bleibt verborgen) und Traefik. Ohne weitere Einstellung verwirft Traefik das
 `X-Forwarded-For` von Cloudflare und setzt die Adresse des Cloudflare-Knotens ein; die
 Registrierungsgrenze zählte dann Knoten statt Clients (LLH-2080). Gewählt ist deshalb: **Traefik
-und Relais vertrauen den Cloudflare-Bereichen.** „DNS only“ (graue Wolke) schied aus, weil es die
-Adresse von r-server und damit aller Dienste dort offenlegt; ein Traefik-Plugin für
-`CF-Connecting-IP` wäre ein Fremdbaustein mehr.
+vertraut den Cloudflare-Bereichen, das Relais überspringt einen Cloudflare-Eintrag genau
+einmal.** „DNS only“ (graue Wolke) schied aus, weil es die Adresse von r-server und damit aller
+Dienste dort offenlegt; ein Traefik-Plugin für `CF-Connecting-IP` wäre ein Fremdbaustein mehr.
 
 So kommt die Adresse an: Cloudflare hängt die Adresse des Clients an `X-Forwarded-For` an,
 Traefik behält den Header (die Gegenstelle ist ein Cloudflare-Knoten, also vertraut) und hängt
 den Knoten an. Das Relais sieht Traefik als Gegenstelle und liest
-`<vom Client mitgeschickt>, <Client>, <Knoten>` von rechts: Traefik und der Knoten sind vertraut,
-der erste fremde Eintrag ist der Client. Wer r-server direkt anspricht statt über Cloudflare,
-dessen mitgeschicktes `X-Forwarded-For` verwirft Traefik weiter; es zählt seine eigene Adresse.
+`<vom Client mitgeschickt>, <Client>, <Knoten>` von rechts: Traefik ist vertraut, der Knoten
+wird als CDN-Eintrag einmal übersprungen, der nächste Eintrag ist der Client. Wer r-server direkt
+anspricht statt über Cloudflare, dessen mitgeschicktes `X-Forwarded-For` verwirft Traefik weiter;
+es zählt seine eigene Adresse.
+
+**Warum zwei Listen:** Auch Anfragen von Cloudflare Workers kommen aus Cloudflare-Bereichen
+(etwa `2a06:98c0:3600::103`), und ein Worker setzt `X-Forwarded-For` selbst. Stünden die Bereiche
+in der Proxy-Liste, würden sie beliebig oft übersprungen, und ein eigener Worker schickte eine frei
+gewählte Adresse vor: Registrierungen ohne Grenze. Weil ein CDN-Eintrag nur einmal zählt, gilt im
+Worker-Fall die Adresse des Workers; alle Worker teilen sich damit eine Grenze (IPv6 je /64), echte
+Clients bleiben unberührt.
 
 1. **Traefik**, am Einstiegspunkt für HTTPS (Name wie in der Traefik-Konfiguration, meist
    `websecure`):
@@ -131,19 +144,35 @@ dessen mitgeschicktes `X-Forwarded-For` verwirft Traefik weiter; es zählt seine
    --entrypoints.websecure.forwardedHeaders.trustedIPs=<Cloudflare-Bereiche, kommagetrennt>
    ```
 
+   **Das gilt für jeden Dienst hinter diesem Einstiegspunkt**, nicht nur für das Relais: Was ein
+   Client an `X-Forwarded-*` und `X-Real-Ip` an Cloudflare schickt, reicht Traefik dann durch.
+   Ein Dienst, der den linken `X-Forwarded-For`-Eintrag, `X-Real-Ip` oder `X-Forwarded-Host` liest,
+   bekommt einen Wert, den der Client gewählt hat. Lifeline-Server und Relais lesen nur
+   `X-Forwarded-For` von rechts und `X-Forwarded-Proto`. Für die übrigen Dienste auf r-server
+   prüfen; sonst die Köpfe in einer Cloudflare-Transform-Rule („Modify Request Header“, entfernen)
+   löschen oder Relais und Lifeline-Server über einen eigenen Einstiegspunkt führen.
+
 2. **Relais** (`~/server/push-relais/docker-compose.yml`): `PUSH_RELAIS_HINTER_PROXY` entfernen
-   (beide zugleich brechen den Start ab) und setzen:
+   (zusammen mit der Liste bricht der Start ab) und setzen:
 
    ```text
-   PUSH_RELAIS_TRUSTED_PROXIES=<Docker-Netz zwischen Traefik und Relais>,<Cloudflare-Bereiche>
+   PUSH_RELAIS_TRUSTED_PROXIES=<Docker-Netz zwischen Traefik und Relais>
+   PUSH_RELAIS_CDN_PROXIES=<Cloudflare-Bereiche>
    ```
 
    Das Docker-Netz zeigt `docker network inspect <netz>` (Feld `Subnet`).
 
 3. **Lifeline-Server auf demselben Traefik** (`lifeline-hub.rubeen.dev`) haben dasselbe Problem
-   für Anmelde-Bremse, Passkey- und SSO-Drossel (LFH-604). Code braucht es dort nicht, nur die
-   Liste: `LIFELINE_TRUSTED_PROXIES=10.0.1.0/24,<Cloudflare-Bereiche>`
+   für Anmelde-Bremse, Passkey- und SSO-Drossel (LFH-604):
+
+   ```text
+   LIFELINE_TRUSTED_PROXIES=10.0.1.0/24
+   LIFELINE_CDN_PROXIES=<Cloudflare-Bereiche>
+   ```
+
    ([env-registry](env-registry.md)).
+
+**Die Cloudflare-Bereiche nie in `…_TRUSTED_PROXIES`**, nur in `…_CDN_PROXIES`.
 
 **Cloudflare-Bereiche**, Stand 23.11.2026, Quelle <https://www.cloudflare.com/ips/>
 (`ips-v4`, `ips-v6`):
@@ -156,9 +185,10 @@ Die Liste ändert sich selten, aber sie ändert sich. Fehlt ein neuer Bereich, z
 ihn wieder je Knoten; also bei jedem Update von r-server mit der Quelle abgleichen und an allen
 drei Stellen gleich halten. Im Code steht keine Cloudflare-Adresse.
 
-**Prüfen:** Die Adresse steht nicht im Log. Dass der Client und nicht der Knoten zählt, belegt der
-Test `hinter_cloudflare_zaehlt_die_adresse_des_clients` in `push-relais/tests/registrierung.rs`.
-Auf r-server genügt: Das Relais startet (eine falsche Liste bricht den Start ab), und
+**Prüfen:** Die Adresse steht nicht im Log. Dass der Client und nicht der Knoten zählt, belegen
+die Tests `hinter_cloudflare_zaehlt_die_adresse_des_clients` und
+`worker_kann_die_grenze_nicht_umgehen` in `push-relais/tests/registrierung.rs`. Auf r-server
+genügt: Das Relais startet (eine falsche Liste bricht den Start ab), und
 `curl https://push.rubeen.dev/v1/status` antwortet.
 
 ## Server sperren und entsperren

@@ -177,8 +177,8 @@ Versuch auf 9 000. Je Quelle bleiben die ältesten zehn Versuche, damit ein Schw
 Fehlversuche die fremden nicht verdrängt.
 
 Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird nur ausgewertet, wenn
-die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604;
-Einzelheiten in `docs/betrieb/env-registry.md`): von jeder anderen Gegenstelle ist der
+die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604; ein
+CDN davor in `LIFELINE_CDN_PROXIES`, LLH-2080; Einzelheiten in `docs/betrieb/env-registry.md`): von jeder anderen Gegenstelle ist der
 Header frei fälschbar, und ein fälschbares Rate-Limit ist keins. **Hinter einem
 Reverse-Proxy muss die Liste gesetzt sein** — sonst sieht der Server nur die Proxy-IP, und
 zehn Fehlversuche von beliebiger Seite sperren den Passwort-Login für alle. Dieselbe
