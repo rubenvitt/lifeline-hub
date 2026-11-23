@@ -47,7 +47,7 @@ export function useEinstufungsUhr(liste: readonly Abloesung[] | undefined): Dayj
   // Neu gelesen bei neuer Liste ODER abgelaufenem Wecker — den einzigen Momenten, in denen sich
   // die Einstufung ändern kann. `liste` und `takt` werden im Rumpf nicht gelesen, sie SIND der
   // Anlass, die Uhr neu zu lesen.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   const jetzt = useMemo(() => dayjs(), [liste, takt]);
   useEffect(() => {
     if (!liste) return;

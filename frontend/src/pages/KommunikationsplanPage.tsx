@@ -606,7 +606,7 @@ export default function KommunikationsplanPage() {
       ),
     // Die Mutationen sind identitätsstabil genug; neu gebaut wird mit Recht, Netz, Druck und den
     // Verbindungen der Skizze (sie bestimmen die Rückfrage beim Entfernen).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [mitAktionen, ohneVerbindung, skizzenVerbindungen],
   );
   const spalten = useMemo(() => planSpalten(ohneVerbindung, aktionen), [ohneVerbindung, aktionen]);

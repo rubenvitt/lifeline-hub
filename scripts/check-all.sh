@@ -139,7 +139,7 @@ schritt_1() {
 }
 
 schritt_2() {
-  echo "==> [2/$SCHRITTE] Frontend-Lint (--max-warnings 0)"
+  echo "==> [2/$SCHRITTE] Frontend-Lint (oxlint, jede Warnung bricht)"
   $PNPM -C "$FE" lint
 }
 

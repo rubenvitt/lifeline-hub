@@ -6,8 +6,8 @@
  * ELEMENT schlägt den Provider und nagelt die Trefffläche auf eine Stufe fest; der
  * Handschuh-Betrieb bekommt sie nicht mehr mit.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * `pnpm lint` läuft mit `--max-warnings 0`; eine rot geborene Regel wird abgeschaltet. Ein Guard
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * `pnpm lint` bricht bei jeder Warnung; eine rot geborene Regel wird abgeschaltet. Ein Guard
  * mit SCHULDMENGE ({@link OFFEN}) hält den Bestand sichtbar, ohne das Lint-Gate rot zu färben.
  *
  * ── Warum ein Tag-Scanner und keine Regex ───────────────────────────────────────

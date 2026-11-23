@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as ts from 'typescript';
+import { type AstNode, parseSource, staticText, walk } from '../lib/sourceAst';
 import { ZIEL_PARAMETER } from './rollGedaechtnis';
 import { MELDEBILD_PARAMETER } from '../kraefte/useMeldebildFilter';
 
@@ -24,26 +24,15 @@ export function literaleDerAufrufe(
   quelltext: string,
   passt: (name: string) => boolean,
 ): string[] {
-  const quelle = ts.createSourceFile(
-    pfad,
-    quelltext,
-    ts.ScriptTarget.Latest,
-    true,
-    pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
   const funde: string[] = [];
-  const gehe = (knoten: ts.Node): void => {
-    if (
-      ts.isCallExpression(knoten) &&
-      ts.isIdentifier(knoten.expression) &&
-      passt(knoten.expression.text)
-    ) {
-      const erstes = knoten.arguments[0];
-      if (erstes && ts.isStringLiteralLike(erstes)) funde.push(erstes.text);
+  walk(parseSource(pfad, quelltext), (knoten) => {
+    if (knoten.type !== 'CallExpression') return;
+    const callee = knoten.callee as AstNode;
+    if (callee.type === 'Identifier' && passt(callee.name as string)) {
+      const erstes = staticText((knoten.arguments as AstNode[])[0]);
+      if (erstes !== undefined) funde.push(erstes);
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return funde;
 }
 

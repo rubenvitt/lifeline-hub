@@ -99,7 +99,7 @@ export default function BezirkKartenbild({
         { padding: KARTENRAND_PX, maxZoom: PUNKT_ZOOM + 2, animate: false },
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität
   }, [ausschnittSchluessel, config, dunkel]);
 
   // Flächen als Zonenebene der Lagekarte, nach dem Laden des Stils.

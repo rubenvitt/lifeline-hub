@@ -1,5 +1,5 @@
 /**
- * AST-Scanner für Query-Key-Fundstellen (LFH-312). Sieht mehrzeilige Literale, ignoriert
+ * AST-Scanner für Query-Key-Fundstellen (LFH-312), AST über `lib/sourceAst` (oxc-parser, LLH-2020). Sieht mehrzeilige Literale, ignoriert
  * Kommentare strukturell und kennt den Kontext (`['KB','MB']` gegen `queryKey: [...]`).
  *
  * BEWUSST OHNE `import.meta.glob`: der Scanner nimmt Quelltext als String entgegen, das Glob
@@ -12,7 +12,7 @@
  *   ENG (nur Query-Key-Kontexte): für den Allowlist-Guard (f); darf Konstanten wie
  *     `['KB','MB','GB','TB']` nicht anfassen.
  */
-import * as ts from 'typescript';
+import { type AstNode, parseSource, staticText, textOf, walk, lineOf } from '../lib/sourceAst';
 
 /**
  * Aufrufe des QueryClient, die einen Query-Key als ERSTES ARGUMENT nehmen (v4-Stil,
@@ -74,29 +74,51 @@ export interface Fund {
 }
 
 /** Name des Callees einer CallExpression (`f()` → 'f', `qc.invalidateQueries()` → 'invalidateQueries'). */
-function calleeName(ausdruck: ts.Expression): string | undefined {
-  if (ts.isIdentifier(ausdruck)) return ausdruck.text;
-  if (ts.isPropertyAccessExpression(ausdruck)) return ausdruck.name.text;
+function calleeName(ausdruck: AstNode): string | undefined {
+  if (ausdruck.type === 'Identifier') return ausdruck.name as string;
+  if (ausdruck.type === 'MemberExpression' && !ausdruck.computed) {
+    const eigenschaft = ausdruck.property as AstNode;
+    if (eigenschaft.type === 'Identifier') return eigenschaft.name as string;
+  }
   return undefined;
 }
 
+type ParentOf = Map<AstNode, AstNode>;
+
 /** Ist dieses Array-Literal ein Query-Key — und wenn ja, in welchem Kontext? */
-function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined {
-  const eltern = arr.parent;
+function schluesselKontext(arr: AstNode, parentOf: ParentOf): FundArt | undefined {
+  const eltern = parentOf.get(arr);
   if (!eltern) return undefined;
-  if (ts.isPropertyAssignment(eltern) && eltern.initializer === arr) {
+  if (
+    eltern.type === 'Property' &&
+    eltern.kind === 'init' &&
+    !eltern.method &&
+    !eltern.shorthand &&
+    !eltern.computed &&
+    eltern.value === arr
+  ) {
+    const schluessel = eltern.key as AstNode;
     const name =
-      ts.isIdentifier(eltern.name) || ts.isStringLiteralLike(eltern.name)
-        ? eltern.name.text
-        : undefined;
+      schluessel.type === 'Identifier' ? (schluessel.name as string) : staticText(schluessel);
     if (name && SCHLUESSEL_PROPS.has(name)) return name as FundArt;
   }
-  if (ts.isCallExpression(eltern) && eltern.arguments[0] === arr) {
-    const name = calleeName(eltern.expression);
+  if (eltern.type === 'CallExpression' && (eltern.arguments as AstNode[])[0] === arr) {
+    const name = calleeName(eltern.callee as AstNode);
     if (name && CACHE_CALLS.has(name)) return 'cache-call';
   }
   return undefined;
 }
+
+/** Name eines Parameters, wie TS ihn als `parameter.name` sah (auch mit Vorgabe oder `...`). */
+function paramName(param: AstNode): string | undefined {
+  let kern = param;
+  if (kern.type === 'TSParameterProperty') kern = kern.parameter as AstNode;
+  if (kern.type === 'AssignmentPattern') kern = kern.left as AstNode;
+  else if (kern.type === 'RestElement') kern = kern.argument as AstNode;
+  return kern.type === 'Identifier' ? (kern.name as string) : undefined;
+}
+
+const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
 
 /**
  * Erkennt Funktionen, deren Parameter i strukturell an Position 0 eines Query-Key-Arrays landet
@@ -106,37 +128,35 @@ function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined 
  * `live/useEinsatzLiveStream.ts`. Hart auf EINEN Schritt in DERSELBEN Datei begrenzt; alles
  * darüber wäre Datenfluss-Analyse.
  */
-function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
+function findeSchluesselHelfer(programm: AstNode, parentOf: ParentOf): Map<string, number> {
   const helfer = new Map<string, number>();
 
-  const pruefeFunktion = (name: string | undefined, fn: ts.SignatureDeclaration): void => {
-    if (!name || fn.parameters.length === 0) return;
-    const params = fn.parameters.map((p) => (ts.isIdentifier(p.name) ? p.name.text : undefined));
-    const suche = (knoten: ts.Node): void => {
-      if (ts.isArrayLiteralExpression(knoten) && schluesselKontext(knoten)) {
-        const erstes = knoten.elements[0];
-        if (erstes && ts.isIdentifier(erstes)) {
-          const idx = params.indexOf(erstes.text);
+  const pruefeFunktion = (name: string | undefined, fn: AstNode): void => {
+    const parameter = fn.params as AstNode[];
+    if (!name || parameter.length === 0) return;
+    const params = parameter.map(paramName);
+    walk(fn, (knoten) => {
+      if (knoten.type === 'ArrayExpression' && schluesselKontext(knoten, parentOf)) {
+        const erstes = (knoten.elements as (AstNode | null)[])[0];
+        if (erstes && erstes.type === 'Identifier') {
+          const idx = params.indexOf(erstes.name as string);
           if (idx >= 0 && !helfer.has(name)) helfer.set(name, idx);
         }
       }
-      ts.forEachChild(knoten, suche);
-    };
-    ts.forEachChild(fn, suche);
+    });
   };
 
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isVariableDeclaration(knoten) && ts.isIdentifier(knoten.name) && knoten.initializer) {
-      const init = knoten.initializer;
-      if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
-        pruefeFunktion(knoten.name.text, init);
+  walk(programm, (knoten) => {
+    if (knoten.type === 'VariableDeclarator') {
+      const id = knoten.id as AstNode;
+      const init = knoten.init as AstNode | null;
+      if (id.type === 'Identifier' && init && FUNCTION_VALUES.has(init.type)) {
+        pruefeFunktion(id.name as string, init);
       }
-    } else if (ts.isFunctionDeclaration(knoten) && knoten.name) {
-      pruefeFunktion(knoten.name.text, knoten);
+    } else if (knoten.type === 'FunctionDeclaration' && knoten.id) {
+      pruefeFunktion((knoten.id as AstNode).name as string, knoten);
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return helfer;
 }
 
@@ -147,56 +167,52 @@ function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
  * (`[EINSATZ_KEYS.uhs, id]` ist die erwünschte Form) und Spreads.
  */
 export function scanneQueryKeys(pfad: string, quelltext: string): Fund[] {
-  const tsx = pfad.endsWith('.tsx');
-  const quelle = ts.createSourceFile(
-    pfad,
-    quelltext,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  const programm = parseSource(pfad, quelltext);
+  const parentOf: ParentOf = new Map();
+  walk(programm, (knoten, eltern) => {
+    if (eltern) parentOf.set(knoten, eltern);
+  });
   const funde: Fund[] = [];
-  const zeileVon = (knoten: ts.Node): number =>
-    quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1;
+  const zeile = (knoten: AstNode): number => lineOf(quelltext, knoten.start);
 
-  const helfer = findeSchluesselHelfer(quelle);
+  const helfer = findeSchluesselHelfer(programm, parentOf);
 
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isArrayLiteralExpression(knoten)) {
-      const erstes = knoten.elements[0];
-      if (erstes && ts.isStringLiteralLike(erstes)) {
-        // NoSubstitutionTemplateLiteral (`'…'` ohne Platzhalter) zählt als statischer Prefix.
+  walk(programm, (knoten) => {
+    if (knoten.type === 'ArrayExpression') {
+      const erstes = (knoten.elements as (AstNode | null)[])[0];
+      const statisch = staticText(erstes);
+      if (statisch !== undefined) {
+        // Template ohne Platzhalter (`'…'` in Backticks) zählt als statischer Prefix.
         funde.push({
           pfad,
-          zeile: zeileVon(knoten),
-          prefix: erstes.text,
-          art: schluesselKontext(knoten) ?? 'array-literal',
+          zeile: zeile(knoten),
+          prefix: statisch,
+          art: schluesselKontext(knoten, parentOf) ?? 'array-literal',
         });
-      } else if (erstes && ts.isTemplateExpression(erstes) && schluesselKontext(knoten)) {
+      } else if (erstes?.type === 'TemplateLiteral' && schluesselKontext(knoten, parentOf)) {
         funde.push({
           pfad,
-          zeile: zeileVon(knoten),
-          prefix: erstes.getText(quelle),
+          zeile: zeile(knoten),
+          prefix: textOf(quelltext, erstes),
           art: 'dynamischer-prefix',
         });
       }
-    } else if (ts.isCallExpression(knoten)) {
-      const name = calleeName(knoten.expression);
+    } else if (knoten.type === 'CallExpression') {
+      const name = calleeName(knoten.callee as AstNode);
       const idx = name === undefined ? undefined : helfer.get(name);
       if (idx !== undefined) {
-        const arg = knoten.arguments[idx];
-        if (arg && ts.isStringLiteralLike(arg)) {
+        const arg = (knoten.arguments as AstNode[])[idx];
+        const statisch = staticText(arg);
+        if (statisch !== undefined) {
           funde.push({
             pfad,
-            zeile: zeileVon(knoten),
-            prefix: arg.text,
+            zeile: zeile(knoten),
+            prefix: statisch,
             art: 'schluessel-helfer-arg',
           });
         }
       }
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return funde;
 }
