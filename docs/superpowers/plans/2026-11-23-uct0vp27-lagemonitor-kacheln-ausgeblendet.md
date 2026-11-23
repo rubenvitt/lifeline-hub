@@ -58,26 +58,26 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/uct0vp27hghnxr9b2pixf9s1
   leerer Menge. `alarm` nimmt die Menge statt `org_id` und lädt sie nicht mehr selbst.
 - TS-Typ danach: `LagemonitorAnzeige.ausgeblendet?: LagemonitorKachel[]`.
 
-- [ ] **Step 1: Failing test** `lagemonitor_kacheln_lassen_ausgeblendete_module_weg` in
+- [x] **Step 1: Failing test** `lagemonitor_kacheln_lassen_ausgeblendete_module_weg` in
   `tests/geraet_kopplung.rs` (Helfer `modul_ausblenden` von LLH-1964 nutzen): vermisste Person,
   offene Sofortmeldung, Einheit, eine UHS anlegen; ohne Ausblendung fehlt `ausgeblendet` im JSON
   (`v.get("ausgeblendet").is_none()`). Dann `personen`, `meldungen`, `unfallhilfsstellen`,
   `einheiten` ausblenden → `v["ausgeblendet"] == json!(["betroffene","meldungen","kraefte","uhs"])`,
   `v["betroffene"]["vermisst"] == 0`, `v["sofortmeldungen_offen"] == 0`,
   `v["kraefte"]["einheiten"] == 0`, `v["uhs"] == json!([])`.
-- [ ] **Step 2: Failing test** `lagemonitor_kraefte_fehlt_schon_wenn_nur_einheiten_ausgeblendet`:
+- [x] **Step 2: Failing test** `lagemonitor_kraefte_fehlt_schon_wenn_nur_einheiten_ausgeblendet`:
   nur `einheiten` aus → `v["ausgeblendet"] == json!(["kraefte"])`.
-- [ ] **Step 3:** Bestehenden Test `lagemonitor_alarm_nennt_ausgeblendete_quellen` anpassen: letzte
+- [x] **Step 3:** Bestehenden Test `lagemonitor_alarm_nennt_ausgeblendete_quellen` anpassen: letzte
   Zeile erwartet jetzt `v["sofortmeldungen_offen"] == 0` und `v["ausgeblendet"]` enthält
   `"betroffene"`, `"meldungen"`, `"kraefte"` (Kommentar: Kachel fehlt seit LLH-2072).
-- [ ] **Step 4: Failing test** in `tests/public_api_lage.rs`
+- [x] **Step 4: Failing test** in `tests/public_api_lage.rs`
   `lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet`: Sofortmeldung anlegen, `meldungen`
   per `PUT /api/einsaetze/{id}/modul-overrides/meldungen` `{"sichtbar":false,"benoetigte_rolle":null}`
   ausblenden → `e["sofortmeldungen_offen"] == 1`, `e.get("ausgeblendet").is_none()`.
-- [ ] **Step 5: Tests laufen lassen, rot**
+- [x] **Step 5: Tests laufen lassen, rot**
   Run: `cargo test --test geraet_kopplung lagemonitor_ && cargo test --test public_api_lage lage_zaehlt_weiter`
   Expected: neue Tests FAIL (Step 4 darf schon grün sein; er hält den Vertrag fest).
-- [ ] **Step 6: Umsetzen** in `src/routes/lagemonitor.rs`: `LagemonitorKachel` neben
+- [x] **Step 6: Umsetzen** in `src/routes/lagemonitor.rs`: `LagemonitorKachel` neben
   `AlarmQuelle`; `verdichte_ohne` überspringt je ausgeblendeter Kachel ihre Abfragen
   (`betroffene`: Personenzeilen, Sanitätsdienst-Wahl, Vermisste → Standardwerte, `sanitaetsdienst`
   `None`; `kraefte`: Einheiten- und Personal-Abfrage → 0 und leere Stärke; `uhs`: UHS-Abfrage →
@@ -85,11 +85,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/uct0vp27hghnxr9b2pixf9s1
   `verdichte_ohne` und `alarm` damit und setzt `anzeige.sofortmeldungen_offen = alarm.sofort_offen`
   ohne die Sonderregel von LLH-1964. Doc-Kommentare verweisen auf `frontend/src/geraet/AGENTS.md`,
   Lagemonitor.
-- [ ] **Step 7: Tests grün**
+- [x] **Step 7: Tests grün**
   Run: `cargo test --test geraet_kopplung lagemonitor_ && cargo test --test public_api_lage && cargo test --test lagebild_extern && cargo test --lib lagemonitor`
   Expected: PASS
-- [ ] **Step 8: Codegen** `scripts/check-typ-codegen.sh` (schreibt neu), dann erneut ohne Diff.
-- [ ] **Step 9: Commit** `fix: Lagemonitor liest Kacheln ausgeblendeter Module nicht (LLH-2072)`
+- [x] **Step 8: Codegen** `scripts/check-typ-codegen.sh` (schreibt neu), dann erneut ohne Diff.
+- [x] **Step 9: Commit** `fix: Lagemonitor liest Kacheln ausgeblendeter Module nicht (LLH-2072)`
 
 ### Task 2: Client — Kacheln weglassen, Layout nachziehen
 
@@ -100,7 +100,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/uct0vp27hghnxr9b2pixf9s1
 **Interfaces:**
 - Consumes: `LagemonitorAnzeige.ausgeblendet?: LagemonitorKachel[]` aus Task 1.
 
-- [ ] **Step 1: Failing tests** in neuem `describe('Lagemonitor — ausgeblendete Module (LLH-2072)')`:
+- [x] **Step 1: Failing tests** in neuem `describe('Lagemonitor — ausgeblendete Module (LLH-2072)')`:
   - `rechte Spalte fehlt ganz, die linke nimmt die volle Breite`: `ausgeblendet:
     ['betroffene','kraefte','uhs']` → `queryByRole('region', {name:'Betroffene'|'Kräfte'|'Belegung
     der Unfallhilfsstellen'})` null; `main` hat `gridTemplateColumns` `minmax(0, 1fr)`.
@@ -109,16 +109,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/uct0vp27hghnxr9b2pixf9s1
   - `Meldungen ausgeblendet: Ablauf nimmt die Zeile allein` (ein Programmpunkt nach `JETZT`):
     Region „Meldungen“ fehlt, „Ablauf“ da.
   - `Meldungen ausgeblendet ohne Programmpunkt: keine untere Zeile`: weder „Meldungen“ noch „Ablauf“.
-- [ ] **Step 2: rot**
+- [x] **Step 2: rot**
   Run: `mise exec -- pnpm -C frontend exec vitest run src/geraet/LagemonitorPage.test.tsx`
   Expected: neue Tests FAIL
-- [ ] **Step 3: Umsetzen**: Menge `new Set(lage?.ausgeblendet ?? [])` einmal in der Seite;
+- [x] **Step 3: Umsetzen**: Menge `new Set(lage?.ausgeblendet ?? [])` einmal in der Seite;
   `Kacheln` bekommt sie und lässt je Kachel ihre `KachelGrenze` weg, den Zusatz „an UHS“ bei `uhs`;
   `MeldungenKachel` nur ohne `meldungen`, die Zeile nur, wenn eine der beiden steht; ohne Kachel
   der rechten Spalte (und mit geladenem Lagebild) `gridTemplateColumns: 'minmax(0, 1fr)'` und keine
   rechte Spalte. Kommentar verweist auf `geraet/AGENTS.md`, Lagemonitor.
-- [ ] **Step 4: grün** — Kommando wie Step 2, Expected PASS (alle Tests der Datei).
-- [ ] **Step 5: Commit** `fix: Lagemonitor lässt Kacheln ausgeblendeter Module weg (LLH-2072)`
+- [x] **Step 4: grün** — Kommando wie Step 2, Expected PASS (alle Tests der Datei).
+- [x] **Step 5: Commit** `fix: Lagemonitor lässt Kacheln ausgeblendeter Module weg (LLH-2072)`
 
 ### Task 3: Regel und Anwenderdoku
 
@@ -126,17 +126,30 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/uct0vp27hghnxr9b2pixf9s1
 - Modify: `frontend/src/geraet/AGENTS.md` (Absatz Lagemonitor, nach der Alarmzeilen-Regel)
 - Modify: `docs/anwender/kapitel/lagemonitor.md` (Abschnitt „Was der Monitor zeigt und was nicht“)
 
-- [ ] **Step 1:** AGENTS-Regel: Kacheln fehlen bei ausgeblendetem Modul (Zuordnung wie oben, Kräfte
+- [x] **Step 1:** AGENTS-Regel: Kacheln fehlen bei ausgeblendetem Modul (Zuordnung wie oben, Kräfte
   wie `kraefteZustand`, Ablauf nie); der Server liest sie nicht, nennt sie in `ausgeblendet`, nur
   `lagebild`, nicht `verdichte` für Externe/API v1 (LLH-2072). Den Satz über die Kachel
   „Sofortmeldungen“ aus LLH-1964 streichen, falls vorhanden.
-- [ ] **Step 2:** Anwenderdoku: „die Kacheln „Meldungen“ und „Betroffene“ zählen dagegen weiter“
+- [x] **Step 2:** Anwenderdoku: „die Kacheln „Meldungen“ und „Betroffene“ zählen dagegen weiter“
   ersetzen durch: auch die Kachel des Moduls fehlt (Betroffene bzw. Hilfeleistungen, Meldungen,
   Kräfte, Belegung samt Marken auf der Karte), die übrigen Kacheln nehmen den Platz; „Ablauf“ bleibt.
-- [ ] **Step 3:** Prettier/Doku-Wächter: `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md src/geraet/AGENTS.md` und `./scripts/check-all.sh --geaendert --ohne-e2e` (Task 4) decken den Rest.
-- [ ] **Step 4: Commit** `docs: Regel und Anwenderdoku – Monitorkacheln ausgeblendeter Module (LLH-2072)`
+- [x] **Step 3:** Prettier/Doku-Wächter: `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md src/geraet/AGENTS.md` und `./scripts/check-all.sh --geaendert --ohne-e2e` (Task 4) decken den Rest.
+- [x] **Step 4: Commit** `docs: Regel und Anwenderdoku – Monitorkacheln ausgeblendeter Module (LLH-2072)`
 
 ### Task 4: Gates
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` (ein Aufruf), Expected: grün.
-- [ ] **Step 2:** Plan abhaken, Commit `docs: Plan LLH-2072 abgehakt`.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` (ein Aufruf), Expected: grün.
+- [x] **Step 2:** Plan abhaken, Commit `docs: Plan LLH-2072 abgehakt`.
+
+## Ergebnis (23.11.2026)
+
+- Task 4, Gate: Das Plattenkontingent der Cloud-Sitzung fasst nicht alle Rust-Testbinaries
+  zugleich. Gefahren: `check-all.sh --nur schnell` und `--nur frontend` grün (Vitest 1430 Dateien,
+  22 920 Tests); Rust-Suite in Portionen (`cargo test` für lib, bins, übrige Workspace-Crates, je
+  40 Testdateien, doc) grün, 9 041 Tests. Nicht gefahren: Dev-Seed-Schritt und Server-Binary aus
+  `--nur rust` (vom Diff nicht berührt).
+- Review (Anlass: was der Monitor sieht, Server und Client mit neuer Schnittstelle): Befund
+  „Anstieg nach Wiedereinblenden“ behoben (Test „wieder eingeblendet (LLH-2072)“), neue Lader
+  englisch benannt (`load_anzeige`, `load_*`; `verdichte` bleibt), Anwenderdoku zur Kartenkachel
+  ergänzt. Zurückgestellt: eigener Test für das Lagebild für Externe, kurzes Aufblitzen der
+  Meldungskachel beim ersten Laden.
