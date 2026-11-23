@@ -57,14 +57,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
   Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
-  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
+  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`; **Mono trägt nur
+  Zahl, Zeit, Kennung und Funkrufname**, ein Wort oder ein gemischter Knoten („seit 14:32“, „3
+  offen“) steht in der Textschrift (LLH-2046, ADR-0093). Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
-  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `meta` 11, `monoKlein` 12, `mono` 13,
-  `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen (LLH-1972). **Boden 11 px**
+  Mono-Stufe `mono`. `meta` (11) steht in der Textschrift mit gleich breiten Ziffern
+  (`schriftStil('meta')`, `Textstufe stufe="meta"`). Mono-Text nimmt `monoStil(stufe)` mit
+  `monoFein` 11, `monoKlein` 12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus
+  einer Variablen (LLH-1972). **Boden 11 px**
   (`SCHRIFT_BODEN`, LLH-2044): keine Stufe darunter, Augenbraue und Rail-Etikett 11, Seitentitel
   16/600; darunter bleiben nur Druck, Zeichnungen mit eigenem Maßstab und der Lagemonitor
-  (ADR-0087). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
+  (ADR-0093). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
   `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
   Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
@@ -134,7 +138,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
   `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
-  Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
+  Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` in Textschrift mit gleich breiten Ziffern, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion

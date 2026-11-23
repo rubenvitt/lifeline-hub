@@ -3,8 +3,8 @@
 MetaZeile — Angaben zu einem Datensatz in einer Zeile („Metazeile in
 einer Form", LLH-1810): Teile in `textKlein`/`schwach`, dazwischen „·", den der Vorleser nicht
 hört. Ein leerer Teil fällt samt Trenner weg, damit kein „· ·" stehen bleibt. Zahl, Zeit,
-Kennzeichen und Nummer stehen mit `mono` in der Stufe `meta` (Zahlenfamilie, gleich breite
-Ziffern). Reicht die Breite nicht, bricht die Zeile zwischen den Teilen um.
+Kennzeichen und Nummer stehen mit `mono` in der Stufe `monoFein` (Zahlenfamilie, gleich breite
+Ziffern, vorher `meta`). Reicht die Breite nicht, bricht die Zeile zwischen den Teilen um.
 
 Steht eine Zeit in einem Wortteil („bis 14:32“), trägt `MetaZeile.Zahl` sie in Mono.
 

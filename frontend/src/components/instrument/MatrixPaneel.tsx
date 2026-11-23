@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
 import type { KennzahlTon } from './Kennzahl';
 import { MATRIX_KLASSE } from './matrixGeometrie';
-import { monoStil, useRollen } from './rollenwerte';
+import { schriftStil, useRollen } from './rollenwerte';
 import './matrixPaneel.css';
 
 /**
@@ -108,7 +108,7 @@ export default function MatrixPaneel({
               </span>
               <span
                 style={{
-                  ...monoStil('meta'),
+                  ...schriftStil('meta'),
                   textAlign: 'end',
                   color:
                     z.ton === 'alarm'
@@ -137,7 +137,7 @@ export default function MatrixPaneel({
           <span className={MATRIX_KLASSE.fueller} />
           <span
             className={MATRIX_KLASSE.stufen}
-            style={{ ...monoStil('meta'), color: rollen.schwach }}
+            style={{ ...schriftStil('meta'), color: rollen.schwach }}
           >
             {stufen.map((l) => (
               <span

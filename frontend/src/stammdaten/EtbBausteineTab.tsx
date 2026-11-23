@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { Knopfreihe, Stapel, monoStil } from '../components/instrument';
+import { Knopfreihe, Stapel, monoStil, schriftStil } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
@@ -112,7 +112,8 @@ export default function EtbBausteineTab() {
           <span
             data-typ={t}
             style={{
-              ...monoStil('meta', 500),
+              ...schriftStil('meta'),
+              fontWeight: 500,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,

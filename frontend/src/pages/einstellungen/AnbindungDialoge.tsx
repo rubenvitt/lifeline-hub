@@ -16,7 +16,7 @@ export function RechteText({ scopes }: { scopes: readonly string[] }) {
         <span key={s}>
           {i > 0 && ' · '}
           {scopeText(s)}{' '}
-          <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
+          <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{s}</span>
         </span>
       ))}
     </span>
