@@ -65,6 +65,9 @@ labels:
 Bei anderen Proxys gilt dasselbe Ziel: kein Eintrag im Zugriffsprotokoll für Pfade
 unter `/api/v1/intake/`, auch nicht bei Fehlern.
 
+Bis November 2026 hieß der Pfad `/api/v1/einwurf/` (LLH-2054). Eine Proxy-Regel, die noch
+auf den alten Pfad zeigt, schützt nichts mehr: Regel und Absender ziehen zusammen um.
+
 ## Cert-Beschaffung (Präzedenz)
 
 Beim Start mit `--tls` wird ein Server-Zertifikat in dieser Reihenfolge

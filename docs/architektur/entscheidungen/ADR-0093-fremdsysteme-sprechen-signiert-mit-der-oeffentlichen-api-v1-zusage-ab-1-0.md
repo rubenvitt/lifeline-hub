@@ -23,6 +23,8 @@ herleitung:
 
 - MUST: Routen für Fremdsysteme liegen unter `/api/v1/`; nur sie tragen eine Stabilitätszusage
   (innerhalb von v1 nur hinzufügen), die übrige API keine. Die Zusage gilt ab Version 1.0.0.
+- MUST NOT: Ab 1.0.0 verschwindet kein Pfad unter `/api/v1/`, auch nicht nach der Alias-Frist
+  von ADR-0085; Entfernen und Umbenennen gehen über `/api/v2/`.
 - MUST: Pfade unter `/api/v1/` folgen ADR-0085; die übrigen Namen auf dem Wire (Felder, Werte,
   Scopes, Ereignisarten, Fehlercodes, Kopfzeilen) folgen der Wurzel-`AGENTS.md`,
   „Bezeichner-Sprache“.

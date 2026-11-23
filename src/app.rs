@@ -3208,10 +3208,7 @@ mod tests {
         // Ein langer Pfad mit Schlüssel am Anfang: maskiert und gekürzt.
         let sehr_lang = format!("/api/v1/intake/{schluessel}/{}", "a".repeat(400));
         let gekuerzt = pfad_fuer_protokoll(&sehr_lang);
-        assert!(
-            gekuerzt.starts_with("/api/v1/intake/***/aaa"),
-            "{gekuerzt}"
-        );
+        assert!(gekuerzt.starts_with("/api/v1/intake/***/aaa"), "{gekuerzt}");
         assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN);
         // Auch ohne Schrägstrich vor dem Schlüssel.
         let pfad = format!("/api/v1/intake{schluessel}/alarm");
