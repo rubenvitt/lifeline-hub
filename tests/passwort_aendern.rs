@@ -1,4 +1,4 @@
-//! Self-Service-Passwortwechsel (LFH-471): `POST /api/auth/passwort`.
+//! Self-Service-Passwortwechsel (LFH-471): `POST /api/auth/password`.
 //!
 //! Gepinnt sind die vier Zusagen des Tickets: Wechsel mit Alt-Passwort und Anmeldung mit dem
 //! neuen, 422 bei falschem Alt-Passwort, 400 bei zu kurzem neuen, und die eigene Sitzung
@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 mod common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 
-const PFAD: &str = "/api/auth/passwort";
+const PFAD: &str = "/api/auth/password";
 
 /// Status eines Anmeldeversuchs, ohne Cookie.
 async fn login_status(app: &axum::Router, benutzername: &str, passwort: &str) -> StatusCode {

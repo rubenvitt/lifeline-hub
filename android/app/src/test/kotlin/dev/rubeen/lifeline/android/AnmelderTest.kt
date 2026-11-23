@@ -111,7 +111,7 @@ class AnmelderTest {
         warteFrist()
 
         assertEquals(1, skripte.size)
-        assertTrue(skripte.single().contains("/api/auth/app-code/einloesen"))
+        assertTrue(skripte.single().contains("/api/auth/app-code/redeem"))
         assertTrue(skripte.single().contains(code))
     }
 

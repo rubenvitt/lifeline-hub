@@ -821,7 +821,7 @@ export default function LagekartePage() {
     else onZeichnenAbbrechen();
     setZoneAuswahl(null);
     // Nur der Wechsel zählt; die Handler sind je Render neu.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [bearbeitungVerwaist]);
 
   // Fokus auf einen Einsatzabschnitt (LLH-1057, `lagekarte/useAbschnittFokus.ts`): reine

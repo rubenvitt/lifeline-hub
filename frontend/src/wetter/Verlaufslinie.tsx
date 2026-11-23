@@ -206,9 +206,9 @@ export default function Verlaufslinie({
               {/* Direkt an der Hilfslinie beschriftet; oben am Rand steht der Text darunter statt außerhalb. */}
               <text
                 x={2}
-                y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}
+                y={prognoseY < 14 ? prognoseY + 12 : prognoseY - 3}
                 fill={rollen.gedaempft}
-                style={{ fontFamily: monoStil('meta').fontFamily, fontSize: 9 }}
+                style={monoStil('meta')}
               >
                 Prognose {wasserstandMeter(prognoseCm)} m
               </text>

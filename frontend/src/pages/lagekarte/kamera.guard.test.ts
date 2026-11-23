@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { type AstNode, parseSource, textOf, walk, lineOf } from '../../lib/sourceAst';
 
 /**
  * Jeder Kamera-Aufruf der Lagekarte sagt, wer bewegt (LFH-766, D2 in
@@ -52,32 +52,35 @@ const MARKEN = new Set(['BEDIENUNG', 'AUTOMATISCH']);
 
 function kameraAufrufe(datei: string) {
   const quelle = readFileSync(join(hier, datei), 'utf8');
-  const sf = ts.createSourceFile(datei, quelle, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const funde: { datei: string; zeile: number; methode: string; marke: string | null }[] = [];
-  const besuche = (n: ts.Node) => {
+  walk(parseSource(datei, quelle), (n) => {
+    if (n.type !== 'CallExpression') return;
+    const callee = n.callee as AstNode;
+    const eigenschaft = callee.property as AstNode | undefined;
     if (
-      ts.isCallExpression(n) &&
-      ts.isPropertyAccessExpression(n.expression) &&
-      KAMERA.has(n.expression.name.text)
-    ) {
-      const letztes = n.arguments[n.arguments.length - 1];
-      const marke =
-        letztes != null && ts.isIdentifier(letztes) && MARKEN.has(letztes.text)
-          ? letztes.text
-          : null;
-      const automatischErlaubt =
-        datei === 'kamera.ts' || (n.arguments[0]?.getText(sf).includes('startAnsicht') ?? false);
-      funde.push({
-        datei,
-        zeile: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1,
-        methode: n.expression.name.text,
-        // Was hier stehen muss — die gefundene Marke wird daran gemessen.
-        marke: marke === (automatischErlaubt ? 'AUTOMATISCH' : 'BEDIENUNG') ? 'passt' : marke,
-      });
-    }
-    ts.forEachChild(n, besuche);
-  };
-  besuche(sf);
+      callee.type !== 'MemberExpression' ||
+      callee.computed ||
+      eigenschaft?.type !== 'Identifier' ||
+      !KAMERA.has(eigenschaft.name as string)
+    )
+      return;
+    const argumente = n.arguments as AstNode[];
+    const letztes = argumente[argumente.length - 1];
+    const marke =
+      letztes != null && letztes.type === 'Identifier' && MARKEN.has(letztes.name as string)
+        ? (letztes.name as string)
+        : null;
+    const automatischErlaubt =
+      datei === 'kamera.ts' ||
+      (argumente[0] != null && textOf(quelle, argumente[0]).includes('startAnsicht'));
+    funde.push({
+      datei,
+      zeile: lineOf(quelle, n.start),
+      methode: eigenschaft.name as string,
+      // Was hier stehen muss — die gefundene Marke wird daran gemessen.
+      marke: marke === (automatischErlaubt ? 'AUTOMATISCH' : 'BEDIENUNG') ? 'passt' : marke,
+    });
+  });
   return funde;
 }
 

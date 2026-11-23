@@ -12,8 +12,8 @@
  *     Erlaubt sind die Textzeichen in {@link ERLAUBTE_ZEICHEN}; der Bestand steht in
  *     {@link OFFEN_EMOJI}.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * `pnpm lint` läuft mit `--max-warnings 0`; eine rot geborene Regel würde abgeschaltet. Die
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * `pnpm lint` bricht bei jeder Warnung; eine rot geborene Regel würde abgeschaltet. Die
  * Schuldmenge hält den Bestand sichtbar, bis er abgetragen ist (Muster `dichte.guard.test.ts`).
  * Danach sperrt zusätzlich pnpm den Import, weil beide Pakete aus `package.json` fallen.
  *

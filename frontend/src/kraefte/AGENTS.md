@@ -82,7 +82,7 @@ Geräte-Statusseite. Client: `kraefte/useStatusQuittung.ts` (`use…StatusQuittu
 Schlüssel `lfh-status-quittung-<art>-<id>`); die Antwort des Wechsels kommt ohne
 `status_ruecknahme` in den Cache (`ohneBeleg`). Server: Die Zeile hält beim Wechsel selbst fest,
 was „Rückgängig“ herstellt (`status_gesetzt_von`, `status_gesetzt_at` bzw. beim Fahrzeug
-`status_seit`, Vorzustand, Zeitachsen-Ereignis; Migrationen 0356, 0363); der Beleg trägt nur
+`status_seit`, Vorzustand, Zeitachsen-Ereignis; Migrationen 0356, 0365); der Beleg trägt nur
 Prüfwerte. Riegel und Streichen nur über `src/status_ruecknahme.rs` (`pruefe`,
 `streiche_ereignis_tx`): gleiche Person, höchstens zehn Minuten, Status und Kennung unverändert
 (sonst 409 `veraltet` bzw. 409 mit Grund). Ein Weg ohne Person (Schichtplan-Vollzug) setzt kein

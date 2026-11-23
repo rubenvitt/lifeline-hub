@@ -566,14 +566,14 @@ export default function Schnellerfassung({
     startFokusErledigt.current = true;
     if (startFokus && !istEingabefeld(document.activeElement)) fokusStart(true);
     // `fokusStart` liest den Stand dieses Renders; er ist hier gewollt nur einmal gefragt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [breiteBekannt, startFokus, rufname.geladen, rufname.entschieden]);
 
   /** Nach einem Erfolg ohne Remount (Berichtigung, Einzelaufrufer): Fokus nach derselben Regel. */
   const [fokusNachErfassen, setFokusNachErfassen] = useState(0);
   useEffect(() => {
     if (fokusNachErfassen > 0) fokusStart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [fokusNachErfassen]);
 
   /**
@@ -679,7 +679,7 @@ export default function Schnellerfassung({
     if (!fokusNachRufname.current || rufname.standard == null) return;
     fokusNachRufname.current = false;
     fokusStart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [rufname.standard]);
 
   function aktualisiereTrigger(text: string, caret: number) {

@@ -43,7 +43,7 @@ function BefehlListenKarte({
       hervorgehoben={hervorgehoben}
       zeit={
         <>
-          <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
+          <span style={{ display: 'block', ...monoStil('meta'), color: rollen.schwach }}>
             Stand
           </span>
           <span>

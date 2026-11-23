@@ -831,7 +831,7 @@ async fn melden_einmal_mit(
         fuehrung_bis: fuehrung_empfangen,
         fuehrung_gesendet_bis: fuehrung_gesendet,
         tls_zertifikat: kopplung.tls_zertifikat.clone(),
-        rolle_mitarbeit: true,
+        rolle_mitarbeit: rolle_mitarbeit_melden(),
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
@@ -1716,8 +1716,25 @@ pub async fn handle_meldung(
         fuehrung_mehr: fuehrung_ausgang.mehr,
         hinweise: true,
         web_push,
-        rolle_mitarbeit: true,
+        rolle_mitarbeit: rolle_mitarbeit_melden(),
     })
+}
+
+/// Ob diese Instanz die Einsatzrolle `mitarbeit` beim Melden nennt (LLH-1817, design.md D7):
+/// immer, außer ein Test stellt eine ältere Instanz nach ([`rolle_mitarbeit_fuer_tests`]).
+fn rolle_mitarbeit_melden() -> bool {
+    ROLLE_MITARBEIT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+static ROLLE_MITARBEIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Test-Hook: lässt diese Instanz die Fähigkeit `rolle_mitarbeit` nicht nennen (`false`), wie ein
+/// Stand vor LLH-1817, oder wieder nennen (`true`, Vorgabe). Nicht `cfg(test)`, kein Aufrufer im
+/// Produktcode. Der Schalter gilt prozessweit für jede Instanz: nur in einem Test-Binary aufrufen,
+/// dessen Tests nacheinander laufen (`NACHEINANDER` in `tests/instanz_mitarbeit_nachtrag.rs`).
+#[doc(hidden)]
+pub fn rolle_mitarbeit_fuer_tests(an: bool) {
+    ROLLE_MITARBEIT.store(an, std::sync::atomic::Ordering::Relaxed);
 }
 
 #[cfg(test)]

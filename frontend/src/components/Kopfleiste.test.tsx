@@ -119,8 +119,8 @@ describe('Kopfleiste · Stile', () => {
     // Literale, nicht aus `dichten` zurückgelesen. 73 = 72 px Ziel plus die 1-px-Haarlinie,
     // die in der `border-box`-Spalte von der Zielbreite abgeht.
     const t = (s: keyof typeof dichten) => ({ controlHeight: dichten[s].zeilenhoehe });
-    expect(railBreite(t('kompakt'))).toBe(60);
-    expect(railBreite(t('komfortabel'))).toBe(60);
+    expect(railBreite(t('kompakt'))).toBe(64);
+    expect(railBreite(t('komfortabel'))).toBe(64);
     expect(railBreite(t('handschuh'))).toBe(73);
   });
 

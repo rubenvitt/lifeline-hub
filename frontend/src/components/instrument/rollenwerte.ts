@@ -79,7 +79,7 @@ export type Monostufe = {
 }[Schriftstufenname];
 
 /**
- * Mono-Text in einer Stufe der `schriftskala` (`metaKlein` 10 · `meta` 11 · `monoKlein` 12 ·
+ * Mono-Text in einer Stufe der `schriftskala` (`meta` 11 · `monoKlein` 12 ·
  * `mono` 13 · `monoGross` 14 · `datenwert*`; LLH-1972). Die Stufe liefert Größe und, ohne
  * `gewicht`, ihr Gewicht — ihre Sperrung NICHT: wer sie will, setzt sie selbst.
  *

@@ -9,7 +9,7 @@ import { naechsterUnwetterWechsel } from './unwetter';
 export function useUnwetterUhr(teil: Parameters<typeof naechsterUnwetterWechsel>[0]): number {
   const [takt, setTakt] = useState(0);
   // `teil` und `takt` SIND der Anlass, die Uhr neu zu lesen; gelesen werden sie im Rumpf nicht.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   const jetzt = useMemo(() => Date.now(), [teil, takt]);
   useEffect(() => {
     const wechsel = naechsterUnwetterWechsel(teil, jetzt);

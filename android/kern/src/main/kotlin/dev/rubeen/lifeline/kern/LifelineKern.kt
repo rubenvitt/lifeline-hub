@@ -8,6 +8,9 @@ object LifelineKern {
     /**
      * Die Hüllen-Verträge (`shell_contract` aus `GET /api/shell`), mit denen diese App arbeitet.
      * Ein neuer Wert kommt erst hinzu, wenn die App den Bruch des Servers mitgeht.
+     *
+     * Verlauf: 1 mit LLH-1989; nur 2 mit LLH-1979, weil die App seither
+     * `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0085).
      */
-    val bekannteVertraege: List<Int> = listOf(1)
+    val bekannteVertraege: List<Int> = listOf(2)
 }

@@ -141,7 +141,7 @@ export default function Zeitachseneintrag({
   const metaImKopf = einzeilig && (verfasser == null || typeof verfasser === 'string');
   const menueImKopf = einzeilig && menue != null;
   const trenner = (
-    <span aria-hidden="true" style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>
+    <span aria-hidden="true" style={{ ...monoStil('meta'), color: rollen.schwach }}>
       ·
     </span>
   );
@@ -175,9 +175,7 @@ export default function Zeitachseneintrag({
         <span data-lfh="zeitachse-zeit" style={{ ...monoStil('mono', 500), color: rollen.text }}>
           {zeit}
         </span>
-        {nr != null && (
-          <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{nr}</span>
-        )}
+        {nr != null && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{nr}</span>}
       </div>
       <span
         aria-hidden="true"
@@ -206,7 +204,7 @@ export default function Zeitachseneintrag({
           <span
             data-lfh="typwort"
             style={{
-              ...monoStil('metaKlein', 500),
+              ...monoStil('meta', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -215,7 +213,7 @@ export default function Zeitachseneintrag({
             {typwort}
           </span>
           {meta != null && (
-            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{meta}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
           {metaImKopf && verfasser != null && (
             <>
@@ -226,7 +224,7 @@ export default function Zeitachseneintrag({
                 data-lfh="verfasser"
                 title={typeof verfasser === 'string' ? verfasser : undefined}
                 style={{
-                  ...monoStil('metaKlein'),
+                  ...monoStil('meta'),
                   color: rollen.gedaempft,
                   maxWidth: '24ch',
                   whiteSpace: 'nowrap',
@@ -241,7 +239,7 @@ export default function Zeitachseneintrag({
           {metaImKopf && weg != null && (
             <>
               {trenner}
-              <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{weg}</span>
+              <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{weg}</span>
             </>
           )}
           {menueImKopf && (
@@ -305,7 +303,7 @@ export default function Zeitachseneintrag({
             </span>
           )}
           {!metaImKopf && weg != null && (
-            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{weg}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{weg}</span>
           )}
           {aktionen}
           {!menueImKopf && menue}
