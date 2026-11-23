@@ -104,7 +104,7 @@ export function useQueryParamSelektion(
     // Geklont statt in-place gelöscht (`useLinkAuftrag`): ein konkurrierender Default-Effekt sähe
     // den Param sonst geräumt und defaultete das Deeplink-Ziel weg.
     auftrag.raeume(key);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, auftrag, key, bereit, sicher]);
   const melde = useCallback((id: number) => setLage({ id, pfad: pathname }), [pathname]);
   const schliesse = useCallback(() => setLage(null), []);

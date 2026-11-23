@@ -138,10 +138,10 @@ final class VertragTests: XCTestCase {
     func testJederVerbindungsfehlerGiltWieOhneVerbindung() {
         for code: URLError.Code in [.notConnectedToInternet, .timedOut, .cannotConnectToHost] {
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 1),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
                 .nichtErreichbar(.nichtErreichbar), "\(code)")
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 3),
                 .nichtVertraeglich(.zuNeu, server: nil), "\(code)")
         }
     }
@@ -153,12 +153,12 @@ final class VertragTests: XCTestCase {
         ] {
             XCTAssertEqual(Fehlerklasse(code), .zertifikat, "\(code)")
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 1),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
                 .nichtErreichbar(.zertifikat))
             // Auch ein zuletzt unverträglicher Server zeigt zuerst die Anleitung zum Zertifikat:
             // ohne Vertrauen erfährt die App den heutigen Vertrag nicht.
             XCTAssertEqual(
-                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 3),
                 .nichtErreichbar(.zertifikat))
         }
         for code: URLError.Code in [

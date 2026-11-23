@@ -46,7 +46,7 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
 - **Im Browser anmelden** (LFH-818, `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`):
   `ASWebAuthenticationSession` (`aswas.rs`), PKCE-`verifier` bleibt in der Hülle, Rücksprung nur
   aus der Sitzung (`anmeldung::folge`); eingelöst per `eval` im startenden Fenster mit doppelter
-  Origin-Prüfung, Server `POST /api/auth/app-code[/einloesen]` (einheitlich 401, Audit
+  Origin-Prüfung, Server `POST /api/auth/app-code[/redeem]` (einheitlich 401, Audit
   `systembrowser`). Ein `lifeline://anmeldung` von außen bleibt wirkungslos.
 - Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
   reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`). `verbindung.json`

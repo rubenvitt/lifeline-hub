@@ -172,7 +172,7 @@ export function useFensterAusschnitt({
   // Messen nach jedem Render: Abstand von Eintrag zu Eintrag, der letzte bis zum Messende. Ohne
   // Abhängigkeiten, weil jeder Render Höhen ändern kann (Aufklappen, geänderter Inhalt); die Schleife
   // endet, weil nur eine Änderung über 1 px neu rendert.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- misst bewusst nach jedem Render
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- misst bewusst nach jedem Render
   useLayoutEffect(() => {
     if (!aktiv || !wurzel.current) return;
     const eintraege = Array.from(

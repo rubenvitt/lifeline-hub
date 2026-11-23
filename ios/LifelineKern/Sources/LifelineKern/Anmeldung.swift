@@ -169,7 +169,7 @@ public enum Anmeldung {
         let (code, verifier, ereignis) = (literal(code), literal(verifier), literal(ereignis))
         return "(() => { const melden = (ergebnis) => window.dispatchEvent(new CustomEvent(\(ereignis), "
             + "{ detail: { ergebnis } })); if (window.location.origin !== \(origin)) return; "
-            + "fetch('/api/auth/app-code/einloesen', { method: 'POST', credentials: 'same-origin', "
+            + "fetch('/api/auth/app-code/redeem', { method: 'POST', credentials: 'same-origin', "
             + "headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: \(code), "
             + "verifier: \(verifier) }) }).then((antwort) => melden(antwort.ok ? 'angemeldet' : "
             + "antwort.status === 401 ? 'abgelehnt' : 'fehler')).catch(() => melden('fehler')); })(); 0;"

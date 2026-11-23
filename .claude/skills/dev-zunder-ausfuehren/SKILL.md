@@ -301,8 +301,8 @@ nicht. Neue verbindliche Regeln stehen in der Bereichs-`AGENTS.md` oder einer AD
   „Geprüft“. Das Label `voll` (alle Suiten im PR, ohne Pflicht) setzt du nur nach den Kriterien
   in `scripts/AGENTS.md`, „Leichte PR-Prüfung“, „Wann `voll`“: selten, nicht weil eine Änderung
   riskant scheint. Das frühere Label `e2e` bedeutet nichts mehr. Ist ein Lauf auf `alpha` rot und willst
-  du einen Job neu starten, nur am jüngsten Lauf: der Neustart eines älteren bricht die Tests des
-  jüngeren ab.
+  du einen Job neu starten, nur am jüngsten Lauf: der Neustart eines älteren verdrängt den
+  wartenden Job des jüngeren.
 - **Mit `alpha` zusammen bauen** (seit LLH-1899 kein Pflicht-Check mehr): Liegt dein PR länger
   offen und wurde inzwischen viel gemergt, `alpha` in den Branch mergen (kein Rebase) und
   `./scripts/check-all.sh --nur baut` fahren, bevor Auto-Merge an geht. Kompiliert es zusammen

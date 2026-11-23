@@ -77,7 +77,7 @@ sie revisionssicher, im Backup enthalten und auswertbar (in der Verwaltung, sieh
 | `login_ok` | erfolgreiche Anmeldung **mit Session** | der angemeldete Benutzer |
 | `login_fehlgeschlagen` | falsches Passwort, unbekannter Benutzer, gesperrte Quelle | der **versuchte** Name (muss keinem Benutzer entsprechen) |
 | `logout` | Abmeldung | — (nur `benutzer_id`) |
-| `passwort_geaendert` | Passwort selbst gewechselt (`POST /api/auth/passwort`), nach dem Speichern | der angemeldete Benutzer (mit `benutzer_id`) |
+| `passwort_geaendert` | Passwort selbst gewechselt (`POST /api/auth/password`), nach dem Speichern | der angemeldete Benutzer (mit `benutzer_id`) |
 | `passwort_wechsel_abgewiesen` | Passwortwechsel mit falschem Alt-Passwort | der angemeldete Benutzer (mit `benutzer_id`) |
 
 Beim Passwortwechsel schreibt nur die Prüfung des Alt-Passworts eine Zeile. Formfehler (`400`),

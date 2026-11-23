@@ -118,10 +118,10 @@ class VertragTest {
     @Test
     fun `ein Zertifikatsfehler ist kein Nicht-erreichbar`() {
         val fehler = ShellAbruf.Fehler(Netzfehler.ZERTIFIKAT)
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 1))
+        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 2))
         // Auch ein zuletzt unverträglicher Server zeigt zuerst die Anleitung zum Zertifikat:
         // ohne Vertrauen erfährt die App den heutigen Vertrag nicht.
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 2))
+        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 3))
     }
 
     /** Ein Abbruch durch die App gilt wie jeder Verbindungsfehler, samt gemerktem Vertrag. */

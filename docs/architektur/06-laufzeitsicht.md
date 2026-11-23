@@ -79,7 +79,7 @@ sequenceDiagram
     FE->>BE: POST /api/auth/totp/finish {code}
   else Einmalpasswort
     BE-->>FE: {passwort_wechsel_erforderlich}
-    FE->>BE: POST /api/auth/passwort/festlegen
+    FE->>BE: POST /api/auth/password/set
   end
   BE->>DB: session::anlegen (Token-Hash, 7 Tage), auth_audit login_ok
   BE-->>FE: Benutzer, Cookie lifeline_sid (HttpOnly, SameSite=Lax)
@@ -99,7 +99,7 @@ sequenceDiagram
   (`src-tauri/src/aswas.rs`). Der Systembrowser holt mit seiner Sitzung über
   `POST /api/auth/app-code` einen Einmalcode (`TTL` 60 s, `src/auth/huelle/state.rs`) und springt
   mit `lifeline://anmeldung?code=…` zurück; die Hülle löst ihn mit dem PKCE-`verifier` im Webview
-  über `POST /api/auth/app-code/einloesen` ein (`src-tauri/src/anmeldung.rs`). Regeln:
+  über `POST /api/auth/app-code/redeem` ein (`src-tauri/src/anmeldung.rs`). Regeln:
   [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md).
 - Jede schreibende Anfrage trägt `X-Erwarteter-Benutzer-Id`; bei Abweichung antwortet
   `CurrentUser` mit 412 und der Client prüft per `/me`. Regeln und Abmeldewege:
@@ -733,7 +733,7 @@ sequenceDiagram
   (`src/web_push/mod.rs`). Erreicht der Service Worker den Server nicht, zeigt er den Titel der
   Stufe (`frontend/public/alarm-sw.js`).
 - Ohne Einsatz meldet nur der Adapter-Lauf (LLH-2026,
-  [ADR-0084](entscheidungen/ADR-0084-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  [ADR-0086](entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   `adapter::lauf` setzt in seiner Transaktion den Merker `adapter.gemeldet` und ruft danach
   `melden(Anlass::adapter(…))`; Empfänger, Leserecht und Text stehen in
   `src/benachrichtigung/adapter.rs`, zugestellt wird über den Org-Kanal, nie über den Hub.

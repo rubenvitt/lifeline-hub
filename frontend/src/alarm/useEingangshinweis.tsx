@@ -201,7 +201,7 @@ export function useEingangshinweis(
       desktop: null,
     }),
     // Je Einsatz ein eigener Zustand (wie der Scope der Alarmzone).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [einsatzId],
   );
 

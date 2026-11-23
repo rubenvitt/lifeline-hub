@@ -1564,7 +1564,7 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0364_benachrichtigung_adapter.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
@@ -9148,7 +9148,7 @@ export interface components {
          * @enum {string}
          */
         VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
-        /** @description Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`. */
+        /** @description Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
             gelesen_bis?: string | null;

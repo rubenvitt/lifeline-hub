@@ -170,7 +170,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::auth::app_code_ausstellen),
         )
         .route(
-            "/api/auth/app-code/einloesen",
+            "/api/auth/app-code/redeem",
             post(routes::auth::app_code_einloesen).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         // LFH-892: ein Gerät löst seinen Kopplungscode ein (öffentlich, Rate-Limit je Quelle).
@@ -219,22 +219,22 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/totp/finish",
             post(routes::auth::totp_finish).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
-        .route("/api/auth/passwort", post(routes::auth::passwort_aendern))
+        .route("/api/auth/password", post(routes::auth::passwort_aendern))
         // LFH-1121: der Schritt nach einem Login mit Einmalpasswort (öffentlich, trägt das
         // Wechsel-Cookie statt einer Sitzung). Body-Grenze wie der Login: ein neues Passwort hat
         // höchstens 128 Zeichen.
         .route(
-            "/api/auth/passwort/festlegen",
+            "/api/auth/password/set",
             post(routes::auth::passwort_festlegen)
                 .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
         )
-        .route("/api/auth/sitzungen", get(routes::sitzung::eigene_liste))
+        .route("/api/auth/sessions", get(routes::sitzung::eigene_liste))
         .route(
-            "/api/auth/sitzungen/andere-beenden",
+            "/api/auth/sessions/end-others",
             post(routes::sitzung::eigene_andere_beenden),
         )
         .route(
-            "/api/auth/sitzungen/{kennung}",
+            "/api/auth/sessions/{kennung}",
             delete(routes::sitzung::eigene_beenden),
         )
         .route(
@@ -279,9 +279,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benutzer/{id}/sitzungen/{kennung}",
             delete(routes::sitzung::admin_beenden),
         )
-        .route("/api/versionsstand", get(routes::versionsstand::lesen))
+        .route("/api/release-notes", get(routes::versionsstand::lesen))
         .route(
-            "/api/versionsstand/gelesen",
+            "/api/release-notes/read",
             post(routes::versionsstand::gelesen),
         )
         .route(

@@ -1,63 +1,63 @@
 {
   "zweck": "Gemeinsame Fälle der Vertragsprüfung gegen GET /api/shell (src-tauri/src/vertrag.rs, ios/LifelineKern Vertrag.swift, android/kern Vertrag.kt). „bewerte“: was der Abruf erlebt hat (status, content_type, koerper als Text, oder fehler: keine Antwort), der zuletzt bestätigte Vertrag dieses Servers (letzter_vertrag) und die Verträge, die die Hülle kennt (bekannt, sonst die Liste oben) → ergebnis vertraeglich, zu_alt, zu_neu oder nicht_erreichbar, dazu die Version des Servers (server_version, null, wenn der Server keinen Vertrag nannte oder nur der gemerkte galt) und bei vertraeglich der Vertrag. „weiterleitung“: folgt der Abruf einer Weiterleitung von → nach? Nur auf derselben Origin. Zertifikatsfehler unterscheiden nur die mobilen Hüllen (iOS, Android); sie stehen in deren eigenen Tests.",
-  "bekannt": [1],
+  "bekannt": [2],
   "bewerte": [
     {
       "beschreibung": "ein bekannter Vertrag ist verträglich",
       "abruf": {
         "status": 200,
         "content_type": "application/json",
-        "koerper": "{\"version\":\"1.0.0-alpha.300\",\"shell_contract\":1}"
+        "koerper": "{\"version\":\"1.0.0-alpha.300\",\"shell_contract\":2}"
       },
       "letzter_vertrag": null,
       "ergebnis": "vertraeglich",
       "server_version": "1.0.0-alpha.300",
-      "shell_contract": 1
+      "shell_contract": 2
     },
     {
       "beschreibung": "neue Felder des Servers ignoriert die Hülle",
       "abruf": {
         "status": 200,
         "content_type": "application/json",
-        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1,\"kuenftig\":[\"a.js\"],\"neu\":true}"
+        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":2,\"kuenftig\":[\"a.js\"],\"neu\":true}"
       },
       "letzter_vertrag": null,
       "ergebnis": "vertraeglich",
       "server_version": "1.0.0",
-      "shell_contract": 1
+      "shell_contract": 2
     },
     {
       "beschreibung": "der Vertrag gilt auch mit Zeichensatz und anderer Schreibweise im Content-Type",
       "abruf": {
         "status": 200,
         "content_type": " Application/JSON ; charset=utf-8",
-        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1}"
+        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":2}"
       },
       "letzter_vertrag": null,
       "ergebnis": "vertraeglich",
       "server_version": "1.0.0",
-      "shell_contract": 1
+      "shell_contract": 2
     },
     {
       "beschreibung": "ein heute verträglicher Server ist verträglich, auch wenn er zuletzt einen anderen Vertrag sprach",
       "abruf": {
         "status": 200,
         "content_type": "application/json",
-        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1}"
+        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":2}"
       },
-      "letzter_vertrag": 2,
+      "letzter_vertrag": 3,
       "ergebnis": "vertraeglich",
       "server_version": "1.0.0",
-      "shell_contract": 1
+      "shell_contract": 2
     },
     {
       "beschreibung": "ein größerer Vertrag heißt „App aktualisieren“ und nennt die Version des Servers",
       "abruf": {
         "status": 200,
         "content_type": "application/json",
-        "koerper": "{\"version\":\"2.0.0\",\"shell_contract\":2}"
+        "koerper": "{\"version\":\"2.0.0\",\"shell_contract\":3}"
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "zu_neu",
       "server_version": "2.0.0"
     },
@@ -71,6 +71,29 @@
       "letzter_vertrag": null,
       "ergebnis": "zu_alt",
       "server_version": "0.1"
+    },
+    {
+      "beschreibung": "ein Server mit Vertrag 1 kennt nur /api/auth/app-code/einloesen: für die Hülle zu alt, statt dass die Anmeldung am umbenannten Pfad scheitert (LLH-1979)",
+      "abruf": {
+        "status": 200,
+        "content_type": "application/json",
+        "koerper": "{\"version\":\"1.0.0-alpha.300\",\"shell_contract\":1}"
+      },
+      "letzter_vertrag": null,
+      "ergebnis": "zu_alt",
+      "server_version": "1.0.0-alpha.300"
+    },
+    {
+      "beschreibung": "eine Hülle, die nur Vertrag 1 kennt, sieht einen Server mit Vertrag 2 als zu neu: „App aktualisieren“ (LLH-1979)",
+      "abruf": {
+        "status": 200,
+        "content_type": "application/json",
+        "koerper": "{\"version\":\"1.0.0-alpha.400\",\"shell_contract\":2}"
+      },
+      "letzter_vertrag": 1,
+      "bekannt": [1],
+      "ergebnis": "zu_neu",
+      "server_version": "1.0.0-alpha.400"
     },
     {
       "beschreibung": "kennt die Hülle nur größere Verträge, ist der Server zu alt",
@@ -103,7 +126,7 @@
         "content_type": "application/json; charset=utf-8",
         "koerper": "{\"status\":\"ok\"}"
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "zu_alt",
       "server_version": null
     },
@@ -125,7 +148,7 @@
         "content_type": "text/plain",
         "koerper": ""
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "zu_alt",
       "server_version": null
     },
@@ -158,7 +181,7 @@
         "content_type": "text/html",
         "koerper": "<!doctype html><title>WLAN-Anmeldung</title>"
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -169,7 +192,7 @@
         "content_type": "text/html",
         "koerper": "<!doctype html><title>WLAN-Anmeldung</title>"
       },
-      "letzter_vertrag": 2,
+      "letzter_vertrag": 3,
       "ergebnis": "zu_neu",
       "server_version": null
     },
@@ -180,7 +203,7 @@
         "content_type": "text/plain",
         "koerper": "ok"
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -191,7 +214,7 @@
         "content_type": null,
         "koerper": "<!doctype html><title>WLAN-Anmeldung</title>"
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -200,7 +223,7 @@
       "abruf": {
         "status": 200,
         "content_type": "text/html",
-        "koerper": "{\"version\":\"9\",\"shell_contract\":1}"
+        "koerper": "{\"version\":\"9\",\"shell_contract\":2}"
       },
       "letzter_vertrag": null,
       "ergebnis": "nicht_erreichbar",
@@ -211,7 +234,7 @@
       "abruf": {
         "status": 200,
         "content_type": "application/jsonp",
-        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":1}"
+        "koerper": "{\"version\":\"1.0.0\",\"shell_contract\":2}"
       },
       "letzter_vertrag": null,
       "ergebnis": "nicht_erreichbar",
@@ -224,7 +247,7 @@
         "content_type": "text/html",
         "koerper": ""
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -246,7 +269,7 @@
         "content_type": "text/html",
         "koerper": ""
       },
-      "letzter_vertrag": 2,
+      "letzter_vertrag": 3,
       "ergebnis": "zu_neu",
       "server_version": null
     },
@@ -257,7 +280,7 @@
         "content_type": "text/html",
         "koerper": ""
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -286,7 +309,7 @@
       "abruf": {
         "fehler": true
       },
-      "letzter_vertrag": 1,
+      "letzter_vertrag": 2,
       "ergebnis": "nicht_erreichbar",
       "server_version": null
     },
@@ -295,7 +318,7 @@
       "abruf": {
         "fehler": true
       },
-      "letzter_vertrag": 2,
+      "letzter_vertrag": 3,
       "ergebnis": "zu_neu",
       "server_version": null
     },

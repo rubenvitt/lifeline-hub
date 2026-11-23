@@ -213,7 +213,7 @@ export default function OfflineRegionPicker({
     }
     // download/message/qc sind stabile Referenzen; bewusst nicht in den Deps, damit die
     // Verarbeitung nur an neuen Bau-Status-/Verkettungs-Ständen hängt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [bauJobs, verkettung]);
 
   // Basisliste: mit karten-service alle baubaren Regionen, sonst nur die lieferbaren

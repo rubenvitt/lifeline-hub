@@ -171,7 +171,7 @@ async fn abmeldung_einer_sitzung_ohne_anmeldeweg_schreibt_unbekannt() {
 
 // --- Passwortwechsel (LFH-827) ---
 //
-// `POST /api/auth/passwort` schrieb bis LFH-827 nur `tracing`. Bei einem Vorfall lautet die Frage
+// `POST /api/auth/password` schrieb bis LFH-827 nur `tracing`. Bei einem Vorfall lautet die Frage
 // aber „wann hat wer das Passwort geändert, und von welcher IP?“ — die beantwortet nur die
 // Tabelle.
 
@@ -188,7 +188,7 @@ async fn passwort_wechseln(
     let body = format!(r#"{{"altes_passwort":"{alt}","neues_passwort":"{neu}"}}"#);
     let mut req = Request::builder()
         .method("POST")
-        .uri("/api/auth/passwort")
+        .uri("/api/auth/password")
         .header(header::COOKIE, cookie)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(body))

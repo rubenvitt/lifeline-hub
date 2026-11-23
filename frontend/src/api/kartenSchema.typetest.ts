@@ -2,7 +2,7 @@
 // REGELN:
 //  - jeder Assert-Alias MUSS exportiert sein, sonst feuert TS6196 (`noUnusedLocals`).
 //  - `@ts-expect-error` nur auf EXPORTIERTEN const-Bindungen und nur MIT Begründung, sonst
-//    absorbiert TS6133 die Direktive bzw. bricht @typescript-eslint/ban-ts-comment das Lint-Gate.
+//    absorbiert TS6133 die Direktive bzw. bricht typescript/ban-ts-comment das Lint-Gate.
 import type { components } from './types.generated';
 
 type S = components['schemas'];

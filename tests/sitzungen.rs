@@ -121,7 +121,7 @@ async fn liste_zeigt_geraet_und_markiert_die_aktuelle() {
     let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
     let _ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
 
-    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    let sitzungen = liste(&app, &firefox, "/api/auth/sessions").await;
     assert_eq!(sitzungen.len(), 2, "{sitzungen:?}");
     let aktuell: Vec<(&str, bool)> = sitzungen
         .iter()
@@ -151,7 +151,7 @@ async fn me_nennt_die_kennung_der_eigenen_sitzung() {
     let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
     let ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
 
-    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    let sitzungen = liste(&app, &firefox, "/api/auth/sessions").await;
     for (cookie, geraet) in [(&firefox, "Firefox · Windows"), (&ipad, "Safari · iPadOS")] {
         let (s, v) = anfrage(&app, "GET", "/api/auth/me", cookie, None).await;
         assert_eq!(s, StatusCode::OK, "{v}");
@@ -184,7 +184,7 @@ async fn abmelden_mit_erwarteter_sitzung_trifft_nur_diese() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "marlene", "keine").await;
     let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
-    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    let sitzungen = liste(&app, &firefox, "/api/auth/sessions").await;
     let eigene = kennung(&sitzungen, "Firefox · Windows");
 
     assert_eq!(
@@ -204,7 +204,7 @@ async fn abmelden_mit_erwarteter_sitzung_trifft_nur_diese() {
 async fn ohne_user_agent_fehlt_das_geraet() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let sitzungen = liste(&app, &admin, "/api/auth/sitzungen").await;
+    let sitzungen = liste(&app, &admin, "/api/auth/sessions").await;
     assert_eq!(sitzungen.len(), 1);
     assert!(
         sitzungen[0].as_object().unwrap().get("geraet").is_none(),
@@ -227,13 +227,13 @@ async fn eine_eigene_beenden_laesst_das_konto_unveraendert() {
         .await
         .unwrap();
     let k = kennung(
-        &liste(&app, &firefox, "/api/auth/sitzungen").await,
+        &liste(&app, &firefox, "/api/auth/sessions").await,
         "Safari · iPadOS",
     );
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &firefox,
         None,
     )
@@ -264,7 +264,7 @@ async fn eine_eigene_beenden_laesst_das_konto_unveraendert() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &firefox,
         None,
     )
@@ -287,13 +287,13 @@ async fn beenden_einer_sitzung_ohne_anmeldeweg_schreibt_unbekannt() {
         .unwrap();
 
     let k = kennung(
-        &liste(&app, &firefox, "/api/auth/sitzungen").await,
+        &liste(&app, &firefox, "/api/auth/sessions").await,
         "Safari · iPadOS",
     );
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &firefox,
         None,
     )
@@ -324,13 +324,13 @@ async fn fehlende_spur_verhindert_das_beenden_nicht() {
     .unwrap();
 
     let k = kennung(
-        &liste(&app, &firefox, "/api/auth/sitzungen").await,
+        &liste(&app, &firefox, "/api/auth/sessions").await,
         "Safari · iPadOS",
     );
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &firefox,
         None,
     )
@@ -344,14 +344,14 @@ async fn fehlende_spur_verhindert_das_beenden_nicht() {
 async fn die_aktuelle_ist_422() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let k = liste(&app, &admin, "/api/auth/sitzungen").await[0]["kennung"]
+    let k = liste(&app, &admin, "/api/auth/sessions").await[0]["kennung"]
         .as_str()
         .unwrap()
         .to_string();
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &admin,
         None,
     )
@@ -367,7 +367,7 @@ async fn fremde_kennung_ist_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "marlene", "keine").await;
     let marlene = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
-    let k_admin = liste(&app, &admin, "/api/auth/sitzungen").await[0]["kennung"]
+    let k_admin = liste(&app, &admin, "/api/auth/sessions").await[0]["kennung"]
         .as_str()
         .unwrap()
         .to_string();
@@ -375,7 +375,7 @@ async fn fremde_kennung_ist_404() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k_admin}"),
+        &format!("/api/auth/sessions/{k_admin}"),
         &marlene,
         None,
     )
@@ -400,14 +400,7 @@ async fn alle_anderen_beenden_schreibt_je_sitzung_einen_eintrag() {
         anmelden(&app, "marlene", "marlenepw1", FIREFOX).await,
     ];
 
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sitzungen/andere-beenden",
-        &ich,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &ich, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["beendet"], 3);
     for c in &andere {
@@ -420,17 +413,10 @@ async fn alle_anderen_beenden_schreibt_je_sitzung_einen_eintrag() {
         "andere Konten bleiben"
     );
     assert_eq!(anmeldespur(&pool).await.len(), 3);
-    assert_eq!(liste(&app, &ich, "/api/auth/sitzungen").await.len(), 1);
+    assert_eq!(liste(&app, &ich, "/api/auth/sessions").await.len(), 1);
 
     // Nichts mehr zu beenden: 200 mit 0, kein Eintrag.
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sitzungen/andere-beenden",
-        &ich,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &ich, None).await;
     assert_eq!((s, v["beendet"].as_u64()), (StatusCode::OK, Some(0)));
     assert_eq!(anmeldespur(&pool).await.len(), 3);
 }
@@ -444,7 +430,7 @@ async fn schreiben_traegt_die_bindung_an_den_erwarteten_benutzer() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/auth/sitzungen/andere-beenden")
+                .uri("/api/auth/sessions/end-others")
                 .header(header::COOKIE, &admin)
                 .header("x-erwarteter-benutzer-id", "999")
                 .body(Body::empty())
@@ -459,9 +445,9 @@ async fn schreiben_traegt_die_bindung_an_den_erwarteten_benutzer() {
 async fn ohne_sitzung_ist_401() {
     let (app, _pool) = setup_mit_pool().await;
     for (m, uri) in [
-        ("GET", "/api/auth/sitzungen"),
-        ("POST", "/api/auth/sitzungen/andere-beenden"),
-        ("DELETE", "/api/auth/sitzungen/00"),
+        ("GET", "/api/auth/sessions"),
+        ("POST", "/api/auth/sessions/end-others"),
+        ("DELETE", "/api/auth/sessions/00"),
         ("GET", "/api/benutzer/1/sitzungen"),
     ] {
         let (s, _) = anfrage(&app, m, uri, "lifeline_sid=unsinn", None).await;
@@ -557,7 +543,7 @@ async fn admin_einer_fremden_organisation_bekommt_404() {
     let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
     let fremd = anmelden(&app, "fremd", "fremdpw12", FIREFOX).await;
     let uri = format!("/api/benutzer/{fremd_id}/sitzungen");
-    let k = liste(&app, &fremd, "/api/auth/sitzungen").await[0]["kennung"]
+    let k = liste(&app, &fremd, "/api/auth/sessions").await[0]["kennung"]
         .as_str()
         .unwrap()
         .to_string();
@@ -649,7 +635,7 @@ async fn geraetesitzungen_bleiben_aussen_vor() {
         .unwrap();
 
     // Das Gerät selbst erreicht die Routen nicht.
-    let (s, _) = anfrage(&app, "GET", "/api/auth/sitzungen", &geraet, None).await;
+    let (s, _) = anfrage(&app, "GET", "/api/auth/sessions", &geraet, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     // Ein Admin sieht das Gerätekonto nicht als Person.
     for (m, u) in [
@@ -663,14 +649,7 @@ async fn geraetesitzungen_bleiben_aussen_vor() {
         assert_eq!(s, StatusCode::NOT_FOUND, "{m} {u}");
     }
     // Alle anderen Sitzungen des Admins beenden lässt das Gerät gekoppelt.
-    let (s, _) = anfrage(
-        &app,
-        "POST",
-        "/api/auth/sitzungen/andere-beenden",
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage(&app, "POST", "/api/auth/sessions/end-others", &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(me(&app, &geraet).await, StatusCode::OK);
 }
@@ -714,7 +693,7 @@ async fn offener_strom_endet_mit_seiner_sitzung() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let verloren = anmelden(&app, "admin", "startpw12", IPAD).await;
     let k = kennung(
-        &liste(&app, &admin, "/api/auth/sitzungen").await,
+        &liste(&app, &admin, "/api/auth/sessions").await,
         "Safari · iPadOS",
     );
 
@@ -727,7 +706,7 @@ async fn offener_strom_endet_mit_seiner_sitzung() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{k}"),
+        &format!("/api/auth/sessions/{k}"),
         &admin,
         None,
     )
