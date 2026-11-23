@@ -152,7 +152,10 @@ modul_marker! {
 /// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
 pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
-    ("/api/einsaetze/{id}/situation/reports", Some("lagemeldungen")),
+    (
+        "/api/einsaetze/{id}/situation/reports",
+        Some("lagemeldungen"),
+    ),
     // LLH-1031: Kenntnisnahme der Lagemeldungen, auch unter der Kennung der Meldung.
     ("/api/einsaetze/{id}/situation/seen", Some("lagemeldungen")),
     (

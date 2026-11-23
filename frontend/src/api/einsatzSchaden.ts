@@ -394,5 +394,5 @@ export function schadenAnhangDownloadPfad(
   schadenId: number,
   anhangId: number,
 ): string {
-  return `${anhangBasis(einsatzId, schadenId)}/${anhangId}/datei`;
+  return `${anhangBasis(einsatzId, schadenId)}/${anhangId}/file`;
 }

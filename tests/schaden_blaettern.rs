@@ -189,24 +189,14 @@ async fn erste_seite_traegt_die_hoechsten_nummern() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     anlegen(&app, &admin, e, 12).await;
-    let (s, v) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/damages?limit=5"),
-    )
-    .await;
+    let (s, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages?limit=5")).await;
     assert_eq!(s, StatusCode::OK);
     let nr: Vec<i64> = zeilen(&v)
         .iter()
         .map(|s| s["registrier_nr"].as_i64().unwrap())
         .collect();
     assert_eq!(nr, vec![12, 11, 10, 9, 8]);
-    let (_, v) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/damages?limit=0"),
-    )
-    .await;
+    let (_, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages?limit=0")).await;
     assert_eq!(zeilen(&v).len(), 1, "limit wird auf mindestens 1 geklemmt");
 }
 
@@ -380,12 +370,7 @@ async fn auswahl_ohne_freitext_und_ohne_stornierte() {
         .await
         .unwrap();
 
-    let (s, v) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/damages/options"),
-    )
-    .await;
+    let (s, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages/options")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let zeilen = zeilen(&v);
     assert_eq!(

@@ -5314,7 +5314,14 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/situation-monitor"), &monitor, None).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/situation-monitor"),
+        &monitor,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v["zonen"], "typ"), ["absperrbereich"]);
     assert_eq!(v["zonen"][0]["geometrie"], json!(ZONE_POLY));
@@ -9092,7 +9099,14 @@ async fn lagemonitor_alarm_nennt_ausfall_ohne_personennamen() {
     .await
     .unwrap();
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/situation-monitor"), &monitor, None).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/situation-monitor"),
+        &monitor,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
     assert!(!v.to_string().contains("Anna Muster"), "{v}");

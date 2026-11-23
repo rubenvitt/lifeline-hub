@@ -72,9 +72,7 @@ async fn upload_bild(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/map/background-images"
-                ))
+                .uri(format!("/api/einsaetze/{einsatz_id}/map/background-images"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -493,9 +491,7 @@ async fn upload_bild_ansicht(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/map/background-images"
-                ))
+                .uri(format!("/api/einsaetze/{einsatz_id}/map/background-images"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
