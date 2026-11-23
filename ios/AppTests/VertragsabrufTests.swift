@@ -41,8 +41,10 @@ final class VertragsabrufTests: XCTestCase {
     }
 
     /// Ohne Server antwortet niemand: die Prüfung ergibt „nicht erreichbar“, nie „verträglich“.
+    /// Port 2 wie in WebviewTests: 9 (discard) steht auf der Liste gesperrter Ports, die
+    /// `ServerAdresse.parse` seit 544aa15c ablehnt (`gesperrter_port`, src-tauri/faelle/adresse.json).
     func testEinUnerreichbarerServerIstNichtErreichbar() async throws {
-        let adresse = try ServerAdresse.parse("https://127.0.0.1:9")
+        let adresse = try ServerAdresse.parse("https://127.0.0.1:2")
         let (ergebnis, health) = await Vertragsabruf.check(adresse, letzterVertrag: nil)
         XCTAssertEqual(ergebnis, .nichtErreichbar(.nichtErreichbar))
         XCTAssertNil(health)
