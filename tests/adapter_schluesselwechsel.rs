@@ -106,7 +106,14 @@ async fn wechsel_schluesselt_um_und_adapter_laeuft_weiter() {
     // Neustart nur mit dem neuen Schlüssel: der Adapter ruft mit dem Token ab.
     let nur_neu = rahmen(&u.art, Geheimnisspeicher::new(Some(neu)));
     u.art.plane(Ok(1));
-    durchgang(&u.pool, &nur_neu, Utc::now()).await.unwrap();
+    durchgang(
+        &u.pool,
+        &nur_neu,
+        &lifeline_hub::live::LiveHub::new(),
+        Utc::now(),
+    )
+    .await
+    .unwrap();
     let gesehen = u.art.gesehen();
     assert_eq!(gesehen.len(), 1);
     assert_eq!(gesehen[0].token.as_deref(), Some(TOKEN));
