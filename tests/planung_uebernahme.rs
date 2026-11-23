@@ -1023,11 +1023,7 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
             format!("{PFAD}/{p}/agenda-items/{einlass}"),
             Some(json!({"bezeichnung": "Einlass Bühne"})),
         ),
-        (
-            "DELETE",
-            format!("{PFAD}/{p}/agenda-items/{einlass}"),
-            None,
-        ),
+        ("DELETE", format!("{PFAD}/{p}/agenda-items/{einlass}"), None),
         ("DELETE", format!("{PFAD}/{p}/helpers/{spaet}"), None),
     ];
     for (methode, pfad, body) in schritte {
