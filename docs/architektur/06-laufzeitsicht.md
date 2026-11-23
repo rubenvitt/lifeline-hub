@@ -771,7 +771,7 @@ sequenceDiagram
   diesen Hub reisen (`EinsatzAnzeige.ios_push_hub_gesperrt`, Band für Einsatzleitung und Admins),
   pusht Hub-Konten aber nicht selbst: ihre Geräte sind am Hub angemeldet. Beginn und Ende der
   Sperre melden den Einsatzkopf (`hinweis::sperre_melden`); Entscheidung:
-  [ADR-0093](entscheidungen/ADR-0093-ein-am-relais-gesperrter-hub-wird-am-elw-angezeigt-nicht-ersetzt.md).
+  [ADR-0095](entscheidungen/ADR-0095-ein-am-relais-gesperrter-hub-wird-am-elw-angezeigt-nicht-ersetzt.md).
 - Bietet der Hub einen Kanal an, lässt der ELW den Push in diesem Kanal nur an Konten aus, die aus
   der Kopplung stammen (`hinweis::konten_am_hub` mit `hinweis::Kanal`). Konten nur am ELW, einen
   Kanal, den der Hub nicht anbietet, und ein gescheitertes Vormerken pusht er selbst.

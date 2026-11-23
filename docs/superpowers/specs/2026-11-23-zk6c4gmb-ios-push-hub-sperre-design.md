@@ -117,7 +117,7 @@ stehen. Der Ausfall der Kopplung selbst zeigt die Seite „Instanzkopplung“ oh
 - Die Aufgabe nennt ADR-0084/R48. Das ist die Android-Hülle; für iOS-Push gelten
   [ADR-0090](../../architektur/entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)
   und R54. **Nachtrag nach dem Review:** `docs/architektur/AGENTS.md` verlangt für eine
-  Entscheidung der Route `entwurf` (E1) eine ADR, also ADR-0093.
+  Entscheidung der Route `entwurf` (E1) eine ADR, also ADR-0095.
 
 ## Prüfung (Tests)
 

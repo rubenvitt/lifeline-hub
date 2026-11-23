@@ -1,5 +1,5 @@
 ---
-id: ADR-0093
+id: ADR-0095
 titel: Ein am Push-Relais gesperrter Hub wird am ELW angezeigt, nicht durch eigenen iOS-Push ersetzt
 status: akzeptiert
 datum: 2026-11-23
@@ -13,7 +13,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
 ---
 
-# ADR-0093: Ein am Push-Relais gesperrter Hub wird am ELW angezeigt, nicht durch eigenen iOS-Push ersetzt
+# ADR-0095: Ein am Push-Relais gesperrter Hub wird am ELW angezeigt, nicht durch eigenen iOS-Push ersetzt
 
 ## Regeln
 
