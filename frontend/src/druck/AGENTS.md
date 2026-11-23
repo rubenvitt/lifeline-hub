@@ -237,5 +237,5 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `einsatzakteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0` (Betroffene über `…/personen/druck`). Befehle
   und Lageberichte nur freigegeben, je Kette der Kopf (`kettenKoepfe`), wie das ZIP. Das ZIP ist
   ein Link mit `download`, kein Blob.
-- **Org-Branding** (`PATCH /api/organization`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
+- **Org-Branding** (`PATCH /api/organization`, `…/organization/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

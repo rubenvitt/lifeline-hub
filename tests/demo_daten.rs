@@ -1409,7 +1409,7 @@ fn median_ms(mut werte: Vec<std::time::Duration>) -> f64 {
 }
 
 /// Misst je [`MESSLAEUFE`] Läufe `POST /api/demo-data` (auf leerem Stand) und
-/// `POST /api/demo-data/neu` (auf aktivem Import) über HTTP, samt Routing und Auth. Die Dauer
+/// `POST /api/demo-data/{lage}/reimport` (auf aktivem Import) über HTTP, samt Routing und Auth. Die Dauer
 /// von `/reimport` ist die obere Schranke dafür, wie lange der Vorgang die Schreibsperre hält.
 async fn messen(app: &axum::Router, admin: &str) -> (f64, f64) {
     let mut import = Vec::new();
