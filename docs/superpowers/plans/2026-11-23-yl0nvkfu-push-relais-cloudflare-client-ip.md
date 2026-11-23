@@ -94,3 +94,69 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/yl0nvkfufmblhseov80bcql0
 - [ ] **Step 3:** `env-registry.md`: ein Satz „Steht ein CDN davor (r-server: Cloudflare), dessen Bereiche mit eintragen und dem Proxy ebenso vertrauen lassen; siehe `push-relais.md`, Abschnitt …“. `07-verteilungssicht.md`: `PUSH_RELAIS_TRUSTED_PROXIES` statt nur `PUSH_RELAIS_HINTER_PROXY`.
 - [ ] **Step 4:** `mise exec -- pnpm exec prettier --check` ist für `docs/` nicht zuständig; `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
 - [ ] **Step 5: Commit** `docs(push-relais): Betrieb hinter Cloudflare (LLH-2080)`.
+
+## Nachtrag: CDN nur ein Mal (Spec, Abschnitt „Nachtrag 23.11.2026“)
+
+Review Focus dazu: Worker-Kette `<frei>, <CF-Adresse>, <CF-Knoten>` → gezählt wird die
+CF-Adresse, nie `<frei>` (Tests in Task 4 und 5).
+
+### Task 4: CDN-Liste im Relais
+
+**Files:** Modify `push-relais/src/client_ip.rs`, `push-relais/src/config.rs`,
+`push-relais/tests/registrierung.rs`.
+
+**Interfaces:**
+- `ClientIpSource::TrustedProxies { proxies: Vec<IpNet>, cdn: Vec<IpNet> }` (ersetzt das Tupel).
+- `RelaisConfig.cdn_proxies: Vec<IpNet>` (`--cdn-proxies`, `PUSH_RELAIS_CDN_PROXIES`, Parser
+  `proxy_netz_parsen`); `client_ip_source()` → Fehler „PUSH_RELAIS_CDN_PROXIES verlangt
+  PUSH_RELAIS_TRUSTED_PROXIES“, wenn CDN ohne Proxy-Liste.
+
+- [ ] **Step 1: Tests** (`client_ip.rs`, Proxys `10.0.1.0/24`, CDN `173.245.48.0/20` und
+  `2a06:98c0::/29`): `cdn_wird_einmal_uebersprungen` (`203.0.113.7, 173.245.48.10` → `203.0.113.7`);
+  `worker_zaehlt_selbst` (`198.51.100.66, 2a06:98c0:3600::103, 173.245.48.10` →
+  `2a06:98c0:3600::103`); `innere_proxys_vor_dem_cdn_werden_uebersprungen`
+  (`203.0.113.7, 173.245.48.10, 10.0.1.9` → `203.0.113.7`); `proxy_links_vom_cdn_zaehlt_selbst`
+  (`198.51.100.66, 10.0.1.9, 173.245.48.10` → `10.0.1.9`); bestehende Listentests auf die neue
+  Form (CDN-Bereich in `cdn`). Config: `cdn_ohne_proxy_liste_bricht_ab`,
+  `cdn_und_proxy_liste` (→ `TrustedProxies { … }`). Integrationstest
+  `hinter_cloudflare_zaehlt_die_adresse_des_clients` mit CDN-Liste, dazu
+  `worker_kann_die_grenze_nicht_umgehen` (Grenze 1, zwei Anfragen
+  `<anders>, 2a06:98c0:3600::103, 173.245.48.10` → zweite 429).
+- [ ] **Step 2:** `cargo test -p push-relais` → FAIL.
+- [ ] **Step 3:** Umsetzen (Algorithmus aus dem Spec-Nachtrag).
+- [ ] **Step 4:** `cargo test -p push-relais` → PASS; clippy ohne Warnung.
+- [ ] **Step 5: Commit** `fix(push-relais): CDN-Liste wird nur einmal übersprungen (LLH-2080)`.
+
+### Task 5: CDN-Liste im Hauptserver
+
+**Files:** Modify `src/extract.rs`, `src/config.rs`, `src/main.rs`, `tests/login_sperre_proxy.rs`
+(falls nötig).
+
+**Interfaces:**
+- `pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet], cdn: &[IpNet]) -> IpAddr`;
+  `static CDN_PROXYS`, `pub fn init_cdn_proxys(Vec<IpNet>)`, `pub fn cdn_proxys() -> &'static [IpNet]`;
+  `PeerIp` nutzt beide. Doc-Kommentar verweist auf `push-relais/src/client_ip.rs` (Zwilling).
+- `Config.cdn_proxies: Vec<IpNet>` (`--cdn-proxies`, `LIFELINE_CDN_PROXIES`, `proxy_netz_parsen`);
+  `Config::cdn_proxies_checked(&self) -> anyhow::Result<&[IpNet]>` → Fehler ohne
+  `--trusted-proxies`. `main.rs` ruft es, loggt die Liste wie die Proxy-Liste (`warn`) und ruft
+  `init_cdn_proxys`.
+
+- [ ] **Step 1: Tests** in `src/extract.rs` (bestehende Aufrufe bekommen `&[]`):
+  `cdn_wird_einmal_uebersprungen`, `worker_zaehlt_selbst`, `ohne_cdn_liste_wie_bisher`
+  (Kette aus Proxys wird beliebig übersprungen); `src/config.rs`:
+  `cdn_proxies_als_liste`, `cdn_ohne_trusted_proxies_bricht_ab`.
+- [ ] **Step 2:** `cargo test --lib extract:: config::` → FAIL.
+- [ ] **Step 3:** Umsetzen.
+- [ ] **Step 4:** dieselben Tests und `cargo test --test login_sperre_proxy` → PASS.
+- [ ] **Step 5: Commit** `fix(auth): CDN-Liste für die Client-Adresse (LLH-2080)`.
+
+### Task 6: Doku nachziehen
+
+- [ ] `docs/betrieb/push-relais.md`: CDN-Abschnitt auf zwei Listen umstellen (Cloudflare nur in
+  `…_CDN_PROXIES`), Worker-Fall erklären, Hinweis zum Einstiegspunkt (gilt für jeden Dienst
+  dahinter; Abhilfe Transform-Rule oder eigener Einstiegspunkt), Tabellenzeilen (Standard
+  „ungesetzt“), `docker run`-Beispiel mit Verweis auf den CDN-Abschnitt.
+- [ ] `docs/betrieb/env-registry.md`: Zeile `LIFELINE_CDN_PROXIES`, Satz bei
+  `LIFELINE_TRUSTED_PROXIES` anpassen. `push-relais/AGENTS.md`, `07-verteilungssicht.md` anpassen.
+- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün. Commit
+  `docs(push-relais): zwei Listen hinter Cloudflare (LLH-2080)`.
