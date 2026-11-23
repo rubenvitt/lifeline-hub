@@ -913,7 +913,9 @@ Entscheidung [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-ios-push-lae
 - **Versand nur aus `benachrichtigung::ausliefern`, neben Web Push:** dieselben Ereignisse an
   `IosPush::versenden`, Stilles nie, Konten in `UeberHub::ios_push` nie; die auf dem Gerät stumme
   Art filtert `ios_push::soll_senden` je Anmeldung, ein Alarm geht immer. Ohne `--ios-push` ist
-  `LiveHub::ios_push()` `None`, und die Routen antworten 404.
+  `LiveHub::ios_push()` `None`, und die Routen antworten 404. Ereignisse ohne Einsatz (Störung
+  einer Anbindung, LLH-2026) gehen nicht per iOS-Push, weil der Klartext `e` verlangt; Web Push
+  und Live bleiben (Folgeaufgabe LLH-2077).
 - **Klartext aus derselben Stelle wie `GET /api/benachrichtigungen/{id}`**
   (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
   Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`. Absender und Wortlaut nur mit
