@@ -202,7 +202,7 @@ Ein abgeschlossener Einsatz bleibt eine Schonfrist lang für alle Mitglieder les
 (`NACHLAUF_STUNDEN` in `src/einsatz/berechtigung.rs`); nach Ablauf seiner Aufbewahrungsfrist ist
 er für jeden gesperrt, auch für den System-Admin (`einsatz::berechtigung::darf_lesen`). Fällige
 Einsätze schwärzt der Purge-Lauf (`src/einsatz/purge_scheduler.rs`); danach liest sie nur noch
-das Archiv `/api/aufbewahrung` (`src/aufbewahrung/`). Personendaten werden geschwärzt (`src/einsatz/schwaerzung_*.rs`) und physisch überschrieben (`secure_delete`
+das Archiv `/api/retention` (`src/aufbewahrung/`). Personendaten werden geschwärzt (`src/einsatz/schwaerzung_*.rs`) und physisch überschrieben (`secure_delete`
 in `src/db.rs`, `src/db/physisch.rs`). Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt
 „Aufbewahrung“; Specs [`aufbewahrung`](../../openspec/specs/aufbewahrung/spec.md),
 [`aufbewahrung-archiv`](../../openspec/specs/aufbewahrung-archiv/spec.md),

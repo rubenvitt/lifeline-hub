@@ -21,7 +21,7 @@ async fn override_setzen(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(body),
     )

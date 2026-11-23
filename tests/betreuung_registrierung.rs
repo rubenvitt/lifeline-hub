@@ -237,7 +237,7 @@ async fn ohne_personen_nur_die_zaehlung() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -328,7 +328,7 @@ async fn replay_nach_einsatzende() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -723,7 +723,7 @@ async fn druck_ohne_personenrecht_ist_403_ohne_eintrag() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -891,7 +891,7 @@ async fn haushalt_aendern_body_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

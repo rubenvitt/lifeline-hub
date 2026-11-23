@@ -547,7 +547,7 @@ async fn ziel_und_rechte() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1221,7 +1221,7 @@ async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/einsatzabschnitte"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/einsatzabschnitte"),
         &admin,
         Some(&json!({"sichtbar": false})),
     )

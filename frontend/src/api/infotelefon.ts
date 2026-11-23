@@ -14,7 +14,7 @@ import type {
 
 /**
  * Informationstelefon (LFH-554): Anrufprotokoll, seit i6k6mzed ein eigenes Modul. Die Adresse
- * liegt unter `…/staff/info-line` (ADR-0093). Name, Rückrufnummer und
+ * liegt unter `…/staff/info-line` (ADR-0085). Name, Rückrufnummer und
  * Notiz sind personenbezogen; sie erscheinen in keiner Ableitung (Lagebericht, Druck).
  *
  * Seit LLH-732 ist die Liste immer geblättert, und alle Zahlen kommen aus `…/zaehler` über den

@@ -153,10 +153,10 @@ jobs:
               -f state="$state" -f context=ADR-Nummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
-      # Der deutsche Bestand der API-Routen wächst nur um Pfade mit Präfix `einsaetze` (ADR-0093).
-      # Im Bündel `schnell` fehlt der Basis-Ref (flacher Checkout), dort fällt nur dieser
-      # Vergleich laut aus; hier ist die Basis geholt. Kein eigener Status: das Ergebnis geht in
-      # „Ergebnis der Prüfung“ ein, und ein roter Befund überspringt den Autofix nicht.
+      # Der deutsche Bestand der API-Routen wächst nicht (LLH-1979, ADR-0085). Im Bündel `schnell`
+      # fehlt der Basis-Ref (flacher Checkout), dort fällt nur dieser Vergleich laut aus; hier ist
+      # die Basis geholt. Kein eigener Status: das Ergebnis geht in „Ergebnis der Prüfung“ ein,
+      # und ein roter Befund überspringt den Autofix nicht.
       - name: Bestand der deutschen API-Routen gegen die Basis
         id: routen
         env:

@@ -34,7 +34,7 @@ async fn override_setzen(
             Request::builder()
                 .method("PUT")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/modul-overrides/{modul_key}"
+                    "/api/einsaetze/{einsatz_id}/module-overrides/{modul_key}"
                 ))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
@@ -52,7 +52,7 @@ async fn overrides_laden(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}/modul-overrides"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/module-overrides"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -221,7 +221,7 @@ async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
 
     // GET der Einstellungen + Stammdaten bleibt für die Einsatzleitung erreichbar.
     assert_eq!(
-        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}/einstellungen")).await,
+        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}/settings")).await,
         StatusCode::OK
     );
     assert_eq!(
@@ -270,7 +270,7 @@ async fn einsatzfuehrung_ist_gueltig_und_ungueltiges_aendert_nichts() {
     let (status, v) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-overrides"),
+        &format!("/api/einsaetze/{eid}/module-overrides"),
         &admin,
         None,
     )
@@ -1206,7 +1206,7 @@ async fn override_ohne_eigene_sichtbarkeit_speichert_null() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/schaeden"),
+        &format!("/api/einsaetze/{eid}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":null,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -1306,7 +1306,7 @@ async fn load_modul_vorgaben(app: &axum::Router, cookie: &str, eid: i64) -> (Sta
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-vorgaben"),
+        &format!("/api/einsaetze/{eid}/module-defaults"),
         cookie,
         None,
     )

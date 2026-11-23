@@ -376,10 +376,10 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
         ),
         (
             "PUT",
-            format!("/api/einsaetze/{eid}/aufbewahrungsfrist"),
+            format!("/api/einsaetze/{eid}/retention-period"),
             Some(r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#),
         ),
-        ("POST", format!("/api/einsaetze/{eid}/abschliessen"), None),
+        ("POST", format!("/api/einsaetze/{eid}/close"), None),
     ];
     for (methode, pfad, rumpf) in schritte {
         let (status, json) = anfrage(&app, methode, &pfad, &admin, rumpf).await;
@@ -495,7 +495,7 @@ async fn faelliger_einsatz(
     let (status, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{eid}/abschliessen"),
+        &format!("/api/einsaetze/{eid}/close"),
         admin,
         None,
     )
@@ -551,7 +551,7 @@ async fn wiederherstellen_meldet_einsatzliste() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{eid}/wiederherstellen"),
+        &format!("/api/retention/incidents/{eid}/restore"),
         &admin,
         Some(&format!(r#"{{"retention_bis":"{}"}}"#, zeitpunkt(90))),
     )

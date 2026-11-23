@@ -33,8 +33,8 @@ const KATALOG = [
 function rendere() {
   const posts: Record<string, unknown>[] = [];
   server.use(
-    http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json(KATALOG)),
-    http.post('/api/karte/online-quellen', async ({ request }) => {
+    http.get('/api/map/online-sources/catalog', () => HttpResponse.json(KATALOG)),
+    http.post('/api/map/online-sources', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       posts.push(body);
       return HttpResponse.json({ id: posts.length, ...body }, { status: 201 });
@@ -112,8 +112,8 @@ function Harness() {
 describe('AusKatalogModal — abgelehnte Übernahme (LFH-1077)', () => {
   function abgelehnt() {
     server.use(
-      http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json(KATALOG)),
-      http.post('/api/karte/online-quellen', () =>
+      http.get('/api/map/online-sources/catalog', () => HttpResponse.json(KATALOG)),
+      http.post('/api/map/online-sources', () =>
         HttpResponse.json({ error: 'URL schon vorhanden' }, { status: 409 }),
       ),
     );
@@ -160,8 +160,8 @@ describe('AusKatalogModal — abgelehnte Übernahme (LFH-1077)', () => {
     let gibFrei: () => void = () => {};
     const freigabe = new Promise<void>((r) => (gibFrei = r));
     server.use(
-      http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json(KATALOG)),
-      http.post('/api/karte/online-quellen', async () => {
+      http.get('/api/map/online-sources/catalog', () => HttpResponse.json(KATALOG)),
+      http.post('/api/map/online-sources', async () => {
         await freigabe;
         return HttpResponse.json({ error: 'URL schon vorhanden' }, { status: 409 });
       }),

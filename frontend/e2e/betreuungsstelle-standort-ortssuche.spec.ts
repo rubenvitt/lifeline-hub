@@ -28,11 +28,11 @@ const TREFFER = {
 
 async function geocoder(page: Page) {
   const anfragen: string[] = [];
-  await page.route(/\/api\/einsaetze\/\d+\/ort-suche\?/, async (route) => {
+  await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, async (route) => {
     anfragen.push(new URL(route.request().url()).searchParams.get('q') ?? '');
     await route.fulfill({ json: { zustand: 'ok', treffer: [TREFFER] } });
   });
-  await page.route(/\/api\/einsaetze\/\d+\/ort-vorschau\?/, (route) =>
+  await page.route(/\/api\/einsaetze\/\d+\/place-preview\?/, (route) =>
     route.fulfill({ json: { ortsname: TREFFER.kurz, peilung: null } }),
   );
   return anfragen;

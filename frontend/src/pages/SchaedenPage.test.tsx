@@ -20,7 +20,7 @@ beforeEach(() => {
   sessionStorage.clear();
   // Ort-Zeile unter dem Schadensort (LLH-1121).
   server.use(
-    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+    http.get('/api/einsaetze/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
   );

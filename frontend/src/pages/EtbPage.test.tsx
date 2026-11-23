@@ -1998,7 +1998,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('fragt ohne Modulrecht Abschnitte und Einheiten nicht ab (kein 403, LLH-1839)', async () => {
     const abgefragt: string[] = [];
     const { client } = setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(
           freigabenFixture({
             einsatzabschnitte: { zugriff: false },
@@ -2026,7 +2026,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('fragt ohne Modulrecht `dokumente` keine Dokumente ab und zeigt keinen Verweis', async () => {
     let abgefragt = false;
     const { client } = setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ dokumente: { zugriff: false } })),
       ),
       http.get('/api/einsaetze/7/dokumente', () => {
@@ -2708,7 +2708,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
   it('nennt Nachträge vor der Lagebesprechung unter „seit LB“', async () => {
     setup('/einsaetze/7/etb?von=2026-05-23%2011%3A30%3A00', [
       zaehlerJeFilter(),
-      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/7/briefing', () =>
         HttpResponse.json({
           anzahl_lagebesprechungen: 1,

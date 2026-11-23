@@ -170,11 +170,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
-  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
+  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`; **Mono trägt nur
+  Zahl, Zeit, Kennung und Funkrufname**, ein Wort oder ein gemischter Knoten („seit 14:32“, „3
+  offen“) steht in der Textschrift. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
-  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `meta` 11, `monoKlein` 12, `mono` 13,
-  `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen. **Boden 11 px**
+  Mono-Stufe `mono`. `meta` (11) steht in der Textschrift mit gleich breiten Ziffern
+  (`schriftStil('meta')`, `Textstufe stufe="meta"`). Mono-Text nimmt `monoStil(stufe)` mit
+  `monoFein` 11, `monoKlein` 12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus
+  einer Variablen. **Boden 11 px**
   (`SCHRIFT_BODEN`): keine Stufe darunter, Augenbraue und Rail-Etikett 11, Seitentitel
   16/600; darunter bleiben nur Druck, Zeichnungen mit eigenem Maßstab und der Lagemonitor. Die Stufen wachsen nicht mit der Dichte. Neue
   `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die

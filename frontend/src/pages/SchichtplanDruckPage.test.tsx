@@ -77,7 +77,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern: Listen trotzdem gefragt, ihr Fehler sperrt den Druck', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
       http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
@@ -88,7 +88,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern, UHS-Liste 403: Blatt trotzdem da, Druck frei', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
       http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),

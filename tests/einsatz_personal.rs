@@ -162,7 +162,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/abschliessen"),
+            &format!("/api/einsaetze/{einsatz}/close"),
             &admin,
             None
         )
@@ -364,7 +364,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

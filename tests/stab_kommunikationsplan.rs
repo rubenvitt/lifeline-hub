@@ -888,7 +888,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

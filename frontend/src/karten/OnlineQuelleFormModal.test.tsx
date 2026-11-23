@@ -28,8 +28,8 @@ const quelle: OnlineQuelle = {
 
 function handler() {
   server.use(
-    http.post('/api/karte/online-quellen', () => HttpResponse.json({ ...quelle, id: 9 })),
-    http.patch('/api/karte/online-quellen/3', () => HttpResponse.json(quelle)),
+    http.post('/api/map/online-sources', () => HttpResponse.json({ ...quelle, id: 9 })),
+    http.patch('/api/map/online-sources/3', () => HttpResponse.json(quelle)),
   );
 }
 
@@ -82,7 +82,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     let rumpf: Record<string, unknown> | null = null;
     let aufrufe = 0;
     server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
+      http.post('/api/map/online-sources', async ({ request }) => {
         aufrufe += 1;
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...quelle, id: 9 });
@@ -115,7 +115,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   it('Enter in der Attribution bricht um und sendet nicht ab', async () => {
     const rumpfe: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
+      http.post('/api/map/online-sources', async ({ request }) => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ ...quelle, id: 9 });
       }),
@@ -168,7 +168,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   it('behält Sortierung, Aktiv, Proxy und Dunkle Karte, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/karte/online-quellen/3', async ({ request }) => {
+      http.patch('/api/map/online-sources/3', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(quelle);
       }),
@@ -202,7 +202,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   it('ein aufgeklappt umgelegter Schalter kommt umgelegt an', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/karte/online-quellen/3', async ({ request }) => {
+      http.patch('/api/map/online-sources/3', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(quelle);
       }),
@@ -274,7 +274,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
    */
   it('zeigt eine Ablehnung im Dialog, behält den Wortlaut und zeigt keinen Toast', async () => {
     server.use(
-      http.patch('/api/karte/online-quellen/3', () =>
+      http.patch('/api/map/online-sources/3', () =>
         HttpResponse.json({ error: 'Name schon vergeben' }, { status: 409 }),
       ),
     );

@@ -644,7 +644,7 @@ export function istModulAusblendbar(key: string): boolean {
  * Modul-Gate des Clients (LFH-669). Die Regel (Ausblenden, Rolle aus Einsatz-Override, sonst
  * Org-Vorgabe, Admin-Ausnahme, nicht ausblendbare Module) wertet NUR der Server aus
  * (`src/einsatz/berechtigung.rs`, `modul_freigabe`); der Client liest das Ergebnis aus
- * `GET /api/einsaetze/{id}/modul-freigaben` (`einsatzKeys.modulFreigaben`). Eine Kopie der Regel
+ * `GET /api/einsaetze/{id}/module-access` (`einsatzKeys.modulFreigaben`). Eine Kopie der Regel
  * hier kannte die Org-Vorgaben nicht und hielt gesperrte Module für frei.
  */
 

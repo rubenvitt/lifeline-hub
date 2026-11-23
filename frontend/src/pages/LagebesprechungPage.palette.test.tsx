@@ -56,7 +56,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/briefing', stand),
     http.get('/api/einsaetze/1/briefings', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[
       'personen',
@@ -70,7 +70,7 @@ function render(
       'material',
       'abschnitte',
     ].map((l) => http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([]))),
-    http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/1/module-counts', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>

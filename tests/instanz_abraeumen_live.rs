@@ -31,7 +31,7 @@ async fn verwahrt_der_hub_meldet_der_elw_das_abraeumen_live() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &elw.admin,
         None,
     )

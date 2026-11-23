@@ -111,7 +111,7 @@ async fn abschluss_des_einsatzes_feuert_einsatz() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -125,7 +125,7 @@ async fn frist_setzen_feuert_einsatz_unveraendert_nicht() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/aufbewahrungsfrist");
+    let pfad = format!("/api/einsaetze/{einsatz}/retention-period");
     let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
 
     let mut rx = live.abonniere(einsatz);
@@ -178,7 +178,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         cookie,
         None,
     )
@@ -194,7 +194,7 @@ async fn abschluss_mit_dauer_politik_meldet_den_frist_eintrag_im_etb() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einstellungen"),
+        &format!("/api/einsaetze/{einsatz}/settings"),
         &admin,
         Some(r#"{"retention_dauer_tage":365}"#),
     )
@@ -253,7 +253,7 @@ async fn frist_setzen_meldet_den_audit_eintrag_im_etb() {
     let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/aufbewahrungsfrist");
+    let pfad = format!("/api/einsaetze/{einsatz}/retention-period");
     let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
     let vorher = system_eintraege(&pool, einsatz).await;
 
@@ -298,7 +298,7 @@ async fn wiederherstellen_meldet_den_audit_eintrag_im_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{einsatz}/wiederherstellen"),
+        &format!("/api/retention/incidents/{einsatz}/restore"),
         &admin,
         Some(r#"{"retention_bis":null}"#),
     )
@@ -733,7 +733,7 @@ async fn mitglieder_erreicht_jeden_leser_und_keine_fremde_org() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
             &admin,
             Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
         )

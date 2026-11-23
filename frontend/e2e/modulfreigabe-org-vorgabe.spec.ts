@@ -59,7 +59,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect
       .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/schaeden/marker`))
       .toBe(true);
-    expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/modul-freigaben`);
+    expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/module-access`);
 
     // Navigation: das Modul steht da, gesperrt, mit Grund.
     const eintrag = page.locator('button[title="Keine Berechtigung"]', {
@@ -133,7 +133,7 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
     await route.fulfill({ json: vorgaben() });
   });
   // Dieselben Vorgaben am Einsatz: daraus liest der Editor „Module“ die Herkunft (LLH-1183).
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-vorgaben`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-defaults`, async (route) => {
     await route.fulfill({ json: vorgaben() });
   });
   await page.route(`**/api/org-modul-einstellungen/${MODUL}`, async (route) => {
@@ -144,12 +144,12 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   });
   // Der Override geht echt an den Server (er gehört nur diesem Einsatz); gemerkt wird der eigene
   // Wert, damit die Freigaben unten wie auf dem Server rechnen.
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-overrides/${MODUL}`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-overrides/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar: boolean | null };
     zustand.eigen = body.sichtbar ?? null;
     await route.continue();
   });
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-freigaben`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-access`, async (route) => {
     const antwort = await route.fetch();
     const json = (await antwort.json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
     if (zustand.orgAus && zustand.eigen === null) json[MODUL] = { ...json[MODUL], sichtbar: false };

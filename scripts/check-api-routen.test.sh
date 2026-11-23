@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0093). Der Wächter irrt in beide
+# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0085). Der Wächter irrt in beide
 # Richtungen still: ließe er eine deutsche Route durch, wüchse der Bestand wieder, den die
 # Pakete von LLH-1979 abbauen; schlüge er auf Testcode oder eine englische Route an, würde er
 # abgeschaltet.
@@ -151,18 +151,20 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
-# Pakete unter `/api/einsaetze/{id}/` übersetzen erst die Segmente nach `{id}`, das Präfix zuletzt
-# (LLH-2057): der umbenannte Pfad bleibt bis dahin im Bestand, aber nur mit `einsaetze` als
-# einzigem deutschen Segment.
-fall "neue Bestandszeile, einziges deutsches Segment einsaetze" gruen \
-  "route_dazu '/api/einsaetze/{id}/health' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/health' > scripts/api-routen-bestand.txt" \
+fall "Bestand wächst nur in der Zahl (neue Route unter deutschem Präfix)" rot \
+  "route_dazu '/api/einsaetze/{id}/close' && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/close" "2 statt 1"
+# Ein Paket übersetzt Segmente unter einem Präfix, das erst ein späteres Paket umstellt: der Pfad
+# bleibt im Bestand, nur seine Zeile ändert sich (LLH-2060).
+fall "Segment unter deutschem Präfix übersetzt" gruen \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/close#' src/app.rs > x && mv x src/app.rs && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
   "OK"
-fall "neue Bestandszeile mit einsaetze und einem weiteren deutschen Segment" rot \
-  "route_dazu '/api/einsaetze/{id}/neu-deutsch' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/neu-deutsch' > scripts/api-routen-bestand.txt" \
-  "/api/einsaetze/{id}/neu-deutsch" "origin/alpha"
-fall "neue Bestandszeile mit einsaetze nicht als Präfix" rot \
-  "route_dazu '/api/health/einsaetze' && printf '%s\n' '/api/einsaetze/{id}' '/api/health/einsaetze' > scripts/api-routen-bestand.txt" \
-  "/api/health/einsaetze" "origin/alpha"
+fall "Segment unter deutschem Präfix in ein neues deutsches Wort umbenannt" rot \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/beenden#' src/app.rs > x && mv x src/app.rs && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/beenden' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/beenden" "beenden" "origin/alpha"
+fall "neue deutsche Route bei gleicher Zeilenzahl, aus bekannten Wörtern" rot \
+  "route_dazu /api/alt-deutsch && printf '%s\n' '/api/alt-deutsch' '/api/einsaetze/{id}' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '\"/api/alt-deutsch\"' src/app.rs > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/alt-deutsch' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/alt-deutsch' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/alt-deutsch" "origin/alpha"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

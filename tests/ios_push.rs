@@ -1193,3 +1193,73 @@ async fn kollaps_verraet_keine_ids() {
     }
     assert_ne!(gesehen[0], gesehen[1], "je Benachrichtigung ein eigener");
 }
+
+/// LLH-2077: die Störung einer Anbindung hat keinen Einsatz und erreicht trotzdem das Gerät des
+/// Admins. Der Klartext trägt kein `e`; Titel, Detail und Pfad (zu den Anbindungen) sind dieselben
+/// wie in `GET /api/benachrichtigungen/{id}`.
+#[tokio::test]
+async fn stoerung_einer_anbindung_erreicht_den_admin_ohne_einsatz() {
+    let mut w = versand().await;
+    let (admin, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO adapter (id, org_id, art, name, intervall_s, einstellungen, \
+             letzter_fehler_art, letzter_fehler_status) \
+         VALUES ('a1', ?, 'test', 'Leitstelle Nord', 60, '{}', 'abgelehnt', 401)",
+    )
+    .bind(org_id)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let g = Geraet::neu(3);
+    w.geraet(admin, &g, false, &[]).await;
+
+    let empfaenger = melden(
+        &w.pool,
+        &w.live,
+        Anlass::adapter(
+            org_id,
+            "a1",
+            Art::AdapterGestoert,
+            Bezug::neu(Typ::Adapter, 7),
+        ),
+    )
+    .await;
+    assert!(empfaenger.contains(&admin), "{empfaenger:?}");
+
+    let n = w.nachrichten().await;
+    let (kennung, k) = oeffnen(
+        nachricht_an(&n, &g)["nutzlast"].as_str().unwrap(),
+        &g.schluessel,
+    );
+    assert_eq!(kennung, g.kennung);
+    assert!(k.get("e").is_none(), "ohne Einsatz kein `e`: {k}");
+    let b = k["b"].as_i64().unwrap();
+    let cookie = w.cookie(admin).await;
+    let (s, anzeige) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/benachrichtigungen/{b}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{anzeige}");
+    assert_eq!(k["titel"], anzeige["titel"]);
+    assert_eq!(k["detail"], anzeige["detail"]);
+    assert!(
+        k["detail"].as_str().unwrap().contains("Leitstelle Nord"),
+        "{k}"
+    );
+    assert_eq!(k["pfad"], anzeige["pfad"]);
+    assert!(
+        k["pfad"]
+            .as_str()
+            .unwrap()
+            .starts_with("/admin/einstellungen/anbindungen"),
+        "{k}"
+    );
+}

@@ -109,7 +109,7 @@ impl Welt {
         self.schreiben(
             &self.admin,
             "PUT",
-            "/modul-overrides/lagekarte",
+            "/module-overrides/lagekarte",
             json!({ "sichtbar": true, "benoetigte_rolle": "einsatzfuehrung" }),
         )
         .await;

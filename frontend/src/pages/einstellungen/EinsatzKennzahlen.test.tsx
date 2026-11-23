@@ -44,7 +44,7 @@ function stelleBereit(a: Aufbau = {}) {
         spiegel: a.spiegel ?? null,
       });
     }),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.put('/api/einsaetze/1/lagekennzahl-wahl', async ({ request }) => {

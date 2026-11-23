@@ -152,7 +152,7 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
 
     // Vorbedingung: einen Stab kennen die Freigaben nicht mehr, die Lagebesprechung ist frei.
     const freigaben = (await (
-      await page.request.get(`/api/einsaetze/${id}/modul-freigaben`)
+      await page.request.get(`/api/einsaetze/${id}/module-access`)
     ).json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
     expect(freigaben.stab, 'Vorbedingung: kein Modul Stab').toBeUndefined();
     expect(freigaben.lagebesprechung, 'Vorbedingung: Lagebesprechung frei').toEqual({

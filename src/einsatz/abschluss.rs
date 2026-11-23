@@ -77,7 +77,7 @@ pub struct AbschlussKraefte {
     pub personal: i64,
 }
 
-/// Antwort von `GET /api/einsaetze/{id}/abschluss/pruefung`: die offenen Punkte je Gruppe.
+/// Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AbschlussPruefung {
     pub kraefte: AbschlussKraefte,

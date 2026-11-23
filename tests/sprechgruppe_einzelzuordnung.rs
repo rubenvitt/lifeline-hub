@@ -540,7 +540,7 @@ async fn recht_auf_stab_nicht_auf_einheiten() {
     let (status, _) = anfrage(
         &a.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/einheiten", a.einsatz),
+        &format!("/api/einsaetze/{}/module-overrides/einheiten", a.einsatz),
         &a.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )

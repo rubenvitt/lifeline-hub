@@ -38,8 +38,8 @@ import {
  */
 
 const KAPITEL = 'einsatzdaten';
-const STIL_PFAD = '/api/karte/proxy/9/style.json';
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const STIL_PFAD = '/api/map/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 
 /** Kartengrundlage des Kartenausschnitts aus der Fixture (docs/anwender/AGENTS.md, „Bilder“). */
 async function kartengrundlage(page: Page) {
@@ -56,7 +56,7 @@ async function kartengrundlage(page: Page) {
 
 /** Treffer der Ortssuche, ohne Geocoder. */
 async function ortssuche(page: Page) {
-  await page.route(/\/api\/einsaetze\/\d+\/ort-suche\?/, (route) =>
+  await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, (route) =>
     route.fulfill({
       json: {
         zustand: 'ok',
@@ -151,7 +151,7 @@ test.describe(KAPITEL, () => {
     await kartengrundlage(page);
     // Die Ort-Vorschau trägt keinen Ortsnamen: der Geocoder zeigt im Bildlauf auf Loopback
     // (`e2e/geocoder-kern.ts`, LLH-2063), die Peilung rechnet der Server selbst.
-    const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
+    const ortVorschau = page.waitForResponse((r) => r.url().includes('/place-preview'));
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     await expect(page.getByRole('region', { name: 'Erstmeldung' })).toBeVisible();
     await ortVorschau;

@@ -185,7 +185,7 @@ test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter im abge
   const einsatzId = await einsatzPerApi(page, `Anzeige Beobachter ${Date.now()}`);
   const konto = await benutzerAnlegen(page, 'beobachter');
   await mitgliedEintragen(page, einsatzId, konto.id, 'beobachter');
-  const zu = await page.request.post(`/api/einsaetze/${einsatzId}/abschliessen`);
+  const zu = await page.request.post(`/api/einsaetze/${einsatzId}/close`);
   expect(zu.ok(), await zu.text()).toBe(true);
   await benachrichtigungenQuittieren(konto);
   await wechsleZu(page, konto);

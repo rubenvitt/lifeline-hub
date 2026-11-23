@@ -347,7 +347,7 @@ async fn bilden_auf_abgeschlossenem_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -2614,7 +2614,7 @@ async fn ohne_freigabe_fahrzeuge_darf_die_rolle_das_fahrzeug_als_einheit_fuehren
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/fahrzeuge"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )

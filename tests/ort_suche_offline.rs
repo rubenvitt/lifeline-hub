@@ -109,7 +109,7 @@ async fn ohne_netz_an_allen_einstiegen_mit_netz_lokal_vorn() {
 
     for pfad in [
         format!("/api/einsaetze/{einsatz}/karte/ort-suche?q={q}"),
-        format!("/api/einsaetze/{einsatz}/ort-suche?q={q}"),
+        format!("/api/einsaetze/{einsatz}/place-search?q={q}"),
         format!("/api/ort-suche?q={q}"),
     ] {
         let (status, json) = anfrage(&app, "GET", &pfad, &admin, None).await;

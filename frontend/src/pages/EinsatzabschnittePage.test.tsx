@@ -1074,7 +1074,7 @@ describe('EinsatzabschnittePage', () => {
     it('ohne Freigabe der Lagekarte gesperrt mit Grund, kein Link', async () => {
       server.use(
         ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
-        http.get('/api/einsaetze/1/modul-freigaben', () =>
+        http.get('/api/einsaetze/1/module-access', () =>
           HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
         ),
       );

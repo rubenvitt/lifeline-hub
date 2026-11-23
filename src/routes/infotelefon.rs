@@ -1,7 +1,7 @@
 //! Routen des Informationstelefons (LFH-554) unter `/api/einsaetze/{id}/staff/info-line`.
 //!
 //! Gates über `EinsatzLesezugriff<Infotelefon>` bzw. `EinsatzSchreibzugriff<Infotelefon>`: seit
-//! i6k6mzed (design.md D3) ein eigenes Modul, der Pfad liegt unter `…/staff` (ADR-0093).
+//! i6k6mzed (design.md D3) ein eigenes Modul, der Pfad liegt unter `…/staff` (ADR-0085).
 //! Live: `LiveEvent::Infotelefon` nur mit Kennungen, nie mit Namen, Nummern oder Notizen.
 
 use axum::extract::{Query, State};

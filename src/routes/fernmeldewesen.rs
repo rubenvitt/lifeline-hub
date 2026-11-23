@@ -1,6 +1,6 @@
 //! Routen des Moduls Fernmeldewesen (LLH-1180): Kommunikationsplan (LFH-848) und Fernmeldeskizze
 //! (LFH-893). Die Pfade liegen unter `…/staff/comms-plan…` und `…/staff/comms-sketch…`
-//! (ADR-0093); `PFAD_KEY` ordnet sie dem Modul `fernmeldewesen` zu. Seit
+//! (ADR-0085); `PFAD_KEY` ordnet sie dem Modul `fernmeldewesen` zu. Seit
 //! LLH-1602 eigene Datei, vorher in `routes::stab`.
 //!
 //! Gates strukturell über `EinsatzLesezugriff<Fernmeldewesen>` bzw.

@@ -823,7 +823,7 @@ pub(crate) fn check_bbox(bbox: &Bbox) -> Result<(), String> {
     Ok(())
 }
 
-/// `GET /api/karte/fachebenen/copernicus?bbox=…[&archiv=1]`. Kalt wartet die Anfrage höchstens
+/// `GET /api/map/overlays/copernicus?bbox=…[&archiv=1]`. Kalt wartet die Anfrage höchstens
 /// [`COPERNICUS_WARTE`] und antwortet sonst `offline`; der Abruf läuft weiter und füllt den
 /// Cache für den nächsten Poll (Aufwärmtakt im Frontend). Eine unvollständige Antwort geht hinaus,
 /// wird aber nicht gespeichert.

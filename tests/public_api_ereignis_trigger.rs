@@ -116,7 +116,7 @@ async fn abschliessen(l: &Lage, einsatz: i64) {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &l.admin,
         None,
     )
@@ -851,7 +851,7 @@ async fn aenderungen_ueber_den_spiegel_melden_dem_fremdsystem_am_hub() {
     let (s, v) = anfrage(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e_elw}/abschliessen"),
+        &format!("/api/einsaetze/{e_elw}/close"),
         &elw.admin,
         None,
     )
