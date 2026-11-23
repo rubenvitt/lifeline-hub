@@ -220,11 +220,11 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modul (wie die Einsatz-Kopfdaten).
     ("/api/einsaetze/{id}/sprechgruppen", None),
     // Die Einsatzakte (LLH-1835) prüft jedes ihrer Module im Handler, nicht im Extractor.
-    ("/api/einsaetze/{id}/einsatzakte", None),
+    ("/api/einsaetze/{id}/case-file", None),
     // Programmpunkte (LLH-1570) gehören wie die Kopfdaten keinem Modul.
-    ("/api/einsaetze/{id}/programmpunkte", None),
-    ("/api/einsaetze/{id}/ort-vorschau", None),
-    ("/api/einsaetze/{id}/ort-suche", None),
+    ("/api/einsaetze/{id}/agenda-items", None),
+    ("/api/einsaetze/{id}/place-preview", None),
+    ("/api/einsaetze/{id}/place-search", None),
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
     ("/api/einsaetze/{id}/zonen", Some("lagekarte")),
@@ -250,20 +250,20 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modulzähler (LFH-612): modul-lose Gate-Route wie der Live-Feed. Die Modulrechte
     // wirken als Filter über die Felder der Antwort — ein nicht erlaubtes Modul fehlt —,
     // nicht als Türsteher der Route.
-    ("/api/einsaetze/{id}/modul-zaehler", None),
+    ("/api/einsaetze/{id}/module-counts", None),
     // Lagebild des Lagemonitors (LFH-892): verdichtete Zahlen ohne Personenbezug, nur für ein
     // gekoppeltes Gerät dieser Ansicht (der Handler weist alles andere mit 403 ab).
     ("/api/einsaetze/{id}/lagemonitor", None),
     // Modulfreigaben (LFH-669): modul-los wie die Zähler. Die Antwort IST die Auskunft über
     // die Modulrechte des Benutzers; ein Modul-Gate davor wäre ein Zirkel.
-    ("/api/einsaetze/{id}/modul-freigaben", None),
+    ("/api/einsaetze/{id}/module-access", None),
     // Verlauf und „alle gelesen“ der Benachrichtigungen (LLH-1143): modul-los wie die Zähler.
     // Berechtigung ist die eigene Empfängerzeile; das Modulrecht am Bezug prüft der Handler je
     // Eintrag (`benachrichtigung::aufloesung::Leserecht`).
-    ("/api/einsaetze/{id}/benachrichtigungen", None),
+    ("/api/einsaetze/{id}/notifications", None),
     // Vorgabe je Funktion (LLH-1421): Einstellung des Einsatzes, modul-los wie die übrigen
     // Einstellungen.
-    ("/api/einsaetze/{id}/benachrichtigung-vorgaben", None),
+    ("/api/einsaetze/{id}/notification-defaults", None),
     // Eigene Anträge an einem Spiegel (LLH-1492): modul-los. Ein Antrag gehört dem Konto, das ihn
     // gestellt hat; das Modulrecht prüfte schon die Erfassung, aus der er entstand.
     ("/api/einsaetze/{id}/antraege", None),
@@ -275,33 +275,33 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].
     (EINSATZ_WURZEL, None),
-    ("/api/einsaetze/{id}/abschliessen", None),
+    ("/api/einsaetze/{id}/close", None),
     // LLH-1814: Prüfung vor dem Abschluss und Wiederöffnen, beide ohne Modul.
-    ("/api/einsaetze/{id}/abschluss", None),
-    ("/api/einsaetze/{id}/wiedereroeffnen", None),
-    ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
+    ("/api/einsaetze/{id}/closure", None),
+    ("/api/einsaetze/{id}/reopen", None),
+    ("/api/einsaetze/{id}/retention-period", None),
     // Nachbereitungsfrist (LLH-1494): wie die Aufbewahrungsfrist.
-    ("/api/einsaetze/{id}/nachbereitung", None),
-    ("/api/einsaetze/{id}/einstellungen", None),
+    ("/api/einsaetze/{id}/follow-up", None),
+    ("/api/einsaetze/{id}/settings", None),
     // Richtwerte des Unterkunftsrechners (LLH-1520): Einstellung des Einsatzes, modul-los wie die
     // übrigen Einstellungen; der Rechner der Betreuung und die Einstellungsseite lesen sie.
     ("/api/einsaetze/{id}/unterkunft-richtwerte", None),
-    ("/api/einsaetze/{id}/modul-overrides", None),
+    ("/api/einsaetze/{id}/module-overrides", None),
     // Modul-Vorgaben der Einsatz-Org (LLH-1183): modul-los wie die Overrides, die Antwort
     // beschreibt die Modulregeln selbst.
-    ("/api/einsaetze/{id}/modul-vorgaben", None),
+    ("/api/einsaetze/{id}/module-defaults", None),
     ("/api/einsaetze/{id}/mitglieder", None),
     // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
     ("/api/einsaetze/{id}/fuehrungsstelle", None),
     // Präsenz an Einsatzdaten und Führungsstelle (LLH-1946): Gate wie die Kopfdaten, modul-los;
     // die Präsenz an einer Einheit liegt unter `/einheiten` und erbt deren Key.
-    ("/api/einsaetze/{id}/praesenz", None),
+    ("/api/einsaetze/{id}/presence", None),
     // Führung je Einsatz (LLH-1491): Zustand der Instanzkopplung, modul-los wie der Abschluss.
     ("/api/einsaetze/{id}/fuehrung", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/einsaetze/{id}/geraete", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
-    ("/api/einsaetze/{id}/anbindungen", None),
+    ("/api/einsaetze/{id}/integrations", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.
     ("/api/einsaetze/{id}/lagebild-freigaben", None),
 ];

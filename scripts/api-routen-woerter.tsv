@@ -4,10 +4,12 @@ accommodation	Unterkunft
 activate	aktivieren
 adapter	-
 admin	-
+agenda-items	Programmpunkte
 animals	Tiere
 api	-
 app-code	-
 archive	Archiv
+attachments.zip	Anlagen
 attempts	Versuche
 audit	-
 auth	-
@@ -26,6 +28,8 @@ catalog	Katalog
 catering	Verpflegung
 chat	-
 check	prüfen
+close	abschließen
+closure	Abschluss
 code	-
 codes	-
 command	Führung
@@ -49,10 +53,12 @@ existing	vorhandene
 export	-
 fetch-certificate	Zertifikat abrufen
 finish	-
+follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 gauges	Pegel
 glyphs	-
+grant	Freigabe
 hazard-areas	Gefahrengebiete
 health	-
 import	-
@@ -76,7 +82,14 @@ master-data	Stammdaten
 material	Material
 matrix	-
 me	-
+member-selection	Mitglied-Auswahl
 mirror	Spiegel
+module-access	Modulfreigaben
+module-counts	Modulzähler
+module-defaults	Modulvorgaben
+module-overrides	Modul-Overrides
+notification-defaults	Benachrichtigungsvorgaben
+notifications	Benachrichtigungen
 offline	-
 offline-maps	Offline-Karten
 oidc	-
@@ -91,11 +104,14 @@ pause	anhalten
 person-search	Personensuche
 personnel	Personal
 persons	Personen
+place-preview	Ortsvorschau
+place-search	Ortssuche
 plan	-
 plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+presence	Präsenz
 providers	-
 proxy	-
 raster	-
@@ -106,6 +122,7 @@ register	-
 registration	-
 release-notes	Versionsstand
 reliefs	Ablösungen
+reopen	wiedereröffnen
 reports	Meldungen
 requests	Anträge
 reset	-
@@ -113,6 +130,8 @@ resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
 retention	Aufbewahrung
+retention-categories	Aufbewahrungskategorien
+retention-period	Aufbewahrungsfrist
 revoke	widerrufen
 seats	Plätze
 secrets	Geheimnisse

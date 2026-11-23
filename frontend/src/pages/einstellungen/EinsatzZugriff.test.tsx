@@ -20,7 +20,7 @@ const einsatz = (meine_rolle: string | null, status = 'aktiv', spiegel: unknown 
 function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = null) {
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status, spiegel))),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/1/mitglieder', () =>

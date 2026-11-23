@@ -1741,7 +1741,7 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     );
     if (freigaben) {
       server.use(
-        http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        http.get('/api/einsaetze/:einsatzId/module-access', () =>
           HttpResponse.json(freigabenFixture(freigaben)),
         ),
       );
@@ -1953,7 +1953,7 @@ describe('BrDetailPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     const abrufe: string[] = [];
     stelleBelegtBereit();
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(
           freigabenFixture(Object.fromEntries(module.map((m) => [m, { zugriff: false }]))),
         ),
@@ -2006,7 +2006,7 @@ describe('BrDetailPage — gescheiterte Freigaben (LLH-1462)', () => {
     let heil = false;
     let nachKlick = 0;
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () => {
+      http.get('/api/einsaetze/:einsatzId/module-access', () => {
         if (heil) nachKlick += 1;
         return heil
           ? HttpResponse.json(freigabenFixture())
@@ -2642,7 +2642,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
       http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+      http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([DEICH])),
       http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
         aufrufe.abruf.push(await request.json());
@@ -3176,7 +3176,7 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
       http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
     );

@@ -2325,9 +2325,9 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
       [`E2E Sanitätsdienst Stadtlauf ${Date.now()}`, false],
     ] as const) {
       const id = await neuerEinsatz(page, bezeichnung);
-      await seedeJson(page, 'post', `/api/einsaetze/${id}/abschliessen`);
+      await seedeJson(page, 'post', `/api/einsaetze/${id}/close`);
       if (mitFrist) {
-        await seedeJson(page, 'put', `/api/einsaetze/${id}/aufbewahrungsfrist`, {
+        await seedeJson(page, 'put', `/api/einsaetze/${id}/retention-period`, {
           retention_bis: new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString(),
           bestaetigt: true,
         });

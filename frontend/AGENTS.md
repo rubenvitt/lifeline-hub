@@ -1557,7 +1557,7 @@ und `pages/personen/`.
 
 **Formularseiten**
 
-- **Aufgeteilte Route erbt den Vollersatz-Vertrag:** `PUT …/einstellungen` ist Vollersatz — die
+- **Aufgeteilte Route erbt den Vollersatz-Vertrag:** `PUT …/settings` ist Vollersatz — die
   Sektionen (`…/einstellungen/{allgemein,verhalten,aufbewahrung,module}`,
   `einsatzEinstellungenPfad`) schicken über `einstellungen/einsatzEinstellungenForm.ts`
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,

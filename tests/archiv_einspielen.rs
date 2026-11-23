@@ -131,7 +131,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )

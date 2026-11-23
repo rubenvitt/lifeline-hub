@@ -298,7 +298,7 @@ export type ModulOverrides = Record<string, ModulOverride>;
 /** Effektive Freigabe eines Moduls für den angemeldeten Benutzer (LFH-669). */
 export type ModulFreigabe = S['ModulFreigabe'];
 
-/** Antwort von `GET /api/einsaetze/{id}/modul-freigaben`: ein Eintrag je Modul-Key der Registry.
+/** Antwort von `GET /api/einsaetze/{id}/module-access`: ein Eintrag je Modul-Key der Registry.
  *  Die Map selbst ist kein Backend-Schema, FE-lokal. */
 export type ModulFreigaben = Record<string, ModulFreigabe>;
 
@@ -1999,14 +1999,14 @@ export interface WiederherstellenBody {
   retention_bis: string | null;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist`. `null` hebt die Frist auf; eine
+/** Body von `PUT /api/einsaetze/{id}/retention-period`. `null` hebt die Frist auf; eine
  *  Verkürzung braucht `bestaetigt: true`, sonst 409. Kein Backend-Schema, FE-lokal. */
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/nachbereitung` (LLH-1494). `null` hebt die Frist auf.
+/** Body von `PUT /api/einsaetze/{id}/follow-up` (LLH-1494). `null` hebt die Frist auf.
  *  Kein Backend-Schema, FE-lokal. */
 export interface NachbereitungSetzenBody {
   nachbereitung_bis: string | null;
@@ -2041,7 +2041,7 @@ export type KategorieVorgabe = S['KategorieVorgabe'];
 /** Aufbewahrung einer Kategorie am Einsatz bzw. in der Archivakte (Frist, Zustand, Rechtsgrundlage). */
 export type KategorieAufbewahrung = S['KategorieAufbewahrungAnzeige'];
 
-/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`. `null` hebt die Frist auf
+/** Body von `PUT /api/einsaetze/{id}/retention-period/{kategorie}`. `null` hebt die Frist auf
  *  (die Kategorie folgt der Einsatz-Frist); eine Verkürzung braucht `bestaetigt: true`, sonst 409;
  *  die erste Frist einer Kategorie braucht eine Rechtsgrundlage, sonst 422. Kein Backend-Schema,
  *  FE-lokal. */

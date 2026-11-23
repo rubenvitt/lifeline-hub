@@ -345,7 +345,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
-- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/einsatzakte/anlagen.zip`,
+- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/case-file/attachments.zip`,
   `routes/einsatzakte.rs`, `einsatzakte/`): liest die Bytes über `support::anhang_fuer_akte`,
   immer bereinigt; unbereinigbar, am Spiegel noch nicht geholt oder entfernt steht als „nicht
   enthalten“ im `inhalt.csv` statt das ZIP zu kippen. Gate: jedes Modul aus `AKTE_MODULE` lesbar
@@ -760,7 +760,7 @@ Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitgli
 - **Die anlegende Person ist immer Einsatzleitung** und steht nicht in der Liste (sonst 400).
 - **Dieselbe Menge wie unter „Zugriff“:** aufnehmbar ist, was `einsatz::repo::auswahl_sql` liefert
   (aktiv, eigene Org, ohne Geräte-, Stellvertreter- und Archivkonten). Die Auswahl beim Anlegen
-  (`GET /api/einsaetze/mitglied-auswahl`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
+  (`GET /api/einsaetze/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
   Eine fremde oder unbekannte Person nennt die Meldung nur mit Kennung.
 - **Jede aufgenommene Person bekommt nach dem Commit den Hinweis `einsatz_aufnahme`** wie bei
   `mitglied_setzen`; die anlegende Person nicht.
@@ -883,8 +883,8 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   stellt (EL als Einsatzleiter der Führungsstelle ∪ Funktion der Mitgliedschaft, leer = `ohne`);
   lauter gewinnt. Ohne Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
   `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
-  Verlauf `GET …/einsaetze/{id}/benachrichtigungen` (≤ 200, `ungelesen` = unquittierte Eingänge
-  nach der Rechteprüfung), „alle gelesen“ `POST …/benachrichtigungen/gelesen` nur über
+  Verlauf `GET …/einsaetze/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
+  nach der Rechteprüfung), „alle gelesen“ `POST …/notifications/read` nur über
   `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines
   je Zeile.
 - **Für alle erledigt nur über `benachrichtigung::erledigen`** (LLH-1062): ist der Anlass selbst
@@ -1117,7 +1117,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.
 - Archivzugriff nur für den System-Admin der eigenen Org (`fordere_archivzugriff`: fremd 403,
-  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` schneidet gleich (LFH-753): Admin nur
+  unbekannt 404, aktiv 409). `PUT …/retention-period` schneidet gleich (LFH-753): Admin nur
   der Einsatz-Org, sonst Einsatzleitung (auch org-fremd); der Client spiegelt das über
   `BenutzerAnzeige.org_id`. Nach Fristablauf hat die Einsatzleitung bewusst keinen **UI**-Weg;
   der PUT bleibt ihr bis zur Vormerkung (≤ 10 min) offen, danach nur das Wiederherstellen des

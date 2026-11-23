@@ -23,7 +23,7 @@ import { apiDateiMitName, apiGet, apiSend, mitParametern } from './client';
  * der System-Admin der eigenen Organisation kommt hinein (sonst 403), ein unbekannter Einsatz ist
  * 404, ein aktiver 409. Bis auf Wiederherstellen und Löschersuchen (Antrag, Rücknahme; LFH-751)
  * liest er nur. Die Frist ändert man am
- * Einsatz (`PUT …/aufbewahrungsfrist`); an einem vorgemerkten Einsatz ist das 422 (erst
+ * Einsatz (`PUT …/retention-period`); an einem vorgemerkten Einsatz ist das 422 (erst
  * wiederherstellen), an einem geschwärzten 409.
  */
 
@@ -85,20 +85,20 @@ export function stelleWiederHer(
   return apiSend<ArchivAkte>(`${BASIS}/incidents/${einsatzId}/restore`, 'POST', body);
 }
 
-/** `PUT /api/einsaetze/{id}/aufbewahrungsfrist` — Frist setzen, ändern oder aufheben. */
+/** `PUT /api/einsaetze/{id}/retention-period` — Frist setzen, ändern oder aufheben. */
 export function setzeAufbewahrungsfrist(
   einsatzId: number,
   body: FristSetzenBody,
 ): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/aufbewahrungsfrist`, 'PUT', body);
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/retention-period`, 'PUT', body);
 }
 
-/** `PUT …/nachbereitung` — Ende der Nachbereitung setzen oder aufheben (LLH-1494). */
+/** `PUT …/follow-up` — Ende der Nachbereitung setzen oder aufheben (LLH-1494). */
 export function setzeNachbereitung(
   einsatzId: number,
   body: NachbereitungSetzenBody,
 ): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/nachbereitung`, 'PUT', body);
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/follow-up`, 'PUT', body);
 }
 
 /** `GET …/redaction-requests` — Löschersuchen nach Art. 17 des Einsatzes, neueste zuerst. */
@@ -142,12 +142,12 @@ export function suchePersonen(einsatzId: number, suchtext: string): Promise<Pers
   });
 }
 
-/** `GET /api/einsaetze/{id}/aufbewahrung-kategorien` — Aufbewahrung je Datenkategorie (LFH-749). */
+/** `GET /api/einsaetze/{id}/retention-categories` — Aufbewahrung je Datenkategorie (LFH-749). */
 export function ladeKategorieAufbewahrung(einsatzId: number): Promise<KategorieAufbewahrung[]> {
-  return apiGet<KategorieAufbewahrung[]>(`/api/einsaetze/${einsatzId}/aufbewahrung-kategorien`);
+  return apiGet<KategorieAufbewahrung[]>(`/api/einsaetze/${einsatzId}/retention-categories`);
 }
 
-/** `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}` — Frist einer Datenkategorie setzen,
+/** `PUT /api/einsaetze/{id}/retention-period/{kategorie}` — Frist einer Datenkategorie setzen,
  *  ändern oder aufheben; in der Karenz nimmt eine künftige Frist die Vormerkung zurück. */
 export function setzeKategorieFrist(
   einsatzId: number,
@@ -155,7 +155,7 @@ export function setzeKategorieFrist(
   body: KategorieFristBody,
 ): Promise<KategorieAufbewahrung[]> {
   return apiSend<KategorieAufbewahrung[]>(
-    `/api/einsaetze/${einsatzId}/aufbewahrungsfrist/${kategorie}`,
+    `/api/einsaetze/${einsatzId}/retention-period/${kategorie}`,
     'PUT',
     body,
   );

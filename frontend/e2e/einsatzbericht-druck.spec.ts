@@ -94,7 +94,7 @@ async function saeen(page: Page, einsatzId: string) {
     art: 'alarmierung',
     zeitpunkt_at: vorEinerStunde(),
   });
-  await sende(page, 'PUT', `${basis}/modul-overrides/betreuung`, {
+  await sende(page, 'PUT', `${basis}/module-overrides/betreuung`, {
     sichtbar: false,
     benoetigte_rolle: null,
   });
@@ -266,7 +266,7 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
   const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Rollen ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
   for (const modul of BERICHT_MODULE) {
-    await sende(page, 'PUT', `${basis}/modul-overrides/${modul}`, {
+    await sende(page, 'PUT', `${basis}/module-overrides/${modul}`, {
       sichtbar: false,
       benoetigte_rolle: null,
     });
@@ -287,7 +287,7 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
 
   // ── Rollensperre auf Personen (zurück zum Admin, dann wieder Beobachter).
   await wechsleZuAdmin(page);
-  await sende(page, 'PUT', `${basis}/modul-overrides/personen`, {
+  await sende(page, 'PUT', `${basis}/module-overrides/personen`, {
     sichtbar: true,
     benoetigte_rolle: 'fuehrungskraft',
   });

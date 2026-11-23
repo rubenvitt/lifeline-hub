@@ -798,7 +798,7 @@ describe('PersonalPage', () => {
     // Den Abruf selbst prüft die Personenansicht: die Verdichtungszeile über der Liste liest die
     // Fahrzeuge für ihre eigenen Zahlen (Bestand, LFH-973).
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -817,7 +817,7 @@ describe('PersonalPage', () => {
 
   it('ohne Freigabe des Moduls Einheiten: keine Spalte „Einheit“ und keine Gruppen', async () => {
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
