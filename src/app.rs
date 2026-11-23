@@ -2720,10 +2720,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     let router = router
         .route("/api/map/config", get(routes::karte::config))
-        .route(
-            "/api/map/overlays/{quelle}",
-            get(routes::karte::fachebenen),
-        )
+        .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(

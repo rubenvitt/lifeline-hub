@@ -793,14 +793,7 @@ async fn fachebenen_luftqualitaet_wird_bedient() {
     lifeline_hub::karte::cache::setze(&cache_pool, "luftqualitaet", &gesetzt).await;
 
     // Ohne `bbox` — die Ebene ist nicht bbox-abhängig, anders als kritis (Gegenprobe oben).
-    let res = anfrage(
-        &app,
-        "GET",
-        "/api/map/overlays/luftqualitaet",
-        None,
-        None,
-    )
-    .await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/luftqualitaet", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["quelle"], "luftqualitaet");
@@ -1043,14 +1036,7 @@ async fn online_crud_durchlauf() {
     assert_eq!(angelegt["aktiv"], true);
 
     // Liste → 200, enthält die Quelle.
-    let res = anfrage(
-        &app,
-        "GET",
-        "/api/map/online-sources",
-        Some(&cookie),
-        None,
-    )
-    .await;
+    let res = anfrage(&app, "GET", "/api/map/online-sources", Some(&cookie), None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let liste = json(res).await;
     assert_eq!(liste.as_array().unwrap().len(), 1);
@@ -1080,14 +1066,7 @@ async fn online_crud_durchlauf() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    let res = anfrage(
-        &app,
-        "GET",
-        "/api/map/online-sources",
-        Some(&cookie),
-        None,
-    )
-    .await;
+    let res = anfrage(&app, "GET", "/api/map/online-sources", Some(&cookie), None).await;
     assert!(json(res).await.as_array().unwrap().is_empty());
 }
 
@@ -1169,17 +1148,8 @@ async fn patch_proxy_true_prueft_gespeicherte_url_gegen_ssrf() {
     );
 
     // Und die Quelle ist unverändert direkt geblieben.
-    let liste = json(
-        anfrage(
-            &app,
-            "GET",
-            "/api/map/online-sources",
-            Some(&cookie),
-            None,
-        )
-        .await,
-    )
-    .await;
+    let liste =
+        json(anfrage(&app, "GET", "/api/map/online-sources", Some(&cookie), None).await).await;
     assert_eq!(liste[0]["proxy"], false, "abgelehnt ⇒ nichts geschrieben");
 }
 
@@ -1501,14 +1471,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(json(res).await["aktiv_basemap"], true);
 
-    let res = anfrage(
-        &app,
-        "GET",
-        "/api/map/offline-maps",
-        Some(&cookie),
-        None,
-    )
-    .await;
+    let res = anfrage(&app, "GET", "/api/map/offline-maps", Some(&cookie), None).await;
     assert_eq!(json(res).await.as_array().unwrap().len(), 1);
 
     let res = anfrage(
@@ -1747,17 +1710,8 @@ async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let liste = json(
-        anfrage(
-            &app,
-            "GET",
-            "/api/map/offline-maps",
-            Some(&cookie),
-            None,
-        )
-        .await,
-    )
-    .await;
+    let liste =
+        json(anfrage(&app, "GET", "/api/map/offline-maps", Some(&cookie), None).await).await;
     let eintrag = &liste.as_array().unwrap()[0];
     assert_eq!(
         eintrag["update_verfuegbar"], false,
@@ -1783,17 +1737,8 @@ async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let liste = json(
-        anfrage(
-            &app,
-            "GET",
-            "/api/map/offline-maps",
-            Some(&cookie),
-            None,
-        )
-        .await,
-    )
-    .await;
+    let liste =
+        json(anfrage(&app, "GET", "/api/map/offline-maps", Some(&cookie), None).await).await;
     let eintrag = &liste.as_array().unwrap()[0];
     assert_eq!(eintrag["update_verfuegbar"], false);
     assert!(eintrag["katalog_url"].is_null());
@@ -1825,14 +1770,7 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     // Lesen erlaubt (read-only-Einblick, Muster GlobalEinstellungen/org_einstellungen).
-    let res = anfrage(
-        &app,
-        "GET",
-        "/api/map/online-sources",
-        Some(&frieda),
-        None,
-    )
-    .await;
+    let res = anfrage(&app, "GET", "/api/map/online-sources", Some(&frieda), None).await;
     assert_eq!(
         res.status(),
         StatusCode::OK,
@@ -2024,17 +1962,8 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     assert_eq!(res.status(), StatusCode::CREATED);
     common::zwang_aufheben("frieda").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let liste = json(
-        anfrage(
-            &app,
-            "GET",
-            "/api/map/online-sources",
-            Some(&frieda),
-            None,
-        )
-        .await,
-    )
-    .await;
+    let liste =
+        json(anfrage(&app, "GET", "/api/map/online-sources", Some(&frieda), None).await).await;
     assert_eq!(liste[0]["url"], "***", "Führungskraft sieht maskierte url");
     assert!(
         !liste[0]["url"].as_str().unwrap().contains("GEHEIM"),

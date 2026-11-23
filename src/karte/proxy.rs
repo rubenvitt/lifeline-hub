@@ -970,10 +970,7 @@ mod tests {
             proxy_url(3, SlotArt::Glyphs, 9),
             "/api/map/proxy/3/glyphs/9/{fontstack}/{range}"
         );
-        assert_eq!(
-            proxy_url(3, SlotArt::Static, 9),
-            "/api/map/proxy/3/asset/9"
-        );
+        assert_eq!(proxy_url(3, SlotArt::Static, 9), "/api/map/proxy/3/asset/9");
     }
 
     #[test]

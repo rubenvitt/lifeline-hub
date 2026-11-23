@@ -140,17 +140,8 @@ async fn liste_kennzeichnet_aktualisierbare_karten() {
     assert_eq!(res.status(), StatusCode::CREATED);
     let registriert = json(res).await["id"].as_i64().unwrap();
 
-    let liste = json(
-        anfrage(
-            &a.app,
-            "GET",
-            "/api/map/offline-maps",
-            Some(&a.admin),
-            None,
-        )
-        .await,
-    )
-    .await;
+    let liste =
+        json(anfrage(&a.app, "GET", "/api/map/offline-maps", Some(&a.admin), None).await).await;
     let feld = |id: i64| {
         liste
             .as_array()
