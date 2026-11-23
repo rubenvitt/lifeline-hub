@@ -51,7 +51,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
 - Produces: `impl Funktionsangabe { pub fn as_freitext(&self, geschwaerzt: bool) -> Funktionsangabe }`
   — liefert immer `funktion: None`; `text` nach Global Constraints. Ohne Code: unverändert.
 
-- [ ] **Step 1: Tests schreiben** (`src/fuehrung/tests.rs`)
+- [x] **Step 1: Tests schreiben** (`src/fuehrung/tests.rs`)
   - `funktion_wird_zum_kuerzel`: `S4` ohne Text → text `Some("S4")`; `El` → `"EL"`; `S7` → `"S7"`.
   - `fachberater_wird_zu_label_mit_bezeichnung`: `Fachberater` + `"THW"` → `"Fachberater: THW"`;
     `Fuehrungshilfspersonal` + `"Funk"` → `"Führungshilfspersonal: Funk"`.
@@ -60,11 +60,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
     → `{None, None}`.
   - `freitext_bleibt_freitext`: `{None, Some("ELW 2")}` → unverändert.
   - `wird_auf_text_max_gekuerzt`: Fachberater + 195×„x“ → `chars().count() == TEXT_MAX`.
-- [ ] **Step 2:** `cargo test --lib fuehrung::tests` → FAIL (Methode fehlt).
-- [ ] **Step 3:** Implementieren; Kürzel aus `kuerzel()`, Label aus `standard_label()`, Kürzen per
+- [x] **Step 2:** `cargo test --lib fuehrung::tests` → FAIL (Methode fehlt).
+- [x] **Step 3:** Implementieren; Kürzel aus `kuerzel()`, Label aus `standard_label()`, Kürzen per
   `chars().take(TEXT_MAX)`.
-- [ ] **Step 4:** `cargo test --lib fuehrung::tests` → PASS.
-- [ ] **Step 5:** Commit `feat(fuehrung): Funktionsangabe als Freitext (LLH-2064)`.
+- [x] **Step 4:** `cargo test --lib fuehrung::tests` → PASS.
+- [x] **Step 5:** Commit `feat(fuehrung): Funktionsangabe als Freitext (LLH-2064)`.
 
 ### Task 2: D2 — Mitgliederroute
 
@@ -83,7 +83,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
 - Consumes: `Funktionsangabe::as_freitext` (Task 1).
 - Produces: `setze_mitgliedschaft` gleiche Signatur und Rückgabe (`Ok(true)` = neu aufgenommen).
 
-- [ ] **Step 1: Tests schreiben**
+- [x] **Step 1: Tests schreiben**
   - `mitarbeit_und_beobachter_mit_funktion_sind_422`: PUT mit `{"einsatz_rolle":"mitarbeit","fuehrungsfunktion":"s4"}`
     → 422; dasselbe für `beobachter`; Mitgliedschaft danach unverändert (keine Zeile bzw. alte Rolle).
   - `mitarbeit_mit_freitext_ist_erlaubt`: `{"einsatz_rolle":"mitarbeit","fuehrungsstelle":"Funk ELW 2"}`
@@ -95,15 +95,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
     `fuehrungsfunktion == "s4"`.
   - `herabgestufte_funktion_bekommt_keinen_hinweis`: Anna führt S4, wird Mitarbeit, Auftrag an S4 →
     keine Zeile in `benachrichtigung` für Anna (Pool-Abfrage wie in `tests/benachrichtigung.rs`).
-- [ ] **Step 2:** `cargo test --test fuehrungsfunktionen` → neue Tests FAIL.
-- [ ] **Step 3:** Route: nach `pruefe_funktion` 422, wenn `!neue_rolle.gehoert_zur_fuehrung()` und
+- [x] **Step 2:** `cargo test --test fuehrungsfunktionen` → neue Tests FAIL.
+- [x] **Step 3:** Route: nach `pruefe_funktion` 422, wenn `!neue_rolle.gehoert_zur_fuehrung()` und
   `angabe.funktion.is_some()`. Repo: `setze_mitgliedschaft` öffnet `pool.begin_with("BEGIN IMMEDIATE")`
   (sqlx ≥ 0.8; sonst `BEGIN IMMEDIATE` per `conn`), INSERT wie bisher; im UPDATE-Zweig, wenn die
   Rolle nicht zur Führung gehört und `fuehrungsstelle` `None` ist: `fuehrungsfunktion`,
   `fuehrungsstelle` und `einsatz.geschwaerzt_at IS NOT NULL` lesen, `as_freitext` anwenden und als
   `Some(angabe)` ins bestehende UPDATE geben. Org-Guard unverändert.
-- [ ] **Step 4:** `cargo test --test fuehrungsfunktionen --test einsatz_live --test benachrichtigung_chat --test einsatzrolle_mitarbeit` → PASS.
-- [ ] **Step 5:** Commit `feat(einsatz): Führungsfunktion nur für die Führung (LLH-2064)`.
+- [x] **Step 4:** `cargo test --test fuehrungsfunktionen --test einsatz_live --test benachrichtigung_chat --test einsatzrolle_mitarbeit` → PASS.
+- [x] **Step 5:** Commit `feat(einsatz): Führungsfunktion nur für die Führung (LLH-2064)`.
 
 ### Task 3: D3 — Migration mit CHECK und Bereinigung
 
@@ -116,7 +116,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
 **Interfaces:**
 - Consumes: `Funktionsangabe::as_freitext` (Task 1) im Gleichheitstest.
 
-- [ ] **Step 1: Tests schreiben** (Muster: der 0358-Test spielt bis zur Vorgängerversion, legt Zeilen an, spielt nach)
+- [x] **Step 1: Tests schreiben** (Muster: der 0358-Test spielt bis zur Vorgängerversion, legt Zeilen an, spielt nach)
   - `migration_0363_erhaelt_zeilen_trigger_und_schema`: Index `idx_mitgliedschaft_benutzer` und
     sechs Trigger `einsatz_mitgliedschaft_spiegel%` existieren; Zeilen der Führung inkl.
     `zugewiesen_at` unverändert; Änderungslog (`einsatz_aenderung`) bekommt durch die Migration keine
@@ -126,14 +126,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
     Zeile `(None, fuehrungsstelle) == Funktionsangabe{…}.as_freitext(geschwaerzt)`.
   - `migration_0363_check_lehnt_funktion_bei_mitarbeit_ab`: INSERT `mitarbeit` + `s4` → Fehler mit
     „CHECK constraint failed“; `fuehrungspersonal` + `s4` → ok.
-- [ ] **Step 2:** `cargo test --lib db::tests::migration_0363` → FAIL.
-- [ ] **Step 3:** Migration schreiben: Kopf-Kommentar wie 0358 (Herleitung, Blatt, Test-Name),
+- [x] **Step 2:** `cargo test --lib db::tests::migration_0363` → FAIL.
+- [x] **Step 3:** Migration schreiben: Kopf-Kommentar wie 0358 (Herleitung, Blatt, Test-Name),
   `CREATE TABLE einsatz_mitgliedschaft_neu` = Schema 0358 + `CHECK (fuehrungsfunktion IS NULL OR
   einsatz_rolle IN ('einsatzleitung', 'fuehrungspersonal'))`; `INSERT … SELECT … FROM
   einsatz_mitgliedschaft m JOIN einsatz e ON e.id = m.einsatz_id` mit `CASE` für die beiden
   Spalten; DROP, RENAME, Index und Trigger wortgleich aus 0358 kopieren.
-- [ ] **Step 4:** `cargo test --lib db::tests` → PASS; `scripts/check-migrationen.sh` → ok.
-- [ ] **Step 5:** Commit `feat(db): Mitgliedschaft trägt Funktion nur in der Führung (LLH-2064)`.
+- [x] **Step 4:** `cargo test --lib db::tests` → PASS; `scripts/check-migrationen.sh` → ok.
+- [x] **Step 5:** Commit `feat(db): Mitgliedschaft trägt Funktion nur in der Führung (LLH-2064)`.
 
 ### Task 4: D4 — Spiegel normalisiert beim Übernehmen
 
@@ -147,17 +147,17 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
   `einsatz_mitgliedschaft`) und `async fn strip_funktion(conn, t, werte) -> Result<(), AppError>`
   (liest `geschwaerzt_at` des lokalen Einsatzes über die `einsatz_id` aus `werte`).
 
-- [ ] **Step 1: Tests schreiben**
+- [x] **Step 1: Tests schreiben**
   - `normalize_funktion_macht_beobachter_s4_zu_freitext`: werte mit `einsatz_rolle = "beobachter"`,
     `fuehrungsfunktion = "s4"`, `fuehrungsstelle = null` → `fuehrungsfunktion` Null, `fuehrungsstelle` „S4“.
   - `normalize_funktion_laesst_fuehrung_stehen`: `fuehrungspersonal` + `s4` unverändert.
   - `normalize_funktion_geschwaerzt_nur_code_weg`.
   - `normalize_funktion_ohne_rollenspalte_unveraendert` (Teil-Lieferung ohne `einsatz_rolle`).
-- [ ] **Step 2:** `cargo test --lib instanz::spiegel` → FAIL.
-- [ ] **Step 3:** Implementieren; in der Übernahme nach `keep_mitarbeit` aufrufen. Doc-Kommentar
+- [x] **Step 2:** `cargo test --lib instanz::spiegel` → FAIL.
+- [x] **Step 3:** Implementieren; in der Übernahme nach `keep_mitarbeit` aufrufen. Doc-Kommentar
   verweist auf das Design-Doc D4 und auf `keep_mitarbeit`.
-- [ ] **Step 4:** `cargo test --lib instanz::spiegel` → PASS.
-- [ ] **Step 5:** Commit `feat(spiegel): Funktion von Mitarbeit und Beobachter beim Übernehmen als Freitext (LLH-2064)`.
+- [x] **Step 4:** `cargo test --lib instanz::spiegel` → PASS.
+- [x] **Step 5:** Commit `feat(spiegel): Funktion von Mitarbeit und Beobachter beim Übernehmen als Freitext (LLH-2064)`.
 
 ### Task 5: D5 — Oberfläche im Reiter „Zugriff“
 
@@ -170,7 +170,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
 - Produces: `const FUEHRUNG: ReadonlySet<EinsatzRolle> = new Set(['einsatzleitung', 'fuehrungspersonal'])`
   (lokal); `Herabstufung` wird zu `{ benutzerId; rolle; eigene: boolean; funktion?: string }`.
 
-- [ ] **Step 1: Tests schreiben**
+- [x] **Step 1: Tests schreiben**
   - `LLH-2064: für Mitarbeit bietet die Führungsstelle nur Freitext`: Mitglied `mitarbeit`, Dialog
     öffnen → keine Option „S2 …“; Freitext eingeben und speichern sendet `fuehrungsfunktion: null`.
   - `LLH-2064: Wechsel einer S4 auf Mitarbeit fragt vorher`: Mitglied `fuehrungspersonal` mit
@@ -178,8 +178,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
     Dialog „Führungsfunktion endet“ mit Text (s. Step 3); erst „Rolle ändern“ sendet PUT.
   - `LLH-2064: ohne Funktion keine Rückfrage`: Mitglied ohne Code → Rolle „Beobachter“ sendet sofort.
   - `LLH-2064: eigene Herabstufung mit Funktion zeigt eine Bestätigung mit beiden Folgen`.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/MitgliederAbschnitt.test.tsx` → FAIL.
-- [ ] **Step 3:** Implementieren. `FuehrungsstelleModal`: für Rolle außerhalb `FUEHRUNG`
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/MitgliederAbschnitt.test.tsx` → FAIL.
+- [x] **Step 3:** Implementieren. `FuehrungsstelleModal`: für Rolle außerhalb `FUEHRUNG`
   `vorschlaege={{ ...funktionen, katalog: [] }}`, `extra="Nur als erster Vorschlag für den
   ETB-Rufnamen – Mitarbeit und Beobachter tragen keine Führungsfunktion"`, Platzhalter „Freitext,
   z. B. Funk ELW 2“. `rolleWaehlen`: Rückfrage, wenn eigene Herabstufung **oder**
@@ -188,9 +188,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
   herabstufen“). Text Funktion: `Mit „<Rolle>“ endet die Führungsfunktion <anzeige>. „<Kürzel bzw.
   anzeige>“ bleibt als Bezeichnung stehen; Hinweise an diese Funktion erreichen <Name> nicht mehr.`
   Beide Sätze untereinander, wenn beides gilt. Texte vor dem Commit mit `design:ux-copy` gegenlesen.
-- [ ] **Step 4:** Vitest wie Step 2 → PASS; `mise exec -- pnpm -C frontend lint` und
+- [x] **Step 4:** Vitest wie Step 2 → PASS; `mise exec -- pnpm -C frontend lint` und
   `mise exec -- pnpm -C frontend exec tsc --noEmit` → ohne Fehler.
-- [ ] **Step 5:** Commit `feat(zugriff): Funktion nur für die Führung wählbar (LLH-2064)`.
+- [x] **Step 5:** Commit `feat(zugriff): Funktion nur für die Führung wählbar (LLH-2064)`.
 
 ### Task 6: D6 — Regeln, Doku, Gates
 
@@ -199,19 +199,22 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/u195f4et5a9pz4u1lm466n2l
 - Modify: `frontend/src/fuehrung/AGENTS.md` (Absatz „Wer eine Funktion trägt …“)
 - Modify: `docs/anwender/kapitel/rechte-im-einsatz.md` („Führungsfunktionen der Mitglieder“, ~Z. 109–131)
 
-- [ ] **Step 1:** `scripts/adr-fuer.sh` über alle geänderten Pfade; Ergebnis beachten.
-- [ ] **Step 2:** Regel in `src/AGENTS.md` ergänzen (Satz: Eine Funktion tragen nur Einsatzleitung
+- [x] **Step 1:** `scripts/adr-fuer.sh` über alle geänderten Pfade; Ergebnis beachten.
+- [x] **Step 2:** Regel in `src/AGENTS.md` ergänzen (Satz: Eine Funktion tragen nur Einsatzleitung
   und Führungspersonal — CHECK aus 0363, 422 der Route, Spiegel normalisiert; muss sie weichen,
   bleibt ihre Anzeige als Freitext, nach `Funktionsangabe::as_freitext`; Anzeige und Hinweise lesen
   deshalb ohne Rollenfilter dieselben Personen). `frontend/src/fuehrung/AGENTS.md`: Rollenbedingung
   mit Verweis auf `src/AGENTS.md`. Anwenderdoku nach `docs/anwender/AGENTS.md` (Kapitelform,
   Wächter).
-- [ ] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` (einmal, ggf. `run_in_background`) → grün.
-- [ ] **Step 4:** Commit `docs: Führungsfunktion nur für die Führung (LLH-2064)`.
+- [x] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` (einmal, ggf. `run_in_background`) → grün.
+  Erledigt in Portionen wegen des Plattenkontingents der Cloud-Sitzung: `--nur schnell` und
+  `--nur frontend` grün, Rust-Suite stückweise (lib, 273 Integrationstests, doc, Dev-Seed,
+  Server-Binary) grün; die Desktop-Hülle baut hier nicht (`gdk-3.0` fehlt), sie ist nicht berührt.
+- [x] **Step 4:** Commit `docs: Führungsfunktion nur für die Führung (LLH-2064)`.
 
 ### Nach LLH-2008 (falls es vor dem PR auf `alpha` liegt)
 
-- [ ] `git fetch origin alpha && git merge origin/alpha`; Konflikte in `src/AGENTS.md`,
+- [x] `git fetch origin alpha && git merge origin/alpha`; Konflikte in `src/AGENTS.md`,
   `rechte-im-einsatz.md`, `benachrichtigung/aufloesung.rs` zusammenführen. Tests aus LLH-2008, die
   einer Mitarbeit/Beobachterin eine Funktion geben, auf den Rollenwechsel umstellen (Funktion wird
   zur Bezeichnung, kein Hinweis). Filter in `funktion_nutzer` bleibt, Kommentar verweist auf 0363.
