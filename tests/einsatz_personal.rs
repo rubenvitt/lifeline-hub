@@ -1385,8 +1385,8 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         ),
         ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
         ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
-        ("POST", "abschnitte".to_string(), Some(leiter)),
-        ("POST", "schaeden".to_string(), Some(schaden)),
+        ("POST", "sectors".to_string(), Some(leiter)),
+        ("POST", "damages".to_string(), Some(schaden)),
     ] {
         let (s, json) = anfrage(
             &app,

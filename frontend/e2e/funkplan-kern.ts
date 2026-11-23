@@ -49,7 +49,7 @@ export async function seede(page: Page, einsatzId: string) {
   const tmo = await post('sprechgruppen', { bezeichnung: 'TMO 412_F_DRK', betriebsart: 'TMO' });
   const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
   await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
-  const abschnitt = await post('abschnitte', {
+  const abschnitt = await post('sectors', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
     sprechgruppe_ids: [tmo, dmo],
@@ -111,7 +111,7 @@ export async function seedeSprechgruppen(page: Page, einsatzId: string) {
   });
   const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
   await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
-  const abschnitt = await post('abschnitte', {
+  const abschnitt = await post('sectors', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
     sprechgruppe_ids: [tmo, dmo],

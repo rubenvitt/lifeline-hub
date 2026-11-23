@@ -5343,7 +5343,7 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     }
 
     // Die Listen der Personen tragen Notizen und Leiter; der Monitor liest sie nicht.
-    for pfad in ["zonen", "abschnitte", "gefahrengebiete"] {
+    for pfad in ["zones", "sectors", "hazard-areas"] {
         let (s, _) = anfrage(&app, "GET", &format!("{basis}/{pfad}"), &monitor, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
     }

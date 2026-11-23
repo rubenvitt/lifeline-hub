@@ -87,7 +87,7 @@ async function seede(page: Page, einsatzId: string): Promise<Probe[]> {
     }),
   );
 
-  await post(page, einsatzId, 'schaeden', {
+  await post(page, einsatzId, 'damages', {
     typ: 'sachschaden',
     ausmass: 'katastrophal',
     ort: 'Schaden Kontrast',
@@ -104,7 +104,7 @@ async function seede(page: Page, einsatzId: string): Promise<Probe[]> {
     await page.request.patch(`${basis}/uhs/${uhs}`, { data: { lat: ort(4)[1], lon: ort(4)[0] } }),
   );
 
-  await post(page, einsatzId, 'freie-zeichen', {
+  await post(page, einsatzId, 'free-symbols', {
     lat: ort(5)[1],
     lon: ort(5)[0],
     zeichen_spec: JSON.stringify({ v: 1, spec: { kind: 'formation' } }),

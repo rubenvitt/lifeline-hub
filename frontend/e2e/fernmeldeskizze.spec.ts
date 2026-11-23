@@ -83,7 +83,7 @@ async function seedeGross(page: Page, einsatzId: string) {
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [tmo] });
   for (let i = 1; i <= 8; i++) {
     const ab = (
-      await a.post('abschnitte', {
+      await a.post('sectors', {
         name: `Einsatzabschnitt ${i} Nordwest`,
         kurzbezeichnung: `EA ${i}`,
         sprechgruppe_ids: [tmo, dmo],
@@ -427,7 +427,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   const slAs = (await a.post('sprechgruppen', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [slAs] });
   const zaehle = async () => ({
-    abschnitte: (await a.get<unknown[]>('abschnitte')).length,
+    abschnitte: (await a.get<unknown[]>('sectors')).length,
     einheiten: (await a.get<unknown[]>('einheiten')).length,
   });
   const vorher = await zaehle();
@@ -621,7 +621,7 @@ async function seedeLuecken(page: Page, einsatzId: string) {
   const d505 = (await a.post('sprechgruppen', { bezeichnung: '505', betriebsart: 'DMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (
-    await a.post('abschnitte', {
+    await a.post('sectors', {
       name: 'Einsatzabschnitt Nord',
       kurzbezeichnung: 'EA 1',
       sprechgruppe_ids: [bnBos],
@@ -702,7 +702,7 @@ test('Wurzel: ohne erfasste Führungsstelle keine erfundene Einsatzleitung', asy
   const a = api(page, einsatzId);
   const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   const ea = (
-    await a.post('abschnitte', {
+    await a.post('sectors', {
       name: 'Einsatzabschnitt Nord',
       kurzbezeichnung: 'EA 1',
       sprechgruppe_ids: [bnBos],
@@ -778,7 +778,7 @@ test('Lage: zweimal Pfeil rechts bleibt über Neuladen; „Neu anordnen“ stell
   await expect.poll(() => lage(ea1), { message: 'wieder im Auto-Layout' }).toEqual(auto);
   expect(await stiche(page), 'Zuordnungen unverändert').toEqual(zuordnungen);
   const abschnitt = await api(page, einsatzId).get<{ sprechgruppen: { id: number }[] }[]>(
-    'abschnitte',
+    'sectors',
   );
   expect(abschnitt.map((x) => x.sprechgruppen.map((s) => s.id))).toEqual([
     [n.bnBos],
@@ -867,7 +867,7 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
   const a = api(page, einsatzId);
   const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
-  const ea1 = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  const ea1 = (await a.post('sectors', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   const vorne = (
     await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
   ).id;
@@ -920,7 +920,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   const a = api(page, einsatzId);
   const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
-  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  const ea = (await a.post('sectors', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
   const zugB = (
     await a.post('einheiten', { name: 'Zug B', abschnitt_id: ea, sprechgruppe_ids: [bnBos] })
@@ -973,7 +973,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz ob
   const a = api(page, einsatzId);
   const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
-  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  const ea = (await a.post('sectors', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   // Funkrufname und Telefon: „Zug Ohne“ fehlt nur die Sprechgruppe. Sonst stünde er seit LLH-1134
   // in zwei weiteren Lücken (ohne Funkrufname, ohne Telefon), das Paneel wüchse um eine Zeile mit
   // Betroffenen, und die Fläche begänne unter dem Fenster.

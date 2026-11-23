@@ -117,7 +117,7 @@ test('Evakuierung: Gebiet des Bezirks ohne Kartengrafik, Sprung bleibt', async (
     plan_erhebung: 'geschaetzt',
   });
   const [w, o, s, n] = [ORT.lon - 0.002, ORT.lon + 0.002, ORT.lat - 0.001, ORT.lat + 0.001];
-  await a.post('zonen', {
+  await a.post('zones', {
     typ: 'evakuierungsbezirk',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify({
