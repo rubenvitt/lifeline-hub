@@ -192,7 +192,7 @@ iOS-App über `faehigkeiten.ts`.
 ### Task 4: Migration, Repo, Verschlüsselung, gemeinsamer Testvektor
 
 **Files:**
-- Create: `migrations/0363_ios_push.sql`, `src/ios_push/mod.rs`, `src/ios_push/repo.rs`,
+- Create: `migrations/0364_ios_push.sql`, `src/ios_push/mod.rs`, `src/ios_push/repo.rs`,
   `src/ios_push/krypto.rs`, `src/ios_push/tests.rs`, `src-tauri/faelle/push-nutzlast.json`
 - Modify: `src/lib.rs` (Modul), `src/instanz/spiegel/art.rs` (`AUSGENOMMEN` +
   `("ios_push_anmeldung", "iOS-Anmeldungen hängen an einem Gerät dieser Instanz")`,
