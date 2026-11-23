@@ -915,6 +915,19 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Bezugstyp braucht seine Tabelle in `hinweis::bezug_tabelle` (Wächter
   `jeder_bezugstyp_ist_eingeordnet`), ein neuer Adressat seine Textform dort. Das Aufräumen
   schließt Spiegel ein. Nachweis `tests/instanz_hinweise.rs`.
+- **Automatische Fristen stehen am Bezug (LLH-1908,** Entwurf
+  `docs/superpowers/specs/2026-11-22-ndd6jaby-faellige-erinnerung-einmal-design.md`): Eine
+  Erinnerung mit `quelle = 'auto_frist'` und Bezug `meldung`, `auftrag`, `abloesung` oder
+  `abloesung_vorwarnung` zählt und steht dort, wo man sie erledigt — an der Meldung („Bestätigung
+  überfällig“), am Auftrag („überfällig“), an der Ablösung — sofern die Person das Modul des Bezugs
+  sieht (sichtbar und Zugriff; ein Admin erreicht ein ausgeblendetes Modul, sieht es aber nicht) und
+  der Bezug offen ist (Meldung nicht erledigt, Auftrag offen oder in Arbeit; Ablösungen schließen
+  ihre Fristen beim Ende selbst). Sie fehlt dann im Zähler „Erinnerungen fällig“ (`erinnerung::repo::faellige_offene`, auch
+  Lagemonitor), in Offene Vorgänge → Erinnerungen und doppelt in Nächste Marken; das
+  Erinnerungsmodul zeigt sie weiter, als „automatisch“. Den Planungshinweis (`abloesung_planung`)
+  und selbst angelegte Erinnerungen mit Bezug zeigt sonst nichts, sie bleiben Erinnerungen. Die Menge
+  steht je Seite einmal: `erinnerung::AM_BEZUG_GETRAGEN` und `AM_BEZUG_GETRAGEN` in
+  `frontend/src/erinnerung/amBezug.ts`; eine neue Auto-Frist-Art zieht beide nach.
 
 ## Backend — Meldungsmodell (LLH-1027)
 

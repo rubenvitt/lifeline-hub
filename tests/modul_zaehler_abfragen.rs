@@ -101,7 +101,8 @@ async fn statements_von_berechne(
     .into_iter()
     .collect();
     STATEMENTS.lock().unwrap().clear();
-    zaehler::berechne(pool, einsatz, admin, &alle, "2026-06-12 12:00:00")
+    // Alle Module sichtbar: auch der Abgleich der Fristen am Bezug (LLH-1908) läuft mit.
+    zaehler::berechne(pool, einsatz, admin, &alle, &alle, "2026-06-12 12:00:00")
         .await
         .expect("berechne");
     sqlx::query(MESSPUNKT).execute(pool).await.unwrap();
@@ -260,6 +261,9 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         ]
         .into_iter()
         .collect(),
+        // Kein Modul sichtbar: keine Frist steht am Bezug (LLH-1908), „fällig“ zählt jede
+        // fällige Erinnerung und bleibt mit der Liste unten vergleichbar.
+        &HashSet::new(),
         "2026-06-12 12:00:00",
     )
     .await

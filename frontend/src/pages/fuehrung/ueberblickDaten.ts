@@ -492,6 +492,8 @@ export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
 export type MarkenArt =
   | 'auftrag'
   | 'erinnerung'
+  /** Bestätigungsfrist einer Meldung (automatische Frist, LLH-1908); `id` ist die Meldung. */
+  | 'bestaetigung'
   | 'lagebesprechung'
   | 'pegelprognose'
   | 'abloesung'
@@ -532,7 +534,7 @@ export function markenBewertung(
   zeit: Dayjs,
   jetzt: Dayjs,
   art?: MarkenArt,
-  /** Nur Erinnerung: fällig nach `erinnerungZustand` (Server oder Uhr). */
+  /** Nur Erinnerung und Bestätigungsfrist: fällig nach Server oder Uhr. */
   erinnerungFaellig = false,
 ): { ton: MarkenTon; wort: string } {
   if (art === 'lagebesprechung') {
@@ -543,7 +545,9 @@ export function markenBewertung(
   if (art === 'erinnerung' && (erinnerungFaellig || abstand <= 0)) {
     return { ton: ERINNERUNG_FAELLIG.ton, wort: ERINNERUNG_FAELLIG.wort };
   }
-  if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
+  if (abstand <= 0 || (art === 'bestaetigung' && erinnerungFaellig)) {
+    return { ton: 'alarm', wort: 'überfällig' };
+  }
   const minuten = Math.floor(abstand / 60_000);
   const wort = abstandText(minuten);
   if (art === 'programmpunkt') return { ton: 'neutral', wort };
@@ -567,6 +571,11 @@ function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
  * Beginn angekündigter Unwetterwarnungen und Programmpunkte der Veranstaltung (LLH-1570).
  * Aufsteigend nach Zeit, Überfälliges also oben.
  *
+ * Automatische Fristen stehen am Bezug (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen
+ * am Bezug“): Die Quittierfrist eines Auftrags entfällt, wenn der Auftrag selbst eine Marke hat.
+ * Die Bestätigungsfrist einer Meldung ist bei freiem Modul Meldungen eine Marke der Meldung
+ * (`bestaetigung`); verstrichen heißt sie „überfällig“, denn sie ist eine Frist, kein Wecker.
+ *
  * Pegel-Prognose, Unwetterbeginn und Programmpunkt sind keine Fristen, sondern Erwartungen:
  * verstrichen sind sie vorbei, nicht „überfällig", und fallen vor dem Sortieren heraus. Ein begonnenes Unwetter
  * trägt der Modulzähler weiter (LFH-663). Ablösungen kommen als eigene Quelle (je
@@ -586,6 +595,7 @@ export function naechsteMarken(
     beginn?: string | null;
   }[] = [],
   programm: readonly Programmpunkt[] = [],
+  options: { meldungenFrei?: boolean } = {},
 ): MarkenAuswahl {
   const roh: {
     key: string;
@@ -593,8 +603,9 @@ export function naechsteMarken(
     id: number | null;
     zeit: string;
     text: string;
-    /** Nur Erinnerung: der Server meldet sie fällig (`ist_faellig`), auch wenn die Uhr des Geräts
-     *  nachgeht — dieselbe Regel wie der Abschnitt „Erinnerungen“ (`erinnerungZustand`). */
+    /** Nur Erinnerung und Bestätigungsfrist: der Server meldet sie fällig (`ist_faellig`), auch
+     *  wenn die Uhr des Geräts nachgeht — dieselbe Regel wie der Abschnitt „Erinnerungen“
+     *  (`erinnerungZustand`). */
     faellig?: boolean;
   }[] = [];
   for (const a of auftraege) {
@@ -616,14 +627,30 @@ export function naechsteMarken(
     ) {
       continue;
     }
+    const auto = e.quelle === 'auto_frist' && e.bezug_id != null;
+    if (auto && e.bezug_typ === 'auftrag' && roh.some((m) => m.key === `a-${e.bezug_id}`)) {
+      continue;
+    }
     if (e.status === 'offen' && zeitpunkt(e.faellig_at)) {
+      const faellig = erinnerungZustand(e, jetzt.valueOf()).wort === ERINNERUNG_FAELLIG.wort;
+      if (auto && e.bezug_typ === 'meldung' && options.meldungenFrei) {
+        roh.push({
+          key: `b-${e.bezug_id}`,
+          art: 'bestaetigung',
+          id: e.bezug_id!,
+          zeit: e.faellig_at,
+          text: e.titel,
+          faellig,
+        });
+        continue;
+      }
       roh.push({
         key: `e-${e.id}`,
         art: 'erinnerung',
         id: e.id,
         zeit: e.faellig_at,
         text: e.titel,
-        faellig: erinnerungZustand(e, jetzt.valueOf()).wort === ERINNERUNG_FAELLIG.wort,
+        faellig,
       });
     }
   }
