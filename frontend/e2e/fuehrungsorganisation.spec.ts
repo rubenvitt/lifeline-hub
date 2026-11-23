@@ -205,7 +205,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
 
   const anfragen: string[] = [];
   page.on('request', (r) => {
-    if (/\/lageberichte(\/\d+)?$/.test(new URL(r.url()).pathname) && r.method() !== 'GET') {
+    if (/\/situation-reports(\/\d+)?$/.test(new URL(r.url()).pathname) && r.method() !== 'GET') {
       anfragen.push(`${r.method()} ${new URL(r.url()).pathname}`);
     }
   });

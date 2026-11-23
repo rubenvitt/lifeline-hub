@@ -283,7 +283,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     'Personal (Personalseite + Meldebild)',
   );
   await anlegen(
-    'befehle',
+    'orders',
     { vorlage: 'befehl_lad', titel: 'Befehl an den 2. Zug zur Menschenrettung im Abschnitt Nord' },
     'Befehl',
   );

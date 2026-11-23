@@ -89,7 +89,7 @@ test('dieselben Zahlen wie das Dashboard, Übernahme in EINEM Aufruf', async ({ 
   const anfragen: string[] = [];
   page.on('request', (r) => {
     const pfad = new URL(r.url()).pathname;
-    if (/\/lageberichte(\/\d+)?$/.test(pfad) && r.method() !== 'GET') {
+    if (/\/situation-reports(\/\d+)?$/.test(pfad) && r.method() !== 'GET') {
       anfragen.push(`${r.method()} ${pfad}`);
     }
   });
