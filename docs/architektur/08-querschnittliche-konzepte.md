@@ -33,6 +33,9 @@ Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfa
 (`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
 [ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
+Ein Spiegel, der `mitarbeit` gegen einen älteren Führer festgehalten hat, trägt sie nach dessen
+Aufrüsten einmal nach
+([ADR-0088](entscheidungen/ADR-0088-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
 
 ## 8.3 Fehlervertrag und Statuscodes
 

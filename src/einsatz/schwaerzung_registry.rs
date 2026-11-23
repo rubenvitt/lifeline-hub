@@ -3598,6 +3598,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
+    // Ausgang der Mitarbeit-Nachträge an den Führer (LLH-2007): nur Kennungen einer
+    // Mitgliedschaft, nie Inhalte; mit dem Einsatz weg.
+    TabellenRegel {
+        tabelle: "mitarbeit_nachtrag",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kopplung_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("angelegt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
     // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
     // der Purge-Lauf löscht nach sieben Tagen. Mit dem Einsatz gehen die Zeilen über seinen

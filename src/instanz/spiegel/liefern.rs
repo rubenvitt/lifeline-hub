@@ -403,20 +403,7 @@ pub async fn resend_mitarbeit(
         .fetch_all(&mut *conn)
         .await?;
     for (einsatz_id, schluessel) in zeilen {
-        sqlx::query(
-            "DELETE FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? AND schluessel = ?",
-        )
-        .bind(einsatz_id)
-        .bind(tabelle)
-        .bind(&schluessel)
-        .execute(&mut *conn)
-        .await?;
-        sqlx::query("INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (?, ?, ?)")
-            .bind(einsatz_id)
-            .bind(tabelle)
-            .bind(&schluessel)
-            .execute(&mut *conn)
-            .await?;
+        super::nachtrag::relog_mitgliedschaft(conn, einsatz_id, &schluessel).await?;
     }
     Ok(())
 }
