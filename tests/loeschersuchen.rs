@@ -603,14 +603,7 @@ async fn antrag_etb_eintraege_gehen_live_hinaus() {
     assert!(s.is_success(), "{s}: {v}");
     etb.pruefe(&app, &admin, einsatz, "Antrag stellen").await;
     let aid = v["id"].as_i64().unwrap();
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        &format!("{uri}/{aid}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", &format!("{uri}/{aid}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     etb.pruefe(&app, &admin, einsatz, "Antrag zurücknehmen")
         .await;

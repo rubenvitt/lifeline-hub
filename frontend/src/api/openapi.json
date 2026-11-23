@@ -2123,7 +2123,7 @@
       },
       "ArchivAkteAnzeige": {
         "type": "object",
-        "description": "Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",
+        "description": "Die pseudonyme Archivakte (`GET /api/retention/incidents/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",
         "required": [
           "kopf",
           "zustand",
@@ -2688,7 +2688,7 @@
       },
       "AufbewahrungEintragAnzeige": {
         "type": "object",
-        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
+        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
         "required": [
           "einsatz_id",
           "zustand"
@@ -20135,7 +20135,7 @@
       },
       "SchwaerzungsantragAnzeige": {
         "type": "object",
-        "description": "Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und\npseudonyme Kennung darin.",
+        "description": "Ein Antrag in der Archivakte (`GET …/redaction-requests`). Das Ziel steht nur als Art und\npseudonyme Kennung darin.",
         "required": [
           "id",
           "ziel_art",

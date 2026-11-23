@@ -820,7 +820,7 @@ export interface components {
             code: string;
         };
         /**
-         * @description Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der
+         * @description Die pseudonyme Archivakte (`GET /api/retention/incidents/{id}`). Vor und nach der
          *     Schwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.
          */
         ArchivAkteAnzeige: {
@@ -997,7 +997,7 @@ export interface components {
             storniert_at?: string | null;
         };
         /**
-         * @description Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine
+         * @description Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine
          *     personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im
          *     Zustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine
          *     Bezeichnung.
@@ -8055,7 +8055,7 @@ export interface components {
          */
         Schutzobjekt: "menschen" | "tiere" | "umwelt" | "sachwerte" | "einsatzkraefte";
         /**
-         * @description Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und
+         * @description Ein Antrag in der Archivakte (`GET …/redaction-requests`). Das Ziel steht nur als Art und
          *     pseudonyme Kennung darin.
          */
         SchwaerzungsantragAnzeige: {

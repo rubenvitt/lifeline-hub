@@ -130,14 +130,7 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v.as_array().unwrap().len(), 0, "fremde Übersicht leer: {v}");
 
-    let (s, _) = anfrage(
-        &app,
-        "GET",
-        "/api/retention/incidents/999999",
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage(&app, "GET", "/api/retention/incidents/999999", &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(
         &app,
@@ -812,7 +805,8 @@ fn pruefe_namensraum(app_rs: &str, routen_rs: &str, weitere: &[(String, String)]
     let mut erlaubt = vec![
         "post /api/retention/incidents/{id}/restore → wiederherstellen".to_string(),
         "post /api/retention/incidents/{id}/redaction-requests → antrag_stellen".to_string(),
-        "post /api/retention/incidents/{id}/redaction-requests/{aid}/undo → antrag_zuruecknehmen".to_string(),
+        "post /api/retention/incidents/{id}/redaction-requests/{aid}/undo → antrag_zuruecknehmen"
+            .to_string(),
         "post /api/retention/incidents/{id}/person-search → personensuche".to_string(),
     ];
     erlaubt.sort();
