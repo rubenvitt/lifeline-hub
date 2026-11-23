@@ -1111,7 +1111,7 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 
 Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md`.
 - **Totalsperre bleibt** (`einsatz::berechtigung::darf_lesen`, auch für den System-Admin); das
-  Archiv liest nur `/api/aufbewahrung` (`routes/aufbewahrung.rs`), Guard
+  Archiv liest nur `/api/retention` (`routes/aufbewahrung.rs`), Guard
   `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) — neue Routen dort
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.

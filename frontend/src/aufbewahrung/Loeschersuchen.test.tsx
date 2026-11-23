@@ -25,7 +25,7 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /** Löschersuchen nach Art. 17 (LFH-751): Rückfrage, Personensuche, Paneel der Akte. */
 
-const BASIS = '/api/aufbewahrung/einsaetze/7';
+const BASIS = '/api/retention/incidents/7';
 let gesendet: Record<string, unknown>[];
 
 beforeEach(() => {
@@ -48,7 +48,7 @@ const PERSON: AntragZielWahl = { art: 'betroffene', id: 11, kennung: 'R-042' };
 describe('SchwaerzungsantragDialog', () => {
   it('Kennung „R-04“ für R-042 → Absenden gesperrt; erst die passende Kennung gibt frei', async () => {
     server.use(
-      http.post(`${BASIS}/schwaerzungsantraege`, async ({ request }) => {
+      http.post(`${BASIS}/redaction-requests`, async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({}, { status: 201 });
       }),
@@ -98,7 +98,7 @@ describe('SchwaerzungsantragDialog', () => {
 
   it('zeigt die Ablehnung des Servers im Dialog und lässt die Felder stehen', async () => {
     server.use(
-      http.post(`${BASIS}/schwaerzungsantraege`, () =>
+      http.post(`${BASIS}/redaction-requests`, () =>
         HttpResponse.json(
           { error: 'Für R-042 besteht bereits ein offener Antrag' },
           { status: 409 },
@@ -156,7 +156,7 @@ const TREFFER: PersonTreffer[] = [
 describe('PersonensucheDialog', () => {
   it('sucht per POST, zeigt nur Kennungen und bietet den Antrag nur ohne bestehenden an', async () => {
     server.use(
-      http.post(`${BASIS}/personensuche`, async ({ request }) => {
+      http.post(`${BASIS}/person-search`, async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(TREFFER);
       }),
@@ -252,8 +252,8 @@ describe('Loeschersuchen', () => {
       }),
     ];
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json(stand)),
-      http.post(`${BASIS}/schwaerzungsantraege/1/zuruecknehmen`, () => {
+      http.get(`${BASIS}/redaction-requests`, () => HttpResponse.json(stand)),
+      http.post(`${BASIS}/redaction-requests/1/undo`, () => {
         zurueck += 1;
         stand = [
           antrag({
@@ -286,7 +286,7 @@ describe('Loeschersuchen', () => {
 
   it('filtert im Kopf „Stand“ und sortiert nach dem Ziel (LLH-1096)', async () => {
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+      http.get(`${BASIS}/redaction-requests`, () =>
         HttpResponse.json([
           antrag(),
           antrag({
@@ -314,11 +314,11 @@ describe('Loeschersuchen', () => {
   it('Rücknahme zu spät (409): Fehler am Paneel, Liste lädt neu', async () => {
     let gets = 0;
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () => {
+      http.get(`${BASIS}/redaction-requests`, () => {
         gets += 1;
         return HttpResponse.json([antrag()]);
       }),
-      http.post(`${BASIS}/schwaerzungsantraege/1/zuruecknehmen`, () =>
+      http.post(`${BASIS}/redaction-requests/1/undo`, () =>
         HttpResponse.json(
           {
             error:
@@ -336,7 +336,7 @@ describe('Loeschersuchen', () => {
   });
 
   it('Geschwärzter Einsatz: keine Antragsaktion', async () => {
-    server.use(http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json([])));
+    server.use(http.get(`${BASIS}/redaction-requests`, () => HttpResponse.json([])));
     renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('geschwaerzt')} />);
     expect(await screen.findByText('Kein Löschersuchen gestellt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Person suchen und schwärzen' })).toBeNull();
@@ -344,7 +344,7 @@ describe('Loeschersuchen', () => {
   });
 
   it('„Einsatz sofort schwärzen“ öffnet die Rückfrage mit der Einsatznummer', async () => {
-    server.use(http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json([])));
+    server.use(http.get(`${BASIS}/redaction-requests`, () => HttpResponse.json([])));
     renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('frist_laeuft')} />);
     const knopf = await screen.findByRole('button', { name: 'Einsatz sofort schwärzen' });
     expect(knopf).toHaveClass('ant-btn-dangerous');
@@ -395,7 +395,7 @@ describe('Loeschersuchen', () => {
   });
 
   it('Archivierter Einsatz: „Einsatz und Archiv löschen“ und „Person per Kennung schwärzen“', async () => {
-    server.use(http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json([])));
+    server.use(http.get(`${BASIS}/redaction-requests`, () => HttpResponse.json([])));
     renderMitProviders(<Loeschersuchen einsatzId={7} akte={archivierteAkte()} />);
     expect(await screen.findByRole('button', { name: 'Einsatz und Archiv löschen' })).toHaveClass(
       'ant-btn-dangerous',
@@ -417,7 +417,7 @@ describe('Loeschersuchen', () => {
 
   it('Archivierter Einsatz: ohne geladene Antragsliste kein Einsatz-Weg', async () => {
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+      http.get(`${BASIS}/redaction-requests`, () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -431,7 +431,7 @@ describe('Loeschersuchen', () => {
 
   it('Archivierter Einsatz: ein fälliger Personen-Antrag wartet auf den Befehl', async () => {
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+      http.get(`${BASIS}/redaction-requests`, () =>
         HttpResponse.json([
           antrag({ zuruecknehmbar: false }),
           antrag({ id: 2, ziel_kennung: 'EK-17', ziel_art: 'externe_kraft' }),
@@ -452,7 +452,7 @@ describe('Loeschersuchen', () => {
 
   it('Ohne Archiv wartet kein Antrag auf einen Befehl', async () => {
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+      http.get(`${BASIS}/redaction-requests`, () =>
         HttpResponse.json([antrag({ zuruecknehmbar: false })]),
       ),
     );
@@ -486,7 +486,7 @@ describe('ArchivPersonAntragDialog', () => {
 
   it('sendet erst mit gültiger Kennung und Aktenzeichen, nennt den Befehl', async () => {
     server.use(
-      http.post(`${BASIS}/schwaerzungsantraege`, async ({ request }) => {
+      http.post(`${BASIS}/redaction-requests`, async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({}, { status: 201 });
       }),

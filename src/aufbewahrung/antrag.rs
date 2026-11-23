@@ -103,7 +103,7 @@ impl AntragZiel {
     }
 }
 
-/// Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und
+/// Ein Antrag in der Archivakte (`GET …/redaction-requests`). Das Ziel steht nur als Art und
 /// pseudonyme Kennung darin.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct SchwaerzungsantragAnzeige {

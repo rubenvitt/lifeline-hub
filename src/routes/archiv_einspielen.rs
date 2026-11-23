@@ -7,7 +7,7 @@
 //! | POST | `/api/admin/archiv/einspielen` | Schlüssel und Block hochladen, einspielen |
 //!
 //! Beide nur für den System-Admin; eingespielt wird immer in seine Org, und deren Name muss im
-//! Archiv derselbe sein. Nicht im Archiv-Namensraum `/api/aufbewahrung`: der bleibt lesend (Spec
+//! Archiv derselbe sein. Nicht im Archiv-Namensraum `/api/retention`: der bleibt lesend (Spec
 //! `aufbewahrung-archiv`), und das Einspielen ändert keinen archivierten Einsatz, es legt einen
 //! neuen Spiegel an.
 //!

@@ -1971,33 +1971,33 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
         // Wiederherstellen und Löschersuchen (Antrag, Rücknahme; die Suche ist POST, liest aber
         // nur). Guard in tests/aufbewahrung.rs.
-        .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
+        .route("/api/retention", get(routes::aufbewahrung::uebersicht))
         .route(
-            "/api/aufbewahrung/einsaetze/{id}",
+            "/api/retention/incidents/{id}",
             get(routes::aufbewahrung::akte),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/etb",
+            "/api/retention/incidents/{id}/etb",
             get(routes::aufbewahrung::etb),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/wiederherstellen",
+            "/api/retention/incidents/{id}/restore",
             post(routes::aufbewahrung::wiederherstellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege",
+            "/api/retention/incidents/{id}/redaction-requests",
             get(routes::aufbewahrung::antraege).post(routes::aufbewahrung::antrag_stellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen",
+            "/api/retention/incidents/{id}/redaction-requests/{aid}/undo",
             post(routes::aufbewahrung::antrag_zuruecknehmen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/personensuche",
+            "/api/retention/incidents/{id}/person-search",
             post(routes::aufbewahrung::personensuche),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/archiv",
+            "/api/retention/incidents/{id}/archive",
             get(routes::aufbewahrung::archiv_herunterladen).route_layer(download_grenze()),
         )
         // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der

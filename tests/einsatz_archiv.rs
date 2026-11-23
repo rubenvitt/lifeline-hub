@@ -170,7 +170,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, akte) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )
@@ -186,7 +186,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
 
     let (s, bytes, name) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &admin,
     )
     .await;
@@ -226,7 +226,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let fremd = login_cookie(&app, "fremdadmin", "fremdpw12").await;
     let (s, _, _) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &fremd,
     )
     .await;

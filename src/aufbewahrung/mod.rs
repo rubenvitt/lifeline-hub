@@ -2,7 +2,7 @@
 //!
 //! Die Lesesperre der regulären Einsatz-Routen (`einsatz::berechtigung::darf_lesen`) bleibt
 //! unverändert, auch für den System-Admin. Daneben gibt es einen eigenen, lesenden Pfad
-//! (`/api/aufbewahrung`, `routes::aufbewahrung`): eine Übersicht der abgeschlossenen Einsätze
+//! (`/api/retention`, `routes::aufbewahrung`): eine Übersicht der abgeschlossenen Einsätze
 //! der eigenen Organisation mit Aufbewahrungszustand und eine pseudonyme Archivakte (Kopf,
 //! Register, ETB) nur aus Retain-Spalten ([`projektion`]). Schreibaktionen sind das
 //! Wiederherstellen während der Karenz (`einsatz::repo::wiederherstellen`) sowie Stellen und
@@ -30,7 +30,7 @@ use crate::person::{PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatu
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine
+/// Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine
 /// personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im
 /// Zustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine
 /// Bezeichnung.
@@ -155,7 +155,7 @@ pub struct ArchivSchadenAnzeige {
     pub storniert_at: Option<String>,
 }
 
-/// Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der
+/// Die pseudonyme Archivakte (`GET /api/retention/incidents/{id}`). Vor und nach der
 /// Schwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ArchivAkteAnzeige {

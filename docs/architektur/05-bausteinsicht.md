@@ -247,7 +247,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | --- | --- | --- |
 | `src/anhang` | Generische Anhänge als BLOB in SQLite: Allowlist, 25 MiB, Scan, Vorschaubilder, Audit | `…/{id}/anhaenge`; von ETB, Person, Tier, Schaden, UHS, Dokument genutzt |
 | `src/dokument` | Dokumentenablage eines Einsatzes mit Kategorie und Bezug, Bytes in `anhang` | `…/{id}/dokumente`; Live `dokument` |
-| `src/aufbewahrung` | Lesender Archivpfad des Org-Admins: Übersicht, pseudonyme Archivakte, Wiederherstellen, Schwärzungsantrag, Download des verschlüsselten Archivs | `/api/aufbewahrung` |
+| `src/aufbewahrung` | Lesender Archivpfad des Org-Admins: Übersicht, pseudonyme Archivakte, Wiederherstellen, Schwärzungsantrag, Download des verschlüsselten Archivs | `/api/retention` |
 | `src/backup` | Konsistente Sicherung (auch verschlüsselt mit `age`), Download, Restore, Scheduler | `GET /api/backup`, CLI `backup`/`restore` |
 | `src/storno.rs` | Soft-Delete einer Zeile genau einmal, mit 404/409-Semantik | von den Fachmodulen genutzt |
 | `src/feld_cas.rs` | Feldvergleich beim Speichern (`erwartet`): Altwerte je Feld gegen den Stand prüfen, 409 bei fremder Änderung, 422 bei unvollständigem Paar | genutzt von Einsatzkopf, Einheit, Führungsstelle, Personendaten |

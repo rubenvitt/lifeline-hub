@@ -6,6 +6,7 @@ admin	-
 animals	Tiere
 api	-
 app-code	-
+archive	Archiv
 audit	-
 auth	-
 backup	-
@@ -70,6 +71,7 @@ orders	Befehle
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+person-search	Personensuche
 personnel	Personal
 persons	Personen
 plan	-
@@ -81,6 +83,7 @@ providers	-
 proxy	-
 raster	-
 read	gelesen
+redaction-requests	Schwärzungsanträge
 redeem	einlösen
 register	-
 registration	-
@@ -90,6 +93,7 @@ reports	Meldungen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
+restore	wiederherstellen
 retention	Aufbewahrung
 seats	Plätze
 sectors	Einsatzabschnitte
@@ -119,6 +123,7 @@ totp	-
 transport	-
 triage	Sichtung
 uhs	UHS
+undo	zurücknehmen
 units	Einheiten
 unregister	-
 users	Benutzer

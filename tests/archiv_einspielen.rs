@@ -155,7 +155,7 @@ async fn umgebung() -> Umgebung {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/aufbewahrung/einsaetze/{id}/archiv"))
+                .uri(format!("/api/retention/incidents/{id}/archive"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
