@@ -219,7 +219,8 @@ async fn code_nur_fuer_admin_mit_unterschriftsschluessel() {
 
     common::benutzer_anlegen(&hub.app, &hub.admin, "helfer", "keine").await;
     let helfer = common::login_cookie(&hub.app, "helfer", "helferpw1").await;
-    let (s, _) = common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", &helfer, None).await;
+    let (s, _) =
+        common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", &helfer, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, _) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &helfer, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
@@ -670,7 +671,15 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
     let mut anders = body.clone();
     anders.push(b' ');
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &anders, "/api/instance/check-in").await,
+        melden_roh(
+            &hub,
+            &elw_i,
+            &hub_k,
+            &body,
+            &anders,
+            "/api/instance/check-in"
+        )
+        .await,
         StatusCode::UNAUTHORIZED
     );
     // Anderer Pfad im Token
@@ -1265,14 +1274,7 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
 
 /// Konten, deren Deaktivieren die Org ohne gültigen Schlüssel zurückließe (LLH-1605, D5).
 async fn letzte_schluessel(i: &Instanz, wer: &str) -> Value {
-    let (s, v) = common::anfrage(
-        &i.app,
-        "GET",
-        "/api/admin/instance/last-keys",
-        wer,
-        None,
-    )
-    .await;
+    let (s, v) = common::anfrage(&i.app, "GET", "/api/admin/instance/last-keys", wer, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v
 }

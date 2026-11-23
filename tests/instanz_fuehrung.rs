@@ -808,12 +808,7 @@ async fn anfrage_nur_von_einem_admin_der_org() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _) = post(
-        &elw,
-        "/api/admin/instance/command/99999/request",
-        json!({}),
-    )
-    .await;
+    let (s, _) = post(&elw, "/api/admin/instance/command/99999/request", json!({})).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -936,10 +931,7 @@ async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
 
     let (s, v) = post(
         &elw,
-        &mit_kennung(
-            &format!("/api/admin/instance/command/{akte}/request"),
-            &neu,
-        ),
+        &mit_kennung(&format!("/api/admin/instance/command/{akte}/request"), &neu),
         json!({}),
     )
     .await;

@@ -1908,7 +1908,8 @@ async fn schon_gekoppelt_gilt_nur_mit_gueltiger_zuordnung_der_eigenen_org() {
         let app = i.app.clone();
         let admin = i.admin.clone();
         async move {
-            let (s, v) = common::anfrage(&app, "GET", "/api/admin/instance/lan", &admin, None).await;
+            let (s, v) =
+                common::anfrage(&app, "GET", "/api/admin/instance/lan", &admin, None).await;
             assert_eq!(s, StatusCode::OK, "{v}");
             v["gefunden"][0]["gekoppelt"].clone()
         }
@@ -2400,12 +2401,7 @@ async fn fragen_zwei_gegenstellen_an_wartet_die_erste_und_die_zweite_steht_als_h
             &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
         )
         .await;
-        let (s, r) = post(
-            i,
-            &format!("/api/einsaetze/{e}/command/request"),
-            json!({}),
-        )
-        .await;
+        let (s, r) = post(i, &format!("/api/einsaetze/{e}/command/request"), json!({})).await;
         assert_eq!(s, StatusCode::OK, "{r}");
         melden(i).await;
     }

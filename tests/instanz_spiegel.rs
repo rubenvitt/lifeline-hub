@@ -1717,7 +1717,8 @@ async fn widerrufen_am_hub(hub: &Instanz, elw: &Instanz, cookie: &str) {
 /// Der Admin am Hub (Cookie) stellt einen Code aus, der ELW löst ihn ein: dieselbe Kopplung, eine
 /// neue Zuordnung der Org des ELW an die Org dieses Admins.
 async fn neu_zuordnen(hub: &Instanz, elw: &Instanz, cookie: &str) {
-    let (st, v) = common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", cookie, None).await;
+    let (st, v) =
+        common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", cookie, None).await;
     assert_eq!(st, StatusCode::CREATED, "{v}");
     let (st, v) = common::anfrage_json(
         &elw.app,

@@ -1779,7 +1779,11 @@ mod tests {
             SendError::Abgelehnt(404, ANDERER_STAND.into())
         );
         assert_eq!(
-            deute_unsigniert(crate::instanz::extractor::SPIEGEL_PFAD, 404, nicht_gefunden()),
+            deute_unsigniert(
+                crate::instanz::extractor::SPIEGEL_PFAD,
+                404,
+                nicht_gefunden()
+            ),
             SendError::Abgelehnt(404, nicht_gefunden())
         );
         assert_eq!(
