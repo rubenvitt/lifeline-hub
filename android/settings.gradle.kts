@@ -4,6 +4,8 @@
 pluginManagement {
     repositories {
         google()
+        // Spiegel vor Maven Central: Kopf von `kern/settings.gradle.kts`.
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "MavenCentralSpiegel" }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -13,6 +15,7 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         google()
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "MavenCentralSpiegel" }
         mavenCentral()
     }
 }

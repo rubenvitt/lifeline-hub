@@ -56,8 +56,43 @@ jobs:
         run: ./scripts/android/jdk-waehlen.sh
       - name: Android-SDK ergänzen
         run: ./scripts/android/sdk-installieren.sh
+      # Abhängigkeiten aus dem Cache statt jedes Mal aus dem Netz (knapp 1 GB). Ohne Cache lud
+      # jeder Lauf den ganzen Baum neu, und Maven Central drosselt die geteilten Runner-Adressen:
+      # am 23.11.2026 scheiterten drei Läufe auf zwei PRs binnen fünf Minuten an „429 Too Many
+      # Requests“ für `nativeruntime-dist-compat-1.0.20.jar` (Robolectric). Seitdem lädt der Build
+      # über Googles Spiegel (Kopf von android/kern/settings.gradle.kts); der Cache spart auch
+      # dort. Mit dabei: Gradle-Wrapper und die `android-all`-Jars, die Robolectric zur Laufzeit
+      # selbst nach `~/.m2` lädt. Ohne die Sperrdateien des Gradle-Caches.
+      #
+      # Laden und Speichern getrennt (`restore`/`save`, wie in e2e.yml): gespeichert wird gleich
+      # nach dem App-Bau, auch wenn danach der Kern rot wird. Nur wenn der App-Bau grün war, denn
+      # dann ist alles geladen; ein Eintrag mit Lücke bliebe unter seinem Schlüssel stehen. Der
+      # Schlüssel hängt an Versionskatalog, Build-Skripten und Wrapper; ein älterer Eintrag hilft
+      # über `restore-keys`, Gradle lädt nur, was fehlt. Läufe auf `alpha` (android-pruefung-alpha.yml)
+      # legen Einträge an, die jeder PR lesen darf.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: abhaengigkeiten
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            !~/.gradle/caches/modules-2/*.lock
+            ~/.gradle/wrapper/dists
+            ~/.m2/repository/org/robolectric
+          key: android-abh-${{ runner.os }}-${{ hashFiles('android/gradle/libs.versions.toml', 'android/**/*.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: android-abh-${{ runner.os }}-
       - name: App-Tests und Release-APK (ohne Signatur)
+        id: app
         run: ./android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease --console=plain
+      # Nur ohne exakten Treffer: ein bestehender Schlüssel lässt sich nicht überschreiben.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ !cancelled() && steps.app.outcome == 'success' && steps.abhaengigkeiten.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            !~/.gradle/caches/modules-2/*.lock
+            ~/.gradle/wrapper/dists
+            ~/.m2/repository/org/robolectric
+          key: ${{ steps.abhaengigkeiten.outputs.cache-primary-key }}
       - name: Kotlin-Kern
         run: ./android/gradlew -p android/kern test --console=plain
       - name: Bildschirmbilder
