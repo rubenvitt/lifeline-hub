@@ -282,13 +282,14 @@ async fn nachricht_ohne_erwaehnung_bleibt_still() {
 async fn ohne_sicht_auf_den_chat_kein_hinweis() {
     let w = welt().await;
     w.chat_nur_fuer_die_fuehrung().await;
-    w.funktion_setzen(w.dora, "beobachter", "s4").await;
+    // Eine Beobachterin trägt keine Funktion (LLH-2064); sie ist hier nur namentlich erwähnt.
+    rolle_setzen(&w.app, &w.admin, w.einsatz, w.dora, "beobachter").await;
     let n = w
         .gesendet(
             &w.admin,
             json!({
-                "inhalt": "@Dora @Annika @S4",
-                "erwaehnungen": [erwaehnung(w.dora), erwaehnung(w.anna), funktion("s4")]
+                "inhalt": "@Dora @Annika",
+                "erwaehnungen": [erwaehnung(w.dora), erwaehnung(w.anna)]
             }),
         )
         .await;

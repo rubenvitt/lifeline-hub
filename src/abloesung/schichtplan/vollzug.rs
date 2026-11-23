@@ -592,6 +592,8 @@ async fn status_setzen_tx(
             .bind(einsatz_id)
             .execute(&mut *conn)
             .await?;
+        // Ein Wechsel ohne Person überholt einen gemerkten von Hand (LLH-1986).
+        disposition_repo::vergiss_statuswechsel_tx(conn, einsatz_id, ep).await?;
         return Ok(None);
     };
     disposition_repo::update_tx(

@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * Lässt die Init-Skripte der Hüllen (`src-tauri/src/kennung.js`, LLH-1982,
  * `src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7, `src-tauri/src/faehigkeiten.js`,
- * LFH-817, und `ios/App/Huelle/huelle.js`, t39ltxxi) im jsdom
+ * LFH-817, `ios/App/Huelle/huelle.js`, t39ltxxi, und `android/app/src/main/assets/huelle.js`,
+ * LLH-1989) im jsdom
  * laufen, wie der Webview sie vor dem ersten Skript der Seite ausführt. Die Tests setzen die
  * Kennung also nicht von Hand: benennt eine Seite sie um, wird der Test rot, statt still zu driften.
  */
@@ -17,9 +18,22 @@ const kennungSkript = liesSkript('src-tauri/src/kennung.js');
 const benachrichtigungSkript = liesSkript('src-tauri/src/benachrichtigung.js');
 const faehigkeitenSkript = liesSkript('src-tauri/src/faehigkeiten.js');
 const iosSkript = liesSkript('ios/App/Huelle/huelle.js');
+const androidSkript = liesSkript('android/app/src/main/assets/huelle.js');
 
-/** Der Platzhalter, den die iOS-Hülle beim Einspielen durch ihre volle Version ersetzt. */
-export const IOS_VERSION_PLATZHALTER = '__LIFELINE_VERSION__';
+/** Der Platzhalter, den beide Hüllen (iOS und Android) beim Einspielen durch ihre volle Version ersetzen. */
+export const VERSION_PLACEHOLDER = '__LIFELINE_VERSION__';
+
+/**
+ * Ersetzt den Platzhalter wie die Hülle. Fehlt er im Skript (umbenannt), bricht der Test ab, statt
+ * still nichts zu ersetzen und den Fall „ohne Version“ zu prüfen.
+ */
+function replaceVersion(skript: string, pfad: string, version: string | null): string {
+  if (version == null) return skript;
+  if (!skript.includes(VERSION_PLACEHOLDER)) {
+    throw new Error(`${pfad} enthält den Platzhalter ${VERSION_PLACEHOLDER} nicht`);
+  }
+  return skript.split(VERSION_PLACEHOLDER).join(version);
+}
 
 /** Version, die die Desktop-Hülle in den Tests nennt (in der App: die Version des Workspace). */
 export const DESKTOP_TEST_VERSION = '1.0.0-alpha.test';
@@ -117,7 +131,7 @@ export function starteIosHuelle({
       messageHandlers: { lifeline: bruecke },
     };
   }
-  fuehreAus(version == null ? iosSkript : iosSkript.split(IOS_VERSION_PLATZHALTER).join(version));
+  fuehreAus(replaceVersion(iosSkript, 'ios/App/Huelle/huelle.js', version));
 }
 
 /** Antwortet als iOS-Hülle auf die Nachricht mit `id`: `fehler` `null` erfüllt, sonst lehnt ab. */
@@ -127,7 +141,51 @@ export function antworteIosHuelle(id: number, fehler: string | null, wert?: unkn
   antwort(id, fehler, wert);
 }
 
+/** Stub des Objekts `window.lifeline`, das `addWebMessageListener` der Android-Hülle einhängt. */
+export interface AndroidBruecke {
+  postMessage: (text: string) => void;
+}
+
+/** Die Nachricht einer Android-Hülle an die Seite: `data` ist der JSON-Text von `replyJson`. */
+type AndroidAntworter = EventTarget;
+
+const androidAntworter = new WeakMap<object, AndroidAntworter>();
+
+/**
+ * Führt das Init-Skript der Android-Hülle aus, wie `addDocumentStartJavaScript` es vor dem ersten
+ * Skript der Seite tut; den Versions-Platzhalter ersetzt der Helfer wie die Hülle. Mit `bruecke`
+ * hängt vorher `window.lifeline` (mit `postMessage` und `message`-Ereignissen), sonst bleibt das
+ * Skript stumm. {@link antworteAndroidHuelle} spielt die Antwort der Hülle ein.
+ */
+export function starteAndroidHuelle({
+  bruecke,
+  version = '1.0.0-alpha.7',
+}: {
+  bruecke?: AndroidBruecke;
+  /** `null`: der Platzhalter bleibt stehen, als hätte die Hülle ihn nicht ersetzt. */
+  version?: string | null;
+} = {}) {
+  if (bruecke) {
+    const ziel = new EventTarget();
+    const objekt = Object.assign(ziel, { postMessage: bruecke.postMessage });
+    androidAntworter.set(objekt, ziel);
+    (window as unknown as { lifeline?: unknown }).lifeline = objekt;
+  }
+  fuehreAus(replaceVersion(androidSkript, 'android/app/src/main/assets/huelle.js', version));
+}
+
+/** Antwortet als Android-Hülle auf die Nachricht mit `id`: `fehler` `null` erfüllt, sonst lehnt ab. */
+export function antworteAndroidHuelle(id: number, fehler: string | null, wert: unknown = null) {
+  const objekt = (window as unknown as { lifeline?: object }).lifeline;
+  const ziel = objekt && androidAntworter.get(objekt);
+  if (!ziel) throw new Error('Keine Brücke der Android-Hülle');
+  ziel.dispatchEvent(
+    Object.assign(new Event('message'), { data: JSON.stringify({ id, fehler, wert }) }),
+  );
+}
+
 export function beendeHuelle() {
+  delete (window as unknown as { lifeline?: unknown }).lifeline;
   delete window.__LIFELINE_HUELLE__;
   delete (window as unknown as { __TAURI_INTERNALS__?: HuellenIpc }).__TAURI_INTERNALS__;
   delete (window as unknown as { webkit?: unknown }).webkit;

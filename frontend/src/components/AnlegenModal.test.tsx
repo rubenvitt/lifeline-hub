@@ -3,8 +3,8 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import { useState } from 'react';
-import { neuerQueryClient, renderMitProviders } from '../test/utils';
-import { ApiError } from '../api/client';
+import { neuerQueryClient, renderMitProviders, setzeOnline } from '../test/utils';
+import { ApiError, NetzFehler } from '../api/client';
 import { bestaetigeVerwerfen, ohneVerwerfenRueckfrage } from '../test/verwerfen';
 import AnlegenModal from './AnlegenModal';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -114,6 +114,27 @@ describe('AnlegenModal (LFH-1077, LLH-1921)', () => {
     await act(async () => antworte({ id: 1 }));
     expect(await screen.findByText('Ding angelegt')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Zustand')).toHaveTextContent('zu'));
+  });
+
+  it('ohne Netz: zeigt den Grund im Dialog, Abbrechen schließt (LLH-1950)', async () => {
+    const lege = vi.fn().mockRejectedValue(new NetzFehler());
+    setzeOnline(false);
+    try {
+      renderMitProviders(<Harness legeAn={lege} />);
+      await legeAn();
+
+      expect(await within(offenerDialog()).findByRole('alert')).toHaveTextContent(
+        'NICHT abgeschickt',
+      );
+      expect(lege).toHaveBeenCalledTimes(1);
+      const abbrechen = within(offenerDialog()).getByRole('button', { name: 'Abbrechen' });
+      expect(abbrechen).toBeEnabled();
+      await userEvent.click(abbrechen);
+      await bestaetigeVerwerfen();
+      expect(screen.getByLabelText('Zustand')).toHaveTextContent('zu');
+    } finally {
+      setzeOnline(true);
+    }
   });
 
   it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {

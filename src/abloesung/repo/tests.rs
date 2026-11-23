@@ -855,6 +855,74 @@ async fn ruecknahme_direkt_nach_vollzug() {
         .unwrap();
 }
 
+/// LLH-2024: Wurde die Fälligkeitsfrist von Hand erledigt (Vollzug „vollzogen“) und quittiert,
+/// öffnet die Rücknahme sie mit allen drei Achsen wieder. Sonst zeigte die Karte „offen“ und
+/// trüge zugleich den Vollzugs- und den Quittungsvermerk.
+#[tokio::test]
+async fn ruecknahme_raeumt_vollzug_und_quittung_der_wieder_geoeffneten_frist() {
+    use crate::erinnerung::STATUS_ERLEDIGT;
+    use crate::kommunikation::{repo as krepo, OBJEKT_ERINNERUNG};
+
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let frist: i64 = sqlx::query_scalar(
+        "SELECT id FROM erinnerung WHERE quelle = 'auto_frist' AND status = 'offen' \
+           AND bezug_typ = 'abloesung' AND bezug_id = ?",
+    )
+    .bind(a.id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let mut conn = w.pool.acquire().await.unwrap();
+    erepo::abschliessen_tx(&mut conn, 1, w.e, frist, STATUS_ERLEDIGT, w.b, jetzt)
+        .await
+        .unwrap();
+    krepo::quittiere_tx(&mut conn, 1, w.e, OBJEKT_ERINNERUNG, frist, w.b, jetzt)
+        .await
+        .unwrap();
+    drop(conn);
+    vollziehen(&w.pool, w.e, a.id, w.b, jetzt, None, jetzt)
+        .await
+        .unwrap();
+
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:41:00")
+        .await
+        .unwrap();
+
+    let e = erepo::laden(&w.pool, frist, "2026-09-22 15:42:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        e.status,
+        crate::erinnerung::STATUS_OFFEN,
+        "Frist wieder offen"
+    );
+    let (vollzug, vollzogen_at, vollzogen_von, quittiert_at, quittiert_von): (
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+    ) = sqlx::query_as(
+        "SELECT vollzug_status, vollzogen_at, vollzogen_von_id, quittiert_at, quittiert_von_id \
+         FROM kommunikation_status WHERE objekt_typ = 'erinnerung' AND objekt_id = ?",
+    )
+    .bind(frist)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(vollzug, "offen", "Vollzug folgt dem Status");
+    assert_eq!((vollzogen_at, vollzogen_von), (None, None));
+    assert_eq!(
+        (quittiert_at, quittiert_von),
+        (None, None),
+        "keine Quittung"
+    );
+}
+
 #[tokio::test]
 async fn ruecknahme_nach_vollzug_der_folgeschicht_ist_422() {
     let w = welt().await;

@@ -348,6 +348,16 @@ export type EntlassungAntwort = S['EntlassungAntwort'];
 export type StatusRuecknahmeBeleg = S['StatusRuecknahmeBeleg'];
 /** Antwort des Status-PATCH: das Fahrzeug, dazu der Beleg bei einem echten Wechsel. */
 export type FahrzeugPatchAntwort = S['FahrzeugPatchAntwort'];
+/** Beleg eines Personal- oder Einheitsstatuswechsels für „Rückgängig“ (LLH-1986). */
+export type HandStatusRuecknahmeBeleg = S['HandStatusRuecknahmeBeleg'];
+/** Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). */
+export type MaterialStatusRuecknahmeBeleg = S['MaterialStatusRuecknahmeBeleg'];
+/** Antwort des PATCH einer Kraft: die Kraft, dazu der Beleg bei einem echten Statuswechsel. */
+export type PersonalPatchAntwort = S['PersonalPatchAntwort'];
+/** Antwort des PATCH eines Postens: der Posten, dazu der Beleg bei einem echten Statuswechsel. */
+export type MaterialPatchAntwort = S['MaterialPatchAntwort'];
+/** Antwort des Handstatus-PUT: die Einheit, dazu der Beleg bei einem echten Wechsel. */
+export type EinheitStatusAntwort = S['EinheitStatusAntwort'];
 export type EntlassungRuecknahmeAntwort = S['EntlassungRuecknahmeAntwort'];
 export type RuecknahmeAusgelassen = S['RuecknahmeAusgelassen'];
 export type PersonalEntlassungVorzustand = S['PersonalEntlassungVorzustand'];

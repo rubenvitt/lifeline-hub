@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/BemerkungZelle.tsx, frontend/src/components/useBemerkungMitAltwert.ts]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/BemerkungZelle.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/kraefte/useStatusQuittung.ts, src/status_ruecknahme.rs]
 ---
 
 ## Überblick
@@ -116,7 +116,13 @@ Für Einsatzleitung und Führungspersonal, wenn eine Person im Einsatz eine Aufg
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Spalte „Status“ den Status der Person wählen. Er gilt sofort.
+1. In der Spalte „Status“ den Status der Person wählen. Er gilt sofort. Unten erscheint kurz
+   „Anna Probe: alarmiert → im Einsatz · Rückgängig“. War es die falsche Person oder der falsche
+   Status, „Rückgängig“ wählen: Die Person steht wieder auf dem Status davor, und ein Ereignis der
+   Kräfte-Zeitachse aus dem Wechsel ist gestrichen. Das geht nur direkt danach (höchstens zehn
+   Minuten), nur für die Person, die gewechselt hat, und nur, solange niemand den Status
+   inzwischen wieder geändert hat; sonst meldet der Hinweis „Nicht mehr zurückzunehmen,
+   inzwischen geändert“. Dasselbe gilt in der Ansicht der Person.
 2. Eine Bemerkung in der Spalte „Bemerkung“ eintragen (unter „Spalten“ einblenden) oder in der
    Ansicht der Person unter „Bemerkung“.
 

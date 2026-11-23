@@ -187,6 +187,31 @@ pub struct EinheitMitgliedMaterial {
     pub ausgegeben: i64,
 }
 
+/// Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
+/// „Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EinheitStatusAntwort {
+    #[serde(flatten)]
+    pub einheit: EinheitAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_ruecknahme: Option<crate::status_ruecknahme::HandStatusRuecknahmeBeleg>,
+}
+
+/// System-ETB der Rücknahme eines Handstatus (LLH-1986): `alt` ist der wiederhergestellte, `neu`
+/// der zurückgenommene Status.
+pub fn etb_text_statuswechsel_zurueckgenommen(
+    name: &str,
+    alt: Option<&str>,
+    neu: Option<&str>,
+) -> String {
+    format!(
+        "Einheit «{}»: Statuswechsel «{}» → «{}» zurückgenommen",
+        name,
+        alt.unwrap_or("—"),
+        neu.unwrap_or("—")
+    )
+}
+
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
 /// Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
 /// `None`); `ist`/`ist_kumuliert` sind immer gesetzt.

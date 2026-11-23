@@ -290,8 +290,8 @@ export function BemerkungZelle({
 
   const senden = (val: string) => {
     zurueckRef.current = null;
-    // Gesperrt: nichts geht hinaus, das Feld bleibt mit dem Entwurf offen (sonst pausierte die
-    // Mutation ohne Netz und holte nach der Rückkehr still nach, LLH-1103, design.md D8).
+    // Gesperrt: nichts geht hinaus, das Feld bleibt mit dem Entwurf offen (LLH-1103, design.md
+    // D8). Bis LLH-1950 pausierte die Mutation sonst und holte nach der Rückkehr still nach.
     if (isGesperrt) return;
     // Über der Grenze geht nichts hinaus, der Server lehnte mit 400 ab; das Feld bleibt offen.
     if (max != null && istZuLang(val, max)) return;

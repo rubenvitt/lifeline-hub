@@ -3,6 +3,8 @@ import type {
   AusVorlageErgebnis,
   Einheit,
   EinheitenAusNachforderungEingabe,
+  EinheitStatusAntwort,
+  HandStatusRuecknahmeBeleg,
   Nachforderung,
   NeueVerbindung,
   QualiSollEingabe,
@@ -311,14 +313,34 @@ export function gibFahrzeugFrei(einsatzId: number, eid: number, efId: number): P
 
 /**
  * Handstatus einer Einheit OHNE Fahrzeug setzen oder löschen (`null`, LFH-609). Mit
- * Fahrzeugen führen diese den Status — der Server antwortet dann 422.
+ * Fahrzeugen führen diese den Status — der Server antwortet dann 422. Bei einem echten Wechsel
+ * trägt die Antwort den Beleg `status_ruecknahme` für „Rückgängig“ (LLH-1986).
  */
 export function setzeEinheitStatus(
   einsatzId: number,
   eid: number,
   statusId: number | null,
+): Promise<EinheitStatusAntwort> {
+  return apiSend<EinheitStatusAntwort>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/status`,
+    'PUT',
+    { status_id: statusId },
+  );
+}
+
+/**
+ * „Rückgängig“ nach einem Wechsel des Handstatus, auch nach dem Löschen (LLH-1986): Status und
+ * „seit“ von davor. Nur direkt danach und nur für die Person, die gewechselt hat; inzwischen
+ * geändert → 409 `veraltet`, sonst 409 mit Grund (etwa: inzwischen führen Fahrzeuge).
+ */
+export function nimmEinheitStatuswechselZurueck(
+  einsatzId: number,
+  eid: number,
+  beleg: HandStatusRuecknahmeBeleg,
 ): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/status`, 'PUT', {
-    status_id: statusId,
-  });
+  return apiSend<Einheit>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/status/zuruecknehmen`,
+    'POST',
+    beleg,
+  );
 }

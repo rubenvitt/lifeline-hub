@@ -188,12 +188,15 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `queryKeys.test.ts`).
 - **Seitenfenster** (LFH-947, Spec `etb-zeitachse-fenster`, Herleitung
   `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`): die Liste
-  hält höchstens `ETB_MAX_SEITEN` (5) Seiten (`etb/seitenfenster.ts`); Seitenparameter mit
-  Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
+  blättert über `components/fensterBeideRichtungen.ts` wie Chat und Infotelefon (LLH-2036) und hält
+  höchstens `FENSTER_MAX_SEITEN` (5) Seiten; Cursor ist die laufende Nummer (`ETB_CURSOR`,
+  `etb/seitenfenster.ts`), Seitenparameter mit Richtung (`{ aelter }` → `before_lfd_nr`,
+  `{ neuer }` → `after_lfd_nr` mit einem Eintrag mehr, `etbSeitenAbfrage`), nie eine nackte Zahl.
+  Eine nicht volle `neuer`-Seite vorn wird zum Kopf (`useKopfAnnehmen`).
   „Ältere laden“ steht über der Zeitachse; fällt der Kopf heraus, steht „Neuere laden“ darunter. Ein `?eintrag=` wählt die
   Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
   Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
-  neueste Seite (`zumKopf`) und rollt ans Ende. Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  neueste Seite (`zumKopf` aus `components/listenFenster.ts`) und rollt ans Ende. Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
   laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
 - **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
   `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler

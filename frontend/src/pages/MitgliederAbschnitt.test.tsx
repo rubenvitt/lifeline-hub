@@ -885,3 +885,130 @@ describe('MitgliederAbschnitt · Sortieren und Filtern (LLH-1096)', () => {
     expect(folge()).toEqual(['3', '2']);
   });
 });
+
+describe('MitgliederAbschnitt · Funktion nur für die Führung (LLH-2064)', () => {
+  const zeile = async (name: string) =>
+    (await screen.findByText(name)).closest('tr') as HTMLElement;
+  async function rollenOption(name: string, option: string): Promise<HTMLElement> {
+    await userEvent.click(screen.getByRole('combobox', { name: `Rolle von ${name}` }));
+    const treffer = await screen.findAllByTitle(option);
+    const sichtbar = treffer.filter((el) => el.closest('.ant-select-item-option'));
+    return sichtbar[sichtbar.length - 1].closest('.ant-select-item-option') as HTMLElement;
+  }
+  const S4 = { fuehrungsfunktion: 's4', fuehrungsstelle_anzeige: 'S4 Versorgung' };
+
+  it('für Mitarbeit bietet die Führungsstelle nur Freitext', async () => {
+    const gespeichert: unknown[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([mitglied({ einsatz_rolle: 'mitarbeit' })]),
+      ),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', async ({ request }) => {
+        gespeichert.push(await request.json());
+        return HttpResponse.json([
+          mitglied({ einsatz_rolle: 'mitarbeit', fuehrungsstelle: 'Funk ELW 2' }),
+        ]);
+      }),
+    );
+    renderMitProviders(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />
+      </ConfigProvider>,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
+    );
+    expect(
+      screen.getByText(
+        'Mitarbeit und Beobachter tragen keine Führungsfunktion. Die Angabe ist nur der erste Vorschlag für den ETB-Rufnamen.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(stellenFeld());
+    expect(screen.queryByTitle('S2 – Lage (Müller)')).toBeNull();
+    await userEvent.type(stellenFeld(), 'Funk ELW 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(gespeichert).toEqual([
+      { einsatz_rolle: 'mitarbeit', fuehrungsfunktion: null, fuehrungsstelle: 'Funk ELW 2' },
+    ]);
+  });
+
+  it('der Wechsel einer S4 auf Mitarbeit fragt vorher', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied(S4)])),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json([mitglied({ einsatz_rolle: 'mitarbeit', fuehrungsstelle: 'S4' })]);
+      }),
+    );
+    renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    await zeile('Eva Einsatz');
+    await userEvent.click(await rollenOption('Eva Einsatz', 'Mitarbeit'));
+    const frage = await screen.findByRole('dialog', { name: 'Führungsfunktion beenden?' });
+    expect(frage).toHaveTextContent(
+      'Mit „Mitarbeit“ endet die Führungsfunktion „S4 Versorgung“ von Eva Einsatz. Die Angabe bleibt als Bezeichnung stehen; Hinweise an die Funktion erreichen Eva Einsatz nicht mehr.',
+    );
+    expect(gesendet).toHaveLength(0);
+    await userEvent.click(within(frage).getByRole('button', { name: 'Rolle ändern' }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([expect.objectContaining({ einsatz_rolle: 'mitarbeit' })]),
+    );
+  });
+
+  it('ohne Funktion keine Rückfrage', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([mitglied({ fuehrungsstelle: 'Funk ELW 2' })]),
+      ),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', async ({ request }) => {
+        gesendet.push(await request.json());
+        return new Promise<never>(() => {});
+      }),
+    );
+    renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    await zeile('Eva Einsatz');
+    await userEvent.click(await rollenOption('Eva Einsatz', 'Beobachter'));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('die eigene Herabstufung mit Funktion nennt beide Folgen in einer Bestätigung', async () => {
+    server.use(
+      meHandler(benutzerFixture({ id: 1, anzeigename: 'Lea' })),
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([
+          mitglied({
+            benutzer_id: 1,
+            anzeigename: 'Lea',
+            benutzername: 'lea',
+            einsatz_rolle: 'einsatzleitung',
+            fuehrungsfunktion: 'el',
+            fuehrungsstelle_anzeige: 'Einsatzleitung',
+          }),
+          mitglied({ benutzer_id: 3, anzeigename: 'Leo', einsatz_rolle: 'einsatzleitung' }),
+        ]),
+      ),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    await zeile('Lea');
+    await userEvent.click(await rollenOption('Lea', 'Beobachter'));
+    const frage = await screen.findByRole('dialog', { name: 'Eigene Rolle herabstufen?' });
+    expect(frage).toHaveTextContent('endet das Recht, den Zugriff dieses Einsatzes zu verwalten');
+    expect(frage).toHaveTextContent('endet die Führungsfunktion „Einsatzleitung“ von Lea');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
+});

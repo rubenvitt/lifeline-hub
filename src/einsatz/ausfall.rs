@@ -140,12 +140,41 @@ pub fn einheiten_mit_ausfall(e: &AusfallEingabe) -> Vec<String> {
     namen
 }
 
+/// Welche Mittel-Listen der Lader liest (LLH-1964). Eine nicht gelesene Liste geht leer in die
+/// Regel, wie eine gesperrte Liste im Browser (`leerWennGesperrt` in `lage/useWasBrennt.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AusfallListen {
+    pub personal: bool,
+    pub fahrzeuge: bool,
+    pub material: bool,
+}
+
+impl AusfallListen {
+    pub const ALL: Self = Self {
+        personal: true,
+        fahrzeuge: true,
+        material: true,
+    };
+
+    /// Die Listen, deren Modul im Einsatz nicht ausgeblendet ist (`aus` aus
+    /// `berechtigung::load_ausgeblendete_module`).
+    pub fn from_ausgeblendet(aus: &HashSet<&'static str>) -> Self {
+        Self {
+            personal: !aus.contains("personal"),
+            fahrzeuge: !aus.contains("fahrzeuge"),
+            material: !aus.contains("material"),
+        }
+    }
+}
+
 /// Die Eingabe aus der Datenbank: aktive Einheiten mit abgeleitetem Status über
 /// [`crate::einheit::repo::liste`] (eine Ableitung des Status), dazu Personal, Fahrzeuge und
-/// Material mit denselben Filtern wie ihre Listen. Liest keine Namen von Personen.
+/// Material mit denselben Filtern wie ihre Listen, soweit `listen` sie nennt. Liest keine Namen
+/// von Personen.
 pub async fn load_einheiten_mit_ausfall(
     pool: &SqlitePool,
     einsatz_id: i64,
+    listen: AusfallListen,
 ) -> Result<Vec<String>, AppError> {
     let einheiten = crate::einheit::repo::liste(pool, einsatz_id)
         .await?
@@ -159,23 +188,31 @@ pub async fn load_einheiten_mit_ausfall(
         })
         .collect();
 
-    let personal: Vec<(Option<i64>, Option<StatusKategorie>)> = sqlx::query_as(
-        "SELECT ep.einheit_id, s.kategorie FROM einsatz_personal ep \
-         LEFT JOIN personal_status s ON s.id = ep.status_id \
-         WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let personal: Vec<(Option<i64>, Option<StatusKategorie>)> = if listen.personal {
+        sqlx::query_as(
+            "SELECT ep.einheit_id, s.kategorie FROM einsatz_personal ep \
+             LEFT JOIN personal_status s ON s.id = ep.status_id \
+             WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL",
+        )
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
 
-    let fahrzeuge: Vec<(i64, Option<i64>, Option<StatusKategorie>)> = sqlx::query_as(
-        "SELECT ef.id, ef.einheit_id, s.kategorie FROM einsatz_fahrzeug ef \
-         LEFT JOIN fahrzeug_status s ON s.id = ef.status_id \
-         WHERE ef.einsatz_id = ? AND ef.beendet_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let fahrzeuge: Vec<(i64, Option<i64>, Option<StatusKategorie>)> = if listen.fahrzeuge {
+        sqlx::query_as(
+            "SELECT ef.id, ef.einheit_id, s.kategorie FROM einsatz_fahrzeug ef \
+             LEFT JOIN fahrzeug_status s ON s.id = ef.status_id \
+             WHERE ef.einsatz_id = ? AND ef.beendet_at IS NULL",
+        )
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
 
     type MaterialZeile = (
         Option<i64>,
@@ -187,13 +224,17 @@ pub async fn load_einheiten_mit_ausfall(
         i64,
         i64,
     );
-    let material: Vec<MaterialZeile> = sqlx::query_as(
-        "SELECT einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, status, art, menge, ausgegeben \
-         FROM einsatz_material WHERE einsatz_id = ? AND beendet_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let material: Vec<MaterialZeile> = if listen.material {
+        sqlx::query_as(
+            "SELECT einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, status, art, menge, ausgegeben \
+             FROM einsatz_material WHERE einsatz_id = ? AND beendet_at IS NULL",
+        )
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
 
     let mut eingabe = AusfallEingabe {
         einheiten,
@@ -325,8 +366,138 @@ mod tests {
         id(&pool, material, &[e, None, uhs]).await;
 
         assert_eq!(
-            load_einheiten_mit_ausfall(&pool, einsatz_id).await.unwrap(),
+            load_einheiten_mit_ausfall(&pool, einsatz_id, AusfallListen::ALL)
+                .await
+                .unwrap(),
             ["Logistiktrupp", "Sanitätszug", OHNE_EINHEIT]
         );
+    }
+
+    /// LLH-1964: eine im Einsatz ausgeblendete Liste liest der Lader nicht; sie geht leer in die
+    /// Regel wie im Browser (`leerWennGesperrt`). Die Beladung eines nicht gelesenen Fahrzeugs
+    /// zählt dann ebenfalls nicht.
+    #[tokio::test]
+    async fn lader_liest_ausgeblendete_listen_nicht() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e = Some(
+            id(
+                &pool,
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
+                &[],
+            )
+            .await,
+        );
+        let einsatz_id = e.unwrap();
+        let p_aus = Some(id(&pool, "INSERT INTO personal_status (org_id, label, kategorie) VALUES (1, 'krank', 'nicht_verfuegbar') RETURNING id", &[]).await);
+        let einheit =
+            "INSERT INTO einsatz_einheit (einsatz_id, name, sortier) VALUES (?, ?, ?) RETURNING id";
+        let logistik = Some(
+            sqlx::query_scalar::<_, i64>(einheit)
+                .bind(e)
+                .bind("Logistiktrupp")
+                .bind(1)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+        );
+        let sanitaet = Some(
+            sqlx::query_scalar::<_, i64>(einheit)
+                .bind(e)
+                .bind("Sanitätszug")
+                .bind(2)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+        );
+        let fuehrung = Some(
+            sqlx::query_scalar::<_, i64>(einheit)
+                .bind(e)
+                .bind("Führungstrupp")
+                .bind(3)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+        );
+        // Logistiktrupp: defekte Trage direkt an der Einheit.
+        id(&pool, "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, status, einheit_id) VALUES (?, 'Trage', 'geraet', 1, 'defekt', ?) RETURNING id", &[e, logistik]).await;
+        // Sanitätszug: krankes Personal.
+        id(&pool, "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id, status_id) VALUES (?, 'Anna Muster', ?, ?) RETURNING id", &[e, sanitaet, p_aus]).await;
+        // Führungstrupp: einsatzbereites Fahrzeug mit defekter Beladung (ein Fahrzeug außer
+        // Dienst machte die Einheit selbst „nicht verfügbar“ und zählte deshalb nicht).
+        let fz = Some(id(&pool, "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) VALUES (?, 'Florian', ?) RETURNING id", &[e, fuehrung]).await);
+        id(&pool, "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, status, einsatz_fahrzeug_id) VALUES (?, 'Pumpe', 'geraet', 1, 'defekt', ?) RETURNING id", &[e, fz]).await;
+
+        let load = |listen: AusfallListen| {
+            let pool = pool.clone();
+            async move {
+                load_einheiten_mit_ausfall(&pool, einsatz_id, listen)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            load(AusfallListen::ALL).await,
+            ["Logistiktrupp", "Sanitätszug", "Führungstrupp"]
+        );
+        assert_eq!(
+            load(AusfallListen {
+                material: false,
+                ..AusfallListen::ALL
+            })
+            .await,
+            ["Sanitätszug"]
+        );
+        assert_eq!(
+            load(AusfallListen {
+                personal: false,
+                ..AusfallListen::ALL
+            })
+            .await,
+            ["Logistiktrupp", "Führungstrupp"]
+        );
+        assert_eq!(
+            load(AusfallListen {
+                fahrzeuge: false,
+                ..AusfallListen::ALL
+            })
+            .await,
+            ["Logistiktrupp", "Sanitätszug"]
+        );
+    }
+
+    /// LLH-1964, Review: je ausgeblendetes Modul entfällt genau seine Liste.
+    #[test]
+    fn listen_folgen_den_ausgeblendeten_modulen() {
+        use std::collections::HashSet;
+        let aus = |m: &[&'static str]| {
+            AusfallListen::from_ausgeblendet(&m.iter().copied().collect::<HashSet<_>>())
+        };
+        assert_eq!(aus(&[]), AusfallListen::ALL);
+        assert_eq!(
+            aus(&["personal"]),
+            AusfallListen {
+                personal: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(
+            aus(&["fahrzeuge"]),
+            AusfallListen {
+                fahrzeuge: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(
+            aus(&["material"]),
+            AusfallListen {
+                material: false,
+                ..AusfallListen::ALL
+            }
+        );
+        assert_eq!(aus(&["einheiten", "etb"]), AusfallListen::ALL);
     }
 }
