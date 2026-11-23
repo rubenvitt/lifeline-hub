@@ -175,6 +175,15 @@ im Browser ein, nicht in der App.
   Entfernen der Zahl fragt nie); ändern unter Einstellungen → Mitteilungen → „Lifeline“.
 - **Haptik:** beim Speichern einer Erfassung, bei einem eingehenden Alarm und beim Wechsel eines
   Segments, nur auf dem iPhone und nur mit eingeschaltetem Schalter.
+- **Standort** (LLH-2071, [ADR-0093](../architektur/entscheidungen/ADR-0093-die-app-huellen-geben-den-standort-nur-dem-aktiven-server-im-vordergrund.md)): „Position“ auf
+  der Lagekarte, „Eigene Position“ im Ortsfeld und „Mein Standort“ am gekoppelten Gerät gehen wie
+  im Browser. iOS fragt beim ersten Mal, nur „Beim Verwenden der App“; wer „Genauer Standort“
+  ausschaltet, bekommt eine grobe Position, und der Kreis auf der Karte zeigt, wie grob. Den
+  Standort bekommt nur die Seite des aktiven Servers, nie eine fremde Seite oder ein eingebetteter
+  Frame. Die App ortet nicht im Hintergrund und speichert oder sendet den Standort nicht selbst:
+  die Eigenposition bleibt auf dem Gerät, Ortsfeld und „Mein Standort“ schicken ihn erst mit dem
+  Formular bzw. der Meldung an den Server. Entziehen oder wieder erlauben: Einstellungen →
+  Datenschutz & Sicherheit → Ortungsdienste → „Lifeline“.
 
 ## Meldungen im Hintergrund
 
@@ -251,7 +260,8 @@ Für den Push liegt neben der Serverliste `push.json` (welche Kennung zu welchem
 Schlüssel je Kennung im Schlüsselbund, den App und Extension teilen (lesbar nach dem ersten
 Entsperren), und die Zahl der Server in den Einstellungen der App Group. Das Privacy-Manifest
 (`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit den Gründen CA92.1 und 1C8F.1,
-kein Tracking und keine erhobenen Daten. Vorgaben für
+kein Tracking und als erhobene Daten nur den genauen Standort (App-Funktion, mit dem Konto
+verknüpft): Ortsfeld und „Mein Standort“ schicken ihn auf Knopfdruck an den Server (LLH-2071). Vorgaben für
 Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 
 ## Grenzen (offen)
@@ -359,7 +369,10 @@ Bevor der erste Upload gelingt (Aufgabe 10.1 der Change):
    Danach in App Store Connect → TestFlight die Tester eintragen. Für „Extern“ zusätzlich unter
    „Testinformationen“ Beschreibung, Feedback-Mail und Kontakt ausfüllen, die Apple für das
    Beta-App-Review verlangt.
-5. Der erste Upload läuft mit dem ersten Alpha-Tag nach LLH-1988.
+5. **App-Datenschutz** in App Store Connect (App → App-Datenschutz) wie im Privacy-Manifest
+   angeben: „Genauer Standort“, Zweck „App-Funktionalität“, mit der Identität verknüpft, kein
+   Tracking; sonst keine Datentypen (LLH-2071).
+6. Der erste Upload läuft mit dem ersten Alpha-Tag nach LLH-1988.
 
 **Kosten:** im Apple Developer Program enthalten (siehe
 [desktop-app.md](desktop-app.md#signierung-und-notarisierung-macos), „Kosten und Termine“).

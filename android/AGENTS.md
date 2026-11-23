@@ -29,7 +29,9 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   (`window.top !== window`, der WebView spielt sie dort trotzdem ein); Nachrichten zählen nur
   aus dem Hauptframe (`Bruecke.accepts`), Antworten nur, solange derselbe WebView noch auf dieser
   Origin steht (`web/Brueckenempfang.kt`). Ebenso bekommt nur diese Origin die Kamera der Oberfläche
-  (`getUserMedia`, nur Video, `Seitenzugriff.kamera`); die Dateiwahl (`<input type="file">`) geht
+  (`getUserMedia`, nur Video, `Seitenzugriff.kamera`) und den Standort (`navigator.geolocation`,
+  `Seitenzugriff.standort`, LLH-2071, ADR-0093: Recht fein oder grob, nur Vordergrund, der WebView
+  merkt sich die Freigabe nie); die Dateiwahl (`<input type="file">`) geht
   über `web/HuellenChromeClient.kt` und `dienste/Activityzugriffe.kt`.
 - **Vertrauen wie das System:** System- und Nutzer-CAs (`res/xml/network_security_config.xml`),
   keine Ausnahme, kein Pinning, kein Klartext; `onReceivedSslError` bricht immer ab. Nur die
