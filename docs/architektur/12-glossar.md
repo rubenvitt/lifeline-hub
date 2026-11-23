@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 22.11.2026 (Push-Relais und Kennung des iOS-Push, LLH-1981; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
+Stand: 22.11.2026 (Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -88,7 +88,7 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Einwurf-Zugang | Zugang für einen Absender, der nur eine URL aufrufen kann (BOSWatch, FE2, Divera-Webhook, OsmAnd): ein Schlüssel im Pfad, genau ein Zweck (Alarmmeldungen oder Positionen), nur schreibend. Der einzelne Aufruf heißt Einwurf. | Spec [`einwurf-zugang`](../../openspec/specs/einwurf-zugang/spec.md), [ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md), `src/public_api/einwurf/` |
 | Funktionsansicht | Was ein gekoppeltes Gerät lesen und schreiben darf (etwa UHS, Abschnitt, Lagemonitor). | Spec [`funktionsansichten`](../../openspec/specs/funktionsansichten/spec.md), [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
 | Gerätekonto | Konto, unter dem ein gekoppeltes Gerät schreibt; keine Person. | `ist_geraetekonto` in `src/geraet/repo.rs`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md), „Gerätekonto ist keine Person“ |
-| Geheimnisspeicher | Ablage der Geheimnisse der Adapter: age-Chiffrate an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`, je Zeile mit dessen Fingerabdruck; nur setzen und ersetzen, nie lesen. Zustand für die Verwaltung: bereit, fehlt, passt nicht. | `src/adapter/geheimnis.rs`, `adapter_geheimnis` in `migrations/0360_adapter.sql` |
+| Geheimnisspeicher | Ablage der Geheimnisse der Adapter: age-Chiffrate an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL` (oder `…_DATEI`), je Zeile mit dessen Fingerabdruck; nur setzen und ersetzen, nie lesen. Beim Schlüsselwechsel schlüsselt der Start mit `…_ALT` alles auf den neuen Schlüssel um. Zustand für die Verwaltung: bereit, fehlt, passt nicht. | `src/adapter/geheimnis.rs`, `adapter_geheimnis` in `migrations/0360_adapter.sql` |
 | Hülle (Desktop-Hülle) | Tauri-2-App `src-tauri`, deren Webview die https-Adresse des Servers lädt; ohne Anwendungslogik. | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), `frontend/src/huelle/faehigkeiten.ts` |
 | Instanzkopplung | Vertrauensbeziehung zweier Lifeline-Hub-Instanzen (etwa ELW und Hub): Einmal-Code, Austausch der Ed25519-Schlüssel, signierte Meldungen; eine Kopplung je Instanzpaar, Orgs einzeln. | `src/instanz/`, Spec `instanz-kopplung` (`openspec/specs/instanz-kopplung/`) |
 | Kanal `alpha`, `beta`, `main` | Release-Kanäle: jeder Merge auf `alpha` gibt eine Vorabversion `X.Y.Z-alpha.N` frei, ein nachgezogener Alpha-Tag auf `beta` eine `X.Y.Z-beta.N`, `main` die stabile. | `branches` in `release.config.mjs`, `scripts/release/kanal-nachziehen.sh` |
