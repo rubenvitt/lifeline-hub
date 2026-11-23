@@ -16,7 +16,7 @@ use url::Url;
 /// Hülle den Bruch des Servers mitgeht.
 ///
 /// Verlauf: 1 mit LLH-1982; nur 2 mit LLH-1979, weil die Hülle seither
-/// `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0084).
+/// `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0085).
 pub const BEKANNTE_VERTRAEGE: [u32; 1] = [2];
 
 /// Höchstdauer des Verbindungsaufbaus samt Namensauflösung: ein Server, der gar nicht antwortet,

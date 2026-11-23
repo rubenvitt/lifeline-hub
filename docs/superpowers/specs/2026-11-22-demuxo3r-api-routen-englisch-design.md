@@ -118,7 +118,7 @@ geänderten Punkt „Grenzwerte bleiben“ (Routen fallen dort heraus):
   in einer eigenen Aufgabe.)*
 - Ab 1.0.0: Wer einen Pfad umbenennt, lässt den alten 3 Majors lang als Alias erreichbar.
 
-**Neue ADR** (`ADR-0084`, sofern die Nummer auf `alpha` dann noch frei ist; `gilt_fuer`:
+**Neue ADR** (`ADR-0085`, sofern die Nummer auf `alpha` dann noch frei ist; `gilt_fuer`:
 `src/app.rs`, `src/public_api/**`, `scripts/api-routen-*`). Regeln: Routen englisch nach Glossar,
 Bestand darf nur schrumpfen, harter Schnitt bis 1.0.0, Alias für 3 Majors danach. Prüfung:
 `verlange` auf den Wächter-Aufruf in `scripts/check-all.sh`. Kontext und Konsequenzen verweisen

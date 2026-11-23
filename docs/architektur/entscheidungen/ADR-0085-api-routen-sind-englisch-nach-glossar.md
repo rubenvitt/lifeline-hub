@@ -1,5 +1,5 @@
 ---
-id: ADR-0084
+id: ADR-0085
 titel: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 status: akzeptiert
 datum: 2026-11-22
@@ -8,6 +8,7 @@ gilt_fuer:
   - src/public_api/**
   - src/routes/shell.rs
   - src-tauri/src/vertrag.rs
+  - android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/LifelineKern.kt
   - scripts/api-routen-woerter.tsv
   - scripts/api-routen-bestand.txt
   - scripts/check-api-routen.sh
@@ -15,7 +16,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md
 ---
 
-# ADR-0084: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
+# ADR-0085: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 
 ## Regeln
 
@@ -28,7 +29,7 @@ herleitung:
 - MUST: Ab 1.0.0 bleibt ein umbenannter Pfad drei Major-Versionen lang als Alias erreichbar.
 - MUST: Bricht eine Umbenennung einen Pfad, den eine Hülle fest aufruft, steigt
   `SHELL_CONTRACT` in `src/routes/shell.rs`, und die Hüllen kennen im selben PR nur noch die neue
-  Nummer (iOS `bekannteVertraege`, Desktop `BEKANNTE_VERTRAEGE`).
+  Nummer (iOS und Android `bekannteVertraege`, Desktop `BEKANNTE_VERTRAEGE`).
 
 ## Prüfung
 

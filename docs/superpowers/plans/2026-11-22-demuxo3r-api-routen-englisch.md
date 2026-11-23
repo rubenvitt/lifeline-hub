@@ -22,7 +22,7 @@ Neuigkeiten (`versionsstand`) und Anmeldung (`auth`) mit hartem Schnitt umstelle
   `segment`, `segment` passt auf `^[a-z0-9]+([.-][a-z0-9]+)*$`.
 - Bestand darf nur schrumpfen; keine Zeile, die auf `origin/alpha` fehlt.
 - Bezeichner im Code, Wire-Felder, Pfadparameter-Namen und App-Routen bleiben unverändert.
-- ADR-Nummer: nächste freie auf `origin/alpha` (Stand 22.11.2026: `ADR-0084`).
+- ADR-Nummer: nächste freie auf `origin/alpha` (Stand 22.11.2026: `ADR-0085`).
 - Wurzel-`AGENTS.md` bleibt unter 200 Zeilen.
 - Prosa, Kommentare, Commit-Nachrichten deutsch; jeder Commit-Body trägt
   `Zunder: https://zunder.rubeen.dev/#/aufgabe/demuxo3rcnfmof9uvilczsnz`.
@@ -92,7 +92,7 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   Run: `scripts/check-api-routen.test.sh` → Expected: scheitert (Skript fehlt).
 
 - [x] **Step 3: `check-api-routen.sh` schreiben.** Kopf wie `check-schreibweisen.sh` (Rot ist,
-  Grenzen, Abhilfe, Aufruf; Verweis auf ADR-0084 und Design-Doc). Pfade sammeln mit
+  Grenzen, Abhilfe, Aufruf; Verweis auf ADR-0085 und Design-Doc). Pfade sammeln mit
   `git -C "$ROOT" grep -h` (versionierte und neue Dateien wie dort):
   - `src/app.rs`: Zeilen `^\s*(\.route\()?"(/api[^"]*)"` — nur bis zur ersten Zeile
     `#[cfg(test)]`;
@@ -146,7 +146,7 @@ Pfadzuordnung des ersten Pakets (verbindlich):
 ### Task 3: Regel und ADR
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0084-api-routen-sind-englisch-nach-glossar.md`
+- Create: `docs/architektur/entscheidungen/ADR-0085-api-routen-sind-englisch-nach-glossar.md`
 - Modify: `AGENTS.md` (Abschnitt „Bezeichner-Sprache“)
 - Modify: `docs/architektur/12-glossar.md` (ein Satz)
 
@@ -167,7 +167,7 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   verlange '^api	' scripts/api-routen-woerter.tsv
   ```
   Kontext/Konsequenzen je 2–5 Sätze, verweisen auf das Design-Doc.
-- [x] **Step 2: `AGENTS.md`:** neuer Punkt „**API-Routen englisch** (LLH-1979, ADR-0084)“ nach
+- [x] **Step 2: `AGENTS.md`:** neuer Punkt „**API-Routen englisch** (LLH-1979, ADR-0085)“ nach
   „Fachbegriffe deutsch …“: jedes Segment englisch nach Glossar, auch Fachbegriffe; Abkürzungen
   wie `etb`, `uhs` bleiben; Kleinbuchstaben, `-` verbindet, Sammlungen Plural, Aktion als Verb
   am Ende; Pfadparameter-Namen und Code-Bezeichner bleiben deutsch nach der Regel oben; neue
@@ -175,11 +175,11 @@ Pfadzuordnung des ersten Pakets (verbindlich):
   einem bestehenden Typ folgt dessen Sprache. „Grenzwerte bleiben“: `Routen` streichen, Verweis
   auf den neuen Punkt. Danach `wc -l AGENTS.md` < 200.
 - [x] **Step 3: Kapitel 12:** ein Satz, dass das englische Glossar der API-Routen in
-  `scripts/api-routen-woerter.tsv` steht (ADR-0084).
+  `scripts/api-routen-woerter.tsv` steht (ADR-0085).
 - [x] **Step 4: Verifizieren**
   Run: `scripts/check-architektur.test.sh && scripts/check-architektur.sh && scripts/check-adr-nummern.sh origin/alpha && scripts/adr-fuer.sh src/app.rs`
-  Expected: grün; `adr-fuer.sh` nennt ADR-0084.
-- [x] **Step 5: Commit** (`docs: ADR-0084 und Regel „API-Routen englisch“ (LLH-1979)`)
+  Expected: grün; `adr-fuer.sh` nennt ADR-0085.
+- [x] **Step 5: Commit** (`docs: ADR-0085 und Regel „API-Routen englisch“ (LLH-1979)`)
 
 ### Task 4: Paket Neuigkeiten (`versionsstand` → `release-notes`)
 

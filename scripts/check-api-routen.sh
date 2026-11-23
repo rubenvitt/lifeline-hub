@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0084, Wurzel-`AGENTS.md`,
+# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0085, Wurzel-`AGENTS.md`,
 # „Bezeichner-Sprache“). Herleitung:
 # `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
 #
@@ -134,7 +134,7 @@ ohne_bestand="$(comm -23 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '
 if [ -n "$ohne_bestand" ]; then
   while IFS="$(printf '\t')" read -r pfad seg; do
     melde "$pfad: Segment '$seg' steht nicht im Glossar (scripts/api-routen-woerter.tsv)." \
-      "Englisch benennen und den Begriff eintragen (ADR-0084)."
+      "Englisch benennen und den Begriff eintragen (ADR-0085)."
   done <<< "$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NR == FNR { neu[$0] = 1; next } ($1 in neu)' \
     <(printf '%s\n' "$ohne_bestand") -)"
 fi
@@ -155,7 +155,7 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0084). Die Route englisch benennen."
+          "(ADR-0085). Die Route englisch benennen."
       done <<< "$neu_zeilen"
     fi
   fi
@@ -164,7 +164,7 @@ else
 fi
 
 if [ "$fehler" -gt 0 ]; then
-  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0084)." >&2
+  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0085)." >&2
   exit 1
 fi
 echo "OK: $(registrierte_pfade | wc -l | tr -d ' ') API-Routen geprüft, $(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ') im deutschen Bestand."

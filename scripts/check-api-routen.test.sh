@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0084). Der Wächter irrt in beide
+# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0085). Der Wächter irrt in beide
 # Richtungen still: ließe er eine deutsche Route durch, wüchse der Bestand wieder, den die
 # Pakete von LLH-1979 abbauen; schlüge er auf Testcode oder eine englische Route an, würde er
 # abgeschaltet.
