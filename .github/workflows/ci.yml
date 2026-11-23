@@ -29,7 +29,7 @@
 # verschobener Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot hält die
 # Pins aktuell.
 #
-# NEBENLÄUFIGKEIT AUF KANAL-BRANCHES (LLH-1889, LLH-2035/ADR-0086): Gestartete Testjobs laufen zu
+# NEBENLÄUFIGKEIT AUF KANAL-BRANCHES (LLH-1889, LLH-2035/ADR-0087): Gestartete Testjobs laufen zu
 # Ende; je Job wartet höchstens ein Lauf, ein neuer Push ersetzt nur den wartenden. Das geschieht
 # über Concurrency AUF JOB-EBENE in `suiten.yml`, nicht für den ganzen Workflow: der Release-Job
 # hängt am selben Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein

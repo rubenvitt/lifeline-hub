@@ -62,7 +62,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     fehlende). `--auswahl` zeigt die Schritte nur an; ohne Argument läuft alles. Die CI wählt
     nicht mehr nach Bereichen.
   - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Gestartete **Testjobs**
-    laufen zu Ende (ADR-0086, LLH-2035; Concurrency je Job ohne Abbruch: `rust`, `frontend` je
+    laufen zu Ende (ADR-0087, LLH-2035; Concurrency je Job ohne Abbruch: `rust`, `frontend` je
     Anteil, `e2e`, `ios`, `android`, `berichte`). Je Job wartet höchstens ein Lauf; ein neuer Push
     ersetzt nur den wartenden, und dessen Lauf deckt die übersprungenen Zwischenstände mit ab. Der **Release** hat eine eigene
     Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
