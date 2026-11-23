@@ -12854,7 +12854,7 @@
       },
       "LageGesehenAnzeige": {
         "type": "object",
-        "description": "Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.",
+        "description": "Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.",
         "required": [
           "gesehen"
         ],
