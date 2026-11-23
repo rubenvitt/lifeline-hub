@@ -338,7 +338,7 @@ Typen weiter mit openapi-typescript (über TS 6) und typprüft mit TypeScript 7.
 - `no-unused-vars` ignoriert `_`-Namen nicht (wie zuvor ESLint), im Probe-Test belegt.
 - `typecheck`/`build` rufen `tsc` ohne Node-Heap-Schalter: `bin/tsc` startet per `execve` das
   Go-Binary.
-- ADR-0085: 0082 und 0083 wurden während der Arbeit auf `alpha` vergeben, 0084 belegen offene PRs.
+- ADR-0089: 0082 und 0083 wurden während der Arbeit auf `alpha` vergeben, 0084 belegen offene PRs.
 - Task 8, Step 1: lokal in Bündeln gefahren (`--nur schnell`, `--nur frontend`, `--nur rust` mit
   `CARGO_INCREMENTAL=0`), weil der volle Lauf das Plattenkontingent der Sitzung sprengte; die
   übrigen Suiten fährt der PR mit Label `voll`.
