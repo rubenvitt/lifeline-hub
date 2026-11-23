@@ -4160,7 +4160,7 @@
       },
       "BenachrichtigungEreignis": {
         "type": "object",
-        "description": "Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und\n`org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der\nClient über `GET /api/benachrichtigungen/{id}`.",
+        "description": "Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und\n`org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der\nClient über `GET /api/notifications/{id}`.",
         "required": [
           "einsatz_id",
           "benachrichtigung_id",
@@ -5782,7 +5782,7 @@
       },
       "DatentraegerStatus": {
         "type": "object",
-        "description": "Antwort von `GET /api/system/datentraeger`.",
+        "description": "Antwort von `GET /api/system/storage`.",
         "required": [
           "gesamt",
           "warnung",
@@ -7001,7 +7001,7 @@
       },
       "Einmalpasswort": {
         "type": "object",
-        "description": "Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,\ngenau dieses eine Mal.",
+        "description": "Antwort von `POST /api/users/{id}/one-time-password` (LFH-1121): das erzeugte Einmalpasswort,\ngenau dieses eine Mal.",
         "required": [
           "einmalpasswort"
         ],
@@ -16563,7 +16563,7 @@
       },
       "OrgModulEinstellung": {
         "type": "object",
-        "description": "Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).\n`sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.",
+        "description": "Eine Vorgabe, wie `GET /api/org-module-settings` sie je Modul liefert (LLH-1179).\n`sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.",
         "required": [
           "sichtbar"
         ],
@@ -16604,7 +16604,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/OrgLogoAnzeige",
-                "description": "Logo der Organisation (LFH-22) ohne Bytes; fehlt, wenn keines hinterlegt ist. Die\nBytes liefert `GET /api/organisation/logo`."
+                "description": "Logo der Organisation (LFH-22) ohne Bytes; fehlt, wenn keines hinterlegt ist. Die\nBytes liefert `GET /api/organization/logo`."
               },
               {
                 "type": "null"
