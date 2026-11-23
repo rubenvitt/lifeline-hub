@@ -6,8 +6,8 @@ import { Select } from '../components/Select';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
-  Augenbraue,
   FELD_KLASSE,
+  Feldetikett,
   Paneel,
   kennzahlenbandStil,
   monoStil,
@@ -383,7 +383,7 @@ const KOPF_MIN_BREITE = 220;
  * Nichts hier ist bedienbar, die Zwei-Angaben-Regel für handgebaute Bedienziele gilt nicht.
  */
 /**
- * Eine Angabe als Zelle im Fugenraster (Augenbraue über dem Wert). Kein `Kennzahl`-Baustein: die
+ * Eine Angabe als Zelle im Fugenraster (Feldetikett über dem Wert). Kein `Kennzahl`-Baustein: die
  * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
 function KopfAngabe({
@@ -413,7 +413,9 @@ function KopfAngabe({
         minWidth: 0,
       }}
     >
-      <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
+      <div style={{ marginBottom: token.marginXXS }}>
+        <Feldetikett als="div">{etikett}</Feldetikett>
+      </div>
       <div
         style={{
           ...(mono ? monoStil(15, 500) : { ...schriftStil('kartentitel'), fontWeight: 500 }),
@@ -429,8 +431,8 @@ function KopfAngabe({
 }
 
 /**
- * Beschriftete Angaben als Zeilen (`dl`) statt umrandeter `Descriptions`-Tabelle: Augenbraue links,
- * Wert rechts, Trenner `flaeche3`. Unter `md` steht die Augenbraue ÜBER dem Wert (Muster
+ * Beschriftete Angaben als Zeilen (`dl`) statt umrandeter `Descriptions`-Tabelle: Feldetikett links,
+ * Wert rechts, Trenner `flaeche3`. Unter `md` steht das Feldetikett ÜBER dem Wert (Muster
  * `ModulEinstellungsListe`): die 140 px der Etikettspalte ließen dem Wert am Handy zu wenig, und
  * die Seite lief über (LFH-964).
  */
@@ -461,7 +463,7 @@ function Angaben({
             alignItems: 'baseline',
           }}
         >
-          <Augenbraue als="dt">{etikett}</Augenbraue>
+          <Feldetikett als="dt">{etikett}</Feldetikett>
           <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>
             {wert}
             <VermerkZeile vermerk={vermerk} praesenz={praesenz} />

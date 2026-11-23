@@ -1,5 +1,5 @@
 ---
-id: ADR-0084
+id: ADR-0086
 titel: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
 status: akzeptiert
 datum: 2026-11-22
@@ -12,15 +12,16 @@ herleitung:
   - Zunder LLH-2035 (Weg abgestimmt mit Ruben am 22.11.2026)
 ---
 
-# ADR-0084: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
+# ADR-0086: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
 
 ## Regeln
 
 - MUST: Aus ADR-0048 entfällt „Auf einem Kanal-Branch bricht ein neuer Push die Testjobs des
   laufenden Laufs ab“; die übrigen Regeln von ADR-0048 gelten weiter.
-- MUST: Die Testjobs in `suiten.yml` (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`)
-  haben Concurrency je Branch und Job mit `cancel-in-progress: false`: ein gestarteter Job läuft
-  zu Ende, je Gruppe wartet höchstens ein Lauf, ein neuer Push ersetzt nur den wartenden.
+- MUST: Jeder Testjob in `suiten.yml` (Stand 23.11.2026: `rust`, `frontend` je Anteil, `e2e`,
+  `ios`, `android`, `berichte`) hat Concurrency je Branch und Job mit `cancel-in-progress: false`:
+  ein gestarteter Job läuft zu Ende, je Gruppe wartet höchstens ein Lauf, ein neuer Push ersetzt
+  nur den wartenden.
 - MUST NOT: `cancel-in-progress: true` in `suiten.yml`.
 - MUST: Der Release bleibt wie in ADR-0048 (eigene Gruppe ohne Abbruch, `needs`); ein überholter
   Lauf released nicht (`scripts/release-ruhefenster.sh`).
@@ -31,8 +32,9 @@ herleitung:
 
 ```sh
 verbiete '^[^#]*cancel-in-progress:[[:space:]]*true' .github/workflows/suiten.yml
-# Genau die fünf Testjobs tragen die Concurrency ohne Abbruch.
-test "$(grep -cE '^      cancel-in-progress: false$' .github/workflows/suiten.yml)" -eq 5
+# Jeder Concurrency-Block eines Jobs trägt `cancel-in-progress: false`.
+test "$(grep -cE '^      cancel-in-progress: false$' .github/workflows/suiten.yml)" \
+  -eq "$(grep -cE '^    concurrency:$' .github/workflows/suiten.yml)"
 # Form der Gruppen je Job: scripts/ci-stufen.test.sh.
 ```
 

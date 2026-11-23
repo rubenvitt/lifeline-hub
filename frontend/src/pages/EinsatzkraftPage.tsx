@@ -77,6 +77,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { usePersonalStatusQuittung } from '../kraefte/useStatusQuittung';
 import { kraftDauern } from '../kraefte/zeitachse';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
@@ -194,12 +195,20 @@ export default function EinsatzkraftPage() {
 
   /** Gründe am Ort: Status an seiner Zeile, Entlassen/Stornieren/Erneut am Abschnitt. */
   const orte = useZeilenFehler<'status' | 'aus'>();
+  const quittiereStatus = usePersonalStatusQuittung(einsatzId, statusQuery.data);
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzPersonal,
     { epId: number; statusId: number }
   >({
     queryKey: einsatzKeys.personal(einsatzId),
-    mutationFn: (v) => updateDisposition(einsatzId, v.epId, { status_id: v.statusId }),
+    // Den Beleg merken, die Zeile ohne ihn in den Cache; die Quittung mit Rückweg (LLH-1986).
+    mutationFn: async (v) => {
+      const { status_ruecknahme, ...kraft } = await updateDisposition(einsatzId, v.epId, {
+        status_id: v.statusId,
+      });
+      if (status_ruecknahme) quittiereStatus({ ...kraft, status_ruecknahme });
+      return kraft;
+    },
     zeilenId: (v) => v.epId,
     ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
     onBeginn: () => orte.beginne('status'),

@@ -1,5 +1,5 @@
 # Suiten (LLH-1896): Rust-, Frontend- und e2e-Suite samt Bericht, dazu der Swift-Kern der iOS-Hülle
-# (LLH-1978), als wiederverwendbarer Workflow.
+# (LLH-1978) und der Kotlin-Kern der Android-Hülle (LLH-1989), als wiederverwendbarer Workflow.
 #
 # WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: `ci.yml` ruft ihn bei jedem Push auf einen Kanal-Branch
 # (der Release wartet darauf), `pr.yml` nur an einem PR mit dem Label `voll` (ohne Pflicht).
@@ -9,10 +9,10 @@
 # Die Jobs heißen am Commit `<Aufrufer> / <Job>` (etwa `Suiten / Rust-Suite`). Ein Pflicht-Check
 # darf deshalb nicht hier stehen: die Schnellprüfungen stehen in `ci.yml` und `pr.yml` selbst.
 #
-# ZU ENDE AUF KANAL-BRANCHES (LLH-2035, ADR-0084; vorher Abbruch nach LLH-1889): Concurrency AUF
-# JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`) ohne Abbruch. Ein gestarteter
-# Job läuft zu Ende; je Gruppe wartet höchstens ein Lauf, und ein neuer Push ersetzt nur diesen
-# wartenden. Sonst käme die ~68-min-Rust-Suite bei mehreren Merges pro Stunde nie durch. Im
+# ZU ENDE AUF KANAL-BRANCHES (LLH-2035, ADR-0086; vorher Abbruch nach LLH-1889): Concurrency AUF
+# JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `android`, `berichte`) ohne Abbruch. Ein
+# gestarteter Job läuft zu Ende; je Gruppe wartet höchstens ein Lauf, und ein neuer Push ersetzt
+# nur diesen wartenden. Sonst käme die ~68-min-Rust-Suite bei mehreren Merges pro Stunde nie durch. Im
 # aufgerufenen Workflow ist `github.event_name` der des Aufrufers: bei Push eine Gruppe je Branch,
 # im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
 # eigene Gruppe, bricht nie ab und tritt bei einem neueren Commit zurück (Ruhefenster).
@@ -179,6 +179,27 @@ jobs:
         env:
           IOS_SWIFT_PFLICHT: "1"
         run: ./scripts/check-all.sh --nur ios
+
+  # ── Kotlin-Kern der Android-Hülle (LLH-1989) ───────────────────────────────────────
+  # `gradlew -p android/kern test` über Schritt 20 von check-all.sh, nur JDK, kein Android-SDK. Die
+  # App baut und testet nur `android-pruefung.yml`. ANDROID_KERN_PFLICHT=1 macht ein fehlendes
+  # JDK rot statt zur Lücke. Das vorinstallierte JDK der Version aus scripts/android/sdk-version.sh
+  # (jdk-waehlen.sh, keine Action), wie beim App-Bau.
+  android:
+    name: Android-Kern
+    concurrency:
+      group: ci-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: JDK (vorinstalliert, Version aus sdk-version.sh)
+        run: ./scripts/android/jdk-waehlen.sh
+      - name: Kotlin-Kern
+        env:
+          ANDROID_KERN_PFLICHT: "1"
+        run: ./scripts/check-all.sh --nur android
 
   # ── Ein Bericht aus den Vitest-Teilläufen ───────────────────────────────────────────
   # Die Merge-Werkzeuge scheitern nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen

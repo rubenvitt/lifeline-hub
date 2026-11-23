@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 21.11.2026 (Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 22.11.2026 (Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -18,6 +18,7 @@ flowchart LR
   website["website<br/>(Astro, statisch)"]
   tauri["src-tauri<br/>(Desktop-Hülle)"]
   ios["ios<br/>(iOS-Hülle)"]
+  android["android<br/>(Android-Hülle)"]
   subgraph bin["Binary lifeline-hub"]
     hub["lifeline-hub<br/>(axum + SQLite)"]
     fe["frontend<br/>(eingebettet aus frontend/dist)"]
@@ -32,6 +33,8 @@ flowchart LR
   tauri -- "Webview lädt Server-Adresse" --> hub
   ios -- "Webview lädt Server-Adresse,<br/>GET /api/shell" --> hub
   ios -.-|gemeinsame Fälle| tauri
+  android -- "WebView lädt Server-Adresse,<br/>GET /api/shell" --> hub
+  android -.-|gemeinsame Fälle| tauri
   hub -- "liefert aus" --> fe
   hub -- "HTTP + Bearer-Token<br/>(Region-Bau)" --> ks
   ks -- "make tiles" --> kb
@@ -49,6 +52,7 @@ flowchart LR
 | `frontend` | React-19/antd-6-Oberfläche als PWA (`frontend/package.json`); Stabsoberfläche und Gerätehülle | ruft `/api` über `frontend/src/api/client.ts`, Live über `EventSource` (`frontend/src/live/liveVerbindung.ts`) | `frontend/src/` |
 | Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | `GET /api/shell` (`src/routes/shell.rs`), Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
 | iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` ([AGENTS.md](../../ios/AGENTS.md)) |
+| Android-Hülle `android` | Eigene Kotlin-App für Android-Handys und -Tablets (Jetpack Compose + Android-WebView), lädt die Oberfläche des gewählten Servers in einem WebView-Profil je Server, keine Anwendungslogik; testbare Logik im Kotlin-Kern `android/kern` (ohne Android-SDK), App unter `android/app`, Versionskatalog und Gradle-Wrapper unter `android/gradle`; Auslieferung als APK mit eigenem Updater | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `android/app/src/main/assets/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/`, Manifest `android.json` an den GitHub-Releases | `android/` ([AGENTS.md](../../android/AGENTS.md)) |
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
 | `karten-build` | Bau-zeitiges Erzeugen der Shortbread-MBTiles mit Planetiler, nie zur Laufzeit der App | `make tiles AREA=…`, `make validate` (`karten-build/README.md`) | `karten-build/` |
 | `crates/karten-katalog` | Geteilte Wire-Typen des Offline-Kartenkatalogs und der Bau-Jobs | Lib-Crate, Feature `schema` für den Typ-Codegen (`crates/karten-katalog/Cargo.toml`) | `crates/karten-katalog/src/lib.rs` |
@@ -150,6 +154,7 @@ Regeln: [frontend/src/kraefte/AGENTS.md](../../frontend/src/kraefte/AGENTS.md) (
 | `src/kraefte_disposition.rs` | Gemeinsamer Baustein „disponieren und zuordnen in einer Transaktion“, alles oder nichts mit Gründen je Zeile (422) | genutzt u. a. von `src/routes/einsatz_personal.rs`, `einsatz_fahrzeug.rs`, `einsatz_einheit.rs`, `abloesung.rs`, `src/einheit/aus_vorlage.rs`; `AppError::Zeilen` |
 | `src/kraefte_disposition` | Nur die Tests zu `src/kraefte_disposition.rs` (`tests.rs`) | — |
 | `src/entlassung.rs` | Lebenszustand einer Kraft: entlassen oder storniert statt löschen | genutzt von Einheit, Fahrzeug, Personal, Material, Bereitstellungsraum |
+| `src/status_ruecknahme.rs` | Gemeinsame Prüfung für die Rücknahme eines Statuswechsels (wer, binnen 10 Minuten, seither unverändert) und das Streichen des zugehörigen Zeitachsen-Ereignisses | genutzt von Fahrzeug, Personal, Material, Einheit (`…/status/zuruecknehmen`) |
 | `src/zeitachse` | Append-only Kräfte-Zeitachse (Alarmierung, Eintreffen, Ablösung, Entlassung), Perioden beim Lesen | `…/{id}/einheiten/zeitachse`, `…/{id}/personal/zeitachse`; feuert `einheit` |
 | `src/abloesung` | Schichten von Einheiten: Fälligkeit beim Lesen berechnet, Vollzug, Vorgaben je Abschnitt; `schichtplan/` der Schichtplan (Soll-Blöcke an Einheit, UHS, Pause, Befunde beim Lesen, LLH-1552) | `…/{id}/abloesungen`, `…/abloesungen/schichtplan`; Live `abloesung` |
 | `src/schichtmodell` | Org-Schichtmodelle (Rhythmus oder Wechselzeiten), Kopie am Einsatz | `/api/schichtmodelle` |
@@ -328,7 +333,7 @@ flowchart TB
 | `frontend/src/anzeige` | Anzeige-Konventionen: Zeit, Koordinaten, Stärke, Ortsfelder, Zeitpunkteingabe | `src/zeit.rs`, `src/staerke.rs` |
 | `frontend/src/assets` | Schriftdateien (`fonts/`) | — |
 | `frontend/src/marke` | Bildmarke „Lebenslinie“ und PWA-Manifest | — |
-| `frontend/src/huelle` | Einzige Stelle, die die Kennung der Hüllen liest (`__LIFELINE_HUELLE__`) | `src-tauri`, `ios` |
+| `frontend/src/huelle` | Einzige Stelle, die die Kennung der Hüllen liest (`__LIFELINE_HUELLE__`) | `src-tauri`, `ios`, `android` |
 | `frontend/src/heic` | HEIC-Vorschau im Browser per `libheif-js` (LGPL, `heic/LIESMICH.md`) | WASM aus `src/static_files.rs` |
 | `frontend/src/command-palette` | Sprungpalette mit Befehlen, Datensätzen, Adress- und Koordinatensprung ([AGENTS.md](../../frontend/src/command-palette/AGENTS.md)) | `src/benutzer_einstellungen` |
 | `frontend/src/druck` | Druckmechanik und Listendruck ([AGENTS.md](../../frontend/src/druck/AGENTS.md)) | Listenrouten der Fachmodule |
@@ -434,6 +439,24 @@ Haptik-Abbildung (`Haptik.swift`). Seine Suite liest die gemeinsamen Fälle der 
 meldet der Seite die Kennung `__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in
 seinem Kopf. Das Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App, `ios/AppTests`,
 `ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt `scripts/ios/version.sh`.
+
+### `android`
+
+Die Android-Hülle (LLH-1989, ADR-0084), Regeln in [android/AGENTS.md](../../android/AGENTS.md).
+`android/kern` ist ein eigener Gradle-Build für Kotlin/JVM ohne Android-SDK
+(`android/kern/build.gradle.kts`), Gegenstück zu `ios/LifelineKern`: Adressprüfung
+(`Adresse.kt`), Deeplink, Linkregeln und Linkweiche, Serverliste und ihre Ablage, Vertragsprüfung
+gegen `GET /api/shell` (`Vertrag.kt`), Ablauf und Onboarding, Brücke und ihre Ausführung,
+Anmeldung im Browser, Statustexte, Testzustände, Kanal und Update-Entscheidungen (`Kanal.kt`,
+`Update.kt`). Seine Suite liest die gemeinsamen Fälle aus `src-tauri/faelle/` und braucht nur ein
+JDK (Schritt 20 von `scripts/check-all.sh`). `android/app` ist die App
+`dev.rubeen.lifeline.android` (Einstieg `MainActivity.kt`, Ausführung in `AppModell.kt`): native
+Seiten unter `seiten/`, WebView je Profil, Brücke und Vertragsabruf unter `web/`, Systemdienste
+(Haptik, Meldung, Druck, Downloads, Anmeldung) unter `dienste/`, Updater unter `update/`; das
+Init-Skript `android/app/src/main/assets/huelle.js` meldet der Seite die Kennung
+`__LIFELINE_HUELLE__` und beschreibt das Wire-Format in seinem Kopf. `android/gradle` trägt
+Wrapper und Versionskatalog `libs.versions.toml`, `android/settings.gradle.kts` bindet den Kern per
+`includeBuild` ein; die Version schreibt `scripts/android/version.sh`.
 
 ### `karten-service`
 

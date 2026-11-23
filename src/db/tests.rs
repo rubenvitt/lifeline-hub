@@ -7064,6 +7064,206 @@ async fn migration_0358_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema(
     .expect_err("unbekannte Rolle scheitert");
 }
 
+// --- LLH-2064: Führungsfunktion nur für die Führung (0363) ---
+
+/// Ein Konto und eine Mitgliedschaft im Einsatz `e`.
+async fn mitglied_0363(
+    pool: &SqlitePool,
+    e: i64,
+    name: &str,
+    rolle: &str,
+    funktion: Option<&str>,
+    stelle: Option<&str>,
+) -> i64 {
+    let b: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, ?1, ?1, 'h') RETURNING id",
+    )
+    .bind(name)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+                zugewiesen_at, fuehrungsstelle, fuehrungsfunktion) \
+             VALUES (?, ?, ?, '2026-11-20 08:15:00', ?, ?)",
+    )
+    .bind(e)
+    .bind(b)
+    .bind(rolle)
+    .bind(stelle)
+    .bind(funktion)
+    .execute(pool)
+    .await
+    .unwrap();
+    b
+}
+
+type Zeile0363 = (i64, i64, String, String, Option<String>, Option<String>);
+
+async fn zeilen_0363(pool: &SqlitePool) -> Vec<Zeile0363> {
+    sqlx::query_as(
+        "SELECT einsatz_id, benutzer_id, einsatz_rolle, zugewiesen_at, fuehrungsstelle, \
+                fuehrungsfunktion FROM einsatz_mitgliedschaft ORDER BY benutzer_id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Der Neubau behält Zeilen der Führung, Index und die sechs Spiegel-Trigger und schreibt
+/// nichts ins Änderungsprotokoll (Entwurf LLH-2064 D3).
+#[tokio::test]
+async fn migration_0363_erhaelt_zeilen_trigger_und_schema() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 362).await;
+    let (e, b) = bild_grundlage(&pool).await;
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+                zugewiesen_at, fuehrungsstelle, fuehrungsfunktion) \
+             VALUES (?, ?, 'einsatzleitung', '2026-10-16 13:42:00', 'THW', 'fachberater')",
+    )
+    .bind(e)
+    .bind(b)
+    .execute(&pool)
+    .await
+    .unwrap();
+    mitglied_0363(&pool, e, "fp", "fuehrungspersonal", Some("s2"), None).await;
+    mitglied_0363(&pool, e, "frei", "mitarbeit", None, Some("Funk ELW 2")).await;
+    let vorher = zeilen_0363(&pool).await;
+    sqlx::query("DELETE FROM einsatz_aenderung")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    migriere_bis(&pool, 363).await;
+
+    assert_eq!(
+        zeilen_0363(&pool).await,
+        vorher,
+        "Führung und Freitext unverändert"
+    );
+    let protokoll: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_aenderung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(protokoll, 0, "der Neubau meldet dem Spiegel nichts");
+    let namen: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM sqlite_master WHERE tbl_name = 'einsatz_mitgliedschaft' \
+             AND (type = 'trigger' OR name = 'idx_mitgliedschaft_benutzer') ORDER BY name",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        namen,
+        [
+            "einsatz_mitgliedschaft_spiegellog_d",
+            "einsatz_mitgliedschaft_spiegellog_i",
+            "einsatz_mitgliedschaft_spiegellog_u",
+            "einsatz_mitgliedschaft_spiegelschutz_d",
+            "einsatz_mitgliedschaft_spiegelschutz_i",
+            "einsatz_mitgliedschaft_spiegelschutz_u",
+            "idx_mitgliedschaft_benutzer",
+        ]
+    );
+    let reste: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name = 'einsatz_mitgliedschaft_neu'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+}
+
+/// Die SQL-Bereinigung liefert für jeden Katalogcode dasselbe wie
+/// `Funktionsangabe::as_freitext` (Entwurf LLH-2064 D1/D3).
+#[tokio::test]
+async fn migration_0363_bereinigt_wie_as_freitext() {
+    use crate::fuehrung::{Fuehrungsfunktion, Funktionsangabe};
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 362).await;
+    let (offen, _) = bild_grundlage(&pool).await;
+    let geschwaerzt: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung, geschwaerzt_at) \
+             VALUES (1, 'Alt', '2026-11-01 00:00:00') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let lang = "x".repeat(195);
+    let mut erwartet = Vec::new();
+    let mut n = 0;
+    for f in Fuehrungsfunktion::ALLE {
+        let texte: Vec<Option<&str>> = if f.bezeichnung_pflicht() {
+            vec![Some("THW"), None, Some(lang.as_str())]
+        } else {
+            vec![None]
+        };
+        for text in texte {
+            for rolle in ["mitarbeit", "beobachter"] {
+                for (e, ist_geschwaerzt) in [(offen, false), (geschwaerzt, true)] {
+                    n += 1;
+                    let b =
+                        mitglied_0363(&pool, e, &format!("m{n}"), rolle, Some(f.as_str()), text)
+                            .await;
+                    let soll = Funktionsangabe {
+                        funktion: Some(f),
+                        text: text.map(str::to_string),
+                    }
+                    .as_freitext(ist_geschwaerzt);
+                    erwartet.push((b, soll.text, f, ist_geschwaerzt));
+                }
+            }
+        }
+    }
+
+    migriere_bis(&pool, 363).await;
+
+    for (b, text, f, ist_geschwaerzt) in erwartet {
+        let (stelle, code): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT fuehrungsstelle, fuehrungsfunktion FROM einsatz_mitgliedschaft \
+                 WHERE benutzer_id = ?",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(code, None, "{f:?} geschwärzt={ist_geschwaerzt}");
+        assert_eq!(stelle, text, "{f:?} geschwärzt={ist_geschwaerzt}");
+    }
+}
+
+/// Der CHECK lässt eine Funktion nur in der Führung zu (Entwurf LLH-2064 D3).
+#[tokio::test]
+async fn migration_0363_check_lehnt_funktion_bei_mitarbeit_ab() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 363).await;
+    let (e, b) = bild_grundlage(&pool).await;
+    for rolle in ["mitarbeit", "beobachter"] {
+        let fehler = sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+                    fuehrungsfunktion) VALUES (?, ?, ?, 's4')",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(rolle)
+        .execute(&pool)
+        .await
+        .expect_err(rolle);
+        assert!(
+            fehler.to_string().contains("CHECK constraint failed"),
+            "{rolle}: {fehler}"
+        );
+    }
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+                fuehrungsfunktion) VALUES (?, ?, 'fuehrungspersonal', 's4')",
+    )
+    .bind(e)
+    .bind(b)
+    .execute(&pool)
+    .await
+    .expect("Führungspersonal trägt S4");
+}
+
 // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
 /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem

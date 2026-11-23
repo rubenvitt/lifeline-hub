@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 
 /**
  * Wahl im Aktionsmenü eines Datensatzes (`components/MenueAusloeser.tsx`), geteilt von den Specs
@@ -96,9 +97,7 @@ export async function waehleAnzeige(
  */
 export async function oeffneAbmeldenRueckfrage(page: Page, menue: Locator): Promise<Locator> {
   await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
-  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
-  await expect(rueckfrage).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const rueckfrage = await dialogSteht(page, 'Abmelden?');
   // Der Fokus steht erst nach der Einblendung auf „Abbrechen“ (design.md D3).
   await expect(rueckfrage.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
   return rueckfrage;

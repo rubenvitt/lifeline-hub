@@ -12,7 +12,8 @@ import {
 /**
  * Seitenfenster in beide Richtungen für Chat und Infotelefon (LLH-1886, Entwurf
  * `docs/superpowers/specs/2026-11-22-se7ytm9j-chat-infotelefon-seitenfenster-design.md`, D2).
- * Dieselben Übergänge wie `etb/seitenfenster.test.ts`, mit beiden Cursor-Arten.
+ * Die Übergänge mit beiden Cursor-Arten; das ETB prüft sie mit seinem Cursor in
+ * `etb/seitenfenster.test.ts`.
  */
 const GROESSE = 3;
 

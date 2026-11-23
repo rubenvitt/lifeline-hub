@@ -1,13 +1,8 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
-
-/** Wartet, bis der Dialog steht und die Zoom-Animation vorbei ist (wie `betreuung-pruefliste`). */
-async function dialogSteht(page: Page, dialog: Locator) {
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-}
 
 // ETB-Entwurf-Tabs und Autosave; nach dem Anlegen wird direkt die ETB-Modul-URL angesteuert.
 
@@ -303,13 +298,13 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     const kreuz = reiter.getByRole('button', { name: 'Entwurf verwerfen' });
     await kreuz.click();
     // Erst klicken, wenn der Dialog steht: ein Klick in die Zoom-Animation verpufft.
-    await dialogSteht(page, dialog);
+    await eingeblendet(dialog);
     await dialog.getByRole('button', { name: 'Behalten' }).click();
     await expect(dialog).toBeHidden();
     await expect(feld).toHaveValue(inhalt);
 
     await kreuz.click();
-    await dialogSteht(page, dialog);
+    await eingeblendet(dialog);
     await dialog.getByRole('button', { name: 'Verwerfen' }).click();
     // Es bleibt der leere zweite Entwurf, ohne Reiterband.
     await expect(page.getByRole('tab')).toHaveCount(0);

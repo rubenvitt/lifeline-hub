@@ -1588,6 +1588,20 @@
           }
         }
       },
+      "AlarmQuelle": {
+        "type": "string",
+        "description": "Eine Quelle der Alarmzeile, benannt wie in `WasBrenntQuellen` (`lage/wasBrennt.ts`). Für\n[`LagemonitorAlarm::ausgeblendet`] (LLH-1964).",
+        "enum": [
+          "meldungen",
+          "auftraege",
+          "erinnerungen",
+          "nachforderungen",
+          "vermisst",
+          "kritisch",
+          "rueckmeldung",
+          "ausfall"
+        ]
+      },
       "AnbindungAblehnung": {
         "type": "object",
         "description": "Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6).",
@@ -4034,8 +4048,12 @@
             "description": "Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt."
           },
           "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026)."
           },
           "erstellt_at": {
             "type": "string"
@@ -4065,7 +4083,7 @@
       },
       "BenachrichtigungArt": {
         "type": "string",
-        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)\nspiegelt `ALLE`.",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)\nspiegelt `ALLE`.",
         "enum": [
           "sofortmeldung",
           "sofortmeldung_eskaliert",
@@ -4095,7 +4113,10 @@
           "unwetter",
           "fuehrung_ungueltig",
           "fuehrung_uebernommen",
-          "fuehrung_angefragt"
+          "fuehrung_angefragt",
+          "adapter_eingriff",
+          "adapter_gestoert",
+          "adapter_wieder_ok"
         ]
       },
       "BenachrichtigungBezugTyp": {
@@ -4130,7 +4151,8 @@
           "person",
           "einheit",
           "fahrzeug",
-          "chat_nachricht"
+          "chat_nachricht",
+          "adapter"
         ]
       },
       "BenachrichtigungEreignis": {
@@ -4161,8 +4183,12 @@
             "$ref": "#/components/schemas/BenachrichtigungBezugTyp"
           },
           "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit\nClient und Service Worker denselben Tag bilden."
           },
           "gelesen_bis": {
             "type": [
@@ -6593,6 +6619,29 @@
             "description": "Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt."
           }
         }
+      },
+      "EinheitStatusAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinheitAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/HandStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für\n„Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986)."
       },
       "EinheitStatusQuelle": {
         "type": "string",
@@ -11155,6 +11204,35 @@
           "unbekannt"
         ]
       },
+      "HandStatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der gesetzte Status (`null` = gelöscht); die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "vorher_status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Status vor dem Wechsel, nur für die Quittung („S2 → S3“)."
+          }
+        }
+      },
       "HaushaltAnzeige": {
         "type": "object",
         "description": "Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind.",
@@ -13790,7 +13868,8 @@
           "nachforderungen_ueberfaellig",
           "rueckmeldung_ueberfaellig",
           "abschnitte_kritisch",
-          "ausfall"
+          "ausfall",
+          "ausgeblendet"
         ],
         "properties": {
           "abschnitte_kritisch": {
@@ -13810,6 +13889,13 @@
               "type": "string"
             },
             "description": "Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der\nEinheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie."
+          },
+          "ausgeblendet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlarmQuelle"
+            },
+            "description": "Quellen, deren Modul im Einsatz ausgeblendet ist (LLH-1964), in der Folge von\n[`AlarmQuelle`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer. Der\nMonitor lässt sie weg, ohne den Stand unvollständig zu nennen."
           },
           "bestaetigung_ueberfaellig": {
             "type": "integer",
@@ -14677,6 +14763,29 @@
           }
         }
       },
+      "MaterialPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzMaterialAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/MaterialStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des PATCH einer Materialzeile: die Zeile wie bisher, dazu der Beleg für „Rückgängig“,\nwenn der Status gewechselt hat (LLH-1986)."
+      },
       "MaterialRuecknahmeAntwort": {
         "type": "object",
         "description": "Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
@@ -14706,6 +14815,35 @@
           "verbraucht",
           "desinfektion_noetig"
         ]
+      },
+      "MaterialStatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "status",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "status": {
+            "$ref": "#/components/schemas/MaterialStatus",
+            "description": "Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "vorher_status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MaterialStatus",
+                "description": "Status vor dem Wechsel, nur für die Quittung."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "MeAntwort": {
         "allOf": [
@@ -17591,6 +17729,29 @@
             "format": "int64"
           }
         }
+      },
+      "PersonalPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzPersonalAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/HandStatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu\nder Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986)."
       },
       "PersonalStatus": {
         "type": "object",
