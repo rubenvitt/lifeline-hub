@@ -12,8 +12,12 @@ pub enum ClientIpSource {
     /// Genau ein Proxy, der anhängt (`PUSH_RELAIS_HINTER_PROXY`): der rechte
     /// `X-Forwarded-For`-Eintrag.
     SingleProxy,
-    /// Vertraute Proxys (`PUSH_RELAIS_TRUSTED_PROXIES`), etwa Traefik und die Bereiche eines CDN.
-    TrustedProxies(Vec<IpNet>),
+    /// Vertraute Proxys (`PUSH_RELAIS_TRUSTED_PROXIES`, etwa das Docker-Netz von Traefik) und
+    /// die Bereiche eines CDN davor (`PUSH_RELAIS_CDN_PROXIES`).
+    TrustedProxies {
+        proxies: Vec<IpNet>,
+        cdn: Vec<IpNet>,
+    },
 }
 
 const X_FORWARDED_FOR: &str = "x-forwarded-for";
@@ -24,11 +28,14 @@ const X_FORWARDED_FOR: &str = "x-forwarded-for";
 /// - [`ClientIpSource::SingleProxy`]: der rechte `X-Forwarded-For`-Eintrag, den der eine Proxy
 ///   anhängt; alles links davon kann der Client selbst mitschicken. Fehlt er, die Gegenstelle.
 /// - [`ClientIpSource::TrustedProxies`]: wie `src/extract.rs::client_ip` im Hauptpaket
-///   (LFH-604). Liegt die Gegenstelle nicht in der Liste, gilt sie selbst. Sonst wird
-///   `X-Forwarded-For` von rechts gelesen: jeder Proxy hängt an, von wem er die Anfrage bekam,
-///   und der erste Eintrag außerhalb der Liste ist der Client. Ein unlesbarer Eintrag beendet
-///   die Suche bei der letzten bekannten Stufe; besteht die Kette nur aus Vertrautem, gilt deren
-///   linkester Eintrag. IPv4-gemappte Adressen zählen als IPv4.
+///   (LFH-604, Zwilling; beide gleich halten). Liegt die Gegenstelle nicht in `proxies`, gilt
+///   sie selbst. Sonst wird `X-Forwarded-For` von rechts gelesen: jeder Proxy hängt an, von wem
+///   er die Anfrage bekam. Einträge aus `proxies` werden übersprungen, solange kein CDN-Eintrag
+///   kam; der erste Eintrag aus `cdn` wird **einmal** übersprungen; der nächste ist der Client,
+///   auch wenn er in einer der Listen liegt. So zählt ein eigener Worker im CDN, der
+///   `X-Forwarded-For` selbst setzt, mit seiner eigenen Adresse (LLH-2080). Ein unlesbarer
+///   Eintrag beendet die Suche bei der letzten bekannten Stufe; endet die Kette ohne fremden
+///   Eintrag, gilt ihr linkester. IPv4-gemappte Adressen zählen als IPv4.
 pub fn client_ip(source: &ClientIpSource, headers: &HeaderMap, peer: Option<SocketAddr>) -> IpAddr {
     let Some(gegenstelle) = peer.map(|p| p.ip()) else {
         return IpAddr::from([0, 0, 0, 0]);
@@ -41,14 +48,21 @@ pub fn client_ip(source: &ClientIpSource, headers: &HeaderMap, peer: Option<Sock
             .and_then(|v| v.rsplit(',').next())
             .and_then(|v| v.trim().parse::<IpAddr>().ok())
             .unwrap_or(gegenstelle),
-        ClientIpSource::TrustedProxies(netze) => hinter_proxys(gegenstelle, headers, netze),
+        ClientIpSource::TrustedProxies { proxies, cdn } => {
+            hinter_proxys(gegenstelle, headers, proxies, cdn)
+        }
     }
 }
 
-fn hinter_proxys(gegenstelle: IpAddr, headers: &HeaderMap, netze: &[IpNet]) -> IpAddr {
-    let ist_vertraut = |ip: &IpAddr| netze.iter().any(|netz| netz.contains(ip));
+fn hinter_proxys(
+    gegenstelle: IpAddr,
+    headers: &HeaderMap,
+    proxies: &[IpNet],
+    cdn: &[IpNet],
+) -> IpAddr {
+    let liegt_in = |netze: &[IpNet], ip: &IpAddr| netze.iter().any(|netz| netz.contains(ip));
     let mut stufe = gegenstelle.to_canonical();
-    if !ist_vertraut(&stufe) {
+    if !liegt_in(proxies, &stufe) {
         return stufe;
     }
     // Mehrere Headerzeilen gelten als eine Liste in ihrer Reihenfolge (RFC 9110, 5.3). Getrennt
@@ -58,6 +72,7 @@ fn hinter_proxys(gegenstelle: IpAddr, headers: &HeaderMap, netze: &[IpNet]) -> I
         .iter()
         .flat_map(|zeile| zeile.as_bytes().split(|b| *b == b','))
         .collect();
+    let mut cdn_gesehen = false;
     for eintrag in eintraege.into_iter().rev() {
         let Some(ip) = std::str::from_utf8(eintrag)
             .ok()
@@ -66,9 +81,17 @@ fn hinter_proxys(gegenstelle: IpAddr, headers: &HeaderMap, netze: &[IpNet]) -> I
             return stufe;
         };
         stufe = ip.to_canonical();
-        if !ist_vertraut(&stufe) {
+        if cdn_gesehen {
             return stufe;
         }
+        if liegt_in(proxies, &stufe) {
+            continue;
+        }
+        if liegt_in(cdn, &stufe) {
+            cdn_gesehen = true;
+            continue;
+        }
+        return stufe;
     }
     stufe
 }
@@ -88,10 +111,20 @@ mod tests {
     const TRAEFIK: &str = "10.0.1.5:4000";
 
     fn liste() -> ClientIpSource {
-        ClientIpSource::TrustedProxies(vec![
-            "10.0.1.0/24".parse().unwrap(),
-            "173.245.48.0/20".parse().unwrap(),
-        ])
+        ClientIpSource::TrustedProxies {
+            proxies: vec!["10.0.1.0/24".parse().unwrap()],
+            cdn: vec![
+                "173.245.48.0/20".parse().unwrap(),
+                "2a06:98c0::/29".parse().unwrap(),
+            ],
+        }
+    }
+
+    fn ohne_cdn() -> ClientIpSource {
+        ClientIpSource::TrustedProxies {
+            proxies: vec!["10.0.1.0/24".parse().unwrap()],
+            cdn: vec![],
+        }
     }
 
     fn xff(zeilen: &[&str]) -> HeaderMap {
@@ -174,6 +207,52 @@ mod tests {
     fn eintrag_mit_port_wird_gelesen() {
         let h = xff(&["203.0.113.7:5555, 173.245.48.10"]);
         assert_eq!(client_ip(&liste(), &h, peer(TRAEFIK)), ip("203.0.113.7"));
+    }
+
+    #[test]
+    fn cdn_wird_einmal_uebersprungen() {
+        let h = xff(&["203.0.113.7, 173.245.48.10"]);
+        assert_eq!(client_ip(&liste(), &h, peer(TRAEFIK)), ip("203.0.113.7"));
+    }
+
+    /// Ein eigener Cloudflare Worker schickt aus einem Cloudflare-Bereich und setzt
+    /// `X-Forwarded-For` selbst: gezählt wird der Worker, nie der frei gewählte Eintrag.
+    #[test]
+    fn worker_zaehlt_selbst() {
+        let h = xff(&["198.51.100.66, 2a06:98c0:3600::103, 173.245.48.10"]);
+        assert_eq!(
+            client_ip(&liste(), &h, peer(TRAEFIK)),
+            ip("2a06:98c0:3600::103")
+        );
+    }
+
+    #[test]
+    fn innere_proxys_vor_dem_cdn_werden_uebersprungen() {
+        let h = xff(&["203.0.113.7, 173.245.48.10, 10.0.1.9"]);
+        assert_eq!(client_ip(&liste(), &h, peer(TRAEFIK)), ip("203.0.113.7"));
+    }
+
+    #[test]
+    fn proxy_links_vom_cdn_zaehlt_selbst() {
+        let h = xff(&["198.51.100.66, 10.0.1.9, 173.245.48.10"]);
+        assert_eq!(client_ip(&liste(), &h, peer(TRAEFIK)), ip("10.0.1.9"));
+    }
+
+    #[test]
+    fn ohne_cdn_liste_werden_proxys_beliebig_uebersprungen() {
+        let h = xff(&["203.0.113.7, 10.0.1.8, 10.0.1.9"]);
+        assert_eq!(client_ip(&ohne_cdn(), &h, peer(TRAEFIK)), ip("203.0.113.7"));
+        let h = xff(&["10.0.1.8, 10.0.1.9"]);
+        assert_eq!(client_ip(&ohne_cdn(), &h, peer(TRAEFIK)), ip("10.0.1.8"));
+    }
+
+    #[test]
+    fn gegenstelle_im_cdn_zaehlt_selbst() {
+        let h = xff(&["203.0.113.7"]);
+        assert_eq!(
+            client_ip(&liste(), &h, peer("173.245.48.10:4000")),
+            ip("173.245.48.10")
+        );
     }
 
     #[test]

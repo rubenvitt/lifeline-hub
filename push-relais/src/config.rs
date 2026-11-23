@@ -53,6 +53,16 @@ pub struct RelaisConfig {
         value_parser = proxy_netz_parsen
     )]
     pub trusted_proxies: Vec<IpNet>,
+    /// Bereiche eines CDN vor dem Proxy (etwa Cloudflare), nur zusammen mit
+    /// `PUSH_RELAIS_TRUSTED_PROXIES`. Ein Eintrag daraus wird höchstens einmal übersprungen
+    /// (LLH-2080), damit ein eigener Worker im CDN seine Adresse nicht frei wählt.
+    #[arg(
+        long,
+        env = "PUSH_RELAIS_CDN_PROXIES",
+        value_delimiter = ',',
+        value_parser = proxy_netz_parsen
+    )]
+    pub cdn_proxies: Vec<IpNet>,
     #[arg(
         long,
         env = "PUSH_RELAIS_APNS_BASIS_PRODUCTION",
@@ -76,12 +86,21 @@ impl RelaisConfig {
     /// Woher die Client-Adresse für die Registrierungsgrenze kommt. Schalter und Liste zugleich
     /// sind ein Fehler: welche Regel dann gälte, wäre nicht zu sehen.
     pub fn client_ip_source(&self) -> anyhow::Result<ClientIpSource> {
+        if !self.cdn_proxies.is_empty() && self.trusted_proxies.is_empty() {
+            anyhow::bail!(
+                "PUSH_RELAIS_CDN_PROXIES verlangt PUSH_RELAIS_TRUSTED_PROXIES \
+                 (die Adresse des Proxys, über den das CDN das Relais erreicht)"
+            );
+        }
         match (self.hinter_proxy, self.trusted_proxies.is_empty()) {
             (true, false) => anyhow::bail!(
                 "PUSH_RELAIS_HINTER_PROXY und PUSH_RELAIS_TRUSTED_PROXIES sind beide gesetzt; \
                  nur PUSH_RELAIS_TRUSTED_PROXIES verwenden"
             ),
-            (_, false) => Ok(ClientIpSource::TrustedProxies(self.trusted_proxies.clone())),
+            (_, false) => Ok(ClientIpSource::TrustedProxies {
+                proxies: self.trusted_proxies.clone(),
+                cdn: self.cdn_proxies.clone(),
+            }),
             (true, true) => Ok(ClientIpSource::SingleProxy),
             (false, true) => Ok(ClientIpSource::Peer),
         }
@@ -137,8 +156,46 @@ mod tests {
         assert_eq!(cfg.trusted_proxies, erwartet);
         assert_eq!(
             cfg.client_ip_source().unwrap(),
-            ClientIpSource::TrustedProxies(erwartet)
+            ClientIpSource::TrustedProxies {
+                proxies: erwartet,
+                cdn: vec![]
+            }
         );
+    }
+
+    #[test]
+    fn cdn_und_proxy_liste() {
+        let cfg = parse(&[
+            "--trusted-proxies",
+            "10.0.1.0/24",
+            "--cdn-proxies",
+            "173.245.48.0/20,2a06:98c0::/29",
+        ])
+        .unwrap();
+        assert_eq!(
+            cfg.client_ip_source().unwrap(),
+            ClientIpSource::TrustedProxies {
+                proxies: vec!["10.0.1.0/24".parse().unwrap()],
+                cdn: vec![
+                    "173.245.48.0/20".parse().unwrap(),
+                    "2a06:98c0::/29".parse().unwrap()
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn cdn_ohne_proxy_liste_bricht_ab() {
+        let cfg = parse(&["--cdn-proxies", "173.245.48.0/20"]).unwrap();
+        let fehler = cfg.client_ip_source().unwrap_err().to_string();
+        assert!(fehler.contains("PUSH_RELAIS_CDN_PROXIES"), "{fehler}");
+        let cfg = parse(&["--hinter-proxy", "--cdn-proxies", "173.245.48.0/20"]).unwrap();
+        assert!(cfg.client_ip_source().is_err());
+    }
+
+    #[test]
+    fn hostname_in_der_cdn_liste_bricht_ab() {
+        assert!(parse(&["--cdn-proxies", "cloudflare"]).is_err());
     }
 
     #[test]
