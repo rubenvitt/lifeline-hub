@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, Input, Modal } from 'antd';
 import { useState } from 'react';
@@ -102,6 +102,44 @@ describe('useVerwerfenSchutz (LLH-2010)', () => {
     expect(rueckfrage()).toBeNull();
     expect(onSchliessen).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Text')).toHaveValue('abc');
+  });
+
+  it('auch beim zweiten Öffnen steht der Fokus auf „Weiter bearbeiten“ (LLH-2013)', async () => {
+    renderMitProviders(<Probe onSchliessen={vi.fn()} />);
+    const feld = screen.getByLabelText('Text');
+    await userEvent.type(feld, 'abc');
+    for (const runde of [1, 2]) {
+      await userEvent.keyboard('{Escape}');
+      const weiter = await screen.findByRole('button', { name: 'Weiter bearbeiten' });
+      await waitFor(() => expect(weiter, `Runde ${runde}`).toHaveFocus());
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(rueckfrage()).toBeNull());
+      await waitFor(() => expect(feld).toHaveFocus());
+      // jsdom beendet die Ausblendung nie; im Browser ist sie nach 0,2 s fertig.
+      await waitFor(() => {
+        const gehend = document.querySelector<HTMLElement>('.ant-zoom-leave');
+        if (gehend) {
+          fireEvent.transitionEnd(gehend);
+          fireEvent.animationEnd(gehend);
+        }
+        expect(document.querySelector('.ant-zoom-leave')).toBeNull();
+      });
+    }
+    expect(feld).toHaveValue('abc');
+  });
+
+  it('zieht eine Fokusfalle den Fokus beim Öffnen auf das Kreuz der Rückfrage, holt sie ihn zurück (LLH-2013)', async () => {
+    renderMitProviders(<Probe onSchliessen={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText('Text'), 'abc');
+    await userEvent.keyboard('{Escape}');
+    const offen = await screen.findByRole('dialog', { name: 'Eingaben verwerfen?' });
+    const weiter = screen.getByRole('button', { name: 'Weiter bearbeiten' });
+    // Was rc-dialogs `useLockFocus` im Browser tut (jsdom kennt die Falle nicht): Fokus auf das
+    // erste fokussierbare Element der Rückfrage, ihr Kreuz; danach auf ihren Rahmen.
+    act(() => offen.querySelector<HTMLElement>('.ant-modal-close')!.focus());
+    expect(weiter).toHaveFocus();
+    act(() => offen.closest<HTMLElement>('.ant-modal')!.focus());
+    expect(weiter).toHaveFocus();
   });
 
   it('gesperrt tut das Kreuz nichts', async () => {
