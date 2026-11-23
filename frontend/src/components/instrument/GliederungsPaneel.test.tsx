@@ -54,7 +54,7 @@ describe('GliederungsPaneel', () => {
     expect(kanten[0]).toHaveAttribute('aria-hidden', 'true');
     expect(kanten[0]).toHaveAttribute('data-rolle', 'alarm');
     expect(kanten[0].style.background).toBe('rgb(255, 0, 0)');
-    expect(kanten[1].style.background).toBe('transparent');
+    expect(kanten[1].style.backgroundColor).toBe('transparent');
   });
 
   it('Laden, Fehler, Leer, Gesperrt ohne Zeilen', () => {

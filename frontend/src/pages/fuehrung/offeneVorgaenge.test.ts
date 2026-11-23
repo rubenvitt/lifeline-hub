@@ -17,6 +17,7 @@ import {
   nachforderungFuerMich,
   sichtAusUrl,
   vorgangsAbloesungen,
+  bezugTraeger,
   vorgangsErinnerungen,
   vorgangsMeldungen,
   vorgangsNachforderungen,
@@ -158,6 +159,45 @@ describe('Folge je Abschnitt (LLH-1145)', () => {
       JETZT,
     );
     expect(liste.map((e) => e.id)).toEqual([3, 1]);
+  });
+
+  it('Erinnerungen: automatische Frist steht am Bezug (LLH-1908)', () => {
+    const faellig = { faellig_at: um(11, 0), ist_faellig: true, bezug_id: 7 };
+    const liste = [
+      erinnerung({ id: 1, quelle: 'auto_frist', bezug_typ: 'meldung', ...faellig }),
+      erinnerung({ id: 2, quelle: 'auto_frist', bezug_typ: 'auftrag', ...faellig }),
+      erinnerung({ id: 3, quelle: 'auto_frist', bezug_typ: 'abloesung', ...faellig }),
+      erinnerung({ id: 4, quelle: 'auto_frist', bezug_typ: 'abloesung_vorwarnung', ...faellig }),
+      erinnerung({ id: 5, quelle: 'auto_frist', bezug_typ: 'abloesung_planung', ...faellig }),
+      erinnerung({ id: 6, quelle: 'manuell', bezug_typ: 'meldung', ...faellig }),
+    ];
+    expect(vorgangsErinnerungen(liste, JETZT, () => true).map((e) => e.id)).toEqual([5, 6]);
+    expect(vorgangsErinnerungen(liste, JETZT, (m) => m !== 'meldungen').map((e) => e.id)).toEqual([
+      1, 5, 6,
+    ]);
+  });
+
+  it('Erinnerungen: Frist eines geschlossenen Bezugs bleibt Erinnerung (LLH-1908)', () => {
+    const faellig = { faellig_at: um(11, 0), ist_faellig: true, quelle: 'auto_frist' as const };
+    const liste = [
+      erinnerung({ id: 1, bezug_typ: 'meldung', bezug_id: 10, ...faellig }),
+      erinnerung({ id: 2, bezug_typ: 'meldung', bezug_id: 11, ...faellig }),
+      erinnerung({ id: 3, bezug_typ: 'auftrag', bezug_id: 20, ...faellig }),
+      erinnerung({ id: 4, bezug_typ: 'auftrag', bezug_id: 21, ...faellig }),
+      erinnerung({ id: 5, bezug_typ: 'abloesung', bezug_id: 30, ...faellig }),
+    ];
+    const traeger = bezugTraeger({
+      meldungen: [{ id: 10 }],
+      auftraege: [{ id: 20 }],
+      abloesung: true,
+    });
+    expect(vorgangsErinnerungen(liste, JETZT, traeger).map((e) => e.id)).toEqual([2, 4]);
+    // Modul nicht frei (`null`): alle seine Fristen bleiben Erinnerungen.
+    const ohne = bezugTraeger({ meldungen: null, auftraege: null, abloesung: false });
+    expect(vorgangsErinnerungen(liste, JETZT, ohne).map((e) => e.id)).toEqual([1, 2, 3, 4, 5]);
+    // Liste lädt noch (`undefined`): die Frist steht schon am Bezug, sonst blitzte sie auf.
+    const laedt = bezugTraeger({ meldungen: undefined, auftraege: undefined, abloesung: true });
+    expect(vorgangsErinnerungen(liste, JETZT, laedt)).toEqual([]);
   });
 
   it('Ablösungen: überfällig oder in der Vorwarnzeit, früheste zuerst', () => {

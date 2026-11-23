@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 22.11.2026 (Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -17,7 +17,7 @@ stehen in den genannten Dateien und Bereichs-`AGENTS.md` und werden hier nicht w
 | 6.6a | Instanzen koppeln und melden | `src/instanz`, `src/routes` |
 | 6.6b | Einsatz spiegeln und am Spiegel beantragen | `src/instanz` (`spiegel`), `src/auth`, `src/live` |
 | 6.7 | Kartenkacheln über Proxy, Cache und Offline-Karte | `src/karte`, `karten-service` |
-| 6.8 | Benachrichtigung und Web Push | `src/benachrichtigung`, `src/web_push`, `frontend/src/alarm` |
+| 6.8 | Benachrichtigung, Web Push und iOS-Push | `src/benachrichtigung`, `src/web_push`, `src/ios_push`, `push-relais`, `ios`, `frontend/src/alarm` |
 
 „Ohne Netz“ hat zwei Bedeutungen: In 6.4 und 6.5 erreicht das Endgerät den Server nicht. In 6.7
 erreicht der Server das Internet nicht, die Endgeräte erreichen ihn aber.
@@ -764,9 +764,67 @@ sequenceDiagram
   HN->>HN: Empfänger am Hub, Zeilen, Live, Web Push mit Kennungen des Hubs
 ```
 
-- Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort
-  (`MeldenAntwort.hinweise`, `web_push`); die meldende Seite merkt es an der Kopplung.
-- Bietet der Hub Push an, lässt der ELW den Push nur an Konten aus, die aus der Kopplung stammen
-  (`hinweis::konten_am_hub`). Konten nur am ELW und ein gescheitertes Vormerken pusht er selbst.
+- Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort je Kanal
+  (`MeldenAntwort.hinweise`, `web_push`, `ios_push`); die meldende Seite merkt es an der Kopplung.
+- Bietet der Hub einen Kanal an, lässt der ELW den Push in diesem Kanal nur an Konten aus, die aus
+  der Kopplung stammen (`hinweis::konten_am_hub` mit `hinweis::Kanal`). Konten nur am ELW, einen
+  Kanal, den der Hub nicht anbietet, und ein gescheitertes Vormerken pusht er selbst.
 - Was am Spiegel noch fehlt, bleibt ohne Quittung und kommt mit dem nächsten Abgleich wieder;
   nach 12 Stunden geht ein Anlass nicht mehr hinaus (`hinweis::NACHREICHEN_STUNDEN`).
+
+### 6.8b iOS-Push: anmelden, senden, tippen
+
+Die iOS-App bekommt Benachrichtigungen bei geschlossener App über das Push-Relais und APNs
+(LLH-1981, [ADR-0090](entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend (alarm/iosPush.ts)
+  participant IOS as ios (Brücke, App)
+  participant BE as lifeline-hub (src/routes/ios_push.rs)
+  participant IP as src/ios_push
+  participant R as push-relais
+  participant A as APNs
+  participant NSE as ios/Benachrichtigungsdienst
+  FE->>IOS: push_register
+  IOS->>IOS: Berechtigung, Token; je Server Kennung und Schlüssel (Schlüsselbund)
+  IOS-->>FE: registration_id, token, environment, key
+  FE->>BE: PUT /api/ios-push/registration (mit inhalt, stumm)
+  BE->>BE: Upsert auf token, an Konto und Gerät
+  Note over BE,IP: später: benachrichtigung::ausliefern
+  BE->>IP: versenden (eigener Task, Filter wie Web Push)
+  IP->>IP: Klartext wie GET /api/benachrichtigungen/{id}, AES-256-GCM je Gerät
+  opt noch kein Zugang
+    IP->>R: POST /v1/server
+    R-->>IP: server_id, geheimnis
+  end
+  IP->>R: POST /v1/senden (höchstens 100, Bearer)
+  R->>A: HTTP/2 /3/device/{token}: Rückfalltitel, Umschlag l
+  R-->>IP: ergebnisse (token_ungueltig löscht die Anmeldung)
+  A-->>NSE: Push (mutable-content)
+  NSE->>NSE: Schlüssel zur Kennung, öffnen, Titel, Detail, Thread setzen
+  IOS->>IOS: Tippen: Kennung → Server, Pfad über Linkregeln.sichererPfad
+  IOS->>BE: Pfad im Webview des Servers laden (anderer Server: sichtbar wechseln)
+```
+
+- Ohne `--ios-push` richtet `src/main.rs` keinen Client ein: kein Kontakt zum Relais, die Routen
+  antworten 404. Der Server meldet sich erst beim ersten Versand selbst an
+  (`IosPush::zugang` in `src/ios_push/mod.rs`); `401` vom Relais führt zu einer neuen Anmeldung,
+  `403` (gesperrt) beendet den Versand für `SPERRE_GILT_STUNDEN` (24 h), danach versucht der
+  nächste Versand es einmal mit demselben Zugang (angenommen: Sperre weg; wieder `403`: sie gilt
+  ab jetzt neu). Solange sie steht, meldet `GET /api/ios-push` `relais_gesperrt`, und
+  `GET /api/admin/instanz` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
+- Das Relais setzt `apns-expiration` auf 12 Stunden, `apns-priority` 10 und für einen Alarm
+  `interruption-level: time-sensitive`, für einen Hinweis `active` (`push-relais/src/apns.rs`).
+  Ohne Extension oder Schlüssel bleibt der Rückfalltitel „Alarm“ bzw. „Neue Benachrichtigung“.
+- Bei offener App zeigt die App eine Push-Meldung des aktiven Servers nicht als Banner, die
+  Oberfläche meldet sie über den Live-Kanal; Meldungen anderer Server erscheinen
+  (`Meldungsdelegat` in `ios/App/LifelineHubApp.swift`). Ein Tippen beim Kaltstart wartet, bis der
+  Start steht (`Meldungsweg`). Auf der gespeicherten Oberfläche ohne Server (6.5) prüft die App wie
+  auf jeder Status-Seite erst den Server und lädt den Pfad danach; antwortet er nicht, startet die
+  gespeicherte Oberfläche wieder, ohne den Pfad (`meldungAngetippt` in
+  `ios/LifelineKern/Sources/LifelineKern/Ablauf.swift`).
+- Regeln zu Versand, Ende der Anmeldung und Kopplung je Kanal:
+  [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „iOS-Push“; Hülle:
+  [`ios/AGENTS.md`](../../ios/AGENTS.md), „Push über APNs“; Betrieb:
+  [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md).

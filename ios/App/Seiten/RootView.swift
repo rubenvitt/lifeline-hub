@@ -54,7 +54,7 @@ struct RootView: View {
         switch modell.seite {
         case .onboarding:
             OnboardingView(alsBlatt: false)
-        case .pruefung(let eintrag):
+        case .pruefung(let eintrag, _):
             VStack(spacing: 16) {
                 ProgressView().tint(.white)
                 Text("Verbinde mit „\(modell.aktuell(eintrag).name)“ …")

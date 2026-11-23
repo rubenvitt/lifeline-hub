@@ -152,7 +152,7 @@ describe('Datensicht · Filter im Spaltenkopf (LLH-1086)', () => {
     const kopf = () => screen.getByRole('button', { name: /^Typ filtern/ }).closest('th')!;
     expect(kopf().style.boxShadow).toBe('');
     await kopfFilterWaehlen('Typ', ['Sturm (1)']);
-    await waitFor(() => expect(kopf().style.boxShadow).toMatch(/inset 0 -2px 0/));
+    await waitFor(() => expect(kopf().style.boxShadow).toMatch(/ 0px -2px inset$/));
   });
 
   it('der Chip nimmt genau seinen Wert heraus', async () => {

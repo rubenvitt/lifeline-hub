@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 22.11.2026 (Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App, iOS-App oder Android-App darauf zu. Einen
@@ -36,6 +36,8 @@ flowchart LR
     KS["karten-service<br/>+ karten-build (Docker)"]
     GH["GitHub Releases + GHCR"]
     TF["App Store Connect<br/>+ TestFlight"]
+    RL["push-relais (Docker)<br/>betreibt das Projekt"]
+    APNS["APNs (Apple)"]
   end
   BR -->|"HTTPS (SSE, REST)"| RP
   DT -->|HTTPS| RP
@@ -56,6 +58,9 @@ flowchart LR
   KS --> OS
   DT -.->|"Update latest.json"| GH
   TF -.->|"Build installieren"| IOS
+  LH -.->|"iOS-Push (--ios-push)"| RL
+  RL -.->|"HTTP/2"| APNS
+  APNS -.->|Push| IOS
   AND -.->|"Update android.json + APK"| GH
 ```
 
@@ -73,6 +78,7 @@ Offline-Karten liegen in `karten/`, der Rest scheitert still oder ist abgeschalt
 | iOS-App | Swift-App (SwiftUI und WKWebView) ohne Anwendungslogik, lädt die Oberfläche des gewählten Servers; iPhone und iPad ab iOS 17.4, Bundle-ID `dev.rubeen.lifeline.ios`; nur über TestFlight an Tags der Kanäle `beta` und `main`, nicht im App Store | `ios/project.yml`, `.github/workflows/ios.yml`, `scripts/ios/testflight.sh`, [`ios-app.md`](../betrieb/ios-app.md) |
 | Android-App | Kotlin-App (Jetpack Compose und Android-WebView) ohne Anwendungslogik, lädt die Oberfläche des gewählten Servers; Handys und Tablets ab Android 10 (`minSdk` 29), Paket `dev.rubeen.lifeline.android`; nur als signierte APK an den GitHub-Releases jedes Kanals, nicht über Google Play; eigener Updater liest `android.json` seines Kanals | `android/app/build.gradle.kts`, `.github/workflows/android.yml`, `scripts/android/release-apk.sh`, `scripts/release/android-kanal.mjs`, [`android-app.md`](../betrieb/android-app.md) |
 | `karten-service` | Region-Build-Dienst; Linux-Binary und Abbild `ghcr.io/rubenvitt/lifeline-hub-karten-service` auf `debian:13-slim` mit `make`, `sqlite3` und Docker-CLI | `karten-service/Dockerfile`, Job `docker-karten` in `artefakte.yml`, [Runbook](../ops/lfh-204-karten-service-ops-runbook.md) |
+| `push-relais` | Relais für iOS-Push, betrieben vom Projekt (`https://push.rubeen.dev`); ein Lifeline-Server braucht es nicht selbst; Linux-Binary und Abbild `ghcr.io/rubenvitt/lifeline-hub-push-relais` auf `distroless/cc-debian13:nonroot`, `linux/amd64` und `linux/arm64` | `push-relais/Dockerfile`, Job `docker-relais` in `artefakte.yml`, [`push-relais.md`](../betrieb/push-relais.md) |
 | `website` | statische Astro-Seite auf Cloudflare Pages, Produktions-Branch `alpha`, nicht im Binary | [`website/AGENTS.md`](../../website/AGENTS.md) |
 
 `compose.yml` und `garage.toml` sind **reine Entwicklungsinfrastruktur**: ein lokaler
@@ -86,6 +92,7 @@ kein Docker (Kopf von `compose.yml`).
 | `lifeline-hub` | `127.0.0.1:8080` (`--bind`, `LIFELINE_BIND`); im Abbild `0.0.0.0:8080`. `--tls` ändert den Port nicht | `src/config.rs`, `Dockerfile`, [`betrieb-tls.md`](../betrieb-tls.md) |
 | `lifeline-hub` Health | `GET /api/health`: 200 mit Version, 503 ohne Datenbank | `src/routes/health.rs` |
 | `karten-service` | `0.0.0.0:8088` (`KS_BIND`), `GET /healthz`, Bearer-Token `KS_TOKEN` | `karten-service/src/config.rs`, `karten-service/src/api.rs` |
+| `push-relais` | `0.0.0.0:8089` (`PUSH_RELAIS_BIND`), `GET /v1/status`; spricht selbst kein TLS, läuft hinter einem Proxy (`PUSH_RELAIS_HINTER_PROXY`) | `push-relais/src/config.rs`, `push-relais/Dockerfile`, [`push-relais.md`](../betrieb/push-relais.md) |
 | Garage (nur Dev) | `3900` S3-API, `3902` unsignierter Lesepfad | `compose.yml` |
 
 Der Server begrenzt sich selbst: höchstens 1024 Verbindungen, Kopflesefrist 15 s, HTTP/1-Köpfe
@@ -99,15 +106,16 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 
 | Ort | Inhalt | Beleg |
 | --- | --- | --- |
-| `--db-path` (Vorgabe `lifeline.db`, Abbild `/data/lifeline.db`) | Datenbank im WAL-Modus; Anhänge als BLOB in der Tabelle `anhang`, Schlüssel des Web Push | `src/config.rs`, `migrations/0052_anhang.sql`, `src/web_push/mod.rs` |
+| `--db-path` (Vorgabe `lifeline.db`, Abbild `/data/lifeline.db`) | Datenbank im WAL-Modus; Anhänge als BLOB in der Tabelle `anhang`, Schlüssel des Web Push, Zugang zum Push-Relais (`ios_push_relais`) | `src/config.rs`, `migrations/0052_anhang.sql`, `src/web_push/mod.rs` |
 | `<Verzeichnis von --db-path>/karten` | Offline-Karten (MBTiles), `tile-cache.db`, Welt-Übersicht, `kritis/` | `default_karten_dir` in `src/config.rs`, `src/karte/tile_cache.rs`, `src/karte/kritis/scheduler.rs` |
 | neben der Datenbank | `lifeline-tls-cert.pem`/`lifeline-tls-key.pem` (Zertifikat-Cache), `lifeline-download-…` (Kopie für den Sicherungs-Download) | `src/tls/mod.rs`, `src/backup/mod.rs` |
 | `--backup-verzeichnis` | automatische Sicherungen, Vorgabe alle 360 min, 7 behalten, mit `--backup-empfaenger` per age verschlüsselt | `src/config.rs`, [`backup-restore.md`](../betrieb/backup-restore.md) |
 | `LIFELINE_GEHEIMNIS_SCHLUESSEL` oder `…_DATEI` (Umgebung, Flag oder eine Datei, deren Pfad die Umgebung nennt; nie Datenbank oder Sicherung) | privater age-Schlüssel des Geheimnisspeichers der Adapter; in der Datenbank liegen nur Chiffrate mit seinem Fingerabdruck (`adapter_geheimnis`). Getrennt sichern: ohne ihn sind die Geheimnisse nach einer Wiederherstellung neu zu setzen. Für einen Wechsel zusätzlich `…_ALT` (oder `…_ALT_DATEI`) für einen Neustart; der Start schlüsselt um (LLH-2025) | `src/config.rs`, `src/adapter/geheimnis.rs`, [ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md), [`backup-restore.md`](../betrieb/backup-restore.md) |
 | Endgerät, Browserprofil oder Webview | IndexedDB `lifeline-lagebild`, `lifeline-offline`, `lifeline-ortcache`, ETB-Entwürfe; Liste aller Orte in `GERAETESPEICHER` | `frontend/src/offline/geraetRaeumung.ts`, [`endgeraete.md`](../betrieb/endgeraete.md) |
 | Desktop-App | `verbindung.json` (Server, `bekannt`), `kanal.json` (Update-Kanal) im App-Konfigurationsverzeichnis (`app_config_dir`, Kennung `dev.rubeen.lifeline.desktop`) | `src-tauri/src/verbindung.rs`, `src-tauri/src/kanal.rs`, [`desktop-app.md`](../betrieb/desktop-app.md) |
-| iOS-App | Serverliste `server.json` in Application Support, Schalter „Haptik“ in `UserDefaults`; je Server ein eigener `WKWebsiteDataStore` mit der UUID des Eintrags (Cookies, IndexedDB, Cache) | `ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift` (`Serverablage`), `ios/App/Webview.swift` (`Webviewfabrik`), [`ios-app.md`](../betrieb/ios-app.md) |
+| iOS-App | Serverliste `server.json` und Push-Kennungen je Server `push.json` in Application Support, Schalter „Haptik“ in `UserDefaults`, Zahl der Server in den `UserDefaults` der App Group; Schlüssel des iOS-Push im gemeinsamen Schlüsselbund von App und Extension; je Server ein eigener `WKWebsiteDataStore` mit der UUID des Eintrags (Cookies, IndexedDB, Cache) | `ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift` (`Serverablage`), `ios/LifelineKern/Sources/LifelineKern/PushAnmeldungen.swift` (`Pushablage`), `ios/Gemeinsam/Schluesselbund.swift`, `ios/App/Webview.swift` (`Webviewfabrik`), [`ios-app.md`](../betrieb/ios-app.md) |
 | Android-App | Serverliste `filesDir/lifeline/server.json`; Schalter „Haptik“, Update-Kanal und Stand des Updaters in `SharedPreferences("lifeline")`; geladenes Update unter `noBackupFilesDir/update/`, Downloads zum Teilen höchstens 24 h unter `cacheDir/downloads/`; je Server ein eigenes WebView-Profil mit der UUID des Eintrags (Cookies, IndexedDB, Service Worker, Cache); keine Cloud-Sicherung (`allowBackup="false"`) | `android/app/src/main/kotlin/dev/rubeen/lifeline/android/MainActivity.kt`, `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Serverablage.kt`, `android/app/src/main/kotlin/dev/rubeen/lifeline/android/web/WebviewFabrik.kt`, `android/app/src/main/AndroidManifest.xml`, [`android-app.md`](../betrieb/android-app.md) |
+| `push-relais` | Volume `/data` mit `push-relais.sqlite` (Server, Hash des Geheimnisses, Sperre; keine Tokens), `.p8` nur lesbar eingehängt unter `/geheimnisse/AuthKey.p8` | `push-relais/Dockerfile`, `push-relais/src/speicher.rs`, [`push-relais.md`](../betrieb/push-relais.md) |
 | `karten-service` | Volume `/opt/karten-build/out`, Ergebnis im Objektspeicher | `karten-service/Dockerfile`, `karten-service/src/storage/s3.rs` |
 
 Das Abbild legt Datenbank und `karten/` auf **ein** Volume `/data`, weil der Kartenpfad aus dem
@@ -153,6 +161,7 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 | `karten-service` | `--karten-service-url` und `--karten-service-token`, beide nötig |
 | clamd | `--clamav-addr`, ohne Angabe ungescannt; nicht erreichbar → 503 außer `--clamav-fail-open` |
 | Push-Dienste der Browser | `--web-push` aus |
+| Push-Relais für iOS | `--ios-push` aus; Adresse `--ios-push-relais`, Vorgabe `https://push.rubeen.dev`, nur `https`; Kontakt erst beim ersten Versand |
 | OIDC-Anbieter | alle vier `--oidc-*` gesetzt |
 | Webhook-Empfänger der Anbindungen | je eingerichtetem Webhook; nur `https`, ohne Weiterleitung, LAN nur mit Ausnahme (ADR-0046) |
 | Quellen der Adapter (Divera, HiOrg …) | je angelegtem Adapter im Intervall, Vorgabe der Art; nur `https`, ohne Weiterleitung, LAN nur mit Ausnahme (ADR-0077). Ohne Adapter kein Abruf |
@@ -170,8 +179,8 @@ flowchart LR
   CI -->|"Tests grün,<br/>nicht abgebrochen"| REL["release.yml<br/>Ruhefenster, semantic-release"]
   REL --> TAG["Tag, Versions-Commit,<br/>Release als Entwurf"]
   TAG --> ART["artefakte.yml"]
-  ART --> B["bauen: 4 Binaries,<br/>karten-service, SBOM"]
-  ART --> D["docker, docker-karten<br/>(GHCR)"]
+  ART --> B["bauen: 4 Binaries,<br/>karten-service, push-relais, SBOM"]
+  ART --> D["docker, docker-karten,<br/>docker-relais (GHCR)"]
   ART --> DS["desktop (nur stabil)"]
   NZ["kanal-nachziehen.yml<br/>Alpha-Tag nach beta"] -->|Push auf beta| CI
   B --> F["freigeben"]
@@ -252,4 +261,5 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
   `backup` und `restore`: [`docs/betrieb/backup-restore.md`](../betrieb/backup-restore.md).
 - Vorgaben für Endgeräte (Verschlüsselung, Bildschirmsperre, Gemeinschaftsgeräte, Verlust):
   [`docs/betrieb/endgeraete.md`](../betrieb/endgeraete.md). Web Push:
-  [`docs/betrieb/web-push.md`](../betrieb/web-push.md).
+  [`docs/betrieb/web-push.md`](../betrieb/web-push.md); Push-Relais für iOS:
+  [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md).

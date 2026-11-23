@@ -11,6 +11,7 @@ import PersonalPage from './PersonalPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 import { waehle } from '../test/auswahlListe';
 import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfen';
+import { warteAufMenueFokus } from '../test/menue';
 
 /**
  * Abgelehnte Speichervorgänge der Personalseite stehen am Ort der Handlung (LFH-1077,
@@ -253,6 +254,9 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     const { container } = render();
     await screen.findByText('Thomas Müller');
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    // Der späte `autoFocus` des Spaltenmenüs zöge den Fokus sonst aus dem eben geöffneten
+    // Bemerkungsfeld, und es klappte wieder zu (LLH-1390, `test/menue.ts`).
+    await warteAufMenueFokus();
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {
@@ -283,6 +287,9 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     const { container } = render();
     await screen.findByText('Thomas Müller');
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    // Der späte `autoFocus` des Spaltenmenüs zöge den Fokus sonst aus dem eben geöffneten
+    // Bemerkungsfeld, und es klappte wieder zu (LLH-1390, `test/menue.ts`).
+    await warteAufMenueFokus();
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {

@@ -153,7 +153,10 @@ pub(crate) async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, A
     Ok(groesse)
 }
 
-/// Leert die `session`-Tabelle in einer geschriebenen Sicherungsdatei.
+/// Leert die Tabellen mit Bearer-Geheimnissen in einer geschriebenen Sicherungsdatei: `session`
+/// und die von iOS-Push (`ios_push_anmeldung` mit Geräte-Token und -Schlüsseln,
+/// `ios_push_relais` mit dem Geheimnis am Relais; Review B-I3). Nach dem Einspielen meldet sich
+/// der Server beim nächsten Versand neu am Relais an und die App nach dem Login neu am Server.
 ///
 /// Bewusst im `Delete`-Journal-Modus statt WAL: ein `DELETE` im WAL-Modus landete in
 /// `<ziel>-wal`, das ein späteres `std::fs::read` der Hauptdatei nicht sähe — die Sessions
@@ -165,13 +168,17 @@ async fn scrub_sessions(ziel: &Path) -> Result<(), AppError> {
         .filename(ziel)
         .journal_mode(SqliteJournalMode::Delete);
     let pool = SqlitePool::connect_with(options).await?;
-    sqlx::query("DELETE FROM session").execute(&pool).await?;
+    for tabelle in ["session", "ios_push_anmeldung", "ios_push_relais"] {
+        sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {tabelle}")))
+            .execute(&pool)
+            .await?;
+    }
     pool.close().await;
     Ok(())
 }
 
-/// Wie [`vacuum_into`], aber ohne Session-Tokens in der Kopie: ein geleaktes Backup trägt keine
-/// verwertbaren Bearer-Secrets. `passwort_hash`/`totp_secret` bleiben, damit die Sicherung
+/// Wie [`vacuum_into`], aber ohne Session-Tokens und iOS-Push-Geheimnisse in der Kopie
+/// ([`scrub_sessions`]): ein geleaktes Backup trägt keine verwertbaren Bearer-Secrets. `passwort_hash`/`totp_secret` bleiben, damit die Sicherung
 /// restore-fähig ist. Liefert die Größe in Bytes.
 ///
 /// **Atomar** (LFH-926): VACUUM und Scrub laufen in `<ziel>.part`, nach `fsync` folgt das
@@ -440,6 +447,60 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(orgs, 1, "Fachdaten müssen erhalten bleiben");
+    }
+
+    /// Review B-I3: Geräte-Token, Geräteschlüssel und das Geheimnis am Push-Relais genügen, um
+    /// echt wirkende Pushes an jedes angemeldete iPhone zu schicken; sie gehören nicht in eine
+    /// Sicherung. Nach dem Einspielen meldet sich der Server beim Relais neu an, die App beim
+    /// nächsten Login.
+    #[tokio::test]
+    async fn sicherung_enthaelt_keinen_ios_push() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bid: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+             VALUES (1, 'Max', 'max', 'hash', 1) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO ios_push_anmeldung (kennung, benutzer_id, token, umgebung, schluessel) \
+             VALUES ('k', ?, 'ab', 'sandbox', 'geheim')",
+        )
+        .bind(bid)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO ios_push_relais (id, server_id, geheimnis) VALUES (1, 's', 'geheim')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let ziel = dir.path().join("backup.sqlite");
+        erzeuge_sicherung(&pool, &ziel).await.unwrap();
+
+        let backup_pool = oeffne_sicherung(&ziel).await;
+        for tabelle in ["ios_push_anmeldung", "ios_push_relais"] {
+            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM {tabelle}"
+            )))
+            .fetch_one(&backup_pool)
+            .await
+            .unwrap();
+            assert_eq!(n, 0, "{tabelle} in der Sicherung");
+        }
+        let konten: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+            .fetch_one(&backup_pool)
+            .await
+            .unwrap();
+        assert_eq!(konten, 1, "Fachdaten müssen erhalten bleiben");
     }
 
     #[tokio::test]

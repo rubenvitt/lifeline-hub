@@ -42,6 +42,8 @@ pub enum Zweck {
     Oidc,
     /// Versand an die Push-Dienste der Browser.
     WebPush,
+    /// Versand an das Push-Relais für iOS (APNs).
+    IosPush,
     /// Koppeln und Melden zwischen Lifeline-Hub-Instanzen.
     Instanzkopplung,
     /// Kommando `lifeline-hub zugang …`: ein Fremdsystem bindet sich an einen Hub an (LLH-1652).
@@ -63,6 +65,7 @@ impl Zweck {
             Zweck::KartenService => "KartenService",
             Zweck::Oidc => "OIDC",
             Zweck::WebPush => "WebPush",
+            Zweck::IosPush => "IosPush",
             Zweck::Instanzkopplung => "Instanzkopplung",
             Zweck::Anbindung => "Anbindung",
             Zweck::Webhook => "Webhook",
@@ -166,6 +169,7 @@ mod tests {
             Zweck::KartenService,
             Zweck::Oidc,
             Zweck::WebPush,
+            Zweck::IosPush,
             Zweck::Instanzkopplung,
             Zweck::Anbindung,
             Zweck::Webhook,

@@ -1,9 +1,10 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { zeigeLeistenAnsicht } from './leisten-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { GEOCODER_LOOPBACK, setGeocoderUrl, writeOrgEinstellungen } from './geocoder-kern';
 
 // Adresssuche ohne Internet aus der Offline-Karte (LLH-1119, Spec `lagekarte-ortssuche`,
 // „Adresssuche aus der Offline-Karte“): Mit dem Adressindex der Region „Testgebiet“ im
@@ -62,35 +63,6 @@ async function mitte(page: Page): Promise<[number, number]> {
   });
 }
 
-type Einstellungen = Record<string, unknown>;
-
-/**
- * Setzt die Geocoder-URL der Organisation und liefert die vorherigen Einstellungen. Der PUT ist ein
- * Vollersatz (`org::einstellungen::speichern`), also gehen alle Felder mit; `auto_etb_eintraege`
- * liest sich als Zahl und schreibt sich als Wahrheitswert, die Kategorie-Vorgaben bleiben weg
- * (fehlend = unverändert).
- */
-async function geocoderSetzen(
-  request: APIRequestContext,
-  url: string | null,
-): Promise<Einstellungen> {
-  const alt = await request.get('/api/org-einstellungen');
-  expect(alt.ok(), await alt.text()).toBeTruthy();
-  const vorher = (await alt.json()) as Einstellungen;
-  await einstellungenSchreiben(request, { ...vorher, geocoder_url: url });
-  return vorher;
-}
-
-async function einstellungenSchreiben(request: APIRequestContext, e: Einstellungen) {
-  const body: Einstellungen = { ...e };
-  for (const feld of ['org_id', 'aufbewahrung_kategorien', 'geaendert_at', 'geaendert_von']) {
-    delete body[feld];
-  }
-  body.auto_etb_eintraege = e.auto_etb_eintraege == null ? null : e.auto_etb_eintraege !== 0;
-  const antwort = await request.put('/api/org-einstellungen', { data: body });
-  expect(antwort.ok(), await antwort.text()).toBeTruthy();
-}
-
 test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Offline-Karte', async ({
   page,
 }) => {
@@ -103,8 +75,7 @@ test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Off
   copyFileSync(FIXTURE, index);
 
   await anmelden(page, { startseite: false });
-  // Port 9 (discard) auf Loopback: niemand antwortet, die Verbindung wird verweigert.
-  const vorher = await geocoderSetzen(page.request, 'http://127.0.0.1:9');
+  const vorher = await setGeocoderUrl(page.request, GEOCODER_LOOPBACK);
   try {
     const einsatz = await page.request.post('/api/einsaetze', {
       data: { bezeichnung: `E2E Offline-Adresse ${Date.now()}` },
@@ -147,7 +118,7 @@ test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Off
     );
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   } finally {
-    await einstellungenSchreiben(page.request, vorher);
+    await writeOrgEinstellungen(page.request, vorher);
     rmSync(index, { force: true });
   }
 });

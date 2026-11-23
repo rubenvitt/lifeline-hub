@@ -16,6 +16,7 @@ import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 import { gewaehlteOptionen, waehle } from '../test/auswahlListe';
 import { listeQualifikationen } from '../api/qualifikationen';
+import { warteAufMenueFokus } from '../test/menue';
 
 dayjs.extend(utc);
 
@@ -375,6 +376,7 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await screen.findAllByRole('article');
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 4' }));
+    await warteAufMenueFokus(); // LLH-1390: sonst stiehlt der späte autoFocus den Fokus
     const menu = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
@@ -746,6 +748,7 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await screen.findAllByRole('article');
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    await warteAufMenueFokus(); // LLH-1390: sonst stiehlt der späte autoFocus den Fokus
     const menu = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
@@ -778,6 +781,7 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await screen.findAllByRole('article');
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    await warteAufMenueFokus(); // LLH-1390: sonst stiehlt der späte autoFocus den Fokus
     const menu = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
@@ -809,6 +813,7 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await screen.findAllByRole('article');
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    await warteAufMenueFokus(); // LLH-1390: sonst stiehlt der späte autoFocus den Fokus
     const menu = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
@@ -1107,6 +1112,7 @@ describe('AbloesungPage (LFH-635)', () => {
       await client.invalidateQueries();
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
       await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 3' }));
+      await warteAufMenueFokus(); // LLH-1390: sonst stiehlt der späte autoFocus den Fokus
       const menu = document.querySelector(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
       ) as HTMLElement;

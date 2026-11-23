@@ -6,6 +6,7 @@ import type { Sichtungskategorie } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import { farbenHell, sichtungsfarben, sichtungsflaechen, sichtungsToenung } from '../theme/tokens';
 import SichtungsWahl, { sichtungsFlaecheStil, sichtungsLuecke } from './SichtungsWahl';
+import { cssForm } from '../test/cssForm';
 
 /** Ein kontrollierter Rahmen wie im `Form.Item`: der Wert lebt außen. */
 function Gesteuert({
@@ -94,7 +95,9 @@ describe('SichtungsWahl — Wahl und Zustand', () => {
     // Die Test-Provider rendern hell: getönt heißt, nicht der helle Grund der Maske.
     expect(sk1.style.backgroundColor).not.toBe(rgb(farbenHell.flaeche));
     expect(sk1.style.backgroundColor).toBe(rgb(sichtungsToenung('rot', farbenHell.flaeche)));
-    expect(sk1.style.boxShadow).toBe(`inset 0 0 0 4px ${sichtungsfarben.rot}`);
+    expect(sk1.style.boxShadow).toBe(
+      cssForm('box-shadow', `inset 0 0 0 4px ${sichtungsfarben.rot}`),
+    );
     expect(sk1.style.borderInlineStart).not.toContain('8px');
     expect(sk1).toBeEnabled();
     // „unverletzt“ ohne Farbe bekommt weder Rahmen noch Tönung.

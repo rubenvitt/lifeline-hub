@@ -293,10 +293,10 @@ describe('SeitenSackgasse', () => {
       <SeitenSackgasse titel="Einsatz konnte nicht geladen werden" />,
     );
     const paneel = () => container.querySelector<HTMLElement>('[data-lfh="paneel"]');
-    expect(paneel()?.style.boxShadow).toContain('inset 3px');
+    expect(paneel()?.style.boxShadow).toMatch(/ 3px 0px inset$/);
 
     rerender(<SeitenSackgasse titel="Kein Zugriff auf diesen Einsatz" neutral />);
-    expect(paneel()?.style.boxShadow ?? '').not.toContain('inset 3px');
+    expect(paneel()?.style.boxShadow ?? '').not.toMatch(/ 3px 0px inset$/);
   });
 });
 

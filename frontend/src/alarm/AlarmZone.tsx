@@ -72,7 +72,11 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
     rowGap: token.paddingXXS,
     minHeight: token.controlHeight + 2 * token.paddingXXS,
     paddingBlock: token.paddingXXS,
-    paddingInline: `var(--lfh-seiten-polsterung)`,
+    // Start und Ende einzeln, nicht als Kurzform: die Zeilen überschreiben den Start, und jsdom 31
+    // verliert beim Serialisieren dann das Ende der Kurzform (`padding-inline-end: ;`), was die
+    // Vorschau im Design System falsch erzeugte (LLH-2023).
+    paddingInlineStart: `var(--lfh-seiten-polsterung)`,
+    paddingInlineEnd: `var(--lfh-seiten-polsterung)`,
   };
 
   return (

@@ -80,6 +80,14 @@ android {
     testOptions {
         // Robolectric braucht die Ressourcen der App (Thema, Texte, Symbol).
         unitTests.isIncludeAndroidResources = true
+        // Die `android-all`-Jars lädt Robolectric zur Laufzeit selbst, an Gradle vorbei: auch sie
+        // vom Spiegel, aus demselben Grund wie die Repositories (Kopf von kern/settings.gradle.kts).
+        unitTests.all {
+            it.systemProperty(
+                "robolectric.dependency.repo.url",
+                "https://maven-central.storage-download.googleapis.com/maven2",
+            )
+        }
     }
 }
 

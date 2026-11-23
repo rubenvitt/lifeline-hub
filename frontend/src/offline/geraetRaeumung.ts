@@ -291,6 +291,20 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'SHA-256 des zuletzt angemeldeten Push-Endpunkts dieses Browsers (LLH-1839): der Seitenstart erkennt daran ein rotiertes Abo. Kein Endpunkt, kein Personenbezug; ausschalten entfernt ihn.',
   },
   {
+    ort: 'localStorage lfh:ios-push:<benutzer>',
+    datei: 'alarm/iosPush.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Nur „diese Person hat hier iOS-Push gewählt“ und ob mit Absender und Wortlaut, damit ihre nächste Sitzung das Gerät samt Wahl wieder anmeldet; kein Inhalt, kein Token. Die Anmeldung liegt am Server.',
+  },
+  {
+    ort: 'localStorage lfh:ios-push-token',
+    datei: 'alarm/iosPush.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'SHA-256 aus Kennung, Token und Schlüssel, die dieses Gerät zuletzt für iOS-Push angemeldet hat: der Seitenstart erkennt daran ein geändertes Token oder einen neuen Schlüssel. Weder Token noch Schlüssel, kein Personenbezug; ausschalten entfernt ihn.',
+  },
+  {
     ort: 'localStorage lfh:lagekarte:zeitachse-eingeklappt',
     datei: 'pages/lagekarte/SnapshotLeiste.tsx',
     entscheidung: 'bleibt',

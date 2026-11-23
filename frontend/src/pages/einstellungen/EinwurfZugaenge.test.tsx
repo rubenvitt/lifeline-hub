@@ -171,6 +171,11 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     )!;
     expect(box.textContent).toMatch(/Nur jetzt sichtbar\./);
 
+    // Erst ganz eingeblendet: im ersten Schritt der Einblendung ist der Dialog noch durchsichtig,
+    // in jsdom ab 31 wie im Browser (LLH-2023).
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Adresse für OsmAnd ELW' })).toBeVisible(),
+    );
     // Escape schließt den Dialog nicht: der Schlüssel ginge verloren, bevor er eingetragen ist.
     screen.getByRole('button', { name: 'Fertig' }).focus();
     await user.keyboard('{Escape}');

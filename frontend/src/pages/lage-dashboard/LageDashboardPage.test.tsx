@@ -362,7 +362,7 @@ function paneel(titel: string): HTMLElement {
 function kante(el: HTMLElement): number {
   const zelle = el.closest<HTMLElement>('[data-lfh="kennzahl-zelle"]');
   const traeger = zelle ? zelle.querySelector<HTMLElement>('[data-lfh="kennzahl-kante"]') : el;
-  const m = (traeger?.style.boxShadow ?? '').match(/inset (\d+)px/);
+  const m = (traeger?.style.boxShadow ?? '').match(/ (\d+)px 0px inset$/);
   return m ? Number(m[1]) : 0;
 }
 
@@ -1288,7 +1288,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     const marke = ertrinken.querySelector<HTMLElement>('[data-lfh="erlaeuterung-marke"]');
     expect(marke, 'die Zeile trägt die Marke der Matrix').not.toBeNull();
     expect(marke).toHaveAttribute('aria-hidden', 'true');
-    expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+    expect(marke!.style.borderBlockStartColor).toMatch(/currentcolor/i);
     // Das Zeichen steht am Gefahrennamen, nicht im Stufenwort.
     expect(ertrinken.firstChild).toContainElement(marke);
 

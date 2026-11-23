@@ -11,6 +11,7 @@ import type {
 } from '../../api/types';
 import type { ListenAbschnittZustand } from '../../components/instrument';
 import { einstufungOf } from '../../abloesung/einstufung';
+import { amBezugGetragen, type BezugModul } from '../../erinnerung/amBezug';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
 import { istSofort } from '../../meldungen/meldungKorrekturKern';
 import {
@@ -193,12 +194,43 @@ export function vorgangsNachforderungen(
     );
 }
 
-/** Erinnerungen: offen und fällig oder in den nächsten 30 min; früheste Fälligkeit zuerst. */
-export function vorgangsErinnerungen(liste: readonly Erinnerung[], jetzt: number): Erinnerung[] {
+/**
+ * Wer trägt eine automatische Frist (LLH-1908, `src/AGENTS.md`, „Automatische Fristen stehen
+ * am Bezug“)? Je Modul die offenen Vorgänge, die sein Abschnitt zeigt: `null` = Modul nicht frei,
+ * `undefined` = Liste lädt noch (dann gilt die Frist als getragen, sonst blitzte sie kurz als
+ * Erinnerung auf). Ablösungen schließen ihre Fristen beim Ende selbst; dort zählt nur das Modul.
+ * Dieselbe Menge zählt der Server (`erinnerung::AM_BEZUG_GETRAGEN`).
+ */
+export function bezugTraeger(offen: {
+  meldungen: readonly { id: number }[] | null | undefined;
+  auftraege: readonly { id: number }[] | null | undefined;
+  abloesung: boolean;
+}): (modul: BezugModul, bezugId: number) => boolean {
+  const zeigt = (liste: readonly { id: number }[] | null | undefined, id: number) =>
+    liste === undefined || (liste !== null && liste.some((v) => v.id === id));
+  return (modul, id) =>
+    modul === 'meldungen'
+      ? zeigt(offen.meldungen, id)
+      : modul === 'auftraege'
+        ? zeigt(offen.auftraege, id)
+        : offen.abloesung;
+}
+
+/**
+ * Erinnerungen: offen und fällig oder in den nächsten 30 min; früheste Fälligkeit zuerst. Eine
+ * automatische Frist, die ihr Bezug schon trägt, fehlt (LLH-1908, `src/AGENTS.md`, „Automatische
+ * Fristen stehen am Bezug“): `frei` sagt, welche Module die Person sieht. Dieselbe Regel zählt der
+ * Server für die Zahl des Abschnitts.
+ */
+export function vorgangsErinnerungen(
+  liste: readonly Erinnerung[],
+  jetzt: number,
+  traegt: (modul: BezugModul, bezugId: number) => boolean = () => false,
+): Erinnerung[] {
   const grenze = jetzt + ERINNERUNG_FENSTER_MINUTEN * 60_000;
   return liste
     .filter((e) => {
-      if (e.status !== 'offen') return false;
+      if (e.status !== 'offen' || amBezugGetragen(e, traegt)) return false;
       const f = ms(e.faellig_at);
       return e.ist_faellig || (f != null && f <= grenze);
     })

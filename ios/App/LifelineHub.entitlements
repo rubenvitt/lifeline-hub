@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Berechtigungen der App (Entwurf „iOS-Alarme über APNs“; CODE_SIGN_ENTITLEMENTS in ios/project.yml).
+  `aps-environment` steht fest auf development: automatisch signiert archiviert Xcode mit einem
+  Entwicklungsprofil, der Export für App Store Connect setzt production selbst. Die App meldet dem
+  Server die Umgebung über `#if DEBUG` (App/Systemdienste.swift).
+  App Group und Schlüsselbund teilt die App mit der Extension Benachrichtigungsdienst
+  (Benachrichtigungsdienst/Benachrichtigungsdienst.entitlements). Geprüft in
+  ios/AppTests/InfoPlistTests.swift.
+-->
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dev.rubeen.lifeline.ios</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)dev.rubeen.lifeline.ios.gemeinsam</string>
+	</array>
+</dict>
+</plist>

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { farbenHell } from '../../theme/tokens';
 import { grossMass } from './grossMass';
 import { GrossZeile, GrossZeilen } from './GrossZeile';
+import { cssForm } from '../../test/cssForm';
 
 describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entfernung“)', () => {
   it('stellt den Wert in die Spalte direkt neben die Bezeichnung', () => {
@@ -15,7 +16,7 @@ describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entf
     const liste = screen.getByRole('list', { name: 'Sichtung' });
     // Zwei Spalten, die erste so breit wie die längste Bezeichnung: kein Rand dazwischen.
     expect(liste.style.gridTemplateColumns).toBe(
-      'repeat(1, minmax(0, max-content) minmax(0, 1fr))',
+      cssForm('grid-template-columns', 'repeat(1, minmax(0, max-content) minmax(0, 1fr))'),
     );
     const zeilen = screen.getAllByRole('listitem');
     expect(zeilen).toHaveLength(2);
@@ -31,7 +32,7 @@ describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entf
       </GrossZeilen>,
     );
     expect(screen.getByRole('list').style.gridTemplateColumns).toBe(
-      'repeat(2, minmax(0, max-content) minmax(0, 1fr))',
+      cssForm('grid-template-columns', 'repeat(2, minmax(0, max-content) minmax(0, 1fr))'),
     );
   });
 

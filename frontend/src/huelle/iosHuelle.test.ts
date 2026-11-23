@@ -33,6 +33,10 @@ describe('Init-Skript der iOS-Hülle (t39ltxxi)', () => {
     expect(typeof kennung.haptics).toBe('function');
     expect(typeof kennung.benachrichtigungZeigen).toBe('function');
     expect(typeof kennung.setAppBadge).toBe('function');
+    expect(kennung.push).toBe(true);
+    expect(typeof kennung.pushRegister).toBe('function');
+    expect(typeof kennung.pushUnregister).toBe('function');
+    expect(typeof kennung.pushState).toBe('function');
     expect(Object.isFrozen(kennung)).toBe(true);
   });
 
@@ -74,6 +78,40 @@ describe('Init-Skript der iOS-Hülle (t39ltxxi)', () => {
     antworteIosHuelle(nachrichten[0].id!, null);
     await zusage;
     expect(fertig).toBe(true);
+  });
+
+  it('sendet push_register und löst mit dem Reply auf', async () => {
+    const { bruecke, nachrichten } = brueckeMit();
+    starteIosHuelle({ bruecke });
+    const zusage = window.__LIFELINE_HUELLE__!.pushRegister!();
+    expect(nachrichten).toEqual([{ cmd: 'push_register', id: expect.any(Number) }]);
+    const reply = { registration_id: 'k-1', token: 'ab', environment: 'sandbox', key: 'sk' };
+    antworteIosHuelle(nachrichten[0].id!, null, reply);
+    await expect(zusage).resolves.toEqual(reply);
+  });
+
+  it('sendet push_unregister und push_state', async () => {
+    const { bruecke, nachrichten } = brueckeMit();
+    starteIosHuelle({ bruecke });
+    const kennung = window.__LIFELINE_HUELLE__!;
+    const ab = kennung.pushUnregister!();
+    const stand = kennung.pushState!();
+    expect(nachrichten).toEqual([
+      { cmd: 'push_unregister', id: expect.any(Number) },
+      { cmd: 'push_state', id: expect.any(Number) },
+    ]);
+    antworteIosHuelle(nachrichten[0].id!, null, null);
+    antworteIosHuelle(nachrichten[1].id!, null, { permission: 'granted', registration_id: 'k-1' });
+    await expect(ab).resolves.toBeNull();
+    await expect(stand).resolves.toEqual({ permission: 'granted', registration_id: 'k-1' });
+  });
+
+  it('lehnt push_register mit dem Fehlercode der Hülle ab', async () => {
+    const { bruecke, nachrichten } = brueckeMit();
+    starteIosHuelle({ bruecke });
+    const zusage = window.__LIFELINE_HUELLE__!.pushRegister!();
+    antworteIosHuelle(nachrichten[0].id!, 'denied');
+    await expect(zusage).rejects.toThrow('denied');
   });
 
   it('reicht eine Ablehnung der Hülle als Fehler weiter', async () => {

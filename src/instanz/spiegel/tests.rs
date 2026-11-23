@@ -1635,7 +1635,7 @@ async fn aufgeruestetes_gegenueber_bekommt_mitarbeit_nachgeliefert() {
                 .await
                 .unwrap();
         } else {
-            crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+            crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, false, true)
                 .await
                 .unwrap();
         }
@@ -1673,7 +1673,7 @@ async fn zweites_melden_ohne_wechsel_liefert_nichts_nach() {
     let (f, s) = zwei_seiten().await;
     mitarbeit_beim_alten_spiegel(&f, &s).await;
     let mut fc = f.acquire().await.unwrap();
-    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, false, true)
         .await
         .unwrap();
     drop(fc);
@@ -1686,7 +1686,7 @@ async fn zweites_melden_ohne_wechsel_liefert_nichts_nach() {
     let log: i64 = eine(&f, "SELECT MAX(stand) FROM einsatz_aenderung").await;
     // Nächste Meldungen mit derselben Fähigkeit, von beiden Speicherstellen.
     let mut fc = f.acquire().await.unwrap();
-    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, false, true)
         .await
         .unwrap();
     crate::instanz::repo::save_rolle_mitarbeit(&mut fc, 1, true)
@@ -1710,7 +1710,7 @@ async fn nachlieferung_nutzt_das_frische_flag() {
     let veraltet = crate::instanz::repo::load_kopplung(&f, 1).await.unwrap();
     assert!(!veraltet.gegenueber_rolle_mitarbeit);
     let mut fc = f.acquire().await.unwrap();
-    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, false, true)
         .await
         .unwrap();
     drop(fc);
@@ -2077,7 +2077,7 @@ async fn vor_der_grenze_bearbeitet_hebt_trotzdem_an() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;
@@ -2095,7 +2095,7 @@ async fn abgelehnter_nachtrag_legt_die_zeile_neu_ins_log() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;
@@ -2275,7 +2275,7 @@ async fn bearbeitung_nach_dem_aufruesten_vor_dem_melden_bleibt() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;

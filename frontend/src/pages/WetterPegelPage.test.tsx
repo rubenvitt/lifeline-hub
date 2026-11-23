@@ -302,7 +302,7 @@ describe('WetterPegelPage (LFH-633)', () => {
       expect(within(zeile).getByText(/veraltet/)).toBeInTheDocument();
       expect(within(zeile).getByText('6,84')).toBeInTheDocument();
       // Die Kante ist der zweite Kanal neben dem Wort — der Ton allein belegt sie nicht.
-      expect(zeile.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+      expect(zeile.style.boxShadow).toMatch(/^rgba?\([^)]*\) 3px 0px inset$/);
     });
 
     it('eine frische Messung trägt keine Kante (Gegenstück)', async () => {

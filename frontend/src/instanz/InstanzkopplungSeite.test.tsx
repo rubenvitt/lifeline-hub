@@ -109,6 +109,22 @@ describe('InstanzkopplungSeite', () => {
     expect(screen.getByText('Bea Admin · Stick B')).toBeInTheDocument();
   });
 
+  it('warnt, wenn das Push-Relais den Server sperrt, und sonst nicht', async () => {
+    const { unmount } = renderMitProviders(<InstanzkopplungSeite />);
+    await screen.findByText('AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH');
+    expect(screen.queryByText(/iOS-Push/)).not.toBeInTheDocument();
+    unmount();
+
+    vi.mocked(loadInstanzUebersicht).mockResolvedValue(
+      uebersicht({ ios_push_relais_gesperrt_seit: '2026-11-20 08:15:00' }),
+    );
+    renderMitProviders(<InstanzkopplungSeite />);
+    const warnung = await screen.findByText(
+      /^iOS-Push: Das Relais nimmt diesen Server nicht an \(gesperrt seit \d*09:?15\)\. Bitte den Betreiber des Relais informieren\.$/,
+    );
+    expect(warnung).toBeVisible();
+  });
+
   it('zeigt je Kopplung die gespiegelten und gelieferten Einsätze samt Hinweis (LLH-1492)', async () => {
     const basis = uebersicht();
     vi.mocked(loadInstanzUebersicht).mockResolvedValue({

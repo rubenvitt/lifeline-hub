@@ -77,12 +77,12 @@ fn is_json(content_type: Option<&str>) -> bool {
         .is_some_and(|medientyp| medientyp.trim().eq_ignore_ascii_case("application/json"))
 }
 
-/// Richtung eines unbekannten Vertrags; `None`, wenn die Hülle ihn kennt.
-pub fn richtung(vertrag: u32) -> Option<Richtung> {
-    if BEKANNTE_VERTRAEGE.contains(&vertrag) {
+/// Richtung eines unbekannten Vertrags; `None`, wenn die Hülle ihn kennt (`bekannt`).
+fn richtung(vertrag: u32, bekannt: &[u32]) -> Option<Richtung> {
+    if bekannt.contains(&vertrag) {
         return None;
     }
-    let groesster = BEKANNTE_VERTRAEGE.iter().copied().max().unwrap_or(0);
+    let groesster = bekannt.iter().copied().max().unwrap_or(0);
     Some(if vertrag > groesster {
         Richtung::ZuNeu
     } else {
@@ -93,6 +93,16 @@ pub fn richtung(vertrag: u32) -> Option<Richtung> {
 /// Bewertet einen Abruf. `letzter_vertrag` ist der zuletzt bestätigte Vertrag dieses Servers; er
 /// gilt ohne Verbindung.
 pub fn evaluate(abruf: &ShellAbruf, letzter_vertrag: Option<u32>) -> Vertragsergebnis {
+    evaluate_mit(abruf, letzter_vertrag, &BEKANNTE_VERTRAEGE)
+}
+
+/// [`evaluate`] gegen die Verträge `bekannt` statt die der Hülle; so prüfen die gemeinsamen Fälle
+/// (`faelle/vertrag.json`) auch Hüllen mit anderen Verträgen, wie `Vertragspruefung.evaluate`.
+fn evaluate_mit(
+    abruf: &ShellAbruf,
+    letzter_vertrag: Option<u32>,
+    bekannt: &[u32],
+) -> Vertragsergebnis {
     match abruf {
         ShellAbruf::Antwort {
             status: 200,
@@ -106,7 +116,7 @@ pub fn evaluate(abruf: &ShellAbruf, letzter_vertrag: Option<u32>) -> Vertragserg
                     server_version: None,
                 };
             };
-            match richtung(info.shell_contract) {
+            match richtung(info.shell_contract, bekannt) {
                 Some(richtung) => Vertragsergebnis::NichtVertraeglich {
                     richtung,
                     server_version: Some(info.version),
@@ -122,7 +132,7 @@ pub fn evaluate(abruf: &ShellAbruf, letzter_vertrag: Option<u32>) -> Vertragserg
         // Proxy, startender Server, fremde Weiterleitung, Captive Portal mit 200 ohne JSON: das
         // ist nicht der Server, also wie ohne Verbindung.
         ShellAbruf::Antwort { .. } | ShellAbruf::Fehler => {
-            match letzter_vertrag.and_then(richtung) {
+            match letzter_vertrag.and_then(|vertrag| richtung(vertrag, bekannt)) {
                 Some(richtung) => Vertragsergebnis::NichtVertraeglich {
                     richtung,
                     server_version: None,
@@ -223,138 +233,140 @@ mod tests {
     use std::net::TcpListener;
     use std::time::{Duration, Instant};
 
+    use serde::Deserialize;
+
     use super::*;
 
     fn url(s: &str) -> Url {
         Url::parse(s).unwrap()
     }
 
-    fn json(body: &str) -> ShellAbruf {
-        ShellAbruf::Antwort {
-            status: 200,
-            body: body.as_bytes().to_vec(),
-            content_type: Some("application/json; charset=utf-8".into()),
+    /// Gemeinsame Fälle beider Hüllen (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“): dieselbe
+    /// Datei prüft der Swift-Kern der iOS-Hülle (`ios/LifelineKern`).
+    const FAELLE: &str = include_str!("../faelle/vertrag.json");
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Datei {
+        #[allow(dead_code)]
+        zweck: String,
+        bekannt: Vec<u32>,
+        bewerte: Vec<BewerteFall>,
+        weiterleitung: Vec<WeiterleitungFall>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct BewerteFall {
+        beschreibung: String,
+        abruf: Abruf,
+        letzter_vertrag: Option<u32>,
+        bekannt: Option<Vec<u32>>,
+        ergebnis: String,
+        server_version: Option<String>,
+        shell_contract: Option<u32>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields, untagged)]
+    enum Abruf {
+        Antwort {
+            status: u16,
+            content_type: Option<String>,
+            koerper: String,
+        },
+        Fehler {
+            #[allow(dead_code)]
+            fehler: bool,
+        },
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct WeiterleitungFall {
+        beschreibung: String,
+        von: String,
+        nach: String,
+        folgt: bool,
+    }
+
+    fn datei() -> Datei {
+        serde_json::from_str(FAELLE).expect("faelle/vertrag.json ist lesbar")
+    }
+
+    #[test]
+    fn jeder_gemeinsame_fall_von_bewerte_gilt() {
+        let datei = datei();
+        assert!(
+            datei.bewerte.len() >= 20,
+            "nur {} Fälle gelesen",
+            datei.bewerte.len()
+        );
+        for fall in datei.bewerte {
+            let abruf = match fall.abruf {
+                Abruf::Antwort {
+                    status,
+                    content_type,
+                    koerper,
+                } => ShellAbruf::Antwort {
+                    status,
+                    body: koerper.into_bytes(),
+                    content_type,
+                },
+                Abruf::Fehler { .. } => ShellAbruf::Fehler,
+            };
+            let bekannt = fall.bekannt.as_deref().unwrap_or(&datei.bekannt);
+            let soll = match fall.ergebnis.as_str() {
+                "vertraeglich" => Vertragsergebnis::Vertraeglich(ShellInfo {
+                    version: fall.server_version.clone().expect("server_version"),
+                    shell_contract: fall.shell_contract.expect("shell_contract"),
+                }),
+                "zu_alt" => Vertragsergebnis::NichtVertraeglich {
+                    richtung: Richtung::ZuAlt,
+                    server_version: fall.server_version.clone(),
+                },
+                "zu_neu" => Vertragsergebnis::NichtVertraeglich {
+                    richtung: Richtung::ZuNeu,
+                    server_version: fall.server_version.clone(),
+                },
+                "nicht_erreichbar" => Vertragsergebnis::NichtErreichbar,
+                anderes => panic!("{}: unbekanntes Ergebnis {anderes}", fall.beschreibung),
+            };
+            assert_eq!(
+                evaluate_mit(&abruf, fall.letzter_vertrag, bekannt),
+                soll,
+                "{}",
+                fall.beschreibung
+            );
         }
     }
 
-    fn status(status: u16) -> ShellAbruf {
-        ShellAbruf::Antwort {
-            status,
-            body: Vec::new(),
-            content_type: None,
+    #[test]
+    fn jeder_gemeinsame_fall_von_weiterleitung_gilt() {
+        let faelle = datei().weiterleitung;
+        assert!(faelle.len() >= 5, "nur {} Fälle gelesen", faelle.len());
+        for fall in faelle {
+            assert_eq!(
+                follows_redirect(&url(&fall.von), &url(&fall.nach)),
+                fall.folgt,
+                "{}",
+                fall.beschreibung
+            );
         }
     }
 
+    /// Die Liste der gemeinsamen Fälle ist die der Hülle; `evaluate` prüft gegen sie.
     #[test]
-    fn bekannter_vertrag_ist_vertraeglich() {
-        assert_eq!(
-            evaluate(
-                &json(r#"{"version":"1.0.0","shell_contract":2,"neu":true}"#),
-                None
-            ),
-            Vertragsergebnis::Vertraeglich(ShellInfo {
-                version: "1.0.0".into(),
-                shell_contract: 2,
-            })
-        );
-    }
-
-    #[test]
-    fn groesserer_vertrag_heisst_app_aktualisieren() {
-        assert_eq!(
-            evaluate(&json(r#"{"version":"9","shell_contract":3}"#), None),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuNeu,
-                server_version: Some("9".into()),
-            }
-        );
-    }
-
-    #[test]
-    fn kleinerer_vertrag_heisst_server_zu_alt() {
-        assert_eq!(richtung(0), Some(Richtung::ZuAlt));
-        assert_eq!(richtung(1), Some(Richtung::ZuAlt));
-        assert_eq!(richtung(2), None);
-        assert_eq!(
-            evaluate(&json(r#"{"version":"0.1","shell_contract":0}"#), None),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuAlt,
-                server_version: Some("0.1".into()),
-            }
-        );
-    }
-
-    #[test]
-    fn json_ohne_lesbaren_vertrag_ist_zu_alt() {
-        assert_eq!(
-            evaluate(&json(r#"{"version":"1"}"#), None),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuAlt,
-                server_version: None,
-            }
-        );
-    }
-
-    #[test]
-    fn status_404_ist_zu_alt() {
-        assert_eq!(
-            evaluate(&status(404), Some(2)),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuAlt,
-                server_version: None,
-            }
-        );
-    }
-
-    #[test]
-    fn html_mit_200_gilt_wie_ohne_verbindung() {
-        let portal = ShellAbruf::Antwort {
+    fn die_huelle_kennt_die_vertraege_der_gemeinsamen_faelle() {
+        assert_eq!(BEKANNTE_VERTRAEGE.as_slice(), datei().bekannt.as_slice());
+        let abruf = ShellAbruf::Antwort {
             status: 200,
-            body: b"<html>Anmelden</html>".to_vec(),
-            content_type: Some("text/html".into()),
+            body: br#"{"version":"2.0.0","shell_contract":2}"#.to_vec(),
+            content_type: Some("application/json".into()),
         };
-        assert_eq!(evaluate(&portal, None), Vertragsergebnis::NichtErreichbar);
         assert_eq!(
-            evaluate(&portal, Some(2)),
-            Vertragsergebnis::NichtErreichbar
-        );
-    }
-
-    #[test]
-    fn fehler_ohne_gemerkten_vertrag_ist_nicht_erreichbar() {
-        for abruf in [ShellAbruf::Fehler, status(503), status(302)] {
-            assert_eq!(evaluate(&abruf, None), Vertragsergebnis::NichtErreichbar);
-        }
-    }
-
-    #[test]
-    fn ohne_verbindung_gilt_der_gemerkte_vertrag() {
-        assert_eq!(
-            evaluate(&ShellAbruf::Fehler, Some(3)),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuNeu,
-                server_version: None,
-            }
-        );
-        assert_eq!(
-            evaluate(&ShellAbruf::Fehler, Some(2)),
-            Vertragsergebnis::NichtErreichbar
-        );
-    }
-
-    /// Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für diese Hülle zu
-    /// alt, statt dass die Anmeldung am umbenannten Pfad scheitert (LLH-1979).
-    #[test]
-    fn server_mit_vertrag_eins_ist_zu_alt() {
-        assert_eq!(
-            evaluate(
-                &json(r#"{"version":"1.0.0-alpha.300","shell_contract":1}"#),
-                None
-            ),
-            Vertragsergebnis::NichtVertraeglich {
-                richtung: Richtung::ZuAlt,
-                server_version: Some("1.0.0-alpha.300".into()),
-            }
+            evaluate(&abruf, None),
+            evaluate_mit(&abruf, None, &BEKANNTE_VERTRAEGE)
         );
     }
 
@@ -364,22 +376,6 @@ mod tests {
             endpoint(&url("https://elw.local:8443/pfad/"), "/api/shell").as_str(),
             "https://elw.local:8443/api/shell"
         );
-    }
-
-    #[test]
-    fn fremde_weiterleitung_wird_nicht_verfolgt() {
-        let shell = url("https://elw.local:8443/api/shell");
-        assert!(follows_redirect(
-            &shell,
-            &url("https://ELW.local:8443/api/shell/")
-        ));
-        for fremd in [
-            "https://portal.example/login",
-            "http://elw.local:8443/api/shell",
-            "https://elw.local:8444/api/shell",
-        ] {
-            assert!(!follows_redirect(&shell, &url(fremd)), "{fremd}");
-        }
     }
 
     /// Beantwortet je Verbindung eine Anfrage: `/api/shell` mit 404, `/api/health` mit JSON.

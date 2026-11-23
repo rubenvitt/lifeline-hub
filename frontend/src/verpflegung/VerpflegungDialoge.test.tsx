@@ -613,6 +613,8 @@ describe('AusgabeDialog', () => {
     const { rerender } = renderMitProviders(<AusgabeDialog {...props} fehler={null} />);
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '2');
+    // Sonderkost liegt hinter „Weitere Angaben“; zugeklappt nimmt sie keinen Fokus (LLH-2023).
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(within(dialog).getByLabelText('vegan'), '3');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>

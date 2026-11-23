@@ -41,8 +41,9 @@ final class VertragsabrufTests: XCTestCase {
     }
 
     /// Ohne Server antwortet niemand: die Prüfung ergibt „nicht erreichbar“, nie „verträglich“.
+    /// Port 2, nicht 9: 9 steht seit LLH-1987 auf der Sperrliste und lehnt schon `parse` ab.
     func testEinUnerreichbarerServerIstNichtErreichbar() async throws {
-        let adresse = try ServerAdresse.parse("https://127.0.0.1:9")
+        let adresse = try ServerAdresse.parse("https://127.0.0.1:2")
         let (ergebnis, health) = await Vertragsabruf.check(adresse, letzterVertrag: nil)
         XCTAssertEqual(ergebnis, .nichtErreichbar(.nichtErreichbar))
         XCTAssertNil(health)
