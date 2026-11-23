@@ -290,9 +290,7 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
 
   it('ein anderer Fehler der Betreuung ist ein Ausfall und sagt sich am Feld', async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get('/api/einsaetze/1/care', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/care', () => new HttpResponse(null, { status: 500 })));
     zeige();
     await waehle(user, 'Art', 'Notunterkunft');
     expect(await screen.findByText(/Stellen konnten nicht geladen werden/)).toBeInTheDocument();

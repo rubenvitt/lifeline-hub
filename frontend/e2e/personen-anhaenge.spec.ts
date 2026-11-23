@@ -78,7 +78,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
   const personId = await personAnlegen(page, einsatzId);
   const listenAbrufe: string[] = [];
   page.on('request', (r) => {
-    if (r.url().endsWith(`/personen/${personId}/anhaenge`)) listenAbrufe.push(r.method());
+    if (r.url().endsWith(`/persons/${personId}/attachments`)) listenAbrufe.push(r.method());
   });
   await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
   await expect(page.getByRole('heading', { name: /R-001/ })).toBeVisible();

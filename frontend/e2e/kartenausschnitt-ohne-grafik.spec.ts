@@ -111,7 +111,7 @@ test('Evakuierung: Gebiet des Bezirks ohne Kartengrafik, Sprung bleibt', async (
   const id = await einsatzAnlegen(page, `E2E Bezirk ohne Grafik ${Date.now()}`);
   const a = api(page, id);
   const bezeichnung = 'Uferstraße 12–40';
-  const { id: bezirk } = await a.post('evakuierung/bezirke', {
+  const { id: bezirk } = await a.post('evacuation/districts', {
     bezeichnung,
     plan_personen: 120,
     plan_erhebung: 'geschaetzt',

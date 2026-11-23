@@ -30,7 +30,7 @@ fn pfad(e: i64, p: i64) -> String {
 }
 
 fn aufheben_pfad(e: i64, p: i64, v: &Value) -> String {
-    format!("{}/{}/aufheben", pfad(e, p), v["id"])
+    format!("{}/{}/void", pfad(e, p), v["id"])
 }
 
 fn unterarm() -> Value {
@@ -512,7 +512,7 @@ async fn verletzung_am_uhs_geraet() {
         &app,
         &admin,
         e,
-        "betreuung/stellen",
+        "care/positions",
         json!({"bezeichnung": "NU Turnhalle", "art": "notunterkunft", "kapazitaet_personen": 80}),
     )
     .await;

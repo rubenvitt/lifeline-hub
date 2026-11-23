@@ -606,7 +606,9 @@ describe('TierePage', () => {
       status: 'vermisst' as const,
       rufname: 'Fundtier Neu',
     };
-    server.use(http.post('/api/einsaetze/1/animals', () => HttpResponse.json(neu, { status: 201 })));
+    server.use(
+      http.post('/api/einsaetze/1/animals', () => HttpResponse.json(neu, { status: 201 })),
+    );
     const { container, client } = render(einsatzAktiv, []);
     await waitFor(() => expect(client.getQueryState(einsatzKeys.tiere(1))?.status).toBe('success'));
     let veralteteRefetches = 0;

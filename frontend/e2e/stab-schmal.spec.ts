@@ -45,10 +45,9 @@ async function einsatzAnlegen(page: Page, sichtungen: readonly string[] = LANG):
     });
     expect(person.ok(), `Person: ${person.status()} ${await person.text()}`).toBe(true);
     const { id } = (await person.json()) as { id: number };
-    const sichtung = await page.request.post(
-      `/api/einsaetze/${einsatzId}/persons/${id}/triage`,
-      { data: { kategorie } },
-    );
+    const sichtung = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${id}/triage`, {
+      data: { kategorie },
+    });
     expect(sichtung.ok(), `Sichtung ${kategorie}: ${sichtung.status()}`).toBe(true);
   }
   return einsatzId;

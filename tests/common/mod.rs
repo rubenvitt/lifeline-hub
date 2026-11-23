@@ -919,7 +919,7 @@ impl Erfassung {
     /// Pfadsegment unter `/api/einsaetze/{id}/`.
     pub fn segment(self) -> &'static str {
         match self {
-            Erfassung::Tier => "tiere",
+            Erfassung::Tier => "animals",
             Erfassung::Uhs => "uhs",
         }
     }

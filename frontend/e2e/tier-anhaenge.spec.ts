@@ -57,9 +57,12 @@ async function tierAnlegen(page: Page, einsatzId: string): Promise<number> {
 }
 
 async function seedeAnhang(page: Page, einsatzId: string, tierId: number, name: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/animals/${tierId}/attachments`, {
-    multipart: { datei: { name, mimeType: 'image/jpeg', buffer: JPG } },
-  });
+  const antwort = await page.request.post(
+    `/api/einsaetze/${einsatzId}/animals/${tierId}/attachments`,
+    {
+      multipart: { datei: { name, mimeType: 'image/jpeg', buffer: JPG } },
+    },
+  );
   expect(antwort.status(), await antwort.text()).toBe(201);
 }
 

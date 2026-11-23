@@ -2557,7 +2557,7 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung`);
 
   const senden = async (
-    modul: 'evakuierung' | 'betreuung',
+    modul: 'evacuation' | 'care',
     methode: 'post' | 'patch',
     pfad: string,
     data: unknown,
@@ -2575,16 +2575,16 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const BEZIRKE = ['Deichweg 1–9', 'Uferstraße 12–40'];
   for (const bezeichnung of BEZIRKE) {
     const bezirk = await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      'bezirke',
+      'districts',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      `bezirke/${bezirk.id}/staende`,
+      `districts/${bezirk.id}/progress`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
       'Stand',
     );
@@ -2592,30 +2592,24 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const OFFEN = ['Turnhalle Ost', 'Gemeindehaus Süd'];
   for (const bezeichnung of OFFEN) {
     const stelle = await senden(
-      'betreuung',
+      'care',
       'post',
-      'stellen',
+      'positions',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden(
-      'betreuung',
-      'post',
-      `stellen/${stelle.id}/belegungen`,
-      { belegt: 140 },
-      'Belegung',
-    );
+    await senden('care', 'patch', `positions/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('care', 'post', `positions/${stelle.id}/occupancies`, { belegt: 140 }, 'Belegung');
   }
   // Ohne Meldung darf eine Stelle schließen.
   const zu = await senden(
-    'betreuung',
+    'care',
     'post',
-    'stellen',
+    'positions',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('care', 'patch', `positions/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
 
   // Abstand Primäraktion ↔ Dreipunkt an der ersten Zeile: im Handschuh-Betrieb ≥ 16 px
   // (MIL-STD-1472F Fig. 24 [abgeleitet]).
@@ -2713,7 +2707,7 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung Lesend`);
 
   const senden = async (
-    modul: 'evakuierung' | 'betreuung',
+    modul: 'evacuation' | 'care',
     methode: 'post' | 'patch',
     pfad: string,
     data: unknown,
@@ -2732,45 +2726,39 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   // „Zurücknehmen" fehlen KANN; die offenen Stellen tragen Belegungen.
   for (const bezeichnung of ['Deichweg 1–9', 'Uferstraße 12–40']) {
     const bezirk = await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      'bezirke',
+      'districts',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      `bezirke/${bezirk.id}/staende`,
+      `districts/${bezirk.id}/progress`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
       'Stand',
     );
   }
   for (const bezeichnung of ['Turnhalle Ost', 'Gemeindehaus Süd']) {
     const stelle = await senden(
-      'betreuung',
+      'care',
       'post',
-      'stellen',
+      'positions',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden(
-      'betreuung',
-      'post',
-      `stellen/${stelle.id}/belegungen`,
-      { belegt: 140 },
-      'Belegung',
-    );
+    await senden('care', 'patch', `positions/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('care', 'post', `positions/${stelle.id}/occupancies`, { belegt: 140 }, 'Belegung');
   }
   const zu = await senden(
-    'betreuung',
+    'care',
     'post',
-    'stellen',
+    'positions',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('care', 'patch', `positions/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
@@ -3558,7 +3546,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Frühstück Deich',
       von_at: zeit(-30),
@@ -3569,7 +3557,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
     'Zeitfenster Frühstück',
   );
   const mittag = await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3581,7 +3569,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   );
   for (const minuten of [-8, -4]) {
     await post(
-      `zeitfenster/${mittag.id}/ausgaben`,
+      `time-slots/${mittag.id}/distributions`,
       { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
       'Ausgabe',
     );
@@ -3833,7 +3821,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   // Dieselbe Saat wie im Admin-Test: die Ausgaben am Mittag geben „Zurücknehmen" eine Stelle,
   // an der es fehlen KANN.
   await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Frühstück Deich',
       von_at: zeit(-30),
@@ -3844,7 +3832,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
     'Zeitfenster Frühstück',
   );
   const mittag = await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3856,7 +3844,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   );
   for (const minuten of [-8, -4]) {
     await post(
-      `zeitfenster/${mittag.id}/ausgaben`,
+      `time-slots/${mittag.id}/distributions`,
       { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
       'Ausgabe',
     );
@@ -3932,20 +3920,20 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
   };
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  await senden('stellen', { bezeichnung: 'Zuführung Deich', art: 'zufuehrung' });
-  const feldkueche = await senden('stellen', {
+  await senden('positions', { bezeichnung: 'Zuführung Deich', art: 'zufuehrung' });
+  const feldkueche = await senden('positions', {
     bezeichnung: 'Feldküche BR Sportplatz',
     art: 'feldkueche',
   });
-  await senden(`stellen/${feldkueche.id}/status`, { status: 'aktiv' });
-  const zf = await senden('zeitfenster', {
+  await senden(`positions/${feldkueche.id}/status`, { status: 'aktiv' });
+  const zf = await senden('time-slots', {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(-10),
     bis_at: zeit(110),
     bedarf_kraefte: 30,
     bedarf_betreute: 0,
   });
-  await senden(`zeitfenster/${zf.id}`, { stelle_ids: [feldkueche.id] }, 'patch');
+  await senden(`time-slots/${zf.id}`, { stelle_ids: [feldkueche.id] }, 'patch');
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {

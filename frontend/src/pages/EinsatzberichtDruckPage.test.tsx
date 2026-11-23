@@ -71,13 +71,13 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
       zaehle('/lageberichte/:lid');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
     }),
-    json('/personen', 'personen'),
-    json('/personen/verbleib-angaben', 'personenVerbleibAngaben'),
+    json('/persons', 'personen'),
+    json('/persons/whereabouts-details', 'personenVerbleibAngaben'),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
     json('/schaeden', 'schaeden'),
-    json('/evakuierung', 'evakuierung'),
-    json('/betreuung', 'betreuung'),
-    json('/verpflegung', 'verpflegung'),
+    json('/evacuation', 'evakuierung'),
+    json('/care', 'betreuung'),
+    json('/catering', 'verpflegung'),
     json('/etb/zaehler', 'etbZaehler'),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
@@ -193,7 +193,7 @@ describe('EinsatzberichtDruckPage', () => {
     rendere();
     expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
-    expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
     expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
   });
 
@@ -206,7 +206,7 @@ describe('EinsatzberichtDruckPage', () => {
       '[data-lfh="einsatzbericht-block-bilanz"]',
     ) as HTMLElement;
     expect(within(bilanz).getAllByText('In diesem Einsatz nicht genutzt')).toHaveLength(1);
-    expect(aufrufe.get('/betreuung')).toBeUndefined();
+    expect(aufrufe.get('/care')).toBeUndefined();
     // Ausgeblendet ist nicht gesperrt: die Leiste trägt keinen Zusatz „kein Zugriff“.
     expect(
       within(screen.getByRole('region', { name: 'Blöcke' })).queryByText(/kein Zugriff/),
@@ -380,7 +380,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     expect(blockTitel()).toEqual(['Stammdaten']);
     expect(kopf()).toHaveTextContent('Auswahl: Stammdaten');
     expect(kopf()).not.toHaveTextContent('kosten');
-    expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
     expect(aufrufe.get('/lageberichte')).toBeUndefined();
   });
 
@@ -388,7 +388,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     const aufrufe = quellen();
     rendere('', { gcTime: 5 * 60_000 });
     await fertig();
-    expect(aufrufe.get('/personen')).toBe(1);
+    expect(aufrufe.get('/persons')).toBe(1);
     const bilanz = () => within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' });
     await userEvent.click(bilanz());
     await waitFor(() => expect(blockTitel()).not.toContain('Bilanz'));
@@ -397,7 +397,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     await fertig();
     // Je Schnappschuss ein Abruf: die Hilfeleistungen lesen die Personen auch ohne Bilanz
     // (LLH-1575), also auch die Zwischenauswahl.
-    expect(aufrufe.get('/personen')).toBe(3);
+    expect(aufrufe.get('/persons')).toBe(3);
   });
 
   it('der letzte gewählte Block lässt sich nicht abwählen', async () => {
@@ -435,7 +435,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     expect(
       within(auswahlleiste()).getByRole('button', { name: 'Kurzbericht für den Auftraggeber' }),
     ).toBeDisabled();
-    expect(aufrufe.get('/personen/verbleib-angaben')).toBeGreaterThan(0);
+    expect(aufrufe.get('/persons/whereabouts-details')).toBeGreaterThan(0);
   });
 
   it('Anlage Materialverbrauch ruft aktives und herausgenommenes Material ab (LLH-1575)', async () => {
@@ -469,8 +469,8 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     await fertig();
     expect(blockTitel()).not.toContain('Bilanz');
     expect(blockTitel()).not.toContain('Hilfeleistungen');
-    expect(aufrufe.get('/personen')).toBeUndefined();
-    expect(aufrufe.get('/personen/verbleib-angaben')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
+    expect(aufrufe.get('/persons/whereabouts-details')).toBeUndefined();
     // Auch abgewählt nennt der Block sein gesperrtes Modul: wer ihn wieder wählt, weiß vorher, warum
     // das Drucken dann sperrt.
     expect(

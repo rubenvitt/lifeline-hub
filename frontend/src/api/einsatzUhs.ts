@@ -157,11 +157,7 @@ export function legePlaetzeAn(
   uhsId: number,
   daten: PlatzBulkEingabe,
 ): Promise<UhsPlatz[]> {
-  return apiSend<UhsPlatz[]>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`,
-    'POST',
-    daten,
-  );
+  return apiSend<UhsPlatz[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`, 'POST', daten);
 }
 
 interface PlatzPatch {

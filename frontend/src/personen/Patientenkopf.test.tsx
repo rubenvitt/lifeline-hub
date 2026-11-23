@@ -321,7 +321,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.click(within(paneel).getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
-      { pfad: 'sichtung', body: { kategorie: 'sk1', notiz: null, client_id: expect.any(String) } },
+      { pfad: 'triage', body: { kategorie: 'sk1', notiz: null, client_id: expect.any(String) } },
     ]);
     // Online ohne Erfassungszeit: der Server nimmt seine Uhr (LLH-1138).
     expect(gesendet[0].body).not.toHaveProperty('zeitpunkt_at');
@@ -363,7 +363,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet[0]).toMatchObject({
-      pfad: 'verbleib',
+      pfad: 'whereabouts',
       body: { art: 'transport', ziel: 'KH Mitte', transport_durch: 'fremd' },
     });
   });
@@ -382,7 +382,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.click(within(paneel).getByRole('button', { name: 'Übergabe quittieren' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet[0]).toMatchObject({
-      pfad: 'verbleib',
+      pfad: 'whereabouts',
       body: {
         art: 'transport',
         transport_durch: 'eigen',
@@ -404,7 +404,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
-      { pfad: 'notizen', body: { text: 'Infusion läuft', client_id: expect.any(String) } },
+      { pfad: 'notes', body: { text: 'Infusion läuft', client_id: expect.any(String) } },
     ]);
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
@@ -661,7 +661,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
         return HttpResponse.json({ ...basis });
       }),
       http.post('/api/einsaetze/1/persons/10/interventions/:mid/void', ({ params }) => {
-        gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
+        gesendet.push({ pfad: `interventions/${String(params.mid)}/void`, body: null });
         return HttpResponse.json({ id: Number(params.mid) });
       }),
     );
@@ -744,7 +744,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(paneel).getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
-      { pfad: 'massnahmen', body: { art: 'blutstillung', client_id: expect.any(String) } },
+      { pfad: 'interventions', body: { art: 'blutstillung', client_id: expect.any(String) } },
     ]);
   });
 
@@ -769,7 +769,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     const rueckfrage = await screen.findByRole('tooltip');
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Maßnahme aufheben' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
-    expect(gesendet).toEqual([{ pfad: 'massnahmen/1/aufheben', body: null }]);
+    expect(gesendet).toEqual([{ pfad: 'interventions/1/void', body: null }]);
   });
 
   it('hält immer nur ein Paneel offen', async () => {
@@ -952,7 +952,7 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toHaveLength(1);
     expect(gesendet[0]).toMatchObject({
-      pfad: 'verletzungen',
+      pfad: 'injuries',
       body: { ansicht: 'vorn', region: 'unterarm_l', art: 'fraktur_verdacht' },
     });
     // Mehrere Verletzungen nacheinander: das Paneel bleibt offen.
@@ -978,7 +978,7 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
   it('hebt eine Verletzung am Sternchen auf', async () => {
     server.use(
       http.post('/api/einsaetze/1/persons/10/injuries/:vid/void', ({ params }) => {
-        gesendet.push({ pfad: `verletzungen/${String(params.vid)}/aufheben`, body: null });
+        gesendet.push({ pfad: `injuries/${String(params.vid)}/void`, body: null });
         return HttpResponse.json({ id: Number(params.vid) });
       }),
     );
@@ -990,7 +990,7 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
     );
     await userEvent.click(within(paneel).getByRole('button', { name: 'Aufheben' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
-    expect(gesendet).toEqual([{ pfad: 'verletzungen/3/aufheben', body: null }]);
+    expect(gesendet).toEqual([{ pfad: 'injuries/3/void', body: null }]);
   });
 
   it('hebt ohne Netz nicht auf: das Sternchen nennt den Grund', async () => {
@@ -1351,7 +1351,7 @@ describe('Patientenkopf — Review PAT-Kern', () => {
   beforeEach(() => {
     server.use(
       http.post('/api/einsaetze/1/persons/10/interventions/:mid/void', ({ params }) => {
-        gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
+        gesendet.push({ pfad: `interventions/${String(params.mid)}/void`, body: null });
         return HttpResponse.json({ id: Number(params.mid) });
       }),
     );
@@ -1730,7 +1730,7 @@ describe('Patientenkopf — Rettungsmittel (LLH-1573)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([
         {
-          pfad: 'verbleib',
+          pfad: 'whereabouts',
           body: expect.objectContaining({
             art: 'transport',
             transportmittel: 'RTW 1/83-1',
@@ -1767,7 +1767,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
     await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([
-      { pfad: 'anlass', body: { anlass: 'hitze_kaelte', client_id: expect.any(String) } },
+      { pfad: 'reason', body: { anlass: 'hitze_kaelte', client_id: expect.any(String) } },
     ]);
   });
 
@@ -1793,7 +1793,7 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
     await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toEqual({
-      pfad: 'anlass',
+      pfad: 'reason',
       body: { anlass: null, client_id: expect.any(String) },
     });
   });
@@ -1826,7 +1826,7 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
     server.use(
       meHandler(benutzerFixture({ id: 11 })),
       http.post('/api/einsaetze/1/persons/10/notes', async ({ request }) => {
-        gesendet.push({ pfad: 'notizen', body: await request.json() });
+        gesendet.push({ pfad: 'notes', body: await request.json() });
         return HttpResponse.json({ antrag: { id: 8, zustand: 'ausstehend' } }, { status: 202 });
       }),
     );

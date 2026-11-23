@@ -165,7 +165,7 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 
   // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
-  it.each(['/personen/10', ''] as const)(
+  it.each(['/persons/10', ''] as const)(
     'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = render(einsatzAktiv, detail);

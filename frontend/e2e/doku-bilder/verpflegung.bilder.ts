@@ -90,7 +90,8 @@ test.describe(KAPITEL, () => {
           art,
           standort,
         });
-        if (aktiv) await fuelle(api, 'post', `${basis}/positions/${id}/status`, { status: 'aktiv' });
+        if (aktiv)
+          await fuelle(api, 'post', `${basis}/positions/${id}/status`, { status: 'aktiv' });
         return id;
       };
       // Eintreffen der Demo-Einheiten (LLH-1055), nur wo es fehlt.

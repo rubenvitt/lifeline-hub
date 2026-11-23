@@ -41,14 +41,17 @@ function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
     http.get('/api/einsaetze/1/accommodation-guidelines', () =>
       HttpResponse.json(richtwerteAntwort({ flaeche_je_person_m2: 5 }, einsatz)),
     ),
-    http.put('/api/einsaetze/1/accommodation-guidelines/:schluessel', async ({ request, params }) => {
-      const body = (await request.json()) as { wert: number | null };
-      const schluessel = String(params.schluessel);
-      puts.push({ schluessel, body });
-      const rest = Object.fromEntries(Object.entries(einsatz).filter(([k]) => k !== schluessel));
-      einsatz = body.wert == null ? rest : { ...rest, [schluessel]: body.wert };
-      return HttpResponse.json(richtwerteAntwort({ flaeche_je_person_m2: 5 }, einsatz));
-    }),
+    http.put(
+      '/api/einsaetze/1/accommodation-guidelines/:schluessel',
+      async ({ request, params }) => {
+        const body = (await request.json()) as { wert: number | null };
+        const schluessel = String(params.schluessel);
+        puts.push({ schluessel, body });
+        const rest = Object.fromEntries(Object.entries(einsatz).filter(([k]) => k !== schluessel));
+        einsatz = body.wert == null ? rest : { ...rest, [schluessel]: body.wert };
+        return HttpResponse.json(richtwerteAntwort({ flaeche_je_person_m2: 5 }, einsatz));
+      },
+    ),
   );
   return { puts };
 }

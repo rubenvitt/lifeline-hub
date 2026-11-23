@@ -62,7 +62,7 @@ async fn bild(
     if_none_match: Option<&str>,
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut req = Request::builder()
-        .uri(format!("{}/bild", plan(einsatz, uhs)))
+        .uri(format!("{}/image", plan(einsatz, uhs)))
         .header(header::COOKIE, cookie);
     if let Some(e) = if_none_match {
         req = req.header(header::IF_NONE_MATCH, e);
@@ -130,7 +130,7 @@ async fn uebernehmen(
     anfrage(
         app,
         "POST",
-        &format!("{}/aus-anhang", plan(einsatz, uhs)),
+        &format!("{}/from-attachment", plan(einsatz, uhs)),
         cookie,
         Some(&format!(r#"{{"anhang_id":{linker}}}"#)),
     )

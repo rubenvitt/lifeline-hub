@@ -87,7 +87,7 @@ describe.each(faelle)(
 
     it('baut den Download-Pfad an der Modulroute, nie an /anhaenge des Einsatzes', () => {
       const p = downloadPfad(7, 3, 42);
-      expect(p).toBe(`${basis}/42/datei`);
+      expect(p).toBe(`${basis}/42/file`);
       expect(p.startsWith('/api/einsaetze/7/anhaenge')).toBe(false);
     });
   },

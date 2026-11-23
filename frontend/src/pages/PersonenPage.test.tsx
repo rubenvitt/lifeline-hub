@@ -1346,9 +1346,7 @@ describe('PersonenPage', () => {
     const { client } = render(einsatzAktiv, [person]);
     await screen.findByText('R-001');
 
-    server.use(
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();

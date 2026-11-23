@@ -100,7 +100,7 @@ async fn download(
     if_none_match: Option<&str>,
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut req = Request::builder()
-        .uri(format!("{}/{id}/datei", pfad(einsatz, tier)))
+        .uri(format!("{}/{id}/file", pfad(einsatz, tier)))
         .header(header::COOKIE, cookie);
     if let Some(etag) = if_none_match {
         req = req.header(header::IF_NONE_MATCH, etag);

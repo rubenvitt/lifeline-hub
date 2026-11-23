@@ -668,7 +668,7 @@ async fn uhs_mit_kraft(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) 
             format!("uhs/{uhs}/status"),
             Some(r#"{"status":"aktiv"}"#),
         ),
-        ("PUT", format!("uhs/{uhs}/kraefte/{ep}"), None),
+        ("PUT", format!("uhs/{uhs}/forces/{ep}"), None),
     ] {
         let (s, json) = anfrage(
             app,
@@ -1383,7 +1383,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
             format!("fahrzeuge/{fahrzeug}/besatzung/{anna}"),
             None,
         ),
-        ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
+        ("PUT", format!("uhs/{uhs}/forces/{anna}"), None),
         ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
         ("POST", "abschnitte".to_string(), Some(leiter)),
         ("POST", "schaeden".to_string(), Some(schaden)),

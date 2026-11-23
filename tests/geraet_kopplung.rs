@@ -4943,7 +4943,7 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("{}/verfuegbar", kraefte(nord)),
+        &format!("{}/available", kraefte(nord)),
         &geraet,
         None,
     )
@@ -4999,7 +4999,7 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
 
     // Fremde UHS: lesen und ändern 404.
     for (methode, pfad, body) in [
-        ("GET", format!("{}/verfuegbar", kraefte(sued)), None),
+        ("GET", format!("{}/available", kraefte(sued)), None),
         ("PUT", format!("{}/{frei}", kraefte(sued)), None),
         ("DELETE", format!("{}/{bei_sued}", kraefte(sued)), None),
         (
@@ -5042,7 +5042,7 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{}/einheit/{einheit}", kraefte(nord)),
+        &format!("{}/unit/{einheit}", kraefte(nord)),
         &geraet,
         None,
     )
@@ -5051,7 +5051,7 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
 
     // Das Tablet erreicht keine dieser Routen und sieht keine Kräfte im Detail.
     for (methode, pfad, body) in [
-        ("GET", format!("{}/verfuegbar", kraefte(nord)), None),
+        ("GET", format!("{}/available", kraefte(nord)), None),
         ("PUT", format!("{}/{frei}", kraefte(nord)), None),
         ("DELETE", format!("{}/{frei}", kraefte(nord)), None),
         (

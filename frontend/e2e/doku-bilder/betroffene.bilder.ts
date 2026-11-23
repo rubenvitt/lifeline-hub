@@ -124,13 +124,13 @@ test.describe(KAPITEL, () => {
       fachrichtung: 'unfallchirurgie',
     });
     for (const art of ['blutstillung', 'immobilisation']) {
-      await fuelle(page, 'post', `${pfad}/massnahmen`, { art });
+      await fuelle(page, 'post', `${pfad}/interventions`, { art });
     }
     for (const verletzung of [
       { ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung', schwere: 'leicht' },
       { ansicht: 'hinten', region: 'ruecken', art: 'prellung_schwellung' },
     ]) {
-      await fuelle(page, 'post', `${pfad}/verletzungen`, verletzung);
+      await fuelle(page, 'post', `${pfad}/injuries`, verletzung);
     }
     // Höher als der Fükw, damit der Patientenkopf samt Körperschema ohne Bildlauf ganz steht:
     // sonst setzt Playwright die Aufnahme beim Scrollen zusammen, und die klebende Kopfleiste mit

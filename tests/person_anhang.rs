@@ -124,7 +124,7 @@ async fn download(
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     download_mit(
         app,
-        format!("{}/{id}/datei", pfad(einsatz, person)),
+        format!("{}/{id}/file", pfad(einsatz, person)),
         cookie,
         if_none_match,
     )
@@ -663,7 +663,7 @@ async fn jeder_download_schreibt_eine_zeile_anhang_auch_304() {
 async fn vorschau_fassungen_sind_ebenfalls_protokollierte_zugriffe() {
     let (app, pool, admin, einsatz, person) = start().await;
     let id = abgelegt(&app, einsatz, person, &admin, "verletzung.jpg").await;
-    let basis = format!("{}/{id}/datei", pfad(einsatz, person));
+    let basis = format!("{}/{id}/file", pfad(einsatz, person));
     for (n, fassung) in [(1, "vorschau"), (2, "grossansicht")] {
         let (s, _, _) =
             download_mit(&app, format!("{basis}?fassung={fassung}"), &admin, None).await;
@@ -697,7 +697,7 @@ async fn original_durch_einsatzleitung_protokolliert_und_vermerkt() {
     let id = abgelegt(&app, einsatz, person, &admin, "Erika_Mueller.jpg").await;
     let (s, h, bytes) = download_mit(
         &app,
-        format!("{}/{id}/datei?fassung=original", pfad(einsatz, person)),
+        format!("{}/{id}/file?fassung=original", pfad(einsatz, person)),
         &admin,
         None,
     )
@@ -727,7 +727,7 @@ async fn abgewiesene_downloads_schreiben_keinen_protokolleintrag() {
     // 403: Original ohne Leitung — auch kein ETB-Vermerk.
     let (s, _, _) = download_mit(
         &app,
-        format!("{}/{id}/datei?fassung=original", pfad(einsatz, person)),
+        format!("{}/{id}/file?fassung=original", pfad(einsatz, person)),
         &frieda,
         None,
     )
@@ -736,7 +736,7 @@ async fn abgewiesene_downloads_schreiben_keinen_protokolleintrag() {
     // 400: unbekannte Fassung.
     let (s, _, _) = download_mit(
         &app,
-        format!("{}/{id}/datei?fassung=roh", pfad(einsatz, person)),
+        format!("{}/{id}/file?fassung=roh", pfad(einsatz, person)),
         &admin,
         None,
     )

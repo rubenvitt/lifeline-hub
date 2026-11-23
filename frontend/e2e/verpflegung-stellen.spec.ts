@@ -149,7 +149,7 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     // Die Auswahlliste schließen, ohne etwas zu wählen: ein Klick auf ein Etikett daneben.
     await bedarf.getByText('Weitere Personen (EP)').click();
     const patch = page.waitForResponse(
-      (r) => r.request().method() === 'PATCH' && r.url().endsWith(`/zeitfenster/${mittag}`),
+      (r) => r.request().method() === 'PATCH' && r.url().endsWith(`/time-slots/${mittag}`),
     );
     await bedarf.getByRole('button', { name: 'Speichern' }).click();
     const antwort = await patch;

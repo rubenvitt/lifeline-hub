@@ -19,7 +19,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &st
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen", betreuung(einsatz)),
+        &format!("{}/positions", betreuung(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","art":"notunterkunft","kapazitaet_personen":150}}"#
@@ -239,7 +239,7 @@ async fn stornierte_stelle_ist_409_geschlossene_ist_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{storniert}/stornieren", betreuung(e)),
+        &format!("{}/positions/{storniert}/cancel", betreuung(e)),
         &admin,
         None,
     )
@@ -249,7 +249,7 @@ async fn stornierte_stelle_ist_409_geschlossene_ist_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{geschlossen}", betreuung(e)),
+        &format!("{}/positions/{geschlossen}", betreuung(e)),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )
@@ -332,7 +332,7 @@ async fn lage_mit_zwei_namentlichen(app: &axum::Router, admin: &str) -> (i64, i6
     let (s, j) = anfrage(
         app,
         "PATCH",
-        &format!("{}/stellen/{sid}", betreuung(e)),
+        &format!("{}/positions/{sid}", betreuung(e)),
         admin,
         Some(r#"{"status":"in_betrieb"}"#),
     )
@@ -341,7 +341,7 @@ async fn lage_mit_zwei_namentlichen(app: &axum::Router, admin: &str) -> (i64, i6
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", betreuung(e)),
+        &format!("{}/positions/{sid}/occupancies", betreuung(e)),
         admin,
         Some(r#"{"belegt":40}"#),
     )
@@ -389,7 +389,7 @@ async fn uebersicht_nennt_namentliche_zahl_und_laesst_mengen_unveraendert() {
     let (s, k) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung", betreuung(e)),
+        &format!("{}/occupancy", betreuung(e)),
         &admin,
         None,
     )
@@ -562,7 +562,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{andere}/stornieren", betreuung(e)),
+        &format!("{}/positions/{andere}/cancel", betreuung(e)),
         &admin,
         Some("{}"),
     )
@@ -605,7 +605,7 @@ async fn gesicherter_lagestand_enthaelt_keine_leitung_und_keinen_kontaktweg() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", betreuung(e)),
+        &format!("{}/positions/{sid}", betreuung(e)),
         &admin,
         Some(r#"{"leitung":"Frau Schulz","kontaktweg":"0171 2345678"}"#),
     )

@@ -28,7 +28,7 @@ fn pfad(e: i64, p: i64) -> String {
 }
 
 fn aufheben_pfad(e: i64, p: i64, m: &Value) -> String {
-    format!("{}/{}/aufheben", pfad(e, p), m["id"])
+    format!("{}/{}/void", pfad(e, p), m["id"])
 }
 
 async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
@@ -177,7 +177,7 @@ async fn aufheben_genau_einmal_und_nur_an_der_eigenen_person() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("{}/999999/aufheben", pfad(e, p)),
+        &format!("{}/999999/void", pfad(e, p)),
         json!({}),
     )
     .await;
