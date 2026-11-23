@@ -34,13 +34,13 @@ async function ersteId(page: Page, pfad: string): Promise<number> {
 }
 
 /**
- * Löst einen Code ein wie ein Gerät (eigener Cookie-Jar, `POST /api/geraete/koppeln`) und fragt
+ * Löst einen Code ein wie ein Gerät (eigener Cookie-Jar, `POST /api/devices/pair`) und fragt
  * einmal den Anmeldestatus ab, damit die Liste einen letzten Zugriff zeigt.
  */
 async function einloesen(code: string) {
   const geraet = await request.newContext({ baseURL: test.info().project.use.baseURL });
   try {
-    const antwort = await geraet.post('/api/geraete/koppeln', { data: { code } });
+    const antwort = await geraet.post('/api/devices/pair', { data: { code } });
     expect(antwort.ok(), `Koppeln: ${antwort.status()} ${await antwort.text()}`).toBe(true);
     expect((await geraet.get('/api/auth/me')).ok()).toBe(true);
   } finally {

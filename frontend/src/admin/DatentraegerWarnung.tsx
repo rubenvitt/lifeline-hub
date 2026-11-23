@@ -10,7 +10,7 @@ import { Status, monoStil, useRollen } from '../components/instrument';
 /**
  * Warnleiste über der Verwaltung, solange der Server-Rechner einen Ort ohne erkennbare
  * Verschlüsselung meldet (LFH-1100). Nur für den System-Admin: nur er kann am Rechner etwas
- * ändern, und nur ihm antwortet `GET /api/system/datentraeger`.
+ * ändern, und nur ihm antwortet `GET /api/system/storage`.
  *
  * Ob gewarnt wird, entscheidet der Server (`warnung`, samt Zusicherung externer
  * Verschlüsselung); die Leiste nennt nur die Orte, die dazu führen. Kein erklärender Satz:

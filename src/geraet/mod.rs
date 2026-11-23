@@ -82,9 +82,9 @@ pub struct Stelle {
 pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
-    ("POST", "/api/client-fehler"),
-    ("GET", "/api/organisation"),
-    ("GET", "/api/organisation/logo"),
+    ("POST", "/api/client-errors"),
+    ("GET", "/api/organization"),
+    ("GET", "/api/organization/logo"),
     ("GET", "/api/fahrzeug-status"),
     ("GET", "/api/karte/config"),
     ("GET", "/api/karte/offline/tiles/{z}/{x}/{y}"),
@@ -695,7 +695,7 @@ mod tests {
     fn nicht_gelistete_route_ist_verboten() {
         for a in Funktionsansicht::ALLE {
             assert!(!darf_route(a, "GET", "/api/einsaetze/{id}/etb"));
-            assert!(!darf_route(a, "GET", "/api/benutzer"));
+            assert!(!darf_route(a, "GET", "/api/users"));
             assert!(!darf_route(a, "PATCH", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/auth/me"));

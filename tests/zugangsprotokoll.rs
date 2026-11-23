@@ -10,8 +10,8 @@ use serde_json::Value;
 mod common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
-const ANMELDUNGEN: &str = "/api/zugangsprotokoll/anmeldungen";
-const AENDERUNGEN: &str = "/api/zugangsprotokoll/zugangsaenderungen";
+const ANMELDUNGEN: &str = "/api/access-log/logins";
+const AENDERUNGEN: &str = "/api/access-log/access-changes";
 
 async fn leeren(pool: &sqlx::SqlitePool) {
     sqlx::query("DELETE FROM auth_audit")
@@ -339,7 +339,7 @@ async fn zugangsaenderung_liefert_angaben_alter_text_bleibt_detail() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{marlene}"),
+        &format!("/api/users/{marlene}"),
         &admin,
         Some(r#"{"org_rolle":"fuehrungskraft"}"#),
     )

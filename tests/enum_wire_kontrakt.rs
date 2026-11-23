@@ -1205,7 +1205,7 @@ fn fuehrungsfunktion_besetzungszustand_wire() {
     } in lifeline_hub::fuehrung::aufloesung::BesetzungsZustand::ALLE);
 }
 
-/// LFH-1100: Datenträgerprüfung, Wire-Vertrag von `GET /api/system/datentraeger`.
+/// LFH-1100: Datenträgerprüfung, Wire-Vertrag von `GET /api/system/storage`.
 #[test]
 fn datentraeger_wire() {
     enum_wire!(lifeline_hub::datentraeger::Wert {

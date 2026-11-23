@@ -202,7 +202,7 @@ async fn welt_mit(hub_push: (bool, bool), elw_push: (bool, bool)) -> Welt {
     let (s, v) = common::anfrage_json(
         &hub.i.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.i.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erikapw12345", "org_rolle": "keine"})),
@@ -589,7 +589,7 @@ async fn der_gekoppelte_elw_verweist_auf_den_hub_und_lehnt_neue_abos_ab() {
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &erika,
         Some(&abo_body("https://push.example.org/neu")),
     )
@@ -615,7 +615,7 @@ async fn ohne_push_am_hub_bleibt_der_schalter_am_elw() {
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &erika,
         Some(&abo_body("https://push.example.org/neu")),
     )
@@ -778,7 +778,7 @@ async fn ein_konto_nur_am_elw_bekommt_den_push_vom_elw() {
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &w.elw.i.admin,
         Some(&abo_body("https://push.example.org/admin")),
     )

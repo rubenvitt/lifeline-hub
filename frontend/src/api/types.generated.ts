@@ -1578,7 +1578,7 @@ export interface components {
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
-         *     Client über `GET /api/benachrichtigungen/{id}`.
+         *     Client über `GET /api/notifications/{id}`.
          */
         BenachrichtigungEreignis: {
             art: components["schemas"]["BenachrichtigungArt"];
@@ -2306,7 +2306,7 @@ export interface components {
          * @enum {string}
          */
         DatentraegerOrtArt: "datenbank" | "sicherung" | "auslagerung";
-        /** @description Antwort von `GET /api/system/datentraeger`. */
+        /** @description Antwort von `GET /api/system/storage`. */
         DatentraegerStatus: {
             /** @description `--datentraeger-verschluesselung-extern` ist gesetzt. */
             extern_zugesichert: boolean;
@@ -2772,7 +2772,7 @@ export interface components {
          */
         EinheitenSystem: "metrisch" | "imperial";
         /**
-         * @description Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,
+         * @description Antwort von `POST /api/users/{id}/one-time-password` (LFH-1121): das erzeugte Einmalpasswort,
          *     genau dieses eine Mal.
          */
         Einmalpasswort: {
@@ -6699,7 +6699,7 @@ export interface components {
             sha256: string;
         };
         /**
-         * @description Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).
+         * @description Eine Vorgabe, wie `GET /api/org-module-settings` sie je Modul liefert (LLH-1179).
          *     `sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.
          */
         OrgModulEinstellung: {

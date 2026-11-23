@@ -79,7 +79,7 @@ interface EinheitKopfProps {
   abschnitte: Katalog<Einsatzabschnitt>;
   /** Schreiben + Freigabe Einheiten (`EinheitRechte.canEditEinheit`). */
   canEdit: boolean;
-  /** Organisations-Vorgabe des Zeichens aus `/api/organisation`. */
+  /** Organisations-Vorgabe des Zeichens aus `/api/organization`. */
   orgDefault: string | null;
   onPatch: EinheitPatchHandler;
   onSetHandStatus: HandStatusHandler;

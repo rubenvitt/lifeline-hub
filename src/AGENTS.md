@@ -942,7 +942,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `LiveHub::ios_push()` `None`, und die Routen antworten 404. Ereignisse ohne Einsatz (Störung
   einer Anbindung, LLH-2026) gehen nicht per iOS-Push, weil der Klartext `e` verlangt; Web Push
   und Live bleiben (Folgeaufgabe LLH-2077).
-- **Klartext aus derselben Stelle wie `GET /api/benachrichtigungen/{id}`**
+- **Klartext aus derselben Stelle wie `GET /api/notifications/{id}`**
   (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
   Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`. Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
@@ -1087,8 +1087,8 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 `src/demo/`, `src/routes/demo_daten.rs`; Schalter `--demo-daten`/`LIFELINE_DEMO_DATEN=true`
 (Vorgabe aus). Herleitung: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`.
 - 404 ohne Schalter kommt aus der Registrierung (`RouterOptionen { demo_daten }`,
-  `build_router_mit`); das Frontend liest nur `GET /api/demo-daten` (`admin/useDemoDaten.ts`).
-- **Lagen** (LLH-1576): `DemoLage` ist Pfadsegment (`/api/demo-daten/{lage}`, `/neu`) und
+  `build_router_mit`); das Frontend liest nur `GET /api/demo-data` (`admin/useDemoDaten.ts`).
+- **Lagen** (LLH-1576): `DemoLage` ist Pfadsegment (`/api/demo-data/{lage}`, `/reimport`) und
   `demo_import.szenario`; je Org und Lage höchstens ein aktiver Kopf (Index in 0290). Eine neue
   Lage = `Szenario` in eigener Datei (`src/demo/szenario_*.rs`) mit eigenen Stammdaten-Kennungen
   (`demo_herkunft` ist je Datensatz eindeutig) und ein Wert in `DemoLage`; GET liefert immer alle

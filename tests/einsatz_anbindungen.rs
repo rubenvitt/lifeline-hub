@@ -685,7 +685,7 @@ async fn am_spiegel_gilt_die_freigabe_hier_und_das_etb_geht_als_antrag_an_den_fu
     let (s, v) = anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erikapw12345"})),

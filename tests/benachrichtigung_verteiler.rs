@@ -243,7 +243,7 @@ async fn text_nennt_art_und_version_ohne_dokumenttitel() {
         let (s, _) = w.freigeben(&w.admin, art, id).await;
         assert_eq!(s, StatusCode::OK);
         // Ohne `offen`: den Lagebericht stellt der Katalog still (LLH-1421), er ist schon gelesen.
-        let (s, offen) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &anna, None).await;
+        let (s, offen) = anfrage(&w.app, "GET", "/api/notifications", &anna, None).await;
         assert_eq!(s, StatusCode::OK, "{offen}");
         let eintrag = offen
             .as_array()
@@ -393,14 +393,7 @@ async fn wiederholte_freigabe_meldet_nicht_doppelt_fortschreibung_meldet_neu() {
             art.art
         );
 
-        let (_, offen) = anfrage(
-            &w.app,
-            "GET",
-            "/api/benachrichtigungen?offen=true",
-            &anna,
-            None,
-        )
-        .await;
+        let (_, offen) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &anna, None).await;
         assert!(
             offen
                 .as_array()

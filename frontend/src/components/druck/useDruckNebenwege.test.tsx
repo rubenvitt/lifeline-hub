@@ -66,7 +66,7 @@ describe('useDruckNebenwege', () => {
   it('ohne Organisation: gesperrt mit Grund im Text, „Organisation erneut laden“ lädt nach', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/organisation', () => {
+      http.get('/api/organization', () => {
         abrufe += 1;
         return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
       }),

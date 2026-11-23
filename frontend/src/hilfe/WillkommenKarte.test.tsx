@@ -31,7 +31,7 @@ function zeige(client = neuerQueryClient()) {
 }
 
 function stand(eintraege: Record<string, string>) {
-  server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege })));
+  server.use(http.get('/api/user-settings', () => HttpResponse.json({ eintraege })));
 }
 
 beforeEach(() => {
@@ -64,7 +64,7 @@ describe('WillkommenKarte', () => {
   it('bleibt weg, wenn sie schon geschlossen wurde', async () => {
     let geladen = false;
     server.use(
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         geladen = true;
         return HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-01 08:00:00' } });
       }),
@@ -77,7 +77,7 @@ describe('WillkommenKarte', () => {
   it('bleibt bei einem Abruffehler weg', async () => {
     let geladen = false;
     server.use(
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         geladen = true;
         return new HttpResponse(null, { status: 500 });
       }),
@@ -91,7 +91,7 @@ describe('WillkommenKarte', () => {
     stand({});
     let wert: string | undefined;
     server.use(
-      http.put('/api/benutzer-einstellungen/willkommen_geschlossen', async ({ request }) => {
+      http.put('/api/user-settings/willkommen_geschlossen', async ({ request }) => {
         wert = ((await request.json()) as { wert: string }).wert;
         return HttpResponse.json({ eintraege: { willkommen_geschlossen: wert } });
       }),
@@ -107,7 +107,7 @@ describe('WillkommenKarte', () => {
     let antworten!: () => void;
     const antwort = new Promise<void>((r) => (antworten = r));
     server.use(
-      http.put('/api/benutzer-einstellungen/willkommen_geschlossen', async () => {
+      http.put('/api/user-settings/willkommen_geschlossen', async () => {
         await antwort;
         // Ein Serverstand ohne den inzwischen optimistisch gemerkten Palettenbefehl.
         return HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } });
@@ -132,7 +132,7 @@ describe('WillkommenKarte', () => {
     stand({});
     server.use(
       http.put(
-        '/api/benutzer-einstellungen/willkommen_geschlossen',
+        '/api/user-settings/willkommen_geschlossen',
         () => new HttpResponse(null, { status: 500 }),
       ),
     );

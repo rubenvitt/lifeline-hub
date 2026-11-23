@@ -51,7 +51,7 @@ export default function EinheitZeichenPaneel({
 }: {
   einheit: Einheit;
   canEdit: boolean;
-  /** Organisations-Vorgabe aus `/api/organisation`; `null` ohne Vorgabe. */
+  /** Organisations-Vorgabe aus `/api/organization`; `null` ohne Vorgabe. */
   orgDefault: string | null;
   onPatchZeichen: EinheitZeichenHandler;
 }) {

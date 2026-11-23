@@ -2,7 +2,7 @@
 //!
 //! Anders als bei Web Push holt die Notification Service Extension nichts nach: Titel, Detail und
 //! Pfad stehen verschlüsselt in der Nutzlast. Sie kommen aus derselben Stelle wie
-//! `GET /api/benachrichtigungen/{id}` (`routes::benachrichtigung::anzeige`). Absender und
+//! `GET /api/notifications/{id}` (`routes::benachrichtigung::anzeige`). Absender und
 //! Wortlaut kommen nur mit der Wahl „Mit Absender und Wortlaut“, nur für die Arten und Bezüge, zu
 //! denen der Service Worker sie holt (`pushInhalt` in `frontend/public/alarm-sw.js`), und nur,
 //! wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen dürfte:
@@ -102,7 +102,7 @@ pub fn rueckfall_titel(stufe: BenachrichtigungStufe) -> &'static str {
     }
 }
 
-/// Die Anzeige wie `GET /api/benachrichtigungen/{id}`; `None`, wo die Route 404 gäbe.
+/// Die Anzeige wie `GET /api/notifications/{id}`; `None`, wo die Route 404 gäbe.
 async fn anzeige(
     pool: &SqlitePool,
     benutzer: &Benutzer,

@@ -98,7 +98,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/org-archiv-schluessel",
+        "/api/org-archive-keys",
         &admin,
         Some(&json!({
             "schluessel": identitaet.to_public().to_string(),
@@ -120,7 +120,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/org-archiv-schluessel/{sid}/pruefen"),
+        &format!("/api/org-archive-keys/{sid}/verify"),
         &admin,
         Some(&json!({ "code": code.trim() })),
     )

@@ -247,7 +247,7 @@ async fn werkzeug(mut befehl: tokio::process::Command) -> Result<String, Grund> 
 }
 
 /// Letztes Ergebnis und die Zusicherung externer Verschlüsselung; die Prüfschleife schreibt,
-/// `GET /api/system/datentraeger` liest.
+/// `GET /api/system/storage` liest.
 #[derive(Debug, Clone, Default)]
 pub struct Stand(Arc<RwLock<Zustand>>);
 
@@ -326,7 +326,7 @@ pub fn starte(stand: Stand, eingabe: Eingabe) {
     });
 }
 
-/// Antwort von `GET /api/system/datentraeger`.
+/// Antwort von `GET /api/system/storage`.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DatentraegerStatus {
     /// Schlechtester Wert aller Orte; vor der ersten Prüfung `unbekannt`.

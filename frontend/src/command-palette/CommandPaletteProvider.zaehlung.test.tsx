@@ -46,7 +46,7 @@ beforeEach(() => {
   gesehen.length = 0;
   server.use(
     meHandler(nutzer),
-    http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+    http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
       return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
@@ -58,7 +58,7 @@ const oeffne = (u: ReturnType<typeof userEvent.setup>) => u.keyboard('{Control>}
 
 describe('Kommandopalette · Zählung der Schnellaktionen', () => {
   it('zählt eine ausgeführte Schnellaktion und kennt die Zahl beim nächsten Öffnen', async () => {
-    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    server.use(http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
     const { client } = renderMitProviders(
       <CommandPaletteProvider>
@@ -91,7 +91,7 @@ describe('Kommandopalette · Zählung der Schnellaktionen', () => {
       loese = r;
     });
     server.use(
-      http.get('/api/benutzer-einstellungen', async () => {
+      http.get('/api/user-settings', async () => {
         await antwortFrei;
         return HttpResponse.json({
           eintraege: { [SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER]: '{"aktion:etb":5}' },

@@ -616,10 +616,10 @@ const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
     ),
     (
         "PUT",
-        "/api/org-fuehrungsfunktionen/s4",
+        "/api/org-command-roles/s4",
         r#"{"label":"Versorgung (Logistik)"}"#,
     ),
-    ("PATCH", "/api/organisation", r#"{"name":"Neu"}"#),
+    ("PATCH", "/api/organization", r#"{"name":"Neu"}"#),
 ];
 
 #[tokio::test]

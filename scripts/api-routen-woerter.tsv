@@ -1,8 +1,12 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+access-changes	Zugangsänderungen
+access-log	Zugangsprotokoll
 accommodation	Unterkunft
+acknowledge	quittieren
 adapter	-
 admin	-
+administration	Verwaltung
 animals	Tiere
 api	-
 app-code	-
@@ -16,6 +20,7 @@ care	Betreuung
 case-file	Einsatzakte
 catering	Verpflegung
 chat	-
+client-errors	Client-Fehler
 code	-
 codes	-
 command	Führung
@@ -25,11 +30,14 @@ comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
 damages	Schäden
+deactivate	deaktivieren
+demo-data	Demo-Daten
 dev	-
 devices	Geräte
 discoverable	-
 download	-
 emergency-takeover	Notübernahme
+end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
@@ -50,11 +58,13 @@ info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
 integrations	Anbindungen
+inventory	Bestand
 ios-push	-
 jwks.json	-
 lan	-
 live	-
 login	-
+logins	Anmeldungen
 logo	-
 logout	-
 map	Karte
@@ -64,9 +74,17 @@ material	Material
 matrix	-
 me	-
 mirror	Spiegel
+notifications	Benachrichtigungen
 oidc	-
+one-time-password	Einmalpasswort
 openapi.json	-
 orders	Befehle
+org-accommodation-guidelines	Org-Unterkunft-Richtwerte
+org-archive-keys	Org-Archiv-Schlüssel
+org-command-roles	Org-Führungsfunktionen
+org-module-settings	Org-Modul-Einstellungen
+org-settings	Org-Einstellungen
+organization	Organisation
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
@@ -84,6 +102,8 @@ read	gelesen
 redeem	einlösen
 register	-
 registration	-
+reimport	neu importieren
+rejected	abgelehnt
 release-notes	Versionsstand
 reliefs	Ablösungen
 reports	Meldungen
@@ -107,7 +127,9 @@ staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
 status	-
+storage	Datenträger
 style.json	-
+subscription	Abo
 system	-
 talk-groups	Sprechgruppen
 tasks	Aufträge
@@ -121,9 +143,11 @@ triage	Sichtung
 uhs	UHS
 units	Einheiten
 unregister	-
+user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge
+verify	prüfen
 web-push	-
 webauthn	-
 webhook	-

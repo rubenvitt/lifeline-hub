@@ -1687,7 +1687,7 @@ describe('EinsatzLayout · Rundgang (LLH-1990)', () => {
     setup();
     server.use(
       http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
-      http.get('/api/benutzer-einstellungen', () =>
+      http.get('/api/user-settings', () =>
         HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
       ),
     );

@@ -452,7 +452,7 @@ async fn gekoppeltes_geraet_bekommt_kein_zip() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(serde_json::json!({ "code": code }).to_string()))
                 .unwrap(),

@@ -550,7 +550,7 @@ pub struct Config {
     pub einwurf_allow_http: bool,
 
     /// Demo-Daten zur Laufzeit importieren und entfernen (LFH-690). **Default AUS.** Nur mit
-    /// diesem Schalter werden die Routen unter `/api/demo-daten` überhaupt registriert; ohne
+    /// diesem Schalter werden die Routen unter `/api/demo-data` überhaupt registriert; ohne
     /// ihn antworten sie wie ein unbekannter Pfad (404). Sie öffnen einen harten Löschweg für
     /// die Demo-Daten und stehen dann nur dem System-Admin offen. Ein aktiver Schalter wird
     /// beim Serverstart mit einer Warnung protokolliert. Die Umgebungsvariable nimmt nur

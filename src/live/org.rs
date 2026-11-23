@@ -11,7 +11,7 @@
 //! Frontend lädt nach jedem Wiederaufbau ohnehin nach (LFH-734, design.md D4). Die Nutzlast ist leer,
 //! außer bei `org_benachrichtigung` (LLH-1207): sie trägt die Kennungen der Benachrichtigung und
 //! geht nur an ihren Empfänger ([`OrgEmpfaenger::Benutzer`]); verpasst er sie, holt der Client die
-//! offene Liste (`GET /api/benachrichtigungen?offen=true`).
+//! offene Liste (`GET /api/notifications?offen=true`).
 //! Spec `openspec/specs/org-live/`.
 
 use crate::auth::Benutzer;

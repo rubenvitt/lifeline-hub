@@ -123,9 +123,9 @@ impl Umgebung {
             .unwrap();
     }
 
-    /// Die Benachrichtigungen, die `cookie` sieht (`GET /api/benachrichtigungen`), jüngste zuerst.
+    /// Die Benachrichtigungen, die `cookie` sieht (`GET /api/notifications`), jüngste zuerst.
     async fn meldungen(&self, cookie: &str) -> Vec<Value> {
-        let (s, v) = anfrage_json(&self.app, "GET", "/api/benachrichtigungen", cookie, None).await;
+        let (s, v) = anfrage_json(&self.app, "GET", "/api/notifications", cookie, None).await;
         assert_eq!(s, StatusCode::OK, "{v}");
         v.as_array().unwrap().clone()
     }
@@ -746,7 +746,7 @@ async fn meldung_enthaelt_keine_einstellung_und_kein_geheimnis() {
     let (s, einzeln) = anfrage_json(
         &u.app,
         "GET",
-        &format!("/api/benachrichtigungen/{}", m[0]["id"]),
+        &format!("/api/notifications/{}", m[0]["id"]),
         &u.admin,
         None,
     )
@@ -757,7 +757,7 @@ async fn meldung_enthaelt_keine_einstellung_und_kein_geheimnis() {
     let (s, _) = anfrage_json(
         &u.app,
         "GET",
-        &format!("/api/benachrichtigungen/{}", m[0]["id"]),
+        &format!("/api/notifications/{}", m[0]["id"]),
         &u.fremd,
         None,
     )
@@ -925,7 +925,7 @@ async fn meldung_nur_fuer_admins_der_org_lesbar() {
     let u = umgebung().await;
     eingriff_gemeldet(&u).await;
     let id = u.meldungen(&u.admin2).await[0]["id"].clone();
-    let pfad = format!("/api/benachrichtigungen/{id}");
+    let pfad = format!("/api/notifications/{id}");
     let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
     assert_eq!(s, StatusCode::OK);
 

@@ -565,7 +565,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     if config.demo_daten {
         tracing::warn!(
             "Demo-Daten sind freigeschaltet: --demo-daten (LIFELINE_DEMO_DATEN) ist AKTIV — \
-             der System-Admin kann über /api/demo-daten einen Übungseinsatz samt Stammdaten \
+             der System-Admin kann über /api/demo-data einen Übungseinsatz samt Stammdaten \
              importieren, und der harte Löschweg für Demo-Daten ist erreichbar. In einer \
              Einsatzumgebung gehört der Schalter ausgeschaltet."
         );

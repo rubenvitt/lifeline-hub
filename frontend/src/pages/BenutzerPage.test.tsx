@@ -72,7 +72,7 @@ describe('BenutzerPage', () => {
   it('listet Benutzer', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      http.get('/api/users', () => HttpResponse.json([benutzer()])),
     );
     renderMitProviders(
       <Routes>
@@ -91,7 +91,7 @@ describe('BenutzerPage', () => {
     let angelegt = false;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json(
           angelegt
             ? [
@@ -106,7 +106,7 @@ describe('BenutzerPage', () => {
             : [benutzer()],
         ),
       ),
-      http.post('/api/benutzer', () => {
+      http.post('/api/users', () => {
         angelegt = true;
         return HttpResponse.json(benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }), {
           status: 201,
@@ -133,7 +133,7 @@ describe('BenutzerPage', () => {
     let bearbeitet = false;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({
@@ -144,7 +144,7 @@ describe('BenutzerPage', () => {
           }),
         ]),
       ),
-      http.patch('/api/benutzer/2', async ({ request }) => {
+      http.patch('/api/users/2', async ({ request }) => {
         patchBody = (await request.json()) as Record<string, unknown>;
         bearbeitet = true;
         return HttpResponse.json(
@@ -177,8 +177,8 @@ describe('BenutzerPage', () => {
     let gesendet = false;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
-      http.post('/api/benutzer', () => {
+      http.get('/api/users', () => HttpResponse.json([benutzer()])),
+      http.post('/api/users', () => {
         gesendet = true;
         return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
       }),
@@ -213,13 +213,13 @@ describe('BenutzerPage', () => {
     const zuLang = 'Eva' + 'x'.repeat(ANZEIGENAME_MAX);
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({ id: 2, anzeigename: zuLang, benutzername: 'eva', system_rolle: 'keiner' }),
         ]),
       ),
-      http.patch('/api/benutzer/2', () => {
+      http.patch('/api/users/2', () => {
         gesendet = true;
         return HttpResponse.json(benutzer({ id: 2 }));
       }),
@@ -256,7 +256,7 @@ describe('BenutzerPage', () => {
     let reaktiviert = false;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({
@@ -268,7 +268,7 @@ describe('BenutzerPage', () => {
           }),
         ]),
       ),
-      http.patch('/api/benutzer/2', async ({ request }) => {
+      http.patch('/api/users/2', async ({ request }) => {
         patchBody = (await request.json()) as Record<string, unknown>;
         reaktiviert = true;
         return HttpResponse.json(
@@ -304,7 +304,7 @@ describe('BenutzerPage', () => {
     });
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({
@@ -323,7 +323,7 @@ describe('BenutzerPage', () => {
           }),
         ]),
       ),
-      http.patch('/api/benutzer/:id', async ({ params }) => {
+      http.patch('/api/users/:id', async ({ params }) => {
         patchIds.push(Number(params.id));
         await blockiert; // erste Anfrage bewusst in-flight halten
         return HttpResponse.json(benutzer({ id: Number(params.id), aktiv: true }));
@@ -353,14 +353,14 @@ describe('BenutzerPage', () => {
   it('zeigt den Ladezustand beim Deaktivieren NUR an der geklickten Zeile', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
           benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner' }),
         ]),
       ),
-      http.post('/api/benutzer/:id/deaktivieren', () => new Promise(() => {})),
+      http.post('/api/users/:id/deactivate', () => new Promise(() => {})),
     );
     renderMitProviders(
       <Routes>
@@ -382,7 +382,7 @@ describe('BenutzerPage', () => {
   it('sucht, sortiert und filtert die Benutzerliste', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({
@@ -441,7 +441,7 @@ describe('BenutzerPage', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/users', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
       <Routes>
@@ -458,7 +458,7 @@ describe('BenutzerPage', () => {
   it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.get('/api/users', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -484,7 +484,7 @@ describe('BenutzerPage', () => {
     const langerName = 'Maximiliane Kirchgassner-Wohlfahrt';
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([benutzer({ id: 2, anzeigename: langerName, benutzername: 'mkw' })]),
       ),
     );
@@ -523,8 +523,8 @@ describe('BenutzerPage', () => {
     });
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva])),
-      http.get('/api/benutzer/2/sitzungen', () =>
+      http.get('/api/users', () => HttpResponse.json([benutzer(), eva])),
+      http.get('/api/users/2/sessions', () =>
         HttpResponse.json(
           beendet
             ? []
@@ -546,7 +546,7 @@ describe('BenutzerPage', () => {
               ],
         ),
       ),
-      http.post('/api/benutzer/2/sitzungen/beenden', () => {
+      http.post('/api/users/2/sessions/end', () => {
         beendet = true;
         return HttpResponse.json({ beendet: 2 });
       }),
@@ -568,7 +568,7 @@ describe('BenutzerPage', () => {
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
     server.use(
       meHandler(benutzer({ system_rolle: 'keiner' })),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
       ),
     );
@@ -590,7 +590,7 @@ describe('BenutzerPage', () => {
   function renderMitZwei() {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
           benutzer({ id: 3, anzeigename: 'Ben', benutzername: 'ben', system_rolle: 'keiner' }),
@@ -660,7 +660,7 @@ describe('BenutzerPage', () => {
   it('zeigt beim Wechsel von Benutzer A zu Benutzer B wirklich B', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer({
             id: 2,
@@ -715,8 +715,8 @@ describe('BenutzerPage', () => {
   it('lässt nach einer Ablehnung den Anlegen-Dialog samt Wortlaut stehen', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
-      http.post('/api/benutzer', () =>
+      http.get('/api/users', () => HttpResponse.json([benutzer()])),
+      http.post('/api/users', () =>
         HttpResponse.json({ error: 'Benutzername bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -752,8 +752,8 @@ describe('BenutzerPage', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
-      http.post('/api/benutzer', async ({ request }) => {
+      http.get('/api/users', () => HttpResponse.json([benutzer()])),
+      http.post('/api/users', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
       }),
@@ -789,8 +789,8 @@ describe('BenutzerPage', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
-      http.post('/api/benutzer', async ({ request }) => {
+      http.get('/api/users', () => HttpResponse.json([benutzer()])),
+      http.post('/api/users', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
       }),
@@ -855,13 +855,13 @@ describe('BenutzerPage', () => {
       let deaktiviert: string | null = null;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
           ]),
         ),
-        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+        http.post('/api/users/:id/deactivate', ({ params }) => {
           deaktiviert = String(params.id);
           return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
         }),
@@ -876,7 +876,7 @@ describe('BenutzerPage', () => {
       let deaktiviert: string | null = null;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
@@ -885,7 +885,7 @@ describe('BenutzerPage', () => {
         http.get('/api/admin/instanz/letzte-schluessel', () =>
           HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
         ),
-        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+        http.post('/api/users/:id/deactivate', ({ params }) => {
           deaktiviert = String(params.id);
           return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
         }),
@@ -902,7 +902,7 @@ describe('BenutzerPage', () => {
     it('eine abgelehnte Rückfrage räumt ihren Fehler beim Abbrechen (LLH-1605)', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
@@ -911,7 +911,7 @@ describe('BenutzerPage', () => {
         http.get('/api/admin/instanz/letzte-schluessel', () =>
           HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
         ),
-        http.post('/api/benutzer/:id/deaktivieren', () =>
+        http.post('/api/users/:id/deactivate', () =>
           HttpResponse.json({ error: 'Abgelehnt aus Gründen' }, { status: 409 }),
         ),
       );
@@ -935,7 +935,7 @@ describe('BenutzerPage', () => {
       let deaktiviert: string | null = null;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
@@ -944,7 +944,7 @@ describe('BenutzerPage', () => {
         http.get('/api/admin/instanz/letzte-schluessel', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
-        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+        http.post('/api/users/:id/deactivate', ({ params }) => {
           deaktiviert = String(params.id);
           return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
         }),
@@ -963,7 +963,7 @@ describe('BenutzerPage', () => {
       let kaputt = false;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
@@ -972,7 +972,7 @@ describe('BenutzerPage', () => {
         http.get('/api/admin/instanz/letzte-schluessel', () =>
           kaputt ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : HttpResponse.json([]),
         ),
-        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+        http.post('/api/users/:id/deactivate', ({ params }) => {
           deaktiviert = String(params.id);
           return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
         }),
@@ -999,7 +999,7 @@ describe('BenutzerPage', () => {
     it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
@@ -1020,7 +1020,7 @@ describe('BenutzerPage', () => {
     it('sperrt Deaktivieren am letzten aktiven Admin und nennt den Grund', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             // Ein deaktivierter Admin zählt nicht: der angemeldete bleibt der letzte AKTIVE.
@@ -1039,7 +1039,7 @@ describe('BenutzerPage', () => {
     it('sperrt Deaktivieren am eigenen Konto, nicht am zweiten Admin', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 4, anzeigename: 'Zweit', benutzername: 'zweit' }),
@@ -1066,7 +1066,7 @@ describe('BenutzerPage', () => {
       setzeViewportBreite(390);
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+        http.get('/api/users', () => HttpResponse.json([benutzer()])),
       );
       seite();
       const eintrag = within(await oeffneMenue('Admin')).getByRole('menuitem', {
@@ -1078,20 +1078,20 @@ describe('BenutzerPage', () => {
     it('ein abgelehntes Deaktivieren steht an der Seite, bis zum nächsten Absenden', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
             benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner' }),
           ]),
         ),
-        http.post('/api/benutzer/2/deaktivieren', () =>
+        http.post('/api/users/2/deactivate', () =>
           HttpResponse.json(
             { error: 'Gerätekonten werden unter Geräte verwaltet' },
             { status: 409 },
           ),
         ),
-        http.post('/api/benutzer/3/deaktivieren', () => new Promise(() => {})),
+        http.post('/api/users/3/deactivate', () => new Promise(() => {})),
       );
       seite();
       await waehle('Eva', 'Deaktivieren');
@@ -1107,13 +1107,13 @@ describe('BenutzerPage', () => {
     it('ein abgelehntes Reaktivieren steht an der Seite, ohne Toast', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', aktiv: false }),
           ]),
         ),
-        http.patch('/api/benutzer/2', () =>
+        http.patch('/api/users/2', () =>
           HttpResponse.json({ error: 'Reaktivieren abgelehnt' }, { status: 409 }),
         ),
       );
@@ -1128,8 +1128,8 @@ describe('BenutzerPage', () => {
       const grund = 'Der letzte aktive Admin kann nicht deaktiviert oder herabgestuft werden';
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
-        http.patch('/api/benutzer/1', () => HttpResponse.json({ error: grund }, { status: 409 })),
+        http.get('/api/users', () => HttpResponse.json([benutzer()])),
+        http.patch('/api/users/1', () => HttpResponse.json({ error: grund }, { status: 409 })),
       );
       seite();
       await waehle('Admin', 'Bearbeiten');
@@ -1172,7 +1172,7 @@ describe('BenutzerPage', () => {
     it('bietet die Aktion nur bei aktivem zweiten Faktor an, rot hinter dem Trenner', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer(),
             eva(true),
@@ -1202,8 +1202,8 @@ describe('BenutzerPage', () => {
       let zurueckgesetzt = false;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(!zurueckgesetzt)])),
-        http.post('/api/benutzer/:id/totp/reset', ({ params }) => {
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva(!zurueckgesetzt)])),
+        http.post('/api/users/:id/totp/reset', ({ params }) => {
           gesendet.push(String(params.id));
           zurueckgesetzt = true;
           return HttpResponse.json(eva(false));
@@ -1243,9 +1243,9 @@ describe('BenutzerPage', () => {
       let lehneAb: () => void = () => {};
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(true)])),
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva(true)])),
         http.post(
-          '/api/benutzer/2/totp/reset',
+          '/api/users/2/totp/reset',
           () =>
             new Promise((fertig) => {
               lehneAb = () =>
@@ -1275,8 +1275,8 @@ describe('BenutzerPage', () => {
     it('eine Ablehnung steht im Dialog, der Dialog bleibt offen', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(true)])),
-        http.post('/api/benutzer/2/totp/reset', () =>
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva(true)])),
+        http.post('/api/users/2/totp/reset', () =>
           HttpResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 }),
         ),
       );
@@ -1293,7 +1293,7 @@ describe('BenutzerPage', () => {
     it('nennt beim eigenen Konto, dass auch diese Anmeldung endet', async () => {
       server.use(
         meHandler(benutzer({ totp_aktiviert: true })),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([
             benutzer({ totp_aktiviert: true }),
             benutzer({ id: 4, anzeigename: 'Zweit', benutzername: 'zweit' }),
@@ -1335,8 +1335,8 @@ describe('BenutzerPage', () => {
       const vergeben: string[] = [];
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
-        http.post('/api/benutzer/:id/einmalpasswort', ({ params }) => {
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/users/:id/one-time-password', ({ params }) => {
           vergeben.push(String(params.id));
           return HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' });
         }),
@@ -1365,8 +1365,8 @@ describe('BenutzerPage', () => {
     it('legt das Passwort in keinen Query-Cache', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
-        http.post('/api/benutzer/:id/einmalpasswort', () =>
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/users/:id/one-time-password', () =>
           HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' }),
         ),
       );
@@ -1399,9 +1399,9 @@ describe('BenutzerPage', () => {
       let antworten: (() => void) | null = null;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva()])),
         http.post(
-          '/api/benutzer/:id/einmalpasswort',
+          '/api/users/:id/one-time-password',
           () =>
             new Promise<Response>((fertig) => {
               antworten = () => fertig(HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' }));
@@ -1427,7 +1427,7 @@ describe('BenutzerPage', () => {
     it('sperrt das eigene Konto und nennt den Grund', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva()])),
       );
       seite();
       const dialog = await bearbeitenVon('Admin');
@@ -1440,7 +1440,7 @@ describe('BenutzerPage', () => {
     it('sperrt ein SSO-Konto und nennt den Grund', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           HttpResponse.json([benutzer(), eva({ passwort_gesetzt: false })]),
         ),
       );
@@ -1455,8 +1455,8 @@ describe('BenutzerPage', () => {
     it('zeigt eine Ablehnung des Servers im Dialog', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
-        http.post('/api/benutzer/:id/einmalpasswort', () =>
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/users/:id/one-time-password', () =>
           HttpResponse.json(
             { error: 'Dieses Konto meldet sich über SSO an und hat kein Passwort.' },
             { status: 422 },
@@ -1485,7 +1485,7 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
   it('Konto vom Hub: Deaktivieren gesperrt mit Grund; Admin ohne Passkey bekommt den Hinweis', async () => {
     server.use(
       meHandler(benutzer()),
-      http.get('/api/benutzer', () =>
+      http.get('/api/users', () =>
         HttpResponse.json([
           benutzer(),
           benutzer({ id: 7, anzeigename: 'Max', benutzername: 'max' }),
@@ -1533,8 +1533,8 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
       let deaktiviert = false;
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva])),
-        http.post('/api/benutzer/2/deaktivieren', () => {
+        http.get('/api/users', () => HttpResponse.json([benutzer(), eva])),
+        http.post('/api/users/2/deactivate', () => {
           deaktiviert = true;
           return HttpResponse.json({ ...eva, aktiv: false });
         }),
@@ -1557,7 +1557,7 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
     it('eigenes Konto: „Deaktivieren“ steht gesperrt mit Grund, wie im ⋮', async () => {
       server.use(
         meHandler(benutzer()),
-        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+        http.get('/api/users', () => HttpResponse.json([benutzer()])),
       );
       renderMitProviders(<BenutzerPage />);
       const zeile = (await screen.findByText('@admin')).closest('tr')!;

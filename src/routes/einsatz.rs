@@ -1012,7 +1012,7 @@ pub async fn modul_overrides_laden(
 }
 
 /// GET /api/einsaetze/{id}/modul-vorgaben — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
-/// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-modul-einstellungen`.
+/// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-module-settings`.
 /// Damit sieht der Editor „Module“ die Herkunft auch bei einer Einsatzleitung ohne Org-Rolle.
 ///
 /// Gate (design.md D2 der Change `archive/2026-10-13-g145w6op-modul-vorgaben-einsatzleitung`):

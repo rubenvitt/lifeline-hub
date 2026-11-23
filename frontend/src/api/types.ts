@@ -14,7 +14,7 @@ export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
 /** Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) mit `geraet`. */
 export type MeAntwort = S['MeAntwort'];
-// Bestand der Bereitschaft (LLH-1820, `GET /api/verwaltung/bereitschaft`).
+// Bestand der Bereitschaft (LLH-1820, `GET /api/administration/inventory`).
 export type Bereitschaft = S['Bereitschaft'];
 
 // ============================== Gerätekopplung (LFH-892) ==============================
@@ -212,7 +212,7 @@ export type DemoVorgang = S['DemoVorgang'];
 // ============================== Admin — Org-weite Einstellungen ==============================
 export type OrgEinstellungen = S['OrgEinstellungenAnzeige'];
 
-/** PUT-Body für org-weite Einstellungen (PUT /api/org-einstellungen, Vollersatz).
+/** PUT-Body für org-weite Einstellungen (PUT /api/org-settings, Vollersatz).
  *  Kein Backend-Schema, FE-lokal. */
 export interface OrgEinstellungenUpdate {
   zeitzone: string | null;
@@ -250,7 +250,7 @@ export type BenoetigteRolle = 'admin' | 'fuehrungskraft' | 'einsatzfuehrung';
  *  (`false` nur, wenn die Organisation das Modul ausblendet). */
 export type OrgModulEinstellung = S['OrgModulEinstellung'];
 
-/** Org-weite Modul-Vorgaben (GET /api/org-modul-einstellungen): Map modul_key → Vorgabe; fehlt ein
+/** Org-weite Modul-Vorgaben (GET /api/org-module-settings): Map modul_key → Vorgabe; fehlt ein
  *  Key, gibt die Organisation nichts vor (sichtbar, frei). Die Map ist FE-lokal, der Eintrag nicht. */
 export type OrgModulEinstellungen = Record<string, OrgModulEinstellung>;
 
@@ -820,7 +820,7 @@ export type Fuehrungsfunktion = S['Fuehrungsfunktion'];
 export type FuehrungsfunktionEintrag = S['FuehrungsfunktionAnzeige'];
 export type AktuelleBesetzung = S['AktuelleBesetzung'];
 
-/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-fuehrungsfunktionen/{funktion}`. */
+/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-command-roles/{funktion}`. */
 export interface FuehrungsfunktionUpdate {
   /** Leer = Standardlabel. */
   label?: string | null;
@@ -1962,11 +1962,11 @@ export interface EinheitenAusNachforderungEingabe {
 // ============================== Zugangsprotokoll (LFH-1097) ==============================
 /** Ereignis der Anmeldespur (`auth_audit`). */
 export type AnmeldeEreignis = S['Ereignis'];
-/** Zeile der Anmeldespur (`GET /api/zugangsprotokoll/anmeldungen`). */
+/** Zeile der Anmeldespur (`GET /api/access-log/logins`). */
 export type AnmeldeEintrag = S['AnmeldeEintragAnzeige'];
 /** Aktion der Admin-Spur (`admin_audit`). */
 export type AdminAktion = S['AdminAktion'];
-/** Zeile der Admin-Spur (`GET /api/zugangsprotokoll/zugangsaenderungen`). */
+/** Zeile der Admin-Spur (`GET /api/access-log/access-changes`). */
 export type Zugangsaenderung = S['ZugangsaenderungAnzeige'];
 /** Anmeldeweg eines Eintrags der Anmeldespur und einer Sitzung (LFH-1152). */
 export type Anmeldeweg = S['Anmeldeweg'];

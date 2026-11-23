@@ -1,7 +1,7 @@
 //! HTTP-Routen für die Präferenzen des angemeldeten Benutzers (LFH-391).
 //!
-//! GET /api/benutzer-einstellungen              — eigenes Fach lesen.
-//! PUT /api/benutzer-einstellungen/{schluessel} — einen Schlüssel setzen (UPSERT).
+//! GET /api/user-settings              — eigenes Fach lesen.
+//! PUT /api/user-settings/{schluessel} — einen Schlüssel setzen (UPSERT).
 //!
 //! **Berechtigung ist die Sitzung selbst:** die `benutzer_id` stammt ausschließlich aus
 //! [`CurrentUser`], nie aus Pfad oder Body. Es gibt keinen Endpunkt für ein fremdes Fach; die
@@ -29,7 +29,7 @@ pub struct WertUpdate {
     pub wert: String,
 }
 
-/// GET /api/benutzer-einstellungen — die eigenen Präferenzen. Ohne gespeicherte Zeile
+/// GET /api/user-settings — die eigenen Präferenzen. Ohne gespeicherte Zeile
 /// `{"eintraege":{}}` ohne `geaendert_at` — kein 404, „noch nie geschrieben“ ist beim ersten
 /// Login der Normalfall.
 pub async fn lesen(
@@ -39,7 +39,7 @@ pub async fn lesen(
     Ok(Json(repo::laden(&state.pool, benutzer.id).await?))
 }
 
-/// PUT /api/benutzer-einstellungen/{schluessel} — einen Schlüssel setzen (UPSERT). Antwortet mit
+/// PUT /api/user-settings/{schluessel} — einen Schlüssel setzen (UPSERT). Antwortet mit
 /// dem vollen neuen Stand, damit der Aufrufer keinen zweiten Request braucht.
 pub async fn setzen(
     State(state): State<AppState>,

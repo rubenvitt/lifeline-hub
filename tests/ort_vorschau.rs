@@ -173,7 +173,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Regulärer Benutzer (keine Org-Rolle), KEIN Einsatz-Mitglied → kein Lesezugriff.
     // Deterministisch unabhängig von etwaiger Cross-Org-/Admin-Lesepolitik.
-    let (s, _v) = post_json(&app, "/api/benutzer", &admin, serde_json::json!({
+    let (s, _v) = post_json(&app, "/api/users", &admin, serde_json::json!({
         "anzeigename": "gast", "benutzername": "gast", "passwort": "gastpw12", "org_rolle": "keine"
     })).await;
     assert_eq!(s, StatusCode::CREATED);

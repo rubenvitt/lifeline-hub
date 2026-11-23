@@ -459,7 +459,7 @@ impl Anlass {
 
 /// Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
 /// `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
-/// Client über `GET /api/benachrichtigungen/{id}`.
+/// Client über `GET /api/notifications/{id}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenachrichtigungEreignis {
     /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit

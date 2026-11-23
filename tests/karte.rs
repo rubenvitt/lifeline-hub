@@ -1815,7 +1815,7 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         Some(&admin_cookie),
         Some(r#"{"anzeigename":"Frieda","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#),
     )
@@ -2016,7 +2016,7 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         Some(&admin),
         Some(r#"{"anzeigename":"Frieda","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#),
     )

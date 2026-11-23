@@ -66,7 +66,7 @@ async fn lagemonitor(app: &axum::Router, admin: &str, einsatz: i64) -> String {
     let code = v["code"]["code"].as_str().unwrap();
     let req = Request::builder()
         .method("POST")
-        .uri("/api/geraete/koppeln")
+        .uri("/api/devices/pair")
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(json!({ "code": code }).to_string()))
         .unwrap();

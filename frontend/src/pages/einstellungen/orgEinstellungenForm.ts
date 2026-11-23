@@ -10,7 +10,7 @@ import type {
 import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
 
 /**
- * Geteilte Form-Logik der Org-Einstellungs-Sektionen. KRITISCH: `PUT /api/org-einstellungen` ist
+ * Geteilte Form-Logik der Org-Einstellungs-Sektionen. KRITISCH: `PUT /api/org-settings` ist
  * Vollersatz. Jede Sektion speichert `{ ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form)
  * }` — so nullt ein Anzeige-Save nie die Einsatz-Default-Spalten.
  *

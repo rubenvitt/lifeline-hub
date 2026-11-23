@@ -19,7 +19,7 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     // Der Lauf lenkt den Geocoder auf Loopback (`e2e/geocoder-kern.ts`, LLH-2063); das Bild zeigt
     // das Feld, wie eine Organisation es vorfindet: leer, also der öffentliche Nominatim.
-    await page.route('**/api/org-einstellungen', async (route) => {
+    await page.route('**/api/org-settings', async (route) => {
       if (route.request().method() !== 'GET') return route.continue();
       const antwort = await route.fetch();
       const json = (await antwort.json()) as Record<string, unknown>;
@@ -42,7 +42,7 @@ test.describe(KAPITEL, () => {
 
   test('Module für alle Einsätze', async ({ page }) => {
     await anmelden(page);
-    const pfad = '/api/org-modul-einstellungen/lageberichte';
+    const pfad = '/api/org-module-settings/lageberichte';
     // Nur für die Aufnahme: eine Org-Vorgabe ausgeblendet, danach zurückgesetzt. Sie gälte sonst
     // für jeden Einsatz des Laufs.
     await fuelle(page, 'put', pfad, { benoetigte_rolle: null, sichtbar: false });

@@ -5,7 +5,7 @@ import { apiGet, apiSend } from './client';
 // Einsatz am Ende der Nachbereitung verschlüsselt. Nur der System-Admin; ein Schlüssel gilt erst
 // nach der Probe (Code aus der verschlüsselten Probe).
 
-const BASIS = '/api/org-archiv-schluessel';
+const BASIS = '/api/org-archive-keys';
 
 export function ladeArchivSchluessel(): Promise<ArchivEmpfaengerAnzeige[]> {
   return apiGet<ArchivEmpfaengerAnzeige[]>(BASIS);
@@ -20,7 +20,7 @@ export function trageArchivSchluesselEin(
 }
 
 export function pruefeArchivSchluessel(id: number, code: string): Promise<ArchivEmpfaengerAnzeige> {
-  return apiSend<ArchivEmpfaengerAnzeige>(`${BASIS}/${id}/pruefen`, 'POST', { code });
+  return apiSend<ArchivEmpfaengerAnzeige>(`${BASIS}/${id}/verify`, 'POST', { code });
 }
 
 export function entferneArchivSchluessel(id: number): Promise<void> {

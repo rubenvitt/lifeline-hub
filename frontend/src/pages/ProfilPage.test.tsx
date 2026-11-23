@@ -43,8 +43,8 @@ function setup(totpAktiviert = false, providerListe: unknown[] = [], passwortGes
     http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(totpAktiviert, passwortGesetzt))),
     http.get('/api/auth/providers', () => HttpResponse.json(providerListe)),
     // Die Organisation steht nicht am Benutzer; die Kopfsektion holt sie aus `GET
-    // /api/organisation`.
-    http.get('/api/organisation', () =>
+    // /api/organization`.
+    http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'DRK Musterstadt', tz_organisation: null }),
     ),
   );
@@ -102,7 +102,7 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
   // Die Organisation kommt aus einem eigenen Abruf; fällt der aus, zeigt die Seite „—" wie bei
   // jeder unbekannten Angabe.
   it('bleibt lesbar, wenn die Organisation nicht ladbar ist', async () => {
-    server.use(http.get('/api/organisation', () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.get('/api/organization', () => HttpResponse.json({}, { status: 500 })));
     setup();
 
     expect(await screen.findByText('Rita Beispiel')).toBeInTheDocument();

@@ -136,8 +136,7 @@ test('ein einzelner Eintrag ohne Netz gilt sofort als gelesen und wird danach qu
 
     const quittiert = page.waitForResponse(
       (r) =>
-        /\/api\/benachrichtigungen\/\d+\/quittieren$/.test(r.url()) &&
-        r.request().method() === 'POST',
+        /\/api\/notifications\/\d+\/acknowledge$/.test(r.url()) && r.request().method() === 'POST',
     );
     await page.context().setOffline(false);
     expect((await quittiert).status()).toBe(204);

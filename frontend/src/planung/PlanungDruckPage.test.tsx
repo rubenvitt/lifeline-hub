@@ -93,7 +93,7 @@ function Adresse() {
 function setup(route = planungDruckPfad(5)) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
+    http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
     http.get('/api/planungen/5', () => HttpResponse.json(PLANUNG)),
     http.get('/api/qualifikationen', () => HttpResponse.json([])),
   );

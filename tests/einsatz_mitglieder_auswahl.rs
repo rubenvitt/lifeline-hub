@@ -77,7 +77,7 @@ async fn einsatzleitung_ohne_systemrolle_bekommt_genau_die_aufnehmbaren() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &format!("/api/users/{inaktiv}/deactivate"),
         &admin,
         None,
     )
@@ -228,7 +228,7 @@ async fn anlage_auswahl_bietet_die_org_ohne_mich() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &format!("/api/users/{inaktiv}/deactivate"),
         &admin,
         None,
     )

@@ -28,7 +28,7 @@ export default function EinmalpasswortVergeben({
 }: {
   benutzer: BenutzerAnzeige;
   eigenesKonto: boolean;
-  /** `POST /api/benutzer/{id}/einmalpasswort`, Variable ist die Benutzer-id. */
+  /** `POST /api/users/{id}/one-time-password`, Variable ist die Benutzer-id. */
   vergeben: UseMutationResult<Einmalpasswort, Error, number>;
 }) {
   const { token } = useRollen();

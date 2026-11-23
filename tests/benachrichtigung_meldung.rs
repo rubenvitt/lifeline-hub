@@ -123,7 +123,7 @@ impl Welt {
 
     /// Die Benachrichtigungen, wie `cookie` sie über die Route liest.
     async fn lesen(&self, cookie: &str) -> Vec<Value> {
-        let (s, v) = anfrage(&self.app, "GET", "/api/benachrichtigungen", cookie, None).await;
+        let (s, v) = anfrage(&self.app, "GET", "/api/notifications", cookie, None).await;
         assert_eq!(s, StatusCode::OK, "{v}");
         v.as_array().unwrap().clone()
     }
@@ -451,7 +451,7 @@ impl Welt {
             self.app.clone(),
             axum::http::Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
                 .body(axum::body::Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),

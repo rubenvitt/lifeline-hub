@@ -64,7 +64,7 @@ async fn org_wert_setzen(app: &axum::Router, admin: &str, schluessel: &str, wert
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/org-unterkunft-richtwerte/{schluessel}"),
+        &format!("/api/org-accommodation-guidelines/{schluessel}"),
         admin,
         Some(&json!({ "wert": wert })),
     )

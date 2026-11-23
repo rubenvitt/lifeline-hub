@@ -55,7 +55,7 @@ function serverMit(verlauf: { eintraege: BenachrichtigungAnzeige[]; ungelesen: n
       zaehler.abrufe++;
       return HttpResponse.json(verlauf);
     }),
-    http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {
+    http.post('/api/notifications/:id/acknowledge', ({ params }) => {
       zaehler.quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -134,7 +134,7 @@ function browserMitPush() {
     http.get('/api/web-push', () =>
       HttpResponse.json({ schluessel: 'BAECAwQ', angemeldet: true, inhalt: false, stumm: [] }),
     ),
-    http.put('/api/web-push/abo', async ({ request }) => {
+    http.put('/api/web-push/subscription', async ({ request }) => {
       anmeldungen.push(await request.json());
       return new HttpResponse(null, { status: 204 });
     }),
@@ -607,7 +607,7 @@ describe('Eingänge ohne Netz (LLH-1422)', () => {
       daten: { benachrichtigung_id: 9 },
     });
     serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
-    server.use(http.post('/api/benachrichtigungen/:id/quittieren', () => HttpResponse.error()));
+    server.use(http.post('/api/notifications/:id/acknowledge', () => HttpResponse.error()));
     rendern();
     await screen.findByTestId('angemeldet');
     // Ein Ereignis ruft den Verlauf ab, wie die Rückkehr des Netzes vor dem Abgleich.

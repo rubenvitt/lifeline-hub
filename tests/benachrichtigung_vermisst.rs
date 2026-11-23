@@ -169,14 +169,7 @@ async fn wechsel_auf_vermisst_alarmiert_die_leser_der_personen() {
     w.pruefe_gegenseite(&zeilen);
 
     let bert = w.cookie("bertram").await;
-    let (s, offen) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &bert,
-        None,
-    )
-    .await;
+    let (s, offen) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &bert, None).await;
     assert_eq!(s, StatusCode::OK, "{offen}");
     let liste = offen.as_array().unwrap();
     assert_eq!(liste.len(), 1, "{offen}");
@@ -254,7 +247,7 @@ async fn vermisstenmeldung_ist_nicht_abschaltbar() {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        "/api/benutzer-einstellungen/benachrichtigungen_aus",
+        "/api/user-settings/benachrichtigungen_aus",
         &bert,
         Some(&json!({ "wert": "[\"vermisstenmeldung\"]" }).to_string()),
     )

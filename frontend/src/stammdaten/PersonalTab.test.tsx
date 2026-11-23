@@ -91,7 +91,7 @@ function render(
     http.get('/api/qualifikationen', () =>
       HttpResponse.json([{ id: 1, label: 'Sanitäter', sortier: 10 }]),
     ),
-    http.get('/api/benutzer', () => HttpResponse.json([])),
+    http.get('/api/users', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <>
@@ -278,7 +278,7 @@ describe('PersonalTab', () => {
       http.get('/api/personal', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: [] })),
       http.get('/api/qualifikationen', () => HttpResponse.json([])),
-      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.get('/api/users', () => HttpResponse.json([])),
     );
     renderMitProviders(<PersonalTab />);
 

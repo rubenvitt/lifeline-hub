@@ -9,11 +9,11 @@ import type {
 } from './types';
 
 /**
- * Eine eigene Benachrichtigung mit Text (`GET /api/benachrichtigungen/{id}`). Eine fremde oder
+ * Eine eigene Benachrichtigung mit Text (`GET /api/notifications/{id}`). Eine fremde oder
  * aufgeräumte antwortet 404: der Aufrufer zeigt dann nichts.
  */
 export function ladeBenachrichtigung(id: number): Promise<BenachrichtigungAnzeige> {
-  return apiGet<BenachrichtigungAnzeige>(`/api/benachrichtigungen/${id}`);
+  return apiGet<BenachrichtigungAnzeige>(`/api/notifications/${id}`);
 }
 
 /**
@@ -22,9 +22,7 @@ export function ladeBenachrichtigung(id: number): Promise<BenachrichtigungAnzeig
  * Einsatzes.
  */
 export function ladeOffeneBenachrichtigungen(): Promise<BenachrichtigungAnzeige[]> {
-  return apiGet<BenachrichtigungAnzeige[]>(
-    mitParametern('/api/benachrichtigungen', { offen: true }),
-  );
+  return apiGet<BenachrichtigungAnzeige[]>(mitParametern('/api/notifications', { offen: true }));
 }
 
 /**
@@ -32,7 +30,7 @@ export function ladeOffeneBenachrichtigungen(): Promise<BenachrichtigungAnzeige[
  * `offlineQueueBenutzerId` bindet ein vorgemerktes Quittieren an seinen Benutzer (LLH-1477).
  */
 export function quittiereBenachrichtigung(id: number, optionen?: ApiSendOptionen): Promise<void> {
-  return apiSend<void>(`/api/benachrichtigungen/${id}/quittieren`, 'POST', undefined, optionen);
+  return apiSend<void>(`/api/notifications/${id}/acknowledge`, 'POST', undefined, optionen);
 }
 
 /**

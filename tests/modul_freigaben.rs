@@ -41,7 +41,7 @@ async fn org_vorgabe(app: &axum::Router, admin: &str, modul: &str, rolle: &str) 
     let (status, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/org-modul-einstellungen/{modul}"),
+        &format!("/api/org-module-settings/{modul}"),
         admin,
         Some(&format!(r#"{{"benoetigte_rolle":"{rolle}"}}"#)),
     )
@@ -336,7 +336,7 @@ async fn org_sichtbarkeit(app: &axum::Router, admin: &str, modul: &str, sichtbar
     let (status, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/org-modul-einstellungen/{modul}"),
+        &format!("/api/org-module-settings/{modul}"),
         admin,
         Some(&format!(
             r#"{{"benoetigte_rolle":null,"sichtbar":{sichtbar}}}"#

@@ -81,7 +81,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const pfad = (modul: string) => `/api/einsaetze/${demo.id}/modul-overrides/${modul}`;
-    const orgPfad = '/api/org-modul-einstellungen/lage-dashboard';
+    const orgPfad = '/api/org-module-settings/lage-dashboard';
     // Nur für die Aufnahme: zwei Module im Einsatz verändert und eines von der Organisation
     // ausgeblendet (LLH-1179), danach zurückgesetzt. Andere Kapitel brauchen den Demo-Einsatz
     // unverändert.

@@ -28,8 +28,8 @@ beforeEach(() => {
     () => ({ length: 1 }) as unknown as DOMRectList,
   );
   server.use(
-    http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
-    http.put('/api/benutzer-einstellungen/:s', ({ params }) => {
+    http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
+    http.put('/api/user-settings/:s', ({ params }) => {
       geschrieben.push(String(params.s));
       return HttpResponse.json({ eintraege: {} });
     }),

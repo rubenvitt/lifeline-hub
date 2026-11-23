@@ -951,7 +951,7 @@ async fn org_rollensperre_laesst_modul_fehlen() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        "/api/org-modul-einstellungen/personen",
+        "/api/org-module-settings/personen",
         &admin,
         Some(r#"{"benoetigte_rolle":"fuehrungskraft"}"#),
     )

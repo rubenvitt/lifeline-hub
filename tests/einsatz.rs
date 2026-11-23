@@ -523,7 +523,7 @@ async fn deaktivierten_benutzer_zuweisen_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/benutzer/{erika_id}/deaktivieren"))
+                .uri(format!("/api/users/{erika_id}/deactivate"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),

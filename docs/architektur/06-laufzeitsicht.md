@@ -263,7 +263,7 @@ sequenceDiagram
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
-  G->>BE: POST /api/geraete/koppeln {code}
+  G->>BE: POST /api/devices/pair {code}
   BE->>DB: session::anlegen_geraet (mit kopplung_id)
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
   G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
@@ -718,7 +718,7 @@ sequenceDiagram
     N->>WP: versenden (nur Kennungen, RFC 8291)
     WP->>PD: POST an den Abo-Endpunkt
     PD-->>SW: push
-    SW->>BE: GET /api/benachrichtigungen/{id} (mit Sitzung)
+    SW->>BE: GET /api/notifications/{id} (mit Sitzung)
     SW->>SW: showNotification (Tag wie im Tab)
   end
 ```
@@ -793,7 +793,7 @@ sequenceDiagram
   BE->>BE: Upsert auf token, an Konto und Gerät
   Note over BE,IP: später: benachrichtigung::ausliefern
   BE->>IP: versenden (eigener Task, Filter wie Web Push)
-  IP->>IP: Klartext wie GET /api/benachrichtigungen/{id}, AES-256-GCM je Gerät
+  IP->>IP: Klartext wie GET /api/notifications/{id}, AES-256-GCM je Gerät
   opt noch kein Zugang
     IP->>R: POST /v1/server
     R-->>IP: server_id, geheimnis

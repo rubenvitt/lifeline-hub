@@ -555,7 +555,7 @@ async fn am_spiegel_gilt_der_link_hier_und_das_etb_geht_als_antrag_an_den_fuehre
     let (s, v) = anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erikapw12345"})),

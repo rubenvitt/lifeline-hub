@@ -25,7 +25,7 @@ const PASSWORT = 'beispiel-passwort-123';
 
 /** Legt die Person an, falls es sie in diesem Lauf noch nicht gibt. */
 async function personAnlegen(page: Parameters<typeof anmelden>[0]): Promise<number> {
-  const liste = await page.request.get('/api/benutzer');
+  const liste = await page.request.get('/api/users');
   expect(liste.ok(), `Benutzerliste: ${liste.status()}`).toBe(true);
   const vorhanden = ((await liste.json()) as { id: number; benutzername: string }[]).find(
     (b) => b.benutzername === PERSON.benutzername,
@@ -120,7 +120,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     await personAnlegen(page);
     // Ein fester Wert statt des zufälligen: das Bild soll nicht je Lauf ein anderes zeigen.
-    await page.route('**/api/benutzer/*/einmalpasswort', (route) =>
+    await page.route('**/api/users/*/one-time-password', (route) =>
       route.fulfill({ json: { einmalpasswort: 'kx7m-p4qr-9tzw' } }),
     );
     await uhrAnhalten(page);

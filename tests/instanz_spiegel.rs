@@ -334,7 +334,7 @@ async fn konten_nur_einer_seite_werden_stellvertreter_ohne_anmeldung_und_ohne_mi
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika", "passwort": "erikapw12"})),
     )
@@ -370,7 +370,7 @@ async fn konten_nur_einer_seite_werden_stellvertreter_ohne_anmeldung_und_ohne_mi
     )
     .await;
     assert_eq!(verfasser, "spontan", "ETB zeigt den Verfasser vom ELW");
-    let (s, liste) = common::anfrage(&hub.app, "GET", "/api/benutzer", &hub.admin, None).await;
+    let (s, liste) = common::anfrage(&hub.app, "GET", "/api/users", &hub.admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(
         !liste.as_array().unwrap().iter().any(|b| b["benutzername"]
@@ -689,7 +689,7 @@ async fn gemeinsames_konto(hub: &Instanz, elw: &Instanz, name: &str) -> (i64, St
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": name, "benutzername": name, "passwort": format!("{name}pw12345")})),
     )

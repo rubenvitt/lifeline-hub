@@ -2170,7 +2170,7 @@ async fn eine_neue_anfrage_nach_der_ablehnung_zeigt_sich_auch_ohne_zwischenmeldu
     let (s, b) = common::anfrage(
         &v.elw1.app,
         "GET",
-        &format!("/api/benachrichtigungen/{id}"),
+        &format!("/api/notifications/{id}"),
         &v.elw1.admin,
         None,
     )

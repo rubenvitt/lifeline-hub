@@ -23,7 +23,7 @@ import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener'
 import { server } from '../test/server';
 
 /**
- * Was der Server zu `GET /api/benachrichtigungen/{id}` liefert. Seit LLH-1209 kommen Sofortmeldung,
+ * Was der Server zu `GET /api/notifications/{id}` liefert. Seit LLH-1209 kommen Sofortmeldung,
  * überfälliger Auftrag, Erinnerung und Ablösung nur noch als Benachrichtigung; Titel, Detailzeile
  * und Pfad bildet der Server (`src/benachrichtigung/text.rs`).
  */
@@ -52,7 +52,7 @@ beforeEach(() => {
         })),
       ),
     ),
-    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+    http.get('/api/notifications/:id', ({ params }) => {
       const b = bekannt.get(Number(params.id));
       return b
         ? HttpResponse.json(b)
@@ -64,10 +64,7 @@ beforeEach(() => {
         ? HttpResponse.json({ id: Number(params.id), einsatz_id: Number(params.einsatzId), ...m })
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
-    http.post(
-      '/api/benachrichtigungen/:id/quittieren',
-      () => new HttpResponse(null, { status: 204 }),
-    ),
+    http.post('/api/notifications/:id/acknowledge', () => new HttpResponse(null, { status: 204 })),
   );
 });
 
@@ -331,7 +328,7 @@ describe('AlarmZentrale', () => {
   it('ohne Text des Servers springt der Ersatz ebenfalls zur Meldung', async () => {
     meldungen.set(3, { absender: 'Rettungsstaffel', inhalt: 'Kellerabgang Mühlbachweg 34' });
     server.use(
-      http.get('/api/benachrichtigungen/:id', () =>
+      http.get('/api/notifications/:id', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );

@@ -325,7 +325,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
       http.get('/api/einsaetze/7/einstellungen', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
     );
@@ -347,7 +347,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
           org_defaults: { org_id: 1, zeitzone: 'Europe/Berlin' },
         }),
       ),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
     );

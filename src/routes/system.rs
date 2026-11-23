@@ -6,7 +6,7 @@ use crate::auth::session::AdminUser;
 use crate::datentraeger::DatentraegerStatus;
 use axum::{extract::State, Json};
 
-/// GET /api/system/datentraeger — letztes Ergebnis der Datenträgerprüfung (LFH-1100). 200.
+/// GET /api/system/storage — letztes Ergebnis der Datenträgerprüfung (LFH-1100). 200.
 pub async fn datentraeger(
     State(state): State<AppState>,
     _admin: AdminUser,

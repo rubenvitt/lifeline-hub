@@ -1206,7 +1206,7 @@ async fn nach_endgueltiger_loeschung_akte_404_und_protokollzeile_in_der_uebersic
     let (s, v) = anfrage(
         &app,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         &admin,
         Some(r#"{"skelett_dauer_tage": 1, "skelett_dauer_bestaetigt": true}"#),
     )
@@ -1341,7 +1341,7 @@ async fn org_vorgaben(app: &axum::Router, admin: &str) {
     let (s, v) = common::anfrage_json(
         app,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         admin,
         Some(&serde_json::json!({
             "retention_dauer_tage": 30,
@@ -1527,7 +1527,7 @@ async fn wiederoeffnen_laesst_kopplung_und_api_freigabe_beendet() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(serde_json::json!({ "code": code }).to_string()))
                 .unwrap(),

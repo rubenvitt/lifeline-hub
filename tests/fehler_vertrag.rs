@@ -224,7 +224,7 @@ async fn zu_grosser_login_body_liefert_413_im_fehler_envelope() {
 const OEFFENTLICHE_CODE_ROUTEN: [&str; 4] = [
     "/api/auth/totp/finish",
     "/api/auth/app-code/redeem",
-    "/api/geraete/koppeln",
+    "/api/devices/pair",
     "/api/auth/password/set",
 ];
 
