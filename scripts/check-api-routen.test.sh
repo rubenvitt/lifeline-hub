@@ -23,6 +23,21 @@ route_dazu() { # <pfad> → registriert eine Route einzeilig nach `/api/health`
     src/app.rs > src/app.rs.neu && mv src/app.rs.neu src/app.rs
 }
 
+teiluebersetzt() { # <neues Ende>… → auf origin/alpha `/api/einsaetze/{id}/einheiten/{eid}/stornieren`
+  # im Bestand; danach heißt die Route `/api/einsaetze/{id}<neues Ende>` (je Argument eine Route),
+  # das Glossar kennt `units` und `cancel`, der Bestand ist neu geschrieben.
+  route_dazu '/api/einsaetze/{id}/einheiten/{eid}/stornieren'
+  printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/einheiten/{eid}/stornieren' \
+    > scripts/api-routen-bestand.txt
+  git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD
+  grep -vF '/einheiten/{eid}/stornieren' src/app.rs > x && mv x src/app.rs
+  local ende
+  for ende in "$@"; do route_dazu "/api/einsaetze/{id}$ende"; done
+  glossar "api${TAB}-" "auth${TAB}Anmeldung" "cancel${TAB}stornieren" "health${TAB}-" \
+    "login${TAB}-" "me${TAB}-" "units${TAB}Einheiten" "v1${TAB}-"
+  "$SKRIPT_UNTER_TEST" . --bestand > scripts/api-routen-bestand.txt
+}
+
 viele_deutsche_routen() { # <anzahl> → so viele deutsche Routen samt Bestand, ohne origin/alpha
   awk -v n="$1" '{ print } /"\/api\/health"/ {
       for (i = 1; i <= n; i++) print "        .route(\"/api/deutsch" i "/zaehler\", get(h))"
@@ -151,6 +166,14 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+fall "Teilübersetzung ersetzt ihre Bestandszeile (LLH-2056)" gruen \
+  "teiluebersetzt /units/{eid}/cancel" "OK"
+fall "Teilübersetzung mit neuem deutschen Segment" rot \
+  "teiluebersetzt /units/{eid}/streichen" "/api/einsaetze/{id}/units/{eid}/streichen" "neu im Bestand"
+fall "Teilübersetzung mit anderer Segmentzahl" rot \
+  "teiluebersetzt /units/cancel" "/api/einsaetze/{id}/units/cancel" "neu im Bestand"
+fall "zwei Teilübersetzungen aus einer Bestandszeile" rot \
+  "teiluebersetzt /units/{eid}/cancel /units/{uid}/cancel" "neu im Bestand"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

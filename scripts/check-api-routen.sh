@@ -21,7 +21,9 @@
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
-#     nicht, entfällt er;
+#     nicht, entfällt er. Eine Teilübersetzung zählt nicht als neu: Sie ersetzt eine
+#     weggefallene Zeile gleicher Form und behält nur deren deutsche Segmente (LLH-2056, die
+#     Einsatz-Pakete übersetzen erst nach `{id}`, das Präfix zuletzt);
 #   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
 #     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
 #     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
@@ -99,6 +101,45 @@ unbekannte_segmente() {
   '
 }
 
+# Neue Bestandszeilen ohne die Teilübersetzungen (LLH-2056): Eine neue Zeile ersetzt eine
+# weggefallene, wenn beide gleich viele Segmente haben, Platzhalter an denselben Stellen stehen
+# und jedes Segment der neuen außerhalb des Glossars an seiner Stelle schon in der alten stand.
+# So darf `/api/einsaetze/{id}/einheiten` zu `/api/einsaetze/{id}/units` werden, solange das
+# Präfix in einem späteren Paket folgt; ein neues deutsches Segment bleibt rot. Jede weggefallene
+# Zeile deckt höchstens eine neue, der Bestand wächst also nicht.
+ohne_teiluebersetzungen() { # <neue Zeilen> <weggefallene Zeilen> → nicht gedeckte neue Zeilen
+  awk -v glossar="$GLOSSAR" -v weg="$2" '
+    BEGIN {
+      while ((getline zeile < glossar) > 0) {
+        if (zeile ~ /^[[:space:]]*(#|$)/) continue
+        split(zeile, f, "\t")
+        bekannt[f[1]] = 1
+      }
+      anzahl = split(weg, alt, "\n")
+    }
+    function platzhalter(s) { return s ~ /^\{.*\}$/ }
+    function deckt(a, n, b,    m, s, i) {
+      m = split(a, s, "/")
+      if (m != n) return 0
+      for (i = 1; i <= n; i++) {
+        if (platzhalter(b[i]) != platzhalter(s[i])) return 0
+        if (!platzhalter(b[i]) && !(b[i] in bekannt) && b[i] != s[i]) return 0
+      }
+      return 1
+    }
+    NF {
+      n = split($0, seg, "/")
+      for (j = 1; j <= anzahl; j++) {
+        if (alt[j] != "" && !(j in benutzt) && deckt(alt[j], n, seg)) {
+          benutzt[j] = 1
+          next
+        }
+      }
+      print
+    }
+  ' <<< "$1"
+}
+
 if [ "$modus" = bestand ]; then
   unbekannte_segmente "$GLOSSAR" | cut -f1 | sort -u
   exit 0
@@ -151,7 +192,10 @@ fi
 if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
-    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
+    alt_sortiert="$(printf '%s\n' "$alt" | awk 'NF' | sort -u)"
+    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt_sortiert") <(printf '%s\n' "$bestand" | awk 'NF'))"
+    weggefallen="$(comm -23 <(printf '%s\n' "$alt_sortiert") <(printf '%s\n' "$bestand" | awk 'NF'))"
+    neu_zeilen="$(ohne_teiluebersetzungen "$neu_zeilen" "$weggefallen")"
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
