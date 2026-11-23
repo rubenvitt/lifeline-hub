@@ -107,7 +107,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
     let etb_vorher = system_saetze(&pool, e).await.len();
 
     // Vorschau: nichts geschrieben, Abgleich der Posten und Personen.
-    let (s, v) = einlesen(&app, &admin, e, "import/vorschau", ("plan.csv", CSV), None).await;
+    let (s, v) = einlesen(&app, &admin, e, "import/preview", ("plan.csv", CSV), None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["uebernehmbar"], true, "{v}");
     assert_eq!(posten(&v, "Streife 1")["ziel"]["art"], "einheit");
@@ -176,7 +176,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
     );
 
     // Zweiter Lauf derselben Datei: alles unverändert, kein Schreiben, kein ETB.
-    let (s, v2) = einlesen(&app, &admin, e, "import/vorschau", ("plan.csv", CSV), None).await;
+    let (s, v2) = einlesen(&app, &admin, e, "import/preview", ("plan.csv", CSV), None).await;
     assert_eq!(s, StatusCode::OK, "{v2}");
     assert_eq!(v2["zaehlung"]["aenderungen"], 0, "{v2}");
     assert_eq!(v2["zaehlung"]["bloecke_unveraendert"], 10);
@@ -195,7 +195,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
         &app,
         &admin,
         e,
-        "import/vorschau",
+        "import/preview",
         ("plan.xlsx", XLSX),
         None,
     )
@@ -230,7 +230,7 @@ async fn ergaenzt_nur_fehlende_personen_und_entscheidungen_gelten() {
         &app,
         &admin,
         e,
-        "import/vorschau",
+        "import/preview",
         ("b.csv", zweite.as_bytes()),
         None,
     )
@@ -277,7 +277,7 @@ async fn ergaenzt_nur_fehlende_personen_und_entscheidungen_gelten() {
         &app,
         &admin,
         e,
-        "import/vorschau",
+        "import/preview",
         ("b.csv", zweite.as_bytes()),
         Some(json!({"personen": {"m99": {"art": "neu"}}})),
     )
@@ -299,7 +299,7 @@ async fn fehler_sperren_das_uebernehmen_und_unlesbares_ist_400() {
         &app,
         &admin,
         e,
-        "import/vorschau",
+        "import/preview",
         ("f.csv", datei.as_bytes()),
         None,
     )
@@ -337,7 +337,7 @@ async fn fehler_sperren_das_uebernehmen_und_unlesbares_ist_400() {
         ("ohne.csv", &b"Name;Vorname\nA;B\n"[..]),
         ("kaputt.xlsx", &b"PK\x03\x04kaputt"[..]),
     ] {
-        let (s, v) = einlesen(&app, &admin, e, "import/vorschau", (name, inhalt), None).await;
+        let (s, v) = einlesen(&app, &admin, e, "import/preview", (name, inhalt), None).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{name}: {v}");
     }
     let zu_gross = vec![b'a'; 2 * 1024 * 1024 + 1];
@@ -345,7 +345,7 @@ async fn fehler_sperren_das_uebernehmen_und_unlesbares_ist_400() {
         &app,
         &admin,
         e,
-        "import/vorschau",
+        "import/preview",
         ("gross.csv", &zu_gross),
         None,
     )
@@ -368,7 +368,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let bert = login_cookie(&app, "bertram", "bertrampw1").await;
 
     // Beobachter: 403.
-    let (s, _) = einlesen(&app, &bert, e, "import/vorschau", ("plan.csv", CSV), None).await;
+    let (s, _) = einlesen(&app, &bert, e, "import/preview", ("plan.csv", CSV), None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 
     // Ohne Einheiten: die Vorschau nennt es an den Posten, das Übernehmen ist 403.
@@ -388,7 +388,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
         }
     };
     sperre("einheiten").await;
-    let (s, v) = einlesen(&app, &frieda, e, "import/vorschau", ("plan.csv", CSV), None).await;
+    let (s, v) = einlesen(&app, &frieda, e, "import/preview", ("plan.csv", CSV), None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["uebernehmbar"], false);
     assert!(v["meldungen"].as_array().unwrap().iter().any(|m| m["text"]
@@ -400,7 +400,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
 
     // Ohne Personal: 403 schon für die Vorschau (sie zeigt Namen).
     sperre("personal").await;
-    let (s, _) = einlesen(&app, &frieda, e, "import/vorschau", ("plan.csv", CSV), None).await;
+    let (s, _) = einlesen(&app, &frieda, e, "import/preview", ("plan.csv", CSV), None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 
     // Abgeschlossen: 409.

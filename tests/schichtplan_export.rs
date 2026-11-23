@@ -178,7 +178,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
     assert!(mappe.starts_with(b"PK\x03\x04"));
 
     // Wieder einlesen: nur unverändert, jede Person über ihren Bezug.
-    let (s, v) = einlesen(&app, &admin, e, "import/vorschau", &mappe).await;
+    let (s, v) = einlesen(&app, &admin, e, "import/preview", &mappe).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     nur_unveraendert(&v, anzahl);
     let person = |name: &str| {
@@ -209,7 +209,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
         "{}",
         v["zaehlung"]
     );
-    let (s, v) = einlesen(&app, &admin, anderer, "import/vorschau", &mappe).await;
+    let (s, v) = einlesen(&app, &admin, anderer, "import/preview", &mappe).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zaehlung"]["aenderungen"], 0, "{}", v["zaehlung"]);
 }
@@ -268,7 +268,7 @@ async fn planung_export_in_leeren_einsatz_und_zweiter_lauf() {
         "{helfer:?}"
     );
 
-    let (s, v) = einlesen(&app, &admin, e, "import/vorschau", &mappe).await;
+    let (s, v) = einlesen(&app, &admin, e, "import/preview", &mappe).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zaehlung"]["aenderungen"], 0, "{}", v["zaehlung"]);
     assert!(v["bloecke"]

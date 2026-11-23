@@ -649,7 +649,7 @@ async fn grenzwerte_lesen_ohne_modul_abloesung() {
     rolle_setzen(&w.app, &w.admin, w.e, bid, "beobachter").await;
     let bea = login_cookie(&w.app, "beatrix", "beatrixpw1").await;
 
-    for modul in ["einheiten", "personal"] {
+    for modul in ["units", "personnel"] {
         let (s, g) = grenzwerte(&w, &bea, modul).await;
         assert_eq!(s, StatusCode::OK, "{modul}: {g:?}");
         assert_eq!(g["max_dienst_minuten"], 720);

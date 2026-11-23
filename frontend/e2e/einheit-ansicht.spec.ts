@@ -46,7 +46,7 @@ function recordSammel(page: Page, einsatzId: string) {
 /** Körper aller Besatzungs-Zuordnungen über die Sammelroute (LLH-1073 D12), in Reihenfolge. */
 function recordBesatzung(page: Page, einsatzId: string) {
   const bodies: { pfad: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/vehicles/\\d+/besatzung$`);
+  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/vehicles/\\d+/crew$`);
   page.on('request', (r: Request) => {
     if (r.method() === 'POST' && pattern.test(r.url())) {
       bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
