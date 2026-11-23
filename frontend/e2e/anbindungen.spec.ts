@@ -175,9 +175,7 @@ test('Einwurf-Zugang anlegen, einwerfen, widerrufen', async ({ page, request }) 
   await dialog.getByRole('button', { name: 'Anlegen und Adresse zeigen' }).click();
 
   const adresseText = page.locator('[data-lfh="einwurf-adresse-text"]');
-  await expect(adresseText).toHaveText(
-    /\/api\/v1\/intake\/llh_ew_[A-Za-z0-9_-]{43}\/alarm$/,
-  );
+  await expect(adresseText).toHaveText(/\/api\/v1\/intake\/llh_ew_[A-Za-z0-9_-]{43}\/alarm$/);
   const pfad = new URL((await adresseText.textContent())!).pathname;
   await page.getByRole('button', { name: 'Fertig' }).click();
   await expect(adresseText).toHaveCount(0);
