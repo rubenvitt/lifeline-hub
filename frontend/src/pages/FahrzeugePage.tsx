@@ -1012,7 +1012,7 @@ function FahrzeugeInhalt() {
    *
    * `funkrufname` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so passt
    * die Tabelle auf den Fükw-Schirm, auch wenn die Besatzung „Ist … · Soll …“ zeigt; die
-   * Besatzung hält dabei eine Zeile (320 px für „unterbesetzt“ samt Ist und Soll). Den Rest
+   * Besatzung hält dabei eine Zeile (326 px für „unterbesetzt“ samt Ist und Soll). Den Rest
    * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
    * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
    * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
@@ -1026,8 +1026,8 @@ function FahrzeugeInhalt() {
    * je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit LLH-1079 Teil II),
    * `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit nennt ihn mittelbar,
    * das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
-   * 412 px, Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile, ein Ad-hoc-Name neben
-   * „ad-hoc“ 27. Einzeilig ist der Regelfall, keine harte Grenze: ein längerer Ad-hoc-Name und bei
+   * 386 px (Rail 64 px, LLH-2044), Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile,
+   * ein Ad-hoc-Name neben „ad-hoc“ 27. Einzeilig ist der Regelfall, keine harte Grenze: ein längerer Ad-hoc-Name und bei
    * 1366 schon kürzere Namen werden zweizeilig, ebenso eine Einheit mit langem Namen — beides
    * bricht an Wortgrenzen und ist kein Überlauf. Einheit, Status, Besatzung und Aktionen weichen
    * nie. Wer eine Breite ändert, misst neu
@@ -1150,8 +1150,11 @@ function FahrzeugeInhalt() {
       title: 'Besatzung',
       key: 'besatzung',
       // Urteil, Ist und Soll in EINER Zeile (LFH-1149): der randlose `Status` mit Formzeichen
-      // (eon26eat) misst „▲ unterbesetzt“ 95 px, dazu Lücke 12 und „Ist … · Soll …“ 202 px.
-      width: 344,
+      // (eon26eat) misst „▲ unterbesetzt“ 98 px, dazu Lücke 8 und „Ist 0/0/3//3 · Soll 0/1/8//9“
+      // 196 px, mit Polster 326 px (CI-Schriftsatz, LLH-2044). 336 statt 344: seit der Rail 64 px
+      // breit ist (LLH-2044), fehlten dem Funkrufnamen bei 1440 die 4 px für „ad-hoc“ und
+      // „Details“ in seiner Zeile (`e2e/gate1-ueberlauf.spec.ts`, Fükw-Desktop).
+      width: 336,
       // Nach der Ist-Stärke, wie das Abzeichen sie zählt.
       sortWert: (ef) => personal.filter((p) => p.fahrzeug_id === ef.id).length,
       render: (_, ef) =>
