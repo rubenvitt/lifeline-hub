@@ -611,7 +611,7 @@ mod nutzlast {
         Klartext {
             v: 1,
             s: "ELW 1".into(),
-            e: 4,
+            e: Some(4),
             b: 77,
             stufe: BenachrichtigungStufe::Alarm,
             titel: "Sofortmeldung".into(),
@@ -624,6 +624,22 @@ mod nutzlast {
 
     fn groesse(k: &Klartext) -> usize {
         serde_json::to_vec(k).unwrap().len() + 16
+    }
+
+    #[test]
+    fn ohne_einsatz_fehlt_e_und_der_rueckfall_fuehrt_zu_den_anbindungen() {
+        let mut k = klartext(None, None);
+        k.e = None;
+        let v = serde_json::to_value(&k).unwrap();
+        assert!(v.get("e").is_none(), "{v}");
+        assert_eq!(
+            crate::ios_push::inhalt::rueckfall_pfad(None),
+            "/admin/einstellungen/anbindungen"
+        );
+        assert_eq!(
+            crate::ios_push::inhalt::rueckfall_pfad(Some(4)),
+            "/einsaetze/4"
+        );
     }
 
     #[test]
@@ -730,14 +746,14 @@ fn klartext_passt_zu_den_gemeinsamen_faellen() {
     let datei: serde_json::Value =
         serde_json::from_str(include_str!("../../src-tauri/faelle/push-inhalt.json")).unwrap();
     let faelle = datei["faelle"].as_array().unwrap();
-    assert_eq!(faelle.len(), 4);
+    assert_eq!(faelle.len(), 5);
     for fall in faelle {
         let k = &fall["klartext"];
         let text = |f: &str| k.get(f).map(|v| v.as_str().unwrap().to_owned());
         let klartext = Klartext {
             v: k["v"].as_u64().unwrap() as u8,
             s: text("s").unwrap(),
-            e: k["e"].as_i64().unwrap(),
+            e: k.get("e").map(|v| v.as_i64().unwrap()),
             b: k["b"].as_i64().unwrap(),
             stufe: match k["stufe"].as_str().unwrap() {
                 "alarm" => BenachrichtigungStufe::Alarm,

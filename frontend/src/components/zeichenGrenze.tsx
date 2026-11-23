@@ -56,7 +56,7 @@ export function zaehlZeichen(s: string): number {
 }
 
 /**
- * Der Zähler als Element: Mono-Meta mit `tabular-nums` (`frontend/AGENTS.md`, `schriftskala`).
+ * Der Zähler als Element: `meta` (Textschrift) mit `tabular-nums` (`frontend/AGENTS.md`, `schriftskala`).
  * Eine Überlänge steht in `alarmText`, nicht in antds Füllfarbe `colorError` (LFH-874), und
  * zusätzlich als Wort im Text. Gezählt wird wie beim Server nach dem Trimmen.
  */

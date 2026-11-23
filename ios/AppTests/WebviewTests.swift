@@ -12,6 +12,11 @@ final class WebviewTests: XCTestCase {
     let lager = try! ServerAdresse.parse("https://lager.example")
     let elwOrigin = SeitenOrigin(schema: "https", host: "elw.local", port: 8443)
 
+    /// Der erste Webview-Test fing sonst den Kaltstart von WebKit ab (`WebkitVorlauf`).
+    override func setUp() async throws {
+        await WebkitVorlauf.sicherstellen()
+    }
+
     func eintrag(_ adresse: ServerAdresse) -> ServerEintrag {
         var liste = Serverliste()
         return liste.add(adresse)
@@ -36,9 +41,11 @@ final class WebviewTests: XCTestCase {
             fuer: eintrag(elw), skript: skript,
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: nil)
         let skripte = web.configuration.userContentController.userScripts
-        XCTAssertEqual(skripte.map(\.source), [skript, Huellenstil.skript])
+        XCTAssertEqual(
+            skripte.map(\.source), [skript, Huellenstil.skript, Webviewfabrik.unterframeSkript()])
         XCTAssertTrue(skripte.allSatisfy { $0.injectionTime == .atDocumentStart })
-        XCTAssertTrue(skripte.allSatisfy(\.isForMainFrameOnly))
+        // Nur die Sperre des Standorts läuft auch in Unterframes (LLH-2071).
+        XCTAssertEqual(skripte.map(\.isForMainFrameOnly), [true, true, false])
     }
 
     /// tasks.md 8.10: kein Nachfedern, kein Pull-to-Refresh, keine Linkvorschau, Ränder nur über
@@ -113,6 +120,31 @@ final class WebviewTests: XCTestCase {
             """)
         try await Task.sleep(for: .seconds(1))
         XCTAssertEqual(dienste.badges, [])
+    }
+
+    /// Standort über die Brücke (LLH-2071): die Seite des aktiven Servers fragt die Hülle, eine
+    /// Verweigerung kommt als Code 1 der Web-API an.
+    func testDerStandortGehtUeberDieBrueckeUndEineVerweigerungIstCode1() async throws {
+        let (web, _, _) = try await lade(basis: elw.url, aktiv: elw, html: """
+            <script>
+            navigator.geolocation.getCurrentPosition(
+              () => { document.title = 'position'; },
+              (e) => { document.title = 'fehler ' + e.code; },
+              { timeout: 5000 });
+            </script>
+            """)
+        await warte { await self.titel(web) == "fehler 1" }
+        let titel = await titel(web)
+        XCTAssertEqual(titel, "fehler 1")
+    }
+
+    func testEinUnterframeBekommtKeinenStandort() async throws {
+        let (web, _, _) = try await lade(basis: elw.url, aktiv: elw, html: """
+            <iframe srcdoc="<script>navigator.geolocation.getCurrentPosition(() => { parent.document.title = 'position'; }, (e) => { parent.document.title = 'fehler ' + e.code; });</script>"></iframe>
+            """)
+        await warte { await self.titel(web) == "fehler 1" }
+        let titel = await titel(web)
+        XCTAssertEqual(titel, "fehler 1")
     }
 
     func testNachEinemServerwechselGiltDieAlteSeiteNichtMehr() async throws {
@@ -381,4 +413,10 @@ final class Attrappe: Huellendienste {
     }
     func unregisterPush() async throws { abmeldungen += 1 }
     func pushState() async -> (Meldungsfreigabe, kennung: String?) { (freigabe, nil) }
+    var standortfreigabe = Standortfreigabe.verweigert
+    func loadStandortfreigabe() async -> Standortfreigabe { standortfreigabe }
+    func requestStandortfreigabe() async -> Bool { false }
+    func currentPosition(highAccuracy: Bool, timeout: Duration?) async throws -> Standortposition {
+        throw Standortfehler.unavailable
+    }
 }

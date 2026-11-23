@@ -330,7 +330,7 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
           background: rollen.kopf,
           border: `1px solid ${rollen.linieStark}`,
           color: rollen.gedaempft,
-          ...monoStil('meta'),
+          ...monoStil('monoFein'),
         }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>

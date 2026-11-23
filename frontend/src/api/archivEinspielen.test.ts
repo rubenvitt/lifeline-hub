@@ -19,7 +19,7 @@ describe('archivEinspielen-API (LLH-1711)', () => {
     });
     const [xhr] = anfragen;
     expect(xhr.methode).toBe('POST');
-    expect(xhr.url).toBe('/api/admin/archiv/einspielen');
+    expect(xhr.url).toBe('/api/admin/archive/import');
     const fd = xhr.body as FormData;
     expect([...fd.keys()]).toEqual(['schluessel', 'passphrase', 'block']);
     expect(fd.get('schluessel')).toBe('AGE-SECRET-KEY-1ABC');

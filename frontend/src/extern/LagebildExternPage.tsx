@@ -132,7 +132,7 @@ export default function LagebildExternPage() {
     () =>
       (url: string): maplibregl.RequestParameters => {
         const r = absolutiereProxyAnfrage(url);
-        return r.url.startsWith(`${window.location.origin}/api/karte/proxy/`)
+        return r.url.startsWith(`${window.location.origin}/api/map/proxy/`)
           ? { ...r, headers: { Authorization: `Bearer ${schluessel}` } }
           : r;
       },

@@ -399,7 +399,7 @@ async fn hundertzwanzig_akten_gehen_in_mehreren_meldungen() {
 async fn elw_uebergibt_zur_verwahrung_und_schreibt_danach_nicht_mehr() {
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;
-    let (s, _) = post(&elw, &format!("/api/einsaetze/{e}/abschliessen"), json!({})).await;
+    let (s, _) = post(&elw, &format!("/api/einsaetze/{e}/close"), json!({})).await;
     assert!(s.is_success(), "{s}");
     let (s, v) = post(
         &elw,
@@ -3048,7 +3048,7 @@ async fn fristen_am_spiegel_sind_409() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &elw.admin,
         None,
     )
@@ -3062,11 +3062,11 @@ async fn fristen_am_spiegel_sind_409() {
         .to_string();
     for (pfad, body) in [
         (
-            format!("/api/einsaetze/{e}/aufbewahrungsfrist"),
+            format!("/api/einsaetze/{e}/retention-period"),
             json!({"retention_bis": bis, "bestaetigt": true}),
         ),
         (
-            format!("/api/einsaetze/{e}/aufbewahrungsfrist/personenauskunft"),
+            format!("/api/einsaetze/{e}/retention-period/personenauskunft"),
             json!({"retention_bis": bis, "rechtsgrundlage": "Probe", "bestaetigt": true}),
         ),
     ] {
@@ -6345,7 +6345,7 @@ async fn abschliessen(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &i.admin,
         None,
     )

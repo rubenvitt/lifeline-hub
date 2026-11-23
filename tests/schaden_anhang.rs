@@ -208,7 +208,7 @@ async fn override_schaeden(app: &axum::Router, admin: &str, einsatz: i64, body: 
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/schaeden"),
         admin,
         Some(body),
     )
@@ -220,7 +220,7 @@ async fn einsatz_abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         admin,
         None,
     )

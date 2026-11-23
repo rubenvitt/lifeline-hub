@@ -37,7 +37,7 @@ async fn adapter(app: &axum::Router, admin: &str) -> String {
 }
 
 fn geheimnis_pfad(id: &str) -> String {
-    format!("{LISTE}/{id}/geheimnisse/token")
+    format!("{LISTE}/{id}/secrets/token")
 }
 
 async fn spur(pool: &sqlx::SqlitePool) -> Vec<(String, String, Option<String>)> {
@@ -184,7 +184,7 @@ async fn geheimnis_wird_nur_geschrieben_nie_gezeigt() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("{LISTE}/{id}/geheimnisse/passwort"),
+        &format!("{LISTE}/{id}/secrets/passwort"),
         &admin,
         Some(&json!({ "wert": "x" })),
     )
@@ -381,7 +381,7 @@ async fn fuehrungskraft_liest_ohne_einstellungen_und_schreibt_nicht() {
     let (s, liste) = anfrage_json(&app, "GET", LISTE, &fk, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(liste["adapter"][0].get("einstellungen").is_none());
-    let (s, _) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}/versuche"), &fk, None).await;
+    let (s, _) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}/attempts"), &fk, None).await;
     assert_eq!(s, StatusCode::OK);
 
     for (methode, pfad, body) in [
@@ -397,8 +397,8 @@ async fn fuehrungskraft_liest_ohne_einstellungen_und_schreibt_nicht() {
         ),
         ("DELETE", format!("{LISTE}/{id}"), None),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
-        ("POST", format!("{LISTE}/{id}/pruefen"), None),
-        ("POST", format!("{LISTE}/{id}/anhalten"), None),
+        ("POST", format!("{LISTE}/{id}/check"), None),
+        ("POST", format!("{LISTE}/{id}/pause"), None),
     ] {
         let (s, _) = anfrage_json(&app, methode, &pfad, &fk, body.as_ref()).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {pfad}");
@@ -423,7 +423,7 @@ async fn fremde_org_sieht_und_trifft_nichts() {
     assert_eq!(liste["adapter"], json!([]));
     for (methode, pfad, body) in [
         ("GET", format!("{LISTE}/{id}"), None),
-        ("GET", format!("{LISTE}/{id}/versuche"), None),
+        ("GET", format!("{LISTE}/{id}/attempts"), None),
         (
             "PATCH",
             format!("{LISTE}/{id}"),
@@ -431,8 +431,8 @@ async fn fremde_org_sieht_und_trifft_nichts() {
         ),
         ("DELETE", format!("{LISTE}/{id}"), None),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
-        ("POST", format!("{LISTE}/{id}/pruefen"), None),
-        ("POST", format!("{LISTE}/{id}/anhalten"), None),
+        ("POST", format!("{LISTE}/{id}/check"), None),
+        ("POST", format!("{LISTE}/{id}/pause"), None),
     ] {
         let (s, _) = anfrage_json(&app, methode, &pfad, &fremd, body.as_ref()).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {pfad}");
@@ -482,7 +482,7 @@ async fn gekoppelter_elw_schreibt_nicht() {
             Some(json!({ "name": "x" })),
         ),
         ("PUT", geheimnis_pfad(&id), Some(json!({ "wert": "x" }))),
-        ("POST", format!("{LISTE}/{id}/pruefen"), None),
+        ("POST", format!("{LISTE}/{id}/check"), None),
         ("DELETE", format!("{LISTE}/{id}"), None),
     ] {
         let (s, _) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
@@ -497,7 +497,7 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
     let pfad = format!("{LISTE}/{id}");
 
     // Ohne Pflicht-Geheimnis: Fehler, ohne die Art zu fragen.
-    let (s, e) = anfrage_json(&app, "POST", &format!("{pfad}/pruefen"), &admin, None).await;
+    let (s, e) = anfrage_json(&app, "POST", &format!("{pfad}/check"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{e}");
     assert_eq!(e["erfolg"], false);
     assert_eq!(e["fehler_art"], "geheimnis_fehlt");
@@ -512,7 +512,7 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
     )
     .await;
     art.plane(Ok(3));
-    let (_, e) = anfrage_json(&app, "POST", &format!("{pfad}/pruefen"), &admin, None).await;
+    let (_, e) = anfrage_json(&app, "POST", &format!("{pfad}/check"), &admin, None).await;
     assert_eq!(e["erfolg"], true);
     assert_eq!(e["anzahl"], 3);
     let gesehen = art.gesehen();
@@ -524,7 +524,7 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
         art: AdapterFehler::Abgelehnt,
         status: Some(401),
     }));
-    let (_, e) = anfrage_json(&app, "POST", &format!("{pfad}/pruefen"), &admin, None).await;
+    let (_, e) = anfrage_json(&app, "POST", &format!("{pfad}/check"), &admin, None).await;
     assert_eq!(e["fehler_art"], "abgelehnt");
     assert_eq!(e["status"], 401);
 
@@ -534,7 +534,7 @@ async fn pruefen_uebernimmt_nichts_und_aendert_den_zustand_nicht() {
     let (_, a) = anfrage_json(&app, "GET", &pfad, &admin, None).await;
     assert_eq!(a["zustand"], "wartet");
     assert_eq!(a["fehlversuche"], 0);
-    let (_, versuche) = anfrage_json(&app, "GET", &format!("{pfad}/versuche"), &admin, None).await;
+    let (_, versuche) = anfrage_json(&app, "GET", &format!("{pfad}/attempts"), &admin, None).await;
     assert_eq!(versuche.as_array().unwrap().len(), 3);
     assert_eq!(versuche[0]["probe"], true);
     assert_eq!(versuche[0]["fehler_art"], "abgelehnt");
@@ -548,15 +548,15 @@ async fn anhalten_fortsetzen_loeschen() {
     let id = adapter(&app, &admin).await;
     let pfad = format!("{LISTE}/{id}");
 
-    let (s, a) = anfrage_json(&app, "POST", &format!("{pfad}/anhalten"), &admin, None).await;
+    let (s, a) = anfrage_json(&app, "POST", &format!("{pfad}/pause"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{a}");
     assert_eq!(a["zustand"], "aus");
-    let (s, _) = anfrage_json(&app, "POST", &format!("{pfad}/anhalten"), &admin, None).await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{pfad}/pause"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s, a) = anfrage_json(&app, "POST", &format!("{pfad}/fortsetzen"), &admin, None).await;
+    let (s, a) = anfrage_json(&app, "POST", &format!("{pfad}/resume"), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(a["zustand"], "wartet");
-    let (s, _) = anfrage_json(&app, "POST", &format!("{pfad}/fortsetzen"), &admin, None).await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{pfad}/resume"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     anfrage_json(

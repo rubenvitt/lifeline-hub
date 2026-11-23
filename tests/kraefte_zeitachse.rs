@@ -596,7 +596,7 @@ async fn rechte_und_modulsperre() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/personal", w.e),
+        &format!("/api/einsaetze/{}/module-overrides/personal", w.e),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -632,7 +632,7 @@ async fn modul_sichtbar(w: &Welt, modul: &str, sichtbar: bool) {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/{modul}", w.e),
+        &format!("/api/einsaetze/{}/module-overrides/{modul}", w.e),
         &w.admin,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":null}}"#

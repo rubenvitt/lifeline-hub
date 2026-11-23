@@ -72,7 +72,7 @@ const ZONE = 'Asia/Tokyo';
 function rendere(suche = '', client = neuerQueryClient()) {
   server.use(
     http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/einstellungen', () =>
+    http.get('/api/einsaetze/7/settings', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: ZONE, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),

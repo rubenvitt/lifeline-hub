@@ -32,7 +32,7 @@ describe('waehleInitialeBasemap', () => {
     const c = config({
       online_styles: [],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=x',
     });
     expect(waehleInitialeBasemap(c, null)).toEqual({
       modus: 'offline',
@@ -94,7 +94,7 @@ describe('waehleInitialeBasemap', () => {
     const c = config({
       online_styles: [],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=x',
     });
     expect(waehleInitialeBasemap(c, gespeichert)).toEqual({
       modus: 'offline',
@@ -112,7 +112,7 @@ describe('waehleInitialeBasemap', () => {
   it('nutzt den Einsatz-Default, wenn keine gemerkte Wahl existiert', () => {
     const c = config({
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=x',
     });
     expect(waehleInitialeBasemap(c, null, 'offline')).toEqual({
       modus: 'offline',
@@ -133,7 +133,7 @@ describe('waehleInitialeBasemap', () => {
   it('gemerkte Wahl schlägt den Einsatz-Default', () => {
     const c = config({
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=x',
     });
     expect(
       waehleInitialeBasemap(

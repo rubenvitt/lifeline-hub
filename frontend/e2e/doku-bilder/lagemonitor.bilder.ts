@@ -47,8 +47,8 @@ const ABSCHNITT_FLAECHE = JSON.stringify({
     ],
   ],
 });
-const STIL_PFAD = '/api/karte/proxy/9/style.json';
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const STIL_PFAD = '/api/map/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 
 /** Kartengrundlage ohne Netz aus `e2e/kartenFixture.ts` (docs/anwender/AGENTS.md, „Bilder“). */
 async function kartengrundlage(geraet: Page) {

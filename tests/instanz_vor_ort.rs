@@ -422,14 +422,7 @@ async fn vor_ort_macht_die_org_nicht_verteilend_und_kennt_kein_elw_verloren() {
 }
 
 async fn archiv_einspielen_verfuegbar(i: &Instanz) -> bool {
-    let (s, v) = common::anfrage(
-        &i.app,
-        "GET",
-        "/api/admin/archiv/einspielen",
-        &i.admin,
-        None,
-    )
-    .await;
+    let (s, v) = common::anfrage(&i.app, "GET", "/api/admin/archive/import", &i.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v["verfuegbar"].as_bool().unwrap()
 }
@@ -458,7 +451,7 @@ async fn abschliessen_und_nachbereitung_vorbei(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &i.admin,
         None,
     )

@@ -233,7 +233,7 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     bereit();
     let freigabeAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () => {
+      http.get('/api/einsaetze/7/module-access', () => {
         freigabeAbrufe += 1;
         return HttpResponse.json(freigabenFixture());
       }),

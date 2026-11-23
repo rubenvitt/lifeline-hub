@@ -54,11 +54,15 @@
   .kraefte-print-root .ant-table td {
     padding: 3px 5px !important;
   }
-  /* `th.ant-table-cell` hebt die Spezifität über die Zellregel in `druck.css`. */
+  /* `th.ant-table-cell` hebt die Spezifität über die Zellregel in `druck.css`. Die Größe steht auf
+     Papier in pt (7,5 pt = 10 px, wie vor dem Schriftboden): am Schirm tragen die Köpfe die
+     Augenbraue (11 px, LLH-2044), breiter gesetzt drückten sie die Einheit unter ihre
+     Mindestbreite und 40 Kräfte auf fünf Blätter. Druck ist vom Boden ausgenommen (ADR-0087). */
   .kraefte-print-root .ant-table thead th.ant-table-cell {
     overflow-wrap: normal !important;
     letter-spacing: 0 !important;
     text-transform: none !important;
+    font-size: 7.5pt !important;
   }
 
   /* Die Neutralisierer der Tabelle (Bildlaufcontainer, stehende Kopfzeile, fixierte Spalten,

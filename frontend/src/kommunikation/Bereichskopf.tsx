@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import Datenstand from '../components/Datenstand';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, schriftStil, useRollen } from '../components/instrument';
 
 /**
  * Kopf eines Inhaltsbereichs UNTER dem Seitenkopf, etwa ein Reiter mit eigener Menge und
- * eigener Anlegen-Aktion: Augenbraue als echte Überschrift (Vorgabe `h3`), Mengen in Mono,
+ * eigener Anlegen-Aktion: Augenbraue als echte Überschrift (Vorgabe `h3`), Mengen in `meta`,
  * Datenstand, rechts die Aktion — statt eines zweiten großen Titelblocks.
  */
 export default function Bereichskopf({
@@ -15,7 +15,7 @@ export default function Bereichskopf({
   ueberschrift = 'h3',
 }: {
   titel: string;
-  /** Mono-Mengen („3 offen · 2 abgeschlossen"). */
+  /** Mengen („3 offen · 2 abgeschlossen"). */
   meta?: ReactNode;
   dataUpdatedAt?: number;
   aktion?: ReactNode;
@@ -46,7 +46,7 @@ export default function Bereichskopf({
       >
         <Augenbraue als={ueberschrift}>{titel}</Augenbraue>
         {meta != null && (
-          <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{meta}</span>
+          <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>{meta}</span>
         )}
         {dataUpdatedAt != null && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
       </div>

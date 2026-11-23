@@ -307,7 +307,7 @@ export function einsatzaktePfad(einsatzId: number): string {
 
 /** Pfad des ZIP mit Anhängen und Tabellen der Einsatzakte (LLH-1835, `src/routes/einsatzakte.rs`). */
 export function einsatzakteZipPfad(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}/einsatzakte/anlagen.zip`;
+  return `/api/einsaetze/${einsatzId}/case-file/attachments.zip`;
 }
 
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */

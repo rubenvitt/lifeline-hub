@@ -113,7 +113,9 @@ data class ServerAdresse private constructor(val text: String, val host: String)
                 hostRoh = hostPort
                 portText = null
             }
-            val host = hostRoh.lowercase()
+            // Ein Host mit Umlauten gilt in der Form, die der WebView als Origin meldet (LLH-2070);
+            // wie in `adresse.rs` scheitert ein unbrauchbarer Host schon beim Lesen.
+            val host = Idna.toAscii(hostRoh) ?: throw AdressException(AdressError.UNLESBAR)
 
             if (schema in schemataMitHost && host.isEmpty() && !dreiSchraegstriche) {
                 throw AdressException(AdressError.OHNE_HOST)

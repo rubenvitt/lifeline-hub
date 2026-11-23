@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { dialogSteht } from './dialog-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
 const ADMIN = 'admin';
@@ -30,8 +31,12 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
   const uhsName = `BHP DnD ${Date.now()}`;
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
-  await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  // Erst klicken, wenn der Dialog steht (`dialog-kern.ts`, LLH-2065): in der Einblendung ging
+  // „Anlegen“ unter Last verloren, kein POST, der Dialog blieb offen (CI alpha 8115b5ae).
+  const anlegen = await dialogSteht(page, 'Unfallhilfsstelle anlegen');
+  await anlegen.getByPlaceholder('z. B. BHP 50').fill(uhsName);
+  await anlegen.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  await expect(anlegen).toBeHidden();
 
   // Detail öffnen — der Grundriss wird direkt angezeigt.
   await page.getByRole('button', { name: uhsName, exact: true }).click();

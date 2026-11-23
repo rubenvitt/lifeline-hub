@@ -179,7 +179,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   berichtigt, nachgetragen, Anhang, Dokument oder Rückverweis brechen die Folge, ebenso die
   Lesemarke. Schlüssel ist der älteste Eintrag (offen bleibt offen); ein Sprung klappt im Render
   auf. Kein Bündel unter `typ=system`, unter `q` und nie im Druck.
-- **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
+- **Modulzähler** (`GET …/module-counts`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
   Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat,
   Lagemeldungen und Nachforderungen (davon überfällig, LLH-1145) als Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
   SQL-Fragmente wie die Listen (LFH-935, `tests/modul_zaehler_abfragen.rs`). Ablösung (Uhr), Betreuung und Wetter/Pegel (LFH-663) zählt der Browser

@@ -909,7 +909,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &hub.admin,
         None,
     )
@@ -1891,7 +1891,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &hub.admin,
         None,
     )
@@ -1906,7 +1906,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/wiedereroeffnen"),
+        &format!("/api/einsaetze/{s}/reopen"),
         &elw.admin,
         Some(&json!({ "grund": "Versehen" })),
     )
@@ -1916,7 +1916,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/wiedereroeffnen"),
+        &format!("/api/einsaetze/{e}/reopen"),
         &hub.admin,
         Some(&json!({ "grund": "Versehen" })),
     )
@@ -2040,7 +2040,7 @@ async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &hub.admin,
         None,
     )
@@ -2064,7 +2064,7 @@ async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/wiedereroeffnen"),
+        &format!("/api/einsaetze/{e}/reopen"),
         &hub.admin,
         Some(&json!({ "grund": "Versehen" })),
     )

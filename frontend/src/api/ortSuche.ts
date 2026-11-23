@@ -3,10 +3,10 @@
 import { apiGet, mitParametern } from './client';
 import type { OrtSucheAntwort } from './karteOrtSuche';
 
-/** GET /api/einsaetze/:id/ort-suche — Recht der Einsatzdaten, bevorzugt die Umgebung des Einsatzorts. */
+/** GET /api/einsaetze/:id/place-search — Recht der Einsatzdaten, bevorzugt die Umgebung des Einsatzorts. */
 export function sucheOrtImEinsatz(einsatzId: number, begriff: string): Promise<OrtSucheAntwort> {
   return apiGet<OrtSucheAntwort>(
-    mitParametern(`/api/einsaetze/${einsatzId}/ort-suche`, { q: begriff }),
+    mitParametern(`/api/einsaetze/${einsatzId}/place-search`, { q: begriff }),
   );
 }
 

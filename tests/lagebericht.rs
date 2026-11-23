@@ -510,7 +510,7 @@ async fn einsatzfuehrung_laesst_einsatzleitung_ohne_org_rolle_lesen_und_schreibe
     let (status, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/lageberichte"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/lageberichte"),
         &leonie,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )

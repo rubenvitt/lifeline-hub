@@ -243,7 +243,7 @@ describe('Personendaten — Haushalt umbauen (LLH-1615)', () => {
 
   it('ohne Modul Betreuung oder ohne Stelle im Verbleib keine Aktionen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
       ),
     );

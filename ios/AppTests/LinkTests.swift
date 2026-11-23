@@ -16,6 +16,11 @@ final class LinkTests: XCTestCase {
     private var geteilt: [URL] = []
     private var halter: [AnyObject] = []
 
+    /// Der erste Webview-Test fing sonst den Kaltstart von WebKit ab (`WebkitVorlauf`).
+    override func setUp() async throws {
+        await WebkitVorlauf.sicherstellen()
+    }
+
     func testEinFremderLinkInNeuemFensterOeffnetDasSystem() async throws {
         let web = try await lade("<a id='a' href='https://www.dwd.de/warnungen' target='_blank'>DWD</a>")
         _ = try await web.evaluateJavaScript("document.getElementById('a').click(); 0")
@@ -72,7 +77,7 @@ final class LinkTests: XCTestCase {
         // 30 s: der erste Webinhalt im frisch gestarteten Simulator kam im CI erst nach über 80 s
         // (Lauf 44427089802, iPhone und iPad nebeneinander); geprüft wird, dass die Datei ankommt.
         await warte(sekunden: 30) { !self.geteilt.isEmpty }
-        let datei = try XCTUnwrap(geteilt.first)
+        let datei = try XCTUnwrap(geteilt.first, "kein Download im Teilen-Blatt; \(downloadstand())")
         XCTAssertEqual(datei.lastPathComponent, "etb.csv")
         XCTAssertEqual(try String(contentsOf: datei, encoding: .utf8), "Zeit;Text\n12:00;Lage")
         XCTAssertTrue(datei.path.hasPrefix(Downloads.basis.path))
@@ -103,6 +108,16 @@ final class LinkTests: XCTestCase {
         }
         XCTAssertTrue(bereit, "Testseite nach 30 s nicht im Webview geladen")
         return web
+    }
+
+    /// Für die Meldung eines roten Download-Tests: wie weit kam der Download? Eine Datei unter
+    /// `Downloads.basis` heißt, WebKit hat ihn begonnen und ein Ziel bekommen, aber nicht beendet;
+    /// keine Datei heißt, er begann nicht (LLH-2073).
+    private func downloadstand() -> String {
+        let dateien = FileManager.default.enumerator(at: Downloads.basis, includingPropertiesForKeys: nil)?
+            .compactMap { ($0 as? URL)?.lastPathComponent } ?? []
+        let ziele = dateien.isEmpty ? "keine" : dateien.joined(separator: ", ")
+        return "Dateien unter Downloads: \(ziele); gemeldet: \(gemeldet); geöffnet: \(geoeffnet)"
     }
 
     /// Adressen der gemeldeten Ladefehler, in Reihenfolge.

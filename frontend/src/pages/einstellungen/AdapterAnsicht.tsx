@@ -451,7 +451,9 @@ export default function AdapterAnsicht() {
             </Datenfeld>
             <Datenfeld label="Art">
               {adapter.art_bezeichnung ?? adapter.art}{' '}
-              <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{adapter.art}</span>
+              <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>
+                {adapter.art}
+              </span>
             </Datenfeld>
             <Datenfeld label="Angelegt">{zeit(adapter.angelegt_at)}</Datenfeld>
           </Datenraster>
