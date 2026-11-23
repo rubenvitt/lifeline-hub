@@ -840,6 +840,11 @@ pub async fn melden(
     anfrage: GekoppelteInstanz,
 ) -> Result<Response, AppError> {
     let body: MeldenAnfrage = anfrage.json()?;
+    // Sperrt das Push-Relais diese Instanz, erfährt es der ELW (LLH-2074).
+    let ios_push_gesperrt_seit = match state.live.ios_push() {
+        Some(_) => crate::ios_push::repo::relais_gesperrt_seit(&state.pool).await?,
+        None => None,
+    };
     let antwort = melden::handle_meldung(
         &state.pool,
         &anfrage.identitaet,
@@ -847,6 +852,7 @@ pub async fn melden(
         &body,
         state.live.web_push().is_some(),
         state.live.ios_push().is_some(),
+        ios_push_gesperrt_seit,
     )
     .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))

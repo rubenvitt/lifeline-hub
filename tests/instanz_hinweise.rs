@@ -319,6 +319,60 @@ async fn hub_ohne_push_meldet_keinen_push() {
     assert_eq!(faehigkeiten(&elw.i).await, (true, false));
 }
 
+// ── Sperre des Push-Relais am Hub (LLH-2074) ─────────────────────────────────────────────────
+
+const SPERRE_SEIT: &str = "2026-11-23 08:15:00";
+
+/// Der Hub wird vom Relais gesperrt (`403`), wie `ios_push::repo::relais_gesperrt_setzen` es
+/// festhält.
+async fn hub_sperren(hub: &Instanz) {
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO ios_push_relais (id, server_id, geheimnis, gesperrt_at) \
+             VALUES (1, 's', 'g', '{SPERRE_SEIT}') \
+             ON CONFLICT(id) DO UPDATE SET gesperrt_at = excluded.gesperrt_at"
+        ),
+    )
+    .await;
+}
+
+async fn sperre_am_elw(elw: &Instanz) -> Option<String> {
+    eine(
+        &elw.pool,
+        "SELECT gegenueber_ios_push_gesperrt_seit FROM instanz_kopplung LIMIT 1",
+    )
+    .await
+}
+
+#[tokio::test]
+async fn gesperrter_hub_meldet_seine_sperre_an_den_elw() {
+    let hub = seite_mit(false, true).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None, "vor der Sperre");
+    hub_sperren(&hub.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await.as_deref(), Some(SPERRE_SEIT));
+    exec(&hub.i.pool, "UPDATE ios_push_relais SET gesperrt_at = NULL").await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None, "die Sperre ist gefallen");
+}
+
+/// Ohne `--ios-push` zählt eine alte Zeile des Relais nicht: der Hub bietet den Kanal gar nicht an.
+#[tokio::test]
+async fn hub_ohne_ios_push_meldet_keine_sperre() {
+    let hub = seite(false).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    hub_sperren(&hub.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None);
+}
+
 // ── Hinweise am Hub (Aufgaben 2.2, 3.3, 3.4) ────────────────────────────────────────────────
 
 /// Spec `benachrichtigungen`, „Hinweise zu einem Einsatz des ELW entstehen auch am Hub“: die

@@ -195,6 +195,13 @@ pub struct MeldenAntwort {
     /// älterer Stand nennt es nicht: dann `false`.
     #[serde(default)]
     pub ios_push: bool,
+    /// Seit wann das Push-Relais die erreichte Seite sperrt (`ios_push_relais.gesperrt_at`, UTC;
+    /// LLH-2074). Nur mit iOS-Push; die Sperre zählt, bis wieder ein Versand durchgeht, auch nach
+    /// Ablauf von `SPERRE_GILT_STUNDEN`. Die meldende Seite zeigt sie der Einsatzleitung, pusht
+    /// aber nicht selbst: die Geräte sind am Hub angemeldet. Ein älterer Stand nennt es nicht:
+    /// dann nicht gesperrt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ios_push_gesperrt_seit: Option<String>,
     /// Die erreichte Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7); wie
     /// [`MeldenAnfrage::rolle_mitarbeit`].
     #[serde(default)]
@@ -911,6 +918,7 @@ async fn melden_einmal_mit(
             a.hinweise,
             a.web_push,
             a.ios_push,
+            a.ios_push_gesperrt_seit.as_deref(),
             a.rolle_mitarbeit,
         )
         .await?;
@@ -1302,6 +1310,7 @@ pub async fn handle_meldung(
     anfrage: &MeldenAnfrage,
     web_push: bool,
     ios_push: bool,
+    ios_push_gesperrt_seit: Option<String>,
 ) -> Result<MeldenAntwort, AppError> {
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
@@ -1730,6 +1739,7 @@ pub async fn handle_meldung(
         hinweise: true,
         web_push,
         ios_push,
+        ios_push_gesperrt_seit: ios_push_gesperrt_seit.filter(|_| ios_push),
         rolle_mitarbeit: rolle_mitarbeit_melden(),
     })
 }
@@ -1850,6 +1860,7 @@ mod tests {
             hinweise: true,
             web_push: false,
             ios_push: false,
+            ios_push_gesperrt_seit: None,
             rolle_mitarbeit: true,
         }
     }
@@ -2151,6 +2162,10 @@ mod tests {
         assert!(!a.hinweise);
         assert!(!a.web_push);
         assert!(!a.ios_push);
+        assert_eq!(
+            a.ios_push_gesperrt_seit, None,
+            "älterer Hub: nicht gesperrt"
+        );
     }
 
     #[test]
