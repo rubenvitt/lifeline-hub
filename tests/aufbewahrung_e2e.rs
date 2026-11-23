@@ -1038,7 +1038,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PUT",
-        &format!("{basis}/einstellungen"),
+        &format!("{basis}/settings"),
         json!({ "retention_dauer_tage": 1 }),
     )
     .await;
@@ -1216,7 +1216,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/abschliessen"),
+        &format!("{basis}/close"),
         json!({}),
     )
     .await;

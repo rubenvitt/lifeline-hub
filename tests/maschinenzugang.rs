@@ -1058,7 +1058,7 @@ async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &admin,

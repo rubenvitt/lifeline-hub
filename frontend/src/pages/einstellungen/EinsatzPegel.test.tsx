@@ -97,7 +97,7 @@ function stelleBereit(a: Aufbau = {}) {
   let liste = a.liste ?? [HMUE, WAHN];
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/1/pegel', () =>

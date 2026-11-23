@@ -446,7 +446,7 @@ export interface components {
          * @enum {string}
          */
         AbschlussKraftArt: "einheit" | "fahrzeug";
-        /** @description Antwort von `GET /api/einsaetze/{id}/abschluss/pruefung`: die offenen Punkte je Gruppe. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe. */
         AbschlussPruefung: {
             auftraege: components["schemas"]["AbschlussGruppe"];
             /** @description Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen. */
@@ -1639,7 +1639,7 @@ export interface components {
             /** @description In der Reihenfolge von [`BenachrichtigungVorgaben::funktionen`]. */
             still: components["schemas"]["VorgabeFunktion"][];
         };
-        /** @description `GET /api/einsaetze/{id}/benachrichtigung-vorgaben` (design.md D4). */
+        /** @description `GET /api/einsaetze/{id}/notification-defaults` (design.md D4). */
         BenachrichtigungVorgaben: {
             /** @description Jede einstellbare Art in Katalogreihenfolge. */
             arten: components["schemas"]["BenachrichtigungVorgabeArt"][];
@@ -6203,7 +6203,7 @@ export interface components {
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
-         *     `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+         *     `GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter
          *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
          */
         ModulFreigabe: {
@@ -6220,7 +6220,7 @@ export interface components {
             zugriff: boolean;
         };
         /**
-         * @description Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
+         * @description Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */
         ModulZaehlerAnzeige: {

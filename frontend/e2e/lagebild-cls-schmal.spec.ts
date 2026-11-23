@@ -134,9 +134,9 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
   // (LLH-1481): gehalten zeigte er keinen Ladezustand, den man messen kann.
   const rahmen = (pfad: string) =>
     pfad === kopf ||
-    pfad === `${kopf}/modul-freigaben` ||
+    pfad === `${kopf}/module-access` ||
     (seite === 'ueberblick' &&
-      [`${kopf}/modul-zaehler`, ...UEBERBLICK_GLIEDERUNG.map((l) => `${kopf}/${l}`)].includes(
+      [`${kopf}/module-counts`, ...UEBERBLICK_GLIEDERUNG.map((l) => `${kopf}/${l}`)].includes(
         pfad,
       ));
   const haelt = (pfad: string) =>

@@ -650,7 +650,7 @@ describe('Schnellerfassung', () => {
 
   it('LFH-888: ohne Zugriff auf Lageberichte entfällt der Sprung, der Typ „Lage" bleibt', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/modul-freigaben', () =>
+      http.get('/api/einsaetze/:id/module-access', () =>
         HttpResponse.json(freigabenFixture({ lageberichte: { zugriff: false } })),
       ),
     );
@@ -1840,7 +1840,7 @@ describe('Auch in den Meldungseingang', () => {
 
   it('ohne Freigabe der Meldungen aus und gesperrt mit Grund; sendet false', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/modul-freigaben', () =>
+      http.get('/api/einsaetze/:id/module-access', () =>
         HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
       ),
     );

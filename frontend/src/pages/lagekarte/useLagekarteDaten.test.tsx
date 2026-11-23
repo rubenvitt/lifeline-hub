@@ -249,7 +249,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/karte/config', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/einsaetze/5/einstellungen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/5/settings', () => new HttpResponse(null, { status: 500 })),
       // 403 auf die Rückmeldungen ist für Rollen ohne „Meldungen" der Normalfall und gehört nicht
       // in den Katalog.
       http.get(
@@ -297,7 +297,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -431,7 +431,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -449,7 +449,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-freigaben', () => {
+      http.get('/api/einsaetze/5/module-access', () => {
         zaehler.freigaben += 1;
         return HttpResponse.json(freigabenFixture(freigaben));
       }),
@@ -606,7 +606,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -624,7 +624,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
       http.get('/api/einsaetze/5/betreuung', () => {
@@ -806,7 +806,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.bezirke).toHaveLength(1);
     // Die Leitung sperrt die Betreuung; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
     server.use(
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
       ),
     );
@@ -821,7 +821,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 
     // Erst die gesperrte Evakuierung nimmt sie, trotz Altstand im Cache.
     server.use(
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(
           freigabenFixture({ betreuung: { zugriff: false }, evakuierung: { zugriff: false } }),
         ),
@@ -955,7 +955,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -973,7 +973,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
       http.get('/api/einsaetze/5/bereitstellungsraeume', () => {
@@ -1154,7 +1154,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -1170,7 +1170,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
         '/api/einsaetze/5/karte/fuehrungskraefte',
         '/api/einsaetze/5/meldungen/rueckmeldungen',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
       http.get('/api/einsaetze/5/tiere', () => {
@@ -1352,7 +1352,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einstellungen', () =>
+      http.get('/api/einsaetze/5/settings', () =>
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
@@ -1370,7 +1370,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
         zaehle('/api/einsaetze/5/schaeden/marker');
         return schaeden();
       }),
-      http.get('/api/einsaetze/5/modul-freigaben', async () => {
+      http.get('/api/einsaetze/5/module-access', async () => {
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
         if (freigaben === 'haengt') return new Promise<Response>(() => {});
         return HttpResponse.json(freigabenFixture(freigaben));

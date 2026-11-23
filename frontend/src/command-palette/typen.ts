@@ -171,7 +171,7 @@ export interface BefehlKontext {
   benutzer: BenutzerAnzeige | null;
   einsaetze: EinsatzAnzeige[];
   /**
-   * Modulfreigaben des Servers für den aktuellen Einsatz (`GET …/modul-freigaben`, LFH-669).
+   * Modulfreigaben des Servers für den aktuellen Einsatz (`GET …/module-access`, LFH-669).
    * Fehlen sie (laden, Fehler, kein Einsatz), ist kein Modul freigegeben (`istModulFreigegeben`).
    */
   freigaben?: ModulFreigaben;

@@ -149,7 +149,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )

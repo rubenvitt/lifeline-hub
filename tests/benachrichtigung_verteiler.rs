@@ -112,7 +112,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/modul-overrides/{modul}", self.einsatz),
+            &format!("/api/einsaetze/{}/module-overrides/{modul}", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )

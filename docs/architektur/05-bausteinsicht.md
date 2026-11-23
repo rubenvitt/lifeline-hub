@@ -121,8 +121,8 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/einsaetze`, `…/{id}/modul-zaehler`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
-| `src/einsatzakte` | Einsatzakte (LLH-1835): ZIP mit allen Anhängen (bereinigt), den Tabellen von Betroffenen, Tieren und Schäden und einem Inhaltsverzeichnis; Sammeln über die Linker, Bausperre je Einsatz und Server. Das Druckstück der Akte baut der Browser | `GET …/{id}/einsatzakte/anlagen.zip`; nutzt `routes::support::anhang_fuer_akte`, `routes::backup::chunk_stream` |
+| `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/einsaetze`, `…/{id}/module-counts`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
+| `src/einsatzakte` | Einsatzakte (LLH-1835): ZIP mit allen Anhängen (bereinigt), den Tabellen von Betroffenen, Tieren und Schäden und einem Inhaltsverzeichnis; Sammeln über die Linker, Bausperre je Einsatz und Server. Das Druckstück der Akte baut der Browser | `GET …/{id}/case-file/attachments.zip`; nutzt `routes::support::anhang_fuer_akte`, `routes::backup::chunk_stream` |
 | `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/einsatz-vorlagen`; nutzt `einsatz::repo::anlegen_tx` |
 | `src/einsatzabschnitt` | Abschnittsbaum mit Leiter, Fläche und Sprechgruppen; schreibt System-ETB beim Anlegen | `…/{id}/abschnitte`; Live `abschnitt` |
 | `src/etb` | Einsatztagebuch: Eintragstypen, Einfügen als einzige Stelle, Lesemarke, Zähler | `…/{id}/etb`; Live `etb` |
@@ -140,7 +140,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | `src/lage_zone` | Freie Gefahren- und Absperrzonen als GeoJSON | `…/{id}/zonen`; Live `lage_zone` |
 | `src/freies_zeichen` | Taktische Zeichen ohne Fachobjekt (`zeichen_spec`) | `…/{id}/freie-zeichen`; Live `freies_zeichen` |
 | `src/gefahr` | Gefahrengebiete aus Zonen mit Gefahrenmatrix und Beurteilung | `…/{id}/gefahrengebiete`; Live `gefahr` |
-| `src/geocoding` | Peilung (offline), Reverse-Geocoding und Ortssuche über einen Nominatim-kompatiblen Dienst mit Cache und Drossel | `/api/ort-suche`, `/api/ort-vorschau`, `…/{id}/ort-suche`, `…/{id}/ort-vorschau`, `…/{id}/karte/ort-suche` |
+| `src/geocoding` | Peilung (offline), Reverse-Geocoding und Ortssuche über einen Nominatim-kompatiblen Dienst mit Cache und Drossel | `/api/ort-suche`, `/api/ort-vorschau`, `…/{id}/place-search`, `…/{id}/place-preview`, `…/{id}/karte/ort-suche` |
 | `src/schaden` | Schadenregister mit Statusmaschine, Kennzahlen, Export und Anhängen | `…/{id}/schaeden`; Live `schaden` |
 | `src/tier` | Tierregister mit Status, Halterbezug und Anhängen | `…/{id}/tiere`; Live `tier` |
 | `src/pegel` | Maßgebliche PEGELONLINE-Pegel mit Trend und Vorhersage-Vorschlag | `…/{id}/pegel`; Cache über `karte::cache` |
@@ -210,7 +210,7 @@ Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGEN
 | `src/fernmeldewesen` | Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen | `…/{id}/stab/kommunikationsplan`, `…/{id}/stab/fernmeldeskizze`; Live `fernmeldewesen` |
 | `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/fuehrungsfunktionen`, `/api/org-fuehrungsfunktionen/{funktion}` |
 | `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul | `…/{id}/lagebesprechung[en]`; Live `lagebesprechung` |
-| `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/programmpunkte`, Feld `programm` von `…/{id}/lagemonitor`; Live `einsatz` |
+| `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/agenda-items`, Feld `programm` von `…/{id}/lagemonitor`; Live `einsatz` |
 | `src/lagebericht` | Lageberichte nach Vorlage (Registry synchron zu `frontend/src/lageberichte/vorlagen.ts`) | `…/{id}/lageberichte`; Live `lagebericht` |
 | `src/vorlagendokument` | Gemeinsamer Kern von Befehl und Lagebericht: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht` genutzt |
 | `src/infotelefon` | Bürgertelefon, eigenes Modul `infotelefon`: Anrufprotokoll mit Rückrufbedarf | `…/{id}/stab/infotelefon`; Live `infotelefon` |

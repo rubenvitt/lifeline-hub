@@ -275,7 +275,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     let im_einsatz = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/programmpunkte"),
+        &format!("/api/einsaetze/{einsatz}/agenda-items"),
     )
     .await;
     assert_eq!(namen_und_zeiten(&im_einsatz), programm, "derselbe Ablauf");
@@ -355,7 +355,7 @@ async fn laufender_einsatz_ueberspringt_gleiche_punkte() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/programmpunkte"),
+        &format!("/api/einsaetze/{einsatz}/agenda-items"),
         json!({"bezeichnung": "EINLASS", "zeitpunkt_at": "2027-03-13 17:00:00"}),
     )
     .await;
@@ -381,7 +381,7 @@ async fn laufender_einsatz_ueberspringt_gleiche_punkte() {
     let im_einsatz = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/programmpunkte"),
+        &format!("/api/einsaetze/{einsatz}/agenda-items"),
     )
     .await;
     assert_eq!(
@@ -409,7 +409,7 @@ async fn mehr_als_fuenfzig_sperren_die_uebernahme() {
         let (s, v) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{einsatz}/programmpunkte"),
+            &format!("/api/einsaetze/{einsatz}/agenda-items"),
             json!({"bezeichnung": format!("Punkt {i}"), "zeitpunkt_at": "2027-03-13 12:00:00"}),
         )
         .await;
@@ -438,7 +438,7 @@ async fn mehr_als_fuenfzig_sperren_die_uebernahme() {
     let anzahl = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/programmpunkte"),
+        &format!("/api/einsaetze/{einsatz}/agenda-items"),
     )
     .await
     .as_array()

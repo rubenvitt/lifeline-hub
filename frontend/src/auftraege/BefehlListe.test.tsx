@@ -333,7 +333,7 @@ describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () =
  */
 function renderMitZone() {
   server.use(
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );

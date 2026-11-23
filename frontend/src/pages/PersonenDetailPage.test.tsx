@@ -287,7 +287,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       await screen.findByRole('heading', { name: /R-001/ });
       // Die Modulfreigaben (Sprung-Sperre „Auf Lagekarte verorten", LFH-888) zählen nicht: sie
       // liegen in der App schon im Cache des Einsatzrahmens; nur dieser nackte Test lädt sie.
-      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+      expect(pfade.filter((p) => !p.endsWith('/module-access'))).toEqual([
         '/api/einsaetze/1',
         '/api/einsaetze/1/personen/10',
       ]);
@@ -310,7 +310,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       } as PersonDetail);
       await screen.findByRole('heading', { name: /R-001/ });
       expect(within(kopf()).getByText(/^Turnhalle · Wartebereich · seit/)).toBeInTheDocument();
-      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+      expect(pfade.filter((p) => !p.endsWith('/module-access'))).toEqual([
         '/api/einsaetze/1',
         '/api/einsaetze/1/personen/10',
       ]);
@@ -1830,7 +1830,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
 
   it('gesperrte Lagekarte: „Auf Lagekarte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
     render(einsatzAktiv, mitKoordinate, [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     ]);

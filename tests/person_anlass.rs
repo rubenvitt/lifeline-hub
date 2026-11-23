@@ -315,7 +315,7 @@ async fn replay_derselben_client_id_legt_einen_stand_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

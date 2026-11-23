@@ -66,7 +66,7 @@ export function widerrufeAnbindung(id: string): Promise<AnbindungAnzeige> {
  * (LLH-1638). Nur die Einsatzleitung liest und schaltet sie.
  */
 export function loadEinsatzAnbindungen(einsatzId: number): Promise<AnbindungFreigabe[]> {
-  return apiGet<AnbindungFreigabe[]>(`/api/einsaetze/${einsatzId}/anbindungen`);
+  return apiGet<AnbindungFreigabe[]>(`/api/einsaetze/${einsatzId}/integrations`);
 }
 
 /** Gibt den Einsatz für die Anbindung frei (an) oder beendet die Freigabe (aus). */
@@ -76,7 +76,7 @@ export function setAnbindungFreigabe(
   an: boolean,
 ): Promise<AnbindungFreigabe[]> {
   return apiSend<AnbindungFreigabe[]>(
-    `/api/einsaetze/${einsatzId}/anbindungen/${encodeURIComponent(zugangId)}/freigabe`,
+    `/api/einsaetze/${einsatzId}/integrations/${encodeURIComponent(zugangId)}/grant`,
     an ? 'PUT' : 'DELETE',
   );
 }

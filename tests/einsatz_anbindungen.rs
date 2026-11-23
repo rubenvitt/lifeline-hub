@@ -1,5 +1,5 @@
 //! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0035,
-//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/anbindungen`, ein Einsatz je Zugang,
+//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/integrations`, ein Einsatz je Zugang,
 //! Ende der Freigabe, Anzeige an der Anbindung und das Verhalten an einem Spiegel.
 
 use axum::http::StatusCode;
@@ -17,7 +17,7 @@ use common::{
 const IP: &str = "198.51.100.7";
 
 fn liste_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/anbindungen")
+    format!("/api/einsaetze/{einsatz}/integrations")
 }
 
 async fn liste(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -270,7 +270,7 @@ async fn ein_zugang_liest_hoechstens_einen_einsatz_und_abschluss_beendet_die_fre
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{zweiter}/abschliessen"),
+        &format!("/api/einsaetze/{zweiter}/close"),
         &admin,
         None,
     )

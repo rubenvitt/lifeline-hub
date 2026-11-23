@@ -76,7 +76,7 @@ function serverMit(liste: BenachrichtigungAnzeige[], offen: BenachrichtigungAnze
       return b ? HttpResponse.json(b) : HttpResponse.json({ error: 'weg' }, { status: 404 });
     }),
     http.get('/api/benachrichtigungen', () => HttpResponse.json(offen)),
-    http.get('/api/einsaetze/:id/benachrichtigungen', () =>
+    http.get('/api/einsaetze/:id/notifications', () =>
       HttpResponse.json({ eintraege: liste, ungelesen: liste.length }),
     ),
     http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {

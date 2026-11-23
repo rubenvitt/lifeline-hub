@@ -188,7 +188,7 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
         ("POST", "abschnitte", r#"{"name":"Nord"}"#),
         (
             "PUT",
-            "einstellungen",
+            "settings",
             r#"{"auftrag_quittierung_frist_min":45}"#,
         ),
     ] {
@@ -970,7 +970,7 @@ async fn mitarbeit_erfasst_nicht_wenn_etb_auf_fuehrung_im_einsatz_steht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )

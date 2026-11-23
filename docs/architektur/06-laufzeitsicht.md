@@ -153,10 +153,10 @@ sequenceDiagram
   B->>BE: GET /api/einsaetze/{id}/live
   B->>B: onopen leert den Präsenzstand
   BE-->>B: event: praesenz (Stand beim Verbinden, ohne id, nur wenn nicht leer)
-  A->>BE: PUT /api/einsaetze/{id}/praesenz beim Öffnen, dann alle 15 s
+  A->>BE: PUT /api/einsaetze/{id}/presence beim Öffnen, dann alle 15 s
   BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
   Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)
-  A->>BE: DELETE …/praesenz beim Schließen (pagehide mit keepalive)
+  A->>BE: DELETE …/presence beim Schließen (pagehide mit keepalive)
 ```
 
 - Der Stand lebt nur im Speicher (`src/live/praesenz.rs`, Ablauf 45 s, Aufräumtakt 5 s) und geht

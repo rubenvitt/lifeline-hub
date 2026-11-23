@@ -151,7 +151,7 @@ function wert(): OrtsfeldWert {
 function ortVorschau(ortsname = 'Marktplatz 3, 12345 Musterstadt') {
   const abfragen: URL[] = [];
   server.use(
-    http.get('/api/einsaetze/7/ort-vorschau', ({ request }) => {
+    http.get('/api/einsaetze/7/place-preview', ({ request }) => {
       abfragen.push(new URL(request.url));
       return HttpResponse.json({
         ortsname,
@@ -446,7 +446,7 @@ describe('Ortsfeld — Kartenvorschau', () => {
       );
       expect(screen.getByRole('group', { name: 'Karte: Einsatzort' })).toBeInTheDocument();
       await new Promise((r) => setTimeout(r, 800));
-      expect(anfragen.filter((u) => u.includes('ort-vorschau'))).toEqual([]);
+      expect(anfragen.filter((u) => u.includes('place-preview'))).toEqual([]);
     } finally {
       server.events.removeListener('request:start', merken);
     }
