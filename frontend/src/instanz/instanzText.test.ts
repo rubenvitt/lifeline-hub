@@ -120,6 +120,17 @@ describe('instanzText', () => {
     ]);
   });
 
+  it('keine Sperre an einer widerrufenen Kopplung oder Zuordnung (LLH-2074)', () => {
+    const gesperrt = { gegenueber_ios_push_gesperrt_seit: '2026-11-23 08:15:00' };
+    expect(
+      kopplungHinweise(kopplung({ ...gesperrt, zustand: 'widerrufen' }), true, () => '08:15'),
+    ).not.toContainEqual(expect.stringContaining('iOS-Push'));
+    const k = kopplung(gesperrt);
+    expect(
+      kopplungHinweise({ ...k, org: { ...k.org, widerrufen_at: '2026-11-23 09:00:00' } }, true),
+    ).not.toContainEqual(expect.stringContaining('iOS-Push'));
+  });
+
   it('Band zur Sperre des Hubs: Titel und Text (LLH-2074)', () => {
     expect(iosPushHubBandTitel('Hub Nord')).toBe(
       'iOS-Push über den Hub „Hub Nord“ wird nicht zugestellt',

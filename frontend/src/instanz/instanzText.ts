@@ -74,15 +74,16 @@ export function kopplungHinweise(
   zeit: (wert: string) => string = (wert) => wert,
 ): string[] {
   const aus: string[] = [];
+  const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
   // LLH-2074: Der Hub meldet, dass das Push-Relais ihn sperrt; diese Instanz pusht Hub-Konten
-  // trotzdem nicht selbst (die Geräte sind am Hub angemeldet).
-  if (k.gegenueber_ios_push_gesperrt_seit != null) {
+  // trotzdem nicht selbst (die Geräte sind am Hub angemeldet). Nach einem Widerruf meldet niemand
+  // mehr, der Wert wäre veraltet.
+  if (aktiv && k.gegenueber_ios_push_gesperrt_seit != null) {
     aus.push(
       'iOS-Push an Hub-Konten kommt nicht an: das Push-Relais sperrt den Hub ' +
         `(seit ${zeit(k.gegenueber_ios_push_gesperrt_seit)})`,
     );
   }
-  const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
   // Über eine Direktkopplung vor Ort gehen nie Geheimnisse (LLH-1497): dort kein Hinweis dazu.
   const geheimnisse = aktiv && k.art === 'standard';
   // Ohne bestätigte Plattenverschlüsselung kommen Konten ohne Passwort an (D6): hier sagen, warum.

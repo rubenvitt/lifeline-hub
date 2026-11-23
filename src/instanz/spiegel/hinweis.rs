@@ -184,8 +184,8 @@ impl Kanal {
 /// liefert (ohne Demo-Einsatz und ohne einen zum Abräumen vorgemerkten, wie
 /// [`super::liefern`]), und nur zu einer aktiven Kopplung, die sich meldet und Hinweise annimmt,
 /// mit nicht widerrufener Zuordnung seiner Org. Was nicht geliefert wird, käme am Hub nie an.
-/// Dieselbe Menge liest `ios_push_hub_gesperrt_spalte!` in `einsatz::repo` (LLH-2074): wer hier
-/// etwas ändert, zieht es dort nach.
+/// Dieselbe Grundmenge liest `ios_push_hub_gesperrt_spalte!` in `einsatz::repo` (LLH-2074, dort
+/// eingeschränkt auf Kopplungen mit Konten vom Hub): wer hier etwas ändert, zieht es dort nach.
 pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Ziel>, sqlx::Error> {
     sqlx::query_as(
         "SELECT o.id AS kopplung_org_id, k.gegenueber_web_push AS web_push, \
@@ -202,6 +202,29 @@ pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Z
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await
+}
+
+/// Die Sperre des Hubs an der Kopplung `kopplung_id` hat begonnen oder ist gefallen (LLH-2074):
+/// die aktiven, hier geführten Einsätze ihrer Orgs melden einen geänderten Kopf, damit offene
+/// Seiten das Band (`EinsatzAnzeige::ios_push_hub_gesperrt`) ohne Neuladen zeigen oder räumen. Nach
+/// dem Commit; ein Lesefehler wird geloggt, der nächste Abruf holt den Stand.
+pub async fn sperre_melden(pool: &SqlitePool, live: &LiveHub, kopplung_id: i64) {
+    let einsaetze: Result<Vec<i64>, sqlx::Error> = sqlx::query_scalar(
+        "SELECT e.id FROM einsatz e \
+         JOIN instanz_kopplung_org io ON io.org_id = e.org_id AND io.widerrufen_at IS NULL \
+         WHERE io.kopplung_id = ? AND e.spiegel = 0 AND e.status = 'aktiv'",
+    )
+    .bind(kopplung_id)
+    .fetch_all(pool)
+    .await;
+    match einsaetze {
+        Ok(ids) => {
+            for id in ids {
+                crate::live::org::kopf_melden(pool, live, id, &[]).await;
+            }
+        }
+        Err(e) => tracing::warn!(kopplung_id, error = %e, "Einsätze zur Hub-Sperre nicht lesbar"),
+    }
 }
 
 /// Pusht die erreichte Seite für diesen Einsatz in diesem Kanal (D4)? Dann lässt
@@ -1013,6 +1036,14 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // Ein Konto vom Hub: nur ihm pusht der Hub (`konten_am_hub`).
+        sqlx::query(
+            "INSERT INTO stammdaten_herkunft (kopplung_org_id, org_id, art, fremder_schluessel, \
+             lokaler_schluessel) VALUES (1, 1, 'konto', 'h-7', '7')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         (pool, e)
     }
 
@@ -1066,6 +1097,14 @@ mod tests {
                 "zum Abräumen vorgemerkt",
             ),
             ("UPDATE einsatz SET spiegel = 1", "Spiegel"),
+            (
+                "DELETE FROM stammdaten_herkunft",
+                "keine Konten vom Hub (etwa Direktkopplung vor Ort)",
+            ),
+            (
+                "UPDATE instanz_kopplung SET zustand = 'vom_gegenueber_widerrufen'",
+                "vom Gegenüber widerrufen",
+            ),
         ] {
             let (pool, e) = gesperrter_hub("meldet_sich").await;
             sqlx::query(sqlx::AssertSqlSafe(sql.to_string()))

@@ -467,7 +467,9 @@ macro_rules! spiegel_spalten {
 /// (LLH-2074), als JSON-Liste von `instanz::spiegel::hinweis::IosPushHubSperre`, wortgleich in
 /// `laden` und `liste_fuer`. Die Menge ist die von `instanz::spiegel::hinweis::ziele` (aktive
 /// meldende Kopplung, die Hinweise annimmt, Zuordnung nicht widerrufen, kein Spiegel-, Demo- oder
-/// abzuräumender Einsatz), dazu iOS-Push angeboten und gesperrt. Korreliert, damit keine der
+/// abzuräumender Einsatz), dazu iOS-Push angeboten und gesperrt und mindestens ein Konto aus der
+/// Kopplung (nur ihm pusht der Hub, `konten_am_hub`; eine Direktkopplung vor Ort trägt keine).
+/// Korreliert, damit keine der
 /// beiden Abfragen einen weiteren Join braucht.
 macro_rules! ios_push_hub_gesperrt_spalte {
     () => {
@@ -478,6 +480,8 @@ macro_rules! ios_push_hub_gesperrt_spalte {
               AND ik.richtung = 'meldet_sich' AND ik.zustand = 'aktiv' \
               AND ik.gegenueber_hinweise = 1 AND ik.gegenueber_ios_push = 1 \
               AND ik.gegenueber_ios_push_gesperrt_seit IS NOT NULL \
+              AND EXISTS (SELECT 1 FROM stammdaten_herkunft h \
+                          WHERE h.kopplung_org_id = io.id AND h.art = 'konto') \
               AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
               AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id)), \
             '[]') AS ios_push_hub_gesperrt"

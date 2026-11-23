@@ -361,6 +361,50 @@ async fn gesperrter_hub_meldet_seine_sperre_an_den_elw() {
     assert_eq!(sperre_am_elw(&elw.i).await, None, "die Sperre ist gefallen");
 }
 
+/// Ein Hub mit kaputtem oder überlangem Zeitwert (Review LLH-2074): die Sperre gilt trotzdem, der
+/// ELW speichert sie aber nur im kanonischen Format (ADR-0012), als „jetzt“, und behält einen schon
+/// gespeicherten Wert, statt ihn bei jeder Meldung neu zu setzen.
+#[tokio::test]
+async fn ungueltige_sperrzeit_vom_hub_gilt_als_sperre_im_kanonischen_format() {
+    let hub = seite_mit(false, true).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    for kaputt in ["kaputt".to_string(), "x".repeat(10_000)] {
+        exec(
+            &elw.i.pool,
+            "UPDATE instanz_kopplung SET gegenueber_ios_push_gesperrt_seit = NULL",
+        )
+        .await;
+        exec(
+            &hub.i.pool,
+            &format!(
+                "INSERT INTO ios_push_relais (id, server_id, geheimnis, gesperrt_at) \
+                 VALUES (1, 's', 'g', '{kaputt}') \
+                 ON CONFLICT(id) DO UPDATE SET gesperrt_at = excluded.gesperrt_at"
+            ),
+        )
+        .await;
+        melden(&elw.i).await;
+        let gespeichert = sperre_am_elw(&elw.i).await.expect("Sperre gilt");
+        assert!(
+            lifeline_hub::zeit::parse_streng(&gespeichert).is_some(),
+            "kanonisch: {gespeichert:.40}"
+        );
+        exec(
+            &elw.i.pool,
+            "UPDATE instanz_kopplung SET gegenueber_ios_push_gesperrt_seit = '2026-11-23 06:00:00'",
+        )
+        .await;
+        melden(&elw.i).await;
+        assert_eq!(
+            sperre_am_elw(&elw.i).await.as_deref(),
+            Some("2026-11-23 06:00:00"),
+            "ein gespeicherter Wert bleibt"
+        );
+    }
+}
+
 /// Ohne `--ios-push` zählt eine alte Zeile des Relais nicht: der Hub bietet den Kanal gar nicht an.
 #[tokio::test]
 async fn hub_ohne_ios_push_meldet_keine_sperre() {
