@@ -139,7 +139,7 @@ export default function RollWiederherstellung(): null {
       merkeBeimVerlassen();
     };
     // `location.search` gehört zum Schlüssel; getaktet wird über Schlüssel und Art.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [schluessel, navigationType]);
 
   return null;

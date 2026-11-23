@@ -78,7 +78,7 @@ async function zugangsgeschichte(page: Page): Promise<void> {
     await fuelle(page, 'patch', `/api/benutzer/${id}`, { org_rolle: 'fuehrungskraft' });
 
     // Die Person wechselt am iPad ihr Passwort und meldet sich ab.
-    const wechsel = await ipad.post('/api/auth/passwort', {
+    const wechsel = await ipad.post('/api/auth/password', {
       data: { altes_passwort: PASSWORT, neues_passwort: NEUES_PASSWORT },
     });
     expect(wechsel.ok(), `Passwortwechsel: ${wechsel.status()}`).toBe(true);

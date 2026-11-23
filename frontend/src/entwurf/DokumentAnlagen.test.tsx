@@ -44,7 +44,7 @@ vi.mock('../fernmeldewesen/SkizzenAufnahme', () => ({
       if (aufnahme.art === 'bild') onBild({ datei: BILD, standAt: '2026-10-08T12:15:00.000Z' });
       else onFehler(aufnahme.fehler);
       // Einmal je Einhängen, wie die echte Aufnahme.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     return null;
   },

@@ -51,6 +51,9 @@ Umgekehrt **härten** diese die Grenze:
 | `LIFELINE_COOKIE_SECURE` | `--cookie-secure` | Markiert Sitzungs-, MFA-, OIDC- und WebAuthn-Cookies für jede Antwort `Secure`, obwohl die App selbst kein TLS bedient (LFH-603). Hinter einem Proxy, der `X-Forwarded-Proto: https` setzt (Traefik), nicht nötig: dort wird `Secure` je Anfrage erkannt. Der Schalter ist der Zwang für Proxys ohne diesen Kopf. Default aus, damit direkter HTTP-Betrieb (LAN, Dev) funktioniert; mit `--tls` ohnehin an. Mehr in `docs/betrieb-tls.md`. |
 | `LIFELINE_BACKUP_EMPFAENGER` | `--backup-empfaenger` | Öffentliche `age`-Schlüssel (`age1…`, Komma-Liste), an die jede Sicherung verschlüsselt wird: automatische Sicherung, `backup` und der Admin-Download (LFH-1002). Gilt auch für das Subkommando `backup`. **Ohne Angabe** bleiben Sicherungen Klartext, und der Start warnt einmal. Ein ungültiger oder leerer Eintrag bricht den Start ab. Der private Schlüssel gehört nicht auf den Server; ohne ihn ist eine Sicherung verloren. Mehr in `docs/betrieb/backup-restore.md`. |
 | `LIFELINE_GEHEIMNIS_SCHLUESSEL` | `--geheimnis-schluessel` | Privater `age`-Schlüssel (`AGE-SECRET-KEY-1…`, aus `age-keygen`) des Geheimnisspeichers der Adapter (LLH-2017, ADR-0077): Accesskeys und Passwörter von Anbindungen liegen nur verschlüsselt an diesen Schlüssel in der Datenbank. **Ohne Angabe** startet der Server, aber Geheimnisse lassen sich nicht speichern, und Adapter, die eines brauchen, halten an. Ein öffentlicher Schlüssel oder ein unlesbarer Wert bricht den Start ab, ohne den Wert zu nennen. Getrennt von Datenbank und Sicherungen aufbewahren; ein anderer Schlüssel nach einer Wiederherstellung heißt: Geheimnisse neu setzen. Mehr in `docs/betrieb/backup-restore.md`. |
+| `LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI` | `--geheimnis-schluessel-datei` | Pfad zu einer Datei mit dem Schlüssel statt `LIFELINE_GEHEIMNIS_SCHLUESSEL` (LLH-2025), etwa ein Docker-Secret (`/run/secrets/…`) oder systemd `LoadCredential=`; so steht er nicht in Unit- oder Compose-Datei. Format wie `age-keygen -o`: Kommentarzeilen (`#`) zählen nicht, genau eine Zeile ist der Schlüssel. Beides zugleich, eine fehlende oder unlesbare Datei bricht den Start ab (mit Pfad, ohne Inhalt). Dürfen Gruppe oder andere die Datei lesen, warnt der Start (`chmod 600`). |
+| `LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT` | `--geheimnis-schluessel-alt` | Der bisherige Schlüssel, nur für einen Schlüsselwechsel (LLH-2025, ADR-0077). Mit ihm schlüsselt der Start alle Geheimnisse in einer Transaktion auf den neuen Schlüssel um und meldet im Log, wie viele, und dass die Variable weg kann. Ohne neuen Schlüssel oder gleich dem neuen bricht der Start ab. Ablauf in `docs/betrieb/backup-restore.md`. |
+| `LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT_DATEI` | `--geheimnis-schluessel-alt-datei` | Wie `LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI`, für den bisherigen Schlüssel. |
 
 Was der Server nach draußen über sich sagt:
 
@@ -60,7 +63,8 @@ Was der Server nach draußen über sich sagt:
 
 Geheimnisse, die nie ins Log dürfen (im `Debug` maskiert):
 `LIFELINE_ADMIN_PASSWORD`, `LIFELINE_KARTEN_SERVICE_TOKEN`,
-`LIFELINE_OIDC_CLIENT_SECRET`, `LIFELINE_GEHEIMNIS_SCHLUESSEL`.
+`LIFELINE_OIDC_CLIENT_SECRET`, `LIFELINE_GEHEIMNIS_SCHLUESSEL`,
+`LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT`.
 
 ## Der Leak — und warum Gates die Umgebung räumen müssen
 

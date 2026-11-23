@@ -1,4 +1,4 @@
-//! Integrationstests für GET /api/versionsstand und POST /api/versionsstand/gelesen (Spec
+//! Integrationstests für GET /api/release-notes und POST /api/release-notes/read (Spec
 //! `versionsstand`, Change neuigkeiten-versionshinweise).
 //!
 //! Der Versionsstand gilt für die ganze Instanz: was eine Person als gelesen markiert, sieht
@@ -14,8 +14,8 @@ use tower::ServiceExt;
 mod common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
 
-const PFAD: &str = "/api/versionsstand";
-const GELESEN: &str = "/api/versionsstand/gelesen";
+const PFAD: &str = "/api/release-notes";
+const GELESEN: &str = "/api/release-notes/read";
 
 /// Anfrage ohne Cookie, liefert nur den Statuscode.
 async fn ohne_cookie(app: &axum::Router, methode: &str, uri: &str) -> StatusCode {

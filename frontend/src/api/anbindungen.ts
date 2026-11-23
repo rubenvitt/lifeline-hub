@@ -13,6 +13,7 @@ import type {
   WebhookFehler,
   WebhookTestErgebnis,
   WebhookVersuch,
+  WebhookZertifikat,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -141,6 +142,8 @@ export interface WebhookEingabe {
   url: string;
   arten: EventType[];
   lan_erlaubt: boolean;
+  /** Fingerabdruck des Zielzertifikats (LLH-1872); fehlt = keiner. */
+  zertifikat_pin?: string;
 }
 
 /**
@@ -151,6 +154,8 @@ export interface WebhookPatch {
   url?: string;
   arten?: EventType[];
   lan_erlaubt?: boolean;
+  /** `null` entfernt den Fingerabdruck. */
+  zertifikat_pin?: string | null;
   basis_geaendert_at?: string;
 }
 
@@ -174,6 +179,40 @@ export function nimmWebhookWiederAuf(id: string): Promise<WebhookAnzeige> {
 
 export function sendTestereignis(id: string): Promise<WebhookTestErgebnis> {
   return apiSend<WebhookTestErgebnis>(`${webhookPfad(id)}/test`, 'POST');
+}
+
+/**
+ * Liest den Fingerabdruck des Zertifikats, das ein Ziel zeigt (LLH-1872). Der Server bricht den
+ * Verbindungsaufbau danach ab; es geht keine Anfrage an das Ziel.
+ */
+export function holeZertifikat(
+  id: string,
+  url: string,
+  lanErlaubt: boolean,
+): Promise<WebhookZertifikat> {
+  // Neue Routen sind englisch (ADR-0085); die übrigen Webhook-Routen stehen noch im Bestand.
+  return apiSend<WebhookZertifikat>(
+    `/api/admin/integrations/${encodeURIComponent(id)}/webhook/fetch-certificate`,
+    'POST',
+    {
+      url,
+      lan_erlaubt: lanErlaubt,
+    },
+  );
+}
+
+/** Normalform eines Fingerabdrucks wie im Server: ohne `:`, Leerzeichen und `-`, klein. */
+export function pinNormal(roh: string): string {
+  return roh.replace(/[\s:-]/g, '').toLowerCase();
+}
+
+/** Fingerabdruck zum Vergleichen: Großbuchstaben in Paaren, getrennt durch Doppelpunkte. */
+export function fingerabdruckGruppen(hex: string): string {
+  return (
+    pinNormal(hex)
+      .toUpperCase()
+      .match(/.{1,2}/g) ?? []
+  ).join(':');
 }
 
 export function loadWebhookVersuche(id: string): Promise<WebhookVersuch[]> {

@@ -6,7 +6,7 @@ import XCTest
 /// Onboarding“): Adresse → Prüfung → gespeichert wird nur ein verträglicher Server.
 final class OnboardingTests: XCTestCase {
     let elw = try! ServerAdresse.parse("https://elw.local:8443")
-    let info = ShellInfo(version: "1.0.0-alpha.300", shellContract: 1)
+    let info = ShellInfo(version: "1.0.0-alpha.300", shellContract: 2)
 
     func step(_ state: Onboarding.State, _ event: Onboarding.Event) -> Onboarding.Step {
         Onboarding.next(state, event)
@@ -44,7 +44,7 @@ final class OnboardingTests: XCTestCase {
     func testEinUnvertraeglicherOderUnerreichbarerServerWirdNichtGespeichert() {
         for ergebnis: Vertragsergebnis in [
             .nichtVertraeglich(.zuAlt, server: nil),
-            .nichtVertraeglich(.zuNeu, server: ShellInfo(version: "2.0.0", shellContract: 2)),
+            .nichtVertraeglich(.zuNeu, server: ShellInfo(version: "2.0.0", shellContract: 3)),
             .nichtErreichbar(.zertifikat),
             .nichtErreichbar(.nichtErreichbar),
         ] {

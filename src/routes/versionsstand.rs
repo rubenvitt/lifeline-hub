@@ -1,7 +1,7 @@
 //! HTTP-Routen für den Versionsstand der Instanz (Spec `versionsstand`).
 //!
-//! GET  /api/versionsstand          — laufende Version, Vorgänger, Lesestand.
-//! POST /api/versionsstand/gelesen  — markiert die laufende Version als gelesen.
+//! GET  /api/release-notes          — laufende Version, Vorgänger, Lesestand.
+//! POST /api/release-notes/read  — markiert die laufende Version als gelesen.
 //!
 //! Beide verlangen eine Sitzung (`CurrentUser`); anonym gibt es nichts zu lesen und nichts zu
 //! ändern. Der Lesestand gilt für die ganze Instanz, nicht für die Person.
@@ -16,7 +16,7 @@ use axum::Json;
 /// Die Version, die dieser Server trägt. Dieselbe Quelle wie beim Start (`main.rs`).
 pub const LAUFENDE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// GET /api/versionsstand — ohne Zeile (nur in Tests vor dem Start denkbar) antwortet die Route
+/// GET /api/release-notes — ohne Zeile (nur in Tests vor dem Start denkbar) antwortet die Route
 /// mit dem Stand, den der Start schriebe, ohne ihn zu speichern.
 pub async fn lesen(
     State(state): State<AppState>,
@@ -29,7 +29,7 @@ pub async fn lesen(
     Ok(Json(stand.into()))
 }
 
-/// POST /api/versionsstand/gelesen — setzt `gelesen_bis` auf die laufende Version.
+/// POST /api/release-notes/read — setzt `gelesen_bis` auf die laufende Version.
 pub async fn gelesen(
     State(state): State<AppState>,
     CurrentUser(_benutzer): CurrentUser,

@@ -88,7 +88,7 @@ async fn code_ausstellen(app: &axum::Router, cookie: &str, challenge: &str) -> S
 async fn einloesen(app: &axum::Router, code: &str, verifier: &str) -> Antwort {
     post(
         app,
-        "/api/auth/app-code/einloesen",
+        "/api/auth/app-code/redeem",
         None,
         &json!({ "code": code, "verifier": verifier }),
         None,
@@ -298,7 +298,7 @@ async fn einloesen_in_falscher_form_ist_400() {
         json!({ "code": "", "verifier": VERIFIER }),
         json!({ "code": "Z".repeat(64), "verifier": VERIFIER }),
     ] {
-        let a = post(&app, "/api/auth/app-code/einloesen", None, &body, None).await;
+        let a = post(&app, "/api/auth/app-code/redeem", None, &body, None).await;
         assert_eq!(a.status, StatusCode::BAD_REQUEST, "body {body}");
     }
 }
@@ -327,7 +327,7 @@ async fn alte_sitzung_im_einloesenden_speicher_wird_geloescht() {
 
     let a = post(
         &app,
-        "/api/auth/app-code/einloesen",
+        "/api/auth/app-code/redeem",
         Some(&alt),
         &json!({ "code": code, "verifier": VERIFIER }),
         None,
@@ -346,7 +346,7 @@ async fn gesperrte_adresse_bekommt_429_nach_fehlversuchen() {
     for i in 0..10 {
         let a = post(
             &app,
-            "/api/auth/app-code/einloesen",
+            "/api/auth/app-code/redeem",
             None,
             &json!({ "code": format!("{i:064x}"), "verifier": VERIFIER }),
             Some(peer),
@@ -356,7 +356,7 @@ async fn gesperrte_adresse_bekommt_429_nach_fehlversuchen() {
     }
     let a = post(
         &app,
-        "/api/auth/app-code/einloesen",
+        "/api/auth/app-code/redeem",
         None,
         &json!({ "code": "d".repeat(64), "verifier": VERIFIER }),
         Some(peer),
@@ -374,7 +374,7 @@ async fn gesperrte_adresse_verbraucht_den_code_nicht() {
     for i in 0..10 {
         post(
             &app,
-            "/api/auth/app-code/einloesen",
+            "/api/auth/app-code/redeem",
             None,
             &json!({ "code": format!("{i:064x}"), "verifier": VERIFIER }),
             Some(gesperrt),
@@ -383,7 +383,7 @@ async fn gesperrte_adresse_verbraucht_den_code_nicht() {
     }
     let a = post(
         &app,
-        "/api/auth/app-code/einloesen",
+        "/api/auth/app-code/redeem",
         None,
         &json!({ "code": code, "verifier": VERIFIER }),
         Some(gesperrt),
@@ -394,7 +394,7 @@ async fn gesperrte_adresse_verbraucht_den_code_nicht() {
     let frei: SocketAddr = "203.0.113.83:40000".parse().unwrap();
     let b = post(
         &app,
-        "/api/auth/app-code/einloesen",
+        "/api/auth/app-code/redeem",
         None,
         &json!({ "code": code, "verifier": VERIFIER }),
         Some(frei),

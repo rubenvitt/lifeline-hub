@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 22.11.2026 (Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 22.11.2026 (Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -33,6 +33,9 @@ Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfa
 (`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
 [ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
+Ein Spiegel, der `mitarbeit` gegen einen älteren Führer festgehalten hat, trägt sie nach dessen
+Aufrüsten einmal nach
+([ADR-0088](entscheidungen/ADR-0088-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
 
 ## 8.3 Fehlervertrag und Statuscodes
 
@@ -62,7 +65,8 @@ beide Seiten Name für Name.
 
 Response-Typen entstehen aus dem Rust-Code: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 `frontend/src/api/openapi.json` → `openapi-typescript` → `frontend/src/api/types.generated.ts`
-(Skript `gen:types` in `frontend/package.json`). Ablauf, Wire-Enums und handgepflegte Reste
+(Skript `gen:types` in `frontend/package.json`; openapi-typescript läuft dort mit der Compiler-API
+von TypeScript 6 über `frontend/scripts/ts6-fuer-codegen.mjs`, Rückbau LLH-2068). Ablauf, Wire-Enums und handgepflegte Reste
 regelt [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“. Drift fängt
 `scripts/check-typ-codegen.sh` (Schritt 3 des Sammel-Gates) mit `tests/openapi_spec_aktuell.rs`;
 die Wire-Werte der Enums hält `tests/enum_wire_kontrakt.rs` fest.
@@ -460,7 +464,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   aus `addWebMessageListener` mit derselben Annahmeregel (`Bruecke.accepts` in
   `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Bruecke.kt`, Wire-Format im Kopf von
   `android/app/src/main/assets/huelle.js`); jeder Server hat dort ein eigenes WebView-Profil. Die
-  Anmeldung im Systembrowser (`POST /api/auth/app-code[/einloesen]`) nutzen alle Hüllen gleich.
+  Anmeldung im Systembrowser (`POST /api/auth/app-code[/redeem]`) nutzen alle Hüllen gleich.
 
 Adressprüfung, Deeplink und Linkregeln stehen in Rust (`src-tauri/src/adresse.rs`,
 `deeplink.rs`, `links.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden sie von den
@@ -476,8 +480,10 @@ Was Lifeline Hub selbst bei einem Fremdsystem abruft (Divera, HiOrg, Postfach �
 einer Art im Rahmen `src/adapter/` ([ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
 Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md)).
 
-- **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`, mit
-  dessen Fingerabdruck je Zeile; die API setzt und ersetzt, liest aber nie. Ohne Schlüssel läuft der
+- **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL` (oder
+  `…_DATEI`), mit dessen Fingerabdruck je Zeile; die API setzt und ersetzt, liest aber nie. Für
+  einen Schlüsselwechsel liest der Speicher zusätzlich mit dem alten (`…_ALT`), und der Start
+  schlüsselt alle Chiffrate auf den neuen um (LLH-2025). Ohne Schlüssel läuft der
   Server, und Adapter mit Geheimnissen halten mit `geheimnisspeicher_gesperrt` an. Das übrige
   Schlüsselmaterial der Instanz liegt weiter im Klartext der Datenbank (R19, R22).
 - **Abruf:** ein Hintergrundlauf neben dem der Webhooks, zwei Phasen je Abruf (Netz ohne

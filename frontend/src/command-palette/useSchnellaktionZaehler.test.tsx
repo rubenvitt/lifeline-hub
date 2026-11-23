@@ -14,7 +14,7 @@ import { benutzerFixture } from '../test/fixtures';
 const nutzer = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 
 let puts: { schluessel: string; wert: string }[];
-let gets: number;
+let gets = 0;
 
 beforeEach(() => {
   puts = [];

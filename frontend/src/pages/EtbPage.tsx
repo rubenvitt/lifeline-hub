@@ -631,7 +631,7 @@ export default function EtbPage() {
       setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
     }
     eintragAuftrag.raeume('eintrag');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [
     zielEintragId,
     etbQuery.data,

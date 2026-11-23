@@ -120,7 +120,7 @@ final class AnmeldungTests: XCTestCase {
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
         let skript = Anmeldung.einloeseSkript(server: server, code: code, verifier: verifier)
         XCTAssertTrue(skript.contains(#"window.location.origin !== "https:\/\/elw.local:8443""#), skript)
-        XCTAssertTrue(skript.contains("'/api/auth/app-code/einloesen'"), skript)
+        XCTAssertTrue(skript.contains("'/api/auth/app-code/redeem'"), skript)
         XCTAssertTrue(skript.contains(#"code: "\#(code)""#), skript)
         XCTAssertTrue(skript.contains(#"verifier: "\#(verifier)""#), skript)
         XCTAssertEqual(skript.components(separatedBy: code).count - 1, 1)

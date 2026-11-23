@@ -243,6 +243,7 @@ use utoipa::OpenApi;
         crate::routes::anbindungen_webhook::WebhookLetzterFehler,
         crate::routes::anbindungen_webhook::WebhookVersuch,
         crate::routes::anbindungen_webhook::WebhookTestErgebnis,
+        crate::routes::anbindungen_webhook::WebhookZertifikat,
         crate::public_api::webhook::WebhookZustand,
         crate::public_api::webhook::WebhookFehler,
         crate::public_api::webhook::RuhtGrund,

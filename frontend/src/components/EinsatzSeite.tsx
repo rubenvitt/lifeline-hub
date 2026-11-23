@@ -105,7 +105,7 @@ export function titelblockStil(token: {
   };
 }
 
-/** Titel im Seitenkopf: 14/600 (`schriftskala.seitentitel`). SEMANTISCH ist er das `h1` der
+/** Titel im Seitenkopf: 16/600 (`schriftskala.seitentitel`, LLH-2044). SEMANTISCH ist er das `h1` der
  *  Seite, optisch bleibt er klein — die Ebene folgt der Gliederung, der Satz dem Entwurf. */
 export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties {
   return {

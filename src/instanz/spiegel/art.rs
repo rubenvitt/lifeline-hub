@@ -180,6 +180,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Ausgang der Hinweise an den Hub; der Anlass reist im Paket (LLH-1495)",
     ),
     (
+        "mitarbeit_nachtrag",
+        "Ausgang der Mitarbeit-Nachträge an den Führer; der Nachtrag reist im Paket (LLH-2007)",
+    ),
+    (
         "maschine_ereignis",
         "Ausgang an Fremdsysteme gilt an der Instanz, die ihn ausgibt (LLH-1655)",
     ),

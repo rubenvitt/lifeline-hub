@@ -9,8 +9,9 @@
 # ersetzt; mit ihr fielen die Auslöser am PR, die Gruppenlogik und der Matrix-Trick weg, der
 # Pflicht-Checks fehlen ließ.
 #
-# ABBRUCH: Den steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in `suiten.yml`
-# eine Gruppe je Branch mit `cancel-in-progress`: ein neuer Push bricht diesen Lauf ab.
+# NEBENLÄUFIGKEIT: Die steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in
+# `suiten.yml` eine Gruppe je Branch ohne Abbruch (ADR-0091): ein laufender Lauf endet, ein neuer
+# Push wartet.
 #
 # NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`; der eigene Server ist zurückgebaut.
 #
