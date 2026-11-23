@@ -273,8 +273,10 @@ async fn el_erreicht_den_einsatzleiter_vor_der_mitgliedschaft() {
 async fn funktion_erreicht_mitarbeit_und_beobachter_nicht() {
     let w = welt().await;
     let carla = benutzer_anlegen(&w.app, &w.admin, "carla", "keine").await;
-    w.rolle_mit_funktion(w.anna, "fuehrungspersonal", "s4").await;
-    w.rolle_mit_funktion(w.bert, "fuehrungspersonal", "s4").await;
+    w.rolle_mit_funktion(w.anna, "fuehrungspersonal", "s4")
+        .await;
+    w.rolle_mit_funktion(w.bert, "fuehrungspersonal", "s4")
+        .await;
     rolle_setzen(&w.app, &w.admin, w.einsatz, w.anna, "mitarbeit").await;
     rolle_setzen(&w.app, &w.admin, w.einsatz, w.bert, "beobachter").await;
     w.rolle_mit_funktion(carla, "fuehrungspersonal", "s4").await;
