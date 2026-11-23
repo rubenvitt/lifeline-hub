@@ -692,6 +692,11 @@ impl From<AppError> for EinloesenFehler {
     }
 }
 
+/// Ein unsigniertes 404 beim Einlösen: Die Adresse kennt `/api/instance/pair` nicht, etwa weil
+/// dort ein Stand vor den englischen Wegen läuft (LLH-2053).
+const KOPPELN_UNBEKANNT: &str = "kennt den Weg zum Koppeln nicht. Ist dort eine Instanz mit einem \
+     anderen Softwarestand, beide auf denselben Stand bringen; sonst die Adresse prüfen.";
+
 async fn send_einloesen_mit(
     i: &Identitaet,
     adresse: &str,
@@ -769,12 +774,10 @@ async fn send_einloesen_mit(
             )
             .into())
         }
-        404 => return Err(AppError::BadGateway(format!(
-            "Die Instanz unter {adresse} kennt den Weg zum Koppeln nicht. Ist dort eine Instanz \
-                 mit einem anderen Softwarestand, beide auf denselben Stand bringen; sonst die \
-                 Adresse prüfen."
-        ))
-        .into()),
+        404 => {
+            let text = format!("Die Instanz unter {adresse} {KOPPELN_UNBEKANNT}");
+            return Err(AppError::BadGateway(text).into());
+        }
         s => return Err(EinloesenFehler::Netz(format!("Antwort {s}"))),
     }
     let nicht_vertrauenswuerdig = |grund: &str| {
