@@ -1,5 +1,7 @@
+use crate::client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use ipnet::IpNet;
+use std::{net::IpAddr, path::PathBuf};
 
 #[derive(Parser, Debug, Clone)]
 #[command(version, about = "push-relais — APNs-Relais für Lifeline-Server")]
@@ -38,8 +40,19 @@ pub struct RelaisConfig {
     pub registrierungen_stunde: u32,
     /// Hinter einem Reverse-Proxy zählt der letzte (rechte) Eintrag von `X-Forwarded-For` als
     /// Client-IP, den der Proxy anhängt; sonst die Peer-Adresse.
+    /// Für genau einen Proxy ohne CDN davor; nicht zusammen mit `PUSH_RELAIS_TRUSTED_PROXIES`.
     #[arg(long, env = "PUSH_RELAIS_HINTER_PROXY", default_value_t = false)]
     pub hinter_proxy: bool,
+    /// Vertraute Proxys als Komma-Liste aus Netzen (CIDR) und Adressen, etwa das Docker-Netz von
+    /// Traefik und die Bereiche eines CDN (LLH-2080). Nur wenn die Gegenstelle darin liegt, gilt
+    /// `X-Forwarded-For`, von rechts gelesen bis zum ersten Eintrag außerhalb der Liste.
+    #[arg(
+        long,
+        env = "PUSH_RELAIS_TRUSTED_PROXIES",
+        value_delimiter = ',',
+        value_parser = proxy_netz_parsen
+    )]
+    pub trusted_proxies: Vec<IpNet>,
     #[arg(
         long,
         env = "PUSH_RELAIS_APNS_BASIS_PRODUCTION",
@@ -59,6 +72,42 @@ pub struct RelaisConfig {
     pub command: Option<Command>,
 }
 
+impl RelaisConfig {
+    /// Woher die Client-Adresse für die Registrierungsgrenze kommt. Schalter und Liste zugleich
+    /// sind ein Fehler: welche Regel dann gälte, wäre nicht zu sehen.
+    pub fn client_ip_source(&self) -> anyhow::Result<ClientIpSource> {
+        match (self.hinter_proxy, self.trusted_proxies.is_empty()) {
+            (true, false) => anyhow::bail!(
+                "PUSH_RELAIS_HINTER_PROXY und PUSH_RELAIS_TRUSTED_PROXIES sind beide gesetzt; \
+                 nur PUSH_RELAIS_TRUSTED_PROXIES verwenden"
+            ),
+            (_, false) => Ok(ClientIpSource::TrustedProxies(self.trusted_proxies.clone())),
+            (true, true) => Ok(ClientIpSource::SingleProxy),
+            (false, true) => Ok(ClientIpSource::Peer),
+        }
+    }
+}
+
+/// Ein Eintrag der Proxy-Liste, wie `LIFELINE_TRUSTED_PROXIES` im Hauptpaket
+/// (`src/config.rs`): Netz in CIDR-Form oder einzelne Adresse. Hostname, leerer Eintrag und
+/// IPv4-gemapptes Netz brechen den Start ab, statt still jedem Proxy zu misstrauen.
+fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
+    let eintrag = eintrag.trim();
+    let netz = eintrag
+        .parse::<IpNet>()
+        .or_else(|_| eintrag.parse::<IpAddr>().map(IpNet::from))
+        .map(|netz| netz.trunc())
+        .map_err(|_| format!("'{eintrag}' ist weder ein Netz (CIDR) noch eine IP-Adresse"))?;
+    if let IpNet::V6(v6) = netz {
+        if v6.addr().to_ipv4_mapped().is_some() {
+            return Err(format!(
+                "'{eintrag}' ist IPv4-gemappt — das Netz als IPv4 angeben (z. B. 10.0.1.0/24)"
+            ));
+        }
+    }
+    Ok(netz)
+}
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
     /// Dauerbetrieb (Standard).
@@ -67,4 +116,72 @@ pub enum Command {
     Sperren { server_id: String },
     /// Hebt die Sperre eines Servers auf.
     Entsperren { server_id: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client_ip::ClientIpSource;
+
+    fn parse(args: &[&str]) -> Result<RelaisConfig, clap::Error> {
+        RelaisConfig::try_parse_from(std::iter::once("push-relais").chain(args.iter().copied()))
+    }
+
+    #[test]
+    fn trusted_proxies_als_liste() {
+        let cfg = parse(&["--trusted-proxies", "10.0.1.0/24,173.245.48.0/20"]).unwrap();
+        let erwartet: Vec<IpNet> = vec![
+            "10.0.1.0/24".parse().unwrap(),
+            "173.245.48.0/20".parse().unwrap(),
+        ];
+        assert_eq!(cfg.trusted_proxies, erwartet);
+        assert_eq!(
+            cfg.client_ip_source().unwrap(),
+            ClientIpSource::TrustedProxies(erwartet)
+        );
+    }
+
+    #[test]
+    fn einzeladresse_wird_zum_netz() {
+        let cfg = parse(&["--trusted-proxies", "10.0.1.5"]).unwrap();
+        assert_eq!(
+            cfg.trusted_proxies,
+            vec!["10.0.1.5/32".parse::<IpNet>().unwrap()]
+        );
+    }
+
+    #[test]
+    fn hostname_in_der_liste_bricht_ab() {
+        assert!(parse(&["--trusted-proxies", "traefik"]).is_err());
+    }
+
+    #[test]
+    fn leerer_eintrag_bricht_ab() {
+        assert!(parse(&["--trusted-proxies", "10.0.1.5,"]).is_err());
+    }
+
+    #[test]
+    fn gemapptes_netz_bricht_ab() {
+        assert!(parse(&["--trusted-proxies", "::ffff:10.0.0.0/104"]).is_err());
+    }
+
+    #[test]
+    fn beide_gesetzt_bricht_ab() {
+        let cfg = parse(&["--hinter-proxy", "--trusted-proxies", "10.0.1.0/24"]).unwrap();
+        let fehler = cfg.client_ip_source().unwrap_err().to_string();
+        assert!(fehler.contains("PUSH_RELAIS_HINTER_PROXY"), "{fehler}");
+        assert!(fehler.contains("PUSH_RELAIS_TRUSTED_PROXIES"), "{fehler}");
+    }
+
+    #[test]
+    fn schalter_allein_bleibt_ein_proxy() {
+        let cfg = parse(&["--hinter-proxy"]).unwrap();
+        assert_eq!(cfg.client_ip_source().unwrap(), ClientIpSource::SingleProxy);
+    }
+
+    #[test]
+    fn ohne_angabe_zaehlt_die_gegenstelle() {
+        let cfg = parse(&[]).unwrap();
+        assert_eq!(cfg.client_ip_source().unwrap(), ClientIpSource::Peer);
+    }
 }
