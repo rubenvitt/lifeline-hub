@@ -214,12 +214,19 @@ Spec `webhook-zustellung`, Herleitung
   Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
   `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
 - **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
-  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver). Einzige
+  Ausnahme ist `ziel::hole_fingerabdruck`: er baut über dieselbe `ziel::baue_client` einen Client,
+  der nach dem Zertifikat abbricht und nie eine Anfrage sendet (Fingerabdruck unten).
 - **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
   danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
   Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.
 - **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
   Sekunden-Auflösung.
+- **Fingerabdruck** (LLH-1872,
+  [ADR-0092](../docs/architektur/entscheidungen/ADR-0092-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md)):
+  ein Client je `(lan, pin)` aus `ziel::client`, TLS nur über
+  `instanz::zertifikat::tls_config`, das Abrufen vom Ziel nur über `ziel::hole_fingerabdruck`
+  mit dem `Erfasser`. Ein geänderter Fingerabdruck zählt im Repo wie ein neues Ziel.
 
 ## Backend — Adapter (LLH-2017)
 
