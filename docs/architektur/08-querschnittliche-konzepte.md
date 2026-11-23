@@ -469,9 +469,9 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   `android/app/src/main/assets/huelle.js`); jeder Server hat dort ein eigenes WebView-Profil. Die
   Anmeldung im Systembrowser (`POST /api/auth/app-code[/redeem]`) nutzen alle Hüllen gleich.
 
-Adressprüfung, Deeplink und Linkregeln stehen in Rust (`src-tauri/src/adresse.rs`,
-`deeplink.rs`, `links.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden sie von den
-gemeinsamen Fällen unter `src-tauri/faelle/`, die alle drei Suiten prüfen. Regeln:
+Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung stehen in Rust (`src-tauri/src/adresse.rs`,
+`deeplink.rs`, `links.rs`, `vertrag.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden
+sie von den gemeinsamen Fällen unter `src-tauri/faelle/`, die alle drei Suiten prüfen. Regeln:
 [`ios/AGENTS.md`](../../ios/AGENTS.md), [`android/AGENTS.md`](../../android/AGENTS.md),
 [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), „Gemeinsame Fälle“; Betrieb:
 [`ios-app.md`](../betrieb/ios-app.md), [`android-app.md`](../betrieb/android-app.md),

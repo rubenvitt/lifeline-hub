@@ -8,157 +8,125 @@ import XCTest
 #endif
 
 /// Vertragsprüfung gegen `GET /api/shell` (Spec `ios-huelle`, „Die App lädt nur einen
-/// verträglichen Server“ und „Server ohne Vertrag gelten als zu alt“).
+/// verträglichen Server“ und „Server ohne Vertrag gelten als zu alt“). Bewertung und
+/// Weiterleitungsregel prüfen die gemeinsamen Fälle (`src-tauri/faelle/vertrag.json`); hier
+/// stehen nur, was allein die iOS-Hülle kennt: Zertifikatsfehler, `HealthInfo`, fehlende URLs,
+/// `assets` (LLH-1980).
 final class VertragTests: XCTestCase {
-    func shell(_ vertrag: Int, version: String = "1.0.0-alpha.300") -> ShellAbruf {
-        .antwort(
-            status: 200,
-            body: Data(#"{"version":"\#(version)","shell_contract":\#(vertrag)}"#.utf8),
-            contentType: "application/json")
+    struct Datei: Decodable {
+        let bekannt: [Int]
+        let bewerte: [BewerteFall]
+        let weiterleitung: [WeiterleitungFall]
     }
 
-    func testShellInfoLiestDieWireFelderUndIgnoriertNeue() throws {
-        let json = #"{"version":"1.0.0-alpha.300","shell_contract":2,"kuenftig":["a.js"]}"#
-        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
-        XCTAssertEqual(info, ShellInfo(version: "1.0.0-alpha.300", shellContract: 2))
-    }
+    struct BewerteFall: Decodable {
+        let beschreibung: String
+        let abruf: Abruf
+        let letzterVertrag: Int?
+        let bekannt: [Int]?
+        let ergebnis: String
+        let serverVersion: String?
+        let shellContract: Int?
 
-    /// LLH-1980: ein älterer Server kennt das Feld nicht; dann gibt es keinen Start ohne Server.
-    func testAssetsSindOptional() throws {
-        let json = #"{"version":"1.0.0","shell_contract":1}"#
-        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
-        XCTAssertNil(info.assets)
-    }
-
-    func testAssetsWerdenGelesen() throws {
-        let json = #"{"version":"1.0.0","shell_contract":1,"assets":["assets/a.js"]}"#
-        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
-        XCTAssertEqual(info, ShellInfo(version: "1.0.0", shellContract: 1, assets: ["assets/a.js"]))
-    }
-
-    /// Vertrag 2 (LLH-1979): der Login-Pfad heißt `/api/auth/app-code/redeem`.
-    func testDieAppKenntGenauDenZweitenVertrag() {
-        XCTAssertEqual(LifelineKern.bekannteVertraege, [2])
-    }
-
-    /// Eine ältere App (kennt nur Vertrag 1) zeigt einem Server mit Vertrag 2 „App aktualisieren“,
-    /// statt am umbenannten Login-Pfad zu scheitern (LLH-1979).
-    func testEineAppMitVertragEinsSiehtVertragZweiAlsZuNeu() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(2), letzterVertrag: 1, bekannt: [1]).fehlerklasse, .zuNeu)
-    }
-
-    /// Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für die App zu alt.
-    func testEinServerMitVertragEinsIstZuAlt() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(1), letzterVertrag: nil).fehlerklasse, .zuAlt)
-    }
-
-    func testEinBekannterVertragIstVertraeglich() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(2), letzterVertrag: nil),
-            .vertraeglich(ShellInfo(version: "1.0.0-alpha.300", shellContract: 2)))
-    }
-
-    func testEinGroessererVertragHeisstAppAktualisieren() {
-        let info = ShellInfo(version: "2.0.0", shellContract: 3)
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(3, version: "2.0.0"), letzterVertrag: 2),
-            .nichtVertraeglich(.zuNeu, server: info))
-        XCTAssertEqual(Vertragspruefung.evaluate(shell(3), letzterVertrag: 2).fehlerklasse, .zuNeu)
-    }
-
-    func testEinKleinererVertragHeisstServerZuAlt() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(shell(2), letzterVertrag: nil, bekannt: [3, 4]).fehlerklasse,
-            .zuAlt)
-    }
-
-    func testOhneEndpunktIstDerServerZuAlt() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(
-                .antwort(status: 404, body: Data(), contentType: "text/plain"), letzterVertrag: 2),
-            .nichtVertraeglich(.zuAlt, server: nil))
-        // JSON ohne lesbaren Vertrag nennt keinen Vertrag.
-        for typ in ["application/json", "application/json; charset=utf-8", "Application/JSON"] {
-            XCTAssertEqual(
-                Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: Data(#"{"status":"ok"}"#.utf8), contentType: typ),
-                    letzterVertrag: 2),
-                .nichtVertraeglich(.zuAlt, server: nil), typ)
+        enum CodingKeys: String, CodingKey {
+            case beschreibung, abruf, bekannt, ergebnis
+            case letzterVertrag = "letzter_vertrag"
+            case serverVersion = "server_version"
+            case shellContract = "shell_contract"
         }
     }
 
-    func testDerVertragGiltAuchMitZeichensatzImContentType() {
+    struct Abruf: Decodable {
+        let fehler: Bool?
+        let status: Int?
+        let contentType: String?
+        let koerper: String?
+
+        enum CodingKeys: String, CodingKey {
+            case fehler, status, koerper
+            case contentType = "content_type"
+        }
+
+        /// Keine Antwort heißt hier keine Verbindung; Zertifikatsfehler prüfen eigene Tests.
+        var shellAbruf: ShellAbruf {
+            guard fehler != true, let status else { return .fehler(.notConnectedToInternet) }
+            return .antwort(status: status, body: Data((koerper ?? "").utf8), contentType: contentType)
+        }
+    }
+
+    struct WeiterleitungFall: Decodable {
+        let beschreibung: String
+        let von: String
+        let nach: String
+        let folgt: Bool
+    }
+
+    func datei() throws -> Datei { try GemeinsameFaelle.load("vertrag.json", as: Datei.self) }
+
+    /// Das Ergebnis in der Form der Fälle. Die iOS-Hülle trägt bei „nicht verträglich“ den ganzen
+    /// `ShellInfo` des Servers; die Fälle nennen davon die Version (wie die Desktop-Hülle).
+    struct Erwartung: Equatable {
+        let ergebnis: String
+        let serverVersion: String?
+        let shellContract: Int?
+
+        init(_ fall: BewerteFall) {
+            ergebnis = fall.ergebnis
+            serverVersion = fall.serverVersion
+            shellContract = fall.shellContract
+        }
+
+        init(_ ist: Vertragsergebnis) {
+            switch ist {
+            case .vertraeglich(let info):
+                (ergebnis, serverVersion, shellContract) = ("vertraeglich", info.version, info.shellContract)
+            case .nichtVertraeglich(let klasse, let server):
+                ergebnis = klasse == .zuNeu ? "zu_neu" : klasse == .zuAlt ? "zu_alt" : "\(klasse)"
+                (serverVersion, shellContract) = (server?.version, nil)
+            case .nichtErreichbar(let klasse):
+                ergebnis = klasse == .nichtErreichbar ? "nicht_erreichbar" : "\(klasse)"
+                (serverVersion, shellContract) = (nil, nil)
+            }
+        }
+    }
+
+    func testJederGemeinsameFallVonBewerteGilt() throws {
+        let datei = try datei()
+        XCTAssertGreaterThanOrEqual(datei.bewerte.count, 20)
+        for fall in datei.bewerte {
+            let ist = Vertragspruefung.evaluate(
+                fall.abruf.shellAbruf, letzterVertrag: fall.letzterVertrag,
+                bekannt: fall.bekannt ?? datei.bekannt)
+            XCTAssertEqual(Erwartung(ist), Erwartung(fall), fall.beschreibung)
+        }
+    }
+
+    func testJederGemeinsameFallVonWeiterleitungGilt() throws {
+        let faelle = try datei().weiterleitung
+        XCTAssertGreaterThanOrEqual(faelle.count, 5)
+        for fall in faelle {
+            XCTAssertEqual(
+                Vertragspruefung.followsRedirect(von: URL(string: fall.von), nach: URL(string: fall.nach)),
+                fall.folgt, fall.beschreibung)
+        }
+    }
+
+    /// Die Liste der gemeinsamen Fälle ist die der App; ohne `bekannt` prüft `evaluate` gegen sie.
+    func testDieAppKenntDieVertraegeDerGemeinsamenFaelle() throws {
+        XCTAssertEqual(LifelineKern.bekannteVertraege, try datei().bekannt)
         let abruf = ShellAbruf.antwort(
-            status: 200, body: Data(#"{"version":"1.0.0","shell_contract":2}"#.utf8),
-            contentType: "application/json; charset=utf-8")
+            status: 200, body: Data(#"{"version":"2.0.0","shell_contract":2}"#.utf8),
+            contentType: "application/json")
         XCTAssertEqual(
             Vertragspruefung.evaluate(abruf, letzterVertrag: nil),
-            .vertraeglich(ShellInfo(version: "1.0.0", shellContract: 2)))
+            Vertragspruefung.evaluate(abruf, letzterVertrag: nil, bekannt: LifelineKern.bekannteVertraege))
     }
 
-    /// Ein Captive Portal oder Auth-Proxy antwortet mit 200 und HTML (oder ohne Content-Type):
-    /// das ist nicht der Server, also gilt wie ohne Verbindung der zuletzt bestätigte Vertrag.
-    func testEine200OhneJsonIstNichtDerServer() {
-        let portal = Data("<!doctype html><title>WLAN-Anmeldung</title>".utf8)
-        for typ in ["text/html", "text/html; charset=utf-8", "text/plain", nil] as [String?] {
-            XCTAssertEqual(
-                Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 2),
-                .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
-            XCTAssertEqual(
-                Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: nil),
-                .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
-            XCTAssertEqual(
-                Vertragspruefung.evaluate(
-                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 3),
-                .nichtVertraeglich(.zuNeu, server: nil), "\(typ ?? "ohne")")
-        }
-        // Auch ein Portal, das JSON-ähnlichen Text als HTML schickt, nennt keinen Vertrag.
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(
-                .antwort(
-                    status: 200, body: Data(#"{"version":"9","shell_contract":2}"#.utf8),
-                    contentType: "text/html"),
-                letzterVertrag: nil),
-            .nichtErreichbar(.nichtErreichbar))
-    }
-
-    /// Eine nicht verfolgte Weiterleitung auf eine fremde Origin (Vertragsabruf) kommt als 3xx an.
-    func testEineWeiterleitungIstWieOhneVerbindung() {
-        for status in [301, 302, 303, 307, 308] {
-            XCTAssertEqual(
-                Vertragspruefung.evaluate(
-                    .antwort(status: status, body: Data(), contentType: "text/html"), letzterVertrag: 2),
-                .nichtErreichbar(.nichtErreichbar), "\(status)")
-        }
-    }
-
-    /// Der Abruf folgt nur Weiterleitungen auf derselben Origin; eine fremde (Captive Portal,
-    /// Auth-Proxy) bleibt stehen und kommt als 3xx in die Prüfung.
-    func testNurWeiterleitungenAufDerselbenOriginWerdenVerfolgt() {
+    /// Ohne URL folgt der Abruf keiner Weiterleitung (Optionals gibt es nur in der iOS-Hülle).
+    func testOhneUrlWirdKeinerWeiterleitungGefolgt() {
         let shell = URL(string: "https://elw.local:8443/api/shell")
-        XCTAssertTrue(
-            Vertragspruefung.followsRedirect(von: shell, nach: URL(string: "https://ELW.local:8443/api/shell/")))
-        for ziel in [
-            "https://portal.example/login", "https://elw.local/api/shell", "http://elw.local:8443/api/shell",
-            "https://elw.local:8444/api/shell",
-        ] {
-            XCTAssertFalse(Vertragspruefung.followsRedirect(von: shell, nach: URL(string: ziel)), ziel)
-        }
         XCTAssertFalse(Vertragspruefung.followsRedirect(von: nil, nach: shell))
         XCTAssertFalse(Vertragspruefung.followsRedirect(von: shell, nach: nil))
-    }
-
-    func testJsonErkenntDenMedientyp() {
-        for typ in ["application/json", " application/json ; charset=utf-8", "APPLICATION/JSON"] {
-            XCTAssertTrue(ShellAbruf.isJson(typ), typ)
-        }
-        for typ in ["text/html", "application/jsonp", "text/json-ish", "", nil] as [String?] {
-            XCTAssertFalse(ShellAbruf.isJson(typ), typ ?? "nil")
-        }
     }
 
     func testDieVersionEinesZuAltenServersKommtAusHealth() throws {
@@ -166,22 +134,16 @@ final class VertragTests: XCTestCase {
         XCTAssertEqual(try HealthInfo(json: Data(json.utf8)).version, "1.0.0-alpha.12")
     }
 
-    /// Ohne Netz gilt der zuletzt bestätigte Vertrag: die App zeigt „nicht erreichbar“, nicht
-    /// „nicht verträglich“.
-    func testOhneNetzGiltDerZuletztBestaetigteVertrag() {
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(.fehler(.notConnectedToInternet), letzterVertrag: 2),
-            .nichtErreichbar(.nichtErreichbar))
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(.fehler(.timedOut), letzterVertrag: nil),
-            .nichtErreichbar(.nichtErreichbar))
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(.fehler(.cannotConnectToHost), letzterVertrag: 3),
-            .nichtVertraeglich(.zuNeu, server: nil))
-        XCTAssertEqual(
-            Vertragspruefung.evaluate(
-                .antwort(status: 502, body: Data(), contentType: "text/html"), letzterVertrag: 2),
-            .nichtErreichbar(.nichtErreichbar))
+    /// Jeder Verbindungsfehler bewertet sich wie „ohne Verbindung“ der gemeinsamen Fälle.
+    func testJederVerbindungsfehlerGiltWieOhneVerbindung() {
+        for code: URLError.Code in [.notConnectedToInternet, .timedOut, .cannotConnectToHost] {
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 2),
+                .nichtErreichbar(.nichtErreichbar), "\(code)")
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(.fehler(code), letzterVertrag: 3),
+                .nichtVertraeglich(.zuNeu, server: nil), "\(code)")
+        }
     }
 
     func testEinZertifikatsfehlerIstKeinNichtErreichbar() {
@@ -205,5 +167,18 @@ final class VertragTests: XCTestCase {
         ] {
             XCTAssertEqual(Fehlerklasse(code), .nichtErreichbar, "\(code)")
         }
+    }
+
+    /// LLH-1980: ein älterer Server kennt das Feld nicht; dann gibt es keinen Start ohne Server.
+    func testAssetsSindOptional() throws {
+        let json = #"{"version":"1.0.0","shell_contract":1}"#
+        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
+        XCTAssertNil(info.assets)
+    }
+
+    func testAssetsWerdenGelesen() throws {
+        let json = #"{"version":"1.0.0","shell_contract":1,"assets":["assets/a.js"]}"#
+        let info = try JSONDecoder().decode(ShellInfo.self, from: Data(json.utf8))
+        XCTAssertEqual(info, ShellInfo(version: "1.0.0", shellContract: 1, assets: ["assets/a.js"]))
     }
 }

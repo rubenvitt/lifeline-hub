@@ -28,9 +28,9 @@ Change `t39ltxxi-ios-huelle`.
   diesen App-Lauf nicht mehr. Die App-Tests prüfen das gegen einen https-Testserver, dessen CA
   `scripts/ios/simulator-pruefung.sh` in jeden Simulator einträgt; der App-Code bekommt keine
   Ausnahme bei der Zertifikatsprüfung.
-- **Gemeinsame Fälle:** Adressprüfung, Deeplink und Linkregeln prüft der Kern gegen
-  `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
-  JSON, nie nur in einen Swift-Test.
+- **Gemeinsame Fälle:** Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung prüft der Kern
+  gegen `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in
+  die JSON, nie nur in einen Swift-Test.
 - **Bauen nur auf macOS:** keine `.xcodeproj` und keine Versionsangabe im Repo. Ablauf:
   `scripts/ios/version.sh` (Version aus `[workspace.package]`) → `xcodegen generate --spec
   ios/project.yml` → Xcode. Die XcodeGen-Version steht nur in
