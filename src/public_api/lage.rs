@@ -3,7 +3,7 @@
 //!
 //! Die Zahlen kommen aus derselben Verdichtung wie beim gekoppelten Lagemonitor
 //! (`routes::lagemonitor::verdichte`). **Keine Namen, keine Personenkennungen, keine freien
-//! Notizen** (ADR-0095): gezeigt werden nur Bezeichnungen (Einsatz, Abschnitte, UHS) und die
+//! Notizen** (ADR-0096): gezeigt werden nur Bezeichnungen (Einsatz, Abschnitte, UHS) und die
 //! Zusammenfassung des jüngsten freigegebenen Lageberichts, die für die Weitergabe geschrieben
 //! ist. Die Karte trägt die Koordinate des Einsatzorts, nicht seine Adresse.
 //!

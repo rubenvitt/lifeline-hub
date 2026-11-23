@@ -1,5 +1,5 @@
 {
-  "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0095, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
+  "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0096, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
   "client_fingerprint": "CPV0-CWYP-XP44-QW0W-5GH2-V0ND-M1T0-YADC",
   "client_private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
   "client_public_key": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",

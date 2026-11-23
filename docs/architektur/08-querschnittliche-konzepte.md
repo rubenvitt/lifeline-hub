@@ -45,7 +45,7 @@ für Extractor-Ablehnungen. Welcher Fall 400, 409, 413 oder 422 ist, steht verbi
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Statuscode-Konvention“. Nachweis des
 Vertrags: `tests/fehler_vertrag.rs`.
 
-Unter `/api/v1/` (öffentliche API, [ADR-0095](entscheidungen/ADR-0095-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md))
+Unter `/api/v1/` (öffentliche API, [ADR-0096](entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md))
 trägt jeder Fehler zusätzlich einen stabilen englischen `code`. Vertrag ist dort der Code, nicht
 der Text. v1-Handler setzen ihn über `ApiError`; alles andere unter `/api/v1/` bekommt ihn von
 den Schichten `public_api::error_code_layer` (an den Routen, innerhalb der Kompression) und
@@ -249,7 +249,7 @@ mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“). Fremdsysteme
 nutzen dasselbe Verfahren mit eigenem Profil (`lifeline-machine+jwt`, Kopf
 `Authorization: Machine`), eigenen Tabellen und festen Scopes je Zugang, nur unter `/api/v1/`
-([ADR-0095](entscheidungen/ADR-0095-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
+([ADR-0096](entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 `src/public_api/machine.rs`, Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 Ihre Fehlversuche zählt ein eigener Zähler je Quelle, nie die Anmeldesperre.
 Einzige Ausnahme vom Schlüsselpaar ist der Einwurf für Absender, die nicht signieren können: ein

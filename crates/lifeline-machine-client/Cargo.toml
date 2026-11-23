@@ -2,7 +2,7 @@
 name = "lifeline-machine-client"
 version = "0.1.0"
 edition = "2021"
-description = "Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0095)"
+description = "Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0096)"
 publish = false
 
 # Absichtlich unabhängig vom Server (design.md D9): Die Testvektoren beweisen so, dass eine zweite

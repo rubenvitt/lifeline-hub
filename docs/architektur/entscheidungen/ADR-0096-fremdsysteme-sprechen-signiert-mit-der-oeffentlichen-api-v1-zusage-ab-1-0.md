@@ -1,5 +1,5 @@
 ---
-id: ADR-0095
+id: ADR-0096
 titel: Fremdsysteme sprechen signiert mit der öffentlichen API unter /api/v1, deren Zusage ab 1.0.0 gilt
 status: akzeptiert
 datum: 2026-11-23
@@ -17,7 +17,7 @@ herleitung:
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
 
-# ADR-0095: Fremdsysteme sprechen signiert mit der öffentlichen API unter /api/v1, deren Zusage ab 1.0.0 gilt
+# ADR-0096: Fremdsysteme sprechen signiert mit der öffentlichen API unter /api/v1, deren Zusage ab 1.0.0 gilt
 
 ## Regeln
 

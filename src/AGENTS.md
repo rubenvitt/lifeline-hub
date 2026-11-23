@@ -142,7 +142,7 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 
 ## Backend — Öffentliche API v1 (LLH-1653)
 
-Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0095](../docs/architektur/entscheidungen/ADR-0095-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
+Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0096](../docs/architektur/entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec `oeffentliche-api-vertrag`, Herleitung
 `openspec/changes/archive/2026-11-12-h5zpb97t-oeffentliche-api-vertrag/design.md`):
 - **Routen nur in `public_api::router()`** per `.routes(routes!(handler))`, jeder Handler mit

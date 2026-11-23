@@ -1,4 +1,4 @@
-//! Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0095,
+//! Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0096,
 //! Doku `docs/api/maschinenzugang.md`).
 //!
 //! Ablauf:

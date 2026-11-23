@@ -1,11 +1,11 @@
 Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,
-eigene Skripte). Grundlage: ADR-0095.
+eigene Skripte). Grundlage: ADR-0096.
 
 ## Stabilitätszusage
 
 - Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und
   ändert sich ohne Ankündigung.
-- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0095).
+- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0096).
 - Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue
   Enum-Werte und neue Fehlercodes.
 - Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.

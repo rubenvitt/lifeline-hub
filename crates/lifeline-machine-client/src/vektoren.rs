@@ -106,7 +106,7 @@ fn berechne() -> Value {
     let webhooks = webhook_vektoren(&client, &instanz, &instanz_pub);
 
     json!({
-        "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0095, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
+        "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0096, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
         "code": CODE,
         "code_normalized": normalize_code(CODE).unwrap(),
         "salt": String::from_utf8(SALT.to_vec()).unwrap(),

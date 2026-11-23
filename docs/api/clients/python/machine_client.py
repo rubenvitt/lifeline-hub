@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Referenz-Beispiel für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0095,
+"""Referenz-Beispiel für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0096,
 Doku docs/api/maschinenzugang.md). Braucht nur `cryptography` (pip install cryptography).
 
     python3 machine_client.py --selftest          # gegen docs/api/machine-auth-testvektoren.json
