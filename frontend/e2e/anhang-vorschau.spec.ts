@@ -93,7 +93,7 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   // Der Download-Verweis daneben ist unverändert.
   await expect(paneel.getByRole('link', { name: /^dach\.jpg, / })).toHaveAttribute(
     'href',
-    new RegExp(`/schaeden/${schadenId}/anhaenge/\\d+/datei$`),
+    new RegExp(`/damages/${schadenId}/attachments/\\d+/file$`),
   );
 
   // ── 2 · Großansicht in der App, Blättern, Escape, Fokus zurück ──────────────────────
