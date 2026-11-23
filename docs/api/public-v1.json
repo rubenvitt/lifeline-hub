@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0093.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die\nEinsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/situation` mit `einsatz: null` und\n`GET /api/v1/incidents` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/incidents/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage\nihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von\n`rechner:use` beendet eine Freigabe nicht.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit\n  `einsaetze:read` über `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und\n  danach `GET /api/v1/situation`.\n\n## Einwurf\n\nAbsender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 mit „URL öffnen“,\nDivera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,\nnimmt den Maschinenzugang.\n\n- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/intake/{schluessel}/alarm` oder\n  `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt\n  es hier nicht.\n- Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.\n  Eine neue Meldung und eine Wiederholung bekommen dieselbe Antwort.\n- Nur über TLS, sonst `403 tls_required`. Wer POST kann, nimmt POST: Bei GET stehen Schlüssel und\n  Inhalt in der URL.\n- **Alarmmeldung:** Abfrage und Body werden unverändert abgelegt und nicht gedeutet. Der Server\n  erkennt nur `external_id` und `message_id`. Mit ihnen ist eine Wiederholung dauerhaft\n  idempotent; ohne sie gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als\n  Wiederholung, danach entsteht ein neuer Eintrag.\n- **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und\n  `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird\n  nicht übernommen.\n- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.\n- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,\n  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200\n  Kennungen für Positionen je Zugang.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß, bei einem Einwurf 16 KiB.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0093.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0093).\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nPfade sind englisch, auch für Fachbegriffe (ADR-0085). In Feldern, Werten, Scopes und\nEreignisarten sind Fachbegriffe deutsch und alles Technische englisch. Umlaute werden\numschrieben (`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | – | `incidents`, `situation`, `intake`, `alarm`, `position`, `calculators`, `accommodation`, `reference-values`, `access`, `instance`, `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die\nEinsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/situation` mit `einsatz: null` und\n`GET /api/v1/incidents` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/incidents/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage\nihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von\n`rechner:use` beendet eine Freigabe nicht.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit\n  `einsaetze:read` über `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und\n  danach `GET /api/v1/situation`.\n\n## Einwurf\n\nAbsender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 mit „URL öffnen“,\nDivera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,\nnimmt den Maschinenzugang.\n\n- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/intake/{schluessel}/alarm` oder\n  `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt\n  es hier nicht.\n- Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.\n  Eine neue Meldung und eine Wiederholung bekommen dieselbe Antwort.\n- Nur über TLS, sonst `403 tls_required`. Wer POST kann, nimmt POST: Bei GET stehen Schlüssel und\n  Inhalt in der URL.\n- **Alarmmeldung:** Abfrage und Body werden unverändert abgelegt und nicht gedeutet. Der Server\n  erkennt nur `external_id` und `message_id`. Mit ihnen ist eine Wiederholung dauerhaft\n  idempotent; ohne sie gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als\n  Wiederholung, danach entsteht ein neuer Eintrag.\n- **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und\n  `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird\n  nicht übernommen.\n- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.\n- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,\n  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200\n  Kennungen für Positionen je Zugang.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß, bei einem Einwurf 16 KiB.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -12,6 +12,416 @@
     }
   ],
   "paths": {
+    "/api/v1/access/redeem": {
+      "post": {
+        "tags": [
+          "Anmeldung"
+        ],
+        "summary": "Einen Einmal-Code einlösen und den Schlüssel des Fremdsystems an den Zugang binden.",
+        "operationId": "redeem_zugang",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Schlüssel gebunden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Schlüssel unlesbar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Code unbekannt, abgelaufen, schon eingelöst oder Prüfwert falsch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Zu viele gescheiterte Einlösungen von dieser Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calculators/accommodation": {
+      "post": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Unterkunft und Zelte durchrechnen. Speichert nichts.",
+        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert des Einsatzes aus\n`einsatz_id`, sonst der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms. Den\nEinsatz nimmt die Rechnung nur, wenn die Einsatzleitung ihn für den Zugang freigegeben hat.",
+        "operationId": "calculate_unterkunft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnterkunftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis, wirksame Richtwerte und Stand der Basis; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes oder doppeltes Feld, falscher Typ, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt. Geprüft wird nach 400 und 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Der Body ist größer als 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
+    "/api/v1/calculators/accommodation/reference-values": {
+      "get": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.",
+        "description": "`wert` ist mit `einsatz_id` der Wert dieses Einsatzes, sonst der Wert der Organisation des\nZugangs, sonst die Vorgabe des Programms. Den Einsatz nimmt die Auskunft nur, wenn die\nEinsatzleitung ihn für den Zugang freigegeben hat.",
+        "operationId": "get_unterkunft_richtwerte",
+        "parameters": [
+          {
+            "name": "einsatz_id",
+            "in": "query",
+            "description": "Einsatz, dessen Richtwerte gelten sollen; nur ein Einsatz, den die Einsatzleitung für den Zugang freigegeben hat",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftRichtwerteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`einsatz_id` ist keine ganze Zahl (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "tags": [
+          "Ereignisse"
+        ],
+        "summary": "Ereignisse des Zugangs nach einem Cursor, auf Wunsch mit Warten (Long-Poll).",
+        "description": "Ohne `after` kommt der aktuelle Stand ohne Ereignisse. Mit `wait` bleibt der Abruf offen, bis\nein Ereignis vorliegt oder die Zeit abläuft. Kommt eine volle Seite (500), liegt vermutlich\nmehr vor: gleich mit dem neuen Cursor weiter abrufen.",
+        "operationId": "get_events",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Cursor aus der letzten Antwort oder aus `GET /api/v1/incidents`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "description": "Höchste Wartezeit in ganzen Sekunden (0 bis 25), bis ein Ereignis vorliegt. Ohne ihn wartet der Abruf nicht.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 25,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ereignisse nach `after`, aufsteigend nach `id`; Antwort signiert im Kopf `Lifeline-Signature`. Trägt die Antwort `Retry-After`, war kein Warteplatz frei (höchstens 32 Abrufe warten zugleich, je Zugang einer): so viele Sekunden bis zum nächsten Abruf warten.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Nur an einer leeren Antwort ohne Warteplatz: Sekunden bis zum nächsten Abruf"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`after` oder `wait` ungültig (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt `events:read` (`missing_scope`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/incidents` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/situation`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": [
+              "events:read"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/incidents": {
       "get": {
         "tags": [
@@ -168,6 +578,37 @@
             ]
           }
         ]
+      }
+    },
+    "/api/v1/instance/jwks.json": {
+      "get": {
+        "tags": [
+          "Anmeldung"
+        ],
+        "summary": "Öffentlicher Schlüssel dieser Instanz, ohne Anmeldung. Dient dem Schlüsselwechsel; die erste\nBindung kommt mit dem Einlösen.",
+        "operationId": "get_instanz_jwks",
+        "responses": {
+          "200": {
+            "description": "JWKS mit dem Ed25519-Schlüssel der Instanz",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/intake/{schluessel}/alarm": {
@@ -668,91 +1109,26 @@
         }
       }
     },
-    "/api/v1/events": {
+    "/api/v1/me": {
       "get": {
         "tags": [
-          "Ereignisse"
+          "Anmeldung"
         ],
-        "summary": "Ereignisse des Zugangs nach einem Cursor, auf Wunsch mit Warten (Long-Poll).",
-        "description": "Ohne `after` kommt der aktuelle Stand ohne Ereignisse. Mit `wait` bleibt der Abruf offen, bis\nein Ereignis vorliegt oder die Zeit abläuft. Kommt eine volle Seite (500), liegt vermutlich\nmehr vor: gleich mit dem neuen Cursor weiter abrufen.",
-        "operationId": "get_events",
-        "parameters": [
-          {
-            "name": "after",
-            "in": "query",
-            "description": "Cursor aus der letzten Antwort oder aus `GET /api/v1/incidents`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "wait",
-            "in": "query",
-            "description": "Höchste Wartezeit in ganzen Sekunden (0 bis 25), bis ein Ereignis vorliegt. Ohne ihn wartet der Abruf nicht.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "maximum": 25,
-              "minimum": 0
-            }
-          }
-        ],
+        "summary": "Prüfroute: Zugang, Org, Scopes, Serverzeit und Abweichung der Uhr. Der erste Aufruf jeder\nAnbindung.",
+        "operationId": "get_me",
         "responses": {
           "200": {
-            "description": "Ereignisse nach `after`, aufsteigend nach `id`; Antwort signiert im Kopf `Lifeline-Signature`. Trägt die Antwort `Retry-After`, war kein Warteplatz frei (höchstens 32 Abrufe warten zugleich, je Zugang einer): so viele Sekunden bis zum nächsten Abruf warten.",
-            "headers": {
-              "Retry-After": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int64",
-                  "minimum": 0
-                },
-                "description": "Nur an einer leeren Antwort ohne Warteplatz: Sekunden bis zum nächsten Abruf"
-              }
-            },
+            "description": "Angemeldet; Antwort signiert im Kopf `Lifeline-Signature`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EventsResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`after` oder `wait` ungültig (`invalid_field`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
+                  "$ref": "#/components/schemas/MeResponse"
                 }
               }
             }
           },
           "401": {
             "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `events:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/incidents` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/situation`",
             "content": {
               "application/json": {
                 "schema": {
@@ -784,33 +1160,31 @@
         },
         "security": [
           {
-            "machine": [
-              "events:read"
-            ]
+            "machine": []
           }
         ]
       }
     },
-    "/api/v1/instance/jwks.json": {
+    "/api/v1/openapi.json": {
       "get": {
         "tags": [
-          "Anmeldung"
+          "Vertrag"
         ],
-        "summary": "Öffentlicher Schlüssel dieser Instanz, ohne Anmeldung. Dient dem Schlüsselwechsel; die erste\nBindung kommt mit dem Einlösen.",
-        "operationId": "get_instanz_jwks",
+        "summary": "Das OpenAPI-Dokument dieser API.",
+        "operationId": "get_openapi",
         "responses": {
           "200": {
-            "description": "JWKS mit dem Ed25519-Schlüssel der Instanz",
+            "description": "OpenAPI-Dokument (3.1) der öffentlichen API v1",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Jwks"
+                  "type": "object"
                 }
               }
             }
           },
           "default": {
-            "description": "Fehler mit stabilem `code`",
+            "description": "Fehler; `code` nach der Tabelle in `info.description`",
             "content": {
               "application/json": {
                 "schema": {
@@ -900,380 +1274,6 @@
             ]
           }
         ]
-      }
-    },
-    "/api/v1/me": {
-      "get": {
-        "tags": [
-          "Anmeldung"
-        ],
-        "summary": "Prüfroute: Zugang, Org, Scopes, Serverzeit und Abweichung der Uhr. Der erste Aufruf jeder\nAnbindung.",
-        "operationId": "get_me",
-        "responses": {
-          "200": {
-            "description": "Angemeldet; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
-    "/api/v1/openapi.json": {
-      "get": {
-        "tags": [
-          "Vertrag"
-        ],
-        "summary": "Das OpenAPI-Dokument dieser API.",
-        "operationId": "get_openapi",
-        "responses": {
-          "200": {
-            "description": "OpenAPI-Dokument (3.1) der öffentlichen API v1",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler; `code` nach der Tabelle in `info.description`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/calculators/accommodation": {
-      "post": {
-        "tags": [
-          "Rechner"
-        ],
-        "summary": "Unterkunft und Zelte durchrechnen. Speichert nichts.",
-        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert des Einsatzes aus\n`einsatz_id`, sonst der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms. Den\nEinsatz nimmt die Rechnung nur, wenn die Einsatzleitung ihn für den Zugang freigegeben hat.",
-        "operationId": "calculate_unterkunft",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnterkunftRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Ergebnis, wirksame Richtwerte und Stand der Basis; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnterkunftResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes oder doppeltes Feld, falscher Typ, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt das Recht `rechner:use`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt. Geprüft wird nach 400 und 422.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Der Body ist größer als 64 KiB",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
-    "/api/v1/calculators/accommodation/reference-values": {
-      "get": {
-        "tags": [
-          "Rechner"
-        ],
-        "summary": "Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.",
-        "description": "`wert` ist mit `einsatz_id` der Wert dieses Einsatzes, sonst der Wert der Organisation des\nZugangs, sonst die Vorgabe des Programms. Den Einsatz nimmt die Auskunft nur, wenn die\nEinsatzleitung ihn für den Zugang freigegeben hat.",
-        "operationId": "get_unterkunft_richtwerte",
-        "parameters": [
-          {
-            "name": "einsatz_id",
-            "in": "query",
-            "description": "Einsatz, dessen Richtwerte gelten sollen; nur ein Einsatz, den die Einsatzleitung für den Zugang freigegeben hat",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnterkunftRichtwerteResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`einsatz_id` ist keine ganze Zahl (`invalid_field`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt das Recht `rechner:use`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
-    "/api/v1/access/redeem": {
-      "post": {
-        "tags": [
-          "Anmeldung"
-        ],
-        "summary": "Einen Einmal-Code einlösen und den Schlüssel des Fremdsystems an den Zugang binden.",
-        "operationId": "redeem_zugang",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RedeemRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Schlüssel gebunden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RedeemResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Schlüssel unlesbar",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Code unbekannt, abgelaufen, schon eingelöst oder Prüfwert falsch",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Zu viele gescheiterte Einlösungen von dieser Quelle",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        }
       }
     }
   },
