@@ -22,7 +22,7 @@ es nicht (kein SMTP-Crate in [`Cargo.toml`](../../Cargo.toml)).
 | Amtliche und offene Datenquellen | Warnungen, Wetter, Pegel, Strahlung, Verkehr, Luftqualität, Energieanlagen, kritische Infrastruktur als Fachebenen der Lagekarte ([`docs/fachebenen-quellen.md`](../fachebenen-quellen.md)) |
 | Karten- und Ortsdienste | Hintergrundkarten online und als Offline-Datei, Ortsnamen zu Koordinaten und Adresssuche |
 | Push-Dienste der Browser-Hersteller | Benachrichtigungen bei geschlossener App, nur mit Schalter `--web-push` ([`docs/betrieb/web-push.md`](../betrieb/web-push.md)) |
-| Push-Relais des Projekts und Apple (APNs) | Benachrichtigungen an die iOS-App bei geschlossener App, nur mit Schalter `--ios-push`; der Inhalt ist für das Gerät verschlüsselt, Relais und Apple sehen Token, Stufe und Zeitpunkt, nicht den Inhalt ([ADR-0084](entscheidungen/ADR-0084-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md), [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md)) |
+| Push-Relais des Projekts und Apple (APNs) | Benachrichtigungen an die iOS-App bei geschlossener App, nur mit Schalter `--ios-push`; der Inhalt ist für das Gerät verschlüsselt, Relais und Apple sehen Token, Stufe und Zeitpunkt, nicht den Inhalt ([ADR-0086](entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md), [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md)) |
 
 ## 3.2 Technischer Kontext
 

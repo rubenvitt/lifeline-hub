@@ -49,7 +49,7 @@ iOS-App über `faehigkeiten.ts`.
 - Anmeldung hängt an Konto + Gerät; `session_token_hash` ist `ON DELETE SET NULL`.
 - Migrationsnummer: größer als alles auf `origin/alpha` (derzeit 0363), vor dem Push
   `scripts/check-migrationen.sh`.
-- ADR-Nummer 0084 (zuerst 0082; nach dem Merge von alpha umnummeriert, dort tragen 0082 und 0083 andere Entscheidungen; vorher `scripts/check-adr-nummern.sh`).
+- ADR-Nummer 0086 (zuerst 0082, dann 0084; nach Merges von alpha umnummeriert, dort tragen 0082 bis 0084 andere Entscheidungen, 0085 ein offener PR; vorher `scripts/check-adr-nummern.sh`).
 - Swift gibt es im Linux-Container nicht: Kern-Tests (`swift test`) und App-Build belegt erst
   `ios-pruefung.yml` am PR; lokal läuft dort nichts. Jede Swift-Aufgabe trotzdem mit Tests zuerst.
 
@@ -567,7 +567,7 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
 ### Task 12: Regeln, Architektur, Betriebs- und Anwenderdoku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0084-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md`
+- Create: `docs/architektur/entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md`
 - Modify: `src/AGENTS.md` (Abschnitt „iOS-Push“, Kopf-Tabelle), `ios/AGENTS.md` (Push-Befehle,
   Extension dünn, einzige native Netzanfrage), `AGENTS.md` (Tabelle: `src/AGENTS.md`-Inhalt um
   „iOS-Push“), `docs/architektur/` Kap. 3 (externer Dienst Push-Relais/APNs, Diagramm, Tabelle),
@@ -583,7 +583,7 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
   (`verbiete 'tracing::.*token' src/ios_push push-relais/src` o. ä., sonst `manuell:`).
 - [ ] **Step 2:** Bereichsdateien und Doku nach den Festlegungen des Design-Docs.
 - [ ] **Step 3:** `scripts/check-adr-nummern.sh`, `scripts/adr-fuer.sh src/ios_push/mod.rs`
-  (nennt ADR-0084), Anwenderdoku-Wächter
+  (nennt ADR-0086), Anwenderdoku-Wächter
   `mise exec -- pnpm -C frontend exec vitest run src/hilfe/anwenderdoku.guard.test.ts`, Wächter der
   Architekturkapitel aus `check-all.sh --nur schnell`.
 - [ ] **Step 4: Commit** `docs: iOS-Push in Regeln, Architektur und Doku`.
