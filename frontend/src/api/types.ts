@@ -1161,7 +1161,7 @@ export interface PlanungAendernBody {
 }
 
 /**
- * Kein Backend-Schema: `POST …/posten`. Bei `einheit` höchstens eins von Vorlage und Fahrzeug,
+ * Kein Backend-Schema: `POST …/posts`. Bei `einheit` höchstens eins von Vorlage und Fahrzeug,
  * bei `uhs` Pflicht der Typ. `soll_anzahl`/`quali_soll` fehlen = die der Vorlage bzw. des
  * Fahrzeugs, `null` = keins.
  */
@@ -1177,7 +1177,7 @@ export interface PlanungPostenBody {
   quali_soll?: QualiSollEingabe[] | null;
 }
 
-/** Kein Backend-Schema: `PATCH …/posten/{pid}`; die Herkunft bleibt, `null` = leeren. */
+/** Kein Backend-Schema: `PATCH …/posts/{pid}`; die Herkunft bleibt, `null` = leeren. */
 export interface PlanungPostenAendernBody {
   bezeichnung?: string;
   abschnitt?: string | null;
@@ -1190,7 +1190,7 @@ export interface PlanungPostenAendernBody {
 export type PlanungPersonEingabe =
   { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number };
 
-/** Kein Backend-Schema: `POST …/bloecke`; `posten_id` `null` = die Pause. */
+/** Kein Backend-Schema: `POST …/blocks`; `posten_id` `null` = die Pause. */
 export interface PlanungBlockBody {
   posten_id: number | null;
   von: string;
@@ -1201,7 +1201,7 @@ export interface PlanungBlockBody {
   notiz?: string;
 }
 
-/** Kein Backend-Schema: `PATCH …/bloecke/{bid}`; `version` Pflicht (409), `posten_id: null` = Pause. */
+/** Kein Backend-Schema: `PATCH …/blocks/{bid}`; `version` Pflicht (409), `posten_id: null` = Pause. */
 export interface PlanungBlockAendernBody {
   version: number;
   posten_id?: number | null;
@@ -1214,7 +1214,7 @@ export interface PlanungBlockAendernBody {
   notiz?: string | null;
 }
 
-/** Kein Backend-Schema: `POST …/erzeugen`; ohne Länge gilt die Schichtlänge des Postens. */
+/** Kein Backend-Schema: `POST …/generate`; ohne Länge gilt die Schichtlänge des Postens. */
 export interface PlanungErzeugenBody {
   posten_id: number | null;
   von: string;
