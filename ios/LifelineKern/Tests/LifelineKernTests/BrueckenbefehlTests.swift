@@ -40,6 +40,52 @@ final class BrueckenbefehlTests: XCTestCase {
         XCTAssertEqual(Bruecke.parse(["cmd": "push_state", "id": 3]), .pushState(id: 3))
     }
 
+    func testStandortbefehleWerdenGelesen() {
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 3, "high_accuracy": true, "timeout": 15000]),
+            .locationCurrent(id: 3, highAccuracy: true, timeout: .milliseconds(15000)))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 4]),
+            .locationCurrent(id: 4, highAccuracy: false, timeout: nil))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 5, "high_accuracy": false, "timeout": NSNull()]),
+            .locationCurrent(id: 5, highAccuracy: false, timeout: nil))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_watch", "id": 6, "high_accuracy": true, "timeout": 2500.0]),
+            .locationWatch(id: 6, highAccuracy: true, timeout: .milliseconds(2500)))
+        XCTAssertEqual(Bruecke.parse(["cmd": "location_clear", "watch": 6]), .locationClear(watch: 6))
+    }
+
+    func testFehlerhafteStandortbefehle() {
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 1, "timeout": -1]),
+            .ungueltig(id: 1, grund: "Die Frist muss eine Zahl ab 0 sein."))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_watch", "id": 2, "timeout": "15000"]),
+            .ungueltig(id: 2, grund: "Die Frist muss eine Zahl ab 0 sein."))
+        // Ohne Beobachtung oder ohne id gibt es niemanden, dem die Hülle antworten könnte.
+        XCTAssertNil(Bruecke.parse(["cmd": "location_clear"]))
+        XCTAssertNil(Bruecke.parse(["cmd": "location_watch"]))
+    }
+
+    func testDieStandortmeldungRuftLifelineLocationAuf() {
+        let position = Standortposition(
+            latitude: 52.1, longitude: 9.9, accuracy: 12, altitude: nil, altitudeAccuracy: nil,
+            heading: nil, speed: 1.5, timestamp: 1_700_000_000_000)
+        let objekt =
+            #"{"accuracy":12.0,"altitude":null,"altitude_accuracy":null,"heading":null,"#
+            + #""latitude":52.1,"longitude":9.9,"speed":1.5,"timestamp":1700000000000}"#
+        XCTAssertEqual(
+            Bruecke.locationScript(id: 7, fehler: nil, position: position),
+            "window.__LIFELINE_LOCATION__?.(7, null, \(objekt));")
+        XCTAssertEqual(
+            Bruecke.locationScript(id: 7, fehler: .denied, position: nil),
+            #"window.__LIFELINE_LOCATION__?.(7, "denied", null);"#)
+        XCTAssertEqual(
+            Bruecke.replyScript(Brueckenantwort(id: 2, fehler: nil, wert: .position(position))),
+            "window.__LIFELINE_REPLY__?.(2, null, \(objekt));")
+    }
+
     func testFehlerhafteNachrichtenMitIdBekommenEineAblehnung() {
         let faelle: [[String: Any]] = [
             ["cmd": "show_notification", "id": 1],
@@ -272,6 +318,65 @@ final class BrueckenbefehlTests: XCTestCase {
         XCTAssertEqual(a, Brueckenantwort(id: 4, fehler: "x", wert: .null))
     }
 
+    // MARK: Standort (LLH-2071)
+
+    @MainActor
+    func testDerErsteStandortFragtErstUndHoltDannDiePosition() async {
+        let dienste = Dienste()
+        dienste.standortfreigabe = .offen
+        dienste.standortErteilt = true
+        let antwort = await Brueckenausfuehrung.run(
+            .locationCurrent(id: 1, highAccuracy: true, timeout: .seconds(15)), dienste: dienste)
+        XCTAssertEqual(antwort, Brueckenantwort(id: 1, fehler: nil, wert: .position(Dienste.position)))
+        // Die Frist zählt erst nach der Freigabe: die Position wird erst danach geholt.
+        XCTAssertEqual(dienste.standortprotokoll, ["frage", "position(true, \(Duration.seconds(15)))"])
+    }
+
+    @MainActor
+    func testVerweigerterStandortMeldetDeniedOhnePosition() async {
+        let dienste = Dienste()
+        dienste.standortfreigabe = .offen
+        dienste.standortErteilt = false
+        let a = await Brueckenausfuehrung.run(
+            .locationCurrent(id: 2, highAccuracy: false, timeout: nil), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 2, fehler: "denied", wert: .null))
+        dienste.standortfreigabe = .verweigert
+        let b = await Brueckenausfuehrung.run(
+            .locationCurrent(id: 3, highAccuracy: false, timeout: nil), dienste: dienste)
+        XCTAssertEqual(b, Brueckenantwort(id: 3, fehler: "denied", wert: .null))
+        XCTAssertEqual(dienste.standortprotokoll, ["frage"])
+    }
+
+    @MainActor
+    func testOhneOrtungsdienstMeldetDieHuelleUnavailable() async {
+        let dienste = Dienste()
+        dienste.standortfreigabe = .aus
+        let a = await Brueckenausfuehrung.run(
+            .locationCurrent(id: 4, highAccuracy: false, timeout: nil), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 4, fehler: "unavailable", wert: .null))
+        XCTAssertEqual(dienste.standortprotokoll, [])
+    }
+
+    @MainActor
+    func testEinFehlerDerOrtungGehtMitSeinemCodeAnDieSeite() async {
+        let dienste = Dienste()
+        dienste.positionsfehler = .timeout
+        let a = await Brueckenausfuehrung.run(
+            .locationCurrent(id: 5, highAccuracy: false, timeout: .seconds(1)), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 5, fehler: "timeout", wert: .null))
+    }
+
+    @MainActor
+    func testBeobachtungenAntwortenNichtUeberDieBruecke() async {
+        let dienste = Dienste()
+        let a = await Brueckenausfuehrung.run(
+            .locationWatch(id: 6, highAccuracy: false, timeout: nil), dienste: dienste)
+        let b = await Brueckenausfuehrung.run(.locationClear(watch: 6), dienste: dienste)
+        XCTAssertNil(a)
+        XCTAssertNil(b)
+        XCTAssertEqual(dienste.standortprotokoll, [])
+    }
+
     /// Die Antwort sagt nur, ob die Sitzung begonnen hat; das Ergebnis kommt später als Ereignis
     /// `lifeline:app-anmeldung` (wie in der Desktop-Hülle).
     @MainActor
@@ -307,6 +412,14 @@ private final class Dienste: Huellendienste {
     var abmeldungen = 0
     var kennung: String?
     var registrierungFehler: PushFehler?
+    var standortfreigabe = Standortfreigabe.erlaubt
+    var standortErteilt = true
+    var positionsfehler: Standortfehler?
+    var standortprotokoll: [String] = []
+
+    static let position = Standortposition(
+        latitude: 52.1, longitude: 9.9, accuracy: 12, altitude: nil, altitudeAccuracy: nil,
+        heading: nil, speed: nil, timestamp: 1_700_000_000_000)
 
     func play(_ feedback: Haptik.Feedback) { gespielt.append(feedback) }
 
@@ -348,4 +461,17 @@ private final class Dienste: Huellendienste {
     func unregisterPush() async throws { abmeldungen += 1 }
 
     func pushState() async -> (Meldungsfreigabe, kennung: String?) { (freigabe, kennung) }
+
+    func loadStandortfreigabe() async -> Standortfreigabe { standortfreigabe }
+
+    func requestStandortfreigabe() async -> Bool {
+        standortprotokoll.append("frage")
+        return standortErteilt
+    }
+
+    func currentPosition(highAccuracy: Bool, timeout: Duration?) async throws -> Standortposition {
+        standortprotokoll.append("position(\(highAccuracy), \(timeout.map { "\($0)" } ?? "nil"))")
+        if let positionsfehler { throw positionsfehler }
+        return Self.position
+    }
 }
