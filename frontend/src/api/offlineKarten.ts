@@ -144,19 +144,12 @@ export function ladeAktualisierungsStatus(): Promise<AktualisierungsStatus> {
 /** Lädt einen vorhandenen neueren Stand oder stößt einen Neubau an, dessen Ergebnis der Server
  *  danach selbst lädt. */
 export function starteJetztAktualisieren(id: number): Promise<S['JetztAktualisierenAntwort']> {
-  return apiSend<S['JetztAktualisierenAntwort']>(
-    `/api/map/offline-maps/${id}/update-now`,
-    'POST',
-  );
+  return apiSend<S['JetztAktualisierenAntwort']>(`/api/map/offline-maps/${id}/update-now`, 'POST');
 }
 
 /** Speichert die Einstellung; die Antwort ist der aktuelle Status. */
 export function speichereAutoAktualisierung(
   body: AutoAktualisierungBody,
 ): Promise<AktualisierungsStatus> {
-  return apiSend<AktualisierungsStatus>(
-    '/api/map/offline-maps/auto-update/settings',
-    'PUT',
-    body,
-  );
+  return apiSend<AktualisierungsStatus>('/api/map/offline-maps/auto-update/settings', 'PUT', body);
 }
