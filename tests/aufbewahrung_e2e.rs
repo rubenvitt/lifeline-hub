@@ -1212,14 +1212,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     .await;
 
     // 3. Abschluss → Frist aus der Dauer.
-    ok(
-        &app,
-        &admin,
-        "POST",
-        &format!("{basis}/close"),
-        json!({}),
-    )
-    .await;
+    ok(&app, &admin, "POST", &format!("{basis}/close"), json!({})).await;
     let frist: String = sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
         .bind(e)
         .fetch_one(&pool)

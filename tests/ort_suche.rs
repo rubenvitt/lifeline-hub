@@ -85,7 +85,10 @@ async fn lagekarte_ausblenden(app: &axum::Router, admin: &str, einsatz: i64) {
 }
 
 fn im_einsatz(einsatz: i64, q: &str) -> String {
-    format!("/api/einsaetze/{einsatz}/place-search?q={}", url_kodieren(q))
+    format!(
+        "/api/einsaetze/{einsatz}/place-search?q={}",
+        url_kodieren(q)
+    )
 }
 
 fn in_org(q: &str) -> String {

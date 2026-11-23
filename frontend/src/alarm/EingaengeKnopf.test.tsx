@@ -637,9 +637,7 @@ describe('Eingänge ohne Netz (LLH-1422)', () => {
       daten: { bis_id: 9 },
     });
     serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
-    server.use(
-      http.post('/api/einsaetze/:id/notifications/read', () => HttpResponse.error()),
-    );
+    server.use(http.post('/api/einsaetze/:id/notifications/read', () => HttpResponse.error()));
     rendern();
     await screen.findByTestId('angemeldet');
     act(() => {

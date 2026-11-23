@@ -48,10 +48,7 @@ export const server = setupServer(
   http.get('/api/einsaetze/:id/notifications', () =>
     HttpResponse.json({ eintraege: [], ungelesen: 0 }),
   ),
-  http.post(
-    '/api/einsaetze/:id/notifications/read',
-    () => new HttpResponse(null, { status: 204 }),
-  ),
+  http.post('/api/einsaetze/:id/notifications/read', () => new HttpResponse(null, { status: 204 })),
   /**
    * Eigene Führungsstelle (LFH-849/LFH-1181) — nicht erfasst als Default, der echte Zustand eines
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
@@ -142,9 +139,7 @@ export const server = setupServer(
    * Einsatzes ohne Overrides und ohne Org-Vorgaben. Rahmen und jede Seite, die Daten eines
    * fremden Moduls lädt, fragen sie ab; Tests mit Sperren überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/module-access', () =>
-    HttpResponse.json(freigabenFixture()),
-  ),
+  http.get('/api/einsaetze/:einsatzId/module-access', () => HttpResponse.json(freigabenFixture())),
   /**
    * Gefahrengebiete — leere Liste als Default (LFH-397). Der Rahmen fragt sie für die
    * Warnsperre des Helligkeitsreglers beim Mount ab (`einsatz/useAktiveWarnung.ts`); `[]`

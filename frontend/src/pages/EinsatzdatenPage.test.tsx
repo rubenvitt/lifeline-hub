@@ -1850,9 +1850,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
   });
 
   function mitPruefung() {
-    server.use(
-      http.get('/api/einsaetze/7/closure/check', () => HttpResponse.json(nichtsOffen)),
-    );
+    server.use(http.get('/api/einsaetze/7/closure/check', () => HttpResponse.json(nichtsOffen)));
   }
 
   const abschlussPaneel = async () =>
