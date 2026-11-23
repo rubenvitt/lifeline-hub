@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Privacy-Manifest der iOS-Hülle (Regeln: ios/AGENTS.md). Die Hülle verfolgt niemanden und erhebt
-  selbst keine Daten; die Oberfläche kommt vom Einsatzserver des Betreibers. Required-Reason-API ist
+  Privacy-Manifest der iOS-Hülle (Regeln: ios/AGENTS.md). Die Hülle verfolgt niemanden; die
+  Oberfläche kommt vom Einsatzserver des Betreibers. Erhoben gilt vorsichtig der genaue Standort
+  (LLH-2071, ADR-0093): Ortsfeld und „Mein Standort“ schicken ihn auf Knopfdruck an den Server,
+  verknüpft mit dem angemeldeten Konto, nur für die Funktion der App. Required-Reason-API ist
   nur UserDefaults: der Schalter „Haptik“ (`@AppStorage` und `UserDefaults.standard`), gelesen und
   geschrieben nur von der App selbst, Grund CA92.1; die Zahl der Server in der App Group für die
   Extension Benachrichtigungsdienst, Grund 1C8F.1. Wer eine weitere Required-Reason-API nutzt
@@ -16,7 +18,20 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>

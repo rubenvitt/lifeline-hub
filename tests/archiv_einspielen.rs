@@ -14,7 +14,7 @@ use tower::ServiceExt;
 mod common;
 use common::{anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie};
 
-const PFAD: &str = "/api/admin/archiv/einspielen";
+const PFAD: &str = "/api/admin/archive/import";
 const GRENZE: &str = "LFHARCHIVGRENZE";
 
 /// Ein Feld des Uploads: Name, Dateiname (bei einer Datei) und Inhalt.
@@ -155,7 +155,7 @@ async fn umgebung() -> Umgebung {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/aufbewahrung/einsaetze/{id}/archiv"))
+                .uri(format!("/api/retention/incidents/{id}/archive"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),

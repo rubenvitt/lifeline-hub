@@ -1,4 +1,8 @@
-use crate::{apns::ApnsClient, senden, speicher};
+use crate::{
+    apns::ApnsClient,
+    client_ip::{client_ip, ClientIpSource},
+    senden, speicher,
+};
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Extension, State},
     http::{HeaderMap, StatusCode},
@@ -28,7 +32,8 @@ const VERSION_MAX: usize = 64;
 pub struct RelaisState {
     pub pool: SqlitePool,
     pub registrierungen_stunde: u32,
-    pub hinter_proxy: bool,
+    /// Woher die Client-Adresse der Registrierungsgrenze kommt.
+    pub client_ip: ClientIpSource,
     pub apns: Arc<ApnsClient>,
     /// Nachrichten je Server und Minute.
     pub limit_minute: u32,
@@ -44,14 +49,14 @@ impl RelaisState {
     pub fn neu(
         pool: SqlitePool,
         registrierungen_stunde: u32,
-        hinter_proxy: bool,
+        client_ip: ClientIpSource,
         apns: ApnsClient,
         limit_minute: u32,
     ) -> Self {
         Self {
             pool,
             registrierungen_stunde,
-            hinter_proxy,
+            client_ip,
             apns: Arc::new(apns),
             limit_minute,
             minuten: Arc::default(),
@@ -141,23 +146,6 @@ struct RegistrierungAntwort {
     geheimnis: String,
 }
 
-/// Client-IP: hinter Proxy der letzte (rechte) `X-Forwarded-For`-Eintrag, sonst die
-/// Peer-Adresse. Den rechten hängt der eigene Proxy an; alles links davon kann der Client selbst
-/// mitschicken. Voraussetzung: genau ein Proxy vor dem Relais (`docs/betrieb/push-relais.md`).
-fn client_ip(state: &RelaisState, headers: &HeaderMap, peer: Option<SocketAddr>) -> IpAddr {
-    if state.hinter_proxy {
-        if let Some(ip) = headers
-            .get("x-forwarded-for")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.rsplit(',').next())
-            .and_then(|v| v.trim().parse::<IpAddr>().ok())
-        {
-            return ip;
-        }
-    }
-    peer.map(|p| p.ip()).unwrap_or(IpAddr::from([0, 0, 0, 0]))
-}
-
 /// Version: nicht leer, höchstens [`VERSION_MAX`] sichtbare ASCII-Zeichen. Kontakt: höchstens
 /// [`KONTAKT_MAX`] Zeichen ohne Steuerzeichen.
 fn felder_gueltig(anfrage: &RegistrierungAnfrage) -> bool {
@@ -181,7 +169,11 @@ async fn server_registrieren(
     if !felder_gueltig(&anfrage) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let ip = client_ip(&state, &headers, peer.map(|Extension(ConnectInfo(a))| a));
+    let ip = client_ip(
+        &state.client_ip,
+        &headers,
+        peer.map(|Extension(ConnectInfo(a))| a),
+    );
     if !state.registrierung_zaehlen(ip) {
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }

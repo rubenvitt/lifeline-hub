@@ -54,7 +54,7 @@ function mockPicker(
   } = opts;
   server.use(
     meHandler(admin),
-    http.get('/api/karte/config', () =>
+    http.get('/api/map/config', () =>
       HttpResponse.json({
         online_styles: [],
         offline_verfuegbar: false,
@@ -63,13 +63,13 @@ function mockPicker(
         karten_bau_verfuegbar: bauVerfuegbar,
       }),
     ),
-    http.get('/api/karte/offline-karten/baubare-regionen', () => HttpResponse.json(baubar)),
-    http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
-    http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+    http.get('/api/map/offline-maps/buildable-regions', () => HttpResponse.json(baubar)),
+    http.get('/api/map/offline-maps', () => HttpResponse.json(karten)),
+    http.get('/api/map/offline-maps/catalog', ({ request }) => {
       const frisch = new URL(request.url).searchParams.get('frisch') === '1';
       return HttpResponse.json(frisch && katalogFrisch ? katalogFrisch : katalog);
     }),
-    http.get('/api/karte/offline-karten/bau-status', () => HttpResponse.json(bauJobs)),
+    http.get('/api/map/offline-maps/build-status', () => HttpResponse.json(bauJobs)),
   );
 }
 
@@ -111,7 +111,7 @@ describe('OfflineRegionPicker', () => {
     // Bremen gebaut (lieferbar), nicht auf Gerät → „Laden". Bayern-Katalog leer lassen.
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+      http.post('/api/map/offline-maps/download', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ status: 'laedt' }, { status: 202 });
       }),
@@ -136,20 +136,20 @@ describe('OfflineRegionPicker', () => {
     // taucht Bayern erst im FRISCHEN Katalog auf.
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', async ({ request }) => {
+      http.post('/api/map/offline-maps/build', async ({ request }) => {
         bauSlug = ((await request.json()) as { slug: string }).slug;
         return HttpResponse.json({ job_id: 1 });
       }),
       // Bau ist sofort „fertig" (Test-Vereinfachung) → die Verkettung triggert den Download.
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
       ),
-      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+      http.get('/api/map/offline-maps/catalog', ({ request }) => {
         const frisch = new URL(request.url).searchParams.get('frisch') === '1';
         if (frisch) frischGeholt = true;
         return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
       }),
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+      http.post('/api/map/offline-maps/download', async ({ request }) => {
         downloadName = ((await request.json()) as { name: string }).name;
         return HttpResponse.json({ status: 'laedt' }, { status: 202 });
       }),
@@ -210,7 +210,7 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
   function ladenAbgelehnt() {
     mockPicker({ karten: [], katalog: [bremenEintrag, bayernEintrag], bauVerfuegbar: false });
     server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+      http.post('/api/map/offline-maps/download', async ({ request }) => {
         const { name } = (await request.json()) as { name: string };
         return name === 'Bremen'
           ? HttpResponse.json({ error: 'Speicher voll' }, { status: 507 })
@@ -236,7 +236,7 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
   it('Bauen & laden: der Grund steht an der Region', async () => {
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', () =>
+      http.post('/api/map/offline-maps/build', () =>
         HttpResponse.json({ error: 'Kartenbau-Dienst ausgelastet' }, { status: 503 }),
       ),
     );
@@ -254,15 +254,15 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
     let downloads = 0;
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.post('/api/map/offline-maps/build', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
       ),
-      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+      http.get('/api/map/offline-maps/catalog', ({ request }) => {
         const frisch = new URL(request.url).searchParams.get('frisch') === '1';
         return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
       }),
-      http.post('/api/karte/offline-karten/download', () => {
+      http.post('/api/map/offline-maps/download', () => {
         downloads += 1;
         return HttpResponse.json({ error: 'Speicher voll' }, { status: 507 });
       }),
@@ -307,15 +307,15 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
     const downloads: string[] = [];
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.post('/api/map/offline-maps/build', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
       ),
-      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+      http.get('/api/map/offline-maps/catalog', ({ request }) => {
         const frisch = new URL(request.url).searchParams.get('frisch') === '1';
         return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
       }),
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+      http.post('/api/map/offline-maps/download', async ({ request }) => {
         const { name } = (await request.json()) as { name: string };
         downloads.push(name);
         if (name !== 'Bremen') return HttpResponse.json({ status: 'laedt' }, { status: 202 });
@@ -346,11 +346,11 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
     let fertig = false;
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', () => {
+      http.post('/api/map/offline-maps/build', () => {
         gestartet = true;
         return HttpResponse.json({ job_id: 1 });
       }),
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json(
           gestartet
             ? [
@@ -364,11 +364,11 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
             : [],
         ),
       ),
-      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+      http.get('/api/map/offline-maps/catalog', ({ request }) => {
         const frisch = new URL(request.url).searchParams.get('frisch') === '1';
         return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
       }),
-      http.post('/api/karte/offline-karten/download', () =>
+      http.post('/api/map/offline-maps/download', () =>
         HttpResponse.json({ error: 'Speicher voll' }, { status: 507 }),
       ),
     );
@@ -395,15 +395,15 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
   it('ein verketteter Download, der bei offenem Picker scheitert, zeigt keinen Toast', async () => {
     mockPicker({ karten: [], katalog: [bremenEintrag] });
     server.use(
-      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.post('/api/map/offline-maps/build', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
       ),
-      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+      http.get('/api/map/offline-maps/catalog', ({ request }) => {
         const frisch = new URL(request.url).searchParams.get('frisch') === '1';
         return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
       }),
-      http.post('/api/karte/offline-karten/download', () =>
+      http.post('/api/map/offline-maps/download', () =>
         HttpResponse.json({ error: 'Speicher voll' }, { status: 507 }),
       ),
     );

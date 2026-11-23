@@ -2022,6 +2022,10 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 - `exhaustive-deps` strukturell lösen (Primitive, `useMemo`/`useCallback`). Ausnahmen nur als
   `oxlint-disable-next-line <regel>` an der gemeldeten Zeile mit Begründung; keine
   Block-Disables, keine toten Direktiven.
+- **Hook-Regeln heißen `react-hooks/…`** (`react-hooks/exhaustive-deps`,
+  `react-hooks/rules-of-hooks`), in `.oxlintrc.json` wie in Direktiven (LLH-2075). oxlint nimmt
+  auch den Alias `react/…`, druckt in der Meldung aber `react-hooks(…)`; eine Schreibweise hält
+  die Suche nach Ausnahmen vollständig.
 - **Eigene Riegel per AST-Selektor** stehen im Plugin `lfh` (`lint/riegel-plugin.js`, heute die
   e2e-Riegel). Die JS-Plugin-API von oxlint ist Alpha: jeder Riegel bekommt Musterdateien in
   `lint/riegel-plugin.test.ts`, damit ein Update, das Selektoren bricht, rot wird.

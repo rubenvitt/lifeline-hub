@@ -35,8 +35,9 @@ pub struct Klartext {
     pub v: u8,
     /// Anzeigename dieser Instanz; die App nennt ihn, wenn sie mehrere Server kennt.
     pub s: String,
-    /// Einsatz.
-    pub e: i64,
+    /// Einsatz; fehlt bei einer Benachrichtigung ohne Einsatz (Störung einer Anbindung, LLH-2077).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub e: Option<i64>,
     /// Benachrichtigung.
     pub b: i64,
     pub stufe: BenachrichtigungStufe,
@@ -59,26 +60,25 @@ pub async fn klartext(
     ereignis: &BenachrichtigungEreignis,
     mit_inhalt: bool,
 ) -> Result<Klartext, AppError> {
-    // Ohne Einsatz (Störung einer Anbindung, LLH-2026) gibt es keinen Klartext: `e` ist Pflicht
-    // auf dem Wire. `benachrichtigung::ausliefern` reicht solche Ereignisse gar nicht erst her.
-    let einsatz_id = ereignis.einsatz_id.ok_or_else(|| {
-        AppError::Internal("iOS-Push ohne Einsatz hat keinen Klartext".to_owned())
-    })?;
+    // Ohne Einsatz (Störung einer Anbindung, LLH-2026) fehlt `e` (LLH-2077).
+    let einsatz_id = ereignis.einsatz_id;
     let (titel, detail, pfad) = match anzeige(pool, benutzer, ereignis).await? {
         Some(a) => (a.titel, a.detail, a.pfad),
-        // Wie der Service Worker ohne Antwort: Titel der Stufe, Sprung in den Einsatz.
+        // Wie der Service Worker ohne Antwort: Titel der Stufe, Sprung in den Einsatz oder zu
+        // den Anbindungen.
         None => (
             rueckfall_titel(ereignis.stufe).to_owned(),
             None,
-            format!("/einsaetze/{einsatz_id}"),
+            rueckfall_pfad(einsatz_id),
         ),
     };
-    let (absender, wortlaut) = if mit_inhalt && hat_inhalt(ereignis.art, ereignis.bezug_typ) {
-        meldung_inhalt(pool, benutzer, einsatz_id, ereignis.bezug_id)
-            .await
-            .unwrap_or_default()
-    } else {
-        (None, None)
+    let (absender, wortlaut) = match einsatz_id {
+        Some(einsatz_id) if mit_inhalt && hat_inhalt(ereignis.art, ereignis.bezug_typ) => {
+            meldung_inhalt(pool, benutzer, einsatz_id, ereignis.bezug_id)
+                .await
+                .unwrap_or_default()
+        }
+        _ => (None, None),
     };
     Ok(Klartext {
         v: VERSION,
@@ -102,6 +102,15 @@ pub fn rueckfall_titel(stufe: BenachrichtigungStufe) -> &'static str {
     }
 }
 
+/// Pfad, wenn es keine Anzeige gibt; derselbe wie im Service Worker (`alarm-sw.js`): der Einsatz,
+/// ohne Einsatz die Anbindungen.
+pub fn rueckfall_pfad(einsatz_id: Option<i64>) -> String {
+    match einsatz_id {
+        Some(e) => format!("/einsaetze/{e}"),
+        None => "/admin/einstellungen/anbindungen".to_owned(),
+    }
+}
+
 /// Die Anzeige wie `GET /api/benachrichtigungen/{id}`; `None`, wo die Route 404 gäbe.
 async fn anzeige(
     pool: &SqlitePool,
@@ -118,7 +127,17 @@ async fn anzeige(
         return Ok(None);
     };
     let Some(einsatz_id) = zeile.einsatz_id else {
-        return Ok(None);
+        // Am Adapter (LLH-2026): dieselbe Anzeige wie die Route, sonst 404.
+        let Some(adapter_id) = zeile.adapter_id.clone() else {
+            return Ok(None);
+        };
+        return crate::routes::benachrichtigung::adapter_anzeige(
+            pool,
+            benutzer,
+            &adapter_id,
+            zeile,
+        )
+        .await;
     };
     let recht = match Leserecht::laden(pool, einsatz_id).await {
         Ok(r) => r,

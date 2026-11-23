@@ -2123,7 +2123,7 @@
       },
       "ArchivAkteAnzeige": {
         "type": "object",
-        "description": "Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",
+        "description": "Die pseudonyme Archivakte (`GET /api/retention/incidents/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",
         "required": [
           "kopf",
           "zustand",
@@ -2238,7 +2238,7 @@
       },
       "ArchivEingespieltAnzeige": {
         "type": "object",
-        "description": "Was eingespielt wurde (`POST /api/admin/archiv/einspielen`).",
+        "description": "Was eingespielt wurde (`POST /api/admin/archive/import`).",
         "required": [
           "einsatz_id",
           "bezeichnung",
@@ -2291,7 +2291,7 @@
       },
       "ArchivEinspielenVerfuegbarkeit": {
         "type": "object",
-        "description": "Antwort von `GET /api/admin/archiv/einspielen`.",
+        "description": "Antwort von `GET /api/admin/archive/import`.",
         "required": [
           "verfuegbar"
         ],
@@ -2688,7 +2688,7 @@
       },
       "AufbewahrungEintragAnzeige": {
         "type": "object",
-        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
+        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
         "required": [
           "einsatz_id",
           "zustand"
@@ -12252,7 +12252,7 @@
       },
       "KarteConfigAntwort": {
         "type": "object",
-        "description": "Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —\nNICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,\n`frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.",
+        "description": "Antwort von `GET /api/map/config`. Liefert NUR, was die Karte zur Laufzeit braucht —\nNICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,\n`frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.",
         "required": [
           "online_styles",
           "offline_verfuegbar",
@@ -16059,7 +16059,7 @@
             }
           }
         ],
-        "description": "GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).\nListen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur\nfür `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist\n`null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den\nFortschrittsbalken."
+        "description": "GET /api/map/offline-maps — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).\nListen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur\nfür `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist\n`null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den\nFortschrittsbalken."
       },
       "OfflineKarteStatus": {
         "type": "string",
@@ -16136,7 +16136,7 @@
       },
       "OfflineRegionConfig": {
         "type": "object",
-        "description": "Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist\nregion-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das\nFrontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.",
+        "description": "Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist\nregion-adressiert (`/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das\nFrontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.",
         "required": [
           "karte_id",
           "name",
@@ -16248,7 +16248,7 @@
               "string",
               "null"
             ],
-            "description": "Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag\nmit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll\nnicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent."
+            "description": "Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag\nmit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll\nnicht mit einem Klick zur Grundlage aller werden. In `/api/map/config` immer absent."
           },
           "name": {
             "type": "string"
@@ -20135,7 +20135,7 @@
       },
       "SchwaerzungsantragAnzeige": {
         "type": "object",
-        "description": "Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und\npseudonyme Kennung darin.",
+        "description": "Ein Antrag in der Archivakte (`GET …/redaction-requests`). Das Ziel steht nur als Art und\npseudonyme Kennung darin.",
         "required": [
           "id",
           "ziel_art",

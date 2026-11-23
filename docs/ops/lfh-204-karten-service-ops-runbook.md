@@ -318,16 +318,16 @@ LIFELINE_KARTEN_SERVICE_TOKEN=<gleiches Token wie KS_TOKEN> \
 ./lifeline-hub  # oder die entsprechenden --karten-service-url/--karten-service-token-Flags
 ```
 
-Fehlt eine der beiden (URL **oder** Token), meldet `GET /api/karte/config` künftig
+Fehlt eine der beiden (URL **oder** Token), meldet `GET /api/map/config` künftig
 `karten_bau_verfuegbar: false` (`src/routes/karte.rs::karte_config`) — die „Region neu
 bauen"-Aktion bleibt im Admin-UI **unsichtbar**, der normale Katalog-Download läuft davon
 unberührt weiter. Sind beide gesetzt, proxyt lifeline-hub server-side:
 
-- `POST /api/karte/offline-karten/bauen` → `POST {url}/builds` (Bearer-Token, das Token
+- `POST /api/map/offline-maps/build` → `POST {url}/builds` (Bearer-Token, das Token
   verlässt den Server nie zum Browser)
-- `GET /api/karte/offline-karten/baubare-regionen` → `GET {url}/regions`
-- `GET /api/karte/offline-karten/bau-status` → `GET {url}/builds`
-- `GET /api/karte/offline-karten/aktualisierung` → `GET {url}/builds` und `GET {url}/zeitplan`
+- `GET /api/map/offline-maps/buildable-regions` → `GET {url}/regions`
+- `GET /api/map/offline-maps/build-status` → `GET {url}/builds`
+- `GET /api/map/offline-maps/auto-update` → `GET {url}/builds` und `GET {url}/zeitplan`
   (LFH-993, nächster Cron-Lauf für die Verwaltung; ein älterer Service ohne `/zeitplan` liefert
   404, der Hub zeigt dann keinen nächsten Kartenbau)
 
@@ -448,7 +448,7 @@ passt (Abschnitt 3, Storage-URL-Hinweis).
 Mit `LIFELINE_KARTEN_SERVICE_URL`/`_TOKEN` gesetzt und Backend neu gestartet:
 
 ```bash
-curl -s https://<lifeline-hub>/api/karte/config | jq .karten_bau_verfuegbar   # → true
+curl -s https://<lifeline-hub>/api/map/config | jq .karten_bau_verfuegbar   # → true
 ```
 
 Als Admin im Frontend: *Offline-Karten-Verwaltung* → Button **„Region neu bauen"** ist
@@ -462,7 +462,7 @@ Update-/Download-Flow (unverändert, LFH-181/183).
 
 ## 8. Security-/Ops-Hinweise
 
-- **Admin-only auf lifeline-hub-Seite:** `POST /api/karte/offline-karten/bauen` und die
+- **Admin-only auf lifeline-hub-Seite:** `POST /api/map/offline-maps/build` und die
   beiden Status-Proxies verlangen den `_admin`-Guard (`AdminUser`-Extractor,
   `src/routes/karte.rs`) — kein Nicht-Admin kann einen Bau anstoßen oder Job-Status lesen.
 - **Ein Build gleichzeitig:** `jobs::Registry::try_lock_build` — ein globaler

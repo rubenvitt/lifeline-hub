@@ -77,10 +77,10 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
 }
 
 /** Glyphen-Vorlage des Offline-Stils: der eigene, eingebettete Server (`assets/karten/fonts/`). */
-export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
+export const OFFLINE_GLYPHS = '/api/map/offline/fonts/{fontstack}/{range}.pbf';
 
 /** Sprite des Offline-Stils, ebenfalls vom eigenen Server (`assets/karten/sprites/`). */
-const OFFLINE_SPRITE = '/api/karte/offline/sprites/basemap';
+const OFFLINE_SPRITE = '/api/map/offline/sprites/basemap';
 
 /**
  * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln. Je Region eine eigene
@@ -522,7 +522,7 @@ function rasterStyle(tilesUrl: string, tileSize = 256): StyleSpecification {
 }
 
 /**
- * `transformRequest` für MapLibre: absolutiert root-relative URLs (`/api/karte/proxy/…`) gegen die
+ * `transformRequest` für MapLibre: absolutiert root-relative URLs (`/api/map/proxy/…`) gegen die
  * Origin — im Web-Worker ohne Dokument-Base-URL scheiterten sie mit „Failed to parse URL". Absolute
  * URLs bleiben unangetastet, protokoll-relative `//host` sind ausgenommen.
  */

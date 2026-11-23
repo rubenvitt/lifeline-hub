@@ -330,7 +330,7 @@ async fn gemischte_zustaende_am_einsatz_und_in_der_akte() {
     let (status, akte) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )

@@ -40,8 +40,8 @@ const katalogEintrag = {
 function mockBasis(benutzer: typeof admin, quellen: OnlineQuelle[] = [quelle]) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/karte/online-quellen', () => HttpResponse.json(quellen)),
-    http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json([katalogEintrag])),
+    http.get('/api/map/online-sources', () => HttpResponse.json(quellen)),
+    http.get('/api/map/online-sources/catalog', () => HttpResponse.json([katalogEintrag])),
   );
 }
 
@@ -176,7 +176,7 @@ describe('OnlineQuellenVerwaltung', () => {
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/karte/online-quellen', () =>
+      http.get('/api/map/online-sources', () =>
         HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 }),
       ),
     );
@@ -206,13 +206,13 @@ describe('OnlineQuellenVerwaltung', () => {
     let abrufe = 0;
     server.use(
       meHandler(admin),
-      http.get('/api/karte/online-quellen', () => {
+      http.get('/api/map/online-sources', () => {
         abrufe += 1;
         return abrufe === 1
           ? HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 })
           : HttpResponse.json([quelle]);
       }),
-      http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json([katalogEintrag])),
+      http.get('/api/map/online-sources/catalog', () => HttpResponse.json([katalogEintrag])),
     );
     render();
     await userEvent.click(await screen.findByRole('button', { name: 'Erneut abrufen' }));
@@ -230,7 +230,7 @@ describe('OnlineQuellenVerwaltung', () => {
   it('zeigt eine abgelehnte Löschung an ihrer Zeile, nicht als Toast', async () => {
     mockBasis(admin, [quelle, zweiteQuelle]);
     server.use(
-      http.delete('/api/karte/online-quellen/2', () =>
+      http.delete('/api/map/online-sources/2', () =>
         HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 }),
       ),
     );
@@ -273,11 +273,11 @@ describe('OnlineQuellenVerwaltung', () => {
     const freigabe = new Promise<void>((r) => (gibFrei = r));
     mockBasis(admin, [quelle, zweiteQuelle]);
     server.use(
-      http.delete('/api/karte/online-quellen/1', async () => {
+      http.delete('/api/map/online-sources/1', async () => {
         await freigabe;
         return HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 });
       }),
-      http.delete('/api/karte/online-quellen/2', () => new HttpResponse(null, { status: 204 })),
+      http.delete('/api/map/online-sources/2', () => new HttpResponse(null, { status: 204 })),
     );
     render();
     await screen.findByText('Basemap.de');
@@ -301,7 +301,7 @@ describe('OnlineQuellenVerwaltung', () => {
   it('Bearbeiten an der Zeile räumt den Grund einer abgelehnten Löschung', async () => {
     mockBasis(admin, [quelle, zweiteQuelle]);
     server.use(
-      http.delete('/api/karte/online-quellen/2', () =>
+      http.delete('/api/map/online-sources/2', () =>
         HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 }),
       ),
     );
@@ -323,7 +323,7 @@ describe('OnlineQuellenVerwaltung', () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
+      http.post('/api/map/online-sources', async ({ request }) => {
         postBody = await request.json();
         return HttpResponse.json({ id: 9, ...(postBody as object) }, { status: 201 });
       }),
@@ -363,7 +363,7 @@ describe('OnlineQuellenVerwaltung', () => {
     let postAufgerufen = false;
     mockBasis(admin, []);
     server.use(
-      http.post('/api/karte/online-quellen', () => {
+      http.post('/api/map/online-sources', () => {
         postAufgerufen = true;
         return HttpResponse.json({ id: 9 }, { status: 201 });
       }),
@@ -386,7 +386,7 @@ describe('OnlineQuellenVerwaltung', () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
+      http.post('/api/map/online-sources', async ({ request }) => {
         postBody = await request.json();
         return HttpResponse.json({ id: 9, ...(postBody as object) }, { status: 201 });
       }),
@@ -427,7 +427,7 @@ describe('OnlineQuellenVerwaltung', () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
+      http.post('/api/map/online-sources', async ({ request }) => {
         postBody = await request.json();
         return HttpResponse.json({ id: 9, ...(postBody as object) }, { status: 201 });
       }),

@@ -105,9 +105,9 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
     setze(&pool, id, Some(&vor_tagen(3)), Some(&vor_tagen(2)), None).await;
     let aktiv = einsatz_anlegen(&app, &admin).await;
 
-    let akte = format!("/api/aufbewahrung/einsaetze/{id}");
-    let etb = format!("/api/aufbewahrung/einsaetze/{id}/etb");
-    for uri in ["/api/aufbewahrung", akte.as_str(), etb.as_str()] {
+    let akte = format!("/api/retention/incidents/{id}");
+    let etb = format!("/api/retention/incidents/{id}/etb");
+    for uri in ["/api/retention", akte.as_str(), etb.as_str()] {
         let (s, v) = anfrage(&app, "GET", uri, &admin, None).await;
         assert_eq!(s, StatusCode::OK, "Admin eigene Org {uri}: {v}");
     }
@@ -115,7 +115,7 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
     let fk = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
     let leit = login_cookie(&app, "leitung", "leitungpw1").await;
     for (wer, cookie) in [("Führungskraft", &fk), ("Einsatzleitung", &leit)] {
-        for uri in ["/api/aufbewahrung", akte.as_str(), etb.as_str()] {
+        for uri in ["/api/retention", akte.as_str(), etb.as_str()] {
             let (s, _) = anfrage(&app, "GET", uri, cookie, None).await;
             assert_eq!(s, StatusCode::FORBIDDEN, "{wer} {uri}");
         }
@@ -126,23 +126,16 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
         let (s, _) = anfrage(&app, "GET", uri, &fremd, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "fremde Org {uri}");
     }
-    let (s, v) = anfrage(&app, "GET", "/api/aufbewahrung", &fremd, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/retention", &fremd, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v.as_array().unwrap().len(), 0, "fremde Übersicht leer: {v}");
 
-    let (s, _) = anfrage(
-        &app,
-        "GET",
-        "/api/aufbewahrung/einsaetze/999999",
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage(&app, "GET", "/api/retention/incidents/999999", &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{aktiv}"),
+        &format!("/api/retention/incidents/{aktiv}"),
         &admin,
         None,
     )
@@ -175,7 +168,7 @@ async fn uebersicht_ohne_aktive_und_fremde_einsaetze() {
         .await
         .unwrap();
 
-    let (s, v) = anfrage(&app, "GET", "/api/aufbewahrung", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/retention", &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let mut ids: Vec<i64> = v
         .as_array()
@@ -202,7 +195,7 @@ async fn uebersicht_ohne_aktive_und_fremde_einsaetze() {
     assert_eq!(za["zustand"], "ohne_frist");
     assert!(!za.as_object().unwrap().contains_key("karenz_ende"));
 
-    let (_, vf) = anfrage(&app, "GET", "/api/aufbewahrung", &fremd, None).await;
+    let (_, vf) = anfrage(&app, "GET", "/api/retention", &fremd, None).await;
     assert_eq!(
         vf.as_array().unwrap().len(),
         1,
@@ -260,7 +253,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     assert_eq!(s, StatusCode::OK, "{v}");
     setze(&pool, id, Some(&vor_tagen(1)), Some(&vor_tagen(0)), None).await;
 
-    let basis = format!("/api/aufbewahrung/einsaetze/{id}/etb");
+    let basis = format!("/api/retention/incidents/{id}/etb");
     let (s, alle) = anfrage(&app, "GET", &basis, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let alle = alle.as_array().unwrap().clone();
@@ -361,8 +354,8 @@ async fn nach_schwaerzung_regulaer_403_archiv_200() {
     );
     regulaere_routen_gesperrt(&app, &admin, id, aid).await;
     for uri in [
-        format!("/api/aufbewahrung/einsaetze/{id}"),
-        format!("/api/aufbewahrung/einsaetze/{id}/etb"),
+        format!("/api/retention/incidents/{id}"),
+        format!("/api/retention/incidents/{id}/etb"),
     ] {
         let (s, v) = anfrage(&app, "GET", &uri, &admin, None).await;
         assert_eq!(s, StatusCode::OK, "{uri}: {v}");
@@ -370,7 +363,7 @@ async fn nach_schwaerzung_regulaer_403_archiv_200() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )
@@ -387,7 +380,7 @@ async fn wiederherstellen(
     anfrage(
         app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{id}/wiederherstellen"),
+        &format!("/api/retention/incidents/{id}/restore"),
         cookie,
         Some(body),
     )
@@ -570,9 +563,9 @@ async fn wiederherstellen_statuscodes_ohne_schreibvorgang() {
 // ───────────────────────────── Struktur-Guard des Namensraums ─────────────────────────────
 
 /// Der Archiv-Namensraum.
-const ARCHIV: &str = "/api/aufbewahrung";
+const ARCHIV: &str = "/api/retention";
 
-/// Eine Route unter `/api/aufbewahrung` aus `src/app.rs`: Pfad plus Methoden-Handler.
+/// Eine Route unter `/api/retention` aus `src/app.rs`: Pfad plus Methoden-Handler.
 #[derive(Debug)]
 struct Route {
     pfad: String,
@@ -704,11 +697,11 @@ fn verschachtelungen(app_rs: &str) -> Vec<String> {
 
 /// Archivpfad-Literale, die zu keiner erkannten `.route` in `app.rs` gehören (LFH-754): ein
 /// `.route_service`, eine Pfad-Konstante oder ein Router aus einer anderen Datei, den
-/// `app.rs` per `.merge` oder `.nest` einbindet. Ein relatives `"/aufbewahrung…` gehört zu
+/// `app.rs` per `.merge` oder `.nest` einbindet. Ein relatives `"/retention…` gehört zu
 /// einem verschachtelten Router.
 fn fremde_archivpfade(app_rs: &str, erkannt: usize, weitere: &[(String, String)]) -> Vec<String> {
     let literale = |q: &str| {
-        ["\"/api/aufbewahrung", "\"/aufbewahrung"]
+        ["\"/api/retention", "\"/retention"]
             .iter()
             .flat_map(|p| [format!("{p}\""), format!("{p}/")])
             .map(|muster| q.matches(&muster).count())
@@ -776,7 +769,7 @@ fn pruefe_namensraum(app_rs: &str, routen_rs: &str, weitere: &[(String, String)]
     let routen = archivrouten(app_rs);
     verstoesse.extend(fremde_archivpfade(app_rs, routen.len(), weitere));
     if routen.is_empty() {
-        verstoesse.push("keine Route unter /api/aufbewahrung gefunden — Schnitt kaputt?".into());
+        verstoesse.push("keine Route unter /api/retention gefunden — Schnitt kaputt?".into());
     }
     let mut nicht_get = Vec::new();
     for r in &routen {
@@ -810,10 +803,11 @@ fn pruefe_namensraum(app_rs: &str, routen_rs: &str, weitere: &[(String, String)]
     // Benannte Menge der Nicht-GET (LFH-751): Wiederherstellen, Antrag, Rücknahme und die
     // Suche (POST nur wegen des Bodys; dass sie nicht schreibt, prüft `pruefe_suche_liest_nur`).
     let mut erlaubt = vec![
-        "post /api/aufbewahrung/einsaetze/{id}/wiederherstellen → wiederherstellen".to_string(),
-        "post /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege → antrag_stellen".to_string(),
-        "post /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen → antrag_zuruecknehmen".to_string(),
-        "post /api/aufbewahrung/einsaetze/{id}/personensuche → personensuche".to_string(),
+        "post /api/retention/incidents/{id}/restore → wiederherstellen".to_string(),
+        "post /api/retention/incidents/{id}/redaction-requests → antrag_stellen".to_string(),
+        "post /api/retention/incidents/{id}/redaction-requests/{aid}/undo → antrag_zuruecknehmen"
+            .to_string(),
+        "post /api/retention/incidents/{id}/person-search → personensuche".to_string(),
     ];
     erlaubt.sort();
     nicht_get.sort();
@@ -948,7 +942,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
     let app_rs = std::fs::read_to_string("src/app.rs").unwrap();
     let routen_rs = std::fs::read_to_string("src/routes/aufbewahrung.rs").unwrap();
     let anker = "get(routes::aufbewahrung::akte)";
-    let uebersicht = ".route(\"/api/aufbewahrung\", get(routes::aufbewahrung::uebersicht))";
+    let uebersicht = ".route(\"/api/retention\", get(routes::aufbewahrung::uebersicht))";
     assert!(app_rs.contains(uebersicht), "Mutationsanker nicht gefunden");
     let nicht_get = |app: &str, methode: &str| {
         let v = pruefe_namensraum(app, &routen_rs, &[]);
@@ -961,7 +955,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
 
     nicht_get(
         &app_rs.replacen(anker, "any(routes::aufbewahrung::akte)", 1),
-        "any /api/aufbewahrung/einsaetze/{id} → akte",
+        "any /api/retention/incidents/{id} → akte",
     );
     nicht_get(
         &app_rs.replacen(
@@ -969,7 +963,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
             "get(routes::aufbewahrung::akte).on(MethodFilter::POST, routes::aufbewahrung::akte)",
             1,
         ),
-        "on /api/aufbewahrung/einsaetze/{id} → akte",
+        "on /api/retention/incidents/{id} → akte",
     );
     // An ein GET gekettete Schreibwege: `.fallback` nimmt POST, PUT und DELETE an.
     nicht_get(
@@ -978,7 +972,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
             "get(routes::aufbewahrung::akte).fallback(routes::aufbewahrung::akte)",
             1,
         ),
-        "fallback /api/aufbewahrung/einsaetze/{id} → akte",
+        "fallback /api/retention/incidents/{id} → akte",
     );
     nicht_get(
         &app_rs.replacen(
@@ -986,10 +980,10 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
             "get(routes::aufbewahrung::akte).post_service(routes::aufbewahrung::akte)",
             1,
         ),
-        "post_service /api/aufbewahrung/einsaetze/{id} → akte",
+        "post_service /api/retention/incidents/{id} → akte",
     );
 
-    for praefix in ["/api/aufbewahrung/intern", "/api", "/"] {
+    for praefix in ["/api/retention/intern", "/api", "/"] {
         let mit_nest = app_rs.replacen(
             uebersicht,
             &format!(
@@ -1008,7 +1002,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
     // Ein `.nest` neben dem Namensraum bleibt erlaubt.
     let daneben = app_rs.replacen(
         uebersicht,
-        &format!("{uebersicht}\n        .nest(\"/api/aufbewahrungx\", Router::new())"),
+        &format!("{uebersicht}\n        .nest(\"/api/retentionx\", Router::new())"),
         1,
     );
     let v = pruefe_namensraum(&daneben, &routen_rs, &[]);
@@ -1017,7 +1011,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
     let mit_service = app_rs.replacen(
         uebersicht,
         &format!(
-            "{uebersicht}\n        .route_service(\"/api/aufbewahrung/datei\", ServeDir::new(\"x\"))"
+            "{uebersicht}\n        .route_service(\"/api/retention/datei\", ServeDir::new(\"x\"))"
         ),
         1,
     );
@@ -1034,7 +1028,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
         &format!("{uebersicht}\n        .merge(routes::aufbewahrung_intern::router())"),
         1,
     );
-    for pfad in ["/api/aufbewahrung/loeschen", "/aufbewahrung/loeschen"] {
+    for pfad in ["/api/retention/loeschen", "/retention/loeschen"] {
         let weitere = vec![(
             "src/routes/aufbewahrung_intern.rs".to_string(),
             format!(
@@ -1233,13 +1227,13 @@ async fn nach_endgueltiger_loeschung_akte_404_und_protokollzeile_in_der_uebersic
         "Tick schwärzt und löscht endgültig"
     );
     for uri in [
-        format!("/api/aufbewahrung/einsaetze/{id}"),
-        format!("/api/aufbewahrung/einsaetze/{id}/etb"),
+        format!("/api/retention/incidents/{id}"),
+        format!("/api/retention/incidents/{id}/etb"),
     ] {
         let (s, v) = anfrage(&app, "GET", &uri, &admin, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {v}");
     }
-    let (s, v) = anfrage(&app, "GET", "/api/aufbewahrung", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/retention", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let zeile = v
         .as_array()

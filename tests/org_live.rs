@@ -551,7 +551,7 @@ async fn wiederherstellen_meldet_einsatzliste() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{eid}/wiederherstellen"),
+        &format!("/api/retention/incidents/{eid}/restore"),
         &admin,
         Some(&format!(r#"{{"retention_bis":"{}"}}"#, zeitpunkt(90))),
     )

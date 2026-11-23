@@ -42,6 +42,7 @@ final class OhneServerTests: XCTestCase {
     static let assets = ["assets/haupt-1.js", "assets/spaet-1.js"]
 
     override func setUp() async throws {
+        await WebkitVorlauf.sicherstellen()
         server = Testserver(routen: Self.routen())
         let port = try await server.start()
         var liste = Serverliste()
@@ -69,8 +70,13 @@ final class OhneServerTests: XCTestCase {
 
         server.stop()
         Webviewfabrik.close(online)
-        let ohne = webview()
+        let beobachter = Ladebeobachter()
+        halter.append(beobachter)
+        let ohne = webview(navigation: beobachter)
         XCTAssertTrue(vorrat.loadVorrat(eintrag, in: ohne))
+        // Wie beim Laden vom Server: erst das Ende des Ladens, dann die Startprüfung (s. `warteAufLadeende`).
+        let geladen = await warteAufLadeende(beobachter)
+        XCTAssertTrue(geladen, "gespeicherte Oberfläche nicht geladen: \(beobachter.beschreibung)")
         let gestartet = await vorrat.isGestartet(ohne)
         XCTAssertTrue(gestartet, "gespeicherte Oberfläche ohne Server nicht hochgefahren")
         let spaet = try await ohne.callAsyncJavaScript(
@@ -172,26 +178,48 @@ final class OhneServerTests: XCTestCase {
         halter.append(beobachter)
         let web = webview(navigation: beobachter)
         web.load(URLRequest(url: eintrag.adresse.url))
-        let gestartet = await vorrat.isGestartet(web)
+        let geladen = await warteAufLadeende(beobachter)
+        let gestartet = geladen ? await vorrat.isGestartet(web) : false
         if !gestartet {
             let vertrauen = Testserver.vertrauensfehler() ?? "vertraut"
             XCTFail(
-                "Oberfläche vom Testserver nicht geladen. Webview: \(beobachter.beschreibung); "
-                    + "\(server.bericht); Zertifikat: \(vertrauen)")
+                "Oberfläche vom Testserver nicht \(geladen ? "hochgefahren" : "geladen"). "
+                    + "Webview: \(beobachter.beschreibung); \(server.bericht); Zertifikat: \(vertrauen)")
         }
-        while web.isLoading { try await Task.sleep(for: .milliseconds(100)) }
         return web
+    }
+
+    /// Wartet, bis der Webview sein Laden beendet hat oder es scheiterte, höchstens 60 s; `true`
+    /// nach einem beendeten Laden.
+    ///
+    /// Erst danach fragt der Test `isGestartet`, wie die App, die online erst nach dem Laden
+    /// vorwärmt (LLH-2073). Dessen Frist (`Vorrat.startpruefungFrist`, 10 s) zählt ab dem Aufruf;
+    /// riefe der Test es gleich nach `load`, zählte der Kaltstart des Webprozesses mit. Der dauerte
+    /// im CI 9,6 s, und die Seite kam 0,4 s nach Ablauf der Frist an (Lauf 45203095862, iPad).
+    private func warteAufLadeende(_ beobachter: Ladebeobachter) async -> Bool {
+        let beginn = ContinuousClock.now
+        while ContinuousClock.now - beginn < .seconds(60) {
+            if beobachter.isBeendet { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return beobachter.isFertig
     }
 }
 
-/// Hält den letzten Ladefehler des Webviews fest, nur für die Meldung roter Tests. Ohne eigene
-/// Antwort auf Anmeldeanfragen: die Zertifikatsprüfung bleibt die des Systems.
+/// Hält fest, ob der Webview fertig geladen hat, und den letzten Ladefehler, für das Warten und
+/// die Meldung roter Tests. Ohne eigene Antwort auf Anmeldeanfragen: die Zertifikatsprüfung bleibt
+/// die des Systems.
 @MainActor
 private final class Ladebeobachter: NSObject, WKNavigationDelegate {
     private var fehler: Error?
+    /// Das Laden der Hauptseite ist beendet (`didFinish`).
+    private(set) var isFertig = false
+
+    /// Beendet oder gescheitert.
+    var isBeendet: Bool { isFertig || fehler != nil }
 
     var beschreibung: String {
-        guard let fehler else { return "kein Ladefehler" }
+        guard let fehler else { return isFertig ? "geladen, kein Ladefehler" : "Laden nicht beendet, kein Ladefehler" }
         let ns = fehler as NSError
         var text = "\(ns.domain) \(ns.code)"
         if let darunter = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
@@ -208,5 +236,9 @@ private final class Ladebeobachter: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         fehler = error
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        isFertig = true
     }
 }
