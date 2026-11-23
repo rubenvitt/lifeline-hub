@@ -252,7 +252,7 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     await userEvent.click(
       within(offenesMenue()).getByRole('menuitem', { name: 'Außer Dienst nehmen' }),
     );
-    await waitFor(() => expect(gesetzt).toEqual(['1 ausser-dienst']));
+    await waitFor(() => expect(gesetzt).toEqual(['1 out-of-service']));
   });
 
   it('Benutzer: „Deaktivieren“ im Menü wirkt ohne Rückfrage (LFH-966, umkehrbar)', async () => {
