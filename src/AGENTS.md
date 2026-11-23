@@ -940,11 +940,12 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `IosPush::versenden`, Stilles nie, Konten in `UeberHub::ios_push` nie; die auf dem Gerät stumme
   Art filtert `ios_push::soll_senden` je Anmeldung, ein Alarm geht immer. Ohne `--ios-push` ist
   `LiveHub::ios_push()` `None`, und die Routen antworten 404. Ereignisse ohne Einsatz (Störung
-  einer Anbindung, LLH-2026) gehen nicht per iOS-Push, weil der Klartext `e` verlangt; Web Push
-  und Live bleiben (Folgeaufgabe LLH-2077).
+  einer Anbindung, LLH-2026) gehen mit (LLH-2077): im Klartext fehlt dann `e`, die App gruppiert
+  sie im Thread `<kennung>-org`.
 - **Klartext aus derselben Stelle wie `GET /api/benachrichtigungen/{id}`**
   (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
-  Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`. Absender und Wortlaut nur mit
+  Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`, ohne Einsatz
+  `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
   mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
