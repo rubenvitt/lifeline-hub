@@ -540,7 +540,7 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_COOKIE_SECURE", default_value_t = false)]
     pub cookie_secure: bool,
 
-    /// Einwürfe (`/api/v1/einwurf/…`, ADR-0023) auch ohne TLS annehmen. **Default aus:** Der
+    /// Einwürfe (`/api/v1/intake/…`, ADR-0023) auch ohne TLS annehmen. **Default aus:** Der
     /// Schlüssel eines Einwurf-Zugangs steht in der URL, und der Einwurf verlangt deshalb TLS
     /// (`--tls`, oder `X-Forwarded-Proto: https` von einem Proxy aus `--trusted-proxies`). Der
     /// Schalter ist nur für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard); ohne
@@ -1125,7 +1125,7 @@ pub enum ZugangCommand {
         /// Pfad der Schlüsseldatei aus `redeem`.
         datei: String,
     },
-    /// Lage `GET /api/v1/lage` signiert aufrufen (Recht „Lage lesen“): zeigt den Einsatz, den
+    /// Lage `GET /api/v1/situation` signiert aufrufen (Recht „Lage lesen“): zeigt den Einsatz, den
     /// die Einsatzleitung für den Zugang freigegeben hat, oder `einsatz: null`.
     Lage {
         /// Pfad der Schlüsseldatei aus `redeem`.

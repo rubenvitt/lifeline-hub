@@ -1,5 +1,5 @@
 //! Rechner-API Unterkunft und Zelte für Fremdsysteme (LLH-1524, Spec `rechner-api-unterkunft`):
-//! `POST /api/v1/rechner/unterkunft` und `GET /api/v1/rechner/unterkunft/richtwerte`, signiert
+//! `POST /api/v1/calculators/accommodation` und `GET /api/v1/calculators/accommodation/reference-values`, signiert
 //! als Maschinenzugang mit dem Scope `rechner:use`.
 //!
 //! Die Prüfung der Eingabe im Einzelnen und die Gleichheit mit dem Rechner der Oberfläche belegen
@@ -16,8 +16,8 @@ use common::{
     anfrage, anfrage_json, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie, setup_mit_pool,
 };
 
-const RECHNEN: &str = "/api/v1/rechner/unterkunft";
-const RICHTWERTE: &str = "/api/v1/rechner/unterkunft/richtwerte";
+const RECHNEN: &str = "/api/v1/calculators/accommodation";
+const RICHTWERTE: &str = "/api/v1/calculators/accommodation/reference-values";
 
 /// Router, Pool, Admin-Sitzung und ein Zugang mit `rechner:use`. `n` unterscheidet Schlüssel und
 /// Quelle je Test: die Zähler je Quelle gelten prozessweit.
@@ -415,7 +415,7 @@ async fn groesste_anfrage_passt_in_den_body() {
     assert_eq!(v["code"], "payload_too_large");
 }
 
-/// Jeder Abruf steht im Abrufprotokoll des Zugangs, je Route (ADR-0022).
+/// Jeder Abruf steht im Abrufprotokoll des Zugangs, je Route (ADR-0096).
 #[tokio::test]
 async fn abrufe_stehen_im_abrufprotokoll() {
     let (app, pool, _admin, cred, ip) = aufbau(209).await;

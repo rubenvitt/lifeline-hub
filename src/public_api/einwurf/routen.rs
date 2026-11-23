@@ -1,4 +1,4 @@
-//! Die Einwurf-Routen unter `/api/v1/einwurf/{schluessel}/…` (Spec `einwurf-zugang`,
+//! Die Einwurf-Routen unter `/api/v1/intake/{schluessel}/…` (Spec `einwurf-zugang`,
 //! design.md D6 und D12). Die einzigen Routen der öffentlichen API ohne signierte Anfrage
 //! (ADR-0023): Der Schlüssel im Pfad ist die Anmeldung, und sie schreiben nur.
 //!
@@ -218,7 +218,7 @@ async fn ablegen(
 /// POST: Bei GET stehen Schlüssel und Inhalt in der URL.
 #[utoipa::path(
     get,
-    path = "/api/v1/einwurf/{schluessel}/alarmmeldung",
+    path = "/api/v1/intake/{schluessel}/alarm",
     tag = "Einwurf",
     operation_id = "einwurf_alarmmeldung_get",
     params(
@@ -253,7 +253,7 @@ pub async fn alarmmeldung_get(
 /// (oberste Ebene), aus Formularfeldern oder aus der Abfrage; der Body geht vor.
 #[utoipa::path(
     post,
-    path = "/api/v1/einwurf/{schluessel}/alarmmeldung",
+    path = "/api/v1/intake/{schluessel}/alarm",
     tag = "Einwurf",
     operation_id = "einwurf_alarmmeldung_post",
     params(
@@ -288,7 +288,7 @@ pub async fn alarmmeldung_post(
 /// mit der Position abgelegt und mit ihr ersetzt.
 #[utoipa::path(
     get,
-    path = "/api/v1/einwurf/{schluessel}/position",
+    path = "/api/v1/intake/{schluessel}/position",
     tag = "Einwurf",
     operation_id = "einwurf_position_get",
     params(
@@ -324,7 +324,7 @@ pub async fn position_get(
 /// Formular-Body, in einem flachen JSON-Objekt oder in der Abfrage; der Body geht vor.
 #[utoipa::path(
     post,
-    path = "/api/v1/einwurf/{schluessel}/position",
+    path = "/api/v1/intake/{schluessel}/position",
     tag = "Einwurf",
     operation_id = "einwurf_position_post",
     params(

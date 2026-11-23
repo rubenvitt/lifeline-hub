@@ -1,10 +1,12 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+access	Zugang
 accommodation	Unterkunft
 activate	aktivieren
 adapter	-
 admin	-
 agenda-items	Programmpunkte
+alarm	Alarmmeldung
 animals	Tiere
 api	-
 app-code	-
@@ -22,6 +24,7 @@ build	bauen
 build-status	Baustatus
 buildable-regions	baubare Regionen
 bulk	-
+calculators	Rechner
 callback	-
 cancel	abbrechen
 care	Betreuung
@@ -59,6 +62,7 @@ evacuation	Evakuierung
 events	-
 existing	vorhandene
 export	-
+external	extern
 fetch-certificate	Zertifikat abrufen
 finish	-
 follow-up	Nachbereitung
@@ -136,6 +140,7 @@ read	gelesen
 reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference-values	Richtwerte
 register	-
 registration	-
 reject	zurückweisen

@@ -646,7 +646,7 @@ async fn ein_abgelaufener_zugang_sammelt_keine_aenderungen_bekommt_aber_das_ende
 }
 
 /// Ein Spiegel, dessen Abgleich endet oder dessen Freigabestufe sich ändert, hat eine andere Lage
-/// (`einsatz.spiegel` in `GET /api/v1/lage`); der Zeitpunkt des Abgleichs allein nicht.
+/// (`einsatz.spiegel` in `GET /api/v1/situation`); der Zeitpunkt des Abgleichs allein nicht.
 #[tokio::test]
 async fn das_ende_des_spiegel_abgleichs_meldet_lage_changed_der_takt_nicht() {
     let l = lage().await;
