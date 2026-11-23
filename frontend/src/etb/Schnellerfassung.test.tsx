@@ -2319,6 +2319,11 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
     await userEvent.click(erfassenKnopf());
     expect(p.erfassen).not.toHaveBeenCalled();
+    // Der Klick setzt Fokus und Markierung erst im nächsten Frame. Kommt das mitten ins Tippen,
+    // markiert es „1 Pu“ neu und die übrigen Ziffern überschreiben das (/zeit 430mpe).
+    await waitFor(() => expect(inhaltFeld()).toHaveFocus());
+    const feld = inhaltFeld() as HTMLTextAreaElement;
+    expect([feld.selectionStart, feld.selectionEnd]).toEqual([6, 10]);
     // „2590“ markieren und überschreiben: der Cursor steht danach vor dem Leerzeichen, der Befehl
     // wird beim Tippen nicht übernommen (LLH-1088), wohl aber beim nächsten Klick.
     await userEvent.type(inhaltFeld(), '1430', {
