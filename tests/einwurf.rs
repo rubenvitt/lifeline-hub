@@ -343,9 +343,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     let (app, pool, admin) = setup().await;
     let (id, schluessel) = zugang(&app, &admin, "Divera", "alarmmeldungen:write").await;
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarm?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -796,9 +794,7 @@ async fn mit_eigenem_tls_wird_der_einwurf_angenommen() {
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["transport"], "tls");
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarm?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
@@ -815,12 +811,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
     // durch. Die genaue Zahl prüft der Unit-Test in `drossel.rs` mit eingespeister Zeit.
     let mut angenommen: i64 = 0;
     let gedrosselt = loop {
-        let antwort = einwerfen(
-            &app,
-            &schluessel,
-            &format!("alarm?text={angenommen}"),
-        )
-        .await;
+        let antwort = einwerfen(&app, &schluessel, &format!("alarm?text={angenommen}")).await;
         if antwort.status == StatusCode::TOO_MANY_REQUESTS {
             break antwort;
         }
@@ -843,9 +834,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
     );
     // Je Zugang getrennt.
     assert_eq!(
-        einwerfen(&app, &anderer, "alarm?text=a")
-            .await
-            .status,
+        einwerfen(&app, &anderer, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
@@ -884,9 +873,7 @@ async fn zehn_unbekannte_schluessel_sperren_die_quelle_nur_auf_den_maschinenwege
     assert!(!lifeline_hub::auth::rate_limit::ist_gesperrt(ip));
     // Eine andere Quelle ist nicht betroffen.
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarm?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
