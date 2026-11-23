@@ -2709,7 +2709,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     setup('/einsaetze/7/etb?von=2026-05-23%2011%3A30%3A00', [
       zaehlerJeFilter(),
       http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/7/lagebesprechung', () =>
+      http.get('/api/einsaetze/7/briefing', () =>
         HttpResponse.json({
           anzahl_lagebesprechungen: 1,
           letzte_lagebesprechung: {

@@ -11696,7 +11696,7 @@
       },
       "InfotelefonZaehler": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.",
         "required": [
           "gesamt",
           "offen",

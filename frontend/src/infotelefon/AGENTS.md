@@ -5,8 +5,8 @@ Gilt für `frontend/src/infotelefon/`, `pages/InfotelefonPage.tsx` und `src/info
 
 **Eigenes Modul** (i6k6mzed, `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D3): Key
 `infotelefon` in der Kategorie Kommunikation, eigene Freigabe (`useModulFreigabe('infotelefon')`),
-eigenes Live-Ereignis `infotelefon`, kein Modulzähler. Die API bleibt unter
-`…/stab/infotelefon` (`PFAD_KEY` ordnet sie `infotelefon` zu), die Altadresse
+eigenes Live-Ereignis `infotelefon`, kein Modulzähler. Die API liegt unter
+`…/staff/info-line` (`PFAD_KEY` ordnet sie `infotelefon` zu), die Altadresse
 `/einsaetze/:id/stab/infotelefon` leitet dauerhaft um und behält `?anruf=` und `?neu=1`
 (`ALTPFAD_MODUL`). Das Anliegen `presse` („Presseanfrage“) bleibt ein Anliegen eines Bürgers
 (`infotelefon/labels.ts`). Personenbezug (Anrufername, Rückruf, Notiz) wird geschwärzt,

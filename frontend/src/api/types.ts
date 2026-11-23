@@ -843,7 +843,7 @@ export type Stellenart = S['Stellenart'];
 export type Verbindungsmittel = S['Verbindungsmittel'];
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/stab/kommunikationsplan/stellen`, FE-lokal.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/staff/comms-plan/positions`, FE-lokal.
  * `funktion` nur bei `stellenart: 'funktion'`; `bezeichnung` Pflicht bei externen Stellen und bei
  * Führungshilfspersonal/Fachberater, sonst weglassen (422).
  */
@@ -878,7 +878,7 @@ export type Lagebesprechung = S['LagebesprechungAnzeige'];
 export type LagebesprechungStand = S['LagebesprechungStand'];
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/lagebesprechungen`, FE-lokal.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/briefings`, FE-lokal.
  *
  * `naechste_at` ist DREIWERTIG: Schlüssel fehlt = Termin unverändert · `null` = löschen · Wert =
  * setzen. Ein leerer String löscht STILL (`support::trimme_tri`), Aufrufer schicken nie `''`.
@@ -891,7 +891,7 @@ export interface LagebesprechungAbschlussBody {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PUT …/lagebesprechung/termin`, FE-lokal. Der Schlüssel
+ * Kein Backend-Schema: Eingabe-Body von `PUT …/briefing/schedule`, FE-lokal. Der Schlüssel
  * ist Pflicht: Zeitpunkt (UTC 'YYYY-MM-DD HH:mm:ss') = setzen, `null` = kein Termin.
  */
 export interface LagebesprechungTerminBody {
@@ -2062,14 +2062,14 @@ export type InfotelefonAnliegenZaehler = S['InfotelefonAnliegenZaehler'];
 // API-Vertrag: openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md (D14).
 export type Fernmeldeskizze = S['Fernmeldeskizze'];
 export type SkizzenLage = S['SkizzenLage'];
-/** 409 auf `PUT …/stab/fernmeldeskizze/lage/{element}`: Fehlertext und gespeicherter Stand. */
+/** 409 auf `PUT …/staff/comms-sketch/layout/{element}`: Fehlertext und gespeicherter Stand. */
 export type SkizzenLageKonflikt = S['SkizzenLageKonflikt'];
 export type SkizzenKomponente = S['SkizzenKomponente'];
 export type SkizzenVerbindung = S['SkizzenVerbindung'];
 export type SkizzenBezug = S['SkizzenBezug'];
 export type SkizzenBezugArt = S['SkizzenBezugArt'];
 export type SkizzenBereich = S['SkizzenBereich'];
-/** 409 auf `PATCH …/stab/fernmeldeskizze/bereiche/{bid}`: Fehlertext und gespeicherter Stand. */
+/** 409 auf `PATCH …/staff/comms-sketch/areas/{bid}`: Fehlertext und gespeicherter Stand. */
 export type SkizzenBereichKonflikt = S['SkizzenBereichKonflikt'];
 export type Schriftfeld = S['Schriftfeld'];
 export type Komponentenart = S['Komponentenart'];

@@ -301,7 +301,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Informationstelefon (LFH-554): lange Notiz als Stoff für seine Zeitachse.
   await anlegen(
-    'stab/infotelefon',
+    'staff/info-line',
     {
       anliegen: 'vermisstensuche',
       notiz: ANRUF_NOTIZ,
@@ -325,7 +325,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   // Kommunikationsplan S6 (LFH-848): eine Behörde mit langer Bezeichnung, langer Nummer und
   // langem Hinweis. Die Antwort ist der ganze Plan; die id der Stelle steht darin.
   const plan = await page.request.post(
-    `/api/einsaetze/${einsatzId}/stab/kommunikationsplan/stellen`,
+    `/api/einsaetze/${einsatzId}/staff/comms-plan/positions`,
     { data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE } },
   );
   expect(plan.ok(), `Seeding Kommunikationsplan: ${await plan.text()}`).toBeTruthy();
@@ -333,7 +333,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     (s) => s.bezeichnung === KOMMUNIKATION_STELLE,
   )!;
   await anlegen(
-    `stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    `staff/comms-plan/positions/${stelle.id}/connections`,
     {
       mittel: 'festnetz',
       wert: '+49 421 361-1234567',

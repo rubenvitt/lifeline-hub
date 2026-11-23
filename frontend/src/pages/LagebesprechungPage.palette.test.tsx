@@ -54,8 +54,8 @@ function render(
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/lagebesprechung', stand),
-    http.get('/api/einsaetze/1/lagebesprechungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/briefing', stand),
+    http.get('/api/einsaetze/1/briefings', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[

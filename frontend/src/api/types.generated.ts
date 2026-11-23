@@ -4670,7 +4670,7 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
-        /** @description Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`. */
         InfotelefonZaehler: {
             /**
              * Format: int64

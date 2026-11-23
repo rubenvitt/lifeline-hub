@@ -46,14 +46,14 @@ async function sprechgruppe(
   bezeichnung: string,
   betriebsart: 'TMO' | 'DMO',
 ): Promise<Sprechgruppe> {
-  const liste = await api.get(`/api/einsaetze/${einsatzId}/sprechgruppen`);
+  const liste = await api.get(`/api/einsaetze/${einsatzId}/talk-groups`);
   expect(liste.ok(), `Sprechgruppen: ${liste.status()}`).toBe(true);
   const vorhanden = ((await liste.json()) as Sprechgruppe[]).find(
     (s) => s.bezeichnung === bezeichnung,
   );
   return (
     vorhanden ??
-    fuelle<Sprechgruppe>(api, 'post', `/api/einsaetze/${einsatzId}/sprechgruppen`, {
+    fuelle<Sprechgruppe>(api, 'post', `/api/einsaetze/${einsatzId}/talk-groups`, {
       bezeichnung,
       betriebsart,
     })
@@ -78,14 +78,14 @@ test.describe(KAPITEL, () => {
     const san = await sprechgruppe(api, id, 'TMO 311_F_SAN', 'TMO');
     const dmo = await sprechgruppe(api, id, 'DMO 505', 'DMO');
 
-    const fs = await (await api.get(`${e}/fuehrungsstelle`)).json();
+    const fs = await (await api.get(`${e}/command-post`)).json();
     if (!fs.rufname) {
       const fahrzeuge = (await (await api.get(`${e}/fahrzeuge`)).json()) as {
         id: number;
         funkrufname: string;
       }[];
       const elw = fahrzeuge.find((f) => f.funkrufname === 'Musterstadt 11-1');
-      await fuelle(api, 'patch', `${e}/fuehrungsstelle`, {
+      await fuelle(api, 'patch', `${e}/command-post`, {
         rufname: 'Florian Musterstadt 11-1',
         verbindungen: [{ mittel: 'festnetz', wert: '0561 123 4567' }],
         sprechgruppe_ids: [el.id, dmo.id],
@@ -124,7 +124,7 @@ test.describe(KAPITEL, () => {
       });
     }
 
-    const plan = `${e}/stab/kommunikationsplan`;
+    const plan = `${e}/staff/comms-plan`;
     const stellen = (await (await api.get(plan)).json()) as { bezeichnung?: string }[];
     if (!stellen.some((s) => s.bezeichnung === 'ILS Musterstadt')) {
       const neu = (await fuelle(api, 'post', `${plan}/stellen?antwort=stelle`, {

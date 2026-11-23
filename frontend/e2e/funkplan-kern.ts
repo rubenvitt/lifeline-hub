@@ -46,9 +46,9 @@ export async function seede(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const tmo = await post('sprechgruppen', { bezeichnung: 'TMO 412_F_DRK', betriebsart: 'TMO' });
-  const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
-  await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
+  const tmo = await post('talk-groups', { bezeichnung: 'TMO 412_F_DRK', betriebsart: 'TMO' });
+  const dmo = await post('talk-groups', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
+  await post('talk-groups', { bezeichnung: LOKAL, betriebsart: 'DMO' });
   const abschnitt = await post('abschnitte', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
@@ -102,15 +102,15 @@ export async function seedeSprechgruppen(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const tmo = await post('sprechgruppen', {
+  const tmo = await post('talk-groups', {
     bezeichnung: SG_LANG,
     betriebsart: 'TMO',
     hinweis: SG_HINWEIS,
     netz: SG_NETZ,
     sicherheit: SG_SICHERHEIT,
   });
-  const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
-  await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
+  const dmo = await post('talk-groups', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
+  await post('talk-groups', { bezeichnung: LOKAL, betriebsart: 'DMO' });
   const abschnitt = await post('abschnitte', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,

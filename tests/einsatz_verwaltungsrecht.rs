@@ -46,7 +46,7 @@ async fn sprechgruppe(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": "311", "betriebsart": "TMO"})),
     )
@@ -77,17 +77,17 @@ async fn alle_schreibwege(
         ),
         (
             "PATCH",
-            format!("{basis}/fuehrungsstelle"),
+            format!("{basis}/command-post"),
             Some(json!({"rufname": "Florian 1"})),
         ),
         (
             "PUT",
-            format!("{basis}/fuehrungsstelle/sprechgruppen/{sg}"),
+            format!("{basis}/command-post/talk-groups/{sg}"),
             None,
         ),
         (
             "DELETE",
-            format!("{basis}/fuehrungsstelle/sprechgruppen/{sg}"),
+            format!("{basis}/command-post/talk-groups/{sg}"),
             None,
         ),
     ] {
@@ -107,7 +107,7 @@ async fn stand(app: &axum::Router, cookie: &str, einsatz: i64) -> (Value, Value,
     let (s3, fs) = anfrage(
         app,
         "GET",
-        &format!("{basis}/fuehrungsstelle"),
+        &format!("{basis}/command-post"),
         cookie,
         None,
     )
@@ -133,7 +133,7 @@ async fn admin_einer_fremden_org_schreibt_an_keiner_verwaltungsroute() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
         &fk,
         None,
     )

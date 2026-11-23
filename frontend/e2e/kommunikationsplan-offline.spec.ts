@@ -98,7 +98,7 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     });
     expect(einsatz.ok(), await einsatz.text()).toBeTruthy();
     const einsatzId = ((await einsatz.json()) as { id: number }).id;
-    const basis = `/api/einsaetze/${einsatzId}/stab/kommunikationsplan`;
+    const basis = `/api/einsaetze/${einsatzId}/staff/comms-plan`;
     await page.request.post(`${basis}/stellen`, {
       data: { stellenart: 'funktion', funktion: 's2' },
     });

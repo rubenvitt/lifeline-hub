@@ -364,7 +364,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz::abschluss_pruefung),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrungsstelle",
+            "/api/einsaetze/{id}/command-post",
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
@@ -389,7 +389,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
         .route(
-            "/api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg}",
+            "/api/einsaetze/{id}/command-post/talk-groups/{sg}",
             put(routes::einsatz_fuehrungsstelle::sprechgruppe_zuordnen)
                 .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
         )
@@ -882,107 +882,107 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
         .route(
-            "/api/einsaetze/{id}/lagebesprechung",
+            "/api/einsaetze/{id}/briefing",
             get(routes::lagebesprechung::load),
         )
         .route(
-            "/api/einsaetze/{id}/lagebesprechung/termin",
+            "/api/einsaetze/{id}/briefing/schedule",
             put(routes::lagebesprechung::set_termin),
         )
         .route(
-            "/api/einsaetze/{id}/lagebesprechungen",
+            "/api/einsaetze/{id}/briefings",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/infotelefon",
+            "/api/einsaetze/{id}/staff/info-line",
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/infotelefon/zaehler",
+            "/api/einsaetze/{id}/staff/info-line/counts",
             get(routes::infotelefon::zaehler),
         )
         .route(
-            "/api/einsaetze/{id}/stab/infotelefon/{aid}",
+            "/api/einsaetze/{id}/staff/info-line/{aid}",
             get(routes::infotelefon::detail),
         )
         .route(
-            "/api/einsaetze/{id}/stab/infotelefon/{aid}/status",
+            "/api/einsaetze/{id}/staff/info-line/{aid}/status",
             post(routes::infotelefon::status_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan",
+            "/api/einsaetze/{id}/staff/comms-plan",
             get(routes::fernmeldewesen::kommunikationsplan_laden),
         )
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen",
+            "/api/einsaetze/{id}/staff/comms-plan/positions",
             post(routes::fernmeldewesen::kommunikationsplan_stelle_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}",
+            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}",
             patch(routes::fernmeldewesen::kommunikationsplan_stelle_aendern)
                 .delete(routes::fernmeldewesen::kommunikationsplan_stelle_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen",
+            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/connections",
             post(routes::fernmeldewesen::kommunikationsplan_verbindung_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}",
+            "/api/einsaetze/{id}/staff/comms-plan/connections/{vid}",
             patch(routes::fernmeldewesen::kommunikationsplan_verbindung_aendern)
                 .delete(routes::fernmeldewesen::kommunikationsplan_verbindung_entfernen),
         )
         // LFH-893: Kanäle externer Stellen und taktische Fernmeldeskizze (design.md D14).
         .route(
-            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}",
+            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}",
             put(routes::fernmeldewesen::kommunikationsplan_kanal_setzen)
                 .delete(routes::fernmeldewesen::kommunikationsplan_kanal_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze",
+            "/api/einsaetze/{id}/staff/comms-sketch",
             get(routes::fernmeldewesen::fernmeldeskizze_laden),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/lage",
+            "/api/einsaetze/{id}/staff/comms-sketch/layout",
             delete(routes::fernmeldewesen::fernmeldeskizze_lage_verwerfen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/lage/{element}",
+            "/api/einsaetze/{id}/staff/comms-sketch/layout/{element}",
             put(routes::fernmeldewesen::fernmeldeskizze_lage_setzen)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_lage_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/schriftfeld",
+            "/api/einsaetze/{id}/staff/comms-sketch/title-block",
             put(routes::fernmeldewesen::fernmeldeskizze_schriftfeld_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten",
+            "/api/einsaetze/{id}/staff/comms-sketch/components",
             post(routes::fernmeldewesen::fernmeldeskizze_komponente_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}",
+            "/api/einsaetze/{id}/staff/comms-sketch/components/{kid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_komponente_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}",
+            "/api/einsaetze/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}",
             put(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_setzen)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen",
+            "/api/einsaetze/{id}/staff/comms-sketch/connections",
             post(routes::fernmeldewesen::fernmeldeskizze_verbindung_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen/{vid}",
+            "/api/einsaetze/{id}/staff/comms-sketch/connections/{vid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_verbindung_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_verbindung_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche",
+            "/api/einsaetze/{id}/staff/comms-sketch/areas",
             post(routes::fernmeldewesen::fernmeldeskizze_bereich_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}",
+            "/api/einsaetze/{id}/staff/comms-sketch/areas/{bid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_bereich_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_bereich_entfernen),
         )
@@ -2582,11 +2582,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::sprechgruppe::deaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/sprechgruppen",
+            "/api/einsaetze/{id}/talk-groups",
             get(routes::sprechgruppe::liste_fuer_einsatz),
         )
         .route(
-            "/api/einsaetze/{id}/sprechgruppen",
+            "/api/einsaetze/{id}/talk-groups",
             post(routes::sprechgruppe::anlegen_einsatz_lokal),
         )
         .route(

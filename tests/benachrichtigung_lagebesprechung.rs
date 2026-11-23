@@ -100,7 +100,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/lagebesprechung/termin", self.einsatz),
+            &format!("/api/einsaetze/{}/briefing/schedule", self.einsatz),
             &self.admin,
             Some(&json!({ "naechste_at": wert }).to_string()),
         )
@@ -242,7 +242,7 @@ async fn verschieben_nach_der_ankuendigung_kuendigt_den_neuen_termin_erneut_an()
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/lagebesprechungen", w.einsatz),
+        &format!("/api/einsaetze/{}/briefings", w.einsatz),
         &w.admin,
         Some(
             &json!({
@@ -279,7 +279,7 @@ async fn gleicher_termin_erneut_gesetzt_kuendigt_nicht_doppelt_an() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/lagebesprechungen", w.einsatz),
+        &format!("/api/einsaetze/{}/briefings", w.einsatz),
         &w.admin,
         Some(
             &json!({ "entschluss": "Weiter wie bisher", "abgehalten_at": "2026-09-12 13:52:00" })

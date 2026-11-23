@@ -37,7 +37,7 @@ fn anzahl(nachrichten: &[LiveNachricht], event: LiveEvent) -> usize {
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebesprechungen")
+    format!("/api/einsaetze/{einsatz}/briefings")
 }
 
 /// Schliesst eine Lagebesprechung mit dem gegebenen Rumpf ab (Vorbedingung: 201).
@@ -441,7 +441,7 @@ async fn termin_setzen_feuert_einsatz_nur_bei_aenderung() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/lagebesprechung/termin");
+    let pfad = format!("/api/einsaetze/{einsatz}/briefing/schedule");
     let mut rx = live.abonniere(einsatz);
 
     let (status, _) = anfrage(

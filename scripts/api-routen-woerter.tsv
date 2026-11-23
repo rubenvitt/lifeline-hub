@@ -1,4 +1,4 @@
-# Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0093): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accommodation	Unterkunft
 adapter	-
@@ -6,9 +6,11 @@ admin	-
 animals	Tiere
 api	-
 app-code	-
+areas	Bereiche
 audit	-
 auth	-
 backup	-
+briefing	Lagebesprechung
 briefings	Lagebesprechungen
 bulk	-
 callback	-
@@ -23,7 +25,10 @@ command-post	Führungsstelle
 command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
+components	Komponenten
 config	-
+connections	Verbindungen
+counts	Zähler
 damages	Schäden
 dev	-
 devices	Geräte
@@ -53,6 +58,7 @@ integrations	Anbindungen
 ios-push	-
 jwks.json	-
 lan	-
+layout	Anordnung
 live	-
 login	-
 logo	-
@@ -91,6 +97,7 @@ requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 retention	Aufbewahrung
+schedule	Termin
 seats	Plätze
 sectors	Einsatzabschnitte
 sessions	Sitzungen
@@ -115,6 +122,7 @@ test	-
 tile	-
 tilejson	-
 tiles	-
+title-block	Schriftfeld
 totp	-
 transport	-
 triage	Sichtung

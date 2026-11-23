@@ -8,15 +8,15 @@ mod common;
 use common::*;
 
 fn stand_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebesprechung")
+    format!("/api/einsaetze/{einsatz}/briefing")
 }
 
 fn termin_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebesprechung/termin")
+    format!("/api/einsaetze/{einsatz}/briefing/schedule")
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebesprechungen")
+    format!("/api/einsaetze/{einsatz}/briefings")
 }
 
 /// Zählt ETB-Einträge, deren Inhalt `nadel` enthält.
@@ -72,7 +72,7 @@ async fn ohne_stab_bleibt_die_lagebesprechung_voll_nutzbar() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/stab"),
+        &format!("/api/einsaetze/{einsatz}/staff"),
         &kraft,
         None,
     )

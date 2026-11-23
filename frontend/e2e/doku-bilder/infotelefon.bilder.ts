@@ -19,7 +19,7 @@ import {
  *
  * Füllung (D3): der Demo-Einsatz kennt keine Anrufe. Drei Anrufe kommen über die API, nur wenn
  * noch keiner da ist (ein Lauf aller Kapitel teilt eine Datenbank). Die API liegt weiter unter
- * `…/stab/infotelefon` (`frontend/src/infotelefon/AGENTS.md`). Alle Namen und Nummern sind
+ * `…/staff/info-line` (`frontend/src/infotelefon/AGENTS.md`). Alle Namen und Nummern sind
  * erfunden.
  */
 
@@ -29,7 +29,7 @@ test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
     const { id } = await demoEinsatz(api);
-    const pfad = `/api/einsaetze/${id}/stab/infotelefon`;
+    const pfad = `/api/einsaetze/${id}/staff/info-line`;
 
     const anrufe = (await (await api.get(pfad)).json()) as unknown[];
     if (anrufe.length === 0) {

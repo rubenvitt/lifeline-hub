@@ -219,7 +219,7 @@ test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen a
   expect(freigaben.lagebesprechung?.zugriff, 'Vorbedingung: Lagebesprechung frei').toBe(true);
   // Die Besprechung vor fünf Minuten; beide Meldungen gehen erst danach in die Lage.
   const vorMinuten = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
-  const lb = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+  const lb = await page.request.post(`/api/einsaetze/${id}/briefings`, {
     data: { entschluss: 'Lage unverändert', abgehalten_at: vorMinuten(5) },
   });
   expect(lb.status(), `Abschluss: ${await lb.text()}`).toBe(201);

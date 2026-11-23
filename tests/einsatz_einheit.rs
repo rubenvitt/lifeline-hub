@@ -1133,7 +1133,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#),
     )

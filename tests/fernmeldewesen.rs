@@ -1,5 +1,5 @@
 //! Freigabe des Moduls Fernmeldewesen (LLH-1180, Spec `fernmeldewesen`): Kommunikationsplan und
-//! Fernmeldeskizze behalten ihre Pfade unter `…/stab`, hängen aber allein an der Freigabe des
+//! Fernmeldeskizze liegen unter `…/staff`, hängen aber allein an der Freigabe des
 //! Fernmeldewesens. Inhalt und Live-Verhalten prüfen `tests/stab_kommunikationsplan.rs` und
 //! `tests/stab_fernmeldeskizze.rs`.
 
@@ -9,11 +9,11 @@ mod common;
 use common::*;
 
 fn plan_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan")
 }
 
 fn skizze_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/fernmeldeskizze")
+    format!("/api/einsaetze/{einsatz}/staff/comms-sketch")
 }
 
 /// Setzt den Override eines Moduls im Einsatz.
@@ -52,7 +52,7 @@ async fn stelle_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (status, plan) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen", plan_pfad(einsatz)),
+        &format!("{}/positions", plan_pfad(einsatz)),
         cookie,
         Some(r#"{"stellenart":"leitstelle","bezeichnung":"ILS"}"#),
     )
@@ -74,7 +74,7 @@ fn alle_routen(einsatz: i64) -> Vec<(&'static str, String, Option<&'static str>)
         ("GET", p.clone(), None),
         (
             "POST",
-            format!("{p}/stellen"),
+            format!("{p}/positions"),
             Some(r#"{"stellenart":"behoerde","bezeichnung":"x"}"#),
         ),
         ("GET", s.clone(), None),
@@ -114,7 +114,7 @@ async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/stab"),
+        &format!("/api/einsaetze/{einsatz}/staff"),
         &kraft,
         None,
     )
@@ -134,7 +134,7 @@ async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{stelle}/verbindungen", plan_pfad(einsatz)),
+        &format!("{}/positions/{stelle}/connections", plan_pfad(einsatz)),
         &kraft,
         Some(r#"{"mittel":"festnetz","wert":"0911 1234"}"#),
     )

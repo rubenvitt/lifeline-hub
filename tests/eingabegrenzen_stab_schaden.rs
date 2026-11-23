@@ -29,7 +29,7 @@ async fn infotelefon_notiz_name_rueckruf() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/stab/infotelefon");
+    let uri = format!("/api/einsaetze/{e}/staff/info-line");
     let anruf = |notiz: String, name: String, rueckruf: String| {
         json!({ "anliegen": "hinweis", "notiz": notiz, "anrufer_name": name,
                 "rueckruf": rueckruf, "rueckruf_noetig": true })

@@ -78,9 +78,9 @@ const LANG_NAME = 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordw
  */
 async function seedeGross(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
-  const tmo = (await a.post('sprechgruppen', { bezeichnung: LANG_SG, betriebsart: 'TMO' })).id;
-  const dmo = (await a.post('sprechgruppen', { bezeichnung: '314_F*', betriebsart: 'DMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [tmo] });
+  const tmo = (await a.post('talk-groups', { bezeichnung: LANG_SG, betriebsart: 'TMO' })).id;
+  const dmo = (await a.post('talk-groups', { bezeichnung: '314_F*', betriebsart: 'DMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [tmo] });
   for (let i = 1; i <= 8; i++) {
     const ab = (
       await a.post('abschnitte', {
@@ -100,24 +100,24 @@ async function seedeGross(page: Page, einsatzId: string) {
   }
   const stelle = async (stellenart: string, bezeichnung: string) => {
     const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'stab/kommunikationsplan/stellen',
+      'staff/comms-plan/positions',
       { stellenart, bezeichnung },
     );
     return plan.find((x) => x.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');
   await stelle('behoerde', 'Polizei');
-  await a.put(`stab/kommunikationsplan/stellen/${ils}/sprechgruppen/${tmo}`, {
+  await a.put(`staff/comms-plan/positions/${ils}/talk-groups/${tmo}`, {
     status: 'bestehend',
   });
   const repeater = (
-    await a.post('stab/fernmeldeskizze/komponenten', {
+    await a.post('staff/comms-sketch/components', {
       art: 'repeater',
       bezeichnung: 'Repeater Nord',
     })
   ).id;
-  await a.put(`stab/fernmeldeskizze/komponenten/${repeater}/sprechgruppen/${dmo}`);
-  await a.post('stab/fernmeldeskizze/komponenten', { art: 'antenne', bezeichnung: null });
+  await a.put(`staff/comms-sketch/components/${repeater}/talk-groups/${dmo}`);
+  await a.post('staff/comms-sketch/components', { art: 'antenne', bezeichnung: null });
   return { tmo, dmo };
 }
 
@@ -424,8 +424,8 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze Leitstelle ${Date.now()}`);
   const a = api(page, einsatzId);
-  const slAs = (await a.post('sprechgruppen', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [slAs] });
+  const slAs = (await a.post('talk-groups', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [slAs] });
   const zaehle = async () => ({
     abschnitte: (await a.get<unknown[]>('abschnitte')).length,
     einheiten: (await a.get<unknown[]>('einheiten')).length,
@@ -520,24 +520,24 @@ test('Geplant: Verbindung und Stichleitung gestrichelt mit dem Wort „geplant�
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze geplant ${Date.now()}`);
   const n = await seedeGrund(page, einsatzId, { zug: false });
   const a = api(page, einsatzId);
-  const slAs = (await a.post('sprechgruppen', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
+  const slAs = (await a.post('talk-groups', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
   const stelle = async (stellenart: string, bezeichnung: string) => {
     const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'stab/kommunikationsplan/stellen',
+      'staff/comms-plan/positions',
       { stellenart, bezeichnung },
     );
     return plan.find((s) => s.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');
   const polizei = await stelle('behoerde', 'Polizei');
-  await a.put(`stab/kommunikationsplan/stellen/${polizei}/sprechgruppen/${slAs}`, {
+  await a.put(`staff/comms-plan/positions/${polizei}/talk-groups/${slAs}`, {
     status: 'geplant',
   });
-  await a.put(`stab/kommunikationsplan/stellen/${ils}/sprechgruppen/${slAs}`, {
+  await a.put(`staff/comms-plan/positions/${ils}/talk-groups/${slAs}`, {
     status: 'bestehend',
   });
   const geplant = (
-    await a.post('stab/fernmeldeskizze/verbindungen', {
+    await a.post('staff/comms-sketch/connections', {
       von: { art: 'fuehrungsstelle', id: null },
       nach: { art: 'stelle', id: ils },
       art: 'daten',
@@ -546,7 +546,7 @@ test('Geplant: Verbindung und Stichleitung gestrichelt mit dem Wort „geplant�
     })
   ).id;
   const bestehend = (
-    await a.post('stab/fernmeldeskizze/verbindungen', {
+    await a.post('staff/comms-sketch/connections', {
       von: { art: 'abschnitt', id: n.ea[0] },
       nach: { art: 'stelle', id: polizei },
       art: 'telefon',
@@ -617,9 +617,9 @@ const SKIZZEN_LUECKEN = [
 
 async function seedeLuecken(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  const d505 = (await a.post('sprechgruppen', { bezeichnung: '505', betriebsart: 'DMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  const d505 = (await a.post('talk-groups', { bezeichnung: '505', betriebsart: 'DMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (
     await a.post('abschnitte', {
       name: 'Einsatzabschnitt Nord',
@@ -633,7 +633,7 @@ async function seedeLuecken(page: Page, einsatzId: string) {
   const ohne = await einheit('2. Zug', null, []);
   const fremd = await einheit('3. Zug', 'Florian 1/3', [d505]);
   const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-    'stab/kommunikationsplan/stellen',
+    'staff/comms-plan/positions',
     { stellenart: 'leitstelle', bezeichnung: 'ILS Musterhausen' },
   );
   const ils = plan.find((s) => s.bezeichnung === 'ILS Musterhausen')!.id;
@@ -700,7 +700,7 @@ test('Wurzel: ohne erfasste Führungsstelle keine erfundene Einsatzleitung', asy
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze Wurzel ${Date.now()}`);
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   const ea = (
     await a.post('abschnitte', {
       name: 'Einsatzabschnitt Nord',
@@ -771,7 +771,7 @@ test('Lage: zweimal Pfeil rechts bleibt über Neuladen; „Neu anordnen“ stell
   await page.getByRole('button', { name: 'Neu anordnen', exact: true }).click();
   const frage = page.getByRole('dialog', { name: 'Neu anordnen?' });
   const verworfen = page.waitForResponse(
-    (r) => r.url().endsWith('/stab/fernmeldeskizze/lage') && r.request().method() === 'DELETE',
+    (r) => r.url().endsWith('/staff/comms-sketch/layout') && r.request().method() === 'DELETE',
   );
   await frage.getByRole('button', { name: 'Neu anordnen' }).click();
   expect((await verworfen).ok()).toBe(true);
@@ -808,7 +808,7 @@ test('Gleichzeitig: zwei Kontexte verschieben dieselbe Einheit — B bekommt ein
     // hängt in der Leitung, bis B selbst gespeichert hat (Latenz, kein Abschalten des Stroms).
     let halten = false;
     const wartend: Route[] = [];
-    await b.route(/\/api\/einsaetze\/\d+\/stab\/fernmeldeskizze$/, async (route) => {
+    await b.route(/\/api\/einsaetze\/\d+\/staff\/comms-sketch$/, async (route) => {
       if (halten && route.request().method() === 'GET') {
         wartend.push(route);
         return;
@@ -849,7 +849,7 @@ test('Gleichzeitig: zwei Kontexte verschieben dieselbe Einheit — B bekommt ein
       .toEqual(beiA);
     const gespeichert = await api(page, einsatzId).get<{
       lage: { element: string; x: number; y: number }[];
-    }>('stab/fernmeldeskizze');
+    }>('staff/comms-sketch');
     expect(gespeichert.lage.find((l) => l.element === key)).toMatchObject(beiA);
   } finally {
     await zweiter.close();
@@ -865,8 +865,8 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig ${Date.now()}`);
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea1 = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   const vorne = (
     await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
@@ -918,8 +918,8 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig am Schirm ${Date.now()}`);
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
   const zugB = (
@@ -948,10 +948,10 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   const neu = { x: lageVorher.x + 160, y: lageVorher.y + 80 };
   const abruf = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/stab/fernmeldeskizze`) &&
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/staff/comms-sketch`) &&
       r.request().method() === 'GET',
   );
-  await a.put(`stab/fernmeldeskizze/lage/${key}`, { ...neu, version: null });
+  await a.put(`staff/comms-sketch/layout/${key}`, { ...neu, version: null });
   // Vorbedingung: der neue Stand ist geladen und gezeichnet.
   await abruf;
   await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(() => fertig(null))));
@@ -971,8 +971,8 @@ test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz ob
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig oben ${Date.now()}`);
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   // Funkrufname und Telefon: „Zug Ohne“ fehlt nur die Sprechgruppe. Sonst stünde er seit LLH-1134
   // in zwei weiteren Lücken (ohne Funkrufname, ohne Telefon), das Paneel wüchse um eine Zeile mit

@@ -12,12 +12,12 @@ import type {
  * die des Stabs.
  */
 export function fetchLagebesprechungStand(einsatzId: number): Promise<LagebesprechungStand> {
-  return apiGet<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/lagebesprechung`);
+  return apiGet<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/briefing`);
 }
 
 /** Verlauf absteigend nach `lfd_nr`, ohne Cursor. */
 export function fetchLagebesprechungen(einsatzId: number): Promise<Lagebesprechung[]> {
-  return apiGet<Lagebesprechung[]>(`/api/einsaetze/${einsatzId}/lagebesprechungen`);
+  return apiGet<Lagebesprechung[]>(`/api/einsaetze/${einsatzId}/briefings`);
 }
 
 /**
@@ -30,7 +30,7 @@ export function lagebesprechungAbschliessen(
   daten: LagebesprechungAbschlussBody,
 ): Promise<LagebesprechungStand> {
   return apiSend<LagebesprechungStand>(
-    `/api/einsaetze/${einsatzId}/lagebesprechungen`,
+    `/api/einsaetze/${einsatzId}/briefings`,
     'POST',
     daten,
   );
@@ -42,7 +42,7 @@ export function setLagebesprechungTermin(
   daten: LagebesprechungTerminBody,
 ): Promise<LagebesprechungStand> {
   return apiSend<LagebesprechungStand>(
-    `/api/einsaetze/${einsatzId}/lagebesprechung/termin`,
+    `/api/einsaetze/${einsatzId}/briefing/schedule`,
     'PUT',
     daten,
   );

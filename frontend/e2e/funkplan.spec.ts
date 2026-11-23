@@ -455,11 +455,11 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen FS ${Date.now()}`);
   await seedeSprechgruppen(page, einsatzId);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const sg = await page.request.post(`${basis}/sprechgruppen`, {
+  const sg = await page.request.post(`${basis}/talk-groups`, {
     data: { bezeichnung: NUR_FS, betriebsart: 'DMO' },
   });
   expect(sg.ok(), `Seeding Sprechgruppe: ${sg.status()}`).toBeTruthy();
-  const fs = await page.request.patch(`${basis}/fuehrungsstelle`, {
+  const fs = await page.request.patch(`${basis}/command-post`, {
     data: {
       rufname: 'Florian Musterstadt 10/1',
       sprechgruppe_ids: [((await sg.json()) as { id: number }).id],
@@ -479,7 +479,7 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
 
   // Führungsstelle abgelehnt: weder ihre noch die übrige lokale Sprechgruppe heißt „keine“.
-  await page.route(`**${basis}/fuehrungsstelle`, (route) =>
+  await page.route(`**${basis}/command-post`, (route) =>
     route.request().method() === 'GET'
       ? route.fulfill({ status: 403, json: { error: 'verboten' } })
       : route.continue(),

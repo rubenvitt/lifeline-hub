@@ -379,7 +379,7 @@ test('Informationstelefon (LFH-1067): auf 390 × 844 stehen beim Öffnen zwei An
     'sonstiges',
   ];
   for (let n = 1; n <= 10; n += 1) {
-    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/staff/info-line`, {
       data: {
         anliegen: anliegen[n % anliegen.length],
         notiz: `Probe ${n}: Wasser im Keller`,

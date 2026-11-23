@@ -38,7 +38,7 @@ function einheit(o: Partial<Einheit> = {}): Einheit {
 }
 
 function renderFunk(e: Einheit = einheit(), canEdit = true) {
-  server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
+  server.use(http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json([tmo, dmo])));
   const onPatch = vi.fn<EinheitPatchHandler>().mockResolvedValue(undefined);
   const onSprechgruppen = vi.fn<EinheitSprechgruppenHandler>().mockResolvedValue(undefined);
   const ansicht = (x: Einheit) => (
