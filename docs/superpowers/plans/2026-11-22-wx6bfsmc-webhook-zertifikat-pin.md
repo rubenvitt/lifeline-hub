@@ -134,7 +134,7 @@ Tests), React + antd + TanStack Query, Vitest.
 ### Task 3: Datenmodell — Spalte, Repo, Admin-Aktionen
 
 **Files:**
-- Create: `migrations/0363_webhook_zertifikat_pin.sql` (Nummer vor dem Anlegen mit
+- Create: `migrations/0364_webhook_zertifikat_pin.sql` (Nummer vor dem Anlegen mit
   `git fetch origin alpha && scripts/check-migrationen.sh` bestätigen)
 - Modify: `src/public_api/webhook/repo.rs`, `src/public_api/webhook/lauf.rs`,
   `src/auth/admin_audit.rs`
@@ -273,14 +273,14 @@ Tests), React + antd + TanStack Query, Vitest.
 ### Task 6: Regeln und Doku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0084-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md`
+- Create: `docs/architektur/entscheidungen/ADR-0085-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md`
   (Nummer vorher gegen `origin/alpha` und offene PRs prüfen)
 - Modify: `docs/architektur/entscheidungen/ADR-0046-…md` (nur falls ein Verweis erlaubt ist; ADR
   ist akzeptiert und unveränderlich — sonst unangetastet), `src/AGENTS.md` („Webhooks“),
   `docs/anwender/kapitel/anbindungen.md` (Abschnitt „Fingerabdruck hinterlegen“, `quellen` um
   `src/instanz/zertifikat.rs` ergänzen)
 
-- [x] **Step 1:** ADR-0084 nach `docs/architektur/AGENTS.md` (Kopf, `status: akzeptiert`,
+- [x] **Step 1:** ADR-0085 nach `docs/architektur/AGENTS.md` (Kopf, `status: akzeptiert`,
   `gilt_fuer` = `src/public_api/webhook/**`, `src/routes/anbindungen_webhook.rs`,
   `src/instanz/zertifikat.rs`; `herleitung` = Design-Doc). Regeln: MUST „mit Fingerabdruck nur
   dieses Zertifikat, Kette/Name/Anker zählen nicht“; MUST „Zielschutz unverändert, TLS nur über
@@ -289,8 +289,8 @@ Tests), React + antd + TanStack Query, Vitest.
   `verlange 'erfasser_config' src/public_api/webhook/ziel.rs`.
 - [x] **Step 2:** `src/AGENTS.md`, „Webhooks“: ein Punkt „Pin: ein Client je `(lan, pin)` aus
   `baue_client`, TLS nur über `instanz::zertifikat::tls_config`, Abruf nur mit `Erfasser`“, Verweis
-  auf ADR-0084.
+  auf ADR-0085.
 - [x] **Step 3:** Anwenderkapitel: Schritte „Fingerabdruck hinterlegen“ (Vom Ziel holen →
   vergleichen → Übernehmen → Speichern), Hinweis zu Zertifikatswechsel und neuem Server.
 - [x] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf).
-- [x] **Step 5: Commit** `docs: ADR-0084, Regeln und Anwenderdoku zum Webhook-Fingerabdruck (LLH-1872)`
+- [x] **Step 5: Commit** `docs: ADR-0085, Regeln und Anwenderdoku zum Webhook-Fingerabdruck (LLH-1872)`
