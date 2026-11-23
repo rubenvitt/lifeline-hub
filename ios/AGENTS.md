@@ -52,7 +52,7 @@ Change `t39ltxxi-ios-huelle`.
 
 ## Push über APNs (LLH-1981)
 
-Entscheidung ADR-0086; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais in
+Entscheidung ADR-0088; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais in
 `push-relais/AGENTS.md`.
 
 - **Brücke:** `push_register` (fragt die Berechtigung, holt das Token, legt je Server einmal
