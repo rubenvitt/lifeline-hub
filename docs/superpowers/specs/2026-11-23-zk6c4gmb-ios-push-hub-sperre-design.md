@@ -116,8 +116,8 @@ stehen. Der Ausfall der Kopplung selbst zeigt die Seite „Instanzkopplung“ oh
   wenn ein passendes Kapitel existiert (Regeln in `docs/anwender/AGENTS.md`).
 - Die Aufgabe nennt ADR-0084/R48. Das ist die Android-Hülle; für iOS-Push gelten
   [ADR-0090](../../architektur/entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)
-  und R54. Eine neue ADR braucht es nicht, weil die Entscheidung eine Anzeige ist und keine
-  Architekturänderung.
+  und R54. **Nachtrag nach dem Review:** `docs/architektur/AGENTS.md` verlangt für eine
+  Entscheidung der Route `entwurf` (E1) eine ADR, also ADR-0093.
 
 ## Prüfung (Tests)
 
@@ -143,3 +143,13 @@ stehen. Der Ausfall der Kopplung selbst zeigt die Seite „Instanzkopplung“ oh
 erfolgreichen Versand, auch nach Ablauf der 24 h; der Server liefert das Feld an alle Leser, die
 Oberfläche filtert; `Vec` statt `Option`, weil ein Einsatz an mehr als einen Hub geliefert werden
 kann.
+
+## Nachtrag nach dem Review (23.11.2026)
+
+- Die Sperrzeit vom Hub wird nur kanonisch gespeichert (ADR-0012). Ein anderer Wert gilt als
+  Sperre ab dem schon gespeicherten Zeitpunkt oder ab jetzt.
+- Das Band erscheint nur, wenn der Hub für den Einsatz wirklich Konten pusht: Mindestens ein Konto
+  stammt aus der Kopplung (`stammdaten_herkunft`). Eine Direktkopplung vor Ort trägt keins.
+- Beginn und Ende der Sperre melden den Einsatzkopf der aktiven Einsätze (bestehendes Ereignis
+  `einsatz`, kein neues). Sonst bliebe das Band in einer offenen Seite stehen (Anti-Ziel).
+- Die Seite „Instanzkopplung“ zeigt die Sperre nur an einer aktiven Kopplung.

@@ -488,10 +488,13 @@ kommt bei diesen iPhones nichts an, auch kein Alarm. Der Hub meldet die Sperre d
 Einsatzleitwagen. Dort zeigt jeder Einsatz, dessen Hinweise über diesen Hub reisen, der
 Einsatzleitung und den Admins der Organisation das gelbe Band „iOS-Push über den Hub „…“ wird
 nicht zugestellt“. An der Kopplung steht „iOS-Push an Hub-Konten kommt nicht an: das Push-Relais
-sperrt den Hub (seit …)“. Web Push und die offene App bleiben. Der Einsatzleitwagen springt
-nicht selbst ein; wichtige Meldungen sichert die Einsatzleitung auf anderem Weg ab, etwa über
-Funk oder Telefon. Den Betreiber des Hubs informieren: Die Sperre hebt der Betreiber des Relais
-auf. Danach verschwinden Band und Hinweis mit der nächsten Meldung.
+sperrt den Hub (seit …)“. Die Zeit nennt, wann das Relais den Hub zuletzt abgewiesen hat. Web
+Push und die offene App bleiben. Der Einsatzleitwagen springt nicht selbst ein; wichtige
+Meldungen sichert die Einsatzleitung auf anderem Weg ab, etwa über Funk oder Telefon. Den
+Betreiber des Hubs informieren: Die Sperre hebt der Betreiber des Relais auf. Der Hub merkt das
+erst, wenn er wieder etwas sendet, frühestens einen Tag nach der letzten Abweisung. Danach
+verschwinden Band und Hinweis mit der nächsten Meldung des Einsatzleitwagens, auch in schon
+offenen Seiten.
 
 ### Spiegel
 
