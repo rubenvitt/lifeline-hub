@@ -2077,7 +2077,7 @@ async fn vor_der_grenze_bearbeitet_hebt_trotzdem_an() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;
@@ -2095,7 +2095,7 @@ async fn abgelehnter_nachtrag_legt_die_zeile_neu_ins_log() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;
@@ -2275,7 +2275,7 @@ async fn bearbeitung_nach_dem_aufruesten_vor_dem_melden_bleibt() {
     exec(
         &o,
         &format!(
-            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's2' WHERE benutzer_id = {erika}"
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'Abschnitt Nord' WHERE benutzer_id = {erika}"
         ),
     )
     .await;

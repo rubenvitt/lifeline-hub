@@ -152,14 +152,14 @@ async fn erika(hub: &Instanz, elw: &Instanz) -> (i64, i64) {
     (am_hub, am_elw)
 }
 
-async fn mitglied(i: &Instanz, einsatz: i64, benutzer: i64, rolle: &str, funktion: Option<&str>) {
+async fn mitglied(i: &Instanz, einsatz: i64, benutzer: i64, rolle: &str, stelle: Option<&str>) {
     let (s, v) = common::anfrage(
         &i.app,
         "PUT",
         &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer}"),
         &i.admin,
         Some(
-            &json!({"einsatz_rolle": rolle, "fuehrungsfunktion": funktion, "fuehrungsstelle": null})
+            &json!({"einsatz_rolle": rolle, "fuehrungsfunktion": null, "fuehrungsstelle": stelle})
                 .to_string(),
         ),
     )
@@ -247,7 +247,7 @@ async fn bearbeitung_nach_dem_aufruesten_bleibt_und_der_spiegel_folgt() {
     let (hub, elw, hub_einsatz) = rueckgabe_an_den_alten_hub().await;
     rolle_mitarbeit_fuer_tests(true);
     // Melden lehrt beide Seiten die Fähigkeit; vor dem Abgleich wählt die Einsatzleitung am Hub
-    // bewusst Beobachter (mit Führungsfunktion).
+    // bewusst Beobachter (mit Führungsstelle).
     melden(&elw).await;
     let erika_hub: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'erika'")
         .fetch_one(&hub.pool)
@@ -262,7 +262,14 @@ async fn bearbeitung_nach_dem_aufruesten_bleibt_und_der_spiegel_folgt() {
     .execute(&hub.pool)
     .await
     .unwrap();
-    mitglied(&hub, hub_einsatz, erika_hub, "beobachter", Some("s2")).await;
+    mitglied(
+        &hub,
+        hub_einsatz,
+        erika_hub,
+        "beobachter",
+        Some("Abschnitt Nord"),
+    )
+    .await;
     abgleichen(&elw).await;
     abgleichen(&elw).await;
     assert_eq!(rolle(&hub).await, "beobachter", "die bewusste Wahl bleibt");
