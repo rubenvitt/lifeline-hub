@@ -1,5 +1,5 @@
 ---
-id: ADR-0086
+id: ADR-0091
 titel: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
 status: akzeptiert
 datum: 2026-11-22
@@ -12,7 +12,7 @@ herleitung:
   - Zunder LLH-2035 (Weg abgestimmt mit Ruben am 22.11.2026)
 ---
 
-# ADR-0086: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
+# ADR-0091: Testjobs auf Kanal-Branches laufen zu Ende, statt bei jedem Push abzubrechen
 
 ## Regeln
 

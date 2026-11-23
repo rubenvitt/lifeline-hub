@@ -9,7 +9,7 @@
 # Die Jobs heißen am Commit `<Aufrufer> / <Job>` (etwa `Suiten / Rust-Suite`). Ein Pflicht-Check
 # darf deshalb nicht hier stehen: die Schnellprüfungen stehen in `ci.yml` und `pr.yml` selbst.
 #
-# ZU ENDE AUF KANAL-BRANCHES (LLH-2035, ADR-0086; vorher Abbruch nach LLH-1889): Concurrency AUF
+# ZU ENDE AUF KANAL-BRANCHES (LLH-2035, ADR-0091; vorher Abbruch nach LLH-1889): Concurrency AUF
 # JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `android`, `berichte`) ohne Abbruch. Ein
 # gestarteter Job läuft zu Ende; je Gruppe wartet höchstens ein Lauf, und ein neuer Push ersetzt
 # nur diesen wartenden. Sonst käme die ~68-min-Rust-Suite bei mehreren Merges pro Stunde nie durch. Im

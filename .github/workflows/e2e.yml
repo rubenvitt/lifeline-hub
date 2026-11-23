@@ -10,7 +10,7 @@
 # Pflicht-Checks fehlen ließ.
 #
 # NEBENLÄUFIGKEIT: Die steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in
-# `suiten.yml` eine Gruppe je Branch ohne Abbruch (ADR-0086): ein laufender Lauf endet, ein neuer
+# `suiten.yml` eine Gruppe je Branch ohne Abbruch (ADR-0091): ein laufender Lauf endet, ein neuer
 # Push wartet.
 #
 # NUR GITHUB (ADR-0078): Alle Jobs laufen auf `ubuntu-latest`; der eigene Server ist zurückgebaut.

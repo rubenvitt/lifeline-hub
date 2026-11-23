@@ -57,7 +57,7 @@ nur diese eine Regel ändert.
 - `.github/workflows/release.yml`, Kopfkommentar: „ein Lauf, dessen Tests ein neuerer Push
   abgebrochen hat“ — bleibt sachlich richtig (ein verdrängter wartender Lauf zählt als
   abgebrochen); nur prüfen, nicht ändern, wenn er stimmt.
-- **Neue ADR** `ADR-0086-testjobs-auf-kanal-branches-laufen-zu-ende.md` (Nummer vor dem PR gegen
+- **Neue ADR** `ADR-0091-testjobs-auf-kanal-branches-laufen-zu-ende.md` (Nummer vor dem PR gegen
   `origin/alpha` und offene PRs prüfen): Regeln — aus ADR-0048 entfällt der Abbruch; die
   Testjobs in `suiten.yml` laufen auf Kanal-Branches zu Ende, Concurrency je Branch und Job mit
   `cancel-in-progress: false`; der Release bleibt unverändert (eigene Gruppe, `needs`). Prüfung
