@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dialogSteht, eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
 /**
