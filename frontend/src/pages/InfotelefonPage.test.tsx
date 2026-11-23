@@ -446,7 +446,9 @@ describe('InfotelefonPage (LFH-554)', () => {
       a.eingang_at === b.eingang_at ? b.id - a.id : a.eingang_at < b.eingang_at ? 1 : -1;
     function blaettere(bestand: () => InfotelefonAnruf[]) {
       vi.mocked(loadAnrufe).mockImplementation(async (_e, seite = {}) => {
-        const alle = [...bestand()].sort(vergleich);
+        const alle = bestand()
+          .filter((a) => seite.status == null || a.status === seite.status)
+          .sort(vergleich);
         const limit = seite.limit ?? ANRUFE_PAGE_SIZE;
         const c = seite.vor ?? seite.nach;
         if (c == null) return alle.slice(0, limit);
@@ -516,6 +518,52 @@ describe('InfotelefonPage (LFH-554)', () => {
       const zeilen = within(liste).getAllByRole('listitem');
       // Funkprotokoll: jüngster unten. Er ist jünger als das Fenster, also ganz unten.
       expect(zeilen[zeilen.length - 1]).toHaveTextContent('Anruf 940');
+    });
+
+    it('zählt in „offene Rückrufe“ einen nachgerückten alten Nachtrag nicht als neu (LLH-2066)', async () => {
+      // Tiefes Fenster (Kopf nicht geladen), alles offen. Unter dem Fenster liegt ein Nachtrag:
+      // alter Eingang, hohe Kennung. Wird im Fenster ein Rückruf erledigt, rückt er beim Neuladen
+      // in die älteste Seite nach. Er ist verschoben, nicht neu.
+      const offen = (von: number, bis: number) =>
+        reihe(von, bis).map((a) => ({ ...a, status: 'offen' as const }));
+      let bestand = [
+        ...offen(950, 801),
+        anruf({
+          id: 5000,
+          status: 'offen',
+          eingang_at: eingang(790),
+          angelegt_von_id: 9,
+          notiz: 'alter Nachtrag',
+        }),
+      ];
+      blaettere(() => bestand);
+      const client = neuerQueryClient();
+      // `gcTime: 0` im Test-Client: bis die Freigabe steht, beobachtet niemand das Fenster.
+      client.setQueryDefaults(einsatzKeys.infotelefonListe(1, 'offen'), { gcTime: Infinity });
+      client.setQueryData(einsatzKeys.infotelefonListe(1, 'offen'), {
+        pages: [offen(900, 801)],
+        pageParams: [{ aelter: { zeit: eingang(901), id: 901 } }],
+      });
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/infotelefon?sicht=offen', client },
+      );
+      const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+      await within(liste).findByText('Anruf 801');
+      act(() =>
+        within(liste)
+          .getAllByRole('button', { name: /^Status von Anruf / })[0]
+          .focus(),
+      );
+
+      // Ein anderer Platz erledigt Anruf 850: er fällt aus „offene Rückrufe“.
+      bestand = bestand.map((a) => (a.id === 850 ? { ...a, status: 'erledigt' as const } : a));
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) }));
+      expect(await within(liste).findByText('alter Nachtrag')).toBeInTheDocument();
+      expect(within(liste).queryByText('Anruf 850')).toBeNull();
+      expect(screen.queryByText(/neuer Anruf/)).toBeNull();
     });
 
     it('„Neuere laden“ bei eingefrorener Schleuse zeigt die geholte Seite ganz', async () => {
