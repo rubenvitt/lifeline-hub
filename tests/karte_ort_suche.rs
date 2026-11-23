@@ -136,7 +136,7 @@ async fn ohne_lagekarte_modul_ist_403_ohne_geocoder() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/lagekarte"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/lagekarte"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

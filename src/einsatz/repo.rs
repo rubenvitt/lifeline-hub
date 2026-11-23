@@ -5,6 +5,7 @@ use super::{
 };
 use crate::auth::{Benutzer, FremdeinsatzLesezugriff};
 use crate::error::AppError;
+use crate::instanz::spiegel::hinweis::IosPushHubSperre;
 use chrono::Utc;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -462,6 +463,31 @@ macro_rules! spiegel_spalten {
     };
 }
 
+/// Die Hubs, über die die Hinweise des Einsatzes `e` reisen und deren iOS-Push das Relais sperrt
+/// (LLH-2074), als JSON-Liste von `instanz::spiegel::hinweis::IosPushHubSperre`, wortgleich in
+/// `laden` und `liste_fuer`. Die Menge ist die von `instanz::spiegel::hinweis::ziele` (aktive
+/// meldende Kopplung, die Hinweise annimmt, Zuordnung nicht widerrufen, kein Spiegel-, Demo- oder
+/// abzuräumender Einsatz), dazu iOS-Push angeboten und gesperrt und mindestens ein Konto aus der
+/// Kopplung (nur ihm pusht der Hub, `konten_am_hub`; eine Direktkopplung vor Ort trägt keine).
+/// Korreliert, damit keine der
+/// beiden Abfragen einen weiteren Join braucht.
+macro_rules! ios_push_hub_gesperrt_spalte {
+    () => {
+        "COALESCE((SELECT json_group_array(json_object('hub_name', ik.gegenueber_name, \
+                     'since', ik.gegenueber_ios_push_gesperrt_seit)) \
+            FROM instanz_kopplung_org io JOIN instanz_kopplung ik ON ik.id = io.kopplung_id \
+            WHERE io.org_id = e.org_id AND io.widerrufen_at IS NULL AND e.spiegel = 0 \
+              AND ik.richtung = 'meldet_sich' AND ik.zustand = 'aktiv' \
+              AND ik.gegenueber_hinweise = 1 AND ik.gegenueber_ios_push = 1 \
+              AND ik.gegenueber_ios_push_gesperrt_seit IS NOT NULL \
+              AND EXISTS (SELECT 1 FROM stammdaten_herkunft h \
+                          WHERE h.kopplung_org_id = io.id AND h.art = 'konto') \
+              AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
+              AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id)), \
+            '[]') AS ios_push_hub_gesperrt"
+    };
+}
+
 /// Anzeigename der abschließenden Person (LLH-1814), wortgleich in `laden` und `liste_fuer`.
 /// Korreliert statt Join, damit keine der beiden Abfragen einen weiteren Alias braucht.
 macro_rules! abgeschlossen_von_name_spalte {
@@ -512,6 +538,8 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
         fuehrung_spalten!(),
         ", ",
         spiegel_spalten!(),
+        ", ",
+        ios_push_hub_gesperrt_spalte!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
@@ -638,6 +666,7 @@ pub async fn liste_fuer(
         fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
         #[sqlx(flatten)]
         spiegel: crate::instanz::spiegel::SpiegelSpalten,
+        ios_push_hub_gesperrt: sqlx::types::Json<Vec<IosPushHubSperre>>,
     }
 
     // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
@@ -679,6 +708,8 @@ pub async fn liste_fuer(
         fuehrung_spalten!(),
         ", ",
         spiegel_spalten!(),
+        ", ",
+        ios_push_hub_gesperrt_spalte!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
@@ -793,6 +824,7 @@ pub async fn liste_fuer(
                 einsatzleiter: r.einsatzleiter.anzeige(),
                 fuehrung: r.fuehrung.anzeige(),
                 spiegel: r.spiegel.anzeige(),
+                ios_push_hub_gesperrt: r.ios_push_hub_gesperrt.0,
                 vermerke: Default::default(),
             }
         })
@@ -1513,7 +1545,7 @@ pub async fn soft_delete_einsatz(
 /// Transaktion. Gewinnt eine parallele Schwärzung, findet das UPDATE keine Zeile. Bei 0
 /// Zeilen wird neu gelesen und eingeordnet: geschwärzt oder Karenz abgelaufen → 409
 /// (endgültiger Lebenszyklus-Zustand, kein Rückweg), nicht vorgemerkt → 422 (die Frist
-/// ändert man dort über `PUT …/aufbewahrungsfrist`), aktiv → 409, unbekannt → 404.
+/// ändert man dort über `PUT …/retention-period`), aktiv → 409, unbekannt → 404.
 /// Keine Ablehnung schreibt. Liefert die Kennung des ETB-Eintrags für das `etb`-Ereignis
 /// (LFH-858).
 pub async fn wiederherstellen(

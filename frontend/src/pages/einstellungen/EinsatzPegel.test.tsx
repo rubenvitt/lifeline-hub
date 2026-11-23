@@ -68,7 +68,7 @@ const FEATURES = [
   feature(null, 'OHNE UUID', 'IRGENDWO', 1),
 ];
 
-/** Wire-Form von `GET /api/karte/fachebenen/pegelonline` (`FachebeneAntwort`). */
+/** Wire-Form von `GET /api/map/overlays/pegelonline` (`FachebeneAntwort`). */
 const antwort = (status: 'ok' | 'offline' | 'leer', features: unknown[]) => ({
   quelle: 'pegelonline',
   status,
@@ -97,13 +97,13 @@ function stelleBereit(a: Aufbau = {}) {
   let liste = a.liste ?? [HMUE, WAHN];
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/1/gauges', () =>
       a.pegelStatus ? new HttpResponse(null, { status: a.pegelStatus }) : HttpResponse.json(liste),
     ),
-    http.get('/api/karte/fachebenen/pegelonline', () =>
+    http.get('/api/map/overlays/pegelonline', () =>
       a.stationenStatus
         ? new HttpResponse(null, { status: a.stationenStatus })
         : HttpResponse.json(

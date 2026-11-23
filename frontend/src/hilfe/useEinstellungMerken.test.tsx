@@ -17,10 +17,10 @@ vi.mock('../auth/AuthContext', () => ({ useAuthOptional: () => auth.wert }));
 function aufbau(status = 200) {
   const geschrieben: string[] = [];
   server.use(
-    http.get('/api/benutzer-einstellungen', () =>
+    http.get('/api/user-settings', () =>
       HttpResponse.json({ eintraege: { zuletzt_befehle: '[]' } }),
     ),
-    http.put('/api/benutzer-einstellungen/:schluessel', ({ params }) => {
+    http.put('/api/user-settings/:schluessel', ({ params }) => {
       geschrieben.push(String(params.schluessel));
       return status === 200
         ? HttpResponse.json({ eintraege: {} })

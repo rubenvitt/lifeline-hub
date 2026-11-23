@@ -732,7 +732,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/verpflegung"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/verpflegung"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -786,7 +786,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -1039,7 +1039,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -2325,7 +2325,7 @@ async fn modul_override(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -3683,7 +3683,7 @@ async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

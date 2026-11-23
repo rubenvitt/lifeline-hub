@@ -32,7 +32,7 @@ impl FromRequestParts<AppState> for Planer {
     }
 }
 
-/// Extractor für jede Route unter `/api/planungen/{id}`: der Planer und die Kennung einer
+/// Extractor für jede Route unter `/api/plans/{id}`: der Planer und die Kennung einer
 /// Planung seiner Organisation. Erst das Recht (403), dann die Planung (404), damit ein
 /// Benutzer ohne Recht nicht erfährt, welche Kennungen es gibt.
 pub struct PlanungsZugriff {

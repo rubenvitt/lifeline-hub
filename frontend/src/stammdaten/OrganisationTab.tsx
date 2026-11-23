@@ -89,7 +89,7 @@ function erfolgsText(felder: OrganisationPatch): string {
 
 export default function OrganisationTab() {
   /**
-   * Rechte-Gate: `PATCH /api/organisation` lehnt zwar serverseitig ab, aber erst nach dem
+   * Rechte-Gate: `PATCH /api/organization` lehnt zwar serverseitig ab, aber erst nach dem
    * Klick. Formular und Knopf sind deshalb gesperrt, der Grund steht im Hinweis-Slot.
    */
   const { benutzer } = useAuth();

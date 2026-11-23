@@ -91,10 +91,10 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       // Der Admin darf beide Einstellungen lesen. Die Default-403 stieße sonst die
       // Benutzerprüfung an (LLH-1360), und `/me` antwortet hier immer 401.
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           etb_nummer_eingefroren: false,
@@ -363,7 +363,7 @@ describe('App-Routing', () => {
     it('ist der Überblick gesperrt, führt der Rückweg ins erste freie Modul', async () => {
       einsatzServer();
       server.use(
-        http.get('/api/einsaetze/7/modul-freigaben', () =>
+        http.get('/api/einsaetze/7/module-access', () =>
           HttpResponse.json(freigabenFixture({ ueberblick: { zugriff: false } })),
         ),
       );
@@ -466,7 +466,7 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           etb_nummer_eingefroren: false,

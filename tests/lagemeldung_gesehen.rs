@@ -75,7 +75,7 @@ async fn zaehler(app: &axum::Router, cookie: &str, e: i64) -> Value {
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/modul-zaehler"),
+        &format!("/api/einsaetze/{e}/module-counts"),
         cookie,
         None,
     )
@@ -427,7 +427,7 @@ async fn zaehler_neu_entspricht_der_liste_und_fehlt_ohne_freigabe() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/lagemeldungen"),
+        &format!("/api/einsaetze/{e}/module-overrides/lagemeldungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

@@ -13,7 +13,7 @@
 //! **Personenbezug:** Namen und IP sind personenbezogen, deshalb eine eigene Frist
 //! ([`AUFBEWAHRUNG_TAGE`]), durchgesetzt von [`purge_abgelaufene`] im Purge-Scheduler.
 //!
-//! **Lesen:** `GET /api/zugangsprotokoll/zugangsaenderungen` (System-Admin, LFH-1097,
+//! **Lesen:** `GET /api/access-log/access-changes` (System-Admin, LFH-1097,
 //! [`liste`]); das Lesen selbst schreibt keinen Eintrag.
 
 use crate::auth::spur::SpurFilter;

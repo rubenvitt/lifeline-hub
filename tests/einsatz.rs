@@ -249,7 +249,7 @@ async fn nur_einsatzleitung_kann_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -266,7 +266,7 @@ async fn nur_einsatzleitung_kann_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -290,7 +290,7 @@ async fn nicht_leitung_kann_nicht_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -496,7 +496,7 @@ async fn abgeschlossener_einsatz_blockt_mitgliederaenderung() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -523,7 +523,7 @@ async fn deaktivierten_benutzer_zuweisen_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/benutzer/{erika_id}/deaktivieren"))
+                .uri(format!("/api/users/{erika_id}/deactivate"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -646,7 +646,7 @@ async fn abgeschlossener_einsatz_nach_frist_nur_fuer_einsatzleitung() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -880,7 +880,7 @@ async fn patch_auf_abgeschlossenen_einsatz_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -1078,7 +1078,7 @@ async fn anlegen_vergibt_einsatznummer_im_format() {
     assert_eq!(b["einsatznummer_intern"], format!("E-{jahr}-0002"));
 }
 
-/// PUT /api/einsaetze/{id}/aufbewahrungsfrist mit Cookie + JSON-Body.
+/// PUT /api/einsaetze/{id}/retention-period mit Cookie + JSON-Body.
 async fn frist_setzen(
     app: &axum::Router,
     cookie: &str,
@@ -1090,7 +1090,7 @@ async fn frist_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/aufbewahrungsfrist"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/retention-period"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -1109,7 +1109,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, einsatz_id: i64) -> Stat
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -1373,7 +1373,7 @@ async fn einstellungen_get(app: &axum::Router, cookie: &str, id: i64) -> (Status
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{id}/einstellungen"))
+                .uri(format!("/api/einsaetze/{id}/settings"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -1400,7 +1400,7 @@ async fn einstellungen_put(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{id}/einstellungen"))
+                .uri(format!("/api/einsaetze/{id}/settings"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -1616,7 +1616,7 @@ async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -2154,7 +2154,7 @@ async fn abgeschlossen_mit(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .uri(format!("/api/einsaetze/{id}/close"))
                 .header(header::COOKIE, admin.to_string())
                 .body(Body::empty())
                 .unwrap(),

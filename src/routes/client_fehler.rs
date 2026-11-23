@@ -88,7 +88,7 @@ fn melden(drossel: &Sammelzeile, bericht: &Bericht) -> bool {
     true
 }
 
-/// POST /api/client-fehler — nimmt einen Absturzbericht an und antwortet 204.
+/// POST /api/client-errors — nimmt einen Absturzbericht an und antwortet 204.
 pub async fn melde(
     CurrentUser(_benutzer): CurrentUser,
     JsonBody(eingang): JsonBody<ClientFehlerBericht>,

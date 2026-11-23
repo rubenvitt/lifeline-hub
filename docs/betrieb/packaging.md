@@ -328,8 +328,8 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
   Ein kuratierter, schlüsselfreier **Vorschlagskatalog** (OpenFreeMap, basemap.de, TopPlusOpen)
   steht zum Hinzufügen bereit.
 - **Server-Proxy + Tile-Cache** (LFH-182/190): Online-Quellen werden **standardmäßig** „über
-  Server geproxt" (pro Quelle abschaltbar). `/api/karte/config` gibt dann nur relative
-  `/api/karte/proxy/{id}/…`-URLs aus; der Server holt Style/Tiles/Sprite/Glyphs und reicht sie
+  Server geproxt" (pro Quelle abschaltbar). `/api/map/config` gibt dann nur relative
+  `/api/map/proxy/{id}/…`-URLs aus; der Server holt Style/Tiles/Sprite/Glyphs und reicht sie
   durch — **ein Key in der Upstream-URL bleibt server-seitig und erscheint nie im Browser** (für
   Nicht-Admins ist die URL in der Verwaltungsliste maskiert). Jeder Upstream-Abruf ist SSRF-geschützt
   (https-only, interne Ziele + DNS-Rebinding/IPv6-eingebettetes IPv4 blockiert, pinnender Resolver).
@@ -348,9 +348,9 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
     erzeugen je einen Upstream-Fetch, konvergieren danach).
 - **Offline-Karte (Shortbread/MBTiles)** (LFH-195): eine **lokale MBTiles-Datei** (= SQLite)
   im **Shortbread-Schema** wird als Offline-Karte registriert/aktiviert; der Server liest die
-  Kacheln selbst aus der SQLite-DB und liefert sie unter `/api/karte/offline/tiles/{z}/{x}/{y}`
+  Kacheln selbst aus der SQLite-DB und liefert sie unter `/api/map/offline/tiles/{z}/{x}/{y}`
   aus (XYZ, TMS-Y-Flip, `Content-Encoding: gzip`). **Glyphs (OFL) und Sprite (CC0)** sind ins
-  Binary eingebettet und werden lokal unter `/api/karte/offline/{fonts,sprites}/…` serviert →
+  Binary eingebettet und werden lokal unter `/api/map/offline/{fonts,sprites}/…` serviert →
   **Beschriftung offline verfügbar**, kein Fremd-Abruf. Ideal für den ELW ohne Netz. Das
   Datenverzeichnis leitet sich aus dem DB-Pfad ab (`<Verzeichnis von --db-path>/karten`) und
   wird beim Start angelegt.
@@ -372,7 +372,7 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
 weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Sidebar erlaubt
 die manuelle Wahl; im Modus **Online** erscheint zusätzlich ein **Sub-Switcher**, mit dem
 zwischen den konfigurierten Online-Views umgeschaltet wird (Stil + Pflicht-Attribution
-wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/karte/offline/tiles/{z}/{x}/{y}`
+wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/map/offline/tiles/{z}/{x}/{y}`
 `204 No Content` und das Frontend nutzt automatisch Online bzw. Blind.
 
 **Schema-Hinweis (Offline-Vektor-Style):** Der Offline-Style

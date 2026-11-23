@@ -20,7 +20,7 @@ export async function setGeocoderUrl(
   request: APIRequestContext,
   url: string | null,
 ): Promise<OrgEinstellungen> {
-  const alt = await request.get('/api/org-einstellungen');
+  const alt = await request.get('/api/org-settings');
   expect(alt.ok(), await alt.text()).toBeTruthy();
   const vorher = (await alt.json()) as OrgEinstellungen;
   await writeOrgEinstellungen(request, { ...vorher, geocoder_url: url });
@@ -28,7 +28,7 @@ export async function setGeocoderUrl(
 }
 
 /**
- * Schreibt die Org-Einstellungen zurück, wie `GET /api/org-einstellungen` sie liefert:
+ * Schreibt die Org-Einstellungen zurück, wie `GET /api/org-settings` sie liefert:
  * `auto_etb_eintraege` liest sich als Zahl und schreibt sich als Wahrheitswert, die
  * Kategorie-Vorgaben bleiben weg (fehlend = unverändert).
  */
@@ -38,6 +38,6 @@ export async function writeOrgEinstellungen(request: APIRequestContext, e: OrgEi
     delete body[feld];
   }
   body.auto_etb_eintraege = e.auto_etb_eintraege == null ? null : e.auto_etb_eintraege !== 0;
-  const antwort = await request.put('/api/org-einstellungen', { data: body });
+  const antwort = await request.put('/api/org-settings', { data: body });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
 }

@@ -6,5 +6,5 @@ import { apiGet } from './client';
  * in `admin/bereitschaft.ts`. 403 ohne Zugang zur Verwaltung.
  */
 export function loadBereitschaft(): Promise<Bereitschaft> {
-  return apiGet<Bereitschaft>('/api/verwaltung/bereitschaft');
+  return apiGet<Bereitschaft>('/api/administration/inventory');
 }

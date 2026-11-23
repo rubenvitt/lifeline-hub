@@ -1,5 +1,5 @@
 //! Lagebild für Externe (LLH-1496, Spec `lagebild-extern`): Freigaben der Einsatzleitung und der
-//! öffentliche Abruf `GET /api/extern/v1/lagebild`.
+//! öffentliche Abruf `GET /api/external/v1/situation-picture`.
 //!
 //! Herleitung: `/mnt/project-files/llh-1496/openspec/k11guwns-lagebild-extern/design.md`. Die
 //! Zahlen und die Karte kommen aus derselben Verdichtung wie bei der Lage der öffentlichen API
@@ -339,7 +339,7 @@ pub(crate) async fn load_freigabestufe(
     })
 }
 
-/// GET /api/extern/v1/lagebild — das Lagebild des Links. Ohne wirksamen Schlüssel 401.
+/// GET /api/external/v1/situation-picture — das Lagebild des Links. Ohne wirksamen Schlüssel 401.
 pub async fn abruf(
     State(state): State<AppState>,
     zugriff: LagebildZugriff,

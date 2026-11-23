@@ -47,7 +47,7 @@ beforeEach(() => {
   freigaben = freigabenFixture();
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/:id/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/:id/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/:id/personen/auswahl', () => HttpResponse.json([PERSON])),
     http.get('/api/einsaetze/:id/damages/options', () => HttpResponse.json([SCHADEN])),
     http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),

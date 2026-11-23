@@ -687,7 +687,7 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
 }
 
 // ---------------------------------------------------------------------------------------------
-// Lagekarte und Lagemeldung für Abrufe von außen (Lagebild für Externe, `GET /api/v1/lage`)
+// Lagekarte und Lagemeldung für Abrufe von außen (Lagebild für Externe, `GET /api/v1/situation`)
 // ---------------------------------------------------------------------------------------------
 
 /// `?karte=`, mit dem das Lagebild für Externe die Karte abbestellt.

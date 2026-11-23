@@ -54,19 +54,19 @@ export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
 }
 
 export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/abschliessen`, 'POST');
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/close`, 'POST');
 }
 
 /** Offene Punkte vor dem Abschluss (LLH-1814, Spec `einsatz-abschluss`): je Gruppe Anzahl und
  *  Kurzliste, unabhängig von den Modulfreigaben. Nur die Einsatzleitung eines aktiven Einsatzes. */
 export function loadAbschlussPruefung(id: number): Promise<AbschlussPruefung> {
-  return apiGet<AbschlussPruefung>(`/api/einsaetze/${id}/abschluss/pruefung`);
+  return apiGet<AbschlussPruefung>(`/api/einsaetze/${id}/closure/check`);
 }
 
 /** Einen abgeschlossenen Einsatz binnen 24 Stunden wieder öffnen (LLH-1814); der Grund ist
  *  Pflicht und steht danach im ETB. */
 export function oeffneEinsatzWieder(id: number, grund: string): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/wiedereroeffnen`, 'POST', { grund });
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/reopen`, 'POST', { grund });
 }
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
@@ -83,7 +83,7 @@ export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
  * unter „Zugriff“, ohne die anlegende Person. Nur Kennung und Anzeigename.
  */
 export function loadMitgliedAuswahlAnlage(): Promise<MitgliedAuswahl[]> {
-  return apiGet<MitgliedAuswahl[]>('/api/einsaetze/mitglied-auswahl');
+  return apiGet<MitgliedAuswahl[]>('/api/einsaetze/member-selection');
 }
 
 /**
@@ -209,7 +209,7 @@ export function loeseFuehrungsstelleSprechgruppe(
 
 /** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
 export function ladeEinstellungen(id: number): Promise<EinsatzEinstellungen> {
-  return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`);
+  return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/settings`);
 }
 
 /** Einsatz-Einstellungen setzen (Vollersatz); nur bei aktivem Einsatz (sonst 409). */
@@ -217,21 +217,21 @@ export function speichereEinstellungen(
   id: number,
   felder: EinstellungenUpdate,
 ): Promise<EinsatzEinstellungen> {
-  return apiSend<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`, 'PUT', felder);
+  return apiSend<EinsatzEinstellungen>(`/api/einsaetze/${id}/settings`, 'PUT', felder);
 }
 
 /** Modul-Overrides eines Einsatzes laden (LFH-132); Map modul_key→Override (leer = Defaults). */
 export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
-  return apiGet<ModulOverrides>(`/api/einsaetze/${id}/modul-overrides`);
+  return apiGet<ModulOverrides>(`/api/einsaetze/${id}/module-overrides`);
 }
 
 /**
  * Modul-Vorgaben der Organisation des Einsatzes (LLH-1183), Form wie
- * `GET /api/org-modul-einstellungen`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
+ * `GET /api/org-module-settings`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
  * Org-Rolle; daraus zeigt der Editor „Module“ die Herkunft von Rolle und Sichtbarkeit.
  */
 export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
-  return apiGet<OrgModulEinstellungen>(`/api/einsaetze/${id}/modul-vorgaben`);
+  return apiGet<OrgModulEinstellungen>(`/api/einsaetze/${id}/module-defaults`);
 }
 
 /**
@@ -239,7 +239,7 @@ export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
  * `{ sichtbar, zugriff }`, ausgewertet vom Server mit derselben Regel wie die Modul-Gates.
  */
 export function ladeModulFreigaben(id: number): Promise<ModulFreigaben> {
-  return apiGet<ModulFreigaben>(`/api/einsaetze/${id}/modul-freigaben`);
+  return apiGet<ModulFreigaben>(`/api/einsaetze/${id}/module-access`);
 }
 
 /** Sichtbarkeit + benötigte Rolle eines Moduls überschreiben; nur Einsatzleitung/Admin, aktiver Einsatz. */
@@ -248,5 +248,5 @@ export function setzeModulOverride(
   modulKey: string,
   update: ModulOverrideUpdate,
 ): Promise<ModulOverride> {
-  return apiSend<ModulOverride>(`/api/einsaetze/${id}/modul-overrides/${modulKey}`, 'PUT', update);
+  return apiSend<ModulOverride>(`/api/einsaetze/${id}/module-overrides/${modulKey}`, 'PUT', update);
 }

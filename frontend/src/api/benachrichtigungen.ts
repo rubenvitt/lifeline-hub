@@ -9,11 +9,11 @@ import type {
 } from './types';
 
 /**
- * Eine eigene Benachrichtigung mit Text (`GET /api/benachrichtigungen/{id}`). Eine fremde oder
+ * Eine eigene Benachrichtigung mit Text (`GET /api/notifications/{id}`). Eine fremde oder
  * aufgeräumte antwortet 404: der Aufrufer zeigt dann nichts.
  */
 export function ladeBenachrichtigung(id: number): Promise<BenachrichtigungAnzeige> {
-  return apiGet<BenachrichtigungAnzeige>(`/api/benachrichtigungen/${id}`);
+  return apiGet<BenachrichtigungAnzeige>(`/api/notifications/${id}`);
 }
 
 /**
@@ -22,9 +22,7 @@ export function ladeBenachrichtigung(id: number): Promise<BenachrichtigungAnzeig
  * Einsatzes.
  */
 export function ladeOffeneBenachrichtigungen(): Promise<BenachrichtigungAnzeige[]> {
-  return apiGet<BenachrichtigungAnzeige[]>(
-    mitParametern('/api/benachrichtigungen', { offen: true }),
-  );
+  return apiGet<BenachrichtigungAnzeige[]>(mitParametern('/api/notifications', { offen: true }));
 }
 
 /**
@@ -32,7 +30,7 @@ export function ladeOffeneBenachrichtigungen(): Promise<BenachrichtigungAnzeige[
  * `offlineQueueBenutzerId` bindet ein vorgemerktes Quittieren an seinen Benutzer (LLH-1477).
  */
 export function quittiereBenachrichtigung(id: number, optionen?: ApiSendOptionen): Promise<void> {
-  return apiSend<void>(`/api/benachrichtigungen/${id}/quittieren`, 'POST', undefined, optionen);
+  return apiSend<void>(`/api/notifications/${id}/acknowledge`, 'POST', undefined, optionen);
 }
 
 /**
@@ -40,7 +38,7 @@ export function quittiereBenachrichtigung(id: number, optionen?: ApiSendOptionen
  * eigenen Benachrichtigungen mit Text und die Zahl der ungelesenen Eingänge darunter.
  */
 export function ladeBenachrichtigungVerlauf(einsatzId: number): Promise<BenachrichtigungVerlauf> {
-  return apiGet<BenachrichtigungVerlauf>(`/api/einsaetze/${einsatzId}/benachrichtigungen`);
+  return apiGet<BenachrichtigungVerlauf>(`/api/einsaetze/${einsatzId}/notifications`);
 }
 
 /**
@@ -54,7 +52,7 @@ export function markiereBenachrichtigungenGelesen(
   optionen?: ApiSendOptionen,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`,
+    `/api/einsaetze/${einsatzId}/notifications/read`,
     'POST',
     { bis_id: bisId },
     optionen,
@@ -66,7 +64,7 @@ export function markiereBenachrichtigungenGelesen(
  * Funktionen, für die sie still ist (gespeichert oder Katalog).
  */
 export function ladeBenachrichtigungVorgaben(einsatzId: number): Promise<BenachrichtigungVorgaben> {
-  return apiGet<BenachrichtigungVorgaben>(`/api/einsaetze/${einsatzId}/benachrichtigung-vorgaben`);
+  return apiGet<BenachrichtigungVorgaben>(`/api/einsaetze/${einsatzId}/notification-defaults`);
 }
 
 /** Setzt die Vorgabe einer Art (ersetzt ihren Stand); liefert den neuen Stand der Art. */
@@ -76,7 +74,7 @@ export function setzeBenachrichtigungVorgabe(
   still: VorgabeFunktion[],
 ): Promise<BenachrichtigungVorgabeArt> {
   return apiSend<BenachrichtigungVorgabeArt>(
-    `/api/einsaetze/${einsatzId}/benachrichtigung-vorgaben/${art}`,
+    `/api/einsaetze/${einsatzId}/notification-defaults/${art}`,
     'PUT',
     { still },
   );

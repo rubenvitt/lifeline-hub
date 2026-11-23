@@ -699,10 +699,10 @@ describe('AuftragFormular — Ziel als Ortsfeld (LLH-1114)', () => {
       http.get('/api/einsaetze/:eid', ({ params }) =>
         HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
       ),
-      http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+      http.get('/api/einsaetze/:eid/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
-      http.get('/api/einsaetze/:eid/ort-suche', () =>
+      http.get('/api/einsaetze/:eid/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [

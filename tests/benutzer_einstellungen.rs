@@ -1,4 +1,4 @@
-//! Integrationstests für GET/PUT /api/benutzer-einstellungen (LFH-391).
+//! Integrationstests für GET/PUT /api/user-settings (LFH-391).
 //!
 //! Der Speicher ist ein Schlüssel/Wert-Fach **je Benutzer** — kein Org-, kein Einsatzbezug.
 //! Getestet wird deshalb vor allem, was ihn von einer globalen Tabelle unterscheidet:
@@ -15,8 +15,8 @@ use tower::ServiceExt;
 mod common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 
-const PFAD: &str = "/api/benutzer-einstellungen";
-const ZULETZT: &str = "/api/benutzer-einstellungen/zuletzt_befehle";
+const PFAD: &str = "/api/user-settings";
+const ZULETZT: &str = "/api/user-settings/zuletzt_befehle";
 
 /// GET ohne Cookie — der Sitzungsextraktor muss vor allem anderen greifen.
 async fn get_ohne_cookie(app: &axum::Router, uri: &str) -> StatusCode {
@@ -81,12 +81,7 @@ async fn setzen_ohne_sitzung_ist_401() {
 async fn setzen_ohne_sitzung_ist_401_auch_bei_unbekanntem_schluessel() {
     let app = setup().await;
     assert_eq!(
-        put_ohne_cookie(
-            &app,
-            "/api/benutzer-einstellungen/gibts_nicht",
-            r#"{"wert":"x"}"#
-        )
-        .await,
+        put_ohne_cookie(&app, "/api/user-settings/gibts_nicht", r#"{"wert":"x"}"#).await,
         StatusCode::UNAUTHORIZED
     );
 }
@@ -214,7 +209,7 @@ async fn unbekannter_schluessel_ist_400() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        "/api/benutzer-einstellungen/theme",
+        "/api/user-settings/theme",
         &cookie,
         Some(r#"{"wert":"dunkel"}"#),
     )
@@ -300,7 +295,7 @@ async fn etb_standard_rufname_ist_ein_eigenes_fach_je_person() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "berta", "fuehrungskraft").await;
     let berta = login_cookie(&app, "berta", "bertapw1").await;
-    let pfad = "/api/benutzer-einstellungen/etb_standard_rufname";
+    let pfad = "/api/user-settings/etb_standard_rufname";
 
     let (status, json) = anfrage(
         &app,

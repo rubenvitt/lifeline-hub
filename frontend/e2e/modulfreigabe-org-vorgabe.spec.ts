@@ -25,7 +25,7 @@ async function karteBereit(page: Page) {
 }
 
 async function orgVorgabe(page: Page, rolle: 'fuehrungskraft' | null) {
-  const antwort = await page.request.put('/api/org-modul-einstellungen/lagemeldungen', {
+  const antwort = await page.request.put('/api/org-module-settings/lagemeldungen', {
     data: { benoetigte_rolle: rolle },
   });
   expect(antwort.ok(), `Org-Vorgabe: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -59,7 +59,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect
       .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/damages/marker`))
       .toBe(true);
-    expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/modul-freigaben`);
+    expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/module-access`);
 
     // Navigation: das Modul steht da, gesperrt, mit Grund.
     const eintrag = page.locator('button[title="Keine Berechtigung"]', {
@@ -128,15 +128,15 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   const zustand = { orgAus: false, eigen: null as boolean | null, puts: [] as unknown[] };
   const vorgaben = () =>
     zustand.orgAus ? { [MODUL]: { benoetigte_rolle: null, sichtbar: false } } : {};
-  await page.route('**/api/org-modul-einstellungen', async (route) => {
+  await page.route('**/api/org-module-settings', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     await route.fulfill({ json: vorgaben() });
   });
   // Dieselben Vorgaben am Einsatz: daraus liest der Editor „Module“ die Herkunft (LLH-1183).
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-vorgaben`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-defaults`, async (route) => {
     await route.fulfill({ json: vorgaben() });
   });
-  await page.route(`**/api/org-modul-einstellungen/${MODUL}`, async (route) => {
+  await page.route(`**/api/org-module-settings/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar?: boolean };
     zustand.puts.push(body);
     zustand.orgAus = body.sichtbar === false;
@@ -144,12 +144,12 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   });
   // Der Override geht echt an den Server (er gehört nur diesem Einsatz); gemerkt wird der eigene
   // Wert, damit die Freigaben unten wie auf dem Server rechnen.
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-overrides/${MODUL}`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-overrides/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar: boolean | null };
     zustand.eigen = body.sichtbar ?? null;
     await route.continue();
   });
-  await page.route(`**/api/einsaetze/${einsatzId}/modul-freigaben`, async (route) => {
+  await page.route(`**/api/einsaetze/${einsatzId}/module-access`, async (route) => {
     const antwort = await route.fetch();
     const json = (await antwort.json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
     if (zustand.orgAus && zustand.eigen === null) json[MODUL] = { ...json[MODUL], sichtbar: false };

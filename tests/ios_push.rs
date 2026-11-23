@@ -134,7 +134,7 @@ async fn geraetekonto_403() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -445,7 +445,7 @@ async fn sitzungen_beenden_alle_loescht_alle_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{marlene_id}/sitzungen/beenden"),
+        &format!("/api/users/{marlene_id}/sessions/end"),
         &admin,
         None,
     )
@@ -578,7 +578,7 @@ async fn deaktivieren_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{marlene_id}/deaktivieren"),
+        &format!("/api/users/{marlene_id}/deactivate"),
         &admin,
         None,
     )
@@ -587,7 +587,7 @@ async fn deaktivieren_loescht_die_anmeldungen() {
     assert_eq!(zahl(&pool).await, 0);
 }
 
-/// Review M1: Deaktivieren über `PATCH /api/benutzer/{id}` mit `aktiv: false` nimmt die
+/// Review M1: Deaktivieren über `PATCH /api/users/{id}` mit `aktiv: false` nimmt die
 /// Anmeldungen mit wie `deaktivieren`; sonst pushte das alte Gerät nach einer Reaktivierung wieder.
 #[tokio::test]
 async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
@@ -603,7 +603,7 @@ async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{marlene_id}"),
+        &format!("/api/users/{marlene_id}"),
         &admin,
         Some(&json!({ "anzeigename": "Marlene M." }).to_string()),
     )
@@ -613,7 +613,7 @@ async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{marlene_id}"),
+        &format!("/api/users/{marlene_id}"),
         &admin,
         Some(&json!({ "aktiv": false }).to_string()),
     )
@@ -684,7 +684,7 @@ async fn relais_gesperrt_seit(pool: &sqlx::SqlitePool, seit: &str) {
 async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
     let (app, pool) = mit_ios_push().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(!v
         .as_object()
@@ -692,7 +692,7 @@ async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
         .contains_key("ios_push_relais_gesperrt_seit"));
 
     relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ios_push_relais_gesperrt_seit"], "2026-11-20 08:15:00");
 }
@@ -702,7 +702,7 @@ async fn ohne_ios_push_zeigt_die_verwaltung_keine_sperre() {
     let (app, pool, _live) = setup_mit_pool_und_live().await;
     relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(!v
         .as_object()
@@ -914,7 +914,7 @@ async fn still_erreicht_kein_geraet() {
     w.relais.keine().await;
 }
 
-/// Ziel 2: Titel, Detail und Pfad sind dieselben wie in `GET /api/benachrichtigungen/{id}`.
+/// Ziel 2: Titel, Detail und Pfad sind dieselben wie in `GET /api/notifications/{id}`.
 #[tokio::test]
 async fn nutzlast_entschluesselt_ergibt_titel_detail_pfad_wie_die_anzeige() {
     let mut w = versand().await;
@@ -933,7 +933,7 @@ async fn nutzlast_entschluesselt_ergibt_titel_detail_pfad_wie_die_anzeige() {
     let (s, anzeige) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &cookie,
         None,
     )
@@ -1192,4 +1192,74 @@ async fn kollaps_verraet_keine_ids() {
         gesehen.push(kollaps);
     }
     assert_ne!(gesehen[0], gesehen[1], "je Benachrichtigung ein eigener");
+}
+
+/// LLH-2077: die Störung einer Anbindung hat keinen Einsatz und erreicht trotzdem das Gerät des
+/// Admins. Der Klartext trägt kein `e`; Titel, Detail und Pfad (zu den Anbindungen) sind dieselben
+/// wie in `GET /api/notifications/{id}`.
+#[tokio::test]
+async fn stoerung_einer_anbindung_erreicht_den_admin_ohne_einsatz() {
+    let mut w = versand().await;
+    let (admin, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO adapter (id, org_id, art, name, intervall_s, einstellungen, \
+             letzter_fehler_art, letzter_fehler_status) \
+         VALUES ('a1', ?, 'test', 'Leitstelle Nord', 60, '{}', 'abgelehnt', 401)",
+    )
+    .bind(org_id)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let g = Geraet::neu(3);
+    w.geraet(admin, &g, false, &[]).await;
+
+    let empfaenger = melden(
+        &w.pool,
+        &w.live,
+        Anlass::adapter(
+            org_id,
+            "a1",
+            Art::AdapterGestoert,
+            Bezug::neu(Typ::Adapter, 7),
+        ),
+    )
+    .await;
+    assert!(empfaenger.contains(&admin), "{empfaenger:?}");
+
+    let n = w.nachrichten().await;
+    let (kennung, k) = oeffnen(
+        nachricht_an(&n, &g)["nutzlast"].as_str().unwrap(),
+        &g.schluessel,
+    );
+    assert_eq!(kennung, g.kennung);
+    assert!(k.get("e").is_none(), "ohne Einsatz kein `e`: {k}");
+    let b = k["b"].as_i64().unwrap();
+    let cookie = w.cookie(admin).await;
+    let (s, anzeige) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/notifications/{b}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{anzeige}");
+    assert_eq!(k["titel"], anzeige["titel"]);
+    assert_eq!(k["detail"], anzeige["detail"]);
+    assert!(
+        k["detail"].as_str().unwrap().contains("Leitstelle Nord"),
+        "{k}"
+    );
+    assert_eq!(k["pfad"], anzeige["pfad"]);
+    assert!(
+        k["pfad"]
+            .as_str()
+            .unwrap()
+            .starts_with("/admin/einstellungen/anbindungen"),
+        "{k}"
+    );
 }

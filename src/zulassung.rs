@@ -80,7 +80,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Archivblock in der Verwaltung einspielen (LLH-1711): Multipart bis 256 MiB, danach
     // Entschlüsseln, Migrieren und Übernehmen im Request. Upload-Grenze wie alle Uploads. Nur
     // POST — die Verfügbarkeit (GET) bleibt geregelt.
-    ("POST", "/api/admin/archiv/einspielen"),
+    ("POST", "/api/admin/archive/import"),
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
     // Cap-Slot. Eigene Grenze je Benutzer und insgesamt, Lebensdauer statt Zeitbudget:
     // `live::strom` (LFH-920).
@@ -155,7 +155,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/tiere/export"),
     ("GET", "/api/einsaetze/{id}/damages/export"),
     // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
-    ("GET", "/api/aufbewahrung/einsaetze/{id}/archiv"),
+    ("GET", "/api/retention/incidents/{id}/archive"),
 ];
 
 /// Konfiguration der Zulassungssteuerung, als State an der Middleware, damit Tests enge Grenzen

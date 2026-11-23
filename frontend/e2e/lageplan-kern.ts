@@ -18,9 +18,9 @@ import { pngMitMassen } from './pdf-kern';
 /** Um diesen Punkt liegt alles, im Startausschnitt. */
 export const ORT = { lat: 49.3519, lon: 9.1457 };
 
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
-export const GRUNDLAGE = { name: 'Fixture Lageplan', stil: '/api/karte/proxy/9/lp/style.json' };
+export const GRUNDLAGE = { name: 'Fixture Lageplan', stil: '/api/map/proxy/9/lp/style.json' };
 
 /** Grundlage beantworten; `kacheln: false` lässt jede Kachel scheitern (fehlende Kacheln). */
 export async function grundlageOhneNetz(page: Page, { kacheln = true } = {}) {
@@ -84,7 +84,7 @@ async function mitWiederholung(anfrage: () => Promise<APIResponse>): Promise<API
  */
 export async function logoSetzen(page: Page) {
   const antwort = await mitWiederholung(() =>
-    page.request.post('/api/organisation/logo', {
+    page.request.post('/api/organization/logo', {
       multipart: {
         datei: { name: 'logo.png', mimeType: 'image/png', buffer: pngMitMassen(97, 41) },
       },
@@ -133,7 +133,7 @@ export async function einsatzMitLage(page: Page, bezeichnung: string): Promise<s
   await a.patch(`sectors/${abschnitt}/area`, {
     flaeche_geojson: JSON.stringify(rechteck(0.002, 0.001, 0.003)),
   });
-  await a.put('modul-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
+  await a.put('module-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
   return einsatzId;
 }
 

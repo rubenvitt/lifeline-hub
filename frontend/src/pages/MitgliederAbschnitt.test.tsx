@@ -642,7 +642,7 @@ describe('MitgliederAbschnitt', () => {
           auswahlAbrufe += 1;
           return HttpResponse.json(aufgenommen ? [] : [{ benutzer_id: 5, anzeigename: 'Zoe Zug' }]);
         }),
-        http.get('/api/benutzer', () => {
+        http.get('/api/users', () => {
           verwaltungGefragt = true;
           return HttpResponse.json([], { status: 403 });
         }),

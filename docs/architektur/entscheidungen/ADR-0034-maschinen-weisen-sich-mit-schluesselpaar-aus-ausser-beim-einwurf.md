@@ -34,7 +34,7 @@ herleitung:
 - MUST NOT: Routen unter `/api/instanz/` nehmen ein geteiltes Geheimnis oder ein Bearer-Token als
   Anmeldung einer Maschine an.
 - MUST: Einzige Ausnahme vom Schlüsselpaar ist der Einwurf nach ADR-0023: ein Schlüssel im Pfad,
-  nur unter `/api/v1/einwurf/`, nur schreibend und nur über TLS.
+  nur unter `/api/v1/intake/`, nur schreibend und nur über TLS.
 - MUST NOT: Ein Einwurf-Schlüssel gilt an einer anderen Route als Anmeldung, und er steht nie in
   einem Kopf.
 - SHOULD: Eine weitere Ausnahme bekommt eine eigene ADR, die diese ersetzt, statt eine Route

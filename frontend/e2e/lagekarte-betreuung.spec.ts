@@ -301,7 +301,7 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
   // Seit LLH-1034 zwei Module: die Stellen hängen an `betreuung`, Name und Räumung der Fläche an
   // `evakuierung`.
   for (const modul of ['betreuung', 'evakuierung'])
-    await senden(page, 'put', `${basis}/modul-overrides/${modul}`, {
+    await senden(page, 'put', `${basis}/module-overrides/${modul}`, {
       sichtbar: true,
       benoetigte_rolle: 'fuehrungskraft',
     });

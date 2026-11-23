@@ -83,7 +83,7 @@ const rgb = (hex: string) =>
 
 async function grundlageStellen(page: Page, g: Grundlage) {
   if (g.art === 'online') {
-    const stil = `/api/karte/proxy/77/grund-${g.grund.slice(1)}/style.json`;
+    const stil = `/api/map/proxy/77/grund-${g.grund.slice(1)}/style.json`;
     await kartenConfigBeantworten(page, {
       online_styles: [{ name: `Grund ${g.grund}`, typ: 'vektor', url: stil }],
     });
@@ -97,7 +97,7 @@ async function grundlageStellen(page: Page, g: Grundlage) {
       }),
     );
   } else if (g.art === 'offline') {
-    const praefix = '/api/karte/offline/88/tiles/';
+    const praefix = '/api/map/offline/88/tiles/';
     await kartenConfigBeantworten(page, {
       offline_regionen: [
         {
@@ -120,7 +120,7 @@ async function grundlageStellen(page: Page, g: Grundlage) {
 
 async function fachebenenBeantworten(page: Page) {
   for (const key of Object.keys(SCHALTER)) {
-    await page.route(`**/api/karte/fachebenen/${key}**`, (route) =>
+    await page.route(`**/api/map/overlays/${key}**`, (route) =>
       route.fulfill({
         json: {
           quelle: key,

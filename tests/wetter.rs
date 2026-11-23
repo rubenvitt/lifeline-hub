@@ -357,7 +357,7 @@ async fn modul_ausgeblendet_ist_403_pegel_bleiben_200() {
     let (status, json) = anfrage(
         &u.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/wetter-pegel"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/wetter-pegel"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

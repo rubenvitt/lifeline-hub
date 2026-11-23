@@ -257,7 +257,7 @@ async fn frist_aus_einsatz_einstellung_schlaegt_vorgabe() {
     let (s, einst) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"rueckmeldung_frist_min":20}"#),
     )
@@ -288,7 +288,7 @@ async fn ungueltige_rueckmeldefrist_ist_400() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{e}/einstellungen"),
+            &format!("/api/einsaetze/{e}/settings"),
             &admin,
             Some(&json!({ "rueckmeldung_frist_min": wert }).to_string()),
         )

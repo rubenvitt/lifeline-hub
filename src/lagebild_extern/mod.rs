@@ -6,7 +6,7 @@
 //! - Die Einsatzleitung legt eine Freigabe an (Empfänger, Stufe, Ablauf). Der Schlüssel verlässt
 //!   den Server einmal, in der Antwort auf das Anlegen; gespeichert wird nur sein SHA-256 (D1).
 //! - Der Schlüssel ist kein Benutzer und keine Sitzung. [`LagebildZugriff`] öffnet allein
-//!   `GET /api/extern/v1/lagebild` (`routes::lagebild_extern`) und, neben der Sitzung, den
+//!   `GET /api/external/v1/situation-picture` (`routes::lagebild_extern`) und, neben der Sitzung, den
 //!   Karten-Proxy ([`KartenZugriff`]); jede andere Route verlangt weiter `CurrentUser` (D3).
 //! - Gültig ist eine Freigabe, solange sie nicht widerrufen und nicht abgelaufen ist und ihr
 //!   Einsatz aktiv ist. Der Abschluss beendet sie so, ohne das Protokoll zu löschen (D2).

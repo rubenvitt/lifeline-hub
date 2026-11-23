@@ -121,7 +121,7 @@ function render({
   const patches: Patch[] = [];
   const abrufe: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
@@ -405,7 +405,7 @@ describe('MaterialTab · Gerät (UHS-Laptop)', () => {
         abgefragt.push('material');
         return HttpResponse.json([frei]);
       }),
-      http.get('/api/einsaetze/1/modul-freigaben', () => {
+      http.get('/api/einsaetze/1/module-access', () => {
         abgefragt.push('freigaben');
         return HttpResponse.json(freigabenFixture());
       }),

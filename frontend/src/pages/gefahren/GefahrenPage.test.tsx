@@ -812,7 +812,7 @@ describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
 
 /** Sprünge auf die Lagekarte bei gesperrter Lagekarte (LFH-888, design.md D4). */
 describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
-  const gesperrt = http.get('/api/einsaetze/1/modul-freigaben', () =>
+  const gesperrt = http.get('/api/einsaetze/1/module-access', () =>
     HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
   );
 

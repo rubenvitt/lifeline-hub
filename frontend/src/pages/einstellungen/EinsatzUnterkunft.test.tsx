@@ -35,7 +35,7 @@ function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
         spiegel,
       }),
     ),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/1/unterkunft-richtwerte', () =>

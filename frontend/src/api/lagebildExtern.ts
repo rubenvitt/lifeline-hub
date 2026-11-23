@@ -58,8 +58,8 @@ export async function ladeLagebildExtern(
   karteEtag?: string,
 ): Promise<LagebildExtern> {
   const pfad = karteEtag
-    ? `/api/extern/v1/lagebild?karte=${encodeURIComponent(karteEtag)}`
-    : '/api/extern/v1/lagebild';
+    ? `/api/external/v1/situation-picture?karte=${encodeURIComponent(karteEtag)}`
+    : '/api/external/v1/situation-picture';
   let res: Response;
   try {
     res = await fetch(pfad, {

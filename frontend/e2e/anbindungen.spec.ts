@@ -39,7 +39,7 @@ test('Anbindung anlegen, Code einlösen, signiert abrufen', async ({ page, reque
   // Das Fremdsystem löst ein, mit dem Referenz-Client.
   const schluessel = await generateKey();
   const { derivation, request: einloesen } = await prepareRedeem(code, schluessel.publicKey);
-  const antwort = await request.post('/api/v1/zugang/redeem', { data: einloesen });
+  const antwort = await request.post('/api/v1/access/redeem', { data: einloesen });
   expect(antwort.status()).toBe(200);
   const cred = await finishRedeem(derivation, schluessel, baseURL!, await antwort.json());
 
@@ -78,7 +78,7 @@ test('Anbindung anlegen, Code einlösen, signiert abrufen', async ({ page, reque
 /**
  * Lage für einen Lagemonitor (LLH-1638, Specs `maschinenzugang` und `lage-schnittstelle`): der
  * Ablauf über Verwaltung, Einsatz und Fremdsystem. Ohne Freigabe liest die Anbindung nichts; die
- * Einsatzleitung schaltet sie auf der Seite „Geräte“ ein, danach liefert `GET /api/v1/lage` den
+ * Einsatzleitung schaltet sie auf der Seite „Geräte“ ein, danach liefert `GET /api/v1/situation` den
  * Einsatz, und die Verwaltung nennt ihn. Rechte, Umstellen, Ende und Spiegel prüfen
  * `tests/einsatz_anbindungen.rs` und `tests/public_api_lage.rs`.
  */
@@ -106,11 +106,11 @@ test('Lagemonitor anbinden, Einsatz freigeben, Lage lesen', async ({ page, reque
 
   const schluessel = await generateKey();
   const { derivation, request: einloesen } = await prepareRedeem(code, schluessel.publicKey);
-  const antwort = await request.post('/api/v1/zugang/redeem', { data: einloesen });
+  const antwort = await request.post('/api/v1/access/redeem', { data: einloesen });
   expect(antwort.status()).toBe(200);
   const cred = await finishRedeem(derivation, schluessel, baseURL!, await antwort.json());
   const lage = async () => {
-    const pfad = '/api/v1/lage?karte=none';
+    const pfad = '/api/v1/situation?karte=none';
     const auth = await signRequest(
       cred,
       'GET',
@@ -175,9 +175,7 @@ test('Einwurf-Zugang anlegen, einwerfen, widerrufen', async ({ page, request }) 
   await dialog.getByRole('button', { name: 'Anlegen und Adresse zeigen' }).click();
 
   const adresseText = page.locator('[data-lfh="einwurf-adresse-text"]');
-  await expect(adresseText).toHaveText(
-    /\/api\/v1\/einwurf\/llh_ew_[A-Za-z0-9_-]{43}\/alarmmeldung$/,
-  );
+  await expect(adresseText).toHaveText(/\/api\/v1\/intake\/llh_ew_[A-Za-z0-9_-]{43}\/alarm$/);
   const pfad = new URL((await adresseText.textContent())!).pathname;
   await page.getByRole('button', { name: 'Fertig' }).click();
   await expect(adresseText).toHaveCount(0);

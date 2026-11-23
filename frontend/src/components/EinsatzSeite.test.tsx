@@ -105,7 +105,7 @@ describe('EinsatzSeite', () => {
     expect(aktionen).toContainElement(screen.getByRole('button', { name: 'Ad-hoc-Person' }));
   });
 
-  it('zeigt ein optionales Mono-Meta neben dem Titel', () => {
+  it('zeigt ein optionales Meta neben dem Titel, in der Textschrift mit gleich breiten Ziffern (LLH-2046)', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="Lagebericht" meta="Nr. 12">
         <div>x</div>
@@ -114,7 +114,8 @@ describe('EinsatzSeite', () => {
     const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     const meta = screen.getByText('Nr. 12');
     expect(leiste).toContainElement(meta);
-    expect(meta.style.fontFamily).toContain('Mono');
+    expect(meta.style.fontFamily).not.toContain('Mono');
+    expect(meta.style.fontVariantNumeric).toBe('tabular-nums');
   });
 
   it('zieht die Kopfleiste über die Seitenrinne, die Lesebreite gilt dem Inhalt', () => {

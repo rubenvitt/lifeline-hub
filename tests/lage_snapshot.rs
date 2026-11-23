@@ -523,7 +523,7 @@ async fn snapshot_dokument_redigiert_gesperrtes_modul_fuer_den_leser() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -601,7 +601,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/betreuung"),
+        &format!("/api/einsaetze/{e}/module-overrides/betreuung"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
     )
@@ -627,7 +627,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/evakuierung"),
+        &format!("/api/einsaetze/{e}/module-overrides/evakuierung"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
     )
@@ -719,7 +719,7 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{e}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -759,7 +759,7 @@ async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{e}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -855,7 +855,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/tiere"),
+        &format!("/api/einsaetze/{e}/module-overrides/tiere"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

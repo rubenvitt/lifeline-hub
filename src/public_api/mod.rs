@@ -1,4 +1,4 @@
-//! Öffentliche API v1 für Fremdsysteme (LLH-1653, ADR-0022, Konzept
+//! Öffentliche API v1 für Fremdsysteme (LLH-1653, ADR-0096, Konzept
 //! `docs/konzepte/2026-11-11-oeffentliche-api.md`, Spec `oeffentliche-api-vertrag`).
 //!
 //! Alles unter `/api/v1/` entsteht hier, und nur hier:

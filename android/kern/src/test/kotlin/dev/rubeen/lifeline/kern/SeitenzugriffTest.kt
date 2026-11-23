@@ -39,6 +39,21 @@ class SeitenzugriffTest {
         assertEquals(emptyList(), kamera("https://elw.local:8443", video, aktiv = null))
     }
 
+    private fun standort(origin: String?, aktiv: ServerAdresse? = elw) =
+        Seitenzugriff.standort(origin?.let(SeitenOrigin::parse), aktiv)
+
+    @Test
+    fun `der Standort geht nur an die Seite des aktiven Servers`() {
+        assertEquals(true, standort("https://elw.local:8443"))
+        assertEquals(true, standort("https://ELW.local:8443/"))
+        assertEquals(false, standort("https://idp.example"))
+        assertEquals(false, standort("https://elw.local"))
+        assertEquals(false, standort("http://elw.local:8443"))
+        assertEquals(false, standort("null"))
+        assertEquals(false, standort(null))
+        assertEquals(false, standort("https://elw.local:8443", aktiv = null))
+    }
+
     private val endungen = mapOf("pdf" to "application/pdf", "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg")
 
     private fun typen(vararg accept: String) = Seitenzugriff.mimeTypen(accept.toList()) { endungen[it] }

@@ -45,11 +45,11 @@ const ZEICHEN_SPEC = '{"v":1,"spec":{"kind":"hazard"}}';
 const ZEICHEN_BILD = `ez|${ZEICHEN_SPEC}`;
 
 /** Online-Views des Wechsels: eigene Style-Pfade, eigene Source-Ids, gemeinsame Kacheln. */
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 const KACHEL_VORLAGE = `${KACHEL_PRAEFIX}{z}/{x}/{y}.pbf`;
 const KACHEL_LAYER = 'strassen';
-const VIEW_A = { name: 'Fixture A', stil: '/api/karte/proxy/9/a/style.json', quelle: 'fixture-a' };
-const VIEW_B = { name: 'Fixture B', stil: '/api/karte/proxy/9/b/style.json', quelle: 'fixture-b' };
+const VIEW_A = { name: 'Fixture A', stil: '/api/map/proxy/9/a/style.json', quelle: 'fixture-a' };
+const VIEW_B = { name: 'Fixture B', stil: '/api/map/proxy/9/b/style.json', quelle: 'fixture-b' };
 
 /** Die eigenen Quellen der Lagekarte, die nach einem Stilwechsel wieder befüllt sein müssen. */
 const LAGE_QUELLEN = [
@@ -181,7 +181,7 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
     });
   await kachelnBeantworten(page, KACHEL_PRAEFIX, KACHEL_LAYER);
   // Fachebene ohne Netz: die DWD-Ebene liefert eine Warnfläche um den Einsatzort.
-  await page.route('**/api/karte/fachebenen/dwd**', (route) =>
+  await page.route('**/api/map/overlays/dwd**', (route) =>
     route.fulfill({
       json: {
         quelle: 'dwd',
@@ -283,10 +283,10 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
 /** Offline-Region der Abstufung: Pfadform wie `routes/karte.rs`, Shortbread-Layer `streets`. */
 const OFFLINE = {
   kartenId: 7,
-  kachelPraefix: '/api/karte/offline/7/tiles/',
+  kachelPraefix: '/api/map/offline/7/tiles/',
   layer: 'streets',
 } as const;
-const ONLINE_KAPUTT = { name: 'Fixture kaputt', stil: '/api/karte/proxy/9/kaputt/style.json' };
+const ONLINE_KAPUTT = { name: 'Fixture kaputt', stil: '/api/map/proxy/9/kaputt/style.json' };
 
 test('Style-JSON der Online-Karte liefert 404: Anzeige weicht auf die Offline-Region aus, die Wahl bleibt online', async ({
   page,
@@ -362,7 +362,7 @@ test('Style-JSON der Online-Karte liefert 404: Anzeige weicht auf die Offline-Re
 /** Offline-Region des Erststils: eigene Karten-Id, damit sich die Routen nicht überschneiden. */
 const OFFLINE_ERST = {
   kartenId: 8,
-  kachelPraefix: '/api/karte/offline/8/tiles/',
+  kachelPraefix: '/api/map/offline/8/tiles/',
   layer: 'streets',
 } as const;
 

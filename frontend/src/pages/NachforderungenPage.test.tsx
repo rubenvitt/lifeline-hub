@@ -203,7 +203,7 @@ describe('NachforderungenPage', () => {
 
   it('der Seitenkopf liest den Server-Zähler: offen und davon unterwegs', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-zaehler', () =>
+      http.get('/api/einsaetze/:einsatzId/module-counts', () =>
         HttpResponse.json({
           nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
         }),

@@ -199,7 +199,7 @@ async fn ohne_freigabe_der_meldungen_ist_403_und_nichts_entsteht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/meldungen"),
+        &format!("/api/einsaetze/{e}/module-overrides/meldungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )

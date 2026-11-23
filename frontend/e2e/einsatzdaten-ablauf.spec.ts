@@ -27,7 +27,7 @@ async function punkte(
   page: Page,
   id: number,
 ): Promise<{ id: number; bezeichnung: string; zeitpunkt_at: string }[]> {
-  return (await (await page.request.get(`/api/einsaetze/${id}/programmpunkte`)).json()) as {
+  return (await (await page.request.get(`/api/einsaetze/${id}/agenda-items`)).json()) as {
     id: number;
     bezeichnung: string;
     zeitpunkt_at: string;

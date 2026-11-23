@@ -30,7 +30,7 @@ beforeEach(() => {
     http.get('/api/einsaetze/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+    http.get('/api/einsaetze/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
   );
@@ -335,7 +335,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
   function mitschnitt() {
     const gesendet: Record<string, unknown>[] = [];
     server.use(
-      http.get('/api/einsaetze/1/ort-suche', () =>
+      http.get('/api/einsaetze/1/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [

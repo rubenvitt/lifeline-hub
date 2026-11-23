@@ -112,7 +112,7 @@ async function stellePegel(page: Page, einsatzId: string, liste: unknown[]) {
   await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: liste }) : route.continue(),
   );
-  await page.route('**/api/karte/fachebenen/pegelonline', (route) =>
+  await page.route('**/api/map/overlays/pegelonline', (route) =>
     route.fulfill({ json: STATIONEN }),
   );
 }
@@ -937,7 +937,7 @@ test('Einstellungssektion Pegel: das Nachladen von Liste und Stationen tr√§gt ‚â
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const antworten = await zurueckhalten(page, [
       [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(10)],
-      ['**/api/karte/fachebenen/pegelonline', STATIONEN],
+      ['**/api/map/overlays/pegelonline', STATIONEN],
     ]);
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);
     // Anker: der Rahmen der Einstellungen steht, die Sektion wartet auf ihre Daten.

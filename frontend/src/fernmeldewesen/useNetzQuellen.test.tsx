@@ -24,7 +24,7 @@ function Probe() {
 function setup(freigaben: ModulFreigaben) {
   const abrufe = { mitglieder: 0 };
   server.use(
-    http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),

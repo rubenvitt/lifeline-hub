@@ -3,6 +3,7 @@ import {
   DESKTOP_TEST_VERSION,
   beendeHuelle,
   type IosNachricht,
+  starteAndroidHuelle,
   starteIosHuelle,
   starteMacHuelle,
   starteWindowsHuelle,
@@ -12,10 +13,32 @@ import {
   huelleAppBadge,
   huelleBenachrichtigung,
   huelleHaptics,
+  huelleIstApp,
   huellePlatform,
   huelleSperrtPasskey,
   huelleVersion,
 } from './faehigkeiten';
+
+describe('huelleIstApp (LLH-2071)', () => {
+  afterEach(beendeHuelle);
+
+  it('ist im Browser und in den Desktop-Hüllen falsch', () => {
+    expect(huelleIstApp()).toBe(false);
+    starteMacHuelle();
+    expect(huelleIstApp()).toBe(false);
+    beendeHuelle();
+    starteWindowsHuelle();
+    expect(huelleIstApp()).toBe(false);
+  });
+
+  it('ist in der iOS- und der Android-App wahr (ausgelieferte Init-Skripte)', () => {
+    starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
+    expect(huelleIstApp()).toBe(true);
+    beendeHuelle();
+    starteAndroidHuelle({ bruecke: { postMessage: vi.fn() } });
+    expect(huelleIstApp()).toBe(true);
+  });
+});
 
 describe('huelleSperrtPasskey (LFH-817)', () => {
   afterEach(beendeHuelle);
