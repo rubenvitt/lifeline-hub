@@ -26,6 +26,11 @@ enum Webviewfabrik {
         inhalt.addUserScript(
             WKUserScript(
                 source: Huellenstil.skript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        // Standort in Unterframes sperren (LLH-2071): sonst fragte WebKit dort selbst, an der Brücke
+        // vorbei. Im Hauptframe tut das Skript nichts.
+        inhalt.addUserScript(
+            WKUserScript(
+                source: unterframeSkript(), injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let konfiguration = WKWebViewConfiguration()
         konfiguration.websiteDataStore = WKWebsiteDataStore(forIdentifier: eintrag.id)
         konfiguration.userContentController = inhalt
@@ -70,6 +75,17 @@ enum Webviewfabrik {
         return Initskript.render(vorlage: vorlage, version: version)
     }
 
+    /// Die Sperre des Standorts für Unterframes aus den Ressourcen der App (LLH-2071).
+    static func unterframeSkript(bundle: Bundle = .main) -> String {
+        guard let url = bundle.url(forResource: "unterframe-standort", withExtension: "js"),
+            let skript = try? String(contentsOf: url, encoding: .utf8)
+        else {
+            protokoll.fault("unterframe-standort.js fehlt in den Ressourcen der App")
+            return ""
+        }
+        return skript
+    }
+
     /// Vor dem Verwerfen: nichts lädt weiter, und die Brücke ist abgebaut.
     static func close(_ webView: WKWebView) {
         webView.stopLoading()
@@ -98,14 +114,35 @@ final class SchwacherEmpfang: NSObject, WKScriptMessageHandler {
 
 /// Der Message-Handler `lifeline`. Ob eine Nachricht wirkt, entscheidet `Bruecke.accepts` mit
 /// dem in diesem Moment aktiven Server; die Antwort geht nur an eine Seite dieses Servers.
+/// Laufende Beobachtungen des Standorts (`location_watch`, LLH-2071) führt er über
+/// `Standortbeobachtung`; ohne `standort` meldet jede Beobachtung `unavailable`.
 @MainActor
 final class Brueckenempfang: NSObject, WKScriptMessageHandler {
     private let dienste: any Huellendienste
     private let aktiverServer: @MainActor () -> ServerAdresse?
+    private let standort: Standortdienst?
+    private var beobachtung = Standortbeobachtung()
+    /// Der Webview, dessen Seite die Beobachtungen gestartet hat.
+    private weak var beobachteterWebView: WKWebView?
+    /// Prüft im Sekundentakt die Fristen der Beobachtungen, solange welche laufen.
+    private var fristuhr: Task<Void, Never>?
 
-    init(dienste: any Huellendienste, aktiverServer: @escaping @MainActor () -> ServerAdresse?) {
+    init(
+        dienste: any Huellendienste, aktiverServer: @escaping @MainActor () -> ServerAdresse?,
+        standort: Standortdienst? = nil
+    ) {
         self.dienste = dienste
         self.aktiverServer = aktiverServer
+        self.standort = standort
+        super.init()
+        standort?.beiPosition = { [weak self] position in self?.stelleZu(position: position, fehler: nil) }
+        standort?.beiFehler = { [weak self] fehler in self?.stelleZu(position: nil, fehler: fehler) }
+    }
+
+    /// Navigation, Schließen des Webviews oder Ende des Web-Prozesses: alle Beobachtungen enden.
+    func beendeStandort() {
+        fuehreAus(beobachtung.reset())
+        beobachteterWebView = nil
     }
 
     func userContentController(
@@ -120,6 +157,16 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
                 isMainFrame: frame.isMainFrame, origin: origin, aktiverServer: aktiverServer()),
             let befehl = Bruecke.parse(message.body)
         else { return }
+        switch befehl {
+        case .locationWatch(let id, let genau, let frist):
+            starteBeobachtung(id: id, highAccuracy: genau, timeout: frist, in: message.webView)
+            return
+        case .locationClear(let watch):
+            fuehreAus(beobachtung.clear(watch: watch))
+            return
+        default:
+            break
+        }
         let dienste = self.dienste
         Task { @MainActor [weak self, weak webView = message.webView] in
             guard let antwort = await Brueckenausfuehrung.run(befehl, dienste: dienste),
@@ -129,6 +176,87 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
             else { return }
             webView.evaluateJavaScript(Bruecke.replyScript(antwort), completionHandler: nil)
         }
+    }
+
+    // MARK: Standort (LLH-2071)
+
+    private static var jetzt: Double { ProcessInfo.processInfo.systemUptime }
+
+    private func starteBeobachtung(id: Int, highAccuracy: Bool, timeout: Duration?, in webView: WKWebView?) {
+        let dienste = self.dienste
+        Task { @MainActor [weak self, weak webView] in
+            guard let self, let webView else { return }
+            do {
+                guard self.standort != nil else { throw Standortfehler.unavailable }
+                // Erst nach der Freigabe: die Frist zählt die Wartezeit auf die Person nicht mit.
+                try await Brueckenausfuehrung.isStandortErlaubt(dienste)
+            } catch {
+                self.sende(Bruecke.locationScript(
+                    id: id, fehler: error as? Standortfehler ?? .unavailable, position: nil), an: webView)
+                return
+            }
+            guard let server = self.aktiverServer(), self.istSeiteDesServers(webView) else { return }
+            if self.beobachteterWebView !== webView { self.beendeStandort() }
+            self.beobachteterWebView = webView
+            self.fuehreAus(
+                self.beobachtung.start(
+                    id: id, highAccuracy: highAccuracy, timeout: timeout, server: server, jetzt: Self.jetzt))
+        }
+    }
+
+    private func stelleZu(position: Standortposition?, fehler: Standortfehler?) {
+        let webView = beobachteterWebView
+        let (ids, wirkung) = beobachtung.zustellen(
+            aktiverServer: aktiverServer(), seite: webView?.url, jetzt: Self.jetzt)
+        if let webView {
+            for id in ids { sende(Bruecke.locationScript(id: id, fehler: fehler, position: position), an: webView) }
+        }
+        fuehreAus(wirkung)
+        // Nach einer Verweigerung endet jede Beobachtung.
+        if fehler == .denied { beendeStandort() }
+    }
+
+    private func pruefeFristen() {
+        guard let webView = beobachteterWebView, istSeiteDesServers(webView) else {
+            beendeStandort()
+            return
+        }
+        for id in beobachtung.abgelaufen(jetzt: Self.jetzt) {
+            sende(Bruecke.locationScript(id: id, fehler: .timeout, position: nil), an: webView)
+        }
+    }
+
+    private func fuehreAus(_ wirkung: Standortwirkung) {
+        switch wirkung {
+        case .keine:
+            return
+        case .starte(let genau):
+            standort?.starte(highAccuracy: genau)
+            if fristuhr == nil {
+                fristuhr = Task { @MainActor [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard !Task.isCancelled else { return }
+                        self?.pruefeFristen()
+                    }
+                }
+            }
+        case .stoppe:
+            standort?.stoppe()
+            fristuhr?.cancel()
+            fristuhr = nil
+        }
+    }
+
+    private func istSeiteDesServers(_ webView: WKWebView) -> Bool {
+        guard let server = aktiverServer(), let seite = webView.url else { return false }
+        return Linkregeln.belongsToServer(server.url, seite: seite)
+    }
+
+    /// Wie die Antworten: nur an eine Seite des aktiven Servers.
+    private func sende(_ skript: String, an webView: WKWebView) {
+        guard istSeiteDesServers(webView) else { return }
+        webView.evaluateJavaScript(skript, completionHandler: nil)
     }
 }
 
