@@ -39,13 +39,18 @@ Für die Einsatzleitung:
 Wer die eigene Rolle herabstuft, bestätigt das zuerst mit „Rolle herabstufen“: danach endet das
 Recht, den Zugriff des Einsatzes zu verwalten.
 
+Trägt die Person eine Führungsfunktion und bekommt die Rolle „Mitarbeit“ oder „Beobachter“, fragt
+die App vorher „Führungsfunktion beenden?“; „Rolle ändern“ bestätigt. Die Funktion endet, ihre
+Angabe bleibt als Bezeichnung stehen, etwa „S4“ oder „Fachberater: THW“.
+
 ### Die Führungsstelle eines Mitglieds festlegen
 
 Für die Einsatzleitung:
 
 1. Im Reiter „Zugriff“ in der Spalte „Führungsstelle“ „Führungsstelle festlegen“ oder den
    bisherigen Wert wählen.
-2. Im Dialog eine Funktion aus der Liste wählen oder einen Freitext eingeben.
+2. Im Dialog eine Funktion aus der Liste wählen oder einen Freitext eingeben. Bei „Mitarbeit“ und
+   „Beobachter“ bietet die Liste keine Funktion an, nur Freitext.
 
    ![Dialog „Führungsstelle für Administrator“ mit dem Feld „Führungsstelle“](../bilder/rechte-im-einsatz/mitglied-stelle.png)
 
@@ -117,8 +122,7 @@ Führungsfunktion des Mitglieds im Einsatz, die eine Quelle für „wer ist S2?�
 - Aufträge und Erinnerungen an S1 bis S6 zeigen hinter der Funktion die Namen der Mitglieder, die
   sie tragen, sonst „nicht vergeben“. Benachrichtigungen an eine Funktion erreichen diese
   Mitglieder, wenn sie im Einsatz schreiben dürfen (Einsatzleitung, Führungspersonal); für EL
-  zuerst den Einsatzleiter der Führungsstelle, wenn er es darf. Trägt eine Mitarbeit oder ein
-  Beobachter die Funktion, nennt die Anzeige sie, Hinweise bekommen sie aber nicht.
+  zuerst den Einsatzleiter der Führungsstelle, wenn er es darf.
 - Das Organigramm zeigt den Kasten „Stab“ mit den geführten Sachgebieten, die Fernmeldeskizze ihre
   Zeichen im Kasten „Einsatzleitung“, der Kommunikationsplan die Namen in der Spalte „Besetzung“,
   Eigene Lage und Einsatzbericht die „Führungsfunktionen“.
@@ -126,9 +130,13 @@ Führungsfunktion des Mitglieds im Einsatz, die eine Quelle für „wer ist S2?�
 Mehrere Mitglieder dürfen dieselbe Funktion tragen; dann gelten alle, und ihre Namen stehen
 alphabetisch, getrennt durch Komma. Ein Modul braucht es dafür nicht: Wer den Einsatz liest, sieht
 die Mitglieder samt Funktion. Ändert die Einsatzleitung eine Funktion, folgen diese Anzeigen auf
-jedem offenen Schirm ohne Neuladen. Eine Funktion trägt nur, wer ein Konto hat und Mitglied ist;
-ein gekoppeltes Gerät sieht keine Namen. Nach der Schwärzung eines Einsatzes nennt die App keine
-Namen mehr.
+jedem offenen Schirm ohne Neuladen. Eine Funktion trägt nur, wer ein Konto hat und als
+Einsatzleitung oder Führungspersonal Mitglied ist: Mitarbeit und Beobachter können auf einen
+Auftrag oder einen Hinweis nicht reagieren. Ihre Führungsstelle ist deshalb nur ein Freitext, der
+erste Vorschlag für den ETB-Rufnamen; Anzeige und Hinweise kennen sie nicht als Funktion. Wer vor
+dieser Regel als Mitarbeit oder Beobachter eine Funktion trug, behält ihre Angabe als
+Bezeichnung. Ein gekoppeltes Gerät sieht keine Namen. Nach der Schwärzung eines Einsatzes nennt
+die App keine Namen mehr.
 
 Entlassen im Personal berührt die Mitgliedschaft nicht: Wer entlassen ist und keine Funktion mehr
 führen soll, dem nimmt die Einsatzleitung sie im Reiter „Zugriff“ (Führungsstelle leeren) oder

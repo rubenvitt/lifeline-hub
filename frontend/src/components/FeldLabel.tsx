@@ -1,6 +1,6 @@
 import { theme } from 'antd';
 import type { ReactNode } from 'react';
-import { form } from '../theme/tokens';
+import Feldetikett from './instrument/Feldetikett';
 
 interface FeldLabelProps {
   /** Sichtbare Beschriftung — zugleich der Accessible Name des beschrifteten Feldes. */
@@ -25,8 +25,9 @@ interface FeldLabelProps {
  * dem Theme statt des dort hartkodierten `rgba(0,0,0,0.45)`, das im Dunkelmodus schwarz auf
  * dunklem Grund stand.
  *
- * Die Beschriftung spricht die Metadaten-Stimme aus A0 (Signatur 5): gesperrte Versalien in
- * `form.versalSperrung`, `token.fontSizeSM`, `token.colorTextSecondary`.
+ * Die Beschriftung ist ein `Feldetikett` (LLH-2045): gemischt geschrieben, `textKlein`,
+ * `gedaempft`. Vorher sprach sie die Metadaten-Stimme (gesperrte Versalien in
+ * `token.fontSizeSM`); Versalien stehen seit 22.11.2026 nur noch in Köpfen.
  *
  * **Ein Name, nicht zwei:** Wo `FeldLabel` steht, trägt das Feld KEIN `aria-label` mehr —
  * `aria-label` gewinnt gegen `<label>` und entkoppelte sonst den sichtbaren Text vom
@@ -36,20 +37,12 @@ export default function FeldLabel({ text, htmlFor, children }: FeldLabelProps) {
   const { token } = theme.useToken();
   return (
     <div>
-      <label
-        htmlFor={htmlFor}
-        style={{
-          display: 'block',
-          fontSize: token.fontSizeSM,
-          fontWeight: 600,
-          color: token.colorTextSecondary,
-          letterSpacing: form.versalSperrung,
-          textTransform: 'uppercase',
-          marginBottom: token.marginXXS,
-        }}
-      >
-        {text}
-      </label>
+      {/* Flex macht das Label zum Block: ohne die Zeilenhöhe der Hülle als Zeilenstrebe. */}
+      <div style={{ display: 'flex', marginBottom: token.marginXXS }}>
+        <Feldetikett als="label" htmlFor={htmlFor}>
+          {text}
+        </Feldetikett>
+      </div>
       {children}
     </div>
   );

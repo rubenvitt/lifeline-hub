@@ -230,6 +230,23 @@ describe('alarm-sw.js: Web Push (LLH-1223)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('zeigt eine Störung ohne Einsatz ohne /einsaetze/null (LLH-2026)', async () => {
+    serverAntwort(new TypeError('Failed to fetch'));
+    const { push, gezeigt } = ladeMitPush([]);
+    await push({
+      ...EREIGNIS,
+      einsatz_id: null,
+      art: 'adapter_eingriff',
+      stufe: 'hinweis',
+      bezug_typ: 'adapter',
+    });
+    expect(gezeigt[0]!.optionen.tag).toBe('null-b-42');
+    expect((gezeigt[0]!.optionen.data as { ziel: string }).ziel).toBe(
+      'https://lfh.example/admin/einstellungen/anbindungen',
+    );
+    vi.unstubAllGlobals();
+  });
+
   it('zeigt ohne Antwort des Servers den Titel der Stufe', async () => {
     serverAntwort(new TypeError('Failed to fetch'));
     const { push, gezeigt } = ladeMitPush([]);

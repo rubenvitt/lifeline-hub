@@ -77,6 +77,13 @@ describe('DatenfeldEingabe', () => {
     expect(screen.getByText('Ort').closest('dt')).not.toBeNull();
   });
 
+  it('der Begriff ist ein Feldetikett, keine Augenbraue (LLH-2045)', () => {
+    renderMitProviders(<Maske />);
+    const begriff = screen.getByText('Ort').closest('dt')!;
+    expect(begriff).toHaveAttribute('data-lfh', 'feldetikett');
+    expect(begriff).not.toHaveClass('lfh-augenbraue');
+  });
+
   it('zeigt den Prüffehler sichtbar unter der Eingabe derselben Zelle', async () => {
     const onFinish = vi.fn();
     renderMitProviders(<Maske onFinish={onFinish} />);

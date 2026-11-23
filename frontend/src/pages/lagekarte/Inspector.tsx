@@ -21,6 +21,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import {
   Augenbraue,
   FELD_KLASSE,
+  Feldetikett,
   Stapel,
   Status,
   Textstufe,
@@ -132,13 +133,13 @@ function markerBildUrl(mk: KarteMarker, dunkel: boolean): string | null {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-/** Ein Feld des Datenrasters: Augenbraue über dem Wert; mit Statusrolle als getönter Chip. */
+/** Ein Feld des Datenrasters: Feldetikett über dem Wert; mit Statusrolle als getönter Chip. */
 function RasterZelle({ feld }: { feld: RasterFeld }) {
   const { rollen } = useRollen();
   const ton = feld.rolle ? tonVonRolle(feld.rolle) : null;
   return (
     <Stapel abstand="xs">
-      <Augenbraue als="dt">
+      <Feldetikett als="dt">
         {feld.label}
         {feld.labelKuerzel && (
           <>
@@ -146,7 +147,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
             <KuerzelErklaerung kuerzel={feld.labelKuerzel} />
           </>
         )}
-      </Augenbraue>
+      </Feldetikett>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
           <Status groesse="klein" ton={ton} wort={feld.wert} />
@@ -270,7 +271,7 @@ export default function Inspector({
       )}
       {!ohneOrt && (
         <Stapel abstand="xs">
-          <Augenbraue>Koordinate</Augenbraue>
+          <Feldetikett>Koordinate</Feldetikett>
           {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
             Sichtbare tragen. Die Koordinate darüber bleibt ungekürzt. */}

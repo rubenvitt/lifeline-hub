@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 
 /**
  * Wege in die Kartenleiste der Lagekarte (LLH-1028, LLH-1033): die Leiste gliedert sich in die
@@ -131,9 +132,6 @@ export async function waehleWerkzeug(page: Page, eintrag: string, tippen = false
 /** „Weitere …“: der Zeichen-Picker als Dialog „Taktisches Zeichen“ (`ZeichenWahlDialog`). */
 export async function oeffneZeichenWahl(page: Page, tippen = false): Promise<Locator> {
   await waehleWerkzeug(page, 'Weitere …', tippen);
-  const dialog = page.getByRole('dialog', { name: 'Taktisches Zeichen', exact: true });
-  await expect(dialog).toBeVisible();
   // Erst nach dem Aufzoomen messen: während der Animation skaliert `transform` jeden Kasten.
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-  return dialog;
+  return dialogSteht(page, 'Taktisches Zeichen', { exact: true });
 }

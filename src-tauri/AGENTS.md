@@ -55,12 +55,13 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
 - **Gemeinsame Fälle** (LLH-1978, LLH-2062): die Fälle von Adressprüfung (samt
   Meldungstexten), Deeplink (`deute`, `entscheide`), Linkregeln und Vertragsprüfung
   (`bewerte`, `weiterleitung`; `bekannt` gibt die Verträge der Fälle vor, nicht die der Hülle)
-  stehen als JSON unter `src-tauri/faelle/` und sind die gemeinsame Quelle beider Hüllen: die
+  stehen als JSON unter `src-tauri/faelle/` und sind die gemeinsame Quelle aller Hüllen: die
   Rust-Tests lesen sie per `include_str!`, der Swift-Kern der iOS-Hülle (`ios/LifelineKern`)
-  dieselben Dateien. Ein neuer Fall oder eine geänderte Regel kommt in die JSON, nicht in einen
-  einzelnen Test; die Regel selbst bleibt in `adresse.rs`, `deeplink.rs`, `links.rs` und
-  `vertrag.rs`. Nur eine Hülle kennt Zertifikatsfehler (iOS); sie stehen in deren Tests. `scripts/bereiche.sh` ordnet `src-tauri/faelle/*`
-  beiden Prüfungen zu.
+  und der Kotlin-Kern der Android-Hülle (`android/kern`, LLH-1989) dieselben Dateien. Ein neuer
+  Fall oder eine geänderte Regel kommt in die JSON, nicht in einen einzelnen Test; die Regel
+  selbst bleibt in `adresse.rs`, `deeplink.rs`, `links.rs` und `vertrag.rs`. Zertifikatsfehler
+  kennen nur die mobilen Hüllen; sie stehen in deren Tests. `scripts/bereiche.sh` ordnet
+  `src-tauri/faelle/*` allen drei Prüfungen zu.
 - **Fenster sind gleichrangig** (LLH-1281): Schließen des Hauptfensters schließt nichts mit;
   Maske und Serverwechsel bauen `main` bei Bedarf neu (`zeige_maske`, `lade_server`), alles
   andere nimmt `front_fenster`. „Neues Fenster“ (Menü, ⌘N/Strg+N als einziges Menükürzel) baut

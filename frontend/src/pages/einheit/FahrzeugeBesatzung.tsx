@@ -52,7 +52,7 @@ import {
 import { PositionsMarken } from '../../kraefte/KraeftebaumZelle';
 import { fmsEtikett } from '../../kraefte/meldebildRaster';
 import { fahrzeugStatusDarstellung } from '../../kraefte/mittelStatus';
-import { useFahrzeugStatusQuittung } from '../../kraefte/useFahrzeugStatusQuittung';
+import { useFahrzeugStatusQuittung } from '../../kraefte/useStatusQuittung';
 import { gruendeJeKraft } from '../../kraefte/sammelDisposition';
 import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, kategorieDarstellung } from '../../theme/statusFarben';

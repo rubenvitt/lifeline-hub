@@ -76,6 +76,32 @@ pub async fn loesche_quittung_tx(
     Ok(())
 }
 
+/// Setzt die Vollzug-Achse auf `offen` zurück und leert Zeitpunkt und Person (LLH-2024), für
+/// Rücknahmen ohne handelnde Person: anders als [`setze_vollzug_tx`] braucht es weder `org_id`
+/// noch `von_id`. Quittung bleibt unberührt, die räumt [`loesche_quittung_tx`].
+///
+/// Kein UPSERT: ohne Zeile gilt der Vollzug schon als `offen` (Spaltenvorgabe). Läuft auf der
+/// Verbindung des Aufrufers; öffnet und committet nichts.
+pub async fn reset_vollzug_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    objekt_typ: &str,
+    objekt_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE kommunikation_status \
+         SET vollzug_status = ?, vollzogen_at = NULL, vollzogen_von_id = NULL \
+         WHERE einsatz_id = ? AND objekt_typ = ? AND objekt_id = ?",
+    )
+    .bind(VOLLZUG_OFFEN)
+    .bind(einsatz_id)
+    .bind(objekt_typ)
+    .bind(objekt_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Wie [`quittiere`], aber **einmalig**: schreibt die Quittung nur, wenn noch keine
 /// existiert (Guard `quittiert_at IS NULL` im DO-UPDATE). Liefert `true`, wenn DIESER Aufruf
 /// quittiert hat — sonst `false`. Macht „Doppel-Bestätigung → 422" atomar, ohne TOCTOU.

@@ -164,3 +164,33 @@ test('nach dem Wechsel steht die Quittung, und „Rückgängig“ stellt den alt
   await page.reload();
   await expect(knopf(page)).toContainText('S3');
 });
+
+test('Personal: nach dem Wechsel steht die Quittung, und „Rückgängig“ stellt den alten Status her (LLH-1986)', async ({
+  page,
+}) => {
+  const NAME = 'Anna Quittung';
+  await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
+  const einsatz = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Statusquittung ${Date.now()}` },
+  });
+  expect(einsatz.ok(), `Einsatz: ${await einsatz.text()}`).toBeTruthy();
+  const einsatzId = ((await einsatz.json()) as { id: number }).id;
+  const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    data: { adhoc: { name: NAME } },
+  });
+  expect(kraft.ok(), `Kraft: ${await kraft.text()}`).toBeTruthy();
+
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  const statusKnopf = page.getByRole('button', { name: `Status von ${NAME} ändern` });
+  // Startstatus der Disposition: der erste gebundene Katalogeintrag, im Seed „alarmiert“.
+  await expect(statusKnopf).toContainText('alarmiert');
+  await statusKnopf.click();
+  await page.getByRole('menuitem', { name: 'im Einsatz' }).click();
+  await expect(statusKnopf).toContainText('im Einsatz');
+
+  await expect(page.getByText(`${NAME}: alarmiert → im Einsatz`)).toBeVisible();
+  await page.getByRole('button', { name: 'Rückgängig' }).click();
+  await expect(statusKnopf).toContainText('alarmiert');
+  await page.reload();
+  await expect(statusKnopf).toContainText('alarmiert');
+});

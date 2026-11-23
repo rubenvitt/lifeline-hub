@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { zeigeLeistenAnsicht } from './leisten-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
@@ -71,10 +72,8 @@ for (const { dichte, soll, fuge: fugeBoden, titel } of STAFFEL) {
     await page.getByRole('button', { name: 'Ansichts-Aktionen' }).click();
     await page.getByRole('menuitem', { name: /Neue Ansicht/ }).click();
 
-    const dialog = page.getByRole('dialog', { name: 'Neue Ansicht' });
-    await expect(dialog).toBeVisible();
     // Erst nach der Zoom-Einblendung messen: währenddessen ist der Dialog skaliert.
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const dialog = await dialogSteht(page, 'Neue Ansicht');
     // Vorbedingung: wirklich antds Fuß, nicht ein selbstgebauter.
     const fuss = dialog.locator('.ant-modal-footer');
     await expect(fuss.locator('> .ant-btn')).toHaveCount(2);

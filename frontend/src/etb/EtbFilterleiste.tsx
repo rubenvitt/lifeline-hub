@@ -97,10 +97,12 @@ export default function EtbFilterleiste({ onChange, startWerte, vorn, mitte }: P
           {vorn}
         </div>
       )}
-      {/* Grundbreite und Mindestbreite der Suche knapp: bei 1180 px füllten Typleiste (622 px)
-          und diese Gruppe (438 px) die Zeile auf den Pixel, ein klassischer Scrollbalken (15 px,
-          Windows, CI) brach die Leiste um, und Seitenkopf, Leiste und Spaltenkopf klebten nicht
-          mehr (`e2e/rahmen-stehen-bleiben.spec.ts`, 1180 × 600). Mit Platz wächst die Suche. */}
+      {/* Grundbreite und Mindestbreite der Suche knapp, die Einheit auf Feldstufe `kurz`
+          (`pages/EtbPage.tsx`): bei 1180 px nimmt die Typleiste mit dreistelligen Zählern 651 px,
+          diese Gruppe braucht mindestens 342 px (Zeitraum, Einheit 120, Suche 120). Das lässt
+          rund 48 px für einen klassischen Scrollbalken (15 px, Windows) und weitere Ziffern.
+          Bricht die Leiste um, kleben Seitenkopf, Leiste und Spaltenkopf bei 600 px Höhe nicht
+          mehr (LLH-2037, `e2e/rahmen-stehen-bleiben.spec.ts`). Mit Platz wächst die Suche. */}
       <div data-lfh="etb-filter-weitere" style={{ ...gruppe, flexWrap: 'wrap', flex: '1 1 360px' }}>
         {mitte}
         {/* Breite über die Hülle (Mindestbreite Feldstufe `kurz`); das Raster streckt die Suche. */}
