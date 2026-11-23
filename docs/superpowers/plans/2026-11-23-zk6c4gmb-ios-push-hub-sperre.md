@@ -57,7 +57,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
   `handle_meldung(pool, identitaet, kopplung, anfrage, web_push: bool, ios_push: bool, ios_push_gesperrt_seit: Option<String>)`;
   `save_faehigkeiten(conn, kopplung_id, hinweise, web_push, ios_push, ios_push_gesperrt_seit: Option<&str>, rolle_mitarbeit)`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - In `melden.rs`, `antwort_eines_aelteren_hubs_nennt_keine_faehigkeiten`: zusätzlich
     `assert_eq!(a.ios_push_gesperrt_seit, None);`
   - In `tests/instanz_hinweise.rs` neuer Test `gesperrter_hub_meldet_seine_sperre_an_den_elw`:
@@ -68,8 +68,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
     `melden` → `None`.
   - Neuer Test `hub_ohne_ios_push_meldet_keine_sperre`: `hub = seite(false)`, dieselbe Zeile
     einfügen, `melden` → `None`.
-- [ ] **Step 2:** `cargo test --test instanz_hinweise sperre` und `cargo test --lib melden::tests::antwort_eines_aelteren` → FAIL (Kompilierfehler/Feld fehlt).
-- [ ] **Step 3: Implementieren**
+- [x] **Step 2:** `cargo test --test instanz_hinweise sperre` und `cargo test --lib melden::tests::antwort_eines_aelteren` → FAIL (Kompilierfehler/Feld fehlt).
+- [x] **Step 3: Implementieren**
   - Migration: `ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push_gesperrt_seit TEXT;` mit
     Kommentarzeile (LLH-2074).
   - `MeldenAntwort`: Feld mit `#[serde(default, skip_serializing_if = "Option::is_none")]` und
@@ -77,8 +77,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
   - Route `melden`: `ios_push_gesperrt_seit = match state.live.ios_push() { Some(_) => ios_push::repo::relais_gesperrt_seit(&state.pool).await?, None => None }`.
   - Meldende Seite speichert `a.ios_push_gesperrt_seit.as_deref()` in `save_faehigkeiten`.
   - Bestehende Aufrufe nachziehen (`None`).
-- [ ] **Step 4:** Tests aus Step 2 → PASS; `cargo test --test instanz_hinweise` und `--test instanz_fuehrung` grün.
-- [ ] **Step 5: Commit** `feat: Hub meldet iOS-Push-Sperre des Relais an den ELW (LLH-2074)`
+- [x] **Step 4:** Tests aus Step 2 → PASS; `cargo test --test instanz_hinweise` und `--test instanz_fuehrung` grün.
+- [x] **Step 5: Commit** `feat: Hub meldet iOS-Push-Sperre des Relais an den ELW (LLH-2074)`
 
 ### Task 2: Einsatz trägt die gesperrten Hubs, Kopplungsanzeige die Sperre
 
@@ -100,7 +100,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
   `#[serde(default, skip_serializing_if = "Vec::is_empty")]`;
   `InstanzKopplungAnzeige.gegenueber_ios_push_gesperrt_seit: Option<String>` (skip wenn None).
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - Unit (hinweis.rs tests) `ios_push_sperre_steht_nur_am_gelieferten_einsatz_eines_gesperrten_hubs`:
     `kopplung(&pool, "meldet_sich")`, `einsatz(&pool)`; `UPDATE instanz_kopplung SET gegenueber_ios_push = 1, gegenueber_ios_push_gesperrt_seit = '2026-11-23 08:15:00'`;
     `crate::einsatz::repo::laden(&pool, e).await.unwrap().ios_push_hub_gesperrt.0 == vec![IosPushHubSperre { hub_name: "Hub".into(), since: "2026-11-23 08:15:00".into() }]`.
@@ -117,8 +117,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
     `kopplungen[0]["gegenueber_ios_push_gesperrt_seit"] == "2026-11-23 08:15:00"`; am Hub
     `GET /api/einsaetze/{w.spiegel}` → Feld fehlt. Sperre am Hub aufheben, `melden` → Feld
     fehlt am ELW-Einsatz.
-- [ ] **Step 2:** `cargo test --lib ios_push_sperre_steht` und `cargo test --test instanz_hinweise zeigt_die_sperre` → FAIL.
-- [ ] **Step 3: Implementieren**
+- [x] **Step 2:** `cargo test --lib ios_push_sperre_steht` und `cargo test --test instanz_hinweise zeigt_die_sperre` → FAIL.
+- [x] **Step 3: Implementieren**
   - Makro neben `spiegel_spalten!` mit Doc-Kommentar (Menge wie `spiegel::hinweis::ziele`, dazu
     iOS-Push angeboten und gesperrt; wortgleich in `laden` und `liste_fuer`):
     `COALESCE((SELECT json_group_array(json_object('hub_name', ik.gegenueber_name, 'since', ik.gegenueber_ios_push_gesperrt_seit)) FROM instanz_kopplung_org io JOIN instanz_kopplung ik ON ik.id = io.kopplung_id WHERE io.org_id = e.org_id AND io.widerrufen_at IS NULL AND e.spiegel = 0 AND ik.richtung = 'meldet_sich' AND ik.zustand = 'aktiv' AND ik.gegenueber_hinweise = 1 AND ik.gegenueber_ios_push = 1 AND ik.gegenueber_ios_push_gesperrt_seit IS NOT NULL AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) ORDER BY io.id), '[]') AS ios_push_hub_gesperrt`
@@ -127,8 +127,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
   - In `ziele()` einen Kommentar ergänzen, dass das Makro dieselbe Menge liest.
   - `to_anzeige` übernimmt `k.gegenueber_ios_push_gesperrt_seit` nur bei `richtung == meldet_sich`.
   - `scripts/check-typ-codegen.sh` laufen lassen, generierte Dateien übernehmen.
-- [ ] **Step 4:** Tests aus Step 2 → PASS; `cargo test --lib einsatz` grün.
-- [ ] **Step 5: Commit** `feat: Einsatz und Kopplung zeigen die iOS-Push-Sperre des Hubs (LLH-2074)`
+- [x] **Step 4:** Tests aus Step 2 → PASS; `cargo test --lib einsatz` grün.
+- [x] **Step 5: Commit** `feat: Einsatz und Kopplung zeigen die iOS-Push-Sperre des Hubs (LLH-2074)`
 
 ### Task 3: Hinweisband im Einsatz und Zeile an der Kopplung
 
@@ -146,7 +146,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
   `kopplungHinweise(k, datentraegerBestaetigt = true, zeit: (wert: string) => string = (w) => w)`;
   Komponente `IosPushHubBand({ einsatz }: { einsatz: EinsatzAnzeige })`, `data-lfh="ios-push-hub-band"`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `instanzText.test.ts`: `iosPushHubBandTitel('Hub Nord')` →
     `'iOS-Push über den Hub „Hub Nord“ wird nicht zugestellt'`;
     `iosPushHubBandText('08:15')` →
@@ -157,14 +157,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
     Titel und Text sichtbar (Rolle `role="status"` oder Alert); Rolle `fuehrungspersonal` ohne
     Admin → nichts gerendert; Admin der Einsatz-Org ohne Rolle → sichtbar; Admin einer anderen
     Org → nichts; leeres/fehlendes Feld → nichts. Zwei Hubs → zwei Titel.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/instanz` → FAIL.
-- [ ] **Step 3: Implementieren** – Band: je Sperre ein antd `Alert` (`type="warning"`,
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/instanz` → FAIL.
+- [x] **Step 3: Implementieren** – Band: je Sperre ein antd `Alert` (`type="warning"`,
   `showIcon`, `banner`), Zeit über `zeitKurz(since, konv)` wie im `FuehrungHinweisband`; Sichtbarkeit über
   `darfFuehrungBedienen(einsatz, benutzer)`. In `EinsatzLayout` direkt unter dem Führungsband
   einhängen, mit Kommentar (LLH-2074). Vorher `frontend/AGENTS.md` nach „Hinweisband“/„banner“
   greppen und die dortigen Regeln befolgen.
-- [ ] **Step 4:** vitest aus Step 2 → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit` (bzw. das Typecheck-Skript aus `package.json`) und Lint grün.
-- [ ] **Step 5: Commit** `feat: Hinweisband zur iOS-Push-Sperre des Hubs am ELW (LLH-2074)`
+- [x] **Step 4:** vitest aus Step 2 → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit` (bzw. das Typecheck-Skript aus `package.json`) und Lint grün.
+- [x] **Step 5: Commit** `feat: Hinweisband zur iOS-Push-Sperre des Hubs am ELW (LLH-2074)`
 
 ### Task 4: Doku und Gates
 
@@ -173,6 +173,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zk6c4gmbvmsg8eggqh2xkutb
 - Modify: `docs/architektur/06-laufzeitsicht.md` oder `08-querschnittliche-konzepte.md`, wo der Abgleich von `ios_push` beschrieben ist: neues Feld nennen
 - Modify (falls Kapitel vorhanden): Anwenderdoku zur Instanzkopplung bzw. zu Benachrichtigungen, ein Satz (Regeln: `docs/anwender/AGENTS.md`)
 
-- [ ] **Step 1:** Doku ändern; `docs/architektur/AGENTS.md` (Mitänderungsregel, Prüfungen) beachten.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ausgabe im PR unter „Geprüft“).
-- [ ] **Step 3: Commit** `docs: iOS-Push-Sperre des Hubs am ELW (LLH-2074)`
+- [x] **Step 1:** Doku ändern; `docs/architektur/AGENTS.md` (Mitänderungsregel, Prüfungen) beachten.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ausgabe im PR unter „Geprüft“).
+  Abgehakt mit Verweis auf den Lauf: Das Plattenkontingent der Cloud-Sitzung trägt den vollen
+  Rust-Testbau (Schritt 4) nicht. Gefahren: `--nur schnell`, `--nur frontend`, `--nur binaer` grün;
+  Rust gezielt (Bibliotheksmodule der Änderung, 76 betroffene Integrationstests) grün. Details im PR.
+- [x] **Step 3: Commit** `docs: iOS-Push-Sperre des Hubs am ELW (LLH-2074)`
