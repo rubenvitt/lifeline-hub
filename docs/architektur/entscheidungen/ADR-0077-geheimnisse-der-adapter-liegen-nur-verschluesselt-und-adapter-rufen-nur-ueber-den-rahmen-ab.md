@@ -10,6 +10,8 @@ herleitung:
   - docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
   - https://zunder.rubeen.dev/#/aufgabe/r19tuh60j02y0c7o547p5d7z
+  - docs/superpowers/specs/2026-11-22-z211l8p5-schluesselwechsel-geheimnisspeicher-design.md
+  - https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
 ---
 
 # ADR-0077: Geheimnisse der Adapter liegen nur verschlüsselt, Adapter rufen nur über den Rahmen ab
@@ -23,8 +25,12 @@ herleitung:
   einen Fehlertext geschrieben; die Verwaltung sieht nur, ob und wann es gesetzt ist.
 - MUST: Trägt eine Änderung der Einstellungen ein neues Ziel ein (anderer oder neuer Host einer
   URL), werden die Geheimnisse des Adapters entfernt und müssen neu gesetzt werden.
-- MUST NOT: Der Schlüssel des Speichers liegt in der Datenbank, einer Sicherung oder einer Datei
-  des Servers; er kommt nur aus der Umgebung.
+- MUST NOT: Der Schlüssel des Speichers liegt in der Datenbank oder einer Sicherung; er kommt aus
+  der Umgebung oder aus einer Datei, deren Pfad die Umgebung nennt (`…_DATEI`).
+- MUST: Für einen Schlüsselwechsel lädt der Server höchstens einen alten Schlüssel zusätzlich
+  (`LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT`); er liest mit dem Schlüssel des passenden Fingerabdrucks,
+  verschlüsselt nur mit dem neuen und schlüsselt beim Start alle Chiffrate des alten in einer
+  Transaktion um (`adapter::lauf::umschluesseln`).
 - MUST: Fehlt der Schlüssel, startet der Server; Geheimnisse lassen sich dann nicht speichern, und
   ein Adapter, der eines braucht, hält mit einem Fehlercode an.
 - MUST: Ein Adapter erreicht das Netz nur über den Abrufkontext des Rahmens: jede URL besteht vor
@@ -40,6 +46,7 @@ herleitung:
 
 ```sh
 verlange 'age::encrypt\(' src/adapter/geheimnis.rs
+verlange 'fn umschluesseln\(' src/adapter/lauf.rs
 verlange 'has_neues_ziel\(' src/routes/adapter.rs
 verbiete 'load_chiffrate|\.decrypt\(' 'src/routes/**/*.rs'
 verbiete 'Zweck::Adapter' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclude)src/ausgehend.rs'
@@ -61,6 +68,7 @@ interne Netze wie bei den Webhooks (ADR-0046). Jede Anbindung soll das nicht neu
 
 Ein Diebstahl der Datenbank oder einer Sicherung verrät kein Adapter-Geheimnis. Wer den Schlüssel
 verliert oder auf einem anderen Rechner ohne ihn wiederherstellt, setzt die Geheimnisse neu; der
-Schlüssel wird getrennt gesichert (`docs/betrieb/backup-restore.md`). Gegen eine Übernahme des
+Schlüssel wird getrennt gesichert (`docs/betrieb/backup-restore.md`). Ein Wechsel braucht nur
+einen Neustart mit altem und neuem Schlüssel; Sicherungen von vorher bleiben am alten. Gegen eine Übernahme des
 laufenden Servers schützt der Speicher nicht. Eine neue Adapterart schreibt nur Übersetzung und
 Übernahme, keinen eigenen Client.

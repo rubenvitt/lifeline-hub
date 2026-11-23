@@ -131,6 +131,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     tracing::info!(db_path = %config.db_path, bind = %config.bind, "Starte lifeline-hub");
     tracing::info!("{}", lifeline_hub::lizenz::hinweis_kurz());
 
+    // Schlüssel des Geheimnisspeichers (LLH-2017/LLH-2025) vor allem anderen: eine falsche
+    // Schlüsseldatei bricht ab, bevor Datenbank, Bootstrap oder Hintergrundläufe etwas tun.
+    let (speicher, warnungen) = config
+        .load_geheimnisspeicher()
+        .map_err(|e| anyhow::anyhow!(e))?;
+    for warnung in warnungen {
+        tracing::warn!("{warnung}");
+    }
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
     // Zähler des Stammdaten-Logs auf die Uhr (LLH-1853, D3): Nach dem Zurückspielen einer
@@ -334,14 +342,42 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // jeder Durchgang eine leere Abfrage; das Stoppsignal teilt er mit der Sicherung.
     let webhook_task =
         lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang.clone());
-    // Adapter (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung, Abrufe im
+    // Adapter (LLH-2017): Geheimnisspeicher (oben geladen), Abrufe im
     // Hintergrund. Ohne Schlüssel läuft der Server; Adapter mit Geheimnissen melden das selbst.
     let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
-        lifeline_hub::adapter::geheimnis::Geheimnisspeicher::new(
-            config.geheimnis_schluessel.clone(),
-        ),
+        speicher,
         lifeline_hub::adapter::art::Verzeichnis::produktiv(),
     );
+    // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
+    // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.
+    if let Some(alt) = adapter_rahmen.speicher.fingerabdruck_alt() {
+        let neu = adapter_rahmen.speicher.fingerabdruck().unwrap_or_default();
+        match lifeline_hub::adapter::lauf::umschluesseln(&pool, &adapter_rahmen.speicher).await {
+            Ok(n) if n.uebrig == 0 => tracing::info!(
+                alt,
+                neu,
+                anzahl = n.umgeschluesselt,
+                "Geheimnisse der Adapter auf den neuen Schlüssel umgeschlüsselt; \
+                 LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT kann entfernt werden"
+            ),
+            Ok(n) => tracing::warn!(
+                alt,
+                neu,
+                anzahl = n.umgeschluesselt,
+                uebrig = n.uebrig,
+                unlesbar = n.unlesbar,
+                "Nicht alle Geheimnisse der Adapter liegen am neuen Schlüssel; der alte öffnet sie \
+                 nicht: LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT prüfen und nicht wegwerfen, sonst in \
+                 der Verwaltung neu setzen"
+            ),
+            Err(e) => tracing::warn!(
+                alt,
+                neu,
+                "Umschlüsseln der Adapter-Geheimnisse fehlgeschlagen, der Server liest mit \
+                 beiden Schlüsseln: {e}"
+            ),
+        }
+    }
     // Ohne Schlüssel warnt der Start nur, wenn Geheimnisse liegen; mit Schlüssel, wenn welche
     // nicht zu ihm passen (Wiederherstellung auf einem anderen Rechner). Nie ein Wert im Log.
     let fp = adapter_rahmen.speicher.fingerabdruck();
