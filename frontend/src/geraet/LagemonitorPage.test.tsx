@@ -579,6 +579,36 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     expect(screen.queryByText('Neue Sofortmeldung')).toBeNull();
   });
 
+  it('wieder eingeblendet (LLH-2072): die erste Zahl danach ist kein Anstieg', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    // Ausgeblendet liefert der Server 0; das ist kein Stand, von dem aus etwas „steigt“.
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        sofortmeldungen_offen: 0,
+        betroffene: { ...lage.betroffene, sk1: 0 },
+        ausgeblendet: ['betroffene', 'meldungen'],
+      });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Kräfte' });
+
+    await naechsterStand({
+      ...lage,
+      sofortmeldungen_offen: 3,
+      betroffene: { ...lage.betroffene, sk1: 2 },
+    });
+    await waitFor(() =>
+      expect(zahl('Meldungen', 'Sofortmeldungen offen')).toHaveTextContent(
+        '3Sofortmeldungen offen',
+      ),
+    );
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+    expect(screen.queryByText('Neue Sofortmeldung')).toBeNull();
+    expect(screen.queryByText('Neu in SK I')).toBeNull();
+  });
+
   it('SK I steigt: hervorgehoben mit Wort; sinkt sie, nicht', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
     bereit();

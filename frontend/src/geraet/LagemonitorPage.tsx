@@ -306,7 +306,7 @@ function ausgeblendeteKacheln(lage: LagemonitorAnzeige | undefined): Set<Lagemon
 }
 
 /** Ob die rechte Spalte mindestens eine Kachel trägt. */
-function hatRechteSpalte(aus: Set<LagemonitorKachel>): boolean {
+function hasRechteSpalte(aus: Set<LagemonitorKachel>): boolean {
   return !aus.has('betroffene') || !aus.has('kraefte') || !aus.has('uhs');
 }
 
@@ -804,9 +804,11 @@ export default function LagemonitorPage() {
   const lage = lageQuery.data;
   const aus = ausgeblendeteKacheln(lage);
   // Ohne Lagebild steht rechts der Hinweis „wird geladen“; ohne Kachel dort nimmt links alles.
-  const rechts = lage == null || hatRechteSpalte(aus);
-  const sofortNeu = useAnstieg(lage?.sofortmeldungen_offen);
-  const sk1Neu = useAnstieg(lage?.betroffene.sk1);
+  const rechts = lage == null || hasRechteSpalte(aus);
+  // Solange eine Kachel ausgeblendet ist, gibt es keinen Stand: sonst wäre die erste Zahl nach
+  // dem Wiedereinblenden ein „Anstieg“ von der 0, die der Server ausgeblendet liefert (LLH-2072).
+  const sofortNeu = useAnstieg(aus.has('meldungen') ? undefined : lage?.sofortmeldungen_offen);
+  const sk1Neu = useAnstieg(aus.has('betroffene') ? undefined : lage?.betroffene.sk1);
   const ablauf = anstehendeProgrammpunkte(lage?.programm ?? [], dayjs(jetzt), ABLAUF_SICHTBAR);
   const schliesseMenue = useCallback(() => setMenueOffen(false), []);
 
