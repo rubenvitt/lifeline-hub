@@ -239,7 +239,7 @@ async fn ohne_gueltigen_schluessel_ist_401_und_der_schluessel_oeffnet_nichts_and
     }
 
     // Der Karten-Proxy lässt den Link durch (die Quelle gibt es nicht: 404), ohne ihn nicht.
-    let kachel = "/api/karte/proxy/999999/raster/1/0/0";
+    let kachel = "/api/map/proxy/999999/raster/1/0/0";
     assert_eq!(abruf(&app, kachel, None).await.0, StatusCode::UNAUTHORIZED);
     assert_eq!(
         abruf(&app, kachel, Some("llh_lb_falsch")).await.0,

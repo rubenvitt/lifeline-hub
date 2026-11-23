@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Message
 import android.text.InputType
 import android.util.TypedValue
+import android.webkit.GeolocationPermissions
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.MimeTypeMap
@@ -30,7 +31,7 @@ import java.net.URI
 
 /**
  * Was der WebView für die Oberfläche von der Activity braucht (Review W4): den Systemdialog der
- * Dateiwahl und das Recht `CAMERA`. Die App setzt es über Activity-Ergebnisse um
+ * Dateiwahl, das Recht `CAMERA` und das Recht auf den Standort (LLH-2071). Die App setzt es über Activity-Ergebnisse um
  * (`dienste/Activityzugriffe.kt`), die Tests mit einer Attrappe.
  */
 interface Webzugriffe {
@@ -42,17 +43,24 @@ interface Webzugriffe {
 
     /** Hat die App das Recht `CAMERA`? Sonst fragt sie die Person; [fertig] mit dem Ergebnis. */
     fun kamera(fertig: (Boolean) -> Unit)
+
+    /**
+     * Hat die App das Recht auf den Standort, fein oder grob? Sonst fragt sie die Person nach
+     * beiden (ab Android 12 darf sie „ungefähr“ wählen); [fertig] mit dem Ergebnis.
+     */
+    fun standort(fertig: (Boolean) -> Unit)
 }
 
 /**
  * Rückrufe des Browsers im WebView. Neue Fenster (`target=_blank`, `window.open`) gehen an
  * `Linkweiche` mit `neuesFenster` (Entwurf D8); ein zweiter WebView für die Seite entsteht nie.
- * `alert`, `confirm` und `prompt` zeigt die App als nativen Dialog (`Seitendialog`). Dateiwahl
- * und Kamera der Oberfläche gehen über [zugriffe]; was erlaubt ist, entscheidet `Seitenzugriff`.
+ * `alert`, `confirm` und `prompt` zeigt die App als nativen Dialog (`Seitendialog`). Dateiwahl,
+ * Kamera und Standort der Oberfläche gehen über [zugriffe]; was erlaubt ist, entscheidet
+ * `Seitenzugriff`.
  *
  * @param neuesFenster entscheidet über das Ziel (`HuellenClient.neuesFenster`)
- * @param aktiverServer nur seine Origin bekommt die Kamera
- * @param zugriffe Dateiwahl und Recht `CAMERA`; ohne sie lehnt der WebView beides ab
+ * @param aktiverServer nur seine Origin bekommt Kamera und Standort
+ * @param zugriffe Dateiwahl, Recht `CAMERA` und Standort; ohne sie lehnt der WebView alles ab
  */
 class HuellenChromeClient(
     private val neuesFenster: (WebView, URI) -> Unit,
@@ -116,6 +124,24 @@ class HuellenChromeClient(
             if (erlaubt && freigabe.isNotEmpty()) request.grant(freigabe.toTypedArray()) else request.deny()
         }
     }
+
+    /**
+     * `navigator.geolocation` der Oberfläche (LLH-2071): nur für den aktiven Server, erst wenn die
+     * App selbst das Recht hat. Der WebView merkt sich die Antwort nie (`retain` immer `false`).
+     */
+    override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+        val zugriffe = zugriffe
+        if (zugriffe == null || !standortfreigabe(origin)) {
+            callback.invoke(origin, false, false)
+            return
+        }
+        zugriffe.standort { erlaubt ->
+            // Während der Rückfrage kann die App den Server gewechselt haben.
+            callback.invoke(origin, erlaubt && standortfreigabe(origin), false)
+        }
+    }
+
+    private fun standortfreigabe(origin: String): Boolean = Seitenzugriff.standort(SeitenOrigin.parse(origin), aktiverServer())
 
     private fun kamerafreigabe(request: PermissionRequest): List<String> =
         Seitenzugriff.kamera(SeitenOrigin.parse(request.origin.toString()), request.resources.orEmpty().toList(), aktiverServer())

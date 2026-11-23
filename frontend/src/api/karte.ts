@@ -22,5 +22,5 @@ export type OfflineRegion = S['OfflineRegionConfig'];
 export type KarteServerConfig = S['KarteConfigAntwort'];
 
 export function ladeKarteConfig(): Promise<KarteServerConfig> {
-  return apiGet<KarteServerConfig>('/api/karte/config');
+  return apiGet<KarteServerConfig>('/api/map/config');
 }

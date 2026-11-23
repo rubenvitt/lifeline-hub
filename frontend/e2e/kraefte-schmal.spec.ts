@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { eingeblendet } from './dialog-kern';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
@@ -339,6 +339,11 @@ for (const { titel, modul, wortlaut, vorbedingung } of BEOBACHTER_ROUTEN) {
  * Kopf, kein englischer Stufentext von rc-input-number im DOM, auf allen vier Schirmen. Am Desktop
  * steht der Kopf einzeilig: alle Knöpfe auf einer Höhe, der Titel so hoch wie bei Personal.
  * Der Beobachter-Zweig steht im Test darüber (kein Disponier-Knopf).
+ *
+ * Je Schirm ein Test (LLH-2069): als ein Test lud der Fall 19 ganze Seiten, ruhig 51 s, unter Last
+ * (4 Worker) über dem Testlimit, an wechselnden späten Stellen. Der Einsatz kommt über die API,
+ * weil der Fall den Dialog nicht prüft; Material steht zuletzt, damit seine Dialoge ohne zweites
+ * `goto` auf der schon geladenen Seite laufen.
  */
 const SCHIRME = [
   { width: 390, height: 844 },
@@ -347,21 +352,27 @@ const SCHIRME = [
   { width: 1440, height: 900 },
 ] as const;
 
-test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche Namen', async ({
-  page,
-}) => {
-  test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Kopf oeffnet ${Date.now()}`);
+/** Meldet an, legt Einsatz und Bestand über die API an; liefert die Einsatz-ID. */
+async function kopfEinsatz(page: Page, schirm: { width: number; height: number }) {
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `Kopf oeffnet ${schirm.width} ${Date.now()}`);
   await seedeAlles(page, einsatzId);
-  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+  await page.setViewportSize(schirm);
+  return einsatzId;
+}
 
-  for (const schirm of SCHIRME) {
-    await page.setViewportSize(schirm);
+for (const schirm of SCHIRME) {
+  test(`@${schirm.width}: der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche Namen`, async ({
+    page,
+  }) => {
+    const einsatzId = await kopfEinsatz(page, schirm);
+    const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+
+    // Material zuletzt: die Dialoge unten laufen auf dieser Seite weiter.
     for (const [modul, wortlaut, knopf] of [
-      ['material', MATERIAL, 'Material disponieren'],
       ['personal', KRAFT, 'Personal disponieren'],
       ['fahrzeuge', FUNKRUFNAME, 'Fahrzeuge disponieren'],
+      ['material', MATERIAL, 'Material disponieren'],
     ] as const) {
       await page.goto(`/einsaetze/${einsatzId}/${modul}`);
       await expect(page.getByText(wortlaut).first()).toBeVisible();
@@ -381,26 +392,30 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
 
     // Material: die Menge ist in Zeile und Karte ein Wert ohne Feld (LLH-1093 D9); „Ausgeben“
     // öffnet einen Dialog mit benanntem Feld (LLH-1225 D5), der Disponier-Dialog sein Feld „Menge".
-    await page.goto(`/einsaetze/${einsatzId}/material`);
+    // Geklickt wird erst in den stehenden Dialog (`e2e/AGENTS.md`, „Erst klicken, wenn der Dialog
+    // steht“).
     await page.getByRole('button', { name: `${MATERIAL} ausgeben` }).click();
-    const ausgabe = page.getByRole('dialog', { name: `${MATERIAL} ausgeben` });
+    const ausgabe = await dialogSteht(page, `${MATERIAL} ausgeben`);
     await expect(ausgabe.getByRole('spinbutton', { name: 'Menge ausgeben' })).toBeVisible();
     await ausgabe.getByRole('button', { name: 'Abbrechen' }).click();
     await expect(ausgabe).toBeHidden();
-    await page.getByRole('button', { name: 'Material disponieren' }).click();
-    const dialog = page.getByRole('dialog');
+    await kopf.getByRole('button', { name: 'Material disponieren' }).click();
+    const dialog = await dialogSteht(page, 'Material disponieren');
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();
     expect(await page.content(), `Stufentexte @${schirm.width}`).not.toMatch(
       /Increase Value|Decrease Value/,
     );
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
     await expect(dialog).toBeHidden();
-  }
+  });
+}
 
-  // Desktop: einzeilig. Alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Fahrzeugen:
-  // beide Köpfe tragen eine Segmentleiste (Ansicht bzw. Gruppierung, LLH-1225 D4), die mit dem
+test('am Desktop steht der Kopf der Kräfte-Seiten einzeilig', async ({ page }) => {
+  // Einzeilig: alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Fahrzeugen: beide
+  // Köpfe tragen eine Segmentleiste (Ansicht bzw. Gruppierung, LLH-1225 D4), die mit dem
   // Zielabstand höher steht als ein Knopf; Personal hat keine.
-  await page.setViewportSize({ width: 1440, height: 900 });
+  const einsatzId = await kopfEinsatz(page, { width: 1440, height: 900 });
+  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
   const titelOben = async (modul: string, wortlaut: string) => {
     await page.goto(`/einsaetze/${einsatzId}/${modul}`);
     await expect(page.getByText(wortlaut).first()).toBeVisible();

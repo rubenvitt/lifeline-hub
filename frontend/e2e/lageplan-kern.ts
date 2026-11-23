@@ -18,9 +18,9 @@ import { pngMitMassen } from './pdf-kern';
 /** Um diesen Punkt liegt alles, im Startausschnitt. */
 export const ORT = { lat: 49.3519, lon: 9.1457 };
 
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
-export const GRUNDLAGE = { name: 'Fixture Lageplan', stil: '/api/karte/proxy/9/lp/style.json' };
+export const GRUNDLAGE = { name: 'Fixture Lageplan', stil: '/api/map/proxy/9/lp/style.json' };
 
 /** Grundlage beantworten; `kacheln: false` lässt jede Kachel scheitern (fehlende Kacheln). */
 export async function grundlageOhneNetz(page: Page, { kacheln = true } = {}) {

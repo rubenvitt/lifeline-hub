@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Adressprüfung (src-tauri/src/adresse.rs, ios/LifelineKern, android/kern). Alle drei Hüllen prüfen jeden Fall und zeigen die Meldungen wortgleich; Quelle der Regel bleibt die Desktop-Hülle.",
+  "zweck": "Gemeinsame Fälle der Adressprüfung (src-tauri/src/adresse.rs, ios/LifelineKern, android/kern). Alle drei Hüllen prüfen jeden Fall und zeigen die Meldungen wortgleich; Quelle der Regel bleibt die Desktop-Hülle. Hostnamen mit Umlauten (IDN, LLH-2070) wandeln alle drei in Punycode um, wie der URL-Standard (UTS 46, nicht-transitional) und damit wie die Origin, die der Webview meldet; sonst passte die Brücke nie zur Seite.",
   "meldungen": {
     "leer": "Bitte die Adresse des Einsatzservers eingeben.",
     "unlesbar": "Das ist keine gültige Adresse. Beispiel: https://elw.local:8443",
@@ -95,6 +95,101 @@
       "beschreibung": "der Standardport 443 bleibt erlaubt und entfällt",
       "eingabe": "https://elw.local:443",
       "adresse": "https://elw.local/"
+    },
+    {
+      "beschreibung": "ein Host mit Umlaut wird in Punycode gespeichert: so meldet ihn der Webview als Origin",
+      "eingabe": "https://einsatz-lüneburg.de",
+      "adresse": "https://xn--einsatz-lneburg-7vb.de/"
+    },
+    {
+      "beschreibung": "ein großgeschriebener Host mit Umlaut wird klein und in Punycode, Port und Pfad bleiben",
+      "eingabe": "https://EINSATZ-LÜNEBURG.DE:8443/einsatz?x=1",
+      "adresse": "https://xn--einsatz-lneburg-7vb.de:8443/einsatz?x=1"
+    },
+    {
+      "beschreibung": "nur das Label mit Umlaut wird umgewandelt, die übrigen werden klein",
+      "eingabe": "https://Ärzte.ELW.local",
+      "adresse": "https://xn--rzte-koa.elw.local/"
+    },
+    {
+      "beschreibung": "ein schon in Punycode eingegebener Host bleibt, wie er ist",
+      "eingabe": "https://xn--einsatz-lneburg-7vb.de:8443/",
+      "adresse": "https://xn--einsatz-lneburg-7vb.de:8443/"
+    },
+    {
+      "beschreibung": "ß bleibt ß und wird nicht zu ss (nicht-transitional wie der Webview)",
+      "eingabe": "https://straße.de",
+      "adresse": "https://xn--strae-oqa.de/"
+    },
+    {
+      "beschreibung": "das griechische Schluss-Sigma ς bleibt erhalten",
+      "eingabe": "https://ελλάς.gr",
+      "adresse": "https://xn--hxarsa0b.gr/"
+    },
+    {
+      "beschreibung": "ein großes Sigma wird σ, auch am Wortende (Faltung statt Kleinschreibung)",
+      "eingabe": "https://ΕΛΛΆΣ.gr",
+      "adresse": "https://xn--hxarsa5b.gr/"
+    },
+    {
+      "beschreibung": "Vollbreite Zeichen einer asiatischen Tastatur werden zu ASCII",
+      "eingabe": "https://ＥＬＷ.local:8443",
+      "adresse": "https://elw.local:8443/"
+    },
+    {
+      "beschreibung": "der ideografische Punkt trennt Labels wie ein Punkt",
+      "eingabe": "https://elw。local",
+      "adresse": "https://elw.local/"
+    },
+    {
+      "beschreibung": "der vollbreite Punkt trennt Labels wie ein Punkt",
+      "eingabe": "https://elw．local",
+      "adresse": "https://elw.local/"
+    },
+    {
+      "beschreibung": "Vollbreite „：“ und „＠“ werden nicht nachträglich zu Port und Zugangsdaten: der Host wäre evil.example",
+      "eingabe": "https://elw.local：8443＠evil.example",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein vollbreites „＠“ ist kein Trenner für Zugangsdaten, sondern im Host verboten",
+      "eingabe": "https://elw.local＠evil.example",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein vollbreiter Doppelpunkt umgeht die Portsperre nicht",
+      "eingabe": "https://elw.local：22",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein vollbreiter Schrägstrich wird kein Pfad im Host",
+      "eingabe": "https://elw.local／x",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein Steuerzeichen jenseits von ASCII im Host ist keine Adresse",
+      "eingabe": "https://ä\u0085.de",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein weiches Trennzeichen (etwa aus einer Textverarbeitung) fällt weg",
+      "eingabe": "https://elw\u00adlä.de",
+      "adresse": "https://xn--elwl-ooa.de/"
+    },
+    {
+      "beschreibung": "ein Zero-Width-Space fällt weg",
+      "eingabe": "https://elw\u200blä.de",
+      "adresse": "https://xn--elwl-ooa.de/"
+    },
+    {
+      "beschreibung": "ein unsichtbarer Zero-Width-Joiner im Host ist keine Adresse",
+      "eingabe": "https://a\u200db.de",
+      "fehler": "unlesbar"
+    },
+    {
+      "beschreibung": "ein unsichtbarer Zero-Width-Non-Joiner im Host ist keine Adresse",
+      "eingabe": "https://a\u200cb.de",
+      "fehler": "unlesbar"
     }
   ]
 }

@@ -784,7 +784,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // Speicher. `undefined` stellt das v5-Verhalten her (der Konstruktor merged per Spread). Wer
       // Overscaling will, setzt eine Zahl und prüft die Beschriftung auf einem echten Gerät.
       zoomLevelsToOverscale: undefined,
-      // Proxy-URLs (/api/karte/proxy/…) sind root-relativ und scheitern in einem Blob-Worker ohne
+      // Proxy-URLs (/api/map/proxy/…) sind root-relativ und scheitern in einem Blob-Worker ohne
       // Base — siehe `transformiereKartenAnfrage`.
       transformRequest: transformiereKartenAnfrage,
       // Eine Lagekarte bleibt Draufsicht (auch die Betroffenen-Karte): Drehen per Pinch bleibt,

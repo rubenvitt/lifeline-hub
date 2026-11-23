@@ -307,10 +307,10 @@ test('Tagbetrieb: die Zeichen der Lagekarte rastern ohne Theme `dark`', async ({
 /** Online-Fixture ohne Netz: Stil mit hellem Grund `#e8e8e8`, Kacheln ohne gezeichnete Linie. */
 const HELLE_KARTE = {
   name: 'Helle Karte',
-  stil: '/api/karte/proxy/7/a/style.json',
+  stil: '/api/map/proxy/7/a/style.json',
   quelle: 'hell',
 };
-const KACHEL_PRAEFIX = '/api/karte/proxy/7/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/7/tile/';
 
 test('Nachtbetrieb auf heller Online-Karte: die Zeichen rastern wie am Tag und halten 3 : 1 gegen den hellen Grund (LLH-1486)', async ({
   page,
