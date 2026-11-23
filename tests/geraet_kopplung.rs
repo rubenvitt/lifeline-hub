@@ -9376,7 +9376,7 @@ async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{belegung}/{aus}/zuruecknehmen"),
+        &format!("{belegung}/{aus}/retract"),
         &geraet,
         None,
     )

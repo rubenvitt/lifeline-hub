@@ -19237,7 +19237,7 @@
       },
       "RegistrierListe": {
         "type": "object",
-        "description": "Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`).",
+        "description": "Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`).",
         "required": [
           "stelle_id",
           "haushalte",

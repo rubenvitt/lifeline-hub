@@ -1381,14 +1381,14 @@ export type Geschlecht = S['Geschlecht'];
 export type Haushalt = S['HaushaltAnzeige'];
 /** Eine an der Stelle registrierte Person (Registrierliste, Antwort der Registrierung). */
 export type RegistriertePerson = S['RegistriertePerson'];
-/** Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`), nur mit Personenrecht. */
+/** Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`), nur mit Personenrecht. */
 export type RegistrierListe = S['RegistrierListe'];
 /** Antwort auf „Abmelden“: die abgemeldeten Personen (übersprungene fehlen). */
 export type Abmeldung = S['AbmeldungAnzeige'];
 /** Kostformen der Registrierten ohne Personenbezug (`GET …/care/diets`). */
 export type KostformZaehlung = S['KostformZaehlung'];
 
-/** Kein Backend-Schema: eine Person im Body von `POST …/stellen/{sid}/registrierungen`. */
+/** Kein Backend-Schema: eine Person im Body von `POST …/positions/{sid}/registrations`. */
 export interface RegistrierPersonEingabe {
   /** Nachname, Pflicht (leer → 422 „Person n: Nachname fehlt“). */
   name: string;

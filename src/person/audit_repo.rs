@@ -18,7 +18,7 @@ pub enum ZugriffArt {
     /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
     Anhang,
     /// LLH-1616: Druck der Registrierliste einer Betreuungsstelle
-    /// (`GET …/stellen/{sid}/registrierungen/druck`), je gedruckter Person ein Eintrag.
+    /// (`GET …/positions/{sid}/registrations/print`), je gedruckter Person ein Eintrag.
     Registrierliste,
 }
 

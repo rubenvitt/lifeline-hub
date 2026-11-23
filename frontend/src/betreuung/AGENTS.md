@@ -106,7 +106,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   `src/routes/betreuung_registrierung.rs`, Oberfläche `betreuung/registrierung/`): Registrierte
   sind Betroffene (`einsatz_person`, Status `betroffen`, Verbleib „Notunterkunft“ an der Stelle),
   kein eigenes Register. Ein Vorgang registriert einen Haushalt (`haushalt`, „H-n“, erste Person
-  ist Bezugsperson) in EINEM `POST …/stellen/{sid}/registrierungen` mit EINEM ETB-Eintrag ohne
+  ist Bezugsperson) in EINEM `POST …/positions/{sid}/registrations` mit EINEM ETB-Eintrag ohne
   Namen, Kostform und Unverträglichkeiten; Abmelden ist der Verbleib „entlassen“
   (`…/abmeldungen`, Haushalt oder Personen). Prüfkette 403 (Module Betreuung UND Personen, Gerät
   nur eigene Stelle, fremd 403) → Replay über `client_id` (Personen `<cid>#<n>`, Verbleib
@@ -124,7 +124,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (nur Modul Betreuung); daraus belegt die Verpflegung die Sonderkost beim Anlegen eines
   Zeitfensters vor (`useBedarfsvorschlag`, Stand jetzt, nie als 0 ohne Registrierte).
   **Haushalte umbauen** (LLH-1615, Change `lm62ud0b-haushalt-umbauen`): `PUT
-…/stellen/{sid}/haushalte/{hid}/bezugsperson` und `PUT …/stellen/{sid}/personen/{pid}/haushalt`
+…/positions/{sid}/households/{hid}/contact-person` und `PUT …/positions/{sid}/persons/{pid}/household`
   (`haushalt_id` oder `neuer_haushalt`), nur Personen, die jetzt an `{sid}` registriert sind, Ziel
   nur ein Haushalt mit jemandem an `{sid}`. Je Vorgang EIN ETB-Eintrag ohne Namen, ohne
   `client_id`, ohne Netz gesperrt (nie vorgemerkt). Die Bezugsperson rückt nach

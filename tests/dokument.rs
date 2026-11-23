@@ -992,7 +992,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{schaden_pfad}/{lid}/file"),
+        &format!("{schaden_pfad}/{lid}/datei"),
         &frieda,
         None,
     )

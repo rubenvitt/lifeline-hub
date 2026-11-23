@@ -7732,7 +7732,7 @@ export interface components {
             region: string;
             slug: string;
         };
-        /** @description Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`). */
+        /** @description Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`). */
         RegistrierListe: {
             /** @description Haushalte mit mindestens einer hier registrierten Person, nach Nummer. */
             haushalte: components["schemas"]["HaushaltAnzeige"][];

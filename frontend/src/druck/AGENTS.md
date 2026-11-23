@@ -180,7 +180,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `betreuung/registrierung/RegistrierlisteDruckSeite.tsx` und `EinsatzPfade.registrierlisteDruck`;
   Einstieg „Registrierliste – Druckansicht“ im Kopf des Paneels „Registrierung“, auch ohne
   Schreibrecht. Geladen nur
-  über `GET …/stellen/{sid}/registrierungen/druck`, das in EINER Transaktion (`write_retry!`) je Person einen
+  über `GET …/positions/{sid}/registrations/print`, das in EINER Transaktion (`write_retry!`) je Person einen
   Eintrag der eigenen Art `registrierliste` schreibt (nie listenweit, nie `druck`: das Protokoll
   trennt ihn vom Personenblatt) und erst nach dem Commit liefert. Eine Bezugsperson, die nicht auf
   der Liste steht, fällt aus dem Haushaltskopf. Unverträglichkeiten

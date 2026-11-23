@@ -111,7 +111,7 @@ pub struct HaushaltAnzeige {
     pub personen: Vec<RegistriertePerson>,
 }
 
-/// Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`).
+/// Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct RegistrierListe {
     pub stelle_id: i64,
