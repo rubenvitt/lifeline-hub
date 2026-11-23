@@ -121,8 +121,9 @@ function hatStand(query: Query): boolean {
 /**
  * Die Dehydrier-Optionen des Persisters: nur Stände (`hatStand`), die {@link lagebildStandZulaessig}
  * sind, und **keine Mutationen**. Ohne die zweite Regel nähme `dehydrate` jede pausierte
- * Mutation samt `variables` mit — ohne Netz pausiert jede (`networkMode: 'online'`), also
- * Chat-Texte und Personen-PATCHes (Review LFH-723, Befund 1). Offline-Schreiben läuft über die
+ * Mutation samt `variables` mit — ohne Netz pausiert jede mit `networkMode: 'online'` (seit
+ * LLH-1950 nur noch ausdrücklich gesetzt), also etwa Chat-Texte und Personen-PATCHes (Review
+ * LFH-723, Befund 1). Offline-Schreiben läuft über die
  * Offline-Queue, nicht über den Mutations-Cache. Der Guard prüft GENAU diese Optionen.
  */
 export function lagebildDehydrierOptionen(qc: QueryClient): DehydrateOptions {
