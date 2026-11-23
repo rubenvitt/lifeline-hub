@@ -200,7 +200,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
 
   // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
-  it.each(['/schaeden/10', ''] as const)(
+  it.each(['/damages/10', ''] as const)(
     'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = render(einsatzAktiv, basisSchaden());

@@ -322,7 +322,7 @@ async fn kennzahlen_zaehlen_den_bestand_zum_filter() {
         .unwrap();
 
     let b = format!("/api/einsaetze/{e}/damages");
-    let (s, k) = get(&app, &admin, &format!("{b}/kennzahlen")).await;
+    let (s, k) = get(&app, &admin, &format!("{b}/metrics")).await;
     assert_eq!(s, StatusCode::OK, "{k}");
     assert_eq!(
         k,
@@ -336,7 +336,7 @@ async fn kennzahlen_zaehlen_den_bestand_zum_filter() {
         "verortet=ja",
         "ausmass=gering,gross",
     ] {
-        let (_, k) = get(&app, &admin, &format!("{b}/kennzahlen?{q}")).await;
+        let (_, k) = get(&app, &admin, &format!("{b}/metrics?{q}")).await;
         let (_, v) = get(&app, &admin, &format!("{b}?{q}")).await;
         let liste = zeilen(&v);
         assert_eq!(k["gesamt"], json!(liste.len()), "{q}");
@@ -417,7 +417,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
     let b = format!("/api/einsaetze/{e}/damages");
-    for pfad in [format!("{b}/kennzahlen"), format!("{b}/auswahl")] {
+    for pfad in [format!("{b}/metrics"), format!("{b}/options")] {
         let (s, _) = get(&app, &gustav, &pfad).await;
         assert_eq!(s, StatusCode::OK, "Vorbedingung: {pfad} lesbar");
     }
@@ -430,7 +430,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "Override: {v}");
-    for pfad in [b.clone(), format!("{b}/kennzahlen"), format!("{b}/auswahl")] {
+    for pfad in [b.clone(), format!("{b}/metrics"), format!("{b}/options")] {
         let (s, _) = get(&app, &gustav, &pfad).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
     }

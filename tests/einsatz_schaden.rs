@@ -869,13 +869,13 @@ async fn lifecycle_meldet_etb_und_schaden_live() {
         ("POST", basis.clone(), Some(gueltig()), "S-001 angelegt"),
         (
             "POST",
-            format!("{basis}/1/uebergeben"),
+            format!("{basis}/1/hand-over"),
             Some(json!({"uebergeben_an":"Bauhof"})),
             "S-001 übergeben",
         ),
         (
             "POST",
-            format!("{basis}/1/abschliessen"),
+            format!("{basis}/1/close"),
             Some(json!({"abschluss_grund":"behoben"})),
             "S-001 abgeschlossen",
         ),

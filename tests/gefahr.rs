@@ -51,7 +51,7 @@ async fn matrix_leer_dann_put_dann_upsert() {
     let (status, z) = anfrage(
         &app,
         "PUT",
-        &format!("{u}/bewertung"),
+        &format!("{u}/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )
@@ -63,7 +63,7 @@ async fn matrix_leer_dann_put_dann_upsert() {
     anfrage(
         &app,
         "PUT",
-        &format!("{u}/bewertung"),
+        &format!("{u}/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "akut")),
     )
@@ -87,7 +87,7 @@ async fn keine_bleibt_als_meldung_in_der_liste() {
     anfrage(
         &app,
         "PUT",
-        &format!("{u}/bewertung"),
+        &format!("{u}/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )
@@ -95,7 +95,7 @@ async fn keine_bleibt_als_meldung_in_der_liste() {
     anfrage(
         &app,
         "PUT",
-        &format!("{u}/bewertung"),
+        &format!("{u}/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "keine")),
     )
@@ -181,7 +181,7 @@ async fn zu_lange_erlaeuterung_oder_meldeweg_ist_400() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
     let m = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix");
-    let u = format!("{m}/bewertung");
+    let u = format!("{m}/rating");
     let mit = |objekt: &str, beschreibung: String, gemeldet_von: String| {
         json!({
             "gefahrentyp": "brand",
@@ -702,7 +702,7 @@ async fn beurteilung_bestaetigen_setzt_gebiet_schreibt_etb_und_meldet_live() {
     let (status, g) = anfrage(
         &app,
         "POST",
-        &format!("{liste_u}/{gid}/beurteilung"),
+        &format!("{liste_u}/{gid}/assessment"),
         &admin,
         None,
     )
@@ -730,7 +730,7 @@ async fn beurteilung_bestaetigen_setzt_gebiet_schreibt_etb_und_meldet_live() {
     anfrage(
         &app,
         "POST",
-        &format!("{liste_u}/{gid}/beurteilung"),
+        &format!("{liste_u}/{gid}/assessment"),
         &admin,
         None,
     )
@@ -754,7 +754,7 @@ async fn zellaenderung_frischt_nur_bestehende_beurteilung_auf() {
     let put = |warn: &'static str| {
         let app = app.clone();
         let admin = admin.clone();
-        let u = format!("{liste_u}/{gid}/matrix/bewertung");
+        let u = format!("{liste_u}/{gid}/matrix/rating");
         async move {
             let (s, z) = anfrage(
                 &app,
@@ -778,7 +778,7 @@ async fn zellaenderung_frischt_nur_bestehende_beurteilung_auf() {
     anfrage(
         &app,
         "POST",
-        &format!("{liste_u}/{gid}/beurteilung"),
+        &format!("{liste_u}/{gid}/assessment"),
         &admin,
         None,
     )
@@ -918,7 +918,7 @@ async fn bezeichnung_leer_erwartet_und_andere_angabe_dazwischen_ohne_409() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{u}/matrix/bewertung"),
+        &format!("{u}/matrix/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )

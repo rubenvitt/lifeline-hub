@@ -1690,7 +1690,8 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
-          http.get(`/api/einsaetze/1/${quelle}`, async () => {
+          // Die Quelle `abschnitte` liest `/sectors` (LLH-2059, ADR-0093).
+          http.get(`/api/einsaetze/1/${quelle === 'abschnitte' ? 'sectors' : quelle}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
           }),

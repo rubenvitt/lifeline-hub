@@ -44,7 +44,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
   };
 
   const handler: HttpHandler[] = [
-    http.get(`${basis}/kennzahlen`, ({ request }) => {
+    http.get(`${basis}/metrics`, ({ request }) => {
       const q = new URL(request.url).searchParams;
       q.delete('status');
       const treffer = liste(q);
@@ -56,7 +56,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
         abgeschlossen: zahl('abgeschlossen'),
       });
     }),
-    http.get(`${basis}/auswahl`, () =>
+    http.get(`${basis}/options`, () =>
       HttpResponse.json(
         alle()
           .filter((s) => s.storniert_at == null)

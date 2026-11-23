@@ -1359,7 +1359,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
         '/api/einsaetze/5/map/commanders',
-        ...GEBUNDEN.filter((p) => !p.endsWith('/schaeden/marker')),
+        ...GEBUNDEN.filter((p) => !p.endsWith('/damages/marker')),
       ].map((pfad) =>
         http.get(pfad, () => {
           zaehle(pfad);
