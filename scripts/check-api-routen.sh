@@ -16,12 +16,15 @@
 #     `scripts/api-routen-bestand.txt` steht;
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
-#   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
-#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
-#     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
-#     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
-#     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
-#     nicht, entfällt er;
+#   - ein Bestand mit mehr Zeilen als an der Merge-Base mit der Basis (Vorgabe `origin/alpha`)
+#     oder mit einem Segment außerhalb des Glossars, das dort in keiner Zeile stand: der Bestand
+#     wächst nicht. Eine Zeile darf sich ändern, wenn ein Paket Segmente unter einem Präfix
+#     übersetzt, das erst ein späteres umstellt (`/api/einsaetze/{id}/…`, LLH-2060). Merge-Base
+#     statt Spitze, damit ein Paket, das auf der Basis schon Zeilen gestrichen hat, einen älteren
+#     Branch nicht rot macht.
+#     Ohne den Ref (flacher Checkout, so im Bündel `schnell` der CI) laut übersprungen;
+#     durchgesetzt wird der Vergleich im Workflow `migrationen.yml`, der die Basis holt. Trägt die
+#     Merge-Base die Datei noch nicht, entfällt er;
 #   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
 #     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
 #     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
@@ -151,12 +154,46 @@ fi
 if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
-    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
-    if [ -n "$neu_zeilen" ]; then
+    alt="$(printf '%s\n' "$alt" | awk 'NF' | sort -u)"
+    alt_n="$(printf '%s\n' "$alt" | awk 'NF' | wc -l | tr -d ' ')"
+    neu_n="$(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ')"
+    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt") <(printf '%s\n' "$bestand" | awk 'NF'))"
+    # a) Die Zahl der Zeilen wächst nicht. Eine Zeile darf sich ändern: Ein Paket übersetzt
+    #    Segmente unter einem Präfix, das erst ein späteres Paket umstellt (LLH-2060).
+    if [ "$neu_n" -gt "$alt_n" ]; then
       while IFS= read -r pfad; do
-        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0085). Die Route englisch benennen."
+        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base), der Bestand wächst" \
+          "($neu_n statt $alt_n Zeilen); er darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
       done <<< "$neu_zeilen"
+    fi
+    # b) Kein deutsches Wort kommt hinzu: Jedes Segment außerhalb des Glossars in einer
+    #    geänderten Zeile stand an der Merge-Base schon im Bestand.
+    if [ -n "$neu_zeilen" ]; then
+      neue_woerter="$(printf '%s\n' "$neu_zeilen" | awk -F'\t' -v glossar="$GLOSSAR" -v altdatei=<(printf '%s\n' "$alt") '
+        function segmente(pfad, ziel,    n, seg, i) {
+          n = split(pfad, seg, "/")
+          for (i = 1; i <= n; i++) if (seg[i] != "" && seg[i] !~ /^\{.*\}$/) ziel[seg[i]] = 1
+        }
+        BEGIN {
+          while ((getline zeile < glossar) > 0) {
+            if (zeile ~ /^[[:space:]]*(#|$)/) continue
+            split(zeile, f, "\t")
+            bekannt[f[1]] = 1
+          }
+          while ((getline zeile < altdatei) > 0) segmente(zeile, alt)
+        }
+        NF {
+          delete hier
+          segmente($0, hier)
+          for (s in hier) if (!(s in bekannt) && !(s in alt)) print $0 "\t" s
+        }
+      ')"
+      if [ -n "$neue_woerter" ]; then
+        while IFS="$(printf '\t')" read -r pfad seg; do
+          melde "$pfad: Segment '$seg' ist neu im Bestand gegenüber $BASIS (Merge-Base); der" \
+            "Bestand darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+        done <<< "$neue_woerter"
+      fi
     fi
   fi
 else

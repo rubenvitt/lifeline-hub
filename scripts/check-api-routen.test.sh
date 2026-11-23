@@ -151,6 +151,17 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+fall "Bestand wächst nur in der Zahl (neue Route unter deutschem Präfix)" rot \
+  "route_dazu '/api/einsaetze/{id}/close' && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/close" "2 statt 1"
+# Ein Paket übersetzt Segmente unter einem Präfix, das erst ein späteres Paket umstellt: der Pfad
+# bleibt im Bestand, nur seine Zeile ändert sich (LLH-2060).
+fall "Segment unter deutschem Präfix übersetzt" gruen \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/close#' src/app.rs > x && mv x src/app.rs && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
+  "OK"
+fall "Segment unter deutschem Präfix in ein neues deutsches Wort umbenannt" rot \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/beenden#' src/app.rs > x && mv x src/app.rs && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/beenden' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/beenden" "beenden" "origin/alpha"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"
