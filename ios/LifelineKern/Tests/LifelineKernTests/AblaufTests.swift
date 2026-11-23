@@ -311,10 +311,10 @@ final class AblaufTests: XCTestCase {
         XCTAssertEqual(tipp.effects, [.check(lager)])
         let ergebnis = step(
             tipp.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: lager.id))
-        XCTAssertEqual(ergebnis.seite, .web(lager, vertrag: 1))
+        XCTAssertEqual(ergebnis.seite, .web(lager, vertrag: 2))
         XCTAssertEqual(
             ergebnis.effects,
-            [.markVerbunden(lager.id, vertrag: 1), .ladePfad(lager, "/einsaetze/7"), .vorwaermen(lager, info)])
+            [.markVerbunden(lager.id, vertrag: 2), .ladePfad(lager, "/einsaetze/7"), .vorwaermen(lager, info)])
     }
 
     func testTippenOhnePfadOeffnetDieStartseiteDesServers() {
@@ -380,9 +380,9 @@ final class AblaufTests: XCTestCase {
         let tipp = step(.ohneServer(elw, version: info.version), .meldungAngetippt(elw, pfad: "/lage"))
         let ergebnis = step(
             tipp.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id), vorrat: info.version)
-        XCTAssertEqual(ergebnis.seite, .web(elw, vertrag: 1))
+        XCTAssertEqual(ergebnis.seite, .web(elw, vertrag: 2))
         XCTAssertEqual(
-            ergebnis.effects, [.markVerbunden(elw.id, vertrag: 1), .ladePfad(elw, "/lage"), .vorwaermen(elw, info)])
+            ergebnis.effects, [.markVerbunden(elw.id, vertrag: 2), .ladePfad(elw, "/lage"), .vorwaermen(elw, info)])
     }
 
     func testTippAufAnderenServerVonDerGespeichertenOberflaecheWechseltSichtbar() {
