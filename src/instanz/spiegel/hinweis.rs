@@ -131,6 +131,19 @@ fn adressat_lokal(a: &Adressat) -> AdressatLokal {
 
 // ── Meldende Seite ──────────────────────────────────────────────────────────────────────────
 
+/// Ein Hub, über den die Hinweise eines Einsatzes reisen und der iOS-Push anbietet, den das
+/// Push-Relais aber sperrt (LLH-2074): iPhones von Hub-Konten bekommen dann nichts, und diese
+/// Instanz pusht ihnen nicht selbst (die Geräte sind am Hub angemeldet). Die Einsatzleitung sieht
+/// es im Einsatz (`EinsatzAnzeige::ios_push_hub_gesperrt`). Gelesen über die Spalte
+/// `ios_push_hub_gesperrt_spalte!` in `einsatz::repo`, deren Menge die von [`ziele`] ist.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct IosPushHubSperre {
+    /// Name des Hubs, wie er sich meldet.
+    pub hub_name: String,
+    /// Seit wann das Relais ihn sperrt (UTC), wie der Hub es meldet.
+    pub since: String,
+}
+
 /// Eine Kopplung einer Org, über die Hinweise eines Einsatzes reisen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::FromRow)]
 pub struct Ziel {
@@ -171,6 +184,8 @@ impl Kanal {
 /// liefert (ohne Demo-Einsatz und ohne einen zum Abräumen vorgemerkten, wie
 /// [`super::liefern`]), und nur zu einer aktiven Kopplung, die sich meldet und Hinweise annimmt,
 /// mit nicht widerrufener Zuordnung seiner Org. Was nicht geliefert wird, käme am Hub nie an.
+/// Dieselbe Grundmenge liest `ios_push_hub_gesperrt_spalte!` in `einsatz::repo` (LLH-2074, dort
+/// eingeschränkt auf Kopplungen mit Konten vom Hub): wer hier etwas ändert, zieht es dort nach.
 pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Ziel>, sqlx::Error> {
     sqlx::query_as(
         "SELECT o.id AS kopplung_org_id, k.gegenueber_web_push AS web_push, \
@@ -187,6 +202,29 @@ pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Z
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await
+}
+
+/// Die Sperre des Hubs an der Kopplung `kopplung_id` hat begonnen oder ist gefallen (LLH-2074):
+/// die aktiven, hier geführten Einsätze ihrer Orgs melden einen geänderten Kopf, damit offene
+/// Seiten das Band (`EinsatzAnzeige::ios_push_hub_gesperrt`) ohne Neuladen zeigen oder räumen. Nach
+/// dem Commit; ein Lesefehler wird geloggt, der nächste Abruf holt den Stand.
+pub async fn sperre_melden(pool: &SqlitePool, live: &LiveHub, kopplung_id: i64) {
+    let einsaetze: Result<Vec<i64>, sqlx::Error> = sqlx::query_scalar(
+        "SELECT e.id FROM einsatz e \
+         JOIN instanz_kopplung_org io ON io.org_id = e.org_id AND io.widerrufen_at IS NULL \
+         WHERE io.kopplung_id = ? AND e.spiegel = 0 AND e.status = 'aktiv'",
+    )
+    .bind(kopplung_id)
+    .fetch_all(pool)
+    .await;
+    match einsaetze {
+        Ok(ids) => {
+            for id in ids {
+                crate::live::org::kopf_melden(pool, live, id, &[]).await;
+            }
+        }
+        Err(e) => tracing::warn!(kopplung_id, error = %e, "Einsätze zur Hub-Sperre nicht lesbar"),
+    }
 }
 
 /// Pusht die erreichte Seite für diesen Einsatz in diesem Kanal (D4)? Dann lässt
@@ -983,6 +1021,103 @@ mod tests {
         }
         crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
         assert!(ziele_von(&pool, e).await.is_empty(), "Spiegel");
+    }
+
+    /// Ein ELW mit einem Einsatz, dessen Hinweise über einen Hub reisen, der iOS-Push anbietet und
+    /// vom Relais gesperrt ist (LLH-2074).
+    async fn gesperrter_hub(richtung: &str) -> (SqlitePool, i64) {
+        let pool = crate::db::test_pool().await;
+        kopplung(&pool, richtung).await;
+        let e = einsatz(&pool).await;
+        sqlx::query(
+            "UPDATE instanz_kopplung SET gegenueber_ios_push = 1, \
+             gegenueber_ios_push_gesperrt_seit = '2026-11-23 08:15:00'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Ein Konto vom Hub: nur ihm pusht der Hub (`konten_am_hub`).
+        sqlx::query(
+            "INSERT INTO stammdaten_herkunft (kopplung_org_id, org_id, art, fremder_schluessel, \
+             lokaler_schluessel) VALUES (1, 1, 'konto', 'h-7', '7')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        (pool, e)
+    }
+
+    async fn sperren_am_einsatz(pool: &SqlitePool, e: i64) -> Vec<IosPushHubSperre> {
+        crate::einsatz::repo::laden(pool, e)
+            .await
+            .unwrap()
+            .ios_push_hub_gesperrt
+            .0
+    }
+
+    #[tokio::test]
+    async fn ios_push_sperre_steht_nur_am_gelieferten_einsatz_eines_gesperrten_hubs() {
+        let (pool, e) = gesperrter_hub("meldet_sich").await;
+        assert_eq!(
+            sperren_am_einsatz(&pool, e).await,
+            vec![IosPushHubSperre {
+                hub_name: "Hub".into(),
+                since: "2026-11-23 08:15:00".into(),
+            }]
+        );
+        // Dieselbe Menge wie `ziele`, dazu iOS-Push angeboten und gesperrt.
+        for (sql, grund) in [
+            (
+                "UPDATE instanz_kopplung SET gegenueber_ios_push_gesperrt_seit = NULL",
+                "nicht gesperrt",
+            ),
+            (
+                "UPDATE instanz_kopplung SET gegenueber_ios_push = 0",
+                "Hub bietet iOS-Push nicht an",
+            ),
+            (
+                "UPDATE instanz_kopplung SET gegenueber_hinweise = 0",
+                "älterer Hub",
+            ),
+            (
+                "UPDATE instanz_kopplung SET zustand = 'angebahnt'",
+                "nicht aktiv",
+            ),
+            (
+                "UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-12T00:00:00Z'",
+                "Org widerrufen",
+            ),
+            (
+                "INSERT INTO demo_import (org_id, einsatz_id, bericht) SELECT 1, MAX(id), '{}' FROM einsatz",
+                "Demo-Einsatz",
+            ),
+            (
+                "INSERT INTO einsatz_abraeumen (einsatz_id, art) SELECT MAX(id), 'verwahrt' \
+                 FROM einsatz",
+                "zum Abräumen vorgemerkt",
+            ),
+            ("UPDATE einsatz SET spiegel = 1", "Spiegel"),
+            (
+                "DELETE FROM stammdaten_herkunft",
+                "keine Konten vom Hub (etwa Direktkopplung vor Ort)",
+            ),
+            (
+                "UPDATE instanz_kopplung SET zustand = 'vom_gegenueber_widerrufen'",
+                "vom Gegenüber widerrufen",
+            ),
+        ] {
+            let (pool, e) = gesperrter_hub("meldet_sich").await;
+            sqlx::query(sqlx::AssertSqlSafe(sql.to_string()))
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert!(sperren_am_einsatz(&pool, e).await.is_empty(), "{grund}");
+        }
+        let (pool, e) = gesperrter_hub("wird_gemeldet").await;
+        assert!(
+            sperren_am_einsatz(&pool, e).await.is_empty(),
+            "erreichte Seite"
+        );
     }
 
     #[tokio::test]

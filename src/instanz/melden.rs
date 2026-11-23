@@ -195,6 +195,13 @@ pub struct MeldenAntwort {
     /// älterer Stand nennt es nicht: dann `false`.
     #[serde(default)]
     pub ios_push: bool,
+    /// Seit wann das Push-Relais die erreichte Seite sperrt (`ios_push_relais.gesperrt_at`, UTC;
+    /// LLH-2074). Nur mit iOS-Push; die Sperre zählt, bis wieder ein Versand durchgeht, auch nach
+    /// Ablauf von `SPERRE_GILT_STUNDEN`. Die meldende Seite zeigt sie der Einsatzleitung, pusht
+    /// aber nicht selbst: die Geräte sind am Hub angemeldet. Ein älterer Stand nennt es nicht:
+    /// dann nicht gesperrt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ios_push_gesperrt_seit: Option<String>,
     /// Die erreichte Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7); wie
     /// [`MeldenAnfrage::rolle_mitarbeit`].
     #[serde(default)]
@@ -708,6 +715,31 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     melden_einmal_mit(pool, kopplung, true).await
 }
 
+/// Die Sperre des Hubs am Push-Relais aus seiner Meldeantwort (LLH-2074), wie die meldende Seite
+/// sie speichert. Ein kanonischer Zeitpunkt (ADR-0012) gilt wie gemeldet. Einen anderen Wert (ein
+/// fehlerhafter oder fremder Hub) verschluckt sie nicht: die Sperre gilt, mit dem schon
+/// gespeicherten Zeitpunkt oder sonst `jetzt`, damit der Wert nicht bei jeder Meldung springt.
+fn sperrzeit_uebernehmen(
+    kopplung: &KopplungZeile,
+    gemeldet: Option<&str>,
+    jetzt: &str,
+) -> Option<String> {
+    let gemeldet = gemeldet?;
+    if crate::zeit::parse_streng(gemeldet).is_some() {
+        return Some(gemeldet.to_string());
+    }
+    match &kopplung.gegenueber_ios_push_gesperrt_seit {
+        Some(bisher) => Some(bisher.clone()),
+        None => {
+            tracing::warn!(
+                kopplung_id = kopplung.id,
+                "iOS-Push-Sperre des Gegenübers ohne gültigen Zeitpunkt; gilt ab jetzt"
+            );
+            Some(jetzt.to_string())
+        }
+    }
+}
+
 /// Wie [`melden_einmal`]; `aufloesen` erlaubt höchstens ein Neuauflösen der Adresse je Lauf, damit
 /// zwei angekündigte Adressen einander nicht ohne Ende ablösen (LLH-1497, Review).
 async fn melden_einmal_mit(
@@ -897,6 +929,10 @@ async fn melden_einmal_mit(
     } else {
         add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
     };
+    // Sperre des Hubs am Push-Relais (LLH-2074): nur kanonisch gespeichert (ADR-0012).
+    let ios_push_gesperrt_seit =
+        sperrzeit_uebernehmen(kopplung, a.ios_push_gesperrt_seit.as_deref(), &jetzt);
+    let sperre_geaendert = ios_push_gesperrt_seit != kopplung.gegenueber_ios_push_gesperrt_seit;
     let mut abgelehnt_alle = Vec::new();
     let mut vom_gegenueber_widerrufen = Vec::new();
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
@@ -925,6 +961,7 @@ async fn melden_einmal_mit(
             a.hinweise,
             a.web_push,
             a.ios_push,
+            ios_push_gesperrt_seit.as_deref(),
             a.rolle_mitarbeit,
         )
         .await?;
@@ -1090,6 +1127,10 @@ async fn melden_einmal_mit(
     // Admin-Spur der übernommenen Akten.
     fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     if let Some(live) = stammdaten::live() {
+        // Beginnt oder endet die Sperre des Hubs, holen offene Einsätze ihren Kopf neu (Band).
+        if sperre_geaendert {
+            super::spiegel::hinweis::sperre_melden(pool, live, kopplung.id).await;
+        }
         for org_id in &stammdaten_geaendert {
             live.publiziere_stammdaten(*org_id);
         }
@@ -1316,6 +1357,7 @@ pub async fn handle_meldung(
     anfrage: &MeldenAnfrage,
     web_push: bool,
     ios_push: bool,
+    ios_push_gesperrt_seit: Option<String>,
 ) -> Result<MeldenAntwort, AppError> {
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
@@ -1744,6 +1786,7 @@ pub async fn handle_meldung(
         hinweise: true,
         web_push,
         ios_push,
+        ios_push_gesperrt_seit: ios_push_gesperrt_seit.filter(|_| ios_push),
         rolle_mitarbeit: rolle_mitarbeit_melden(),
     })
 }
@@ -1891,6 +1934,7 @@ mod tests {
             hinweise: true,
             web_push: false,
             ios_push: false,
+            ios_push_gesperrt_seit: None,
             rolle_mitarbeit: true,
         }
     }
@@ -2192,6 +2236,10 @@ mod tests {
         assert!(!a.hinweise);
         assert!(!a.web_push);
         assert!(!a.ios_push);
+        assert_eq!(
+            a.ios_push_gesperrt_seit, None,
+            "älterer Hub: nicht gesperrt"
+        );
     }
 
     #[test]

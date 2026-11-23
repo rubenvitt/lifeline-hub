@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 23.11.2026 (Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -766,6 +766,12 @@ sequenceDiagram
 
 - Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort je Kanal
   (`MeldenAntwort.hinweise`, `web_push`, `ios_push`); die meldende Seite merkt es an der Kopplung.
+- Sperrt das Push-Relais den Hub, nennt er es mit (`MeldenAntwort.ios_push_gesperrt_seit`,
+  LLH-2074). Der ELW merkt es an der Kopplung und zeigt es an jedem Einsatz, dessen Hinweise über
+  diesen Hub reisen (`EinsatzAnzeige.ios_push_hub_gesperrt`, Band für Einsatzleitung und Admins),
+  pusht Hub-Konten aber nicht selbst: ihre Geräte sind am Hub angemeldet. Beginn und Ende der
+  Sperre melden den Einsatzkopf (`hinweis::sperre_melden`); Entscheidung:
+  [ADR-0095](entscheidungen/ADR-0095-ein-am-relais-gesperrter-hub-wird-am-elw-angezeigt-nicht-ersetzt.md).
 - Bietet der Hub einen Kanal an, lässt der ELW den Push in diesem Kanal nur an Konten aus, die aus
   der Kopplung stammen (`hinweis::konten_am_hub` mit `hinweis::Kanal`). Konten nur am ELW, einen
   Kanal, den der Hub nicht anbietet, und ein gescheitertes Vormerken pusht er selbst.
