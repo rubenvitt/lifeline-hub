@@ -667,10 +667,10 @@ sequenceDiagram
   participant TC as tile-cache.db
   participant Up as Online-Kartenanbieter
   participant MB as MBTiles in karten/
-  ML->>BE: GET /api/karte/config
-  BE-->>ML: Quellen, bei Proxy relative /api/karte/proxy/{id}/…
+  ML->>BE: GET /api/map/config
+  BE-->>ML: Quellen, bei Proxy relative /api/map/proxy/{id}/…
   alt Online-Quelle über Proxy
-    ML->>BE: GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
+    ML->>BE: GET /api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}
     BE->>TC: nachschlagen
     opt fehlt oder veraltet
       BE->>Up: GET (SSRF-Prüfung, If-None-Match)
@@ -678,7 +678,7 @@ sequenceDiagram
     end
     BE-->>ML: Kachel (fällt der Anbieter aus, der alte Stand)
   else Offline-Karte
-    ML->>BE: GET /api/karte/offline/tiles/{z}/{x}/{y}
+    ML->>BE: GET /api/map/offline/tiles/{z}/{x}/{y}
     BE->>MB: Kachel lesen (TMS-Y-Flip)
     BE-->>ML: Kachel gzip, ohne aktive Karte 204
   end
@@ -688,11 +688,11 @@ sequenceDiagram
   Cache `src/karte/tile_cache.rs`: `TILE_CACHE_CAP_BYTES` = 256 MB in `<karten_dir>/tile-cache.db`;
   gleichzeitige Fehlgriffe auf dieselbe URL teilen sich einen Abruf (LFH-930, Modulkopf).
 - Offline-Karten `src/karte/mbtiles.rs`; Glyphs und Sprite sind eingebettet
-  (`/api/karte/offline/{fonts,sprites}/…`). Das Frontend wählt online, dann offline, sonst den
+  (`/api/map/offline/{fonts,sprites}/…`). Das Frontend wählt online, dann offline, sonst den
   Blind-Modus ([`docs/betrieb/packaging.md`](../betrieb/packaging.md), „Lagekarte / Basemap“).
 - Bezug: Der Admin lädt eine Karte aus dem Katalog (`src/karte/katalog.rs`,
   `crates/karten-katalog`) per SHA256-Pin nach `karten/` (`src/karte/download.rs`).
-  `POST /api/karte/offline-karten/bauen` reicht einen Bauauftrag mit Token an
+  `POST /api/map/offline-maps/build` reicht einen Bauauftrag mit Token an
   `POST {url}/builds` des `karten-service` weiter (`src/routes/karte.rs`). Der baut mit `make`
   und Docker aus `karten-build` (`karten-service/src/build/make_runner.rs`) und lädt Ergebnis und
   Manifest in den Objektspeicher (`karten-service/src/storage/s3.rs`). Spec:

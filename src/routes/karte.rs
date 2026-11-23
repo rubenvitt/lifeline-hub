@@ -28,7 +28,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use utoipa::ToSchema;
 
-/// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
+/// Antwort von `GET /api/map/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
 /// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
 /// `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
 #[derive(Debug, Serialize, ToSchema)]
@@ -56,7 +56,7 @@ pub struct KarteConfigAntwort {
 }
 
 /// Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
-/// region-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
+/// region-adressiert (`/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
 /// Frontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OfflineRegionConfig {
@@ -77,9 +77,9 @@ const REGION_MAXZOOM: u32 = 14;
 /// Maxzoom der Welt-Übersicht (Low-Zoom-Basis) — darüber überzoomt MapLibre sie als groben Kontext.
 const WELT_MAXZOOM: u32 = 6;
 
-/// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
+/// GET /api/map/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
 pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAntwort>, AppError> {
-    // Proxied Quellen (proxy=1) bekommen relative /api/karte/proxy/...-URLs; die Upstream-`url`
+    // Proxied Quellen (proxy=1) bekommen relative /api/map/proxy/...-URLs; die Upstream-`url`
     // (inkl. Key) verlässt den Server NIE über diesen öffentlichen Endpunkt. Direkte Quellen
     // (proxy=0) werden unverändert ausgeliefert (Browser lädt sie selbst).
     let online_styles: Vec<OnlineStyle> = repo::aktive_online_quellen_fuer_config(&state.pool)
@@ -120,7 +120,7 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
                     .filter(|c| c.is_ascii_alphanumeric())
                     .collect();
                 OfflineRegionConfig {
-                    tiles_url: format!("/api/karte/offline/{}/tiles/{{z}}/{{x}}/{{y}}?v={v}", r.id),
+                    tiles_url: format!("/api/map/offline/{}/tiles/{{z}}/{{x}}/{{y}}?v={v}", r.id),
                     karte_id: r.id,
                     name: r.name,
                     attribution: r.lizenz,
@@ -138,7 +138,7 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
             OfflineRegionConfig {
                 karte_id: 0,
                 name: "Welt-Übersicht".into(),
-                tiles_url: format!("/api/karte/offline/welt/tiles/{{z}}/{{x}}/{{y}}?v={version}"),
+                tiles_url: format!("/api/map/offline/world/tiles/{{z}}/{{x}}/{{y}}?v={version}"),
                 attribution: Some("© OpenStreetMap contributors (ODbL)".into()),
                 format: "vektor".into(),
                 maxzoom: WELT_MAXZOOM,
@@ -175,7 +175,7 @@ fn grob_format(format: &str) -> &'static str {
     }
 }
 
-/// GET /api/karte/offline/tiles/{z}/{x}/{y} — **Kompat-Endpoint** (LFH-188): Kachel der ERSTEN
+/// GET /api/map/offline/tiles/{z}/{x}/{y} — **Kompat-Endpoint** (LFH-188): Kachel der ERSTEN
 /// sichtbaren Offline-Region (via `aktive_offline_karte_pfad_und_format`, LIMIT 1). Für alte
 /// Clients ohne Multi-Region-Support; neue Clients nutzen den region-adressierten Endpoint.
 pub async fn offline_tiles(
@@ -189,7 +189,7 @@ pub async fn offline_tiles(
     serve_offline_tile(&state, &pfad_rel, &format, z, x, y).await
 }
 
-/// GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y} — region-adressierte Kachel EINER bereiten
+/// GET /api/map/offline/{karte_id}/tiles/{z}/{x}/{y} — region-adressierte Kachel EINER bereiten
 /// Offline-Region (LFH-188, Multi-Region). Das Frontend bindet je sichtbarer Region eine eigene
 /// Vector-Source auf diesen Endpoint. `204`, wenn die Region unbekannt/nicht bereit ist.
 pub async fn offline_tiles_region(
@@ -204,7 +204,7 @@ pub async fn offline_tiles_region(
     serve_offline_tile(&state, &pfad_rel, &format, z, x, y).await
 }
 
-/// GET /api/karte/offline/welt/tiles/{z}/{x}/{y} — Kachel der eingebetteten Welt-Übersicht
+/// GET /api/map/offline/world/tiles/{z}/{x}/{y} — Kachel der eingebetteten Welt-Übersicht
 /// (Low-Zoom-Basis, LFH-207), beim Start nach `karten_dir/welt-uebersicht.mbtiles` extrahiert.
 /// `204`, wenn keine Welt-Übersicht eingebettet/extrahiert ist (dann fehlt die Datei → serve_offline_tile
 /// liefert über den Containment-Check ohnehin 204). Immer Vektor (`pbf`, Shortbread).
@@ -361,7 +361,7 @@ fn if_none_match(headers: &HeaderMap) -> Option<&str> {
         .and_then(|v| v.to_str().ok())
 }
 
-/// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
+/// GET /api/map/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
 /// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
 pub async fn offline_fonts(
     headers: HeaderMap,
@@ -382,7 +382,7 @@ pub async fn offline_fonts(
     )
 }
 
-/// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
+/// GET /api/map/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
 pub async fn offline_sprite(headers: HeaderMap, PfadParam(datei): PfadParam<String>) -> Response {
     // Nur bekannte Basisnamen zulassen (kein Traversal).
     let ct = if datei.ends_with(".png") {
@@ -567,7 +567,7 @@ fn fachebene_antwort(
         .into_response())
 }
 
-/// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag, bedingt
+/// GET /api/map/overlays/{quelle} — externe Lagedaten als GeoJSON-Umschlag, bedingt
 /// abrufbar über `ETag`/`If-None-Match` (LFH-594, s. [`fachebene_antwort`]).
 pub async fn fachebenen(
     State(state): State<AppState>,
@@ -860,7 +860,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
     })
 }
 
-/// GET /api/karte/online-quellen — alle Online-Quellen. Lesen: admin ODER Führungskraft
+/// GET /api/map/online-sources — alle Online-Quellen. Lesen: admin ODER Führungskraft
 /// (read-only), Muster wie `org_einstellungen` — Schreiben bleibt admin-only.
 pub async fn online_liste(
     State(state): State<AppState>,
@@ -883,7 +883,7 @@ pub async fn online_liste(
     Ok(Json(quellen))
 }
 
-/// POST /api/karte/online-quellen — neue Online-Quelle anlegen (Admin).
+/// POST /api/map/online-sources — neue Online-Quelle anlegen (Admin).
 pub async fn online_anlegen(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -894,12 +894,12 @@ pub async fn online_anlegen(
     Ok((StatusCode::CREATED, Json(quelle)))
 }
 
-/// GET /api/karte/online-quellen/katalog — kuratierter Vorschlagskatalog (eingebaute Shortlist).
+/// GET /api/map/online-sources/catalog — kuratierter Vorschlagskatalog (eingebaute Shortlist).
 pub async fn online_katalog(_admin: AdminUser) -> Result<Json<Vec<OnlineStyle>>, AppError> {
     Ok(Json(default_online_styles()))
 }
 
-/// PATCH /api/karte/online-quellen/{id} — Online-Quelle teilweise aktualisieren (Admin).
+/// PATCH /api/map/online-sources/{id} — Online-Quelle teilweise aktualisieren (Admin).
 ///
 /// Echter Teil-Patch (LFH-306): Feld absent = unverändert. Validiert gegen den
 /// Effektivzustand — insbesondere läuft das SSRF-Gate auch bei `{"proxy":true}` ohne `url`.
@@ -925,7 +925,7 @@ pub async fn online_aktualisieren(
     Ok(Json(aktualisiert))
 }
 
-/// DELETE /api/karte/online-quellen/{id} — Online-Quelle löschen (Admin).
+/// DELETE /api/map/online-sources/{id} — Online-Quelle löschen (Admin).
 pub async fn online_loeschen(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -941,7 +941,7 @@ pub async fn online_loeschen(
     }
 }
 
-/// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
+/// GET /api/map/offline-maps — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
 /// Listen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur
 /// für `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist
 /// `null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den
@@ -977,7 +977,7 @@ fn fortschritt_werte(f: &Fortschritt) -> (i64, Option<i64>) {
     )
 }
 
-/// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
+/// GET /api/map/offline-maps — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
 /// Ein passender Katalog-Eintrag für ein Update: gleicher `name`, andere (neuere) `url` — und
 /// **vollständig gepinnt/lieferbar** (echte URL + sha256). Ein ungebauter Platzhalter (TODO-URL)
 /// wird NIE als Update angeboten, sonst liefe „Aktualisieren" auf eine nicht-ladbare URL
@@ -1160,7 +1160,7 @@ pub async fn offline_liste(
     Ok(Json(antwort))
 }
 
-/// POST /api/karte/offline-karten — vorhandene Offline-Karte registrieren (Admin).
+/// POST /api/map/offline-maps — vorhandene Offline-Karte registrieren (Admin).
 pub async fn offline_registrieren(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -1214,7 +1214,7 @@ pub async fn offline_registrieren(
     Ok((StatusCode::CREATED, Json(karte)))
 }
 
-/// POST /api/karte/offline-karten/{id}/aktivieren — als aktive Basemap setzen (Admin).
+/// POST /api/map/offline-maps/{id}/activate — als aktive Basemap setzen (Admin).
 pub async fn offline_aktivieren(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -1226,7 +1226,7 @@ pub async fn offline_aktivieren(
         .ok_or(AppError::NotFound)
 }
 
-/// DELETE /api/karte/offline-karten/{id} — Offline-Karte löschen (Admin).
+/// DELETE /api/map/offline-maps/{id} — Offline-Karte löschen (Admin).
 ///
 /// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.mbtiles` + evtl.
 /// `.part`), sonst leckt jeder Download→Löschen-Zyklus mehrere GB. Extern registrierte Karten
@@ -1310,7 +1310,7 @@ fn finde_nicht_registrierte(
     out
 }
 
-/// GET /api/karte/offline-karten/vorhandene — im karten_dir liegende, noch nicht registrierte
+/// GET /api/map/offline-maps/existing — im karten_dir liegende, noch nicht registrierte
 /// MBTiles (lokaler Import gebauter Region-Packs, LFH-199). Admin only.
 pub async fn offline_vorhandene(
     State(state): State<AppState>,
@@ -1327,7 +1327,7 @@ pub async fn offline_vorhandene(
     )))
 }
 
-/// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
+/// GET /api/map/offline-maps/catalog — kuratierter Download-Vorschlagskatalog (Admin).
 /// Hybrid (LFH-199): compiled-in Default ∪ best-effort geholtes Remote-Manifest (füllt den Cache,
 /// den `offline_liste` mitnutzt). Fetch-Fehler → nur compiled-in.
 /// `?frisch=1` umgeht die Manifest-Cache-TTL (LFH-206, „Bauen & laden"): direkt nach einem fertigen
@@ -1572,7 +1572,7 @@ pub(crate) async fn starte_in_place_reload(
     Ok(())
 }
 
-/// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
+/// POST /api/map/offline-maps/download — startet einen Hintergrund-Download (Admin).
 ///
 /// Legt IMMER eine NEUE Zeile an (kein Re-Download in eine aktive Karte) — die Live-Lagekarte
 /// bleibt während des Mehr-GB-Downloads verfügbar, bis der Admin die neue Karte aktiviert.
@@ -1707,7 +1707,7 @@ pub async fn offline_download(
     Ok((StatusCode::ACCEPTED, Json(karte)))
 }
 
-/// POST /api/karte/offline-karten/{id}/abbrechen — laufenden Download ODER In-Place-Reload
+/// POST /api/map/offline-maps/{id}/cancel — laufenden Download ODER In-Place-Reload
 /// abbrechen (Admin). Setzt das Abbruch-Flag; der Task bricht beim nächsten Chunk ab und räumt die
 /// `.part`-Datei auf. Ein Neu-Zeile-Download (`offline_download`) geht danach auf Status `fehler`;
 /// ein In-Place-Reload (`starte_in_place_reload`) lässt die alte Karte bewusst UNANGETASTET bereit+aktiv
@@ -1753,7 +1753,7 @@ static KARTEN_SERVICE_CLIENT: std::sync::LazyLock<reqwest::Client> =
             .expect("karten-service-Client baubar")
     });
 
-/// POST /api/karte/offline-karten/bauen — stößt einen Region-Build beim zentralen karten-service
+/// POST /api/map/offline-maps/build — stößt einen Region-Build beim zentralen karten-service
 /// an (Admin, LFH-203). Das Bearer-Token bleibt server-side: der Browser ruft NUR lifeline-hub,
 /// lifeline-hub reicht den Trigger mit Token an `POST {url}/builds` weiter und gibt die
 /// Service-Antwort (`{job_id}`) unverändert durch. `501`, wenn der Service nicht konfiguriert ist
@@ -1830,7 +1830,7 @@ pub(crate) async fn service_get_liste<T: serde::de::DeserializeOwned>(
         .map_err(|e| AppError::BadGateway(format!("karten-service-Antwort: {e}")))
 }
 
-/// GET /api/karte/offline-karten/baubare-regionen — forwarded `GET {url}/regions` des zentralen
+/// GET /api/map/offline-maps/buildable-regions — forwarded `GET {url}/regions` des zentralen
 /// karten-service (Admin, LFH-203). Liefert die vom Service baubaren Regionen für die Admin-UI-Liste.
 pub async fn offline_baubare_regionen(
     State(st): State<AppState>,
@@ -1839,7 +1839,7 @@ pub async fn offline_baubare_regionen(
     Ok(Json(service_get_liste::<RegionDto>(&st, "/regions").await?))
 }
 
-/// GET /api/karte/offline-karten/bau-status — forwarded `GET {url}/builds` des zentralen
+/// GET /api/map/offline-maps/build-status — forwarded `GET {url}/builds` des zentralen
 /// karten-service (Admin, LFH-203). Liefert den Build-Status (u.a. laufende/abgeschlossene Jobs)
 /// zum Polling im Admin-UI.
 pub async fn offline_bau_status(
@@ -1977,7 +1977,7 @@ async fn bau_anstossen(url: &str, token: &str, slug: &str) -> Result<u64, AppErr
         .ok_or_else(|| AppError::BadGateway(format!("karten-service ohne job_id: {antwort}")))
 }
 
-/// POST /api/karte/offline-karten/{id}/jetzt-aktualisieren — Aktualisierung sofort anstoßen
+/// POST /api/map/offline-maps/{id}/update-now — Aktualisierung sofort anstoßen
 /// (Admin, D6). Neuerer Katalogstand → sofort laden (`202 laedt`); sonst Neubau beim
 /// karten-service, dessen Ergebnis der Wächter lädt (`202 bau_wartet|baut`); ohne Dienst oder
 /// baubare Region `200 aktuell`. `422` bei registrierter Karte oder laufender Aktualisierung,
@@ -2175,7 +2175,7 @@ async fn aktualisierungs_status(state: &AppState) -> Result<AktualisierungsStatu
     })
 }
 
-/// GET /api/karte/offline-karten/aktualisierung — Status der automatischen Aktualisierung (D7).
+/// GET /api/map/offline-maps/auto-update — Status der automatischen Aktualisierung (D7).
 /// Lesen: admin ODER Führungskraft, wie die Liste. Ein unerreichbarer karten-service ist
 /// `bau_dienst: unerreichbar`, kein Fehler der Seite.
 pub async fn offline_aktualisierung_status(
@@ -2188,7 +2188,7 @@ pub async fn offline_aktualisierung_status(
     Ok(Json(aktualisierungs_status(&state).await?))
 }
 
-/// PUT /api/karte/offline-karten/aktualisierung/einstellung — Automatik an/aus und Prüfabstand
+/// PUT /api/map/offline-maps/auto-update/settings — Automatik an/aus und Prüfabstand
 /// speichern (Admin, D10). Wirkt ohne Neustart (der Wächter wird geweckt). `400` bei einem
 /// Prüfabstand außerhalb 1…168 Stunden. Antwort: der aktuelle Status.
 pub async fn offline_aktualisierung_einstellen(
@@ -2351,7 +2351,7 @@ async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppE
     Ok(asset_antwort(asset))
 }
 
-/// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
+/// GET /api/map/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
 pub async fn proxy_style(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,
@@ -2372,7 +2372,7 @@ pub async fn proxy_style(
     Ok(json_proxy_antwort(json))
 }
 
-/// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
+/// GET /api/map/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
 pub async fn proxy_raster(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,
@@ -2386,7 +2386,7 @@ pub async fn proxy_raster(
     proxy_asset(&state, u).await
 }
 
-/// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
+/// GET /api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
 pub async fn proxy_tile(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,
@@ -2401,7 +2401,7 @@ pub async fn proxy_tile(
     proxy_asset(&state, u).await
 }
 
-/// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
+/// GET /api/map/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
 pub async fn proxy_tilejson(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,
@@ -2424,7 +2424,7 @@ pub async fn proxy_tilejson(
     Ok(json_proxy_antwort(json))
 }
 
-/// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
+/// GET /api/map/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
 pub async fn proxy_sprite(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,
@@ -2437,7 +2437,7 @@ pub async fn proxy_sprite(
     proxy_asset(&state, u).await
 }
 
-/// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
+/// GET /api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
 pub async fn proxy_glyphs(
     _zugriff: KartenZugriff,
     State(state): State<AppState>,

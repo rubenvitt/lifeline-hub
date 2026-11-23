@@ -34,9 +34,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  */
 
 const KAPITEL = 'evakuierung';
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
-const GRUNDKARTE = { name: 'Grundkarte', stil: '/api/karte/proxy/9/a/style.json', quelle: 'grund' };
+const GRUNDKARTE = { name: 'Grundkarte', stil: '/api/map/proxy/9/a/style.json', quelle: 'grund' };
 
 /** Beantwortet Kartenkonfiguration, Stil und Kacheln aus der Fixture (vor dem ersten `goto`). */
 async function karteVorbereiten(page: Page) {

@@ -57,7 +57,7 @@ pub struct OnlineStyle {
     pub attribution: Option<String>,
     /// Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
     /// mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
-    /// nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+    /// nicht mit einem Klick zur Grundlage aller werden. In `/api/map/config` immer absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hinweis: Option<String>,
     /// Die Grundlage ist dunkel (LLH-1486): die Lagekarte rastert ihre taktischen Zeichen dann mit
@@ -67,7 +67,7 @@ pub struct OnlineStyle {
     pub dunkel: bool,
 }
 
-/// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/karte/online-quellen/katalog`), kein
+/// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/map/online-sources/catalog`), kein
 /// Seed — die DB-Registry startet leer. Die ersten fünf sind behördlich/kommerziell nutzbar.
 ///
 /// **Ausnahme „Satellit (Esri)“** (LFH-616): ein kostenloses, hochauflösendes Luftbild mit
@@ -141,7 +141,7 @@ pub use karten_katalog::{
     eintrag_ist_lieferbar, merge_offline_katalog, remote_eintrag_ist_gueltig, OfflineKatalogEintrag,
 };
 
-/// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
+/// Kuratierter Offline-Karten-Katalog (`GET /api/map/offline-maps/catalog`): Eigenbau
 /// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), vom `karten-service` des Projekts unter
 /// [`crate::karte::katalog::KARTEN_BASIS_URL`] veröffentlicht.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {

@@ -13,7 +13,7 @@ import { bestaetigeVerwerfen, findeDialogOhneRueckfrage } from '../test/verwerfe
 
 function handler(onSend: (body: unknown) => void = () => {}, status = 200) {
   server.use(
-    http.post('/api/karte/offline-karten/download', async ({ request }) => {
+    http.post('/api/map/offline-maps/download', async ({ request }) => {
       onSend(await request.json());
       if (status !== 200) return HttpResponse.json({ error: 'URL nicht erreichbar' }, { status });
       return HttpResponse.json({ id: 5, name: 'Deutschland', status: 'laedt' });
@@ -168,7 +168,7 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
 
   /** Ohne Servermeldung (Netz weg) nennt der Dialog den Netzfehler, nicht „Speichern“. */
   it('nennt bei einem Netzfehler „nicht abgeschickt“ im Dialog', async () => {
-    server.use(http.post('/api/karte/offline-karten/download', () => HttpResponse.error()));
+    server.use(http.post('/api/map/offline-maps/download', () => HttpResponse.error()));
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
 

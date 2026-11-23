@@ -100,10 +100,10 @@ test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', a
     (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte.setStyle(
       {
         version: 8,
-        glyphs: '/api/karte/offline/fonts/{fontstack}/{range}.pbf',
+        glyphs: '/api/map/offline/fonts/{fontstack}/{range}.pbf',
         // Absolut wie `offlineStyle` (LFH-781): root-relativ verwarf MapLibre die URL vor jedem
         // Abruf, und dieser Test hätte das Sprite nie angefragt.
-        sprite: `${location.origin}/api/karte/offline/sprites/basemap`,
+        sprite: `${location.origin}/api/map/offline/sprites/basemap`,
         sources: {},
         layers: [{ id: 'hintergrund', type: 'background', paint: { 'background-color': '#111' } }],
       },
