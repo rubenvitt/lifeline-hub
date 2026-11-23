@@ -1,11 +1,11 @@
 //! HTTP-Routen von iOS-Push (LLH-2040; Spec `ios-push`).
 //!
-//! GET    /api/ios-push?kennung=…   — Stand dieses Geräts (Schalter, Anmeldung samt Bindung an
-//!                                    diese Sitzung, Wahl, Relais)
-//! PUT    /api/ios-push/anmeldung   — Gerät für diese Sitzung anmelden, samt der Wahl „Mit
-//!                                    Absender und Wortlaut“ und der stummen Arten (204)
-//! DELETE /api/ios-push/anmeldung   — eigene Anmeldung abmelden (idempotent, 204)
-//! POST   /api/ios-push/abmelden    — ohne Sitzung, gegen den Nachweis des Geräts (immer 204)
+//! GET    /api/ios-push?kennung=…     — Stand dieses Geräts (Schalter, Anmeldung samt Bindung
+//!                                      an diese Sitzung, Wahl, Relais)
+//! PUT    /api/ios-push/registration  — Gerät für diese Sitzung anmelden, samt der Wahl „Mit
+//!                                      Absender und Wortlaut“ und der stummen Arten (204)
+//! DELETE /api/ios-push/registration  — eigene Anmeldung abmelden (idempotent, 204)
+//! POST   /api/ios-push/unregister    — ohne Sitzung, gegen den Nachweis des Geräts (immer 204)
 //!
 //! Ohne `--ios-push` antworten alle vier 404 wie ein unbekannter Pfad. Die Anmeldung hängt an
 //! Konto und Gerät (`kennung`), nicht an der Sitzung; die Sitzung merkt sich die Zeile nur, damit
@@ -155,7 +155,7 @@ pub async fn stand(
     }))
 }
 
-/// PUT /api/ios-push/anmeldung — 400, wenn ein Feld für sich nicht taugt; 422 bei gekoppeltem
+/// PUT /api/ios-push/registration — 400, wenn ein Feld für sich nicht taugt; 422 bei gekoppeltem
 /// ELW oder einer Kennung, die mit anderem Token und Schlüssel einem anderen Konto gehört
 /// ([`repo::anmelden`]).
 pub async fn anmelden(
@@ -223,7 +223,7 @@ pub async fn anmelden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/ios-push/anmeldung
+/// DELETE /api/ios-push/registration
 pub async fn abmelden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -234,7 +234,7 @@ pub async fn abmelden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/ios-push/abmelden — ohne Sitzung (öffentlich): das Gerät beweist den Besitz mit dem
+/// POST /api/ios-push/unregister — ohne Sitzung (öffentlich): das Gerät beweist den Besitz mit dem
 /// Nachweis aus seinem Schlüssel. Die Antwort ist immer 204 und verrät weder, ob die Kennung
 /// bekannt ist, noch, ob der Nachweis stimmte.
 pub async fn abmelden_mit_nachweis(

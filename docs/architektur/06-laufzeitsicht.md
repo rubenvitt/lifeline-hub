@@ -789,7 +789,7 @@ sequenceDiagram
   FE->>IOS: push_register
   IOS->>IOS: Berechtigung, Token; je Server Kennung und Schlüssel (Schlüsselbund)
   IOS-->>FE: registration_id, token, environment, key
-  FE->>BE: PUT /api/ios-push/anmeldung (mit inhalt, stumm)
+  FE->>BE: PUT /api/ios-push/registration (mit inhalt, stumm)
   BE->>BE: Upsert auf token, an Konto und Gerät
   Note over BE,IP: später: benachrichtigung::ausliefern
   BE->>IP: versenden (eigener Task, Filter wie Web Push)

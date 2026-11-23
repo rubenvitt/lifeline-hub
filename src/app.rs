@@ -329,15 +329,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/web-push/abo",
             put(routes::web_push::anmelden).delete(routes::web_push::abmelden),
         )
-        // iOS-Push (LLH-2040): ohne `--ios-push` 404 aus dem Handler. `abmelden` ist öffentlich
+        // iOS-Push (LLH-2040): ohne `--ios-push` 404 aus dem Handler. `unregister` ist öffentlich
         // (kein `CurrentUser`): das Gerät beweist den Besitz mit dem Nachweis aus seinem Schlüssel.
         .route("/api/ios-push", get(routes::ios_push::stand))
         .route(
-            "/api/ios-push/anmeldung",
+            "/api/ios-push/registration",
             put(routes::ios_push::anmelden).delete(routes::ios_push::abmelden),
         )
         .route(
-            "/api/ios-push/abmelden",
+            "/api/ios-push/unregister",
             post(routes::ios_push::abmelden_mit_nachweis)
                 .layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )

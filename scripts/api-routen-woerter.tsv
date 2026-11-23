@@ -49,6 +49,7 @@ info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
 integrations	Anbindungen
+ios-push	-
 jwks.json	-
 lan	-
 live	-
@@ -81,6 +82,7 @@ raster	-
 read	gelesen
 redeem	einlösen
 register	-
+registration	-
 release-notes	Versionsstand
 reliefs	Ablösungen
 reports	Meldungen
@@ -117,6 +119,7 @@ transport	-
 triage	Sichtung
 uhs	UHS
 units	Einheiten
+unregister	-
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge

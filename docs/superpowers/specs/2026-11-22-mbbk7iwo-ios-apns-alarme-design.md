@@ -144,7 +144,7 @@ Zum Inhalt:
 
 ```
 iPhone (App)                 Lifeline-Server (je Betreiber)          Push-Relais (Ruben)        Apple
- ├─ Brücke: push_register ─► PUT /api/ios-push/anmeldung
+ ├─ Brücke: push_register ─► PUT /api/ios-push/registration
  │   {token, umgebung,          speichert Token+Geräteschlüssel
  │    schluessel, kennung}      an Konto+Gerät
  │                            Benachrichtigung entsteht
@@ -264,12 +264,12 @@ am selben Gerät).
   dieser Kennung und diesem Konto gibt es eine Anmeldung), inhalt, stumm, ueber_hub? }`. Die
   Kennung kommt aus der Hülle (`push_state`), denn nach einer neuen Sitzung ist die alte nicht
   mehr „diese“ (Claude).
-- `PUT /api/ios-push/anmeldung` → Body `{ kennung, token, umgebung, schluessel, inhalt, stumm }`.
+- `PUT /api/ios-push/registration` → Body `{ kennung, token, umgebung, schluessel, inhalt, stumm }`.
   Prüft Längen und Formate (Token 64–200 Hex-Zeichen, Schlüssel genau 32 Byte, `umgebung` aus
   der Liste). 422 bei Push über den Hub.
-- `DELETE /api/ios-push/anmeldung` → Body `{ kennung }`, meldet die Anmeldung dieses Kontos mit
+- `DELETE /api/ios-push/registration` → Body `{ kennung }`, meldet die Anmeldung dieses Kontos mit
   dieser Kennung ab, idempotent.
-- `POST /api/ios-push/abmelden` → **ohne Sitzung**, Body `{ kennung, nachweis }` mit
+- `POST /api/ios-push/unregister` → **ohne Sitzung**, Body `{ kennung, nachweis }` mit
   `nachweis = base64url(HMAC-SHA256(schluessel, "abmelden:" + kennung))`. Für die App, wenn
   jemand einen Server aus der App-Liste entfernt (dann gibt es keinen WebView mehr für ihn).
   Antwortet immer 204 (keine Auskunft, ob es die Kennung gab; Claude).
@@ -284,7 +284,7 @@ am selben Gerät).
   iOS-Anmeldungen des Kontos (verlorenes Gerät),
 - Sperren oder Löschen des Kontos (Sperren: explizit löschen; Löschen: CASCADE über
   `benutzer_id`),
-- Entfernen des Servers in der App (`abmelden` ohne Sitzung, unten),
+- Entfernen des Servers in der App (`unregister` ohne Sitzung, unten),
 - `token_ungueltig` vom Relais.
 
 Eine Anmeldung eines Kontos, das sich inzwischen nicht mehr anmelden darf (Rolle entzogen,
@@ -382,7 +382,7 @@ Person den Hub in der App haben und dort Push einschalten; die Oberfläche des E
 - `userNotificationCenter(_:didReceive:)` → `Ablauf.meldungAngetippt`. `willPresent` für
   Remote-Meldungen des **aktiven** Servers: keine Anzeige (die laufende Oberfläche meldet selbst
   über den Live-Kanal, sonst doppelt); für andere Server Banner wie heute.
-- Server entfernen: für jede Kennung des Servers `POST /api/ios-push/abmelden` mit Nachweis,
+- Server entfernen: für jede Kennung des Servers `POST /api/ios-push/unregister` mit Nachweis,
   einmal, ohne Wiederholen (URLSession, nicht der WebView; einzige native Netzanfrage an einen
   Server, die keine Seite lädt — Claude; Begründung: ohne WebView gibt es keinen anderen Weg, und
   sie trägt keine Anwendungslogik), danach Schlüssel löschen.
@@ -407,7 +407,7 @@ Servers“ wird ergänzt, wenn der Wechsel einen sichtbaren Zwischenzustand hat.
   bietet `register`/`unregister`/`state` über die Brücke an. Einzige Stelle mit Hüllenwissen.
 - `frontend/src/alarm/iosPush.ts` neben `webPush.ts`, gleiche Außenform (`moeglich`,
   `einschalten`, `ausschalten`, `abgleichen`, Stand). `einschalten`: Brücke `push_register` →
-  `PUT /api/ios-push/anmeldung` mit `inhalt` und `stumm` des Geräts. `abgleichen` wird an
+  `PUT /api/ios-push/registration` mit `inhalt` und `stumm` des Geräts. `abgleichen` wird an
   denselben Stellen gerufen wie `pushAbgleichen` (Anmeldung, `EingaengeKnopf`) und meldet ein
   geändertes Token neu.
 - Eine gemeinsame Schnittstelle „Push-Kanal“ wählt in `PushSchalter`
@@ -468,7 +468,7 @@ geprüft sein.
   Kopfzeilen und Rumpf je Stufe, kein Token im Log.
 - **Server**: Repo-Tests für Upsert, Sitzungsablauf lässt die Anmeldung stehen (SET NULL),
   Logout und „Sitzungen beenden“ löschen sie, Sperren des Kontos löscht sie, `erloschen`; Routen-Tests (404 ohne
-  Opt-in, 403 Gerätekonto, 422 über Hub, Validierung, `abmelden` mit falschem Nachweis ändert
+  Opt-in, 403 Gerätekonto, 422 über Hub, Validierung, `unregister` mit falschem Nachweis ändert
   nichts und antwortet 204); Versandtest gegen ein Relais-Doppel: Filter wie Web Push, Stumm,
   Alarm trotz Stumm, `token_ungueltig` löscht, Nutzlast ≤ 3 KB mit langem Wortlaut,
   Entschlüsselung im Test ergibt Titel/Detail/Pfad wie `GET /api/benachrichtigungen/{id}`;

@@ -33,10 +33,10 @@ export interface IosPushAnmeldungEingabe {
 
 /** Meldet dieses Gerät für den angemeldeten Nutzer an; dieselbe Kennung ersetzt die Anmeldung. */
 export function meldeIosPushAn(e: IosPushAnmeldungEingabe): Promise<void> {
-  return apiSend<void>('/api/ios-push/anmeldung', 'PUT', e);
+  return apiSend<void>('/api/ios-push/registration', 'PUT', e);
 }
 
 /** Meldet die Anmeldung dieses Geräts ab; idempotent. */
 export function meldeIosPushAb(kennung: string): Promise<void> {
-  return apiSend<void>('/api/ios-push/anmeldung', 'DELETE', { kennung });
+  return apiSend<void>('/api/ios-push/registration', 'DELETE', { kennung });
 }

@@ -873,7 +873,7 @@ async fn elw_lehnt_ios_anmeldung_fuer_hub_konto_mit_422_ab_wenn_der_hub_ios_kann
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
-        "/api/ios-push/anmeldung",
+        "/api/ios-push/registration",
         &erika,
         Some(&anmeldung),
     )
@@ -895,7 +895,7 @@ async fn elw_lehnt_ios_anmeldung_fuer_hub_konto_mit_422_ab_wenn_der_hub_ios_kann
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
-        "/api/ios-push/anmeldung",
+        "/api/ios-push/registration",
         &erika,
         Some(&anmeldung),
     )

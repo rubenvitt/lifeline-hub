@@ -75,7 +75,7 @@ Entscheidung ADR-0090; Server-Seite in `src/AGENTS.md`, „iOS-Push“, Relais i
   `src-tauri/faelle/push-nutzlast.json` zusammen (Klartext: `push-inhalt.json`).
 - **Native Anfragen an einen Server** gibt es nur drei: `GET /api/shell`, `GET /` für die
   `index.html` des Starts ohne Server (`Vorratsdienst`, ADR-0082) und
-  `POST /api/ios-push/abmelden` beim Entfernen eines Servers (`Vertragsabruf.meldePushAb`, ohne
+  `POST /api/ios-push/unregister` beim Entfernen eines Servers (`Vertragsabruf.meldePushAb`, ohne
   Sitzung). Die Abmeldung liegt in `PushAnmeldungen.ausstehend`, bis sie erledigt ist
   (`AusstehendeAbmeldung.isErledigt`: 2xx oder ein 4xx außer 408/429); erst dann fällt der
   Schlüssel. Versucht wird sie nach dem Entfernen, beim Start und bei jeder Rückkehr in den

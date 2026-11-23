@@ -49,7 +49,7 @@ async fn anmelden(app: &axum::Router, cookie: &str, kennung: &str, token: &str) 
     anfrage(
         app,
         "PUT",
-        "/api/ios-push/anmeldung",
+        "/api/ios-push/registration",
         cookie,
         Some(&body(kennung, token).to_string()),
     )
@@ -69,7 +69,7 @@ async fn oeffentlich_abmelden(app: &axum::Router, kennung: &str, nachweis: &str)
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/ios-push/abmelden")
+                .uri("/api/ios-push/unregister")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     json!({ "kennung": kennung, "nachweis": nachweis }).to_string(),
@@ -100,7 +100,7 @@ async fn ohne_schalter_404() {
         anfrage(
             &app,
             "DELETE",
-            "/api/ios-push/anmeldung",
+            "/api/ios-push/registration",
             &admin,
             Some(&del)
         )
@@ -202,7 +202,7 @@ async fn anmelden_stand_abmelden() {
         let (s, _) = anfrage(
             &app,
             "DELETE",
-            "/api/ios-push/anmeldung",
+            "/api/ios-push/registration",
             &admin,
             Some(&del),
         )
@@ -275,7 +275,7 @@ async fn fremde_kennung_uebernimmt_nur_dasselbe_geraet() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        "/api/ios-push/anmeldung",
+        "/api/ios-push/registration",
         &marlene,
         Some(&fremd.to_string()),
     )
@@ -332,7 +332,7 @@ async fn validierung_400_je_feld() {
         let (s, v) = anfrage(
             &app,
             "PUT",
-            "/api/ios-push/anmeldung",
+            "/api/ios-push/registration",
             &admin,
             Some(&b.to_string()),
         )

@@ -956,12 +956,12 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
 - **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
   anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
-  durch `DELETE /api/ios-push/anmeldung`, Logout (die Anmeldungen der Sitzung, in einer
+  durch `DELETE /api/ios-push/registration`, Logout (die Anmeldungen der Sitzung, in einer
   Transaktion mit der Sitzung, `session::abmelden`), „Sitzungen beenden“ (eine Sitzung: deren Anmeldungen; alle anderen: alle des Kontos
   außer denen der behaltenen Sitzung, auch die ohne Sitzung, `repo::loeschen_fuer_benutzer_ausser`;
   ein Admin für eine andere Person: alle des Kontos), Deaktivieren (jeder Weg, der `aktiv` auf 0
   setzt, über `session::konto_deaktiviert`) und Löschen des Kontos,
-  `POST /api/ios-push/abmelden` der
+  `POST /api/ios-push/unregister` der
   App und `token_ungueltig`. Der Ablauf einer Sitzung und ein Passwortwechsel lassen sie stehen
   (`session_token_hash` ist `ON DELETE SET NULL`); `GET /api/ios-push` nennt dann
   `an_dieser_sitzung: false`, und der Client bindet sie per `PUT` an die neue Sitzung, damit ein
@@ -970,7 +970,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
 - **Keine Sicherung trägt iOS-Push:** `backup::scrub_sessions` leert mit `session` auch
   `ios_push_anmeldung` und `ios_push_relais` (Token, Geräteschlüssel, Relais-Geheimnis). Eine neue
   Tabelle mit solchen Werten kommt dort dazu.
-- **`POST /api/ios-push/abmelden` ohne Sitzung:** Nachweis
+- **`POST /api/ios-push/unregister` ohne Sitzung:** Nachweis
   `HMAC-SHA256(schluessel, "abmelden:" + kennung)`; die Antwort ist immer 204, auch bei falschem
   Nachweis oder unbekannter Kennung. Gerätekonten erreichen die übrigen Routen nicht (403).
 - **Kopplung je Kanal:** `MeldenAntwort.ios_push` und `instanz_kopplung.gegenueber_ios_push`

@@ -66,7 +66,7 @@ public struct PushAnmeldungen: Codable, Equatable, Sendable {
     }
 }
 
-/// Eine Abmeldung beim Server (`POST /api/ios-push/abmelden`), die noch aussteht: der Server ist
+/// Eine Abmeldung beim Server (`POST /api/ios-push/unregister`), die noch aussteht: der Server ist
 /// aus der App entfernt, hat sie aber nicht bestätigt (etwa ohne Netz). Die App versucht sie bei
 /// jedem Start und jeder Rückkehr in den Vordergrund einmal.
 public struct AusstehendeAbmeldung: Codable, Equatable, Sendable {

@@ -62,7 +62,7 @@ final class EntschluesselerTests: XCTestCase {
         XCTAssertNil(Entschluesseler.oeffnen(fremderUmschlag, schluessel: schluessel))
     }
 
-    /// `POST /api/ios-push/abmelden` prüft `nachweis` wie `src/ios_push/krypto.rs::nachweis`.
+    /// `POST /api/ios-push/unregister` prüft `nachweis` wie `src/ios_push/krypto.rs::nachweis`.
     func testNachweisWieDerServer() throws {
         for fall in try faelle() {
             let schluessel = try XCTUnwrap(Base64URL.decode(fall.schluessel), fall.beschreibung)

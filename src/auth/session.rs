@@ -140,7 +140,7 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<Option<String>, 
 }
 
 /// Logout: die iOS-Anmeldungen dieser Sitzung (LLH-2040) und die Sitzung selbst, in einer
-/// Transaktion. Getrennt könnte ein `PUT /api/ios-push/anmeldung` derselben Sitzung dazwischen
+/// Transaktion. Getrennt könnte ein `PUT /api/ios-push/registration` derselben Sitzung dazwischen
 /// das Gerät neu anmelden, und die Sitzung zu löschen setzte dann nur `session_token_hash` auf
 /// NULL (Review M6). Liefert die Kennung der Sitzung wie [`loeschen`].
 pub async fn abmelden(pool: &SqlitePool, token: &str) -> Result<Option<String>, AppError> {

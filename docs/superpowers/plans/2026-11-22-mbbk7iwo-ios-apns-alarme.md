@@ -315,12 +315,12 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
 - `GET /api/ios-push?kennung=<uuid>` → `IosPushStand { eingeschaltet: bool, angemeldet: bool,
   inhalt: bool, stumm: Vec<BenachrichtigungArt>, ueber_hub: Option<PushUeberHub>,
   relais_gesperrt: bool }` (`ToSchema`). Ohne `--ios-push` 404.
-- `PUT /api/ios-push/anmeldung` Body `IosPushAnmeldung { kennung, token, umgebung, schluessel,
+- `PUT /api/ios-push/registration` Body `IosPushAnmeldung { kennung, token, umgebung, schluessel,
   #[serde(default)] inhalt, #[serde(default)] stumm: Vec<String> }` → 204; 400 bei Format
   (kennung UUID, token 64–200 Hex, schluessel base64url = 32 Byte, umgebung aus der Liste,
   stumm ≤ `STUMM_MAX`); 422 bei Push über den Hub (`push_hub_fuer` mit Kanal iOS, Aufgabe 7).
-- `DELETE /api/ios-push/anmeldung` Body `{ kennung }` → 204 idempotent.
-- `POST /api/ios-push/abmelden` (ohne `CurrentUser`, im Router außerhalb der Anmeldepflicht wie
+- `DELETE /api/ios-push/registration` Body `{ kennung }` → 204 idempotent.
+- `POST /api/ios-push/unregister` (ohne `CurrentUser`, im Router außerhalb der Anmeldepflicht wie
   andere öffentliche Routen) Body `{ kennung, nachweis }` → immer 204.
 - Bodies nur über `crate::extract::JsonBody`, Query über den vorhandenen Query-Extraktor.
 - Lebensdauer: `logout` löscht vor `session::loeschen` die Anmeldungen der Sitzung
@@ -511,7 +511,7 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
   Schlüsselbund.
 - `AppModell`: nach jeder Änderung der Serverliste `UserDefaults(suiteName: "group.dev.rubeen.lifeline.ios")`
   `"serverAnzahl"` setzen; beim Entfernen eines Servers für jede Kennung einmal
-  `POST <server>/api/ios-push/abmelden` `{ kennung, nachweis }` per `URLSession` (ohne Wiederholen),
+  `POST <server>/api/ios-push/unregister` `{ kennung, nachweis }` per `URLSession` (ohne Wiederholen),
   dann Schlüssel löschen.
 - `Dienst` (Extension): `didReceive(_:withContentHandler:)` → `l` lesen, Schlüssel holen,
   entschlüsseln, `PushNutzlast.meldung`, Inhalt setzen (`title`, `subtitle`, `body`,

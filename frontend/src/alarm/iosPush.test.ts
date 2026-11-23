@@ -80,11 +80,11 @@ function server_(stand: Partial<Stand> = {}) {
         ...stand,
       });
     }),
-    http.put('/api/ios-push/anmeldung', async ({ request }) => {
+    http.put('/api/ios-push/registration', async ({ request }) => {
       anmeldungen.push((await request.json()) as Record<string, unknown>);
       return new HttpResponse(null, { status: 204 });
     }),
-    http.delete('/api/ios-push/anmeldung', async ({ request }) => {
+    http.delete('/api/ios-push/registration', async ({ request }) => {
       abmeldungen.push(await request.json());
       return new HttpResponse(null, { status: 204 });
     }),
