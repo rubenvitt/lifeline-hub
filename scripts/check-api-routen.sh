@@ -17,7 +17,9 @@
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
 #   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
-#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
+#     der Bestand wächst nicht. Ausnahme: ein Pfad, dessen einziges unbekanntes Segment das
+#     Präfix `einsaetze` ist (Einsatz-Pakete, LLH-2058), sofern die Zeilenzahl nicht wächst.
+#     Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
@@ -152,11 +154,24 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
+    # Ein Einsatz-Paket übersetzt nur die Segmente nach `/api/einsaetze/{id}/`; der neue Pfad
+    # bleibt wegen des Präfixes bis zum Präfix-Paket im Bestand (LLH-2058). Erlaubt, wenn
+    # `einsaetze` sein einziges unbekanntes Segment ist; dafür darf die Zeilenzahl nicht wachsen.
+    nur_praefix="$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NF {
+      if ($2 != "einsaetze") anders[$1] = 1; else praefix[$1] = 1
+    } END { for (p in praefix) if (!(p in anders)) print p }' | sort -u)"
+    neu_zeilen="$(comm -23 <(printf '%s\n' "$neu_zeilen" | awk 'NF') <(printf '%s\n' "$nur_praefix" | awk 'NF'))"
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
           "(ADR-0085). Die Route englisch benennen."
       done <<< "$neu_zeilen"
+    fi
+    anzahl_alt="$(printf '%s\n' "$alt" | awk 'NF' | sort -u | wc -l | tr -d ' ')"
+    anzahl_neu="$(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ')"
+    if [ "$anzahl_neu" -gt "$anzahl_alt" ]; then
+      melde "$BESTAND_REL: $anzahl_neu Zeilen statt $anzahl_alt auf $BASIS (Merge-Base); der Bestand" \
+        "darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
     fi
   fi
 else

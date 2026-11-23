@@ -151,6 +151,19 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+# Einsatz-Pakete (LLH-2058): übersetzt ein Paket nur die Segmente nach `/api/einsaetze/{id}/`,
+# bleibt der neue Pfad wegen des Präfixes im Bestand. Das ist erlaubt, solange `einsaetze` sein
+# einziges deutsches Segment ist und der Bestand nicht wächst.
+EINSATZ_BASIS="route_dazu '/api/einsaetze/{id}/meldungen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/meldungen' > scripts/api-routen-bestand.txt && git commit -qam meldungen && git update-ref refs/remotes/origin/alpha HEAD"
+fall "Einsatz-Paket: neuer Pfad nur mit Präfix einsaetze" gruen \
+  "$EINSATZ_BASIS && sed -i.bak 's#/meldungen#/reports#' src/app.rs && rm src/app.rs.bak && glossar \"api\${TAB}-\" \"auth\${TAB}Anmeldung\" \"health\${TAB}-\" \"login\${TAB}-\" \"me\${TAB}-\" \"reports\${TAB}Meldungen\" \"v1\${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/reports' > scripts/api-routen-bestand.txt" \
+  "OK"
+fall "Einsatz-Paket: Präfix-Zeile dazu, Bestand wächst" rot \
+  "$EINSATZ_BASIS && route_dazu '/api/einsaetze/{id}/reports' && glossar \"api\${TAB}-\" \"auth\${TAB}Anmeldung\" \"health\${TAB}-\" \"login\${TAB}-\" \"me\${TAB}-\" \"reports\${TAB}Meldungen\" \"v1\${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/meldungen' '/api/einsaetze/{id}/reports' > scripts/api-routen-bestand.txt" \
+  "der Bestand darf nur schrumpfen"
+fall "Einsatz-Paket: neuer Pfad mit weiterem deutschen Segment" rot \
+  "$EINSATZ_BASIS && sed -i.bak 's#/meldungen#/neu-deutsch#' src/app.rs && rm src/app.rs.bak && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/neu-deutsch' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/neu-deutsch: neu im Bestand"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"
