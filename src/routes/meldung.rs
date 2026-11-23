@@ -729,7 +729,7 @@ pub struct LageGesehenReq {
     pub meldung_ids: Vec<i64>,
 }
 
-/// Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.
+/// Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LageGesehenAnzeige {
     pub gesehen: u64,

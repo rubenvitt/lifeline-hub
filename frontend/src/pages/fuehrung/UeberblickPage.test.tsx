@@ -1374,7 +1374,7 @@ describe('UeberblickPage', () => {
       expect(m).toHaveAttribute('data-ton', 'neutral');
     });
 
-    it('Modul ausgeblendet → keine Anfrage an …/wetter, keine Unwettermarke', async () => {
+    it('Modul ausgeblendet → keine Anfrage an …/weather, keine Unwettermarke', async () => {
       let wetterAbrufe = 0;
       let freigabenGeliefert = 0;
       stelleBereit(volleDaten, [

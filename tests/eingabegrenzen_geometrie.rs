@@ -1,6 +1,6 @@
 //! LFH-937: Geometrien von Zonen und Abschnittsflächen (Spec `eingabegrenzen`, design.md D7):
 //! Grenzen und Struktur sind 400, kaputtes JSON und ein falscher Typ bleiben 422. Zugleich der
-//! erste Integrationstest für `PATCH …/abschnitte/{aid}/flaeche`.
+//! erste Integrationstest für `PATCH …/sectors/{aid}/area`.
 
 use axum::http::StatusCode;
 use serde_json::{json, Value};

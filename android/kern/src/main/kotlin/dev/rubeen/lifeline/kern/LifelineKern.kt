@@ -10,7 +10,7 @@ object LifelineKern {
      * Ein neuer Wert kommt erst hinzu, wenn die App den Bruch des Servers mitgeht.
      *
      * Verlauf: 1 mit LLH-1989; nur 2 mit LLH-1979, weil die App seither
-     * `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0085).
+     * `/api/auth/app-code/redeem` ruft, den ein Server mit Vertrag 1 nicht kennt (ADR-0093).
      */
     val bekannteVertraege: List<Int> = listOf(2)
 }

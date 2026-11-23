@@ -2,7 +2,7 @@ import { apiSend } from './client';
 import type { Lagekennzahl, LagekennzahlWahl } from './types';
 
 /**
- * Wahl der Lagekennzahlen eines Einsatzes (LLH-1371): `PUT …/lagekennzahl-wahl` ersetzt die
+ * Wahl der Lagekennzahlen eines Einsatzes (LLH-1371): `PUT …/situation-metric-selection` ersetzt die
  * gewählten vollständig. Gelesen wird die Wahl aus `EinsatzAnzeige.lagekennzahlen` — nach dem
  * Speichern also den Einsatz-Key invalidieren.
  */

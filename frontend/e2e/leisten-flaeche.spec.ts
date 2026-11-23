@@ -650,7 +650,7 @@ test('Lagekarte (LLH-1936): ohne Stände ist die Zeitachse nur der Knopf „Stan
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Einsatz mit zwei Gefahrengebieten per API (`POST …/zonen`, ohne WebGL). */
+/** Einsatz mit zwei Gefahrengebieten per API (`POST …/zones`, ohne WebGL). */
 async function matrixEinsatz(
   page: Page,
   bezeichnung: string,

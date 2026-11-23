@@ -11,7 +11,7 @@ import type { ObjektEintrag } from './objektsuche';
 
 /**
  * Ortssuche im Suchfeld der Kartenleiste (LFH-638, Spec `lagekarte-ortssuche`): Koordinate beim
- * Tippen ohne Server, Adresse erst auf Enter über `…/karte/ort-suche`.
+ * Tippen ohne Server, Adresse erst auf Enter über `…/map/place-search`.
  */
 
 const PFAD = '/api/einsaetze/7/map/place-search';

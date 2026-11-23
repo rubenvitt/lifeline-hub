@@ -147,7 +147,7 @@ modul_marker! {
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
-/// Gate-Route. Der **längste** passende Präfix gewinnt (`…/lage/meldungen` ist ein
+/// Gate-Route. Der **längste** passende Präfix gewinnt (`…/situation/reports` ist ein
 /// eigener Eintrag, kein Kind von `…/meldungen`). Wächst pro migriertem Modul; nur
 /// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.

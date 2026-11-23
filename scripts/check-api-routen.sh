@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0085, Wurzel-`AGENTS.md`,
+# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0093, Wurzel-`AGENTS.md`,
 # „Bezeichner-Sprache“). Herleitung:
 # `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
 #
@@ -21,7 +21,9 @@
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
-#     nicht, entfällt er;
+#     nicht, entfällt er. Ausnahme Einsatz-Pakete (LLH-2059): Ist `einsaetze` das einzige Segment
+#     außerhalb des Glossars, darf der Eintrag neu sein, solange der Bestand nicht wächst (der
+#     umbenannte Pfad ersetzt den alten, bis das Präfix-Paket `einsaetze` umstellt);
 #   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
 #     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
 #     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
@@ -134,7 +136,7 @@ ohne_bestand="$(comm -23 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '
 if [ -n "$ohne_bestand" ]; then
   while IFS="$(printf '\t')" read -r pfad seg; do
     melde "$pfad: Segment '$seg' steht nicht im Glossar (scripts/api-routen-woerter.tsv)." \
-      "Englisch benennen und den Begriff eintragen (ADR-0085)."
+      "Englisch benennen und den Begriff eintragen (ADR-0093)."
   done <<< "$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NR == FNR { neu[$0] = 1; next } ($1 in neu)' \
     <(printf '%s\n' "$ohne_bestand") -)"
 fi
@@ -152,11 +154,29 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
-    if [ -n "$neu_zeilen" ]; then
+    # Einsatz-Pakete übersetzen nur die Segmente nach `{id}` (LLH-2059): Ein neuer Eintrag, dessen
+    # einziges Segment außerhalb des Glossars `einsaetze` ist, ersetzt einen alten, solange der
+    # Bestand nicht wächst. Das Präfix-Paket stellt `einsaetze` zuletzt um.
+    nur_praefix="$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NF {
+        if ($2 != "einsaetze") anders[$1] = 1
+        pfade[$1] = 1
+      }
+      END { for (p in pfade) if (!(p in anders)) print p }' | sort -u)"
+    neu_praefix="$(comm -12 <(printf '%s\n' "$neu_zeilen" | awk 'NF') <(printf '%s\n' "$nur_praefix" | awk 'NF'))"
+    neu_sonst="$(comm -23 <(printf '%s\n' "$neu_zeilen" | awk 'NF') <(printf '%s\n' "$nur_praefix" | awk 'NF'))"
+    if [ -n "$neu_sonst" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0085). Die Route englisch benennen."
-      done <<< "$neu_zeilen"
+          "(ADR-0093). Die Route englisch benennen."
+      done <<< "$neu_sonst"
+    fi
+    zahl_alt="$(printf '%s\n' "$alt" | awk 'NF' | sort -u | wc -l | tr -d ' ')"
+    zahl_neu="$(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ')"
+    if [ -n "$neu_praefix" ] && [ "$zahl_neu" -gt "$zahl_alt" ]; then
+      while IFS= read -r pfad; do
+        melde "$pfad: neu im Bestand mit dem Rest 'einsaetze', aber der Bestand wächst gegenüber" \
+          "$BASIS ($zahl_alt → $zahl_neu Zeilen). Ein Einsatz-Paket ersetzt nur umbenannte Pfade (ADR-0093)."
+      done <<< "$neu_praefix"
     fi
   fi
 else
@@ -164,7 +184,7 @@ else
 fi
 
 if [ "$fehler" -gt 0 ]; then
-  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0085)." >&2
+  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0093)." >&2
   exit 1
 fi
 echo "OK: $(registrierte_pfade | wc -l | tr -d ' ') API-Routen geprüft, $(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ') im deutschen Bestand."

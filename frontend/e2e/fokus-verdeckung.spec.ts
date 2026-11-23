@@ -1713,7 +1713,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
+/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zones` nicht). */
 async function matrixEinsatz(page: Page): Promise<number> {
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `Fokus 373 Sued ${Date.now()}` },

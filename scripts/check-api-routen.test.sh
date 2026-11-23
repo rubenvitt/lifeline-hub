@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0085). Der Wächter irrt in beide
+# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0093). Der Wächter irrt in beide
 # Richtungen still: ließe er eine deutsche Route durch, wüchse der Bestand wieder, den die
 # Pakete von LLH-1979 abbauen; schlüge er auf Testcode oder eine englische Route an, würde er
 # abgeschaltet.
@@ -151,6 +151,27 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+# Einsatz-Pakete (LLH-2059): Sie übersetzen nur die Segmente nach `{id}`, der Pfad behält bis
+# zum Präfix-Paket das deutsche `einsaetze`. Auf origin/alpha steht `…/schaeden`.
+einsatz_paket_basis() {
+  route_dazu '/api/einsaetze/{id}/schaeden'
+  printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/schaeden' > scripts/api-routen-bestand.txt
+  git commit -qam schaeden
+  git update-ref refs/remotes/origin/alpha HEAD
+}
+einsatz_umbenennen() { # <neues segment> → `…/schaeden` heißt danach `…/<segment>`
+  sed "s#/api/einsaetze/{id}/schaeden#/api/einsaetze/{id}/$1#" src/app.rs > x && mv x src/app.rs
+  printf '%s\n' '/api/einsaetze/{id}' "/api/einsaetze/{id}/$1" > scripts/api-routen-bestand.txt
+}
+fall "Einsatz-Paket: umbenannter Pfad, einziger deutscher Rest ist einsaetze" gruen \
+  "einsatz_paket_basis && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"damages${TAB}Schäden\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && einsatz_umbenennen damages" \
+  "OK"
+fall "Einsatz-Paket: neues deutsches Wort unter einsaetze" rot \
+  "einsatz_paket_basis && einsatz_umbenennen schadensfaelle" \
+  "/api/einsaetze/{id}/schadensfaelle" "origin/alpha"
+fall "Einsatz-Paket: einsaetze-Rest, aber der Bestand wächst" rot \
+  "einsatz_paket_basis && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"damages${TAB}Schäden\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && route_dazu '/api/einsaetze/{id}/damages' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/damages' '/api/einsaetze/{id}/schaeden' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/damages" "wächst"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"
