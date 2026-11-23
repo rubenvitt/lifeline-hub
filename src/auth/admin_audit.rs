@@ -148,7 +148,7 @@ wire_enum! {
         /// LAN-Ausnahme eines Webhooks zurückgenommen.
         MaschinenzugangWebhookLanEntzogen => "maschinenzugang_webhook_lan_entzogen",
         /// Fingerabdruck des Zielzertifikats an einem Webhook hinterlegt oder gewechselt
-        /// (LLH-1872, Migration 0364); Angaben `fingerabdruck`, beim Wechsel
+        /// (LLH-1872, Migration 0367); Angaben `fingerabdruck`, beim Wechsel
         /// `fingerabdruck_vorher`.
         MaschinenzugangWebhookPinGesetzt => "maschinenzugang_webhook_pin_gesetzt",
         /// Fingerabdruck eines Webhooks entfernt; Angabe `fingerabdruck_vorher`.
