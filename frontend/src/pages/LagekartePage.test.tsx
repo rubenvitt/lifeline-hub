@@ -546,7 +546,7 @@ function platzierModusAn(): boolean {
 
 function LocationSonde() {
   const location = useLocation();
-  return <div data-testid="place-search">{location.search}</div>;
+  return <div data-testid="location-search">{location.search}</div>;
 }
 
 function renderSeiteMitSonde(route: string) {
@@ -1490,7 +1490,7 @@ describe('LagekartePage', () => {
       await screen.findByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' }),
     ).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('evakuierungsbezirk'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
     );
   });
 
@@ -1539,7 +1539,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
     expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
     await waitFor(() => {
-      const ort = screen.getByTestId('place-search').textContent ?? '';
+      const ort = screen.getByTestId('location-search').textContent ?? '';
       expect(ort).toContain('ansicht=2');
       expect(ort).not.toContain('evakuierungsbezirk');
     });
@@ -1549,12 +1549,12 @@ describe('LagekartePage', () => {
     basisHandler();
     const { unmount } = renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=abc');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('evakuierungsbezirk'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
     );
     unmount();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=77');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('evakuierungsbezirk'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
     );
     expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).not.toBeInTheDocument();
   });
@@ -1567,7 +1567,7 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -1603,7 +1603,7 @@ describe('LagekartePage', () => {
     expect(await screen.findByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
     // apply-then-clean: der Param ist nach dem Anwenden aus der URL geräumt.
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('gefahrengebiet'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('gefahrengebiet'),
     );
     // Idempotenz (StrictMode-fest): der erneute Effekt-Lauf mit geräumtem Param selektiert nicht
     // erneut — die Selektion bleibt.
@@ -1628,7 +1628,7 @@ describe('LagekartePage', () => {
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     // apply-then-clean: erst nach dem Anwenden ist der Param weg.
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
   });
 
@@ -1649,7 +1649,7 @@ describe('LagekartePage', () => {
       expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":13.405,"lat":52.52}'),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zentrum'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
     );
   });
 
@@ -1724,7 +1724,7 @@ describe('LagekartePage', () => {
     expect(screen.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
     expect(anfragen).toEqual(['Hauptstraße 12']);
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('ort='),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('ort='),
     );
   });
 
@@ -1762,7 +1762,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52');
 
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zentrum'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
     );
     expect(screen.getByTestId('flyto')).toHaveTextContent('null');
   });
@@ -1778,7 +1778,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
 
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -1788,7 +1788,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
   });
 
@@ -1800,7 +1800,7 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -1810,7 +1810,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=bereitstellungsraum:6');
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
   });
 
@@ -1822,7 +1822,7 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=bereitstellungsraum:6');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -1832,9 +1832,9 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4&zurueck=1');
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
-    expect(screen.getByTestId('place-search')).not.toHaveTextContent('zurueck');
+    expect(screen.getByTestId('location-search')).not.toHaveTextContent('zurueck');
   });
 
   it('Deeplink ?platzieren=tier: ohne Modul Tiere kein Platziermodus, der Auftrag wird geräumt (LLH-1123)', async () => {
@@ -1845,7 +1845,7 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -1855,7 +1855,7 @@ describe('LagekartePage', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
   });
 
@@ -1869,7 +1869,7 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
   });
@@ -2910,7 +2910,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent(/platzieren|zurueck/),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent(/platzieren|zurueck/),
     );
     await user.click(screen.getByText('karte-klick'));
 
@@ -3028,7 +3028,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
     expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('platzieren'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
     expect(platzierModusAn()).toBe(false);
     expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
@@ -3304,7 +3304,7 @@ describe('LFH-825: Zeichnen per Link', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zeichnen'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
   });
 
@@ -3313,7 +3313,7 @@ describe('LFH-825: Zeichnen per Link', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=freie_skizze%3Alinie');
     expect(await screen.findByText('Freie Skizze · Linie')).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zeichnen'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
   });
 
@@ -3324,7 +3324,7 @@ describe('LFH-825: Zeichnen per Link', () => {
     basisHandler();
     renderSeiteMitSonde(`/einsaetze/1/lagekarte?zeichnen=${wert}`);
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zeichnen'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
     // Die Seite steht: der Knopf „Zeichenwerkzeuge“ ist da, der Modus nicht.
     expect(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
@@ -3339,7 +3339,7 @@ describe('LFH-825: Zeichnen per Link', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zeichnen'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
     expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
@@ -3364,11 +3364,11 @@ describe('LFH-825: Zeichnen per Link', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
-    expect(screen.getByTestId('place-search')).toHaveTextContent('zeichnen=gefahrengebiet');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('zeichnen=gefahrengebiet');
     freigeben();
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('zeichnen'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
   });
 
@@ -3403,7 +3403,7 @@ describe('LLH-1043: Kreis', () => {
       radiusM: 300,
     });
     await waitFor(() => {
-      const such = screen.getByTestId('place-search').textContent ?? '';
+      const such = screen.getByTestId('location-search').textContent ?? '';
       expect(such).not.toMatch(/zeichnen|radius|mitte/);
     });
     // Kein terra-draw-Zeichnen und keine Zeichnen-Steuerung im Kreis-Modus.
@@ -3419,7 +3419,7 @@ describe('LLH-1043: Kreis', () => {
     );
     expect(screen.getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('radius'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('radius'),
     );
   });
 
@@ -3521,7 +3521,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   };
   const mitBezirken = (bezirke: unknown[] = [UFER]) =>
     http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke }));
-  const ort = () => screen.getByTestId('place-search');
+  const ort = () => screen.getByTestId('location-search');
   const geraeumt = () =>
     waitFor(() => {
       expect(ort()).not.toHaveTextContent('zeichnen');
@@ -4666,7 +4666,7 @@ describe('LLH-1057: Abschnitt fokussieren', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?abschnitt=3');
     await waitFor(() => expect(band()).toHaveTextContent('EA Nord'));
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('abschnitt'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('abschnitt'),
     );
     // Anflug auf die Fläche von EA Nord.
     expect(kartenHandle.fokussiere).toHaveBeenCalledWith([
@@ -4690,7 +4690,7 @@ describe('LLH-1057: Abschnitt fokussieren', () => {
     renderSeiteMitSonde('/einsaetze/1/lagekarte?abschnitt=99');
     await screen.findByText('marker-abschnitt-3');
     await waitFor(() =>
-      expect(screen.getByTestId('place-search')).not.toHaveTextContent('abschnitt'),
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('abschnitt'),
     );
     expect(band()).toBeNull();
     expect(kartenHandle.fokussiere).not.toHaveBeenCalled();
@@ -4989,12 +4989,12 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       { route: fall.route },
     );
     await fall.gewirkt();
-    await waitFor(() => expect(screen.getByTestId('place-search')).toBeEmptyDOMElement());
+    await waitFor(() => expect(screen.getByTestId('location-search')).toBeEmptyDOMElement());
     await fall.aufheben(user);
     await waitFor(() => expect(fall.wirkt()).toBe(false));
 
     await user.click(screen.getByRole('button', { name: 'neuer-link' }));
     await fall.gewirkt();
-    await waitFor(() => expect(screen.getByTestId('place-search')).toBeEmptyDOMElement());
+    await waitFor(() => expect(screen.getByTestId('location-search')).toBeEmptyDOMElement());
   });
 });

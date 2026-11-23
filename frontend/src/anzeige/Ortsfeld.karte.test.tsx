@@ -446,7 +446,7 @@ describe('Ortsfeld — Kartenvorschau', () => {
       );
       expect(screen.getByRole('group', { name: 'Karte: Einsatzort' })).toBeInTheDocument();
       await new Promise((r) => setTimeout(r, 800));
-      expect(anfragen.filter((u) => u.includes('place-preview'))).toEqual([]);
+      expect(anfragen.filter((u) => u.includes('ort-vorschau'))).toEqual([]);
     } finally {
       server.events.removeListener('request:start', merken);
     }

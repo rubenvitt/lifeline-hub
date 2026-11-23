@@ -1943,7 +1943,9 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         herkunft_adresse: 'Hauptstraße 12, Musterstadt',
         erwartet: { herkunft_adresse: null },
       });
-      expect(anfragen.filter((u) => /ort-suche|ort-vorschau/.test(u))).toEqual([]);
+      expect(
+        anfragen.filter((u) => /ort-suche|ort-vorschau|place-search|place-preview/.test(u)),
+      ).toEqual([]);
     } finally {
       server.events.removeListener('request:start', merken);
     }
