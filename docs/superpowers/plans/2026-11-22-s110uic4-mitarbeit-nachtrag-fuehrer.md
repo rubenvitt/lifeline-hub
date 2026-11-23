@@ -46,7 +46,7 @@ additive Paketfelder in beide Richtungen.
 ### Task 1: Tabelle, Grenze und Wire
 
 **Files:**
-- Create: `migrations/0364_mitarbeit_nachtrag.sql`
+- Create: `migrations/0366_mitarbeit_nachtrag.sql`
 - Create: `src/instanz/spiegel/nachtrag.rs` (nur Wire-Typ und Konstanten in diesem Task)
 - Modify: `src/instanz/spiegel/mod.rs` (`pub mod nachtrag;`)
 - Modify: `src/instanz/spiegel/paket.rs` (`SpiegelPaket`, `check`, Tests unten in der Datei)
