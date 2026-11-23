@@ -178,9 +178,10 @@ im Browser ein, nicht in der App.
 - **Standort** (LLH-2071, [ADR-0093](../architektur/entscheidungen/ADR-0093-die-app-huellen-geben-den-standort-nur-dem-aktiven-server-im-vordergrund.md)): „Position“ auf
   der Lagekarte, „Eigene Position“ im Ortsfeld und „Mein Standort“ am gekoppelten Gerät gehen wie
   im Browser. iOS fragt beim ersten Mal, nur „Beim Verwenden der App“; wer „Genauer Standort“
-  ausschaltet, bekommt eine grobe Position, und der Kreis auf der Karte zeigt, wie grob. Den
-  Standort bekommt nur die Seite des aktiven Servers, nie eine fremde Seite oder ein eingebetteter
-  Frame. Die App ortet nicht im Hintergrund und speichert oder sendet den Standort nicht selbst:
+  ausschaltet, bekommt eine grobe Position, und der Kreis auf der Karte zeigt, wie grob. Über
+  die Hülle bekommt den Standort nur die Seite des aktiven Servers, nie eine fremde Seite oder ein
+  eingebetteter Frame; umgeht eine fremde Seite das, fragt iOS selbst mit dem Namen ihres Hosts,
+  wie im Browser. Die App ortet nicht im Hintergrund und speichert oder sendet den Standort nicht selbst:
   die Eigenposition bleibt auf dem Gerät, Ortsfeld und „Mein Standort“ schicken ihn erst mit dem
   Formular bzw. der Meldung an den Server. Entziehen oder wieder erlauben: Einstellungen →
   Datenschutz & Sicherheit → Ortungsdienste → „Lifeline“.

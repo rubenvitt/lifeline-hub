@@ -37,11 +37,11 @@ herleitung:
 ## Prüfung
 
 ```sh
-verbiete 'ACCESS_BACKGROUND_LOCATION' 'android/app/src/main/**'
+verbiete 'uses-permission[^>]*ACCESS_BACKGROUND_LOCATION' 'android/app/src/main/**'
 verbiete 'NSLocationAlways|NSLocationTemporaryUsageDescriptionDictionary' 'ios/project.yml'
 verlange 'NSLocationWhenInUseUsageDescription' 'ios/project.yml'
 verlange 'callback\.invoke\(origin, false, false\)' 'android/app/src/main/kotlin/dev/rubeen/lifeline/android/web/HuellenChromeClient.kt'
-verbiete 'callback\.invoke\([^)]*, true\)' 'android/app/src/main/kotlin/dev/rubeen/lifeline/android/web/HuellenChromeClient.kt'
+verbiete 'callback\.invoke\(.*,[[:space:]]*true[[:space:]]*\)' 'android/app/src/main/kotlin/dev/rubeen/lifeline/android/web/HuellenChromeClient.kt'
 verlange 'forMainFrameOnly: false' 'ios/App/Webview.swift'
 ```
 
@@ -55,8 +55,10 @@ Origin ersetzt oder auf eine Origin beschränkt; der Android-WebView hat sie
 
 ## Konsequenzen
 
-Die Apps stehen beim Standort dem Browser gleich, und der Standort erreicht nie eine fremde
-Seite. iOS trägt dafür einen Polyfill im Init-Skript und einen Rückkanal der Brücke, die bei jeder
+Die Apps stehen beim Standort dem Browser gleich, und über die Hülle erreicht der Standort nie
+eine fremde Seite. Eine fremde Seite, die den Ersatz im Skript umgeht, landet unter iOS bei der
+WebKit-eigenen Abfrage; die fragt je Origin und nennt den Host, wie im Browser (dafür gibt es
+keine öffentliche Schnittstelle). iOS trägt dafür einen Polyfill im Init-Skript und einen Rückkanal der Brücke, die bei jeder
 Änderung des Wire-Formats mitzuziehen sind. Im Privacy-Manifest gilt der genaue Standort als
 erhoben (App-Funktion, mit dem Konto verknüpft, kein Tracking), weil die Oberfläche ihn auf
 Knopfdruck an den Server schickt.
