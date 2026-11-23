@@ -4,7 +4,8 @@ import { useQueryClient, type InfiniteData, type QueryKey } from '@tanstack/reac
 /**
  * Seitenfenster in beide Richtungen für Chat und Infotelefon (LLH-1886, Entwurf
  * `docs/superpowers/specs/2026-11-22-se7ytm9j-chat-infotelefon-seitenfenster-design.md`, D2), nach
- * dem Muster der ETB-Zeitachse (`etb/seitenfenster.ts`, LFH-947).
+ * dem Muster der ETB-Zeitachse (LFH-947); seit LLH-2036 blättert auch das ETB hierüber
+ * (Cursor in `etb/seitenfenster.ts`).
  *
  * Die Liste hält höchstens {@link FENSTER_MAX_SEITEN} Seiten. TanStack lädt bei einer
  * Invalidierung so viele Seiten nach, wie im Cache liegen — ohne Deckel kostete jedes

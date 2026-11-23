@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/einsatz/feld_vermerk.rs, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/pages/einheit/EinheitZeichenPaneel.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/einsatz/feld_vermerk.rs, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/pages/einheit/EinheitZeichenPaneel.tsx, frontend/src/kraefte/useStatusQuittung.ts, src/status_ruecknahme.rs]
 ---
 
 ## Überblick
@@ -90,7 +90,10 @@ Für Einsatzleitung und Führungspersonal:
    Einheit mindestens braucht. Ohne eigenes gilt das des Einheitstyps und trägt „(Vorgabe)“;
    alle Zeilen entfernt heißt zurück zum Einheitstyp.
 6. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
-   zurück.
+   zurück. Unten erscheint kurz „Rettungsstaffel: S2 → S3 · Rückgängig“, auch in der
+   Kräfteübersicht. „Rückgängig“ stellt den Status mit seiner alten „seit“-Zeit her, auch nach
+   „kein Status“; es geht nur direkt danach (höchstens zehn Minuten), nur für die Person, die
+   gewechselt hat, und nicht mehr, wenn die Einheit inzwischen ein Fahrzeug führt.
 7. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf. Jede
    hinzugefügte oder entfernte Sprechgruppe steht danach im Einsatztagebuch. Was ein anderer
    Arbeitsplatz währenddessen an den Sprechgruppen ändert, bleibt erhalten.

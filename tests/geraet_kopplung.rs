@@ -8033,6 +8033,52 @@ async fn einheitengeraet_setzt_nur_den_eigenen_status() {
     );
 }
 
+/// Das Einheitengerät nimmt den eigenen Wechsel zurück (LLH-1986), auch zu „kein Status“; einen
+/// Wechsel einer fremden Einheit nicht (404).
+#[tokio::test]
+async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
+    let status_id = stati.as_array().unwrap()[0]["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("{basis}/{}/status", l.zug_ost),
+        &geraet,
+        Some(&json!({"status_id": status_id})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let beleg = v["status_ruecknahme"].clone();
+    assert!(beleg["vorher_status_id"].is_null(), "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{}/status/zuruecknehmen", l.zug_nord),
+        &geraet,
+        Some(&beleg),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Einheit: {v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{}/status/zuruecknehmen", l.zug_ost),
+        &geraet,
+        Some(&beleg),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"]["quelle"], "ohne", "zurück auf kein Status: {v}");
+}
+
 /// Absender ist fest die eigene Einheit (Rückmeldung); ein Ort darf an jeder Art Meldung stehen
 /// (F9). Gelesen werden nur die eigenen Meldungen.
 #[tokio::test]
@@ -8855,7 +8901,8 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
             "sofort_offen": 0, "dringend_offen": 0, "bestaetigung_ueberfaellig": 0,
             "auftraege_ueberfaellig": 0, "erinnerungen_faellig": 0,
             "nachforderungen_ueberfaellig": 0,
-            "rueckmeldung_ueberfaellig": [], "abschnitte_kritisch": [], "ausfall": []
+            "rueckmeldung_ueberfaellig": [], "abschnitte_kritisch": [], "ausfall": [],
+            "ausgeblendet": []
         }),
         "{v}"
     );
@@ -9048,6 +9095,187 @@ async fn lagemonitor_alarm_nennt_ausfall_ohne_personennamen() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
     assert!(!v.to_string().contains("Anna Muster"), "{v}");
+}
+
+/// Blendet `modul` im Einsatz aus (Override `sichtbar: false`, LLH-1964).
+async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: &str) {
+    let (s, v) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert!(s.is_success(), "{modul} ausblenden: {s} {v}");
+}
+
+/// Krankes Personal an `einheit` (Ausfall nach der Regel des Meldebilds).
+async fn krankes_personal(pool: &sqlx::SqlitePool, einsatz: i64, einheit: i64) {
+    let krank: i64 = sqlx::query_scalar(
+        "INSERT INTO personal_status (org_id, label, kategorie) \
+         SELECT org_id, 'krank', 'nicht_verfuegbar' FROM einsatz WHERE id = ? RETURNING id",
+    )
+    .bind(einsatz)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id, status_id) \
+         VALUES (?, 'Anna Muster', ?, ?)",
+    )
+    .bind(einsatz)
+    .bind(einheit)
+    .bind(krank)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// LLH-1964 (Beispiel der Aufgabe): ist Material im Einsatz ausgeblendet, fehlt der Ausfall durch
+/// defektes Material auch auf dem Monitor, wie im Überblick; der Ausfall durch Personal bleibt.
+#[tokio::test]
+async fn lagemonitor_alarm_laesst_ausgeblendetes_material_weg() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let mut einheiten = Vec::new();
+    for name in ["Sanitätszug", "Logistiktrupp"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/einheiten"),
+            &admin,
+            Some(&json!({ "name": name })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        einheiten.push(v["id"].as_i64().unwrap());
+    }
+    krankes_personal(&pool, einsatz, einheiten[1]).await;
+    sqlx::query(
+        "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, status, einheit_id) \
+         VALUES (?, 'Trage', 'geraet', 1, 'defekt', ?)",
+    )
+    .bind(einsatz)
+    .bind(einheiten[0])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let lagebild = format!("{basis}/lagemonitor");
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["alarm"]["ausfall"],
+        json!(["Sanitätszug", "Logistiktrupp"]),
+        "{v}"
+    );
+
+    modul_ausblenden(&app, &admin, einsatz, "material").await;
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
+    assert_eq!(v["alarm"]["ausgeblendet"], json!([]), "{v}");
+}
+
+/// LLH-1964: ausgeblendete Quellen liest der Server nicht, liefert 0 bzw. leer und nennt sie in
+/// `ausgeblendet`. Die Kachel „Sofortmeldungen“ behält ihre eigene Zählung.
+#[tokio::test]
+async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/abschnitte"),
+        &admin,
+        Some(&json!({ "name": "UHS Turnhalle", "lagezustand": "kritisch" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/einheiten"),
+        &admin,
+        Some(&json!({ "name": "Logistiktrupp" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    krankes_personal(&pool, einsatz, v["id"].as_i64().unwrap()).await;
+    let eben = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/meldungen"),
+        &admin,
+        Some(&json!({
+            "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
+            "meldungsart": "sofortmeldung", "prioritaet": "sofort", "ereigniszeit": eben,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/auftraege"),
+        &admin,
+        Some(&json!({
+            "auftrag_text": "abholen",
+            "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" }],
+            "frist_at": "2026-06-01 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let lagebild = format!("{basis}/lagemonitor");
+    let (_, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(v["alarm"]["sofort_offen"], json!(1), "{v}");
+    assert_eq!(v["alarm"]["auftraege_ueberfaellig"], json!(1), "{v}");
+    assert_eq!(
+        v["alarm"]["abschnitte_kritisch"],
+        json!(["UHS Turnhalle"]),
+        "{v}"
+    );
+    assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
+
+    for modul in [
+        "auftraege",
+        "meldungen",
+        "einheiten",
+        "einsatzabschnitte",
+        "personen",
+    ] {
+        modul_ausblenden(&app, &admin, einsatz, modul).await;
+    }
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let a = &v["alarm"];
+    assert_eq!(
+        a["ausgeblendet"],
+        json!([
+            "meldungen",
+            "auftraege",
+            "vermisst",
+            "kritisch",
+            "rueckmeldung",
+            "ausfall"
+        ]),
+        "{v}"
+    );
+    assert_eq!(a["sofort_offen"], json!(0), "{v}");
+    assert!(a.get("sofort_aelteste_at").is_none(), "{v}");
+    assert_eq!(a["auftraege_ueberfaellig"], json!(0), "{v}");
+    assert_eq!(a["abschnitte_kritisch"], json!([]), "{v}");
+    assert_eq!(a["ausfall"], json!([]), "{v}");
+    assert_eq!(v["sofortmeldungen_offen"], json!(1), "{v}");
 }
 
 /// Delta-Spec `lagemonitor`, „Sofortmeldungen erreichen den Monitor sofort“ (LLH-1743, D7): der

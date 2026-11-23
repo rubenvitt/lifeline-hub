@@ -78,7 +78,9 @@ export function titelMit(titel: string, inhalt: HinweisInhalt | null | undefined
   return mit;
 }
 
-type Quelle = Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>;
+type Ereignis = Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>;
+/** Eine Benachrichtigung mit Einsatz: nur sie hat einen Gegenstand (LLH-2026: ohne Einsatz nie). */
+type Quelle = Omit<Ereignis, 'einsatz_id'> & { einsatz_id: number };
 
 type Kontext = {
   /** Sprungpfad der Benachrichtigung; im Live-Weg erst mit ihrem Text. */
@@ -215,15 +217,19 @@ const LADER: Partial<Record<BenachrichtigungArt, Lader>> = {
  * Sprungpfad der Benachrichtigung; ohne ihn nennen Quittung und Erwähnung nichts.
  */
 export function ladeHinweisInhalt(
-  e: Quelle,
+  e: Ereignis,
   opts: { pfad?: string | null | Promise<string | null>; qc?: QueryClient | null } = {},
 ): Promise<HinweisInhalt | null> {
   const lader = LADER[e.art];
-  if (!lader) return Promise.resolve(null);
-  const abruf = lader(e, {
-    pfad: Promise.resolve(opts.pfad ?? null).catch(() => null),
-    qc: opts.qc ?? null,
-  }).catch(() => null);
+  const einsatzId = e.einsatz_id;
+  if (!lader || einsatzId == null) return Promise.resolve(null);
+  const abruf = lader(
+    { ...e, einsatz_id: einsatzId },
+    {
+      pfad: Promise.resolve(opts.pfad ?? null).catch(() => null),
+      qc: opts.qc ?? null,
+    },
+  ).catch(() => null);
   let uhr: ReturnType<typeof setTimeout> | undefined;
   const frist = new Promise<null>((fertig) => {
     uhr = setTimeout(() => fertig(null), INHALT_FRIST_MS);

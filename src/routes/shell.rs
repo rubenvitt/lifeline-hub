@@ -4,6 +4,11 @@
 //! und welchen Hüllen-Vertrag der Server spricht. Die Antwort braucht keine Datenbank und
 //! antwortet deshalb auch bei gestörter DB mit 200; Erreichbarkeit prüft die Hülle über das
 //! Laden der Oberfläche, nicht über diesen Endpunkt.
+//!
+//! Seit LLH-1980 nennt die Antwort außerdem die Assets, die die Oberfläche ohne Server braucht;
+//! die iOS-Hülle wärmt sie vor und startet damit auch ohne erreichbaren Server.
+
+use std::sync::LazyLock;
 
 use axum::Json;
 use serde::Serialize;
@@ -24,12 +29,20 @@ pub struct ShellInfo {
     pub version: String,
     /// Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).
     pub shell_contract: u32,
+    /// Pfade relativ zur Wurzel (ohne führenden `/`), die die Oberfläche ohne Server braucht:
+    /// alles unter `assets/` außer den Doku-Bildern, sortiert (LLH-1980). Die iOS-Hülle holt sie
+    /// nach jedem Online-Laden in den Cache ihres Webviews. Ohne eingebettetes Frontend leer.
+    pub assets: Vec<String>,
 }
+
+/// Die Liste ändert sich nur mit dem Binary; einmal je Prozess gelesen.
+static OFFLINE_ASSETS: LazyLock<Vec<String>> = LazyLock::new(crate::static_files::offline_assets);
 
 /// `GET /api/shell`: anonym, ohne Datenbank.
 pub async fn load_shell() -> Json<ShellInfo> {
     Json(ShellInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         shell_contract: SHELL_CONTRACT,
+        assets: OFFLINE_ASSETS.clone(),
     })
 }

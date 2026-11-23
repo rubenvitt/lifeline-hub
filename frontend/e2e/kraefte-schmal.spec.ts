@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
@@ -468,8 +469,7 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
   const dialog = page.getByRole('dialog', { name: 'Einheit bilden' });
   const dialogOeffnen = async () => {
     await bildenKnopf.click();
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await eingeblendet(dialog);
   };
 
   const vorher = await anzahlEinheiten();

@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbSendestatus.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/LagemeldungenPage.tsx, frontend/src/components/Erfassung.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbSendestatus.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/LagemeldungenPage.tsx, frontend/src/components/Erfassung.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx, ios/LifelineKern/Sources/LifelineKern/Ablauf.swift, ios/App/Vorratsdienst.swift]
 ---
 
 ## Überblick
@@ -142,6 +142,18 @@ Liegen auf dem Gerät vorgemerkte Einträge aus einer älteren Version der App, 
 zugeordnet sind, zeigt die Betriebszeile „Alte Offline-Daten ansehen“. Ihr Inhalt ist nicht
 einsehbar und nicht übernehmbar; unter „Alte Offline-Daten ohne Zuordnung“ verwirft „Alle alten
 Offline-Daten verwerfen“ sie nach einer Rückfrage. Zugeordnete Einträge bleiben dabei erhalten.
+
+### Die iOS-App ohne Server starten
+
+Die iOS-App startet auch ohne Verbindung zum Server, wenn sie diesen Server vorher einmal mit
+Netz geladen hat. Sie zeigt dann die Oberfläche der letzten Verbindung mit dem Lagebild auf dem
+Gerät; alles oben gilt dort genauso. Antwortet der Server wieder, arbeitet die App ohne Zutun
+mit ihm weiter. Läuft auf dem Server inzwischen eine neue Version, lädt sie dabei einmal neu.
+
+Nach einem Update des Servers gilt der Start ohne Server erst wieder, wenn die App die neue
+Version einmal vollständig mit Netz geladen hat. Bis dahin zeigt sie ohne Server „Server nicht
+erreichbar“ und prüft weiter. Dasselbe gilt, wenn das Gerät den Zwischenspeicher der App
+geräumt hat.
 
 ### Was dabei auf dem Gerät liegt
 

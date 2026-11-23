@@ -624,6 +624,12 @@ export interface components {
             name?: string | null;
             zustand: components["schemas"]["BesetzungsZustand"];
         };
+        /**
+         * @description Eine Quelle der Alarmzeile, benannt wie in `WasBrenntQuellen` (`lage/wasBrennt.ts`). Für
+         *     [`LagemonitorAlarm::ausgeblendet`] (LLH-1964).
+         * @enum {string}
+         */
+        AlarmQuelle: "meldungen" | "auftraege" | "erinnerungen" | "nachforderungen" | "vermisst" | "kritisch" | "rueckmeldung" | "ausfall";
         /** @description Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6). */
         AnbindungAblehnung: {
             /**
@@ -1540,8 +1546,11 @@ export interface components {
             bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
             /** @description Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt. */
             detail?: string | null;
-            /** Format: int64 */
-            einsatz_id: number;
+            /**
+             * Format: int64
+             * @description Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026).
+             */
+            einsatz_id: number | null;
             erstellt_at: string;
             /** Format: int64 */
             id: number;
@@ -1555,17 +1564,17 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0364_benachrichtigung_adapter.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen" | "fuehrung_angefragt";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen" | "fuehrung_angefragt" | "adapter_eingriff" | "adapter_gestoert" | "adapter_wieder_ok";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht" | "adapter";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
@@ -1578,8 +1587,12 @@ export interface components {
             /** Format: int64 */
             bezug_id: number;
             bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
-            /** Format: int64 */
-            einsatz_id: number;
+            /**
+             * Format: int64
+             * @description Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit
+             *     Client und Service Worker denselben Tag bilden.
+             */
+            einsatz_id: number | null;
             /**
              * Format: int64
              * @description „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes
@@ -2616,6 +2629,13 @@ export interface components {
             status?: components["schemas"]["StatusWert"] | null;
             /** @description Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt. */
             verteilung: components["schemas"]["StatusAnteil"][];
+        };
+        /**
+         * @description Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
+         *     „Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986).
+         */
+        EinheitStatusAntwort: components["schemas"]["EinheitAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["HandStatusRuecknahmeBeleg"] | null;
         };
         /**
          * @description Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
@@ -3755,6 +3775,13 @@ export interface components {
              */
             meldung_id?: number | null;
             /**
+             * @description Der Eintrag oder ein Glied seiner Berichtigungs-Kette gehört zu einer Meldung in der Lage
+             *     (LLH-2008, [`repo::meldung_in_lage`]): die Mitarbeit berichtigt ihn nicht. Stand beim
+             *     Lesen; kommt die Meldung später in die Lage, sperrt der Server weiter mit 403. Fehlt bei
+             *     `false`. Nicht Teil des SELECT, wie `folgeauftraege`.
+             */
+            meldung_in_lage?: boolean;
+            /**
              * Format: int64
              * @description Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
              *     per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
@@ -4450,6 +4477,26 @@ export interface components {
          * @enum {string}
          */
         Geschlecht: "maennlich" | "weiblich" | "divers" | "unbekannt";
+        /**
+         * @description Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
+         *     „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
+         *     und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+         *     wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+         */
+        HandStatusRuecknahmeBeleg: {
+            /** @description Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            gesetzt_at: string;
+            /**
+             * Format: int64
+             * @description Der gesetzte Status (`null` = gelöscht); die Rücknahme gelingt nur, solange er noch steht.
+             */
+            status_id?: number | null;
+            /**
+             * Format: int64
+             * @description Status vor dem Wechsel, nur für die Quittung („S2 → S3“).
+             */
+            vorher_status_id?: number | null;
+        };
         /** @description Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind. */
         HaushaltAnzeige: {
             /** Format: int64 */
@@ -5481,6 +5528,12 @@ export interface components {
              *     Einheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie.
              */
             ausfall: string[];
+            /**
+             * @description Quellen, deren Modul im Einsatz ausgeblendet ist (LLH-1964), in der Folge von
+             *     [`AlarmQuelle`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer. Der
+             *     Monitor lässt sie weg, ohne den Stand unvollständig zu nennen.
+             */
+            ausgeblendet: components["schemas"]["AlarmQuelle"][];
             /** Format: int64 */
             bestaetigung_ueberfaellig: number;
             /** Format: int64 */
@@ -5850,6 +5903,13 @@ export interface components {
             uhs_id?: number | null;
         };
         /**
+         * @description Antwort des PATCH einer Materialzeile: die Zeile wie bisher, dazu der Beleg für „Rückgängig“,
+         *     wenn der Status gewechselt hat (LLH-1986).
+         */
+        MaterialPatchAntwort: components["schemas"]["EinsatzMaterialAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["MaterialStatusRuecknahmeBeleg"] | null;
+        };
+        /**
          * @description Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
          *     zurückkam, steht in `ausgelassen`.
          */
@@ -5863,6 +5923,18 @@ export interface components {
          * @enum {string}
          */
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
+        /**
+         * @description Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
+         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         *     Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+         */
+        MaterialStatusRuecknahmeBeleg: {
+            /** @description Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            gesetzt_at: string;
+            /** @description Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht. */
+            status: components["schemas"]["MaterialStatus"];
+            vorher_status?: components["schemas"]["MaterialStatus"] | null;
+        };
         /**
          * @description Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich
          *     die Kopplung. Eine Person bekommt `geraet: null`.
@@ -7072,6 +7144,13 @@ export interface components {
             /** Format: int64 */
             uhs_id?: number | null;
         };
+        /**
+         * @description Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu
+         *     der Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986).
+         */
+        PersonalPatchAntwort: components["schemas"]["EinsatzPersonalAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["HandStatusRuecknahmeBeleg"] | null;
+        };
         /** @description Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`. */
         PersonalStatus: {
             farbe?: string | null;
@@ -7979,6 +8058,12 @@ export interface components {
         Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
         /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
         ShellInfo: {
+            /**
+             * @description Pfade relativ zur Wurzel (ohne führenden `/`), die die Oberfläche ohne Server braucht:
+             *     alles unter `assets/` außer den Doku-Bildern, sortiert (LLH-1980). Die iOS-Hülle holt sie
+             *     nach jedem Online-Laden in den Cache ihres Webviews. Ohne eingebettetes Frontend leer.
+             */
+            assets: string[];
             /**
              * Format: int32
              * @description Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).

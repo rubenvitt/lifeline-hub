@@ -1,7 +1,7 @@
 import { cloneElement, useId, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { Form } from 'antd';
 import type { FormItemProps, FormRule } from 'antd';
-import Augenbraue from './Augenbraue';
+import Feldetikett from './Feldetikett';
 import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
 import { FELD_GRENZE, FELD_KLASSE } from './Feld';
 import GeaendertPunkt from './GeaendertPunkt';
@@ -68,12 +68,12 @@ export default function DatenfeldEingabe({
   const sperre = useSperrStelle(name);
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
-      <Augenbraue als="dt">
+      <Feldetikett als="dt">
         <label htmlFor={eingabeId}>
           {label}
           <GeaendertPunkt name={name} />
         </label>
-      </Augenbraue>
+      </Feldetikett>
       <dd style={{ margin: 0, minWidth: 0 }}>
         <SperrStelle melden={sperre.melden}>
           <Form.Item

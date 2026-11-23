@@ -4,8 +4,9 @@ import { schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Augenbraue — die Metadaten-Stimme des Neuentwurfs: 10 px, 600, Versalien, Sperrung
- * .14em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt Paneele, Kennzahlen,
- * Tabellenspalten und Feldgruppen.
+ * .14em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt Köpfe: Paneele,
+ * Kennzahlen, Tabellenspalten, Gruppen und Abschnitte. Ein Feld benennt sie nicht, das tut das
+ * `Feldetikett` (LLH-2045); deshalb kennt sie `als="dt"` nicht.
  *
  * Standard ist ein `<span>` (Satz, kein Gliederungspunkt). Wo die Augenbraue eine
  * Sektion BENENNT — Paneelkopf, Kennzahl —, macht `als="h2"` … `"h6"` sie zur Überschrift,
@@ -23,7 +24,7 @@ export function augenbraueStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperti
   };
 }
 
-export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'dt';
+export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
 interface AugenbraueProps {
   children: ReactNode;

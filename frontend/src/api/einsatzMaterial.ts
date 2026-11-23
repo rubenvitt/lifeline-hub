@@ -3,8 +3,10 @@ import type {
   MaterialArt,
   MaterialEntlassungAntwort,
   MaterialEntlassungVorzustand,
+  MaterialPatchAntwort,
   MaterialRuecknahmeAntwort,
   MaterialStatus,
+  MaterialStatusRuecknahmeBeleg,
 } from './types';
 import { apiGet, apiSend } from './client';
 import { zuruecknahmeQuery, type ZuruecknahmeFilter } from './einheiten';
@@ -123,8 +125,8 @@ export function updateDisposition(
   emId: number,
   felder: MaterialPatch,
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'> & { erwartet?: MaterialErwartet },
-): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(
+): Promise<MaterialPatchAntwort> {
+  return apiSend<MaterialPatchAntwort>(
     `/api/einsaetze/${einsatzId}/material/${emId}${zuruecknahmeQuery(optionen)}`,
     'PATCH',
     optionen?.erwartet ? { ...felder, erwartet: optionen.erwartet } : felder,
@@ -139,8 +141,25 @@ export function setzeMaterialStatus(
   einsatzId: number,
   emId: number,
   status: MaterialStatus,
-): Promise<EinsatzMaterial> {
+): Promise<MaterialPatchAntwort> {
   return updateDisposition(einsatzId, emId, { status });
+}
+
+/**
+ * „Rückgängig“ nach einem Statuswechsel eines Postens (LLH-1986). Nur direkt danach, nur für die
+ * Person, die gewechselt hat, und nur, solange Menge und Art unverändert sind; inzwischen
+ * geändert → 409 `veraltet`, sonst 409 mit Grund.
+ */
+export function nimmMaterialStatuswechselZurueck(
+  einsatzId: number,
+  emId: number,
+  beleg: MaterialStatusRuecknahmeBeleg,
+): Promise<EinsatzMaterial> {
+  return apiSend<EinsatzMaterial>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/status/zuruecknehmen`,
+    'POST',
+    beleg,
+  );
 }
 
 /**
