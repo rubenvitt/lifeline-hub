@@ -145,7 +145,10 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
     .getByRole('menuitem', { name: 'Leerer Lagevortrag' })
     .click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  const berichtPfad = new URL(page.url()).pathname.replace(/^\/einsaetze/, '/api/einsaetze');
+  // App-Route deutsch, API englisch (ADR-0085): `/einsaetze/1/lageberichte/5` → `…/situation-reports/5`.
+  const berichtPfad = new URL(page.url()).pathname
+    .replace(/^\/einsaetze/, '/api/einsaetze')
+    .replace('/lageberichte/', '/situation-reports/');
 
   const patches: PatchBody[] = [];
   page.on('request', (r) => {
