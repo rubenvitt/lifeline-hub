@@ -1,4 +1,4 @@
-// eslint-disable-next-line no-restricted-imports -- BBK-Feld, Ausnahme in Spec `status-darstellung`
+// oxlint-disable-next-line no-restricted-imports -- BBK-Feld, Ausnahme in Spec `status-darstellung`
 import { Tag, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import type { Sichtungskategorie } from '../api/types';

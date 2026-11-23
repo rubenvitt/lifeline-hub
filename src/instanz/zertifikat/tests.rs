@@ -87,3 +87,91 @@ fn fingerabdruck_ist_sha256_hex() {
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
 }
+
+/// Wie [`gegenstelle`], zählt aber jede HTTP-Anfrage, die ankommt (LLH-1872: der Erfasser darf
+/// keine auslösen).
+pub(crate) async fn gegenstelle_mit_zaehler() -> (
+    String,
+    String,
+    std::sync::Arc<std::sync::atomic::AtomicUsize>,
+) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let (cert, key) = crate::tls::rcgen_pem(&["localhost".into(), "127.0.0.1".into()]).unwrap();
+    let fp = tls_fingerabdruck_pem(cert.as_bytes()).unwrap();
+    let config =
+        axum_server::tls_rustls::RustlsConfig::from_pem(cert.into_bytes(), key.into_bytes())
+            .await
+            .unwrap();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let addr = listener.local_addr().unwrap();
+    let zaehler = Arc::new(AtomicUsize::new(0));
+    let z = zaehler.clone();
+    let app = axum::Router::new().fallback(move || {
+        let z = z.clone();
+        async move {
+            z.fetch_add(1, Ordering::SeqCst);
+            "ok"
+        }
+    });
+    tokio::spawn(async move {
+        axum_server::from_tcp_rustls(listener, config)
+            .unwrap()
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    });
+    (format!("https://{addr}"), fp, zaehler)
+}
+
+fn client_mit(config: rustls::ClientConfig) -> reqwest::Client {
+    crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
+        .tls_backend_preconfigured(config)
+        .build()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn tls_config_mit_passendem_fingerabdruck_verbindet() {
+    let (adresse, fp, zaehler) = gegenstelle_mit_zaehler().await;
+    let resp = client_mit(tls_config(Some(fp)).unwrap())
+        .get(format!("{adresse}/"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.text().await.unwrap(), "ok");
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn erfasser_liest_den_fingerabdruck_ohne_anfrage() {
+    let (adresse, fp, zaehler) = gegenstelle_mit_zaehler().await;
+    let erfasser = Arc::new(Erfasser::new());
+    let e = client_mit(erfasser_config(erfasser.clone()).unwrap())
+        .post(format!("{adresse}/"))
+        .body("Nutzdaten")
+        .send()
+        .await
+        .unwrap_err();
+    assert!(format!("{e:?}").contains(ERFASST), "{e:?}");
+    assert_eq!(erfasser.gesehen(), Some(fp));
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn erfasser_ohne_tls_liefert_nichts() {
+    let lauscher = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = lauscher.local_addr().unwrap();
+    tokio::spawn(async move {
+        while let Ok((sock, _)) = lauscher.accept().await {
+            drop(sock);
+        }
+    });
+    let erfasser = Arc::new(Erfasser::new());
+    let e = client_mit(erfasser_config(erfasser.clone()).unwrap())
+        .post(format!("https://{addr}/"))
+        .send()
+        .await;
+    assert!(e.is_err());
+    assert_eq!(erfasser.gesehen(), None);
+}

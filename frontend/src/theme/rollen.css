@@ -191,7 +191,7 @@
   --lfh-typo-ueberschrift-groesse: 30px;
   --lfh-typo-ueberschrift-gewicht: 600;
   --lfh-typo-ueberschrift-sperrung: -0.02em;
-  --lfh-typo-seitentitel-groesse: 14px;
+  --lfh-typo-seitentitel-groesse: 16px;
   --lfh-typo-seitentitel-gewicht: 600;
   --lfh-typo-kartentitel-groesse: 15px;
   --lfh-typo-kartentitel-gewicht: 600;
@@ -199,14 +199,12 @@
   --lfh-typo-text-gewicht: 400;
   --lfh-typo-text-klein-groesse: 12px;
   --lfh-typo-text-klein-gewicht: 400;
-  --lfh-typo-augenbraue-groesse: 10px;
+  --lfh-typo-augenbraue-groesse: 11px;
   --lfh-typo-augenbraue-gewicht: 600;
-  --lfh-typo-augenbraue-sperrung: 0.14em;
-  --lfh-typo-rail-etikett-groesse: 9px;
+  --lfh-typo-augenbraue-sperrung: 0.08em;
+  --lfh-typo-rail-etikett-groesse: 11px;
   --lfh-typo-rail-etikett-gewicht: 500;
-  --lfh-typo-rail-etikett-sperrung: 0.06em;
-  --lfh-typo-meta-klein-groesse: 10px;
-  --lfh-typo-meta-klein-gewicht: 400;
+  --lfh-typo-rail-etikett-sperrung: 0.04em;
   --lfh-typo-meta-groesse: 11px;
   --lfh-typo-meta-gewicht: 400;
   --lfh-typo-mono-klein-groesse: 12px;

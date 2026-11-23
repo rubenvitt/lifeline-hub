@@ -34,6 +34,9 @@ pub struct Webhook {
     pub verlust_at: Option<String>,
     pub angelegt_at: String,
     pub geaendert_at: String,
+    /// Fingerabdruck des Zielzertifikats (SHA-256, Hex); gesetzt zählt nur dieses Zertifikat
+    /// (LLH-1872, ADR-0092).
+    pub zertifikat_pin: Option<String>,
 }
 
 impl Webhook {
@@ -71,7 +74,8 @@ pub struct Versuch {
 
 const SPALTEN: &str = "id, zugang_id, url, arten, lan_erlaubt, zustand, cursor, offen_id, \
     fehler_seit, fehlversuche, naechster_versuch_at, letzter_fehler_at, letzter_fehler_status, \
-    letzter_fehler_art, letzter_erfolg_at, angehalten_at, verlust_at, angelegt_at, geaendert_at";
+    letzter_fehler_art, letzter_erfolg_at, angehalten_at, verlust_at, angelegt_at, geaendert_at, \
+    zertifikat_pin";
 
 /// Die Arten als JSON-Liste in fester Reihenfolge (`EventType::ALLE`), ohne Doppelte.
 pub fn arten_json(arten: &[EventType]) -> String {
@@ -127,6 +131,8 @@ pub struct Eingabe {
     pub url: String,
     pub arten: Vec<EventType>,
     pub lan_erlaubt: bool,
+    /// Normalisierter Fingerabdruck (`ziel::normalize_pin`) oder `None`.
+    pub zertifikat_pin: Option<String>,
 }
 
 /// Legt den Webhook eines Zugangs an. Er beginnt beim Höchststand der Outbox (D1). Gibt es schon
@@ -146,8 +152,9 @@ pub async fn create(
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO maschine_webhook \
-         (id, zugang_id, url, arten, lan_erlaubt, cursor, angelegt_at, geaendert_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, zugang_id, url, arten, lan_erlaubt, cursor, angelegt_at, geaendert_at, \
+          zertifikat_pin) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(zugang_id)
@@ -157,6 +164,7 @@ pub async fn create(
     .bind(head)
     .bind(jetzt)
     .bind(jetzt)
+    .bind(&eingabe.zertifikat_pin)
     .execute(&mut *conn)
     .await?;
     load_by_zugang(conn, zugang_id)
@@ -164,7 +172,7 @@ pub async fn create(
         .ok_or_else(|| AppError::Internal("Webhook verschwunden".into()))
 }
 
-/// Ändert Ziel, Arten und LAN-Ausnahme (D7). `basis` ist `geaendert_at`, auf dem die Änderung
+/// Ändert Ziel, Arten, LAN-Ausnahme und Fingerabdruck (D7; LLH-1872). `basis` ist `geaendert_at`, auf dem die Änderung
 /// beruht (409, wenn er nicht mehr stimmt; ohne Basis wird ohne Vergleich geschrieben). Der Cursor bleibt; ein geändertes Ziel setzt die
 /// Störung zurück, ein angehaltener Webhook bleibt angehalten. Ohne wirksame Änderung kein
 /// Schreiben, und vorher gleich nachher.
@@ -187,14 +195,18 @@ pub async fn update(
     if vorher.url == eingabe.url
         && vorher.arten_json == arten
         && vorher.lan_erlaubt == eingabe.lan_erlaubt
+        && vorher.zertifikat_pin == eingabe.zertifikat_pin
     {
         return Ok(Some((vorher.clone(), vorher)));
     }
-    let ziel_neu = vorher.url != eingabe.url || vorher.lan_erlaubt != eingabe.lan_erlaubt;
+    // Ein anderer Fingerabdruck ist ein anderes Ziel: die Störung galt dem alten Zertifikat.
+    let ziel_neu = vorher.url != eingabe.url
+        || vorher.lan_erlaubt != eingabe.lan_erlaubt
+        || vorher.zertifikat_pin != eingabe.zertifikat_pin;
     let stand = neuer_stand(&vorher.geaendert_at, jetzt);
     sqlx::query(
         "UPDATE maschine_webhook SET url = ?1, arten = ?2, lan_erlaubt = ?3, geaendert_at = ?4, \
-             verlust_at = NULL, \
+             verlust_at = NULL, zertifikat_pin = ?7, \
              fehler_seit = CASE WHEN ?5 AND zustand = 'aktiv' THEN NULL ELSE fehler_seit END, \
              fehlversuche = CASE WHEN ?5 AND zustand = 'aktiv' THEN 0 ELSE fehlversuche END, \
              naechster_versuch_at = \
@@ -207,6 +219,7 @@ pub async fn update(
     .bind(&stand)
     .bind(ziel_neu)
     .bind(&vorher.id)
+    .bind(&eingabe.zertifikat_pin)
     .execute(&mut *conn)
     .await?;
     let nachher = load_by_zugang(conn, zugang_id)

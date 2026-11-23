@@ -140,7 +140,7 @@ Diese Werte liest das Format des Design Systems nicht; sie stehen nur im Repo:
 - `farbenDunkel/farbenHell.markeGlut`: kein Farbwert (Nacht `0 0 12px 0 rgba(168, 7, 26, 0.55)`, Tag `0 0 10px 0 rgba(168, 7, 26, 0.3)`)
 - `form.versalSperrung`: Sperrung der Versalien, `2.2px`
 - `form.uebergang`: Übergang, `120ms cubic-bezier(0.2, 0.8, 0.2, 1)`
-- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · augenbraue 0.14em Versalien · railEtikett 0.06em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
+- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · augenbraue 0.08em Versalien · railEtikett 0.04em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
 - `--lfh-abdunkelung (theme/rollen.css)`: Deckschicht des Helligkeitsreglers, keine Farbrolle
 
 ## Gestaltungssprache
@@ -173,8 +173,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
-  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
-  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen. Die Stufen wachsen nicht mit der Dichte. Neue
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `meta` 11, `monoKlein` 12, `mono` 13,
+  `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen. **Boden 11 px**
+  (`SCHRIFT_BODEN`): keine Stufe darunter, Augenbraue und Rail-Etikett 11, Seitentitel
+  16/600; darunter bleiben nur Druck, Zeichnungen mit eigenem Maßstab und der Lagemonitor. Die Stufen wachsen nicht mit der Dichte. Neue
   `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
   Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster**: Abstände kommen aus dem Raster der aktiven
@@ -380,7 +382,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
   nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein rohes antds `Tag`**
-  (ESLint `no-restricted-imports`; Ausnahme nur
+  (Lint `no-restricted-imports`; Ausnahme nur
   `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
   Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.

@@ -3,19 +3,19 @@ import { apiGet, apiSend } from './client';
 
 /**
  * Sitzungsliste und Beenden ohne Deaktivieren (LFH-1092). Die eigenen Sitzungen unter
- * `/api/auth/sitzungen`, die einer Person für den Admin unter `/api/benutzer/{id}/sitzungen`.
+ * `/api/auth/sessions`, die einer Person für den Admin unter `/api/benutzer/{id}/sitzungen`.
  * Die aktuelle Sitzung endet nie über die Liste, nur über Abmelden (der Server antwortet 422).
  */
 export function ladeEigeneSitzungen(): Promise<SitzungAnzeige[]> {
-  return apiGet<SitzungAnzeige[]>('/api/auth/sitzungen');
+  return apiGet<SitzungAnzeige[]>('/api/auth/sessions');
 }
 
 export function beendeEigeneSitzung(kennung: string): Promise<SitzungenBeendet> {
-  return apiSend<SitzungenBeendet>(`/api/auth/sitzungen/${encodeURIComponent(kennung)}`, 'DELETE');
+  return apiSend<SitzungenBeendet>(`/api/auth/sessions/${encodeURIComponent(kennung)}`, 'DELETE');
 }
 
 export function beendeAndereEigeneSitzungen(): Promise<SitzungenBeendet> {
-  return apiSend<SitzungenBeendet>('/api/auth/sitzungen/andere-beenden', 'POST');
+  return apiSend<SitzungenBeendet>('/api/auth/sessions/end-others', 'POST');
 }
 
 export function ladeSitzungenVon(benutzerId: number): Promise<SitzungAnzeige[]> {

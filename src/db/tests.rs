@@ -14959,3 +14959,43 @@ async fn migration_0357_koppelt_start_stichworte_behutsam() {
         "nur eigene Organisation"
     );
 }
+
+/// LLH-2007 (Review-Befund 1): Die Migration, mit der eine Instanz aufrüstet, setzt die Grenze
+/// des Mitarbeit-Nachtrags jeder bestehenden Kopplung auf den Stand des Aufrüstens. Was danach an
+/// einer Mitgliedschaft geschieht, wählte jemand, der `mitarbeit` schon kannte.
+#[tokio::test]
+async fn migration_0366_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruesten() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 365).await;
+    sqlx::query(
+        "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+         gegenueber_name, richtung, zustand) VALUES (1, 'gegen', 'x', 'Gegenstelle', \
+         'wird_gemeldet', 'aktiv')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    // Einträge im Änderungslog entstehen über dessen Trigger (ADR-0018), nicht von Hand.
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         VALUES (1, 1, 'beobachter')",
+        "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'mitarbeit'",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
+    }
+    let hoechster: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(hoechster > 0, "die Trigger haben ins Log geschrieben");
+    migriere_bis(&pool, 366).await;
+    let grenze: Option<i64> =
+        sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(grenze, Some(hoechster));
+}

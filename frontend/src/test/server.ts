@@ -74,10 +74,10 @@ export const server = setupServer(
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
    */
-  http.get('/api/versionsstand', () =>
+  http.get('/api/release-notes', () =>
     HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.106' }),
   ),
-  http.post('/api/versionsstand/gelesen', () =>
+  http.post('/api/release-notes/read', () =>
     HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.106' }),
   ),
   /**
@@ -85,7 +85,7 @@ export const server = setupServer(
    * Anmeldung). Das Profil fragt sie beim Mount ab; Tests der Liste überschreiben per
    * `server.use()`.
    */
-  http.get('/api/auth/sitzungen', () =>
+  http.get('/api/auth/sessions', () =>
     HttpResponse.json([
       {
         kennung: '0'.repeat(32),

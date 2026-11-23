@@ -223,9 +223,9 @@ async fn zu_grosser_login_body_liefert_413_im_fehler_envelope() {
 /// nach einem Einmalpasswort, LFH-1121) und haben ebenfalls 4 KiB (LFH-1061).
 const OEFFENTLICHE_CODE_ROUTEN: [&str; 4] = [
     "/api/auth/totp/finish",
-    "/api/auth/app-code/einloesen",
+    "/api/auth/app-code/redeem",
     "/api/geraete/koppeln",
-    "/api/auth/passwort/festlegen",
+    "/api/auth/password/set",
 ];
 
 fn json_post(pfad: &str, body: &str) -> Request<Body> {

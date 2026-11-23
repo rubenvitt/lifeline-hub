@@ -27,7 +27,7 @@ set -euo pipefail
 #                    Migrationsnummern gegen origin/alpha,
 #                    Werkzeugversionen aus mise.toml,
 #                    OpenSpec bleibt eingefrorenes Archiv,
-#                    Schreibweisen der Dateinamen,
+#                    Schreibweisen der Dateinamen, API-Routen englisch,
 #                    Architekturdoku und ihre Entscheidungen (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt),
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
@@ -139,7 +139,7 @@ schritt_1() {
 }
 
 schritt_2() {
-  echo "==> [2/$SCHRITTE] Frontend-Lint (--max-warnings 0)"
+  echo "==> [2/$SCHRITTE] Frontend-Lint (oxlint, jede Warnung bricht)"
   $PNPM -C "$FE" lint
 }
 
@@ -458,12 +458,17 @@ schritt_13() {
 }
 
 schritt_14() {
-  echo "==> [14/$SCHRITTE] Keine Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden (LFH-1053)"
+  echo "==> [14/$SCHRITTE] Keine Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden (LFH-1053), API-Routen englisch (LLH-1979)"
   # Die Linux-CI unterscheidet die Schreibung und sah die Kollision aus LFH-1050 nicht; erst der
   # macOS-Build nach dem Release brach ab. Erst der Selbsttest, dann die Prüfung: der Wächter
   # irrt in beide Richtungen still.
   "$ROOT/scripts/check-schreibweisen.test.sh"
   "$ROOT/scripts/check-schreibweisen.sh"
+  # API-Routen englisch nach Glossar, deutscher Bestand schrumpft nur (LLH-1979, ADR-0085). Wie
+  # oben: erst der Selbsttest, dann die Prüfung; ohne origin/alpha fällt nur der Vergleich des
+  # Bestands laut aus.
+  "$ROOT/scripts/check-api-routen.test.sh"
+  "$ROOT/scripts/check-api-routen.sh"
 }
 
 schritt_15() {

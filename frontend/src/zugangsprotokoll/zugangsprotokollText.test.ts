@@ -132,6 +132,30 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
   });
 });
 
+describe('Fingerabdruck am Webhook (LLH-1872)', () => {
+  it('nennt Hinterlegen, Entfernen und Abrufen und zeigt Host und Fingerabdruck', () => {
+    expect(AKTION_TEXT.maschinenzugang_webhook_pin_gesetzt).toBe(
+      'Webhook: Fingerabdruck hinterlegt',
+    );
+    expect(AKTION_TEXT.maschinenzugang_webhook_pin_entfernt).toBe(
+      'Webhook: Fingerabdruck entfernt',
+    );
+    expect(AKTION_TEXT.maschinenzugang_webhook_zertifikat_abgerufen).toBe(
+      'Webhook: Zertifikat vom Ziel abgerufen',
+    );
+    expect(hasNamensziel('maschinenzugang_webhook_pin_gesetzt')).toBe(true);
+    const text = instanzText({
+      zugang_id: 'z1',
+      host: 'elw.lan',
+      fingerabdruck: 'ab12',
+      fingerabdruck_vorher: 'cd34',
+    });
+    expect(text).toContain('elw.lan');
+    expect(text).toContain('ab12');
+    expect(text).toContain('cd34');
+  });
+});
+
 describe('Adapter (LLH-2017)', () => {
   it('nennt die Aktionen, trägt den Namen des Adapters als Ziel und zeigt Art, Platz und Host', () => {
     expect(AKTION_TEXT.adapter_geheimnis_gesetzt).toBe('Geheimnis eines Adapters gesetzt');

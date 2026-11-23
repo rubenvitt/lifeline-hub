@@ -88,9 +88,7 @@ export default function KommKarte({
           }}
         >
           <span style={{ ...monoStil('mono', 500), color: rollen.text }}>{zeit}</span>
-          {nr != null && (
-            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{nr}</span>
-          )}
+          {nr != null && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{nr}</span>}
         </div>
       )}
       <div

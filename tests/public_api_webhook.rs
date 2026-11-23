@@ -77,6 +77,7 @@ async fn webhook_anlegen(o: &Org, zugang_id: &str, arten: &[EventType]) -> Webho
             url: "https://empfaenger.example/hook".into(),
             arten: arten.to_vec(),
             lan_erlaubt: false,
+            zertifikat_pin: None,
         },
         &lifeline_hub::zeit::jetzt(),
     )
@@ -211,6 +212,7 @@ async fn ein_webhook_je_zugang_und_er_geht_mit_dem_zugang() {
             url: "https://anderer.example/".into(),
             arten: vec![EventType::EinsatzClosed],
             lan_erlaubt: false,
+            zertifikat_pin: None,
         },
         &lifeline_hub::zeit::jetzt(),
     )
@@ -787,6 +789,7 @@ async fn fehlschlag_an_ein_altes_ziel_macht_die_ruecksetzung_nicht_rueckgaengig(
                         url: "https://neu.example/hook".into(),
                         arten: w.arten(),
                         lan_erlaubt: false,
+                        zertifikat_pin: None,
                     },
                     "2099-01-01 00:00:00",
                 )
@@ -806,4 +809,91 @@ async fn fehlschlag_an_ein_altes_ziel_macht_die_ruecksetzung_nicht_rueckgaengig(
         .await
         .unwrap();
     assert_eq!(verlauf.len(), 1);
+}
+
+// ---------------------------------------------------------------- Fingerabdruck (LLH-1872)
+
+const PIN_A: &str = "aa12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12";
+const PIN_B: &str = "bb12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12";
+
+async fn pin_setzen(o: &Org, z: &str, pin: Option<&str>) -> (Webhook, Webhook) {
+    let w = webhook(o, z).await;
+    repo::update(
+        &mut *o.pool.acquire().await.unwrap(),
+        z,
+        Some(&w.geaendert_at),
+        &Eingabe {
+            url: w.url.clone(),
+            arten: w.arten(),
+            lan_erlaubt: w.lan_erlaubt,
+            zertifikat_pin: pin.map(str::to_string),
+        },
+        &lifeline_hub::zeit::jetzt(),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+}
+
+#[tokio::test]
+async fn pin_wechsel_setzt_die_stoerung_zurueck() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    let auf = Aufzeichner::neu(false);
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    let gestoert = webhook(&o, &z).await;
+    assert!(gestoert.fehler_seit.is_some());
+
+    let (vorher, nachher) = pin_setzen(&o, &z, Some(PIN_A)).await;
+    assert_eq!(vorher.zertifikat_pin, None);
+    assert_eq!(nachher.zertifikat_pin.as_deref(), Some(PIN_A));
+    assert_eq!(nachher.fehler_seit, None);
+    assert_eq!(nachher.fehlversuche, 0);
+    assert!(nachher.geaendert_at > vorher.geaendert_at);
+}
+
+#[tokio::test]
+async fn gleicher_pin_schreibt_nicht() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    pin_setzen(&o, &z, Some(PIN_A)).await;
+    let (vorher, nachher) = pin_setzen(&o, &z, Some(PIN_A)).await;
+    assert_eq!(vorher, nachher);
+    let (_, entfernt) = pin_setzen(&o, &z, None).await;
+    assert_eq!(entfernt.zertifikat_pin, None);
+}
+
+#[tokio::test]
+async fn lauf_gibt_den_pin_mit() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    pin_setzen(&o, &z, Some(PIN_B)).await;
+    let auf = Aufzeichner::neu(true);
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    let gesendet = auf.gesendet.lock().unwrap().clone();
+    assert!(!gesendet.is_empty());
+    for (zustellung, _) in gesendet {
+        assert_eq!(zustellung.zertifikat_pin.as_deref(), Some(PIN_B));
+    }
+    let w = webhook(&o, &z).await;
+    let test = Aufzeichner::neu(true);
+    testereignis(&o.pool, &*test, &w, Utc::now()).await.unwrap();
+    assert_eq!(
+        test.gesendet.lock().unwrap()[0].0.zertifikat_pin.as_deref(),
+        Some(PIN_B)
+    );
+}
+
+#[tokio::test]
+async fn db_lehnt_ungueltigen_pin_ab() {
+    let o = org().await;
+    let (_, w) = drei_ereignisse(&o).await;
+    for falsch in ["XYZ", &PIN_A.to_ascii_uppercase(), &PIN_A[..63]] {
+        let r = sqlx::query("UPDATE maschine_webhook SET zertifikat_pin = ? WHERE id = ?")
+            .bind(falsch)
+            .bind(&w.id)
+            .execute(&o.pool)
+            .await;
+        assert!(r.is_err(), "{falsch}");
+    }
 }

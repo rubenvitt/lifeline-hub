@@ -156,7 +156,7 @@ export default function LagemonitorKarte({
   const flaechen = useMemo(
     () => baueMonitorFlaechen(zonen, abschnitte, token),
     // `dunkel` statt `token`: die Stufenfarbe hängt nur am Modus, der Token wechselt öfter.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
     [flaechenSchluessel, dunkel],
   );
   const punkte: MonitorPunkt[] = [
@@ -213,7 +213,7 @@ export default function LagemonitorKarte({
       map.remove();
     };
     // `anfrage` und `bedienbar` gelten ab dem Bau; sie wechseln auf keiner Seite.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Bau gelesen
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- nur beim Bau gelesen
   }, [config, dunkel, hatAusschnitt]);
 
   // Ausschnitt nachführen, wenn eine UHS oder der Einsatzort dazukommt.
@@ -231,7 +231,7 @@ export default function LagemonitorKarte({
         { padding: 120, maxZoom: PUNKT_ZOOM, animate: false },
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität
   }, [ausschnittSchluessel, config, dunkel]);
 
   // Gefahrenzonen und Abschnittsflächen als Ebenen der Lagekarte, nach dem Laden des Stils.
@@ -364,7 +364,7 @@ export default function LagemonitorKarte({
       map.off('idle', place);
       map.off('resize', place);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
   }, [
     verortetSchluessel,
     flaechen,
