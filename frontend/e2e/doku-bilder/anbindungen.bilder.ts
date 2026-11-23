@@ -123,7 +123,7 @@ async function stelle(page: Page, jetzt: Date) {
         })
       : route.continue(),
   );
-  await page.route('**/api/admin/adapter/a1/versuche', (route) =>
+  await page.route('**/api/admin/adapter/a1/attempts', (route) =>
     route.fulfill({
       json: [
         {
@@ -151,7 +151,7 @@ async function stelle(page: Page, jetzt: Date) {
       ],
     }),
   );
-  await page.route('**/api/admin/adapter/a1/pruefen', (route) =>
+  await page.route('**/api/admin/adapter/a1/check', (route) =>
     route.fulfill({ json: { erfolg: true, dauer_ms: 412, anzahl: 4 } }),
   );
 }

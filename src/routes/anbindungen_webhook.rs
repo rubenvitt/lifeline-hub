@@ -337,7 +337,7 @@ async fn spur_pin_wechsel(
     .await;
 }
 
-/// POST /api/admin/anbindungen/{id}/webhook — richtet den Webhook ein (201). Schon einer da: 409.
+/// POST /api/admin/integrations/{id}/webhook — richtet den Webhook ein (201). Schon einer da: 409.
 /// Admin-Spur `maschinenzugang_webhook_angelegt`, mit LAN-Ausnahme zusätzlich `…_lan_erlaubt`.
 pub async fn create(
     State(state): State<AppState>,
@@ -395,7 +395,7 @@ pub async fn create(
     ))
 }
 
-/// PATCH /api/admin/anbindungen/{id}/webhook — ändert Ziel, Arten oder LAN-Ausnahme; Konflikt
+/// PATCH /api/admin/integrations/{id}/webhook — ändert Ziel, Arten oder LAN-Ausnahme; Konflikt
 /// über `basis_geaendert_at` (409). Admin-Spur `…_geaendert` bei geändertem Ziel oder geänderten
 /// Arten, `…_lan_erlaubt`/`…_lan_entzogen` beim Umschalten der Ausnahme.
 pub async fn update(
@@ -480,7 +480,7 @@ pub async fn update(
     Ok(Json(WebhookAnzeige::aus(&nachher, &z, &jetzt, true)))
 }
 
-/// DELETE /api/admin/anbindungen/{id}/webhook — entfernt den Webhook samt Verlauf (204).
+/// DELETE /api/admin/integrations/{id}/webhook — entfernt den Webhook samt Verlauf (204).
 /// Admin-Spur `maschinenzugang_webhook_entfernt`.
 pub async fn delete(
     State(state): State<AppState>,
@@ -513,7 +513,7 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/admin/anbindungen/{id}/webhook/wieder-aufnehmen — nur aus „angehalten“, sonst 409.
+/// POST /api/admin/integrations/{id}/webhook/resume — nur aus „angehalten“, sonst 409.
 /// Admin-Spur `maschinenzugang_webhook_wieder_aufgenommen`.
 pub async fn wieder_aufnehmen(
     State(state): State<AppState>,
@@ -542,7 +542,7 @@ pub async fn wieder_aufnehmen(
     Ok(Json(WebhookAnzeige::aus(&w, &z, &jetzt, true)))
 }
 
-/// POST /api/admin/anbindungen/{id}/webhook/test — sendet ein signiertes `ping` und wartet auf
+/// POST /api/admin/integrations/{id}/webhook/test — sendet ein signiertes `ping` und wartet auf
 /// die Antwort. Cursor, Zustand und Wartezeit bleiben; kein Eintrag in der Admin-Spur.
 pub async fn test(
     State(state): State<AppState>,
@@ -622,7 +622,7 @@ pub async fn zertifikat_abrufen(
     }))
 }
 
-/// GET /api/admin/anbindungen/{id}/webhook/versuche — die letzten Zustellversuche, neueste
+/// GET /api/admin/integrations/{id}/webhook/attempts — die letzten Zustellversuche, neueste
 /// zuerst.
 pub async fn versuche(
     State(state): State<AppState>,

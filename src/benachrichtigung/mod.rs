@@ -735,17 +735,14 @@ async fn ausliefern(
         );
     }
     // iOS-Push an die angemeldeten Geräte (LLH-2040), mit denselben Filtern, in einem eigenen
-    // Task; ohne `--ios-push` nichts. Den Text bildet der Versand je Empfänger. Eine Meldung ohne
-    // Einsatz (Störung einer Anbindung, LLH-2026) geht nicht per iOS-Push: der Klartext braucht
-    // den Einsatz (`ios_push::inhalt::Klartext::e`).
+    // Task; ohne `--ios-push` nichts. Den Text bildet der Versand je Empfänger, auch ohne Einsatz
+    // (Störung einer Anbindung, LLH-2077).
     if let Some(ios_push) = live.ios_push() {
         ios_push.versenden(
             ereignisse
                 .iter()
                 .filter(|(b, e)| {
-                    e.stufe != BenachrichtigungStufe::Still
-                        && e.einsatz_id.is_some()
-                        && !ueber_hub.ios_push.contains(b)
+                    e.stufe != BenachrichtigungStufe::Still && !ueber_hub.ios_push.contains(b)
                 })
                 .map(|(benutzer_id, e)| crate::ios_push::IosSendung {
                     benutzer_id: *benutzer_id,

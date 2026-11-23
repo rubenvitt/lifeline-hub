@@ -14,7 +14,7 @@ use tower::ServiceExt;
 mod common;
 use common::{anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie};
 
-const PFAD: &str = "/api/admin/archiv/einspielen";
+const PFAD: &str = "/api/admin/archive/import";
 const GRENZE: &str = "LFHARCHIVGRENZE";
 
 /// Ein Feld des Uploads: Name, Dateiname (bei einer Datei) und Inhalt.

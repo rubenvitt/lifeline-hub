@@ -90,8 +90,9 @@ pub(crate) async fn anzeige(
 }
 
 /// Die Anzeige einer Zeile am Adapter (LLH-2026), wenn `benutzer` noch System-Admin seiner Org
-/// ist und es den Adapter noch gibt; sonst `None`.
-async fn adapter_anzeige(
+/// ist und es den Adapter noch gibt; sonst `None`. Auch der iOS-Push bildet den Text hier
+/// (`ios_push::inhalt`, LLH-2077).
+pub(crate) async fn adapter_anzeige(
     pool: &SqlitePool,
     benutzer: &Benutzer,
     adapter_id: &str,

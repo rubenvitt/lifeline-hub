@@ -22,8 +22,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Belegungskachel schneidet ab, und „keine Kachel schneidet ihren Inhalt ab“ wird rot.
  */
 
-const STIL_PFAD = '/api/karte/proxy/9/style.json';
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const STIL_PFAD = '/api/map/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 
 /** Rechteck um die UHS Nord als GeoJSON-String. */
 function rechteck(west: number, sued: number, ost: number, nord: number): string {

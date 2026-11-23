@@ -45,7 +45,7 @@ for (const zustand of ['offline', 'leer'] as const) {
     test(`Fachebenen-Paneel, Stufe ${dichte}: „${MARKE[zustand]}“ steht einzeilig`, async ({
       page,
     }) => {
-      await page.route('**/api/karte/fachebenen/**', (route) => {
+      await page.route('**/api/map/overlays/**', (route) => {
         const quelle = new URL(route.request().url()).pathname.split('/').pop();
         return route.fulfill({
           json: {

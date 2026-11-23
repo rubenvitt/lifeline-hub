@@ -38,8 +38,8 @@ import {
  */
 
 const KAPITEL = 'einsatzdaten';
-const STIL_PFAD = '/api/karte/proxy/9/style.json';
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const STIL_PFAD = '/api/map/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 
 /** Kartengrundlage des Kartenausschnitts aus der Fixture (docs/anwender/AGENTS.md, „Bilder“). */
 async function kartengrundlage(page: Page) {

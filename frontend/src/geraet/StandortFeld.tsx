@@ -6,7 +6,7 @@ import { IconKreuz, IconStandortZiel } from '../icons';
 import {
   EIGENPOSITION_SPERRGRUND,
   MELDUNG_KEIN_STANDORT,
-  MELDUNG_VERWEIGERT,
+  meldungVerweigert,
   eigenpositionVerfuegbarkeit,
   type Eigenposition,
 } from '../pages/lagekarte/useEigenposition';
@@ -64,7 +64,7 @@ export default function StandortFeld({
       (e) => {
         if (nr !== anfrage.current) return;
         setLaeuft(false);
-        setFehler(e.code === e.PERMISSION_DENIED ? MELDUNG_VERWEIGERT : MELDUNG_KEIN_STANDORT);
+        setFehler(e.code === e.PERMISSION_DENIED ? meldungVerweigert() : MELDUNG_KEIN_STANDORT);
       },
       // Wie die Lagekarte: endliche Frist für einen GPS-Kaltstart, ein frischer Wert genügt.
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 5_000 },

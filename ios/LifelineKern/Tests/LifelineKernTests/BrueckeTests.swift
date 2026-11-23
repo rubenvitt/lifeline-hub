@@ -18,6 +18,15 @@ final class BrueckeTests: XCTestCase {
                 isMainFrame: true, origin: origin("https", "elw.local", 8443), aktiverServer: elw))
     }
 
+    /// LLH-2070: WebKit meldet einen Host mit Umlaut als Punycode; die Brücke bleibt nicht stumm.
+    func testEinServerMitUmlautImHostPasstZurPunycodeOrigin() throws {
+        let lueneburg = try ServerAdresse.parse("https://einsatz-lüneburg.de/")
+        XCTAssertTrue(
+            Bruecke.accepts(
+                isMainFrame: true, origin: origin("https", "xn--einsatz-lneburg-7vb.de", 0),
+                aktiverServer: lueneburg))
+    }
+
     func testEinUnterframeDesAktivenServersWirdAbgelehnt() {
         XCTAssertFalse(
             Bruecke.accepts(

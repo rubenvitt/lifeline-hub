@@ -161,6 +161,13 @@ Link von außen bewirkt nichts. Wer den Tab schließt, landet wieder auf der Anm
   von Android mit den Typen, die das Feld annimmt, bei Bedarf mit Mehrfachwahl. Die Kamera der
   Oberfläche bekommt nur die Seite des aktiven Servers, nur als Video (kein Mikrofon); beim ersten
   Mal fragt Android nach der Kamera.
+- **Standort** (LLH-2071, [ADR-0093](../architektur/entscheidungen/ADR-0093-die-app-huellen-geben-den-standort-nur-dem-aktiven-server-im-vordergrund.md)): „Position“ auf
+  der Lagekarte, „Eigene Position“ im Ortsfeld und „Mein Standort“ am gekoppelten Gerät gehen wie
+  im Browser. Android fragt beim ersten Mal, nur für die Nutzung der App; „Ungefähr“ ist erlaubt,
+  der Kreis auf der Karte zeigt dann, wie grob die Position ist. Den Standort bekommt nur die Seite
+  des aktiven Servers, nie eine fremde Seite; die App ortet nicht im Hintergrund und speichert oder
+  sendet den Standort nicht selbst. Entziehen: Einstellungen → Apps → Lifeline → Berechtigungen →
+  Standort.
 - **Drucken** öffnet den Druckdialog von Android (auch „Als PDF speichern“).
 - **Rückfragen der Seite** erscheinen als Dialog von Android; der Titel nennt, wer fragt.
 - **Meldungen:** Bei laufender App zeigt sie eine Benachrichtigung im Kanal „Lifeline“. Ab
@@ -378,6 +385,11 @@ Jeder Punkt mit Ergebnis an die Aufgabe LLH-1989.
   Abbrechen lässt das Feld leer, ein zweiter Versuch öffnet wieder. Fragt eine Seite nach der
   Kamera (`getUserMedia`), fragt Android einmal nach der Kamera, und nur der aktive Server
   bekommt sie.
+- [ ] Standort: „Position“ auf der Lagekarte fragt einmal (genau oder ungefähr, beides
+  ausprobieren), zeigt dann die Eigenposition; verweigert nennt der Hinweis die Einstellungen des
+  Geräts. Nach Wechsel auf einen zweiten Server fragt dessen Seite nicht erneut, eine fremde
+  Seite (Identitätsanbieter) bekommt keinen Standort. Im Hintergrund kein Standort-Symbol in der
+  Statusleiste.
 - [ ] Haptik auf dem Tablet (ohne Vibrationsmotor: kein Fehler) und auf einem Handy; spürt man
   `CONFIRM` und `REJECT` unter One UI?
 

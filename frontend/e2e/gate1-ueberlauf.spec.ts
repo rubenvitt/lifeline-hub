@@ -167,10 +167,25 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
                 contentType: 'image/png',
               });
             }
-            const inhalt = await page.locator('.ant-layout-content').first().boundingBox();
+            // In Seitenkoordinaten, nicht im Fenster: das ETB öffnet am Ende
+            // (`useFunkprotokollLauf`, LLH-1149), und ob der Startlauf rollt, hängt am Zeitpunkt.
+            // Gerollt steht der klebende Kopf über gerolltem Inhalt, ohne ihn zu verdecken; im
+            // Fenster gemessen hieß das „Inhalt bei 33 px, Kopf bis 145 px“ (CI alpha 8115b5ae,
+            // 1024 px handschuh, 112 px gerollt). Gefragt ist, wo der Inhalt ungerollt beginnt.
+            const lage = await page.evaluate(() => {
+              const kopf = document.querySelector('header')!;
+              const inhalt = document.querySelector('.ant-layout-content')!;
+              return {
+                kopfRollt: getComputedStyle(kopf).position === 'static',
+                inhaltOben: inhalt.getBoundingClientRect().top + window.scrollY,
+                gerollt: window.scrollY,
+              };
+            });
+            // Der Kopf klebt (`sticky`/`fixed`): seine Unterkante im Fenster ist die ungerollte.
+            expect(lage.kopfRollt, `${kontext}: Kopf klebt`).toBe(false);
             expect(
-              inhalt!.y,
-              `${kontext}: Kopf verdeckt keinen Seiteninhalt`,
+              lage.inhaltOben,
+              `${kontext}: Kopf verdeckt keinen Seiteninhalt (${lage.gerollt} px gerollt)`,
             ).toBeGreaterThanOrEqual(messung.kopfUnten);
             // Bedienbar: im Kopf, am Handy im Einsatz aus der Navigation (LLH-1728, D3).
             await oeffneSucheUeberOberflaeche(page);

@@ -60,7 +60,12 @@ public struct ServerAdresse: Hashable, Sendable, Codable, CustomStringConvertibl
         else { throw .unlesbar }
         // `URLComponents` liest auch Port 65536; der URL-Standard (und `adresse.rs`) nicht.
         if let port = teile.port, !(0...65535).contains(port) { throw .unlesbar }
-        let host = (teile.percentEncodedHost ?? "").lowercased()
+        // Ein Host mit Umlauten gilt in der Form, die WebKit als Origin meldet (LLH-2070):
+        // `encodedHost` liefert ihn in Punycode wie `adresse.rs` (UTS 46 nicht-transitional; einen
+        // unbrauchbaren, etwa mit Zero-Width-Joiner, liest `URLComponents` schon nicht).
+        // `percentEncodedHost` dekodierte selbst einen eingegebenen `xn--`-Host zu `%c3%bc…`, und
+        // die Brücke bliebe stumm.
+        let host = (teile.encodedHost ?? "").lowercased()
         // Wer drei Schrägstriche tippt, hat den Hostnamen vergessen; der URL-Standard machte aus
         // `https:///einsatz` still den Host `einsatz`.
         let nachSchema = eingabe[eingabe.index(after: eingabe.firstIndex(of: ":")!)...]

@@ -440,7 +440,7 @@ function basisHandler(
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
-    http.get('/api/karte/config', () => HttpResponse.json(config)),
+    http.get('/api/map/config', () => HttpResponse.json(config)),
     http.get('/api/einsaetze/1/settings', () => HttpResponse.json(EINSTELLUNGEN)),
     http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
@@ -1010,7 +1010,7 @@ describe('LagekartePage', () => {
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
       ],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
@@ -1036,7 +1036,7 @@ describe('LagekartePage', () => {
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
       ],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
@@ -1096,7 +1096,7 @@ describe('LagekartePage', () => {
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
       ],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
@@ -1117,7 +1117,7 @@ describe('LagekartePage', () => {
     basisHandler([], {
       online_styles: [],
       offline_verfuegbar: true,
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
@@ -2101,7 +2101,7 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
   it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {
     const angefragt: (string | null)[] = [];
     basisHandler([
-      http.get('/api/karte/fachebenen/energie', ({ request }) => {
+      http.get('/api/map/overlays/energie', ({ request }) => {
         angefragt.push(new URL(request.url).searchParams.get('bbox'));
         return HttpResponse.json({
           quelle: 'energie',

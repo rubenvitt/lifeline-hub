@@ -528,7 +528,7 @@ sequenceDiagram
   participant Admin as frontend Anbindungen
   participant Hub as lifeline-hub (src/routes/anbindungen.rs, src/public_api/)
   participant F as Fremdsystem (crates/lifeline-machine-client)
-  Admin->>Hub: POST /api/admin/anbindungen {name, scopes}
+  Admin->>Hub: POST /api/admin/integrations {name, scopes}
   Hub-->>Admin: Code (16 Zeichen, 15 min)
   F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
   Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
@@ -558,7 +558,7 @@ sequenceDiagram
   participant Admin as frontend Anbindungen
   participant Hub as lifeline-hub (src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/)
   participant A as Absender (BOSWatch, FE2, OsmAnd)
-  Admin->>Hub: POST /api/admin/einwurf-zugaenge {name, scope}
+  Admin->>Hub: POST /api/admin/intake-credentials {name, scope}
   Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
   A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
   Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
@@ -636,7 +636,7 @@ sequenceDiagram
   participant Hub as lifeline-hub (src/routes/adapter.rs, src/adapter/)
   participant DB as SQLite (adapter, adapter_geheimnis, adapter_versuch)
   participant Q as Quelle (Divera, HiOrg …)
-  Admin->>Hub: PUT /api/admin/adapter/{id}/geheimnisse/accesskey {wert}
+  Admin->>Hub: PUT /api/admin/adapter/{id}/secrets/accesskey {wert}
   Hub->>DB: Chiffrat (age, Schlüssel aus der Umgebung) und Fingerabdruck
   Hub-->>Admin: 204, der Wert kommt nie zurück
   loop alle 5 s: fällige Adapter
@@ -655,7 +655,7 @@ sequenceDiagram
   15 min))`; ein Fehler, den ein Mensch beheben muss, hält an (`src/adapter/zustand.rs`). Ein
   neues Geheimnis oder geänderte Einstellungen machen einen so angehaltenen Adapter sofort
   wieder fällig.
-- „Verbindung prüfen“ (`POST …/pruefen`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
+- „Verbindung prüfen“ (`POST …/check`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
   der Versuch steht im Verlauf (`lauf::probe`).
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
@@ -667,10 +667,10 @@ sequenceDiagram
   participant TC as tile-cache.db
   participant Up as Online-Kartenanbieter
   participant MB as MBTiles in karten/
-  ML->>BE: GET /api/karte/config
-  BE-->>ML: Quellen, bei Proxy relative /api/karte/proxy/{id}/…
+  ML->>BE: GET /api/map/config
+  BE-->>ML: Quellen, bei Proxy relative /api/map/proxy/{id}/…
   alt Online-Quelle über Proxy
-    ML->>BE: GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
+    ML->>BE: GET /api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}
     BE->>TC: nachschlagen
     opt fehlt oder veraltet
       BE->>Up: GET (SSRF-Prüfung, If-None-Match)
@@ -678,7 +678,7 @@ sequenceDiagram
     end
     BE-->>ML: Kachel (fällt der Anbieter aus, der alte Stand)
   else Offline-Karte
-    ML->>BE: GET /api/karte/offline/tiles/{z}/{x}/{y}
+    ML->>BE: GET /api/map/offline/tiles/{z}/{x}/{y}
     BE->>MB: Kachel lesen (TMS-Y-Flip)
     BE-->>ML: Kachel gzip, ohne aktive Karte 204
   end
@@ -688,11 +688,11 @@ sequenceDiagram
   Cache `src/karte/tile_cache.rs`: `TILE_CACHE_CAP_BYTES` = 256 MB in `<karten_dir>/tile-cache.db`;
   gleichzeitige Fehlgriffe auf dieselbe URL teilen sich einen Abruf (LFH-930, Modulkopf).
 - Offline-Karten `src/karte/mbtiles.rs`; Glyphs und Sprite sind eingebettet
-  (`/api/karte/offline/{fonts,sprites}/…`). Das Frontend wählt online, dann offline, sonst den
+  (`/api/map/offline/{fonts,sprites}/…`). Das Frontend wählt online, dann offline, sonst den
   Blind-Modus ([`docs/betrieb/packaging.md`](../betrieb/packaging.md), „Lagekarte / Basemap“).
 - Bezug: Der Admin lädt eine Karte aus dem Katalog (`src/karte/katalog.rs`,
   `crates/karten-katalog`) per SHA256-Pin nach `karten/` (`src/karte/download.rs`).
-  `POST /api/karte/offline-karten/bauen` reicht einen Bauauftrag mit Token an
+  `POST /api/map/offline-maps/build` reicht einen Bauauftrag mit Token an
   `POST {url}/builds` des `karten-service` weiter (`src/routes/karte.rs`). Der baut mit `make`
   und Docker aus `karten-build` (`karten-service/src/build/make_runner.rs`) und lädt Ergebnis und
   Manifest in den Objektspeicher (`karten-service/src/storage/s3.rs`). Spec:
