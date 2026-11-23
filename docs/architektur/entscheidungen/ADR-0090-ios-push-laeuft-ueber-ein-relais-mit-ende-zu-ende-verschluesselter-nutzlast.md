@@ -71,6 +71,6 @@ Relais erreichen.
 
 Betreiber brauchen keinen Kontakt zum Projekt: ihr Server meldet sich selbst am Relais an, und das
 Relais sperrt einzelne Server. Dafür läuft ein zweiter Dienst, den das Projekt betreibt; fällt er
-aus, kommt kein iOS-Push, Web Push und die offene App bleiben (R52). Für die iOS-App gelten die
+aus, kommt kein iOS-Push, Web Push und die offene App bleiben (R54). Für die iOS-App gelten die
 Aussagen der eingefrorenen Specs `web-push` (kein Push-Schalter in einer Hülle) und `ios-huelle`
 (keine Meldung im Hintergrund) nicht mehr; die Desktop-Hülle bleibt ohne Schalter.

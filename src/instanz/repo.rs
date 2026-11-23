@@ -699,7 +699,8 @@ pub async fn load_gegenueber_rolle_mitarbeit(
 /// die Kopplung die Fähigkeit neu (0 → 1), gehen die Mitarbeiten, die das Gegenüber bisher als
 /// `beobachter` bekam, einmal neu hinaus (`spiegel::liefern::resend_mitarbeit`). Der
 /// Wechsel steht in der Bedingung des UPDATE: eine weitere Meldung mit 1 ändert keine Zeile und
-/// liefert nichts nach.
+/// liefert nichts nach. Beim selben Wechsel setzt `spiegel::nachtrag` die Grenze als Führer und
+/// merkt als Spiegel die festgehaltenen Mitarbeiten zum Nachtragen vor (LLH-2007).
 pub async fn save_rolle_mitarbeit(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -717,6 +718,10 @@ pub async fn save_rolle_mitarbeit(
     .rows_affected();
     if rolle_mitarbeit && geaendert > 0 {
         super::spiegel::liefern::resend_mitarbeit(conn, kopplung_id).await?;
+        // Als Führer: ab hier zählt eine Bearbeitung als bewusste Wahl. Als Spiegel: was gegen
+        // den älteren Führer festgehalten wurde, geht ihm einmal nach (LLH-2007).
+        super::spiegel::nachtrag::save_grenze(conn, kopplung_id).await?;
+        super::spiegel::nachtrag::queue_nachtraege(conn, kopplung_id).await?;
     }
     Ok(())
 }

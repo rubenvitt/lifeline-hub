@@ -6,8 +6,8 @@
  * Karten aus den Exporten des Moduls ableitet.
  *
  * Die früheren Guards 2 und 3 (kein `<Tag color=…>`) sind seit LLH-1779 (Change
- * `eon26eat-status-und-bedienung`, design.md D5) eine ESLint-Sperre: antds `Tag` ist außerhalb
- * der Sichtung gar nicht mehr zu importieren (`eslint.config.js`). Ein Zustand steht in `Status`,
+ * `eon26eat-status-und-bedienung`, design.md D5) eine Lint-Sperre: antds `Tag` ist außerhalb
+ * der Sichtung gar nicht mehr zu importieren (`.oxlintrc.json`). Ein Zustand steht in `Status`,
  * eine Kennzeichnung in `Marke` (`components/instrument/`).
  *
  * ── WAS DIESE GUARDS NICHT SEHEN (Teil des Vertrags) ──

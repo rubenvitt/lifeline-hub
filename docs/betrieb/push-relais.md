@@ -129,7 +129,7 @@ dann weitere 24 Stunden. Löscht der Betreiber des Lifeline-Servers die Zeile, m
 beim nächsten Versand mit neuer `server_id` an. **Eine Sperre gilt nur für diese eine
 `server_id`**: ein Betreiber, der sich neu registriert, bekommt eine neue, begrenzt nur durch die
 Registrierungen je IP (IPv6: je /64) und Stunde
-([Risiko R52](../architektur/11-risiken-und-technische-schulden.md)).
+([Risiko R54](../architektur/11-risiken-und-technische-schulden.md)).
 
 ## Sicherung
 

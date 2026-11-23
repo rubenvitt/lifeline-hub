@@ -214,12 +214,19 @@ Spec `webhook-zustellung`, Herleitung
   Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
   `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
 - **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
-  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver). Einzige
+  Ausnahme ist `ziel::hole_fingerabdruck`: er baut über dieselbe `ziel::baue_client` einen Client,
+  der nach dem Zertifikat abbricht und nie eine Anfrage sendet (Fingerabdruck unten).
 - **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
   danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
   Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.
 - **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
   Sekunden-Auflösung.
+- **Fingerabdruck** (LLH-1872,
+  [ADR-0092](../docs/architektur/entscheidungen/ADR-0092-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md)):
+  ein Client je `(lan, pin)` aus `ziel::client`, TLS nur über
+  `instanz::zertifikat::tls_config`, das Abrufen vom Ziel nur über `ziel::hole_fingerabdruck`
+  mit dem `Erfasser`. Ein geänderter Fingerabdruck zählt im Repo wie ein neues Ziel.
 
 ## Backend — Adapter (LLH-2017)
 
@@ -691,8 +698,12 @@ Herleitung in
   (`melden::MeldenAnfrage`, `MeldenAntwort`) und in `instanz_kopplung.gegenueber_rolle_mitarbeit`
   (Migration 0359). Ein Gegenüber ohne sie bekommt `mitarbeit` als `beobachter`; ein eingehendes
   `beobachter` eines solchen Gegenübers überschreibt ein lokales `mitarbeit` nicht; kippt die
-  Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus.
-- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
+  Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus. Hat ein
+  Spiegel `mitarbeit` gegen einen älteren Führer festgehalten, meldet er sie beim selben Wechsel
+  einmal nach (`spiegel::nachtrag`, Tabelle `mitarbeit_nachtrag`); der Führer hebt nur unter den
+  Bedingungen aus ADR-0088 an.
+- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback),
+  `tests/instanz_mitarbeit_nachtrag.rs` (Rückgabe und Notübernahme an eine ältere Instanz).
 
 ## Backend — Erfassungs-Gate (LLH-1817)
 

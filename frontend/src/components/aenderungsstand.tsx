@@ -112,7 +112,7 @@ export function AenderungsstandProvider({
   if (ausgang !== undefined && aktuell !== undefined) sammlePfade(ausgang, aktuell, [], pfade);
   const namen = [...pfade].filter((p) => !p.includes('\u0000'));
   const schluessel = [...pfade].sort().join('\u0001');
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Identität folgt der Menge, nicht den Objekten
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- Identität folgt der Menge, nicht den Objekten
   const stand = useMemo<Stand>(() => ({ geaendert: namen, pfade }), [schluessel]);
 
   const merke = useCallback((werte: object) => {

@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App, iOS-App oder Android-App darauf zu. Einen
@@ -171,7 +171,7 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 ```mermaid
 flowchart LR
   PR["PR auf alpha"] -->|jeder Push| CIPR["pr.yml<br/>Schnellprüfungen"]
-  PR -->|Merge| CI["ci.yml auf alpha, beta, main<br/>Schnellprüfungen und Suiten,<br/>neuer Push bricht ältere Tests ab"]
+  PR -->|Merge| CI["ci.yml auf alpha, beta, main<br/>Schnellprüfungen und Suiten,<br/>laufende Tests enden, ein Push wartet"]
   PR -->|Merge| KAN["migrationen-kanal.yml,<br/>ruleset.yml (nur alpha)"]
   CIPR -->|"Label voll: ruft auf"| SU["suiten.yml<br/>Rust, Frontend, Bericht"]
   CI -->|ruft auf| SU
@@ -199,9 +199,11 @@ Schnellprüfungen. Pflicht sind daneben nur `Migrationsnummern` und `ADR-Nummern
 (`migrationen.yml`); die Liste steht in `scripts/ruleset-pruefen.sh`, und
 `ruleset.yml` prüft das Ruleset von `alpha` dagegen. Rust-, Frontend- und e2e-Suite
 (`suiten.yml`) fährt ein PR nur mit dem Label `voll`, ohne Pflicht. Auf `alpha`, `beta` und
-`main` läuft `ci.yml` bei jedem Push voll; ein neuer Push bricht die Testjobs des älteren Laufs
-ab, ein laufender Release bricht nie ab (`concurrency` der Jobs in `suiten.yml` und `ci.yml`,
-[ADR-0048](entscheidungen/ADR-0048-ein-workflow-je-ereignis-ein-pr-prueft-leicht-und-das-ruleset-wird-geprueft.md)).
+`main` läuft `ci.yml` bei jedem Push voll; gestartete Testjobs laufen zu Ende, je Job wartet
+höchstens ein Lauf, und ein laufender Release bricht nie ab (`concurrency` der Jobs in
+`suiten.yml` und `ci.yml`,
+[ADR-0048](entscheidungen/ADR-0048-ein-workflow-je-ereignis-ein-pr-prueft-leicht-und-das-ruleset-wird-geprueft.md),
+[ADR-0091](entscheidungen/ADR-0091-testjobs-auf-kanal-branches-laufen-zu-ende.md)).
 Nach dem Push bewertet `migrationen-kanal.yml` die Nummern der offenen PRs neu; einen Kompilierlauf
 je offenem PR gibt es nicht mehr
 ([ADR-0049](entscheidungen/ADR-0049-kein-pflicht-check-baut-mit-ziel-branch-bei-rotem-alpha-ist-genau-ein-pr-zustaendig.md)).

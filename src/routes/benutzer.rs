@@ -56,7 +56,7 @@ pub struct NeuerBenutzer {
 
 /// Partielle Änderung eines bestehenden Benutzers (PATCH, LFH-286). `None` = Feld nicht
 /// ändern. `benutzername` (Login-Identität) und Passwort sind hier bewusst nicht änderbar; das
-/// Passwort wechselt sein Inhaber selbst, mit dem alten (`POST /api/auth/passwort`, LFH-471), oder
+/// Passwort wechselt sein Inhaber selbst, mit dem alten (`POST /api/auth/password`, LFH-471), oder
 /// die Administration vergibt ein Einmalpasswort (`POST /api/benutzer/{id}/einmalpasswort`,
 /// LFH-1121).
 #[derive(Debug, Deserialize)]

@@ -893,7 +893,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // der entfernten Map.
       attribControlRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Style wechseln (Basemap-Umschalter / Theme / Hydrierung der Ansicht). `stilAngewandt()` öffnet
@@ -1092,7 +1092,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     map.on('movestart', beiBewegung);
     return aufraeumen;
     // Der Rand rechts hängt an der Dichte; ein Wechsel mitten im Tipp ist kein neuer Anlass.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [sichtZiel]);
 
   // Anflug auf ein gewähltes Ziel: nur heran, nie heraus (LLH-1751, `anflugZoom`). Folgt ein
@@ -1968,7 +1968,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       handles.zerstoeren();
       handlesRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.id]);
 
   // Ein Moduswechsel schaltet die laufende Griffgruppe um, statt sie neu zu bauen.
@@ -1980,7 +1980,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Externe Ecken-Änderungen an die Griffe spiegeln; läuft nicht mid-drag.
   useEffect(() => {
     if (platzierBild) handlesRef.current?.setzeEcken(platzierBild.ecken);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.ecken]);
 
   // Die Hülle ist der Bezugsrahmen des Menü-Ankers: `e.point` zählt ab der Kartenecke.

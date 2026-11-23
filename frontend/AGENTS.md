@@ -693,7 +693,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
   nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung (LLH-1083, LLH-1785,
   Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein rohes antds `Tag`**
-  (LLH-1779, Spec `status-darstellung`, ESLint `no-restricted-imports`; Ausnahme nur
+  (LLH-1779, Spec `status-darstellung`, Lint `no-restricted-imports`; Ausnahme nur
   `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
   Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
@@ -1401,7 +1401,7 @@ anwendbar), „nicht geprüft" ist keins.
   `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
   `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2,
   `besatzungsUrteil` in `openspec/changes/archive/2026-10-06-lfh-962-farbvertrag-wort/design.md` D1). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
-  der Datei; rohes `Tag` sperrt ESLint (LLH-1779).
+  der Datei; rohes `Tag` sperrt der Lint (LLH-1779).
 
 **Farbe und Zeichen**
 
@@ -2012,17 +2012,26 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 
 ## Frontend — Lint-Disziplin
 
-`pnpm lint` mit `--max-warnings 0`; Warnungen an der Wurzel beheben. `exhaustive-deps`
-strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur begründet,
-`-next-line` an der gemeldeten Zeile mit Kommentar; keine Block-Disables, keine toten Direktiven.
+- **oxlint** (LLH-2020, ADR-0089): `pnpm lint` = `oxlint --deny-warnings
+--report-unused-disable-directives`. Jede Warnung und jede tote Direktive bricht das Gate;
+  Warnungen an der Wurzel beheben. Das Regelset steht einzeln in `.oxlintrc.json` (keine
+  Kategorien), damit ein oxlint-Update keine Regel still einschaltet; eine neue Regel ist eine
+  eigene Entscheidung.
+- `exhaustive-deps` strukturell lösen (Primitive, `useMemo`/`useCallback`). Ausnahmen nur als
+  `oxlint-disable-next-line <regel>` an der gemeldeten Zeile mit Begründung; keine
+  Block-Disables, keine toten Direktiven.
+- **Eigene Riegel per AST-Selektor** stehen im Plugin `lfh` (`lint/riegel-plugin.js`, heute die
+  e2e-Riegel). Die JS-Plugin-API von oxlint ist Alpha: jeder Riegel bekommt Musterdateien in
+  `lint/riegel-plugin.test.ts`, damit ein Update, das Selektoren bricht, rot wird.
+- **Eigene AST-Prüfungen in Guard-Tests** lesen den Quelltext über `lib/sourceAst.ts`
+  (oxc-parser), nie über `typescript`: TypeScript 7 bringt die Compiler-API nicht mehr mit.
 
-## Frontend — Heap für `tsc` (LLH-1405)
+## Frontend — Typecheck mit TypeScript 7 (LLH-2020)
 
-`typecheck` und `build` starten `tsc` über `node --max-old-space-size=4096` (`package.json`): der
-Typcheck braucht rund 2,3 GB Heap, Node setzt unter 16 GiB Arbeitsspeicher nur 2 GB (Cloud-Sitzung,
-macOS-Runner), und `tsc` bricht mit „JavaScript heap out of memory“ ab. Als Option am Aufruf statt
-`NODE_OPTIONS`, damit das Skript in jeder Shell läuft; sie schlägt ein `NODE_OPTIONS` von außen.
-Wächst der Bedarf, die Zahl dort heben.
+`typecheck` und `build` rufen `tsc` direkt; seit TypeScript 7 startet `bin/tsc` das native
+Go-Binary (Spitze rund 3,1 GB Arbeitsspeicher, Node-Heap spielt keine Rolle mehr, LLH-1405 ist
+damit hinfällig). Der Typ-Codegen braucht noch die Compiler-API von TypeScript 6 und holt sie über
+`scripts/ts6-fuer-codegen.mjs` aus `@typescript/typescript6` (Rückbau: LLH-2068).
 
 ## Frontend — Browserspeicher (LFH-942)
 

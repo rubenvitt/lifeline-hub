@@ -33,6 +33,9 @@ Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfa
 (`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
 [ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
+Ein Spiegel, der `mitarbeit` gegen einen älteren Führer festgehalten hat, trägt sie nach dessen
+Aufrüsten einmal nach
+([ADR-0088](entscheidungen/ADR-0088-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
 
 ## 8.3 Fehlervertrag und Statuscodes
 
@@ -62,7 +65,8 @@ beide Seiten Name für Name.
 
 Response-Typen entstehen aus dem Rust-Code: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 `frontend/src/api/openapi.json` → `openapi-typescript` → `frontend/src/api/types.generated.ts`
-(Skript `gen:types` in `frontend/package.json`). Ablauf, Wire-Enums und handgepflegte Reste
+(Skript `gen:types` in `frontend/package.json`; openapi-typescript läuft dort mit der Compiler-API
+von TypeScript 6 über `frontend/scripts/ts6-fuer-codegen.mjs`, Rückbau LLH-2068). Ablauf, Wire-Enums und handgepflegte Reste
 regelt [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“. Drift fängt
 `scripts/check-typ-codegen.sh` (Schritt 3 des Sammel-Gates) mit `tests/openapi_spec_aktuell.rs`;
 die Wire-Werte der Enums hält `tests/enum_wire_kontrakt.rs` fest.
@@ -463,7 +467,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   aus `addWebMessageListener` mit derselben Annahmeregel (`Bruecke.accepts` in
   `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Bruecke.kt`, Wire-Format im Kopf von
   `android/app/src/main/assets/huelle.js`); jeder Server hat dort ein eigenes WebView-Profil. Die
-  Anmeldung im Systembrowser (`POST /api/auth/app-code[/einloesen]`) nutzen alle Hüllen gleich.
+  Anmeldung im Systembrowser (`POST /api/auth/app-code[/redeem]`) nutzen alle Hüllen gleich.
 
 Adressprüfung, Deeplink und Linkregeln stehen in Rust (`src-tauri/src/adresse.rs`,
 `deeplink.rs`, `links.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden sie von den

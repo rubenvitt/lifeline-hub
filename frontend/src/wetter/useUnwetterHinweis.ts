@@ -73,6 +73,6 @@ export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): vo
       }),
     );
     // Die Konventionen formen nur den Text; ein Wechsel ist kein neuer Stand.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [aktiv, benutzerId, einsatzId, data, konventionenBereit]);
 }

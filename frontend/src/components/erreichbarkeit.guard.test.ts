@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import { visibleTexts } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -24,32 +24,10 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const HILFE = join(SRC, '..', '..', 'docs', 'anwender');
 const MUSTER = /\bErreichbarkeit/;
 
-function texteAus(quelle: string, dateiname: string): { text: string; zeile: number }[] {
-  const datei = ts.createSourceFile(dateiname, quelle, ts.ScriptTarget.Latest, true);
-  const texte: { text: string; zeile: number }[] = [];
-  const merke = (knoten: ts.Node, text: string) =>
-    texte.push({ text, zeile: datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1 });
-  const besuche = (knoten: ts.Node) => {
-    if (ts.isImportDeclaration(knoten) || ts.isExportDeclaration(knoten)) return;
-    if (
-      ts.isStringLiteral(knoten) ||
-      ts.isNoSubstitutionTemplateLiteral(knoten) ||
-      ts.isTemplateHead(knoten) ||
-      ts.isTemplateMiddle(knoten) ||
-      ts.isTemplateTail(knoten) ||
-      ts.isJsxText(knoten)
-    )
-      merke(knoten, knoten.text);
-    ts.forEachChild(knoten, besuche);
-  };
-  besuche(datei);
-  return texte;
-}
-
 function treffer(quelle: string, dateiname = 'x.tsx'): number[] {
-  return texteAus(quelle, dateiname)
+  return visibleTexts(dateiname, quelle)
     .filter(({ text }) => MUSTER.test(text))
-    .map(({ zeile }) => zeile);
+    .map(({ line }) => line);
 }
 
 function dateien(verzeichnis: string, endung: RegExp): string[] {

@@ -587,7 +587,7 @@ async fn pruefe_eigenes_passwort(
     }
 }
 
-/// POST /api/auth/passwort — der angemeldete Benutzer wechselt sein eigenes Passwort (LFH-471).
+/// POST /api/auth/password — der angemeldete Benutzer wechselt sein eigenes Passwort (LFH-471).
 ///
 /// **Das alte Passwort ist Pflicht.** Ohne diese Prüfung machte ein übernommenes Session-Cookie
 /// aus einer Sitzung ein Konto. Geprüft wird über denselben gedrosselten Weg wie beim Login
@@ -696,7 +696,7 @@ pub async fn passwort_aendern(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Body von `POST /api/auth/passwort/festlegen` (LFH-1121).
+/// Body von `POST /api/auth/password/set` (LFH-1121).
 #[derive(Debug, Deserialize)]
 pub struct PasswortFestlegen {
     pub neues_passwort: String,
@@ -730,7 +730,7 @@ async fn festlegen_pruefen(
     Ok((benutzer, hash))
 }
 
-/// POST /api/auth/passwort/festlegen — der Schritt nach einem Login mit Einmalpasswort (LFH-1121,
+/// POST /api/auth/password/set — der Schritt nach einem Login mit Einmalpasswort (LFH-1121,
 /// Spec `konto-einmalpasswort`, Design D3). Mit gültigem Wechsel-Cookie setzt er das neue
 /// Passwort, hebt den Änderungszwang auf und legt erst dann die Session an.
 ///
@@ -2132,7 +2132,7 @@ pub struct AppCode {
     pub code: String,
 }
 
-/// Body von `POST /api/auth/app-code/einloesen` (LFH-818).
+/// Body von `POST /api/auth/app-code/redeem` (LFH-818).
 #[derive(Debug, Deserialize)]
 pub struct AppCodeEinloesen {
     pub code: String,
@@ -2170,7 +2170,7 @@ pub async fn app_code_ausstellen(
     Ok(Json(AppCode { code }))
 }
 
-/// POST /api/auth/app-code/einloesen — löst einen Einmalcode mit dem `verifier` ein und legt im
+/// POST /api/auth/app-code/redeem — löst einen Einmalcode mit dem `verifier` ein und legt im
 /// anfragenden Cookie-Speicher (Webview der Hülle) eine eigene Sitzung an (LFH-818).
 ///
 /// Reihenfolge: Form (400) → Sperre der Adresse (429) → Code entnehmen (damit verbraucht, gleich

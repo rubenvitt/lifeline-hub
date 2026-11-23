@@ -66,7 +66,7 @@ class AppModellTest {
     private val lager: ServerEintrag = liste.eintraege.first { it.name == "Lager" }
     private val kv: ServerEintrag = liste.eintraege.first { it.name == "Kreisverband" }
 
-    private val vertraeglich = ShellAbruf.Antwort(200, """{"version":"1.0.0","shell_contract":1}""", "application/json")
+    private val vertraeglich = ShellAbruf.Antwort(200, """{"version":"1.0.0","shell_contract":2}""", "application/json")
     private val ablage by lazy { Serverablage(ordner.root) }
 
     // Läuft im Testfaden; Zeitgeber (Wiederholen) enden mit dem Test.
@@ -205,7 +205,7 @@ class AppModellTest {
         assertTrue(modell.seite is Ablauf.Seite.Web)
 
         client.onReceivedSslError(webView, handler, SslError(SslError.SSL_UNTRUSTED, zertifikat, "https://elw.local:8443/{z}|1.png"))
-        assertEquals(Ablauf.Seite.Status(elw.copy(bestaetigterVertrag = 1), Statusseite.Zertifikat), modell.seite)
+        assertEquals(Ablauf.Seite.Status(elw.copy(bestaetigterVertrag = 2), Statusseite.Zertifikat), modell.seite)
     }
 
     @Test

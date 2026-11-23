@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as ts from 'typescript';
+import { type AstNode, parseSource, staticText, walk, lineOf } from '../lib/sourceAst';
 import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import {
@@ -60,47 +60,30 @@ interface Leser {
  * Prädikat trennt.
  */
 export function findeLeser(pfad: string, quelltext: string, parameter: string): Leser[] {
-  const quelle = ts.createSourceFile(
-    pfad,
-    quelltext,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
   const funde: Leser[] = [];
-  const gehe = (knoten: ts.Node): void => {
-    if (ts.isCallExpression(knoten) && ts.isPropertyAccessExpression(knoten.expression)) {
-      const name = knoten.expression.name.text;
-      const erstes = knoten.arguments[0];
-      if (
-        (name === 'get' || name === 'has') &&
-        erstes &&
-        ts.isStringLiteralLike(erstes) &&
-        erstes.text === parameter
-      ) {
-        funde.push({
-          pfad,
-          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
-        });
-      }
+  walk(parseSource(pfad, quelltext), (knoten) => {
+    if (knoten.type !== 'CallExpression') return;
+    const callee = knoten.callee as AstNode;
+    const erstes = staticText((knoten.arguments as AstNode[])[0]);
+    const eigenschaft = callee.property as AstNode | undefined;
+    if (
+      callee.type === 'MemberExpression' &&
+      !callee.computed &&
+      eigenschaft?.type === 'Identifier' &&
+      (eigenschaft.name === 'get' || eigenschaft.name === 'has') &&
+      erstes === parameter
+    ) {
+      funde.push({ pfad, zeile: lineOf(quelltext, knoten.start) });
     }
     // Ein Hook der Adresse (`routing/useAdressWert.ts`, LLH-1826) mit dem Schlüssel als Literal.
     if (
-      ts.isCallExpression(knoten) &&
-      ts.isIdentifier(knoten.expression) &&
-      knoten.expression.text.startsWith('useAdress')
+      callee.type === 'Identifier' &&
+      (callee.name as string).startsWith('useAdress') &&
+      erstes === parameter
     ) {
-      const erstes = knoten.arguments[0];
-      if (erstes && ts.isStringLiteralLike(erstes) && erstes.text === parameter) {
-        funde.push({
-          pfad,
-          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
-        });
-      }
+      funde.push({ pfad, zeile: lineOf(quelltext, knoten.start) });
     }
-    ts.forEachChild(knoten, gehe);
-  };
-  gehe(quelle);
+  });
   return funde;
 }
 

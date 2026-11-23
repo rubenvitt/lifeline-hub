@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import { type AstNode, parseSource, walk, lineOf } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -21,8 +21,8 @@ import { describe, expect, it } from 'vitest';
  * mit Grund). Mehr Treffer → rot; ein Eintrag größer als der Fund → ebenfalls rot: wer eine
  * Stelle umstellt, verkleinert den Eintrag im selben Commit.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * Wie `erklaertext.guard.test.ts`: `pnpm lint` läuft mit `--max-warnings 0`, eine rot geborene
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * Wie `erklaertext.guard.test.ts`: `pnpm lint` bricht bei jeder Warnung, eine rot geborene
  * Regel würde abgeschaltet statt befolgt.
  *
  * ── Was dieser Guard NICHT sieht (Teil des Vertrags) ────────────────────────────
@@ -55,24 +55,24 @@ const TOAST_OBJEKTE = new Set(['message', 'meldung', 'notification']);
 
 /** Fehler-Toast-Aufrufe einer Quelle als Zeilennummern. */
 function toastTreffer(quelle: string, dateiname = 'x.tsx'): number[] {
-  const datei = ts.createSourceFile(dateiname, quelle, ts.ScriptTarget.Latest, true);
   const zeilen: number[] = [];
-  const besuche = (knoten: ts.Node) => {
-    if (ts.isCallExpression(knoten)) {
-      const ziel = knoten.expression;
-      const istToast =
-        ts.isPropertyAccessExpression(ziel) &&
-        ziel.name.text === 'error' &&
-        ((ts.isIdentifier(ziel.expression) && TOAST_OBJEKTE.has(ziel.expression.text)) ||
-          (ts.isPropertyAccessExpression(ziel.expression) &&
-            TOAST_OBJEKTE.has(ziel.expression.name.text)));
-      const istHook = ts.isIdentifier(ziel) && ziel.text === 'useFehlerMeldung';
-      if (istToast || istHook)
-        zeilen.push(datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1);
-    }
-    ts.forEachChild(knoten, besuche);
-  };
-  besuche(datei);
+  /** Name einer nicht berechneten Eigenschaft (`a.b` → 'b'). */
+  const eigenschaft = (k: AstNode): string | undefined =>
+    k.type === 'MemberExpression' && !k.computed && (k.property as AstNode).type === 'Identifier'
+      ? ((k.property as AstNode).name as string)
+      : undefined;
+  walk(parseSource(dateiname, quelle), (knoten) => {
+    if (knoten.type !== 'CallExpression') return;
+    const ziel = knoten.callee as AstNode;
+    const objekt = ziel.object as AstNode | undefined;
+    const istToast =
+      eigenschaft(ziel) === 'error' &&
+      objekt != null &&
+      ((objekt.type === 'Identifier' && TOAST_OBJEKTE.has(objekt.name as string)) ||
+        TOAST_OBJEKTE.has(eigenschaft(objekt) ?? ''));
+    const istHook = ziel.type === 'Identifier' && ziel.name === 'useFehlerMeldung';
+    if (istToast || istHook) zeilen.push(lineOf(quelle, knoten.start));
+  });
   return zeilen;
 }
 
@@ -88,7 +88,7 @@ function quelldateien(verzeichnis: string): string[] {
 describe('Speicherfehler-Guard (LFH-1077)', () => {
   it('Selbstbeweis: Toast-Aufrufe und der Hook zählen', () => {
     const quelle = [
-      "onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),",
+      "const o = { onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')) };",
       'const fehler = useFehlerMeldung();',
       "app.message.error('x');",
       "meldung.error('Kopieren nicht möglich');",

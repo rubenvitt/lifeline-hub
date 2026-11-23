@@ -469,7 +469,7 @@ async fn eine_sitzung_beenden_loescht_nur_deren_anmeldung() {
         anmelden(&app, &marlene2, KENNUNG_2, TOKEN_2).await,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/auth/sitzungen", &marlene2, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/auth/sessions", &marlene2, None).await;
     let fremde = liste
         .as_array()
         .unwrap()
@@ -482,7 +482,7 @@ async fn eine_sitzung_beenden_loescht_nur_deren_anmeldung() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/auth/sitzungen/{fremde}"),
+        &format!("/api/auth/sessions/{fremde}"),
         &marlene2,
         None,
     )
@@ -498,7 +498,7 @@ async fn eine_sitzung_beenden_loescht_nur_deren_anmeldung() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        "/api/auth/sitzungen/andere-beenden",
+        "/api/auth/sessions/end-others",
         &marlene2,
         None,
     )
@@ -548,7 +548,7 @@ async fn andere_beenden_loescht_alle_anmeldungen_ausser_der_eigenen_auch_ohne_si
     let (s, _) = anfrage(
         &app,
         "POST",
-        "/api/auth/sitzungen/andere-beenden",
+        "/api/auth/sessions/end-others",
         &marlene1,
         None,
     )

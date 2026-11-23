@@ -42,7 +42,7 @@ export function useEinsatzRueckweg(
     if (isJeBesuchFest) fest.current = { benutzerId, ort };
     return ort;
     // `pathname` ist der Anlass zum Neulesen, kein Eingang der Rechnung.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [benutzerId, isAktiv, isJeBesuchFest, pathname]);
   const { data: einsaetze } = useQuery({
     queryKey: globalKeys.einsaetze(),

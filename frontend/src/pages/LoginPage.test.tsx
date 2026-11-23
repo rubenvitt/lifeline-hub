@@ -998,7 +998,7 @@ describe('LoginPage', () => {
         http.post('/api/auth/login', () =>
           HttpResponse.json({ passwort_wechsel_erforderlich: true }),
         ),
-        http.post('/api/auth/passwort/festlegen', async ({ request }) => {
+        http.post('/api/auth/password/set', async ({ request }) => {
           festgelegt.push(await request.json());
           sitzung = maxim;
           return HttpResponse.json(maxim);
@@ -1053,7 +1053,7 @@ describe('LoginPage', () => {
     it('zeigt die Ablehnung des Servers und bleibt in der Stufe', async () => {
       zeige();
       server.use(
-        http.post('/api/auth/passwort/festlegen', () =>
+        http.post('/api/auth/password/set', () =>
           HttpResponse.json(
             { error: 'Das neue Passwort muss sich vom bisherigen unterscheiden.' },
             { status: 422 },
@@ -1075,7 +1075,7 @@ describe('LoginPage', () => {
     it('führt nach abgelaufenem Zwischenschritt zurück zur Anmeldung', async () => {
       zeige();
       server.use(
-        http.post('/api/auth/passwort/festlegen', () =>
+        http.post('/api/auth/password/set', () =>
           HttpResponse.json({ error: 'Nicht angemeldet' }, { status: 401 }),
         ),
       );
