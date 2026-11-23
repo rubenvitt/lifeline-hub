@@ -270,7 +270,7 @@ async fn nur_der_system_admin_schreibt_und_nur_in_der_eigenen_org() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    for aktion in ["schluessel", "widerrufen"] {
+    for aktion in ["key", "revoke"] {
         let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/{aktion}"), &fk, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{aktion}");
     }
@@ -291,7 +291,7 @@ async fn nur_der_system_admin_schreibt_und_nur_in_der_eigenen_org() {
     let (s, liste) = anfrage_json(&app, "GET", LISTE, &fremd, None).await;
     assert_eq!(s, StatusCode::OK, "{liste}");
     assert!(liste["zugaenge"].as_array().unwrap().is_empty());
-    for aktion in ["schluessel", "widerrufen"] {
+    for aktion in ["key", "revoke"] {
         let (s, _) = anfrage_json(
             &app,
             "POST",
