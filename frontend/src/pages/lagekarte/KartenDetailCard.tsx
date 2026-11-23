@@ -67,7 +67,7 @@ export default function KartenDetailCard({
             borderColor: akzentFarbe,
             color: akzentFarbe,
             overflow: 'hidden',
-            ...monoStil(9),
+            ...monoStil('meta'),
           }}
         >
           {kachel ?? 'TZ'}

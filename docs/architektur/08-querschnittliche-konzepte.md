@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 22.11.2026 (Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 22.11.2026 (Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -33,6 +33,9 @@ Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfa
 (`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
 [ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
+Ein Spiegel, der `mitarbeit` gegen einen älteren Führer festgehalten hat, trägt sie nach dessen
+Aufrüsten einmal nach
+([ADR-0088](entscheidungen/ADR-0088-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
 
 ## 8.3 Fehlervertrag und Statuscodes
 
@@ -477,8 +480,10 @@ Was Lifeline Hub selbst bei einem Fremdsystem abruft (Divera, HiOrg, Postfach �
 einer Art im Rahmen `src/adapter/` ([ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md),
 Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md)).
 
-- **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL`, mit
-  dessen Fingerabdruck je Zeile; die API setzt und ersetzt, liest aber nie. Ohne Schlüssel läuft der
+- **Geheimnisse:** nur als age-Chiffrat an den Schlüssel aus `LIFELINE_GEHEIMNIS_SCHLUESSEL` (oder
+  `…_DATEI`), mit dessen Fingerabdruck je Zeile; die API setzt und ersetzt, liest aber nie. Für
+  einen Schlüsselwechsel liest der Speicher zusätzlich mit dem alten (`…_ALT`), und der Start
+  schlüsselt alle Chiffrate auf den neuen um (LLH-2025). Ohne Schlüssel läuft der
   Server, und Adapter mit Geheimnissen halten mit `geheimnisspeicher_gesperrt` an. Das übrige
   Schlüsselmaterial der Instanz liegt weiter im Klartext der Datenbank (R19, R22).
 - **Abruf:** ein Hintergrundlauf neben dem der Webhooks, zwei Phasen je Abruf (Netz ohne

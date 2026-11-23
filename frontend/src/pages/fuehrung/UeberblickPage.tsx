@@ -1199,7 +1199,7 @@ function abschnittGliederung(
           <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
-              <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>
+              <span style={{ ...monoStil('meta'), color: rollen.schwach }}>
                 {' '}
                 · +{weitere.length} weitere offen
               </span>
@@ -1207,7 +1207,7 @@ function abschnittGliederung(
           </span>
         ) : null}
         {unterzeile && (
-          <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{unterzeile}</span>
+          <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{unterzeile}</span>
         )}
         {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
             der Zeit im Linknamen ihre Bedeutung. */}
@@ -1218,7 +1218,7 @@ function abschnittGliederung(
           >
             {rueck ? (
               <>
-                <span style={{ ...monoStil('metaKlein'), color: rollen.schwach, flex: '0 0 auto' }}>
+                <span style={{ ...monoStil('meta'), color: rollen.schwach, flex: '0 0 auto' }}>
                   <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
                 </span>
                 {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
@@ -1256,7 +1256,7 @@ function abschnittGliederung(
             `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
         <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />
         {verteilung.ohne > 0 && (
-          <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>
+          <span style={{ ...monoStil('meta'), color: rollen.schwach }}>
             +{verteilung.ohne} ohne Status
           </span>
         )}

@@ -184,9 +184,35 @@ age-keygen -o lifeline-geheimnisse.key   # einmal erzeugen, sicher ablegen
 LIFELINE_GEHEIMNIS_SCHLUESSEL="$(grep AGE-SECRET-KEY lifeline-geheimnisse.key)" lifeline-hub …
 ```
 
+Statt des Werts nimmt der Server auch eine Datei (`LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI`), etwa ein
+Docker-Secret oder systemd `LoadCredential=`; die Datei aus `age-keygen -o` passt unverändert. Sie
+gehört dem Dienstkonto mit `chmod 600`, sonst warnt der Start.
+
 Startet der Server nach dem Restore ohne Schlüssel oder mit einem anderen, läuft er trotzdem. Die
 Verwaltung zeigt unter Anbindungen „Geheimnisspeicher: Schlüssel fehlt“ bzw. „passt nicht“, und
 jeder Adapter mit Geheimnis hält mit diesem Grund an, bis ein Admin die Geheimnisse neu setzt.
+
+#### Schlüssel wechseln (LLH-2025)
+
+Etwa nach einem Leck oder wenn jemand den Schlüssel nicht mehr kennen soll:
+
+1. Neuen Schlüssel erzeugen und getrennt sichern:
+   `age-keygen -o lifeline-geheimnisse-neu.key`.
+2. Den Server mit dem neuen Schlüssel neu starten und den bisherigen zusätzlich mitgeben:
+   `LIFELINE_GEHEIMNIS_SCHLUESSEL` (oder `…_DATEI`) = neu, `LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT`
+   (oder `…_ALT_DATEI`) = bisher. Der Start schlüsselt alle Geheimnisse in einer Transaktion um;
+   das Log meldet „… umgeschlüsselt; LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT kann entfernt werden“.
+   Kein Adapter hält an, niemand setzt etwas neu.
+3. `…_ALT` entfernen und erneut starten. Die Verwaltung zeigt „bereit“.
+
+Ließ sich ein Geheimnis mit dem alten Schlüssel nicht öffnen, sagt das Log es mit Anzahl; es zeigt
+in der Verwaltung „unlesbar“ und wird neu gesetzt. Scheitert das Umschlüsseln an der Datenbank,
+startet der Server trotzdem und liest mit beiden Schlüsseln, bis ein Neustart es nachholt.
+
+**Sicherungen von vor dem Wechsel enthalten die Geheimnisse am alten Schlüssel.** Wer eine davon
+zurückspielen will, braucht den alten Schlüssel (dann wie in Schritt 2 neu starten). Den alten
+deshalb aufbewahren, solange es solche Sicherungen gibt. Nach einem Leck heißt das auch: Diese
+Sicherungen sind so gefährdet wie der alte Schlüssel.
 
 ### „Auf der Datenbank ist noch eine Verbindung offen"
 

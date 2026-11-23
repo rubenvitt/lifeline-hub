@@ -401,13 +401,49 @@ pub struct Config {
     /// **Ohne Angabe** startet der Server; Adapter mit Geheimnissen melden „Geheimnisspeicher
     /// gesperrt“, und Geheimnisse lassen sich nicht speichern. Ein ungültiger Wert bricht den
     /// Start ab, ohne ihn zu nennen. `Debug` zeigt ihn nie.
+    /// Statt des Werts: eine Datei mit dem Schlüssel (`--geheimnis-schluessel-datei`,
+    /// LLH-2025), etwa ein Docker-Secret oder `LoadCredential=`, damit er nicht in Unit- oder
+    /// Compose-Datei steht. Mit `-o` aus `age-keygen` geschrieben passt das Format.
     #[arg(
         long,
         env = "LIFELINE_GEHEIMNIS_SCHLUESSEL",
         hide_env_values = true,
-        value_parser = GeheimnisSchluesselParser
+        value_parser = GeheimnisSchluesselParser::NEU
     )]
     pub geheimnis_schluessel: Option<crate::adapter::geheimnis::GeheimnisSchluessel>,
+
+    /// Pfad zu einer Datei mit dem Schlüssel des Geheimnisspeichers (LLH-2025), statt
+    /// `LIFELINE_GEHEIMNIS_SCHLUESSEL`; beides zugleich bricht den Start ab. Format wie
+    /// `age-keygen -o`: Kommentarzeilen (`#`) zählen nicht, genau eine Zeile ist der Schlüssel.
+    /// Gelesen nur beim Serverstart; dürfen Gruppe oder andere die Datei lesen, warnt er.
+    #[arg(
+        long,
+        env = "LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI",
+        conflicts_with = "geheimnis_schluessel"
+    )]
+    pub geheimnis_schluessel_datei: Option<std::path::PathBuf>,
+
+    /// Der bisherige Schlüssel des Geheimnisspeichers, nur für einen Schlüsselwechsel
+    /// (LLH-2025, ADR-0077): Der Start schlüsselt alle Geheimnisse, die an ihn verschlüsselt sind,
+    /// auf den neuen um; danach kann er weg (das Log sagt es). Braucht einen neuen Schlüssel und
+    /// darf nicht derselbe sein. Ein ungültiger Wert bricht den Start ab, ohne ihn zu nennen.
+    #[arg(
+        long,
+        env = "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT",
+        hide_env_values = true,
+        value_parser = GeheimnisSchluesselParser::ALT
+    )]
+    pub geheimnis_schluessel_alt: Option<crate::adapter::geheimnis::GeheimnisSchluessel>,
+
+    /// Pfad zu einer Datei mit dem bisherigen Schlüssel (LLH-2025), statt
+    /// `LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT`; Format und Prüfung wie bei
+    /// `LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI`.
+    #[arg(
+        long,
+        env = "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT_DATEI",
+        conflicts_with = "geheimnis_schluessel_alt"
+    )]
+    pub geheimnis_schluessel_alt_datei: Option<std::path::PathBuf>,
 
     /// Zusicherung des Betreibers, dass der Datenträger außerhalb der Sicht des Servers
     /// verschlüsselt ist (LFH-1100), etwa LUKS auf dem Docker-Host. Dann warnt die
@@ -684,10 +720,25 @@ fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
     Ok(netz)
 }
 
-/// Der private Schlüssel des Geheimnisspeichers (LLH-2017). Ein eigener Parser, weil clap den
-/// Wert sonst in die Fehlermeldung schriebe: ein Tippfehler im Schlüssel landete im Log.
+/// Der private Schlüssel des Geheimnisspeichers (LLH-2017), neu oder alt (LLH-2025). Ein eigener
+/// Parser, weil clap den Wert sonst in die Fehlermeldung schriebe: ein Tippfehler im Schlüssel
+/// landete im Log.
 #[derive(Clone)]
-struct GeheimnisSchluesselParser;
+struct GeheimnisSchluesselParser {
+    flag: &'static str,
+    env: &'static str,
+}
+
+impl GeheimnisSchluesselParser {
+    const NEU: Self = GeheimnisSchluesselParser {
+        flag: "--geheimnis-schluessel",
+        env: "LIFELINE_GEHEIMNIS_SCHLUESSEL",
+    };
+    const ALT: Self = GeheimnisSchluesselParser {
+        flag: "--geheimnis-schluessel-alt",
+        env: "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT",
+    };
+}
 
 impl clap::builder::TypedValueParser for GeheimnisSchluesselParser {
     type Value = crate::adapter::geheimnis::GeheimnisSchluessel;
@@ -701,7 +752,7 @@ impl clap::builder::TypedValueParser for GeheimnisSchluesselParser {
         let fehler = |grund: &str| {
             clap::Error::raw(
                 clap::error::ErrorKind::ValueValidation,
-                format!("--geheimnis-schluessel (LIFELINE_GEHEIMNIS_SCHLUESSEL): {grund}\n"),
+                format!("{} ({}): {grund}\n", self.flag, self.env),
             )
             .with_cmd(cmd)
         };
@@ -709,6 +760,65 @@ impl clap::builder::TypedValueParser for GeheimnisSchluesselParser {
             .ok_or_else(|| fehler("kein gültiges UTF-8"))?
             .parse()
             .map_err(|f: crate::adapter::geheimnis::SchluesselFehler| fehler(f.0))
+    }
+}
+
+impl Config {
+    /// Der Geheimnisspeicher der Adapter aus Wert oder Datei, neu und optional alt (LLH-2025).
+    /// Liefert dazu Warnungen fürs Log (Schlüsseldatei für Gruppe oder andere lesbar). Ein
+    /// Fehler bricht den Start ab und nennt Rolle und Pfad, nie einen Schlüssel. Nur beim
+    /// Serverstart aufrufen: Subkommandos lesen keine Schlüsseldatei.
+    pub fn load_geheimnisspeicher(
+        &self,
+    ) -> Result<(crate::adapter::geheimnis::Geheimnisspeicher, Vec<String>), String> {
+        use crate::adapter::geheimnis::{self, Geheimnisspeicher};
+        let mut warnungen = Vec::new();
+        let mut aus = |wert: &Option<geheimnis::GeheimnisSchluessel>,
+                       datei: &Option<std::path::PathBuf>,
+                       flag: &str,
+                       env: &str|
+         -> Result<Option<geheimnis::GeheimnisSchluessel>, String> {
+            if let Some(s) = wert {
+                return Ok(Some(s.clone()));
+            }
+            let Some(pfad) = datei else {
+                return Ok(None);
+            };
+            let s = geheimnis::read_schluesseldatei(pfad)
+                .map_err(|f| format!("{flag} ({env}): {}: {f}", pfad.display()))?;
+            if let Some(modus) = geheimnis::offener_modus(pfad) {
+                warnungen.push(format!(
+                    "Schlüsseldatei {} ist für Gruppe oder andere lesbar (Modus {modus:o}): \
+                     chmod 600",
+                    pfad.display()
+                ));
+            }
+            Ok(Some(s))
+        };
+        let neu = aus(
+            &self.geheimnis_schluessel,
+            &self.geheimnis_schluessel_datei,
+            "--geheimnis-schluessel-datei",
+            "LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI",
+        )?;
+        let alt = aus(
+            &self.geheimnis_schluessel_alt,
+            &self.geheimnis_schluessel_alt_datei,
+            "--geheimnis-schluessel-alt-datei",
+            "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT_DATEI",
+        )?;
+        let speicher = match (neu, alt) {
+            (neu, None) => Geheimnisspeicher::new(neu),
+            (None, Some(_)) => {
+                return Err("alter Schlüssel des Geheimnisspeichers ohne neuen: erst \
+                            LIFELINE_GEHEIMNIS_SCHLUESSEL oder \
+                            LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI setzen"
+                    .to_string())
+            }
+            (Some(neu), Some(alt)) => Geheimnisspeicher::new_wechsel(neu, alt)
+                .map_err(|f| format!("LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT: {f}"))?,
+        };
+        Ok((speicher, warnungen))
     }
 }
 
@@ -1731,6 +1841,190 @@ mod tests {
             "die Meldung darf den Schlüssel nicht nennen"
         );
         assert!(fehler.contains("PRIVATER"));
+    }
+
+    fn geheimnis_text(s: &crate::adapter::geheimnis::GeheimnisSchluessel) -> String {
+        use age::secrecy::ExposeSecret;
+        s.to_secret_string().expose_secret().to_owned()
+    }
+
+    /// Eine Schlüsseldatei mit Modus `modus` in einem eigenen Verzeichnis.
+    fn schluesseldatei(
+        s: &crate::adapter::geheimnis::GeheimnisSchluessel,
+        modus: u32,
+    ) -> (tempfile::TempDir, String) {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("geheimnis.key");
+        std::fs::write(&pfad, format!("# public key: x\n{}\n", geheimnis_text(s))).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&pfad, std::fs::Permissions::from_mode(modus)).unwrap();
+        }
+        #[cfg(not(unix))]
+        let _ = modus;
+        let pfad = pfad.to_str().unwrap().to_owned();
+        (dir, pfad)
+    }
+
+    fn fp(s: &crate::adapter::geheimnis::GeheimnisSchluessel) -> String {
+        crate::adapter::geheimnis::Geheimnisspeicher::new(Some(s.clone()))
+            .fingerabdruck()
+            .unwrap()
+            .to_owned()
+    }
+
+    /// Eine falsche Schlüsseldatei bricht den Start ab, bevor Datenbank, Bootstrap oder ein
+    /// Hintergrundlauf etwas tun (Review LLH-2025): sonst liefen sie in jeder Runde einer
+    /// Neustartschleife an.
+    #[test]
+    fn geheimnisspeicher_laedt_vor_der_datenbank() {
+        let main = include_str!("main.rs");
+        let server = &main[main.find("async fn run_server").expect("run_server")..];
+        let laden = server
+            .find("load_geheimnisspeicher()")
+            .expect("lädt den Speicher");
+        let db = server.find("db::connect(").expect("öffnet die Datenbank");
+        assert!(
+            laden < db,
+            "load_geheimnisspeicher muss vor db::connect stehen"
+        );
+    }
+
+    #[test]
+    fn geheimnis_schluessel_aus_datei() {
+        let s = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let (_dir, pfad) = schluesseldatei(&s, 0o600);
+        let config = parse_hermetisch(["lifeline-hub", "--geheimnis-schluessel-datei", &pfad]);
+        let (speicher, warnungen) = config.load_geheimnisspeicher().unwrap();
+        assert_eq!(speicher.fingerabdruck(), Some(fp(&s).as_str()));
+        assert_eq!(speicher.fingerabdruck_alt(), None);
+        assert!(warnungen.is_empty(), "{warnungen:?}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn offene_schluesseldatei_warnt() {
+        let s = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let (_dir, pfad) = schluesseldatei(&s, 0o644);
+        let config = parse_hermetisch(["lifeline-hub", "--geheimnis-schluessel-datei", &pfad]);
+        let (speicher, warnungen) = config.load_geheimnisspeicher().unwrap();
+        assert!(speicher.has_schluessel());
+        assert_eq!(warnungen.len(), 1, "{warnungen:?}");
+        assert!(warnungen[0].contains(&pfad) && warnungen[0].contains("644"));
+        assert!(!warnungen[0].contains(&geheimnis_text(&s)));
+    }
+
+    #[test]
+    fn wert_und_datei_zugleich_ist_fehler() {
+        let s = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let text = geheimnis_text(&s);
+        let (_dir, pfad) = schluesseldatei(&s, 0o600);
+        for (env, flag) in [
+            (
+                "LIFELINE_GEHEIMNIS_SCHLUESSEL",
+                "--geheimnis-schluessel-datei",
+            ),
+            (
+                "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT",
+                "--geheimnis-schluessel-alt-datei",
+            ),
+        ] {
+            let fehler = try_parse_mit_env(env, &text, &["lifeline-hub", flag, &pfad])
+                .err()
+                .unwrap_or_else(|| panic!("{env} und {flag} zugleich müssen scheitern"))
+                .to_string();
+            assert!(!fehler.contains(&text[16..]), "{fehler}");
+        }
+    }
+
+    #[test]
+    fn alter_ohne_neuen_ist_fehler() {
+        let alt = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let text = geheimnis_text(&alt);
+        let config = parse_hermetisch(["lifeline-hub", "--geheimnis-schluessel-alt", &text]);
+        let fehler = config.load_geheimnisspeicher().err().unwrap();
+        assert!(fehler.contains("ohne neuen"), "{fehler}");
+        assert!(!fehler.contains(&text[16..]));
+    }
+
+    #[test]
+    fn alter_gleich_neuem_ist_fehler() {
+        let s = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let text = geheimnis_text(&s);
+        let config = parse_hermetisch([
+            "lifeline-hub",
+            "--geheimnis-schluessel",
+            &text,
+            "--geheimnis-schluessel-alt",
+            &text,
+        ]);
+        let fehler = config.load_geheimnisspeicher().err().unwrap();
+        assert!(fehler.contains("derselbe"), "{fehler}");
+        assert!(!fehler.contains(&text[16..]));
+    }
+
+    #[test]
+    fn fehlende_schluesseldatei_nennt_pfad() {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("fehlt.key");
+        let pfad = pfad.to_str().unwrap();
+        let config = parse_hermetisch(["lifeline-hub", "--geheimnis-schluessel-datei", pfad]);
+        let fehler = config.load_geheimnisspeicher().err().unwrap();
+        assert!(
+            fehler.contains(pfad) && fehler.contains("nicht lesbar"),
+            "{fehler}"
+        );
+        assert!(
+            fehler.contains("LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI"),
+            "{fehler}"
+        );
+    }
+
+    #[test]
+    fn wechsel_aus_env_und_datei() {
+        let neu = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let alt = crate::adapter::geheimnis::GeheimnisSchluessel::generate();
+        let (_dir, pfad) = schluesseldatei(&neu, 0o600);
+        let alt_text = geheimnis_text(&alt);
+        let config = parse_hermetisch([
+            "lifeline-hub",
+            "--geheimnis-schluessel-datei",
+            &pfad,
+            "--geheimnis-schluessel-alt",
+            &alt_text,
+        ]);
+        let (speicher, _) = config.load_geheimnisspeicher().unwrap();
+        assert_eq!(speicher.fingerabdruck(), Some(fp(&neu).as_str()));
+        assert_eq!(speicher.fingerabdruck_alt(), Some(fp(&alt).as_str()));
+        assert!(!format!("{config:?}").contains(&alt_text));
+    }
+
+    #[test]
+    fn leerer_alter_schluessel_wie_leerer_neuer() {
+        let neu = try_parse_mit_env("LIFELINE_GEHEIMNIS_SCHLUESSEL", "", &["lifeline-hub"]);
+        let alt = try_parse_mit_env("LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT", "", &["lifeline-hub"]);
+        assert_eq!(neu.is_ok(), alt.is_ok());
+        if let Ok(c) = alt {
+            assert!(c.geheimnis_schluessel_alt.is_none());
+        }
+    }
+
+    #[test]
+    fn kaputter_alter_schluessel_steht_nicht_im_fehler() {
+        let fehler = try_parse_mit_env(
+            "LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT",
+            "AGE-SECRET-KEY-1kaputt",
+            &["lifeline-hub"],
+        )
+        .err()
+        .expect("ein kaputter alter Schlüssel bricht den Start ab")
+        .to_string();
+        assert!(
+            fehler.contains("--geheimnis-schluessel-alt (LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT)"),
+            "{fehler}"
+        );
+        assert!(!fehler.contains("kaputt"), "{fehler}");
     }
 
     #[test]

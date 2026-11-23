@@ -34,9 +34,10 @@ export const MARKENZELLE_BILDMARKE_HOEHE = 22;
 
 /**
  * Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. Die
- * 60 px sind ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}.
+ * 64 px sind ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}. 64 statt 60
+ * seit dem Schriftboden (LLH-2044): das längste Rail-Etikett braucht in 11 px den Platz.
  */
-const RAIL_BREITE = 60;
+const RAIL_BREITE = 64;
 
 /** Die Haarlinie rechts an Rail und Markenzelle; sie geht in der Spalte vom Ziel ab. */
 const RAIL_LINIE = 1;

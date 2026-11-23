@@ -467,7 +467,7 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...monoStil('metaKlein'), fontWeight: 400 }}>
+          <span data-lfh="status-legende" style={{ ...monoStil('meta'), fontWeight: 400 }}>
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -517,7 +517,7 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
     <span
       data-lfh="meldebild-besatzung"
       style={{
-        ...monoStil('metaKlein'),
+        ...monoStil('meta'),
         display: 'flex',
         flexDirection: 'column',
         color: rollen.gedaempft,
