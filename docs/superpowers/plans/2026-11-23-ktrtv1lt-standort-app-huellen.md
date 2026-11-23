@@ -60,14 +60,14 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
 **Interfaces:**
 - Produces: `Seitenzugriff.standort(origin: SeitenOrigin?, aktiverServer: ServerAdresse?): Boolean`
 
-- [ ] **Step 1: Failing test** `` `der Standort geht nur an die Seite des aktiven Servers` ``:
+- [x] **Step 1: Failing test** `` `der Standort geht nur an die Seite des aktiven Servers` ``:
   `true` für `https://elw.local:8443` und `https://ELW.local:8443/`; `false` für
   `https://idp.example`, `https://elw.local`, `http://elw.local:8443`, `"null"`, `null`, aktiv `null`.
-- [ ] **Step 2:** `LC_ALL=C.UTF-8 android/gradlew -p android/kern test` → FAIL (unresolved `standort`).
-- [ ] **Step 3:** `standort` = `Bruecke.accepts(isMainFrame = true, origin, aktiverServer)`, KDoc
+- [x] **Step 2:** `LC_ALL=C.UTF-8 android/gradlew -p android/kern test` → FAIL (unresolved `standort`).
+- [x] **Step 3:** `standort` = `Bruecke.accepts(isMainFrame = true, origin, aktiverServer)`, KDoc
   wie `kamera` (Entwurf LLH-2071).
-- [ ] **Step 4:** Kern-Tests grün.
-- [ ] **Step 5:** Commit `feat(android): Kern entscheidet über den Standort der Seite (LLH-2071)`.
+- [x] **Step 4:** Kern-Tests grün.
+- [x] **Step 5:** Commit `feat(android): Kern entscheidet über den Standort der Seite (LLH-2071)`.
 
 ### Task 2: Android-App: Recht, Rückruf, Einstellungen
 
@@ -85,7 +85,7 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
 - Produces: `Webzugriffe.standort(fertig: (Boolean) -> Unit)`;
   `HuellenChromeClient.onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback)`
 
-- [ ] **Step 1: Failing tests** (Attrappe bekommt `standortErlaubt`, `standortGefragt`):
+- [x] **Step 1: Failing tests** (Attrappe bekommt `standortErlaubt`, `standortGefragt`):
   - `der aktive Server bekommt den Standort, wenn die App das Recht hat` → `invoke(origin, true, false)`, einmal gefragt.
   - `ohne Recht der App bleibt der Standort zu` → `invoke(origin, false, false)`.
   - `eine fremde Origin bekommt keinen Standort und die App fragt nicht` → `false`, `standortGefragt == 0`.
@@ -94,13 +94,13 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
   - `ohne Zugriffe lehnt der WebView ab` (`zugriffe = null`) → `false`.
   - `Activityzugriffe meldet erlaubt, wenn fein oder grob gewährt ist` (Robolectric
     `shadowOf(app).grantPermissions(ACCESS_COARSE_LOCATION)` → `fertig(true)` ohne Launch).
-- [ ] **Step 2:** Lokal ohne SDK nicht lauffähig → Lauf in `android-pruefung.yml` (CI) nach Push.
-- [ ] **Step 3:** Umsetzen. `Activityzugriffe.standort`: sofort `true`, wenn FINE oder COARSE
+- [x] **Step 2:** Lokal ohne SDK nicht lauffähig → Lauf in `android-pruefung.yml` (CI) nach Push.
+- [x] **Step 3:** Umsetzen. `Activityzugriffe.standort`: sofort `true`, wenn FINE oder COARSE
   gewährt; sonst `RequestMultiplePermissions` mit beiden, Wartende sammeln wie `kameraFertig`,
   Ergebnis `any { it.value }`. Manifest-Kommentar wie bei der Kamera.
-- [ ] **Step 4:** CI `android-pruefung.yml` grün (wird mit dem PR-Push geprüft; vorher
+- [x] **Step 4:** CI `android-pruefung.yml` grün (wird mit dem PR-Push geprüft; vorher
   `LC_ALL=C.UTF-8 android/gradlew -p android :app:compileDebugKotlin`, falls ein SDK greifbar ist).
-- [ ] **Step 5:** Commit `feat(android): Standort für die Oberfläche des aktiven Servers (LLH-2071)`.
+- [x] **Step 5:** Commit `feat(android): Standort für die Oberfläche des aktiven Servers (LLH-2071)`.
 
 ### Task 3: iOS-Init-Skript: Polyfill und Unterframe-Sperre
 
@@ -117,7 +117,7 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
   Antwort über `__LIFELINE_REPLY__(id, fehler, position)`; Beobachtung über
   `window.__LIFELINE_LOCATION__(id, fehler, position)`.
 
-- [ ] **Step 1: Failing tests** in `iosHuelle.test.ts`, Block „Standort (LLH-2071)“:
+- [x] **Step 1: Failing tests** in `iosHuelle.test.ts`, Block „Standort (LLH-2071)“:
   - `getCurrentPosition fragt die Hülle und liefert eine GeolocationPosition` — Nachricht
     `{cmd:'location_current', id, high_accuracy:true, timeout:15000}`; Antwort
     `{latitude:52.1, longitude:9.9, accuracy:12, altitude:null, altitude_accuracy:null, heading:null, speed:null, timestamp:1700000000000}`
@@ -132,16 +132,16 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
   - `ohne Message-Handler bleibt navigator.geolocation unangetastet`.
   - `iosUnterframe.test.ts`: `im Unterframe meldet jede Abfrage Code 1` und `im Hauptframe tut das Skript nichts`
     (Skript per `new Function('window','navigator', skript)` mit Fenster-Attrappe `{top: other}`).
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/huelle/iosHuelle.test.ts src/huelle/iosUnterframe.test.ts` → FAIL.
-- [ ] **Step 3:** Polyfill: `Object.defineProperty(navigator, 'geolocation', { configurable: true, value: Object.freeze({...}) })`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/huelle/iosHuelle.test.ts src/huelle/iosUnterframe.test.ts` → FAIL.
+- [x] **Step 3:** Polyfill: `Object.defineProperty(navigator, 'geolocation', { configurable: true, value: Object.freeze({...}) })`.
   Fehlerobjekt mit `code`, `message`, Konstanten `PERMISSION_DENIED=1`, `POSITION_UNAVAILABLE=2`,
   `TIMEOUT=3`; Position als `{ coords: {...}, timestamp }` (Getter-frei, eingefroren). Kennungen
   für `watchPosition` eigene Zahlen (Map Kennung → id der Brücke). `__LIFELINE_LOCATION__` wie
   `__LIFELINE_REPLY__` per `defineProperty` (nicht schreibbar). Unterframe-Skript: steigt aus,
   wenn `window.top === window`, sonst Attrappe mit Code 1 für alle drei Methoden
   (`clearWatch` tut nichts).
-- [ ] **Step 4:** Tests grün.
-- [ ] **Step 5:** Commit `feat(ios): Init-Skript liefert den Standort über die Brücke (LLH-2071)`.
+- [x] **Step 4:** Tests grün.
+- [x] **Step 5:** Commit `feat(ios): Init-Skript liefert den Standort über die Brücke (LLH-2071)`.
 
 ### Task 4: iOS-Kern: Befehle, Antwortwert, Ausführung, Beobachtung
 
@@ -169,7 +169,7 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
     `mutating abgelaufen(jetzt: Double) -> [Int]`, `var isLeer: Bool`;
     `public enum Standortwirkung: Equatable { case keine, starte(highAccuracy: Bool), stoppe }`
 
-- [ ] **Step 1: Failing tests**:
+- [x] **Step 1: Failing tests**:
   - Parse: `location_current` mit `high_accuracy: true, timeout: 15000` → `.locationCurrent(id: 3, highAccuracy: true, timeout: .milliseconds(15000))`;
     fehlendes `high_accuracy` → `false`; `timeout: null` → `nil`; negatives/Text-`timeout` → `.ungueltig`;
     `location_clear` ohne `watch` → `nil` (keine id, keine Antwort); `location_watch` braucht `id`.
@@ -183,14 +183,14 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
     des Servers → ids; mit anderem Server oder Seite einer fremden Origin → `([], .stoppe)` und
     danach `isLeer`; `reset` → `.stoppe`; `abgelaufen` meldet eine id genau einmal je Warten
     (nach `zustellen` beginnt das Warten neu), ohne `timeout` nie.
-- [ ] **Step 2:** `cd ios/LifelineKern && swift test` → FAIL (lokal nur mit Swift-Toolchain; sonst CI `ios-pruefung.yml`).
-- [ ] **Step 3:** Umsetzen. `ganzzahl`-Helfer für `timeout` (≥ 0). `Brueckenausfuehrung.run`:
+- [x] **Step 2:** `cd ios/LifelineKern && swift test` → FAIL (lokal nur mit Swift-Toolchain; sonst CI `ios-pruefung.yml`).
+- [x] **Step 3:** Umsetzen. `ganzzahl`-Helfer für `timeout` (≥ 0). `Brueckenausfuehrung.run`:
   `.locationCurrent` → `antwort(id) { try await isStandortErlaubt(dienste); return .position(try await dienste.currentPosition(...)) }`
   mit `Standortfehler.rawValue` als Ablehnungstext; `.locationWatch`/`.locationClear` → `nil`
   (die App verwaltet sie über `Standortbeobachtung`, Task 5). `Linkregeln.belongsToServer` für
   die Seite in `zustellen`.
-- [ ] **Step 4:** Tests grün (lokal, falls Swift; sonst CI).
-- [ ] **Step 5:** Commit `feat(ios): Kern für Standortbefehle und Beobachtung (LLH-2071)`.
+- [x] **Step 4:** Tests grün (lokal, falls Swift; sonst CI).
+- [x] **Step 5:** Commit `feat(ios): Kern für Standortbefehle und Beobachtung (LLH-2071)`.
 
 ### Task 5: iOS-App: CoreLocation, Empfang, Plist, Manifest, Unterframe-Skript
 
@@ -207,18 +207,18 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
 **Interfaces:**
 - Consumes: alles aus Task 4; Wire aus Task 3.
 
-- [ ] **Step 1:** `Standortdienst` (`@MainActor final class`, `CLLocationManagerDelegate`):
+- [x] **Step 1:** `Standortdienst` (`@MainActor final class`, `CLLocationManagerDelegate`):
   `freigabe`, `requestFreigabe() async -> Bool` (erst beim ersten Befehl), `einmal(highAccuracy:timeout:)`
   per `requestLocation` mit Frist ab Aufruf (Freigabe ist dann schon erteilt), `starte(highAccuracy:)`/`stoppe()`
   für `startUpdatingLocation`; Genauigkeit `kCLLocationAccuracyBest` bzw. `kCLLocationAccuracyHundredMeters`;
   Positionen an einen Rückruf. Fehler: `kCLErrorDenied` → `denied`, sonst `unavailable`.
-- [ ] **Step 2:** `Brueckenempfang`: bei `.locationWatch` erst `isStandortErlaubt` (Fehler als
+- [x] **Step 2:** `Brueckenempfang`: bei `.locationWatch` erst `isStandortErlaubt` (Fehler als
   `locationScript(id, fehler, nil)`), dann `beobachtung.start(...)` und Wirkung ausführen; bei
   jeder Position `zustellen` und für jede id `locationScript`; Timer (1 s) nur bei nicht leerer
   Beobachtung für `abgelaufen` → `timeout`; `.locationClear` → `clear`.
-- [ ] **Step 3:** Plist, Ressource, Privacy-Manifest, Unterframe-`WKUserScript`.
-- [ ] **Step 4:** CI `ios-pruefung.yml` grün (Bauen, `AppTests`; kein neuer Bildschirm → keine neuen Bilder).
-- [ ] **Step 5:** Commit `feat(ios): App liefert den Standort über CoreLocation (LLH-2071)`.
+- [x] **Step 3:** Plist, Ressource, Privacy-Manifest, Unterframe-`WKUserScript`.
+- [x] **Step 4:** CI `ios-pruefung.yml` grün (Bauen, `AppTests`; kein neuer Bildschirm → keine neuen Bilder).
+- [x] **Step 5:** Commit `feat(ios): App liefert den Standort über CoreLocation (LLH-2071)`.
 
 ### Task 6: Frontend-Hinweistext
 
@@ -232,14 +232,14 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
 **Interfaces:**
 - Produces: `huelleIstApp()` — `true` für `platform` `'ios'`/`'android'`; `meldungVerweigert()`.
 
-- [ ] **Step 1: Failing tests:** `huelleIstApp` false ohne Kennung und für `'macos'`/`'windows'`, true
+- [x] **Step 1: Failing tests:** `huelleIstApp` false ohne Kennung und für `'macos'`/`'windows'`, true
   für iOS/Android (über `starteIosHuelle`/`starteAndroidHuelle`); `meldungVerweigert()` im Browser =
   heutiger Text, in der App = App-Text (Global Constraints); `StandortFeld` zeigt bei Code 1 in der
   Android-Hülle den App-Text.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/huelle src/pages/lagekarte src/geraet` → FAIL.
-- [ ] **Step 3:** Umsetzen; alle Verwendungen von `MELDUNG_VERWEIGERT` umstellen (`grep -rn MELDUNG_VERWEIGERT frontend/src`).
-- [ ] **Step 4:** Tests grün, dazu `mise exec -- pnpm -C frontend exec tsc -b --noEmit` bzw. das Lint des Gates.
-- [ ] **Step 5:** Commit `feat(frontend): Hinweis bei verweigertem Standort nennt in der App die Einstellungen (LLH-2071)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/huelle src/pages/lagekarte src/geraet` → FAIL.
+- [x] **Step 3:** Umsetzen; alle Verwendungen von `MELDUNG_VERWEIGERT` umstellen (`grep -rn MELDUNG_VERWEIGERT frontend/src`).
+- [x] **Step 4:** Tests grün, dazu `mise exec -- pnpm -C frontend exec tsc -b --noEmit` bzw. das Lint des Gates.
+- [x] **Step 5:** Commit `feat(frontend): Hinweis bei verweigertem Standort nennt in der App die Einstellungen (LLH-2071)`.
 
 ### Task 7: Regeln, ADR, Betriebs- und Anwenderdoku
 
@@ -250,6 +250,6 @@ CoreLocation), Vanilla-JS-Init-Skripte, TypeScript/React + Vitest.
   iOS: App-Store-Angabe „Precise Location“)
 - Modify: `docs/anwender/kapitel/lagekarte.md` nur, wenn es die Browser-Freigabe nennt
 
-- [ ] **Step 1:** Texte schreiben; `scripts/adr-fuer.sh ios/App/Webview.swift` zeigt die neue ADR.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Doku-/ADR-Wächter, Prettier, Vitest, Kern-Tests soweit Toolchain da).
-- [ ] **Step 3:** Commit `docs: Standort in den App-Hüllen – Regeln, ADR, Betrieb (LLH-2071)`.
+- [x] **Step 1:** Texte schreiben; `scripts/adr-fuer.sh ios/App/Webview.swift` zeigt die neue ADR.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Doku-/ADR-Wächter, Prettier, Vitest, Kern-Tests soweit Toolchain da).
+- [x] **Step 3:** Commit `docs: Standort in den App-Hüllen – Regeln, ADR, Betrieb (LLH-2071)`.
