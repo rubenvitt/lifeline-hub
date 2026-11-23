@@ -1,7 +1,7 @@
 import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode, Ref } from 'react';
-import { monoStil, schriftStil, useRollen } from './rollenwerte';
+import { schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Sammelbanner — „12 neue Meldungen" statt eingeschobener Zeilen (Neuentwurf S4;
@@ -91,7 +91,12 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
           </span>
           <span
             data-lfh="sammelbanner-kurz"
-            style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}
+            // „1 neu“, „umgeordnet“: Wörter in der Textschrift (ADR-0094).
+            style={{
+              ...schriftStil('textKlein'),
+              fontVariantNumeric: 'tabular-nums',
+              whiteSpace: 'nowrap',
+            }}
           >
             {kurz}
           </span>

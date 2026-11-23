@@ -188,6 +188,7 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
               // Ein Bedienziel wie die Zeilenziele des Stabs: Höhe aus `controlHeight` (Gate 3).
               <a
                 href={v.verweis}
+                data-schrift="kennung"
                 style={{
                   ...linkZeilenzielStil(token),
                   ...monoStil('monoGross'),
@@ -197,7 +198,12 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
                 {v.wert}
               </a>
             ) : (
-              <span style={{ ...monoStil('monoGross'), overflowWrap: 'anywhere' }}>{v.wert}</span>
+              <span
+                data-schrift="kennung"
+                style={{ ...monoStil('monoGross'), overflowWrap: 'anywhere' }}
+              >
+                {v.wert}
+              </span>
             ))}
           {v.hinweis && <Gedaempft>{v.hinweis}</Gedaempft>}
         </Stapel>

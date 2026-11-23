@@ -183,7 +183,14 @@ function WarnungEintrag({
         <Status groesse="klein" ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
         <Textstufe stufe="kartentitel">{titelSchreibung(w.ereignis)}</Textstufe>
       </Stapel>
-      <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
+      {/* „seit 13:00 · bis 16:00“ trägt Wörter: Textschrift (ADR-0094). */}
+      <span
+        style={{
+          ...schriftStil('textKlein'),
+          fontVariantNumeric: 'tabular-nums',
+          color: rollen.text2,
+        }}
+      >
         {warnZeitraum(w.beginn, w.ende, jetzt, konv)}
       </span>
       <Textstufe stufe="textKlein" ton="text2">
@@ -430,7 +437,12 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                     <span style={{ minWidth: 96 }}>
                       {niederschlagText(s.niederschlag_mm, s.niederschlag_wahrscheinlichkeit)}
                     </span>
-                    <span>{windText(s.wind_kmh, s.boeen_kmh, s.windrichtung_grad)}</span>
+                    {/* „aus S 11 km/h · Böen 19 km/h“ trägt Wörter: Textschrift (ADR-0094). */}
+                    <span
+                      style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {windText(s.wind_kmh, s.boeen_kmh, s.windrichtung_grad)}
+                    </span>
                   </li>
                 ))}
               </ul>

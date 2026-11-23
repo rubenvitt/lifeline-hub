@@ -17,6 +17,7 @@ import {
   monoStil,
   useRollen,
   type SegmentOption,
+  Kennung,
 } from '../../components/instrument';
 import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
@@ -106,9 +107,11 @@ export default function AbschnittDetail({
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={
-        <span style={feld === 'rufname' ? monoStil('mono') : { whiteSpace: 'pre-wrap' }}>
-          {a[feld]}
-        </span>
+        feld === 'rufname' ? (
+          <Kennung>{a[feld]}</Kennung>
+        ) : (
+          <span style={{ whiteSpace: 'pre-wrap' }}>{a[feld]}</span>
+        )
       }
       leer={isEmptyText}
       gleich={isSameText}

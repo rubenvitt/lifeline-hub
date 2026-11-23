@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { Status, monoStil, Stapel } from '../components/instrument';
+import { Kennung, Status, schriftStil, Stapel } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -101,9 +101,9 @@ export default function EinheitVorlagenTab() {
         ) : (
           <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             {vorlage.fahrzeuge.map((f) => (
-              <span key={f.fahrzeug_id} style={monoStil('monoKlein')}>
+              <Kennung key={f.fahrzeug_id} stufe="monoKlein">
                 {f.funkrufname}
-              </span>
+              </Kennung>
             ))}
           </Stapel>
         ),
@@ -123,7 +123,8 @@ export default function EinheitVorlagenTab() {
         return (
           <>
             <span
-              style={monoStil('monoKlein')}
+              // Gemischt („1/2/6//9 (Vorgabe)“): Textschrift mit gleich breiten Ziffern (ADR-0094).
+              style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}
               title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}
             >
               {sollText(vorlage)}

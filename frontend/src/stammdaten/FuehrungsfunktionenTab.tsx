@@ -5,7 +5,7 @@ import { InlineAngabe } from '../components/InlineAngabe';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { mitVorgabe } from '../components/vorgabeText';
-import { monoStil } from '../components/instrument';
+import { monoStil, schriftStil } from '../components/instrument';
 import { useAuth } from '../auth/AuthContext';
 import { ladeFuehrungsfunktionen, setzeFuehrungsfunktion } from '../api/fuehrungsfunktionen';
 import { globalKeys } from '../api/queryKeys';
@@ -115,7 +115,12 @@ export default function FuehrungsfunktionenTab() {
               <ListenEintragMeta
                 title={
                   <span>
-                    <span style={monoStil('mono')}>{kennung}</span>{' '}
+                    {/* Das Kürzel ist eine Kennung, die Art ohne Kürzel ein Wort (ADR-0094). */}
+                    {eintrag.kuerzel != null ? (
+                      <span style={monoStil('mono')}>{eintrag.kuerzel}</span>
+                    ) : (
+                      <span style={schriftStil('text')}>{kennung}</span>
+                    )}{' '}
                     <Typography.Text type="secondary">· {ART_TEXT[eintrag.art]}</Typography.Text>{' '}
                     <HerkunftAbzeichen
                       herkunft={herkunft.herkunft('fuehrungsfunktion', eintrag.funktion)}

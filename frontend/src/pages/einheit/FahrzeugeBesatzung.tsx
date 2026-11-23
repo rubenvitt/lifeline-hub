@@ -20,7 +20,6 @@ import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from 
 import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
-  monoStil,
   schriftStil,
   Paneel,
   PaneelZustand,
@@ -502,13 +501,13 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span style={monoStil('mono')}>
+    <Kennung>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
         name
       )}
-    </span>
+    </Kennung>
   );
 
   /**
@@ -687,7 +686,9 @@ export default function FahrzeugeBesatzung({
             {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
               <Status darstellung={besatzungsUrteil[f.urteil]} />
             )}
-            <span style={monoStil('monoKlein')}>{besatzungText(f)}</span>
+            <span style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}>
+              {besatzungText(f)}
+            </span>
             {secondaryText([fremdText(f)])}
           </Stapel>
         </span>

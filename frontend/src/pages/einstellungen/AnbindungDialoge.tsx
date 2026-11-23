@@ -63,7 +63,10 @@ export function CodeDialog({
               gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
             </span>
             <KopierbarerText text={kommando} bezeichnung="Kommando">
-              <span style={{ ...monoStil('monoKlein', 500), wordBreak: 'break-all' }}>
+              <span
+                data-schrift="kennung"
+                style={{ ...monoStil('monoKlein', 500), wordBreak: 'break-all' }}
+              >
                 {kommando}
               </span>
             </KopierbarerText>

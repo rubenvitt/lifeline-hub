@@ -465,7 +465,12 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && <span style={monoStil('monoKlein')}> · {k.funkrufname}</span>}
+                {k.funkrufname && (
+                  <>
+                    {' · '}
+                    <Kennung stufe="monoKlein">{k.funkrufname}</Kennung>
+                  </>
+                )}
               </span>
             }
             koerperPolster

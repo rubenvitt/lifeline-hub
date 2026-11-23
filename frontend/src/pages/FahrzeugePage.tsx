@@ -41,6 +41,7 @@ import {
   Stapel,
   Knopfreihe,
   Kennung,
+  schriftStil,
 } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
@@ -136,16 +137,22 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <Status darstellung={besatzungsUrteil[urteil]} />
-      <span style={monoStil('monoKlein')}>
+      <span style={schriftStil('textKlein')}>
         {urteil !== 'nicht_erfasst' && (
           <>
-            Ist <StaerkeAnzeige wert={ist} />
+            Ist{' '}
+            <span style={monoStil('monoKlein')}>
+              <StaerkeAnzeige wert={ist} />
+            </span>
           </>
         )}
         {urteil !== 'nicht_erfasst' && soll && ' · '}
         {soll && (
           <>
-            Soll <StaerkeAnzeige wert={soll} />
+            Soll{' '}
+            <span style={monoStil('monoKlein')}>
+              <StaerkeAnzeige wert={soll} />
+            </span>
           </>
         )}
       </span>

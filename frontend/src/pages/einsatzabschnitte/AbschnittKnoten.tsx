@@ -1,6 +1,6 @@
 import { IconPerson, IconTelefon } from '../../icons';
 import { theme } from 'antd';
-import { Stapel, Status, Textstufe, monoStil } from '../../components/instrument';
+import { Stapel, Status, Textstufe, monoStil, schriftStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { telefonVerbindungen } from '../../components/verbindungen';
@@ -38,10 +38,11 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
       <span style={{ ...monoStil('monoKlein'), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
       </span>
-      <span style={{ ...monoStil('monoKlein'), color: token.colorTextSecondary }}>
+      <span style={{ ...schriftStil('textKlein'), color: token.colorTextSecondary }}>
         {/* Was gezählt wird, steht dran (LFH-973): nur die direkt zugeordneten, der Überblick
             zählt „inkl. UA“. */}
-        {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt
+        <span style={monoStil('monoKlein')}>{anzahlEinheiten}</span>
+        {anzahlEinheiten === 1 ? ' Einheit' : ' Einheiten'} direkt
       </span>
       {!besetzt && <Status groesse="klein" ton="achtung" wort="ohne Leiter" />}
       {abschnitt.leiter_name && (
