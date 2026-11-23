@@ -136,7 +136,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file",
     ),
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
+    ),
     // Bild-Anlagen an Lagebericht und Befehl (LFH-1028): dieselbe Kette wie die Anhänge. Nur POST
     // bzw. GET — Liste und DELETE bleiben geregelt.
     ("POST", "/api/einsaetze/{id}/lageberichte/{lid}/anlagen"),

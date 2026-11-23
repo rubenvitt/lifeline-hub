@@ -4487,7 +4487,7 @@
       },
       "BetreuungUebersicht": {
         "type": "object",
-        "description": "Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen\neines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].",
+        "description": "Die eine Lesequelle des Moduls Betreuung (`GET …/care`): alle nicht stornierten Stellen\neines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].",
         "required": [
           "stellen"
         ],
@@ -9592,7 +9592,7 @@
       },
       "EvakuierungUebersicht": {
         "type": "object",
-        "description": "Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht\nstornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne\nBruch des Drahts dazukommen.",
+        "description": "Die eine Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): alle nicht\nstornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne\nBruch des Drahts dazukommen.",
         "required": [
           "bezirke"
         ],
@@ -12806,7 +12806,7 @@
       },
       "KostformZaehlung": {
         "type": "object",
-        "description": "Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`).",
+        "description": "Kostformen der Registrierten ohne Personenbezug (D7, `GET …/care/diets`).",
         "required": [
           "registriert",
           "sonderkost",
@@ -22062,7 +22062,7 @@
       },
       "UhsZielAuswahl": {
         "type": "object",
-        "description": "Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS\ndes Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul\nUnfallhilfsstellen wählen kann; keine Belegung, keine Plätze.",
+        "description": "Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/persons/uhs`): je aktiver UHS\ndes Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul\nUnfallhilfsstellen wählen kann; keine Belegung, keine Plätze.",
         "required": [
           "id",
           "bezeichnung"
@@ -22738,7 +22738,7 @@
       },
       "VerpflegungAnzeige": {
         "type": "object",
-        "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
+        "description": "Die eine Lesequelle der Modulseite (`GET …/catering`).",
         "required": [
           "zeitfenster",
           "stellen",
@@ -22874,7 +22874,7 @@
       },
       "VerpflegungsstelleAnzeige": {
         "type": "object",
-        "description": "Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne\nBenutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und\nkeine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.",
+        "description": "Eine Verpflegungsstelle in `GET …/catering` und als Antwort der Schreibrouten. **Ohne\nBenutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und\nkeine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.",
         "required": [
           "id",
           "bezeichnung",
@@ -22987,7 +22987,7 @@
       },
       "VersorgendeEinheitAuswahl": {
         "type": "object",
-        "description": "Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver\nEinheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf\ndie Kräfte geht.",
+        "description": "Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/persons/units`): je aktiver\nEinheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf\ndie Kräfte geht.",
         "required": [
           "id",
           "name"

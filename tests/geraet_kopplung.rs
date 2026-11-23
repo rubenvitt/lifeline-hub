@@ -2295,9 +2295,8 @@ async fn tablet_setzt_verfuegbarkeit_aber_bearbeitet_den_grundriss_nicht() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Grundriss bearbeiten: {v}");
 
-    let verfuegbarkeit = |uhs: i64, pid: i64| {
-        format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{pid}/availability")
-    };
+    let verfuegbarkeit =
+        |uhs: i64, pid: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{pid}/availability");
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -2471,11 +2470,7 @@ async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
                 format!("{basis}/whereabouts"),
                 Some(json!({"art": "entlassung"})),
             ),
-            (
-                "POST",
-                format!("{basis}/notes"),
-                Some(json!({"text": "x"})),
-            ),
+            ("POST", format!("{basis}/notes"), Some(json!({"text": "x"}))),
             (
                 "POST",
                 format!("{basis}/reason"),

@@ -15040,10 +15040,11 @@ async fn migration_0369_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
         .unwrap();
     }
     migriere_bis(&pool, 369).await;
-    let neu: Vec<String> = sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let neu: Vec<String> =
+        sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(neu.len(), alt.len());
     for (vorher, nachher) in alt.iter().zip(&neu) {
         assert!(

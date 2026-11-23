@@ -56,7 +56,10 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/persons/{person}/whereabouts", self.einsatz),
+            &format!(
+                "/api/einsaetze/{}/persons/{person}/whereabouts",
+                self.einsatz
+            ),
             &self.admin,
             Some(&body.to_string()),
         )

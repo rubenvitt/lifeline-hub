@@ -1764,7 +1764,7 @@ export interface components {
             name: string;
         };
         /**
-         * @description Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen
+         * @description Die eine Lesequelle des Moduls Betreuung (`GET …/care`): alle nicht stornierten Stellen
          *     eines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].
          */
         BetreuungUebersicht: {
@@ -3856,7 +3856,7 @@ export interface components {
             je_typ: components["schemas"]["EtbTypZaehler"];
         };
         /**
-         * @description Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht
+         * @description Die eine Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): alle nicht
          *     stornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne
          *     Bruch des Drahts dazukommen.
          */
@@ -5102,7 +5102,7 @@ export interface components {
          * @enum {string}
          */
         Kostform: "normal" | "vegetarisch" | "vegan" | "ohne_schwein" | "diaet_allergenarm" | "saeugling_kleinkind";
-        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`). */
+        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/care/diets`). */
         KostformZaehlung: {
             /**
              * Format: int64
@@ -8827,7 +8827,7 @@ export interface components {
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
         /**
-         * @description Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS
+         * @description Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/persons/uhs`): je aktiver UHS
          *     des Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul
          *     Unfallhilfsstellen wählen kann; keine Belegung, keine Plätze.
          */
@@ -9082,7 +9082,7 @@ export interface components {
              */
             menge: number;
         };
-        /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
+        /** @description Die eine Lesequelle der Modulseite (`GET …/catering`). */
         VerpflegungAnzeige: {
             /**
              * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und
@@ -9138,7 +9138,7 @@ export interface components {
          */
         Verpflegungsart: "warm" | "kalt" | "getraenke";
         /**
-         * @description Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne
+         * @description Eine Verpflegungsstelle in `GET …/catering` und als Antwort der Schreibrouten. **Ohne
          *     Benutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und
          *     keine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.
          */
@@ -9186,7 +9186,7 @@ export interface components {
             zuletzt_gestartet?: string | null;
         };
         /**
-         * @description Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver
+         * @description Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/persons/units`): je aktiver
          *     Einheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf
          *     die Kräfte geht.
          */

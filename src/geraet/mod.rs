@@ -338,7 +338,10 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
+    ),
     // Kräfte der eigenen UHS (LFH-1045): zuordnen, ad hoc erfassen, lösen. „Einheit zuordnen“
     // bleibt der Leitung.
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/forces/available"),
@@ -494,10 +497,7 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
     ),
-    (
-        "POST",
-        "/api/einsaetze/{id}/care/occupancies/{mid}/retract",
-    ),
+    ("POST", "/api/einsaetze/{id}/care/occupancies/{mid}/retract"),
     ("GET", "/api/einsaetze/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
     ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
@@ -954,10 +954,7 @@ mod tests {
         for (m, p) in [
             ("POST", "/api/einsaetze/{id}/catering/time-slots"),
             ("PATCH", "/api/einsaetze/{id}/catering/time-slots/{zid}"),
-            (
-                "DELETE",
-                "/api/einsaetze/{id}/catering/time-slots/{zid}",
-            ),
+            ("DELETE", "/api/einsaetze/{id}/catering/time-slots/{zid}"),
             // Verpflegungsstellen planen (LLH-1040 D12): liest sie über `GET …/catering`,
             // legt aber keine an, ändert, storniert und wechselt keinen Status.
             ("POST", "/api/einsaetze/{id}/catering/positions"),
@@ -1132,10 +1129,7 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/care/occupancy"),
             ("POST", "/api/einsaetze/{id}/care/positions"),
             ("PATCH", "/api/einsaetze/{id}/care/positions/{sid}"),
-            (
-                "POST",
-                "/api/einsaetze/{id}/care/positions/{sid}/cancel",
-            ),
+            ("POST", "/api/einsaetze/{id}/care/positions/{sid}/cancel"),
             // Bezirke sind das eigene Modul Evakuierung (LLH-1034); die Stelle sieht keins davon.
             ("GET", "/api/einsaetze/{id}/evacuation"),
             ("POST", "/api/einsaetze/{id}/evacuation/districts"),
