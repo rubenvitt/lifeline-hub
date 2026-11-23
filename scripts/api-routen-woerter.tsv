@@ -15,6 +15,7 @@ audit	-
 auth	-
 auto-update	automatische Aktualisierung
 backup	-
+blocks	Blöcke
 breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
@@ -64,11 +65,13 @@ follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 gauges	Pegel
+generate	erzeugen
 glyphs	-
 grant	Freigabe
 hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 import	-
 incidents	Einsätze
 info-line	Infotelefon
@@ -106,6 +109,7 @@ offline-maps	Offline-Karten
 oidc	-
 online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
 origin	Herkunft
 overlays	Fachebenen
@@ -124,6 +128,7 @@ position	-
 positions	Stellen
 posts	Posten
 presence	Präsenz
+preview	Vorschau
 providers	-
 proxy	-
 raster	-
@@ -177,6 +182,7 @@ tile	-
 tilejson	-
 tiles	-
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 uhs	UHS

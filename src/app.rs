@@ -2347,66 +2347,63 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
-            "/api/planungen",
+            "/api/plans",
             get(routes::planung::list).post(routes::planung::create),
         )
         .route(
-            "/api/planungen/{id}",
+            "/api/plans/{id}",
             get(routes::planung::load)
                 .patch(routes::planung::update)
                 .delete(routes::planung::delete),
         )
         .route(
-            "/api/planungen/{id}/posten",
+            "/api/plans/{id}/posts",
             post(routes::planung::create_posten),
         )
-        // `reihenfolge` ist ein festes Segment neben `{pid}`.
+        // `order` ist ein festes Segment neben `{pid}`.
         .route(
-            "/api/planungen/{id}/posten/reihenfolge",
+            "/api/plans/{id}/posts/order",
             put(routes::planung::reihenfolge),
         )
         .route(
-            "/api/planungen/{id}/posten/{pid}",
+            "/api/plans/{id}/posts/{pid}",
             patch(routes::planung::update_posten).delete(routes::planung::delete_posten),
         )
         .route(
-            "/api/planungen/{id}/bloecke",
+            "/api/plans/{id}/blocks",
             post(routes::planung::create_block),
         )
         .route(
-            "/api/planungen/{id}/bloecke/{bid}",
+            "/api/plans/{id}/blocks/{bid}",
             patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
+        .route("/api/plans/{id}/generate", post(routes::planung::erzeugen))
+        .route("/api/plans/{id}/export", get(routes::planung::export))
         .route(
-            "/api/planungen/{id}/erzeugen",
-            post(routes::planung::erzeugen),
-        )
-        .route("/api/planungen/{id}/export", get(routes::planung::export))
-        .route(
-            "/api/planungen/{id}/helfer",
+            "/api/plans/{id}/helpers",
             post(routes::planung::create_helfer),
         )
         .route(
-            "/api/planungen/{id}/helfer/{hid}",
+            "/api/plans/{id}/helpers/{hid}",
             patch(routes::planung::update_helfer).delete(routes::planung::delete_helfer),
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
-            "/api/planungen/{id}/programmpunkte",
+            "/api/plans/{id}/agenda-items",
             post(routes::planung::create_programmpunkt),
         )
         .route(
-            "/api/planungen/{id}/programmpunkte/{pid}",
+            "/api/plans/{id}/agenda-items/{pid}",
             patch(routes::planung::update_programmpunkt)
                 .delete(routes::planung::delete_programmpunkt),
         )
-        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
+        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `preview` schreibt nichts.
         .route(
-            "/api/planungen/{id}/uebernahme/vorschau",
+            "/api/plans/{id}/transfer/preview",
             post(routes::planung::uebernahme_vorschau),
         )
         .route(
-            "/api/planungen/{id}/uebernahme",
+            "/api/plans/{id}/transfer",
             post(routes::planung::uebernehmen),
         )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
