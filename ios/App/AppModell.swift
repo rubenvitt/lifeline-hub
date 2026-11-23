@@ -79,15 +79,22 @@ final class AppModell {
         anmelder = Anmelder(
             webView: { [weak self] in self?.webView },
             aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
+        let standort = Standortdienst()
         dienste = Systemdienste(
             webView: { [weak self] in self?.webView }, anmelder: anmelder, pushablage: pushablage,
-            aktiverServer: { [weak self] in self?.liste.aktiv?.id })
+            standort: standort, aktiverServer: { [weak self] in self?.liste.aktiv?.id })
         empfang = Brueckenempfang(
-            dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
+            dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse },
+            standort: standort)
         navigation = Navigationsbegleiter(aktiverServer: { [weak self] in self?.liste.aktiv?.adresse }) {
             [weak self] webView, event in
             // Meldungen eines schon verworfenen Webviews zählen nicht.
             guard let self, webView === self.webView else { return }
+            // Eine neue Seite oder ein beendeter Web-Prozess: laufende Ortungen enden (LLH-2071).
+            switch event {
+            case .seiteGeladen, .webProzessBeendet: self.empfang.beendeStandort()
+            default: break
+            }
             self.send(event)
         }
         if let testzustand { zeige(testzustand) }
@@ -228,6 +235,7 @@ final class AppModell {
 
     private func closeWebView() {
         guard let webView else { return }
+        empfang.beendeStandort()
         Webviewfabrik.close(webView)
         self.webView = nil
     }
