@@ -42,11 +42,14 @@ afterEach(() => {
   push.pushInhaltSetzen.mockReset().mockImplementation(async (_id: number, an: boolean) => an);
 });
 
-function zeige(aus: string[] | null = null) {
+function zeige(
+  aus: string[] | null = null,
+  benutzer: Partial<ReturnType<typeof benutzerFixture>> = {},
+) {
   const geschrieben: string[][] = [];
   let stand = aus === null ? {} : { benachrichtigungen_aus: JSON.stringify(aus) };
   server.use(
-    meHandler(benutzerFixture()),
+    meHandler(benutzerFixture(benutzer)),
     http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: stand })),
     http.put('/api/benutzer-einstellungen/benachrichtigungen_aus', async ({ request }) => {
       const { wert } = (await request.json()) as { wert: string };
@@ -108,6 +111,28 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     expect(
       within(hinweise).queryByRole('switch', { name: 'Unwetterwarnung' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('die Störungen einer Anbindung schalten nur Admins (LLH-2026)', async () => {
+    zeige();
+    const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
+    await within(hinweise).findAllByRole('switch');
+    expect(
+      within(hinweise).queryByRole('switch', { name: 'Anbindung gestört' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ein Admin schaltet auch die Störungen einer Anbindung', async () => {
+    zeige(null, { system_rolle: 'admin' });
+    const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
+    for (const name of [
+      'Anbindung braucht Eingriff',
+      'Anbindung gestört',
+      'Anbindung läuft wieder',
+    ]) {
+      expect(await within(hinweise).findByRole('switch', { name })).toBeChecked();
+    }
+    expect(within(hinweise).getAllByRole('switch')).toHaveLength(25);
   });
 
   it('zeigt die gespeicherten abgeschalteten Arten aus', async () => {

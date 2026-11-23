@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Randlos auf Kopf-Schwarz (Entwurf D6): Fenster und Startbildschirm in der Farbe der Marke,
+      helle Symbole in den Systemleisten. Die Insets legt die Activity an.
+    -->
+    <style name="Theme.Lifeline" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/kopf_schwarz</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

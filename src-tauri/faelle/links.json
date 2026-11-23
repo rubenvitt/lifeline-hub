@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Linkregeln (src-tauri/src/links.rs, ios/LifelineKern). „neues_fenster“ gilt für window.open und target=_blank, „navigation“ für das Wegnavigieren im Fenster. Ziele: huelle (läuft im Webview), nebenfenster (Desktop: weiteres Fenster; iOS: derselbe Webview), download, system, verwerfen. server null heißt: noch kein Server verbunden.",
+  "zweck": "Gemeinsame Fälle der Linkregeln (src-tauri/src/links.rs, ios/LifelineKern, android/kern). „neues_fenster“ gilt für window.open und target=_blank, „navigation“ für das Wegnavigieren im Fenster. Ziele: huelle (läuft im Webview), nebenfenster (Desktop: weiteres Fenster; iOS und Android: derselbe Webview), download, system, verwerfen. server null heißt: noch kein Server verbunden.",
   "neues_fenster": [
     {
       "beschreibung": "eine eigene Seite öffnet ein Nebenfenster",

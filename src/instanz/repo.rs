@@ -425,6 +425,9 @@ pub async fn create_org_zuordnung(
             "Diese Organisation ist mit dieser Instanz schon gekoppelt.".into(),
         ));
     }
+    if let Some(voll) = check_org_platz(conn, kopplung_id).await? {
+        return Err(voll);
+    }
     // Ein älterer, nie gemeldeter Widerruf derselben Zuordnung ist mit der neuen erledigt; er
     // ginge sonst mit der nächsten Meldung hinaus und träfe die neue.
     sqlx::query(
@@ -453,6 +456,29 @@ pub async fn create_org_zuordnung(
     // Vorhandene Akten der Org gehen an diese Kopplung (LLH-1491).
     crate::instanz::fuehrung::repo::renew_stand_der_org(conn, org_id).await?;
     Ok(id)
+}
+
+/// Hat die Kopplung noch Platz für eine Zuordnung? Eine Meldung nennt jede aktive Zuordnung und
+/// trägt höchstens [`ORGS_MAX`](super::melden::ORGS_MAX) Orgs; mit mehr würde sie dauerhaft
+/// abgelehnt (LLH-2019). Kürzen geht nicht: Die erreichte Seite ließe eine nie genannte Zuordnung
+/// verfallen (`discard_angebahnte`). `Some` ist die Abweisung (409, wie „schon gekoppelt“).
+pub async fn check_org_platz(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<Option<AppError>, AppError> {
+    let max = super::melden::ORGS_MAX;
+    let aktiv: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM instanz_kopplung_org WHERE kopplung_id = ? AND widerrufen_at IS NULL",
+    )
+    .bind(kopplung_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok((aktiv >= max as i64).then(|| {
+        AppError::Conflict(format!(
+            "Mit dieser Instanz sind schon {max} Organisationen gekoppelt, mehr trägt eine \
+             Kopplung nicht. Erst eine Zuordnung widerrufen."
+        ))
+    }))
 }
 
 /// Erreichte Seite: das Gegenüber hat die Zuordnung gemeldet.
@@ -1433,6 +1459,70 @@ mod tests {
                 .unwrap(),
             "geräumt"
         );
+    }
+
+    /// LLH-2019: Eine Meldung nennt jede aktive Zuordnung und darf höchstens `ORGS_MAX` Orgs
+    /// tragen. Eine Kopplung nimmt deshalb nicht mehr Zuordnungen an; widerrufene zählen nicht.
+    #[tokio::test]
+    async fn eine_kopplung_nimmt_hoechstens_orgs_max_aktive_zuordnungen() {
+        let pool = crate::db::test_pool().await;
+        kopplung(&pool, "hub", "meldet_sich", "aktiv").await;
+        let k: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let max = crate::instanz::melden::ORGS_MAX as i64;
+        for org in 1..=max + 1 {
+            sqlx::query("INSERT INTO organisation (id, name) VALUES (?, ?)")
+                .bind(org)
+                .bind(format!("Org {org}"))
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name, bestaetigt_at) \
+             SELECT ?, id, 'hub/' || id, 'Hub-Org', datetime('now') FROM organisation \
+             WHERE id <= ?",
+        )
+        .bind(k)
+        .bind(max)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let voll = create_org_zuordnung(
+            &mut conn,
+            k,
+            max + 1,
+            &format!("hub/{}", max + 1),
+            "Hub-Org",
+            None,
+            true,
+        )
+        .await;
+        assert!(
+            matches!(&voll, Err(AppError::Conflict(m)) if m.contains(&max.to_string())),
+            "{voll:?}"
+        );
+        sqlx::query(
+            "UPDATE instanz_kopplung_org SET widerrufen_at = datetime('now') WHERE org_id = 1",
+        )
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+        create_org_zuordnung(
+            &mut conn,
+            k,
+            max + 1,
+            &format!("hub/{}", max + 1),
+            "Hub-Org",
+            None,
+            true,
+        )
+        .await
+        .expect("nach einem Widerruf ist wieder Platz");
     }
 }
 

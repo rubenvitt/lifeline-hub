@@ -670,6 +670,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("personal_id", G_FK),
             retain("status_id", G_FK),
+            // Rücknahme eines Statuswechsels (LLH-1986): Benutzer-FK, Zeitpunkt, Vorzustand,
+            // Zeitachsen-Ereignis.
+            retain("status_gesetzt_von", G_FK),
+            retain("status_gesetzt_at", G_ZEIT),
+            retain("status_vorher_id", G_FK),
+            retain("status_ereignis_id", G_FK),
             retain("staerke_position", G_ENUM),
             // snap_name ist NOT NULL → Platzhalter.
             scrub("snap_name", Strategie::Platzhalter, Z_EINSATZ),
@@ -1130,6 +1136,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Auflösung (LLH-1079): Zeitpunkt und Benutzer-FK.
             retain("aufgeloest_at", G_ZEIT),
             retain("aufgeloest_von", G_FK),
+            // Rücknahme eines Handstatus (LLH-1986): Benutzer-FK, Zeitpunkt, Vorzustand samt
+            // „seit“, Zeitachsen-Ereignis.
+            retain("status_gesetzt_von", G_FK),
+            retain("status_gesetzt_at", G_ZEIT),
+            retain("status_vorher_id", G_FK),
+            retain("status_vorher_seit", G_ZEIT),
+            retain("status_ereignis_id", G_FK),
             // Kennzeichen „nicht übernommen“ und Herkunft „unangemeldet“ (LLH-1075, design.md D3):
             // Zeitpunkte, Benutzer-FK und die Meldung des Eintreffens.
             retain("uebernahme_offen_seit", G_ZEIT),
@@ -1242,6 +1255,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("menge", G_ZAEHLER),
             retain("status", G_ENUM),
+            // Rücknahme eines Statuswechsels (LLH-1986): Benutzer-FK, Zeitpunkt, Vorzustand.
+            retain("status_gesetzt_von", G_FK),
+            retain("status_gesetzt_at", G_ZEIT),
+            retain("status_vorher", G_ENUM),
             retain("snap_bezeichnung", G_OP_SNAP),
             retain("snap_kategorie", G_OP_SNAP),
             retain("snap_bestandsnummer", G_OP_SNAP),
@@ -3230,6 +3247,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             // Die auslösende Untereinheit eines geplanten Verbands (LLH-1509): wie `einheit_id`.
             retain("durch_einheit_id", G_FK),
+            // Der Adapter einer Störungsmeldung (LLH-2026, 0363): Org-Stammdatum statt Einsatz;
+            // solche Zeilen haben keine `einsatz_id` und fallen mit dem Adapter.
+            retain("adapter_id", G_FK),
         ],
     },
     // Vorgabe je Funktion (LLH-1421, design.md D2): Einsatz-Konfiguration, keine Person; fällt mit

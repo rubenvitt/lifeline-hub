@@ -3045,3 +3045,261 @@ async fn einheit_etb_eintraege_gehen_live_hinaus() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     etb.pruefe(&app, &admin, einsatz, "auflösen").await;
 }
+
+// ── Handstatus zurücknehmen (LLH-1986) ──────────────────────────────────────────────────────
+
+async fn handstatus_zuruecknehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    einheit: i64,
+    beleg: &serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/status/zuruecknehmen"),
+        cookie,
+        Some(&beleg.to_string()),
+    )
+    .await
+}
+
+/// Ereignisse der Einheit: (Art, gestrichen?).
+async fn einheit_ereignisse(pool: &sqlx::SqlitePool, einheit: i64) -> Vec<(String, bool)> {
+    sqlx::query_as::<_, (String, bool)>(
+        "SELECT art, gestrichen_at IS NOT NULL FROM einsatz_kraft_zeitachse \
+         WHERE einheit_id = ? ORDER BY id",
+    )
+    .bind(einheit)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Einheit ohne Fahrzeug auf S2 („seit“ fünf Minuten zurück), dann ein Wechsel auf S4 mit Marke
+/// `eintreffen`. Liefert (app, pool, admin, einsatz, einheit, s2, s4, Antwort des Wechsels).
+async fn handstatus_welt() -> (
+    axum::Router,
+    sqlx::SqlitePool,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    serde_json::Value,
+) {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Fachberater EVU").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    let s4 = status_id(&app, &admin, "4 – Am Einsatzort").await;
+    sqlx::query("UPDATE fahrzeug_status SET zeitachse_marke = 'eintreffen' WHERE id = ?")
+        .bind(s4)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query(
+        "UPDATE einsatz_einheit SET status_seit = datetime('now', '-5 minutes') WHERE id = ?",
+    )
+    .bind(e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, wechsel) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{wechsel}");
+    (app, pool, admin, einsatz, e, s2, s4, wechsel)
+}
+
+#[tokio::test]
+async fn handstatus_zuruecknehmen_stellt_status_und_seit_her_und_streicht_das_ereignis() {
+    let (app, pool, admin, einsatz, e, s2, s4, wechsel) = handstatus_welt().await;
+    let beleg = wechsel["status_ruecknahme"].clone();
+    assert_eq!(beleg["vorher_status_id"], s2, "{wechsel}");
+    assert_eq!(beleg["status_id"], s4);
+    assert!(beleg["gesetzt_at"].is_string(), "{beleg}");
+    assert_eq!(
+        wechsel["status"]["quelle"], "hand",
+        "die Anzeige steht flach in der Antwort"
+    );
+    let vorher_seit: String =
+        sqlx::query_scalar("SELECT status_vorher_seit FROM einsatz_einheit WHERE id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        einheit_ereignisse(&pool, e).await,
+        vec![("eintreffen".into(), false)]
+    );
+
+    let (s, json) = handstatus_zuruecknehmen(&app, &admin, einsatz, e, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status"]["status"]["status_id"], s2);
+    assert_eq!(json["status"]["seit"], vorher_seit);
+    assert_eq!(
+        einheit_ereignisse(&pool, e).await,
+        vec![("eintreffen".into(), true)]
+    );
+    let etb = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter().any(
+            |t| t.starts_with("Einheit «Fachberater EVU»: Statuswechsel «")
+                && t.ends_with("» zurückgenommen")
+        ),
+        "{etb:?}"
+    );
+    let (s, json) = handstatus_zuruecknehmen(&app, &admin, einsatz, e, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn handstatus_loeschen_ist_zuruecknehmbar() {
+    let (app, _pool, admin, einsatz, e, _s2, s4, _) = handstatus_welt().await;
+    let (s, geloescht) = hand_status(&app, &admin, einsatz, e, r#"{"status_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{geloescht}");
+    let beleg = geloescht["status_ruecknahme"].clone();
+    assert_eq!(beleg["vorher_status_id"], s4, "{geloescht}");
+    assert!(beleg["status_id"].is_null(), "{beleg}");
+    let (s, json) = handstatus_zuruecknehmen(&app, &admin, einsatz, e, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status"]["status"]["status_id"], s4);
+}
+
+#[tokio::test]
+async fn handstatus_rueckname_nach_fahrzeugzuordnung_409() {
+    let (app, pool, admin, einsatz, e, _s2, s4, wechsel) = handstatus_welt().await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, json) =
+        handstatus_zuruecknehmen(&app, &admin, einsatz, e, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        einheit_hand_status(&pool, e).await,
+        Some(s4),
+        "nichts geändert"
+    );
+}
+
+#[tokio::test]
+async fn handstatus_rueckname_zu_kein_status_gelingt_trotz_fahrzeug() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    let (s, wechsel) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, json) =
+        handstatus_zuruecknehmen(&app, &admin, einsatz, e, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(einheit_hand_status(&pool, e).await, None);
+}
+
+/// Der gespeicherte Handstatus, auch wenn Fahrzeuge führen.
+async fn einheit_hand_status(pool: &sqlx::SqlitePool, e: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT status_id FROM einsatz_einheit WHERE id = ?")
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn handstatus_andere_person_409() {
+    let (app, _pool, admin, einsatz, e, _s2, _s4, wechsel) = handstatus_welt().await;
+    let id = benutzer_anlegen(&app, &admin, "fritz", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "fuehrungspersonal").await;
+    let fritz = login_cookie(&app, "fritz", "fritzpw1").await;
+    let (s, json) =
+        handstatus_zuruecknehmen(&app, &fritz, einsatz, e, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn handstatus_nach_elf_minuten_409() {
+    let (app, pool, admin, einsatz, e, _s2, _s4, wechsel) = handstatus_welt().await;
+    let alt: String = sqlx::query_scalar(
+        "UPDATE einsatz_einheit SET status_gesetzt_at = datetime('now', '-11 minutes') \
+         WHERE id = ? RETURNING status_gesetzt_at",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["gesetzt_at"] = alt.into();
+    let (s, json) = handstatus_zuruecknehmen(&app, &admin, einsatz, e, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn aufgeloeste_einheit_rueckname_409() {
+    let (app, _pool, admin, einsatz, e, _s2, _s4, wechsel) = handstatus_welt().await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s}");
+    let (s, _) =
+        handstatus_zuruecknehmen(&app, &admin, einsatz, e, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+/// Löschen unter führenden Fahrzeugen ist nicht zurückzunehmen (die Rücknahme hätte einen
+/// Handstatus herzustellen): kein Beleg, also kein „Rückgängig“, das sicher scheitert.
+#[tokio::test]
+async fn handstatus_loeschen_unter_fahrzeugen_ohne_beleg() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, json) = hand_status(&app, &admin, einsatz, e, r#"{"status_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+}

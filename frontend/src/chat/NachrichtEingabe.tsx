@@ -84,8 +84,9 @@ export default function NachrichtEingabe({
       .map((f) => f.originFileObj as File | undefined)
       .filter((f): f is File => f !== undefined);
     if (!getrimmt && rohdateien.length === 0) return;
-    // Feld und Liste bleiben während des Sendens bedienbar (offline pausiert die Mutation, bis das
-    // Netz zurück ist). Nach dem Erfolg wird deshalb nur geleert, was gesendet wurde.
+    // Feld und Liste bleiben während des Sendens bedienbar. Nach dem Erfolg wird deshalb nur
+    // geleert, was gesendet wurde. Ohne Netz scheitert das Senden sofort, der Text bleibt stehen
+    // (Mutationen pausieren nie, LLH-1950).
     const gesendeterText = text;
     const gesendeteDateien = new Set(dateien.map((f) => f.uid));
     const gesendeteWahl = new Set(gewaehlt.filter((v) => erwaehnungenAusText(text, [v]).length));

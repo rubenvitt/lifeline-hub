@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Adressprüfung (src-tauri/src/adresse.rs, ios/LifelineKern). Beide Hüllen prüfen jeden Fall und zeigen die Meldungen wortgleich; Quelle der Regel bleibt die Desktop-Hülle.",
+  "zweck": "Gemeinsame Fälle der Adressprüfung (src-tauri/src/adresse.rs, ios/LifelineKern, android/kern). Alle drei Hüllen prüfen jeden Fall und zeigen die Meldungen wortgleich; Quelle der Regel bleibt die Desktop-Hülle.",
   "meldungen": {
     "leer": "Bitte die Adresse des Einsatzservers eingeben.",
     "unlesbar": "Das ist keine gültige Adresse. Beispiel: https://elw.local:8443",

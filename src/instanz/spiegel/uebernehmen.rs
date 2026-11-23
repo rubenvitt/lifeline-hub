@@ -6,7 +6,7 @@
 //! übernommen wurde; eine Lieferung ab 0 setzt ihn.
 
 use super::abbildung;
-use super::art::Schluessel;
+use super::art::{self, Schluessel};
 use super::katalog;
 use super::liefern::{quali_ersetzen, quali_ids};
 use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile};
@@ -14,6 +14,7 @@ use super::schema::{self, Tabelle, Ziel, SKIZZE_ELEMENTE};
 use super::{Freigabestufe, SpiegelKategorie};
 use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
+use crate::fuehrung::Fuehrungsfunktion;
 use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
 use sqlx::SqliteConnection;
@@ -232,7 +233,10 @@ async fn uebernehme_zeilen(
             if matches!(&z.daten, Some(Value::Object(d)) if katalog::ist_katalog_daten(&z.art, d)) {
                 continue;
             }
-            super::fuehrung::uebernimm_gegen(conn, id, &z.art, &z.schluessel, gegen).await?;
+            let Some(t) = schema.tabelle(&z.art) else {
+                continue;
+            };
+            super::fuehrung::uebernimm_gegen(conn, id, t, &z.schluessel, gegen).await?;
         }
     }
     let mut einsatz_id = vorhanden;
@@ -335,6 +339,7 @@ async fn uebernehme_zeilen(
                 }
                 Abgebildet::Fertig(mut werte, spaeter) => {
                     keep_mitarbeit(conn, t, e, &mut werte).await?;
+                    strip_funktion(conn, t, einsatz_id, &mut werte).await?;
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
@@ -479,15 +484,19 @@ async fn loeschen(
             .push((z.art.clone(), z.schluessel.clone()));
         return Ok(());
     };
-    sqlx::query(sqlx::AssertSqlSafe(format!(
-        "DELETE FROM {} WHERE {}",
+    // Nur die Zeile dieses Einsatzes: Eine veraltete Herkunft kann auf eine ID zeigen, die SQLite
+    // in einem anderen Einsatz neu vergeben hat (LLH-2029).
+    let geloescht = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM {} WHERE {} AND {} = ?",
         t.name,
-        t.schluessel.gleich(t.name)
+        t.schluessel.gleich(t.name),
+        art::einsatz_ausdruck(t.scoping, t.name)
     )))
     .bind(&lokal)
+    .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    if t.blob.is_some() {
+    if t.blob.is_some() && geloescht.rows_affected() > 0 {
         super::anhang::vergiss(conn, t.name, &lokal).await?;
     }
     sqlx::query(
@@ -548,7 +557,7 @@ async fn kopf_uebernehmen(
         if wechsel == Some(StatusWechsel::Wiedereroeffnet) {
             beende_zugaenge(conn, id).await?;
         }
-        update(conn, t.name, &werte, "id", &id.to_string()).await?;
+        update(conn, t.name, &werte, "id", &id.to_string(), None).await?;
         if wechsel == Some(StatusWechsel::Abgeschlossen) {
             beende_zugaenge(conn, id).await?;
         }
@@ -759,6 +768,65 @@ async fn keep_mitarbeit(
         }
     }
     Ok(())
+}
+
+/// Eine Mitgliedschaft außerhalb der Führung trägt keine Führungsfunktion (LLH-2064, Entwurf
+/// `docs/superpowers/specs/2026-11-22-u195f4et-funktion-nur-mit-schreibrecht-design.md` D4; CHECK
+/// aus 0363). Ein älteres Gegenüber kennt die Regel nicht und liefert etwa Beobachter + `s4`; die
+/// Zeile wird vor dem Schreiben nach `Funktionsangabe::as_freitext` zur Bezeichnung, sonst bliebe
+/// der Abgleich an ihr hängen. Der Spiegel weicht damit bewusst vom Gegenüber ab, wie bei
+/// [`keep_mitarbeit`]. Ob der Einsatz geschwärzt ist, gilt am lokalen Einsatz.
+pub(super) async fn strip_funktion(
+    conn: &mut SqliteConnection,
+    t: &Tabelle,
+    einsatz_id: i64,
+    werte: &mut [(String, Value)],
+) -> Result<(), AppError> {
+    if t.name != "einsatz_mitgliedschaft" || !hat_funktion_ausserhalb_der_fuehrung(werte) {
+        return Ok(());
+    }
+    let geschwaerzt: bool = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT geschwaerzt_at IS NOT NULL FROM einsatz WHERE id = ?), 0)",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    normalize_funktion(werte, geschwaerzt);
+    Ok(())
+}
+
+fn wert_str<'a>(werte: &'a [(String, Value)], name: &str) -> Option<&'a str> {
+    werte
+        .iter()
+        .find(|(s, _)| s == name)
+        .and_then(|(_, w)| w.as_str())
+}
+
+fn hat_funktion_ausserhalb_der_fuehrung(werte: &[(String, Value)]) -> bool {
+    let Some(rolle) = wert_str(werte, "einsatz_rolle").and_then(EinsatzRolle::parse) else {
+        return false;
+    };
+    !rolle.gehoert_zur_fuehrung() && wert_str(werte, "fuehrungsfunktion").is_some()
+}
+
+/// Der reine Teil von [`strip_funktion`]: Code weg, Angabe als Freitext. Ohne Rollenspalte oder
+/// mit einer Rolle der Führung bleibt `werte` unverändert.
+pub(super) fn normalize_funktion(werte: &mut [(String, Value)], geschwaerzt: bool) {
+    if !hat_funktion_ausserhalb_der_fuehrung(werte) {
+        return;
+    }
+    let angabe = crate::fuehrung::Funktionsangabe {
+        funktion: wert_str(werte, "fuehrungsfunktion").and_then(Fuehrungsfunktion::parse),
+        text: wert_str(werte, "fuehrungsstelle").map(str::to_string),
+    }
+    .as_freitext(geschwaerzt);
+    for (s, w) in werte.iter_mut() {
+        match s.as_str() {
+            "fuehrungsfunktion" => *w = Value::Null,
+            "fuehrungsstelle" => *w = angabe.text.clone().map_or(Value::Null, Value::from),
+            _ => {}
+        }
+    }
 }
 
 /// Lokaler Schlüssel der Zeile `fremd` in `ziel` (der Einsatz selbst ist immer bekannt).
@@ -1054,17 +1122,20 @@ async fn zeile_schreiben_innen(
     werte: &[(String, Value)],
 ) -> Result<String, AppError> {
     let bekannt = abbildung::einsatz_lokal(conn, einsatz_id, t.name, fremd).await?;
+    // Nur eine Zeile dieses Einsatzes: Eine veraltete Herkunft kann auf eine ID zeigen, die SQLite
+    // in einem anderen Einsatz neu vergeben hat (LLH-2029).
+    let einsatz = Some((art::einsatz_ausdruck(t.scoping, t.name), einsatz_id));
     let lokal = match &t.schluessel {
         Schluessel::Spalte(pk) if pk == "id" => {
             let ohne_id: Vec<(String, Value)> =
                 werte.iter().filter(|(s, _)| s != "id").cloned().collect();
             match bekannt {
-                Some(l) if update(conn, t.name, &ohne_id, "id", &l).await? > 0 => l,
+                Some(l) if update(conn, t.name, &ohne_id, "id", &l, einsatz).await? > 0 => l,
                 _ => insert_mit_blob(conn, t, &ohne_id).await?.to_string(),
             }
         }
         Schluessel::Rowid => match bekannt {
-            Some(l) if update(conn, t.name, werte, "rowid", &l).await? > 0 => l,
+            Some(l) if update(conn, t.name, werte, "rowid", &l, einsatz).await? > 0 => l,
             _ => insert_mit_blob(conn, t, werte).await?.to_string(),
         },
         Schluessel::Spalte(pk) => upsert(conn, t, werte, std::slice::from_ref(pk)).await?,
@@ -1165,23 +1236,32 @@ async fn update(
     werte: &[(String, Value)],
     schluessel_spalte: &str,
     lokal: &str,
+    einsatz: Option<(String, i64)>,
 ) -> Result<u64, AppError> {
+    let mut wo = format!("{schluessel_spalte} = ?");
+    if let Some((ausdruck, _)) = &einsatz {
+        wo.push_str(&format!(" AND {ausdruck} = ?"));
+    }
     if werte.is_empty() {
-        return Ok(1);
+        // Nichts zu ändern; ob die Zeile hier besteht, entscheidet trotzdem über die Zuordnung.
+        let sql = format!("SELECT COUNT(*) FROM {tabelle} WHERE {wo}");
+        let mut q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql)).bind(lokal.to_string());
+        if let Some((_, id)) = einsatz {
+            q = q.bind(id);
+        }
+        return Ok(q.fetch_one(&mut *conn).await? as u64);
     }
     let setzen: Vec<String> = werte.iter().map(|(s, _)| format!("\"{s}\" = ?")).collect();
-    let sql = format!(
-        "UPDATE {tabelle} SET {} WHERE {schluessel_spalte} = ?",
-        setzen.join(", ")
-    );
+    let sql = format!("UPDATE {tabelle} SET {} WHERE {wo}", setzen.join(", "));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql));
     for (_, w) in werte {
         q = binde(q, w);
     }
-    Ok(q.bind(lokal.to_string())
-        .execute(&mut *conn)
-        .await?
-        .rows_affected())
+    q = q.bind(lokal.to_string());
+    if let Some((_, id)) = einsatz {
+        q = q.bind(id);
+    }
+    Ok(q.execute(&mut *conn).await?.rows_affected())
 }
 
 /// Zeile mit Primärschlüssel aus abgebildeten Spalten: anlegen oder ändern.

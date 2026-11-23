@@ -47,7 +47,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `Wurzel::Einheit`): `einheiten` = nur die eigene, `abschnitte` leer, deshalb sieht das Gerät
   nur Aufträge mit der Einheit selbst als Empfänger, nie die ihres Abschnitts (F4). Handstatus
   nur der eigenen Einheit (`fordere_einheit`, fremde 404), Löschen 403, mit Fahrzeug 422 wie
-  überall (F8). Meldungsabsender fest die eigene Einheit; nur dieses Gerät darf einen Ort an jede
+  überall (F8). Den eigenen Wechsel nimmt das Gerät mit der Quittung zurück (LLH-1986, Regel
+  `kraefte/AGENTS.md`, „Quittung und Rücknahme eines Statuswechsels“), auch wenn das „kein
+  Status“ herstellt: es macht den Fehlgriff ungeschehen und entscheidet nichts Neues. Meldungsabsender fest die eigene Einheit; nur dieses Gerät darf einen Ort an jede
   Art Meldung hängen (F9, `routes/meldung.rs`), die Karte zeigt ihn als Kartensprung
   (`MeldungKarte`). Kein `zonen`, keine `abschnitte`, keine `befehle`: Startseite ist
   `GeraetAuftraegePage` (ohne Abschnitte und Befehle), dazu `GeraetStatusPage` (Flächen aus dem
@@ -172,7 +174,10 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Antwort: Zahlen aus den Zählfunktionen des Modulzählers, überfällige Rückmeldungen nur mit dem
   Namen der Einheit, kritische Abschnitte nur mit ihrer Bezeichnung, nie Meldungs-, Auftrags- oder
   Erinnerungstexte; den Ausfall nur mit den Namen der Einheiten (`einsatz::ausfall`, LLH-1929;
-  Bindung an den Browser: `frontend/AGENTS.md`, „Eine Heimat je Zahl“). Nur der
+  Bindung an den Browser: `frontend/AGENTS.md`, „Eine Heimat je Zahl“). Quellen aus Modulen, die
+  im Einsatz ausgeblendet sind (wirksame Sichtbarkeit, keine Rollenschranke), liest der Server
+  nicht; er nennt sie in `alarm.ausgeblendet`, und `alarmAusMonitor` meldet sie als `gesperrt`,
+  damit Monitor und Überblick dasselbe zeigen (LLH-1964, Zuordnung in `AlarmQuelle`). Nur der
   Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Eine
   Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
   (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse

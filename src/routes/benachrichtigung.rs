@@ -19,6 +19,7 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
+use crate::benachrichtigung;
 use crate::benachrichtigung::aufloesung::Leserecht;
 use crate::benachrichtigung::repo::{self, Zeile};
 use crate::benachrichtigung::vorgabe::{
@@ -55,6 +56,7 @@ async fn anzeige(
     pool: &SqlitePool,
     recht: &Leserecht,
     benutzer: &Benutzer,
+    einsatz_id: i64,
     z: Zeile,
 ) -> Result<Option<BenachrichtigungAnzeige>, AppError> {
     if !recht.darf(benutzer, z.bezug_typ.modul()) {
@@ -62,7 +64,7 @@ async fn anzeige(
     }
     let t = text::bilden_mit_einheit(
         pool,
-        z.einsatz_id,
+        einsatz_id,
         z.art,
         Bezug::neu(z.bezug_typ, z.bezug_id),
         text::HinweisEinheiten {
@@ -74,6 +76,35 @@ async fn anzeige(
     Ok(Some(BenachrichtigungAnzeige {
         id: z.id,
         einsatz_id: z.einsatz_id,
+        art: z.art,
+        stufe: z.stufe,
+        bezug_typ: z.bezug_typ,
+        bezug_id: z.bezug_id,
+        erstellt_at: z.erstellt_at,
+        quittiert_at: z.quittiert_at,
+        titel: t.titel,
+        detail: t.detail,
+        pfad: t.pfad,
+    }))
+}
+
+/// Die Anzeige einer Zeile am Adapter (LLH-2026), wenn `benutzer` noch System-Admin seiner Org
+/// ist und es den Adapter noch gibt; sonst `None`.
+async fn adapter_anzeige(
+    pool: &SqlitePool,
+    benutzer: &Benutzer,
+    adapter_id: &str,
+    z: Zeile,
+) -> Result<Option<BenachrichtigungAnzeige>, AppError> {
+    if !benachrichtigung::adapter::darf_lesen(pool, benutzer, adapter_id).await? {
+        return Ok(None);
+    }
+    let Some(t) = benachrichtigung::adapter::text(pool, z.art, adapter_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some(BenachrichtigungAnzeige {
+        id: z.id,
+        einsatz_id: None,
         art: z.art,
         stufe: z.stufe,
         bezug_typ: z.bezug_typ,
@@ -113,13 +144,21 @@ pub async fn liste(
     let mut rechte: HashMap<i64, Option<Leserecht>> = HashMap::new();
     let mut aus = Vec::with_capacity(zeilen.len());
     for z in zeilen {
-        if !rechte.contains_key(&z.einsatz_id) {
-            rechte.insert(z.einsatz_id, leserecht(&state.pool, z.einsatz_id).await?);
-        }
-        let Some(Some(recht)) = rechte.get(&z.einsatz_id) else {
+        let Some(einsatz_id) = z.einsatz_id else {
+            if let Some(adapter_id) = z.adapter_id.clone() {
+                if let Some(a) = adapter_anzeige(&state.pool, &benutzer, &adapter_id, z).await? {
+                    aus.push(a);
+                }
+            }
             continue;
         };
-        if let Some(a) = anzeige(&state.pool, recht, &benutzer, z).await? {
+        if !rechte.contains_key(&einsatz_id) {
+            rechte.insert(einsatz_id, leserecht(&state.pool, einsatz_id).await?);
+        }
+        let Some(Some(recht)) = rechte.get(&einsatz_id) else {
+            continue;
+        };
+        if let Some(a) = anzeige(&state.pool, recht, &benutzer, einsatz_id, z).await? {
             aus.push(a);
         }
     }
@@ -136,10 +175,17 @@ pub async fn lesen(
     let z = repo::laden_eigene(&state.pool, id, benutzer.id)
         .await?
         .ok_or(AppError::NotFound)?;
-    let recht = leserecht(&state.pool, z.einsatz_id)
+    let Some(einsatz_id) = z.einsatz_id else {
+        let adapter_id = z.adapter_id.clone().ok_or(AppError::NotFound)?;
+        return adapter_anzeige(&state.pool, &benutzer, &adapter_id, z)
+            .await?
+            .map(Json)
+            .ok_or(AppError::NotFound);
+    };
+    let recht = leserecht(&state.pool, einsatz_id)
         .await?
         .ok_or(AppError::NotFound)?;
-    anzeige(&state.pool, &recht, &benutzer, z)
+    anzeige(&state.pool, &recht, &benutzer, einsatz_id, z)
         .await?
         .map(Json)
         .ok_or(AppError::NotFound)
@@ -164,10 +210,18 @@ pub async fn quittieren(
         .ok_or(AppError::NotFound)?;
     if jetzt_quittiert {
         if let Some(z) = repo::laden_eigene(&state.pool, id, benutzer.id).await? {
-            let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
-                .bind(z.einsatz_id)
-                .fetch_optional(&state.pool)
-                .await?;
+            let org_id: Option<i64> = match (&z.einsatz_id, &z.adapter_id) {
+                (Some(einsatz_id), _) => {
+                    sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+                        .bind(einsatz_id)
+                        .fetch_optional(&state.pool)
+                        .await?
+                }
+                (None, Some(adapter_id)) => {
+                    benachrichtigung::adapter::org_von(&state.pool, adapter_id).await?
+                }
+                (None, None) => None,
+            };
             if let Some(org_id) = org_id {
                 crate::benachrichtigung::zustellen(
                     &state.live,
@@ -208,7 +262,7 @@ pub async fn verlauf(
     if !zeilen.is_empty() {
         let recht = Leserecht::laden(&state.pool, ctx.einsatz.id).await?;
         for z in zeilen {
-            if let Some(a) = anzeige(&state.pool, &recht, &ctx.benutzer, z).await? {
+            if let Some(a) = anzeige(&state.pool, &recht, &ctx.benutzer, ctx.einsatz.id, z).await? {
                 eintraege.push(a);
             }
         }

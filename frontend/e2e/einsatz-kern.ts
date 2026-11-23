@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 
 /**
  * Einsatz über die Oberfläche anlegen (LFH-1114) — Muster `rollen-kern.ts`: wer den Dialog
@@ -16,9 +17,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 export async function einsatzDialogOeffnen(page: Page): Promise<Locator> {
   // eslint-disable-next-line no-restricted-syntax -- die eine Stelle, die den Dialog öffnet
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Neuen Einsatz anlegen' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Neuen Einsatz anlegen');
   // Die Vorbelegung ist Pflichtfeld: fehlte sie, hielte die Formularprüfung das Abschicken still
   // auf. So meldet sich dieser Fall hier mit Namen statt als offener Dialog nach dem Klick.
   await expect(dialog.getByLabel('Alarmzeit'), 'Vorbedingung: Alarmzeit vorbelegt').not.toHaveValue(

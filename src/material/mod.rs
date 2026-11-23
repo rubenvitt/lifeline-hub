@@ -89,7 +89,7 @@ pub struct MaterialAnzeige {
 wire_enum! {
     /// Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
     /// Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
     pub enum MaterialStatus {
         Einsatzbereit => "einsatzbereit",
         ImEinsatz => "im_einsatz",
@@ -508,6 +508,44 @@ pub fn etb_text_ort_gewechselt(
     nachher: &str,
 ) -> String {
     format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
+}
+
+/// Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
+/// PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+/// Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct MaterialStatusRuecknahmeBeleg {
+    /// Status vor dem Wechsel, nur für die Quittung.
+    #[serde(default)]
+    pub vorher_status: Option<MaterialStatus>,
+    /// Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht.
+    pub status: MaterialStatus,
+    /// Zeitpunkt des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt.
+    pub gesetzt_at: String,
+}
+
+/// Antwort des PATCH einer Materialzeile: die Zeile wie bisher, dazu der Beleg für „Rückgängig“,
+/// wenn der Status gewechselt hat (LLH-1986).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MaterialPatchAntwort {
+    #[serde(flatten)]
+    pub material: EinsatzMaterialAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_ruecknahme: Option<MaterialStatusRuecknahmeBeleg>,
+}
+
+/// System-ETB der Rücknahme eines Statuswechsels (LLH-1986): `alt` ist der wiederhergestellte,
+/// `neu` der zurückgenommene Status.
+pub fn etb_text_statuswechsel_zurueckgenommen(
+    bezeichnung: &str,
+    alt: MaterialStatus,
+    neu: MaterialStatus,
+) -> String {
+    format!(
+        "Material «{bezeichnung}»: Statuswechsel «{}» → «{}» zurückgenommen",
+        alt.label(),
+        neu.label()
+    )
 }
 
 /// System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
