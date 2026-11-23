@@ -59,7 +59,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`; **Mono trägt nur
   Zahl, Zeit, Kennung und Funkrufname**, ein Wort oder ein gemischter Knoten („seit 14:32“, „3
-  offen“) steht in der Textschrift (LLH-2046, ADR-0093). Die Dichte-Staffel
+  offen“) steht in der Textschrift (LLH-2046, ADR-0094). Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
   Mono-Stufe `mono`. `meta` (11) steht in der Textschrift mit gleich breiten Ziffern
@@ -68,7 +68,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   einer Variablen (LLH-1972). **Boden 11 px**
   (`SCHRIFT_BODEN`, LLH-2044): keine Stufe darunter, Augenbraue und Rail-Etikett 11, Seitentitel
   16/600; darunter bleiben nur Druck, Zeichnungen mit eigenem Maßstab und der Lagemonitor
-  (ADR-0093). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
+  (ADR-0094). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
   `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
   Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven

@@ -877,7 +877,7 @@ export const schriftskala = {
 export type Schriftstufenname = keyof typeof schriftskala;
 
 /**
- * Schriftboden in px (LLH-2044, ADR-0093): keine Stufe der `schriftskala` liegt darunter. Ausnahmen
+ * Schriftboden in px (LLH-2044, ADR-0094): keine Stufe der `schriftskala` liegt darunter. Ausnahmen
  * stehen nicht in der Skala, sondern als Nicht-Ziele im Entwurf: Druck (pt), Zeichnungen mit
  * eigenem Maßstab (Kartenstile, taktische Zeichen, Fernmeldeskizze, Lagekarten-Griffe und
  * Cluster) und die Fernsicht des Lagemonitors.

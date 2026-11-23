@@ -4,7 +4,7 @@ import { schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Feldetikett — benennt ein Feld (LLH-2045, Regel `frontend/AGENTS.md`, „Gestaltungssprache“,
- * Bausteine): Stufe `textKlein` (12 px, fest wie jede Stufe, ADR-0093), Ton `gedaempft`, gemischt
+ * Bausteine): Stufe `textKlein` (12 px, fest wie jede Stufe, ADR-0094), Ton `gedaempft`, gemischt
  * geschrieben, ohne Sperrung.
  *
  * UMGEKEHRT 22.11.2026 gegenüber dem Neuentwurf: dort trug die Augenbraue (10 px, Versalien,

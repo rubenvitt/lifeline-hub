@@ -1,5 +1,5 @@
 ---
-id: ADR-0093
+id: ADR-0094
 titel: Mono trägt nur Zahl, Zeit, Kennung und Funkrufname; meta steht in der Textschrift
 status: akzeptiert
 datum: 2026-11-23
@@ -21,7 +21,7 @@ herleitung:
   - Zunder LLH-2046 (Mono-Grenze allgemein, abgestimmt mit Ruben am 22.11.2026)
 ---
 
-# ADR-0093: Mono trägt nur Zahl, Zeit, Kennung und Funkrufname; meta steht in der Textschrift
+# ADR-0094: Mono trägt nur Zahl, Zeit, Kennung und Funkrufname; meta steht in der Textschrift
 
 ## Regeln
 
