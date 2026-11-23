@@ -245,7 +245,7 @@ pub fn erfolg(ip: IpAddr, benutzername: &str) {
     tabelle().erfolg(ip, konto(benutzername));
 }
 
-/// Zähler für Maschinen (Maschinenzugang, ADR-0022): eine eigene Tabelle mit denselben Regeln
+/// Zähler für Maschinen (Maschinenzugang, ADR-0096): eine eigene Tabelle mit denselben Regeln
 /// wie die Anmeldesperre, aber ohne Konto. Er zählt nur unbekannte Zugänge und gescheiterte
 /// Einlösungen, nie eine falsche Uhr oder Signatur eines bekannten Zugangs. Sonst sperrte ein Gerät
 /// mit falscher Uhr die ganze Wache hinter derselben NAT-Adresse aus. Er berührt die

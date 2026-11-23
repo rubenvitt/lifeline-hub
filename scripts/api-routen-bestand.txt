@@ -376,7 +376,6 @@
 /api/etb-bausteine
 /api/etb-bausteine/{id}
 /api/etb-bausteine/{id}/deaktivieren
-/api/extern/v1/lagebild
 /api/externe-stellen
 /api/externe-stellen/{id}
 /api/fahrzeug-status
@@ -414,14 +413,5 @@
 /api/stichwort-vorschlaege/{id}
 /api/stichwort-vorschlaege/{id}/vorlage
 /api/unterkunft-richtwerte
-/api/v1/einsaetze
-/api/v1/einsaetze/{id}
-/api/v1/einwurf/{schluessel}/alarmmeldung
-/api/v1/einwurf/{schluessel}/position
-/api/v1/instanz/jwks.json
-/api/v1/lage
-/api/v1/rechner/unterkunft
-/api/v1/rechner/unterkunft/richtwerte
-/api/v1/zugang/redeem
 /api/verpflegung-vorlagen
 /api/verpflegung-vorlagen/{vid}

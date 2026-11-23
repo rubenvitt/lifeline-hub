@@ -1,6 +1,6 @@
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! Verwaltung unter `/api/admin/intake-credentials` und die Einwurf-Routen unter
-//! `/api/v1/einwurf/{schluessel}/…`, durch den ganzen Router.
+//! `/api/v1/intake/{schluessel}/…`, durch den ganzen Router.
 //!
 //! Der Zähler für Maschinen und die Drossel gelten prozessweit; jeder Test, der sie berührt,
 //! nimmt eine eigene Quelladresse bzw. einen eigenen Zugang.
@@ -123,7 +123,7 @@ async fn sende(app: &axum::Router, pfad: &str, e: Einwurf<'_>) -> Antwort {
 async fn einwerfen(app: &axum::Router, schluessel: &str, rest: &str) -> Antwort {
     sende(
         app,
-        &format!("/api/v1/einwurf/{schluessel}/{rest}"),
+        &format!("/api/v1/intake/{schluessel}/{rest}"),
         Einwurf::default(),
     )
     .await
@@ -310,7 +310,7 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
     let (app, pool, admin) = setup().await;
     let (id, alt) = zugang(&app, &admin, "FE2", "alarmmeldungen:write").await;
     assert_eq!(
-        einwerfen(&app, &alt, "alarmmeldung?text=a").await.status,
+        einwerfen(&app, &alt, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -323,11 +323,11 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
     assert!(v["zugang"]["schluessel_gewechselt_at"].is_string());
 
     assert_eq!(
-        einwerfen(&app, &alt, "alarmmeldung?text=b").await.status,
+        einwerfen(&app, &alt, "alarm?text=b").await.status,
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(
-        einwerfen(&app, &neu, "alarmmeldung?text=b").await.status,
+        einwerfen(&app, &neu, "alarm?text=b").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -343,9 +343,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     let (app, pool, admin) = setup().await;
     let (id, schluessel) = zugang(&app, &admin, "Divera", "alarmmeldungen:write").await;
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -355,7 +353,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     assert!(v["widerrufen_at"].is_string());
     assert_eq!(v["widerrufen_von_name"], "Administrator");
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=b").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=b").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     assert_eq!(antwort.code(), "unauthorized");
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 1, "nichts gespeichert");
@@ -400,7 +398,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 0);
 
@@ -424,7 +422,7 @@ async fn direktkopplung_vor_ort_sperrt_keine_einwuerfe() {
     let (id, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     org_koppeln(&pool, "vor_ort").await;
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::NO_CONTENT);
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 1);
 
@@ -454,7 +452,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
     let antwort = einwerfen(
         &app,
         &schluessel,
-        "alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung",
+        "alarm?ric=1234567&subric=a&text=B2%20Wohnung",
     )
     .await;
     assert_eq!(antwort.status, StatusCode::NO_CONTENT);
@@ -486,7 +484,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
     let wieder = einwerfen(
         &app,
         &schluessel,
-        "alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung",
+        "alarm?ric=1234567&subric=a&text=B2%20Wohnung",
     )
     .await;
     assert_eq!(wieder.status, StatusCode::NO_CONTENT);
@@ -510,7 +508,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
 async fn post_wird_in_jedem_format_roh_abgelegt() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "Divera", "alarmmeldungen:write").await;
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm");
     let json_body = r#"{"external_id": "LS-1", "stichwort": "RD 2"}"#;
     for (typ, body) in [
         ("application/json", json_body.as_bytes().to_vec()),
@@ -551,7 +549,7 @@ async fn post_wird_in_jedem_format_roh_abgelegt() {
 async fn leerer_und_zu_grosser_einwurf_werden_abgelehnt() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm");
 
     let leer = sende(&app, &pfad, Einwurf::default()).await;
     assert_eq!(leer.status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -612,7 +610,7 @@ async fn unbekannter_und_abgelaufener_schluessel_sind_401() {
 
     let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
     for falsch in [unbekannt.as_str(), "llh_ew_kurz", "irgendwas"] {
-        let antwort = einwerfen(&app, falsch, "alarmmeldung?text=a").await;
+        let antwort = einwerfen(&app, falsch, "alarm?text=a").await;
         assert_eq!(antwort.status, StatusCode::UNAUTHORIZED, "{falsch}");
         assert_eq!(antwort.code(), "unauthorized");
         assert!(
@@ -626,7 +624,7 @@ async fn unbekannter_und_abgelaufener_schluessel_sind_401() {
         .execute(&pool)
         .await
         .unwrap();
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["zugaenge"][0]["is_abgelaufen"], true);
@@ -642,7 +640,7 @@ async fn ein_zugang_schreibt_nur_fuer_seinen_zweck() {
     let antwort = einwerfen(&app, &alarm, "position?id=a&lat=1&lon=2").await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "missing_scope");
-    let antwort = einwerfen(&app, &ortung, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &ortung, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "missing_scope");
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 0);
@@ -653,14 +651,14 @@ async fn ein_zugang_schreibt_nur_fuer_seinen_zweck() {
 async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
-    einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    einwerfen(&app, &schluessel, "alarm?text=a").await;
 
     for pfad in [
-        format!("/api/v1/einwurf/{schluessel}"),
-        format!("/api/v1/einwurf/{schluessel}/"),
-        format!("/api/v1/einwurf/{schluessel}/alarmmeldungen"),
-        format!("/api/v1/einwurf/{schluessel}/alarmmeldung/1"),
-        "/api/v1/einwurf".to_string(),
+        format!("/api/v1/intake/{schluessel}"),
+        format!("/api/v1/intake/{schluessel}/"),
+        format!("/api/v1/intake/{schluessel}/alarms"),
+        format!("/api/v1/intake/{schluessel}/alarm/1"),
+        "/api/v1/intake".to_string(),
     ] {
         let antwort = sende(&app, &pfad, Einwurf::default()).await;
         assert_eq!(antwort.status, StatusCode::NOT_FOUND, "{pfad}");
@@ -669,7 +667,7 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     let vorher = anzahl(&pool, "alarmmeldung").await;
     let kopf = sende(
         &app,
-        &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=per-head"),
+        &format!("/api/v1/intake/{schluessel}/alarm?text=per-head"),
         Einwurf {
             methode: "HEAD",
             ..Default::default()
@@ -686,7 +684,7 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     for methode in ["DELETE", "PUT", "PATCH"] {
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{schluessel}/alarmmeldung"),
+            &format!("/api/v1/intake/{schluessel}/alarm"),
             Einwurf {
                 methode,
                 ..Default::default()
@@ -741,7 +739,7 @@ async fn ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403() {
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["transport"], "keiner");
 
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm?text=a");
     let antwort = sende(&app, &pfad, Einwurf::default()).await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "tls_required");
@@ -768,7 +766,7 @@ async fn ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403() {
         let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{unbekannt}/alarmmeldung?text=a"),
+            &format!("/api/v1/intake/{unbekannt}/alarm?text=a"),
             Einwurf {
                 quelle: Some("198.51.100.202:4000"),
                 ..Default::default()
@@ -796,9 +794,7 @@ async fn mit_eigenem_tls_wird_der_einwurf_angenommen() {
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["transport"], "tls");
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
@@ -815,12 +811,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
     // durch. Die genaue Zahl prüft der Unit-Test in `drossel.rs` mit eingespeister Zeit.
     let mut angenommen: i64 = 0;
     let gedrosselt = loop {
-        let antwort = einwerfen(
-            &app,
-            &schluessel,
-            &format!("alarmmeldung?text={angenommen}"),
-        )
-        .await;
+        let antwort = einwerfen(&app, &schluessel, &format!("alarm?text={angenommen}")).await;
         if antwort.status == StatusCode::TOO_MANY_REQUESTS {
             break antwort;
         }
@@ -843,9 +834,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
     );
     // Je Zugang getrennt.
     assert_eq!(
-        einwerfen(&app, &anderer, "alarmmeldung?text=a")
-            .await
-            .status,
+        einwerfen(&app, &anderer, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
@@ -871,11 +860,11 @@ async fn zehn_unbekannte_schluessel_sperren_die_quelle_nur_auf_den_maschinenwege
     };
     for _ in 0..10 {
         let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
-        let antwort = von(format!("/api/v1/einwurf/{unbekannt}/alarmmeldung?text=a")).await;
+        let antwort = von(format!("/api/v1/intake/{unbekannt}/alarm?text=a")).await;
         assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     }
     // Auch mit gültigem Schlüssel ist die Quelle jetzt gesperrt.
-    let antwort = von(format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a")).await;
+    let antwort = von(format!("/api/v1/intake/{schluessel}/alarm?text=a")).await;
     assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(antwort.code(), "rate_limited");
     assert!(antwort.headers.contains_key(header::RETRY_AFTER));
@@ -884,9 +873,7 @@ async fn zehn_unbekannte_schluessel_sperren_die_quelle_nur_auf_den_maschinenwege
     assert!(!lifeline_hub::auth::rate_limit::ist_gesperrt(ip));
     // Eine andere Quelle ist nicht betroffen.
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
-            .await
-            .status,
+        einwerfen(&app, &schluessel, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 }
@@ -901,7 +888,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     for _ in 0..12 {
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{alt}/alarmmeldung?text=a"),
+            &format!("/api/v1/intake/{alt}/alarm?text=a"),
             Einwurf {
                 quelle: Some(quelle),
                 ..Default::default()
@@ -913,7 +900,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     // Derselbe Absender hinter derselben Adresse mit dem neuen Schlüssel: geht.
     let antwort = sende(
         &app,
-        &format!("/api/v1/einwurf/{gueltig}/alarmmeldung?text=a"),
+        &format!("/api/v1/intake/{gueltig}/alarm?text=a"),
         Einwurf {
             quelle: Some(quelle),
             ..Default::default()
@@ -938,7 +925,7 @@ async fn abgeloeste_schluessel_zaehlen_nicht_im_maschinenzaehler() {
         async move {
             sende(
                 &app,
-                &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a"),
+                &format!("/api/v1/intake/{schluessel}/alarm?text=a"),
                 Einwurf {
                     quelle: Some(quelle),
                     ..Default::default()
@@ -1012,7 +999,7 @@ async fn tagesgrenze_der_ablage_ergibt_429() {
         .await
         .unwrap();
     for abfrage in ["text=zu-viel", "text=schon-da"] {
-        let antwort = einwerfen(&app, &schluessel, &format!("alarmmeldung?{abfrage}")).await;
+        let antwort = einwerfen(&app, &schluessel, &format!("alarm?{abfrage}")).await;
         assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS, "{abfrage}");
         assert_eq!(antwort.headers[header::RETRY_AFTER], "3600");
     }
@@ -1073,7 +1060,7 @@ async fn position_haengt_an_der_kennung_und_ersetzt_ohne_verlauf() {
     // POST mit Formular und eine zweite Kennung.
     let antwort = sende(
         &app,
-        &format!("/api/v1/einwurf/{schluessel}/position"),
+        &format!("/api/v1/intake/{schluessel}/position"),
         Einwurf {
             methode: "POST",
             body: Some((
@@ -1155,8 +1142,8 @@ async fn purge_lauf_loescht_die_ablage_nach_frist() {
     let (app, pool, admin) = setup().await;
     let (_, alarm) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     let (_, ortung) = zugang(&app, &admin, "OsmAnd", "positionen:write").await;
-    einwerfen(&app, &alarm, "alarmmeldung?text=alt").await;
-    einwerfen(&app, &alarm, "alarmmeldung?text=jung").await;
+    einwerfen(&app, &alarm, "alarm?text=alt").await;
+    einwerfen(&app, &alarm, "alarm?text=jung").await;
     einwerfen(&app, &ortung, "position?id=alt&lat=1&lon=2").await;
     einwerfen(&app, &ortung, "position?id=jung&lat=1&lon=2").await;
     sqlx::query(

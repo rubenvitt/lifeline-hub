@@ -69,7 +69,8 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
 - **Unveränderlich, sobald `akzeptiert`:** Regeln und Kontext ändern sich nicht mehr. Eine
   Abkehr ist eine neue ADR mit `ersetzt: ADR-…`; die alte bekommt `status: ersetzt` und
   `ersetzt_durch`. Erlaubt bleiben Pfadnachzüge in `gilt_fuer` und in der Prüfung nach einem
-  Verschieben sowie tote Links.
+  Verschieben, tote Links und der neue Name einer nach ADR-0085 umbenannten API-Route, auch im
+  Text einer Regel (Entscheidung Ruben 23.11.2026, LLH-2054).
 - **Nummer:** die nächste freie auf dem Ziel-Branch, vorher `git fetch origin alpha` und einen
   Blick auf offene PRs (`scripts/adr-fuer.sh --alle` zeigt den eigenen Stand). Durchgesetzt
   über den Commit-Status `ADR-Nummern` (`scripts/check-adr-nummern.sh`,

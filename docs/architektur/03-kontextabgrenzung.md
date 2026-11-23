@@ -67,7 +67,7 @@ flowchart LR
   ios -. "Verbindung des Systems,<br/>Zustellung der Pushes" .-> apns
   geraet -- "HTTP(S), REST + SSE" --> hub
   maschine -- "HTTP(S) /api/v1,<br/>Authorization: Machine" --> hub
-  absender -- "HTTPS /api/v1/einwurf,<br/>Schlüssel im Pfad, nur schreibend" --> hub
+  absender -- "HTTPS /api/v1/intake,<br/>Schlüssel im Pfad, nur schreibend" --> hub
   browser -. "Redirect zur Anmeldung" .-> idp
   browser -. "Tiles direkt (Quelle ohne Proxy)" .-> online
   huelle -- "Updater: latest.json" --> gh
@@ -102,11 +102,11 @@ diese nur unter `/api/v1/`.
 | Oberfläche (eingebettetes `frontend/dist`) | Gerät → Server | HTTP(S), statische Dateien | `src/static_files.rs` (`rust-embed`) |
 | REST-API `/api/…` | Gerät → Server | HTTP(S), JSON; Vertrag als OpenAPI | `src/routes/`, `src/api_doc.rs`, `frontend/src/api/` |
 | Öffentliche API `/api/v1/` | Fremdsystem → Server | HTTP(S), JSON; je Anfrage ein JWS im Kopf `Authorization: Machine`, Antwort signiert in `Lifeline-Signature`; Vertrag `docs/api/public-v1.json` | `src/public_api/`, Referenz-Client `crates/lifeline-machine-client`; [`docs/api/maschinenzugang.md`](../api/maschinenzugang.md) |
-| Einwurf `/api/v1/einwurf/<schlüssel>/…` | Absender ohne Signatur → Server | HTTPS, GET oder POST; der Schlüssel im Pfad ist die Anmeldung, die Antwort ist 204 oder ein Fehler ohne Daten; nur über TLS ([ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md)) | `src/public_api/einwurf/`, Verwaltung `src/routes/einwurf_zugaenge.rs`; [`docs/api/einwurf.md`](../api/einwurf.md) |
+| Einwurf `/api/v1/intake/<schlüssel>/…` | Absender ohne Signatur → Server | HTTPS, GET oder POST; der Schlüssel im Pfad ist die Anmeldung, die Antwort ist 204 oder ein Fehler ohne Daten; nur über TLS ([ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md)) | `src/public_api/einwurf/`, Verwaltung `src/routes/einwurf_zugaenge.rs`; [`docs/api/einwurf.md`](../api/einwurf.md) |
 | Webhook | Server → Fremdsystem | HTTPS POST, ein Ereignis je Anfrage, signiert mit dem Instanzschlüssel im Kopf `Lifeline-Signature` (`typ lifeline-event+jwt`); keine Weiterleitung, kein Proxy, Ziel aufgelöst und geprüft, LAN nur als Ausnahme am Webhook ([ADR-0046](entscheidungen/ADR-0046-webhooks-sind-mit-dem-instanzschluessel-signiert-und-gehen-nur-an-gepruefte-adressen.md)) | `src/public_api/webhook/`, Verwaltung `src/routes/anbindungen_webhook.rs`; [`docs/api/maschinenzugang.md`](../api/maschinenzugang.md), „Webhooks empfangen“ |
 | Live-Kanal | Server → Gerät (vom Gerät geöffnet) | Server-Sent Events, Ereignisnamen als `LiveEvent` | `src/live/`, `frontend/src/live/` |
 | TLS am Server (optional) | Gerät → Server | rustls; eigenes Zertifikat oder selbstsigniertes per `rcgen` | `src/tls/`, `--tls`; [`docs/betrieb-tls.md`](../betrieb-tls.md) |
-| Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto`; für den Einwurf zählt `X-Forwarded-Proto` nur von einem Proxy aus `--trusted-proxies`, und der Proxy protokolliert unter `/api/v1/einwurf/` nichts | `--trusted-proxies` in `src/config.rs`, `is_tls_nachgewiesen` in `src/extract.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md), [`docs/betrieb-tls.md`](../betrieb-tls.md) |
+| Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto`; für den Einwurf zählt `X-Forwarded-Proto` nur von einem Proxy aus `--trusted-proxies`, und der Proxy protokolliert unter `/api/v1/intake/` nichts | `--trusted-proxies` in `src/config.rs`, `is_tls_nachgewiesen` in `src/extract.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md), [`docs/betrieb-tls.md`](../betrieb-tls.md) |
 | Desktop-Hülle | Hülle → Server | Webview lädt die https-Adresse; Anmeldung im Systembrowser über `POST /api/auth/app-code` | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md) |
 | iOS-Hülle | Hülle → Server | Webview lädt die https-Adresse; nativ nur `GET /api/shell` und beim Entfernen eines Servers `POST /api/ios-push/unregister` | [`ios/AGENTS.md`](../../ios/AGENTS.md) |
 | Update der Desktop-Hülle | Hülle → GitHub | HTTPS, `latest.json` am Release (stabil) bzw. Tag `desktop-alpha` | `src-tauri/tauri.conf.json` (`plugins.updater`), `src-tauri/src/update.rs` |
