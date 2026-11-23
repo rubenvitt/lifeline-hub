@@ -50,7 +50,7 @@ async function dwdBeantworten(page: Page) {
     geometry: quadrat(ORTE[EVENT], 0.002),
     properties: { EVENT, HEADLINE: `Amtliche Warnung vor ${EVENT}`, ...p },
   });
-  await page.route('**/api/karte/fachebenen/dwd**', (route) =>
+  await page.route('**/api/map/overlays/dwd**', (route) =>
     route.fulfill({
       json: {
         quelle: 'dwd',

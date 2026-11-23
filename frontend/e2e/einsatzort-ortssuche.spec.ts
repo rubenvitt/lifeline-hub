@@ -205,13 +205,13 @@ test('Einsatz anlegen: Punkt auf der Karte ins leere Feld — Koordinate als Tex
       {
         karte_id: 1,
         name: 'Fixture',
-        tiles_url: '/api/karten/1/tiles/{z}/{x}/{y}.pbf',
+        tiles_url: '/api/mapn/1/tiles/{z}/{x}/{y}.pbf',
         format: 'vektor',
         maxzoom: 14,
       },
     ],
   });
-  await kachelnBeantworten(page, '/api/karten/1/tiles/', 'strassen');
+  await kachelnBeantworten(page, '/api/mapn/1/tiles/', 'strassen');
   await anmeldenAlsAdmin(page);
   const dialog = await einsatzDialogOeffnen(page);
   await dialog.getByLabel('Bezeichnung').fill(`E2E Anlegen Kartenpunkt ${Date.now()}`);
@@ -289,13 +289,13 @@ test('Einsatzdaten: ohne Netz „Auf Karte wählen“ mit Offline-Karte, gespeic
       {
         karte_id: 1,
         name: 'Fixture',
-        tiles_url: '/api/karten/1/tiles/{z}/{x}/{y}.pbf',
+        tiles_url: '/api/mapn/1/tiles/{z}/{x}/{y}.pbf',
         format: 'vektor',
         maxzoom: 14,
       },
     ],
   });
-  await kachelnBeantworten(page, '/api/karten/1/tiles/', 'strassen');
+  await kachelnBeantworten(page, '/api/mapn/1/tiles/', 'strassen');
   await anmeldenAlsAdmin(page, { startseite: false });
   const id = await einsatzAnlegenApi(page);
   await page.goto(einsatzdatenPfad(id));

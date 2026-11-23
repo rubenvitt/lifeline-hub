@@ -4900,7 +4900,7 @@ export interface components {
             phase?: components["schemas"]["AktualisierungsPhase"] | null;
         };
         /**
-         * @description Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
+         * @description Antwort von `GET /api/map/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
          *     NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
          *     `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
          */
@@ -6465,7 +6465,7 @@ export interface components {
             status: components["schemas"]["OfflineKarteStatus"];
         };
         /**
-         * @description GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
+         * @description GET /api/map/offline-maps — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
          *     Listen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur
          *     für `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist
          *     `null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den
@@ -6533,7 +6533,7 @@ export interface components {
         };
         /**
          * @description Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
-         *     region-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
+         *     region-adressiert (`/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
          *     Frontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.
          */
         OfflineRegionConfig: {
@@ -6591,7 +6591,7 @@ export interface components {
             /**
              * @description Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
              *     mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
-             *     nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+             *     nicht mit einem Klick zur Grundlage aller werden. In `/api/map/config` immer absent.
              */
             hinweis?: string | null;
             name: string;

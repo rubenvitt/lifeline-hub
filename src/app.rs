@@ -2719,126 +2719,126 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     };
 
     let router = router
-        .route("/api/karte/config", get(routes::karte::config))
+        .route("/api/map/config", get(routes::karte::config))
         .route(
-            "/api/karte/fachebenen/{quelle}",
+            "/api/map/overlays/{quelle}",
             get(routes::karte::fachebenen),
         )
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
-            "/api/karte/offline/tiles/{z}/{x}/{y}",
+            "/api/map/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
         // Eingebettete Welt-Übersicht: der statische „welt“-Pfad steht vor der `{karte_id}`-Route.
         .route(
-            "/api/karte/offline/welt/tiles/{z}/{x}/{y}",
+            "/api/map/offline/world/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_welt_tiles),
         )
         // Region-adressierter Tile-Endpoint: je sichtbarer Region eine eigene Vector-Source.
         .route(
-            "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}",
+            "/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles_region),
         )
         // Eingebettete Offline-Glyphs/Sprite (rust-embed).
         .route(
-            "/api/karte/offline/fonts/{fontstack}/{datei}",
+            "/api/map/offline/fonts/{fontstack}/{datei}",
             get(routes::karte::offline_fonts),
         )
         .route(
-            "/api/karte/offline/sprites/{datei}",
+            "/api/map/offline/sprites/{datei}",
             get(routes::karte::offline_sprite),
         )
         // Style-/Tile-Proxy: verbirgt Upstream-Key und -URL, nur mit Sitzung (LFH-1072), damit
         // Fremde das Anbieter-Kontingent nicht verbrauchen.
         .route(
-            "/api/karte/proxy/{id}/style.json",
+            "/api/map/proxy/{id}/style.json",
             get(routes::karte::proxy_style),
         )
         .route(
-            "/api/karte/proxy/{id}/raster/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/raster/{z}/{x}/{y}",
             get(routes::karte::proxy_raster),
         )
         .route(
-            "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
             get(routes::karte::proxy_tile),
         )
         .route(
-            "/api/karte/proxy/{id}/tilejson/{slot}",
+            "/api/map/proxy/{id}/tilejson/{slot}",
             get(routes::karte::proxy_tilejson),
         )
         .route(
-            "/api/karte/proxy/{id}/sprite/{rest}",
+            "/api/map/proxy/{id}/sprite/{rest}",
             get(routes::karte::proxy_sprite),
         )
         .route(
-            "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+            "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
             get(routes::karte::proxy_glyphs),
         )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             get(routes::karte::online_liste).post(routes::karte::online_anlegen),
         )
         .route(
-            "/api/karte/online-quellen/katalog",
+            "/api/map/online-sources/catalog",
             get(routes::karte::online_katalog),
         )
         .route(
-            "/api/karte/online-quellen/{id}",
+            "/api/map/online-sources/{id}",
             patch(routes::karte::online_aktualisieren).delete(routes::karte::online_loeschen),
         )
         .route(
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             get(routes::karte::offline_liste).post(routes::karte::offline_registrieren),
         )
         // Statische Segmente (katalog/download) vor /{id} — matchit priorisiert statisch.
         .route(
-            "/api/karte/offline-karten/katalog",
+            "/api/map/offline-maps/catalog",
             get(routes::karte::offline_katalog),
         )
         .route(
-            "/api/karte/offline-karten/vorhandene",
+            "/api/map/offline-maps/existing",
             get(routes::karte::offline_vorhandene),
         )
         .route(
-            "/api/karte/offline-karten/download",
+            "/api/map/offline-maps/download",
             post(routes::karte::offline_download),
         )
         .route(
-            "/api/karte/offline-karten/bauen",
+            "/api/map/offline-maps/build",
             post(routes::karte::offline_bauen),
         )
         .route(
-            "/api/karte/offline-karten/baubare-regionen",
+            "/api/map/offline-maps/buildable-regions",
             get(routes::karte::offline_baubare_regionen),
         )
         .route(
-            "/api/karte/offline-karten/bau-status",
+            "/api/map/offline-maps/build-status",
             get(routes::karte::offline_bau_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung",
+            "/api/map/offline-maps/auto-update",
             get(routes::karte::offline_aktualisierung_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung/einstellung",
+            "/api/map/offline-maps/auto-update/settings",
             put(routes::karte::offline_aktualisierung_einstellen),
         )
         .route(
-            "/api/karte/offline-karten/{id}/jetzt-aktualisieren",
+            "/api/map/offline-maps/{id}/update-now",
             post(routes::karte::offline_jetzt_aktualisieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/aktivieren",
+            "/api/map/offline-maps/{id}/activate",
             post(routes::karte::offline_aktivieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/abbrechen",
+            "/api/map/offline-maps/{id}/cancel",
             post(routes::karte::offline_abbrechen),
         )
         .route(
-            "/api/karte/offline-karten/{id}",
+            "/api/map/offline-maps/{id}",
             delete(routes::karte::offline_loeschen),
         );
 

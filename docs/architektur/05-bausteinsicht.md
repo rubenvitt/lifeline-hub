@@ -72,7 +72,7 @@ zurück, eingehängt als Router-Fallback in `src/app.rs`. Der Workspace umfasst 
 `src-tauri` (`Cargo.toml`). Die Kopplung an den
 `karten-service` ist optional: ohne `LIFELINE_KARTEN_SERVICE_URL` und
 `LIFELINE_KARTEN_SERVICE_TOKEN` ist der Region-Bau aus (`src/config.rs`); die Proxy-Routen
-`/api/karte/offline-karten/bauen|baubare-regionen|bau-status` stehen in `src/app.rs`. Der
+`/api/map/offline-maps/build|buildable-regions|build-status` stehen in `src/app.rs`. Der
 `karten-service` ruft `make tiles` im Verzeichnis von `karten-build`
 (`karten-service/src/build/make_runner.rs`) und schreibt über `karten-service/src/storage/s3.rs`.
 
@@ -133,7 +133,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/karte` | Fachebenen-Aggregator (NINA, DWD, PEGELONLINE, KRITIS u. a.), Style-/Tile-Proxy mit SSRF-Schutz, MBTiles, Offline-Karten-Registry und -Download | `/api/karte/…`; ruft `karten-service`; Cache in `src/cache_db.rs` |
+| `src/karte` | Fachebenen-Aggregator (NINA, DWD, PEGELONLINE, KRITIS u. a.), Style-/Tile-Proxy mit SSRF-Schutz, MBTiles, Offline-Karten-Registry und -Download | `/api/map/…`; ruft `karten-service`; Cache in `src/cache_db.rs` |
 | `src/karte_hintergrundbild` | Hochgeladene Hintergrundbilder (PNG/JPEG) mit vier Eckkoordinaten | `…/{id}/karte/hintergrundbilder`; Live `karte_bild` |
 | `src/karten_ansicht` | Einsatzweit geteilte, benannte Kartenkonfiguration | `…/{id}/karten-ansichten`; Live `karten_ansicht` |
 | `src/lage_snapshot` | Unveränderlicher Stand des vollen Lagebilds als JSON-Dokument | `…/{id}/lage-snapshots`; Live `lage_snapshot` |

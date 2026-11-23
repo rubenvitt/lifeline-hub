@@ -132,7 +132,7 @@ async fn liste_kennzeichnet_aktualisierbare_karten() {
     let res = anfrage(
         &a.app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&a.admin),
         Some(r#"{"name":"Eigen","pfad":"eigen.mbtiles","lizenz":"© OSM"}"#),
     )
@@ -144,7 +144,7 @@ async fn liste_kennzeichnet_aktualisierbare_karten() {
         anfrage(
             &a.app,
             "GET",
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             Some(&a.admin),
             None,
         )
@@ -248,11 +248,11 @@ async fn nutzer(a: &Aufbau, name: &str, org_rolle: &str) -> String {
 }
 
 fn jetzt_uri(id: i64) -> String {
-    format!("/api/karte/offline-karten/{id}/jetzt-aktualisieren")
+    format!("/api/map/offline-maps/{id}/update-now")
 }
 
-const STATUS_URI: &str = "/api/karte/offline-karten/aktualisierung";
-const EINSTELLUNG_URI: &str = "/api/karte/offline-karten/aktualisierung/einstellung";
+const STATUS_URI: &str = "/api/map/offline-maps/auto-update";
+const EINSTELLUNG_URI: &str = "/api/map/offline-maps/auto-update/settings";
 
 // ===== Task 5.1: POST …/{id}/jetzt-aktualisieren =====
 
@@ -271,7 +271,7 @@ async fn jetzt_aktualisieren_registrierte_karte_ist_422() {
     let res = anfrage(
         &a.app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&a.admin),
         Some(r#"{"name":"Eigen","pfad":"eigen.mbtiles","lizenz":"© OSM"}"#),
     )
@@ -559,7 +559,7 @@ async fn geloeschte_karte_vererbt_keinen_fehler() {
     let res = anfrage(
         &a.app,
         "DELETE",
-        &format!("/api/karte/offline-karten/{id}"),
+        &format!("/api/map/offline-maps/{id}"),
         Some(&a.admin),
         None,
     )

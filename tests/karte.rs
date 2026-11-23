@@ -83,9 +83,9 @@ async fn json(res: Response) -> serde_json::Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-// ===== /api/karte/offline/tiles/{z}/{x}/{y} + /api/karte/config (eingefrorener Frontend-Vertrag) =====
+// ===== /api/map/offline/tiles/{z}/{x}/{y} + /api/map/config (eingefrorener Frontend-Vertrag) =====
 
-// ===== /api/karte/offline/tiles/{z}/{x}/{y} (MBTiles, LFH-195) =====
+// ===== /api/map/offline/tiles/{z}/{x}/{y} (MBTiles, LFH-195) =====
 
 /// Schreibt eine Mini-MBTiles-Fixture: `tiles`-Tabelle mit genau einer Kachel bei
 /// TMS (z=1, tile_column=0, tile_row=1) = XYZ (z=1, x=0, y=0). Eigener SCHREIBBARER Pool
@@ -149,7 +149,7 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
 
     // Vorhandene Kachel: XYZ (z=1,x=0,y=0) -> TMS row = (2^1-1)-0 = 1 -> Treffer.
     let req = Request::builder()
-        .uri("/api/karte/offline/tiles/1/0/0")
+        .uri("/api/map/offline/tiles/1/0/0")
         .body(Body::empty())
         .unwrap();
     let res = app.clone().oneshot(req).await.unwrap();
@@ -164,7 +164,7 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
 
     // Fehlende Kachel -> 204.
     let req = Request::builder()
-        .uri("/api/karte/offline/tiles/1/1/1")
+        .uri("/api/map/offline/tiles/1/1/1")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -188,7 +188,7 @@ async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
 
     // Raster-Kachel: image/png, KEIN gzip, Blob round-trippt.
     let req = Request::builder()
-        .uri("/api/karte/offline/tiles/1/0/0")
+        .uri("/api/map/offline/tiles/1/0/0")
         .body(Body::empty())
         .unwrap();
     let res = app.clone().oneshot(req).await.unwrap();
@@ -206,7 +206,7 @@ async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
 
     // /config meldet offline_format='raster'.
     let req = Request::builder()
-        .uri("/api/karte/config")
+        .uri("/api/map/config")
         .body(Body::empty())
         .unwrap();
     let cfg = app.oneshot(req).await.unwrap();
@@ -219,7 +219,7 @@ async fn offline_tiles_ohne_aktive_karte_liefert_204() {
     let pool = pool().await; // leere offline-Tabelle
     let app = app_mit_pool(pool);
     let req = Request::builder()
-        .uri("/api/karte/offline/tiles/1/0/0")
+        .uri("/api/map/offline/tiles/1/0/0")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -240,7 +240,7 @@ async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
 
     let app = app_mit(pool, dir.path().to_path_buf());
     let req = Request::builder()
-        .uri("/api/karte/offline/tiles/99/0/0")
+        .uri("/api/map/offline/tiles/99/0/0")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -270,7 +270,7 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
 
     let app = app_mit_pool(pool);
     let req = Request::builder()
-        .uri("/api/karte/config")
+        .uri("/api/map/config")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -278,10 +278,10 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     let v = json(res).await;
     assert_eq!(v["offline_verfuegbar"].as_bool(), Some(true));
     // offline_tiles_url ist jetzt REGION-ADRESSIERT (LFH-188, Kompat = erste sichtbare Region):
-    // /api/karte/offline/{id}/tiles/{z}/{x}/{y}?v=<Token> — Token dynamisch, id dynamisch.
+    // /api/map/offline/{id}/tiles/{z}/{x}/{y}?v=<Token> — Token dynamisch, id dynamisch.
     let offline_tiles_url = v["offline_tiles_url"].as_str().unwrap();
     assert!(
-        offline_tiles_url.starts_with("/api/karte/offline/")
+        offline_tiles_url.starts_with("/api/map/offline/")
             && offline_tiles_url.contains("/tiles/{z}/{x}/{y}?v="),
         "region-adressierte offline_tiles_url mit Cache-Bust-Token erwartet, war: {offline_tiles_url}"
     );
@@ -311,7 +311,7 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
 async fn welt_tiles_route_greift_und_ist_204_ohne_asset() {
     let app = app_mit_pool(pool().await);
     let req = Request::builder()
-        .uri("/api/karte/offline/welt/tiles/2/1/1")
+        .uri("/api/map/offline/world/tiles/2/1/1")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -327,7 +327,7 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let pool = pool().await; // leere Registry → Karte startet blind
     let app = app_mit_pool(pool);
     let req = Request::builder()
-        .uri("/api/karte/config")
+        .uri("/api/map/config")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -355,7 +355,7 @@ async fn config_endpoint_meldet_karten_bau_verfuegbar_mit_service_konfiguration(
     let pool = pool().await;
     let app = app_mit_pool_und_karten_service(pool);
     let req = Request::builder()
-        .uri("/api/karte/config")
+        .uri("/api/map/config")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -369,7 +369,7 @@ async fn config_endpoint_meldet_karten_bau_nicht_verfuegbar_ohne_service_konfigu
     let pool = pool().await;
     let app = app_mit_pool(pool); // Standard-Helfer: karten_service_url/-token beide None
     let req = Request::builder()
-        .uri("/api/karte/config")
+        .uri("/api/map/config")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -391,7 +391,7 @@ async fn offline_registrieren_lehnt_absolute_und_traversal_pfade_ab() {
         let res = anfrage(
             &app,
             "POST",
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             Some(&cookie),
             Some(boese),
         )
@@ -423,7 +423,7 @@ async fn offline_tiles_lehnt_absoluten_pfad_in_db_ab() {
     .await
     .unwrap();
     let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/offline/tiles/1/0/0", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/offline/tiles/1/0/0", None, None).await;
     assert_eq!(
         res.status(),
         StatusCode::NO_CONTENT,
@@ -432,12 +432,12 @@ async fn offline_tiles_lehnt_absoluten_pfad_in_db_ab() {
     drop(datei);
 }
 
-// ===== /api/karte/fachebenen =====
+// ===== /api/map/overlays =====
 
 #[tokio::test]
 async fn fachebenen_unbekannte_quelle_ist_400() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/gibtsnicht", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/gibtsnicht", None, None).await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
@@ -464,7 +464,7 @@ async fn fachebenen_autobahn_liefert_gecachte_antwort() {
     lifeline_hub::karte::cache::setze(&cache, "autobahn", &gecacht).await;
 
     let app = app_mit(pool().await, dir);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/autobahn", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v: serde_json::Value =
         serde_json::from_slice(&to_bytes(res.into_body(), usize::MAX).await.unwrap()).unwrap();
@@ -527,7 +527,7 @@ async fn fachebenen_zweiter_abruf_ohne_neuen_stand_ist_304_ohne_body() {
     assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
     let app = app_mit(pool().await, dir);
 
-    let erst = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    let erst = anfrage(&app, "GET", "/api/map/overlays/autobahn", None, None).await;
     assert_eq!(erst.status(), StatusCode::OK);
     let etag = etag_aus(&erst);
     // Der Browser darf speichern, muss aber jedes Mal fragen — sonst sähe ein Poll den neuen
@@ -537,7 +537,7 @@ async fn fachebenen_zweiter_abruf_ohne_neuen_stand_ist_304_ohne_body() {
         "private, no-cache"
     );
 
-    let zweit = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &etag).await;
+    let zweit = anfrage_bedingt(&app, "/api/map/overlays/autobahn", &etag).await;
     assert_eq!(zweit.status(), StatusCode::NOT_MODIFIED);
     assert_eq!(etag_aus(&zweit), etag, "304 wiederholt den gültigen ETag");
     let rumpf = to_bytes(zweit.into_body(), usize::MAX).await.unwrap();
@@ -553,10 +553,10 @@ async fn fachebenen_neuer_stand_aendert_etag_und_liefert_200() {
     assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
     let app = app_mit(pool().await, dir);
 
-    let alt = etag_aus(&anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await);
+    let alt = etag_aus(&anfrage(&app, "GET", "/api/map/overlays/autobahn", None, None).await);
     assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A3")).await);
 
-    let res = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &alt).await;
+    let res = anfrage_bedingt(&app, "/api/map/overlays/autobahn", &alt).await;
     assert_eq!(res.status(), StatusCode::OK);
     assert_ne!(etag_aus(&res), alt, "neuer Stand, neuer ETag");
     let v = json(res).await;
@@ -573,8 +573,8 @@ async fn fachebenen_304_auch_bei_schwachem_etag_des_vorschaltservers() {
     assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
     let app = app_mit(pool().await, dir);
 
-    let etag = etag_aus(&anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await);
-    let res = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &format!("W/{etag}")).await;
+    let etag = etag_aus(&anfrage(&app, "GET", "/api/map/overlays/autobahn", None, None).await);
+    let res = anfrage_bedingt(&app, "/api/map/overlays/autobahn", &format!("W/{etag}")).await;
     assert_eq!(res.status(), StatusCode::NOT_MODIFIED);
 }
 
@@ -584,7 +584,7 @@ async fn fachebenen_304_auch_bei_schwachem_etag_des_vorschaltservers() {
 #[tokio::test]
 async fn fachebenen_kritis_ohne_bbox_ist_400() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/kritis", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/kritis", None, None).await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
@@ -606,7 +606,7 @@ async fn fachebenen_kritis_deutschland_ist_kein_400() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/kritis?bbox=5.8,47.2,15.1,55.1",
+        "/api/map/overlays/kritis?bbox=5.8,47.2,15.1,55.1",
         None,
         None,
     )
@@ -621,7 +621,7 @@ async fn fachebenen_kritis_kaputte_bbox_ist_400() {
         let res = anfrage(
             &app,
             "GET",
-            &format!("/api/karte/fachebenen/kritis?bbox={bbox}"),
+            &format!("/api/map/overlays/kritis?bbox={bbox}"),
             None,
             None,
         )
@@ -638,7 +638,7 @@ async fn fachebenen_kritis_ohne_bestand_offline() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/kritis?bbox=6.9,50.9,7.0,51.0",
+        "/api/map/overlays/kritis?bbox=6.9,50.9,7.0,51.0",
         None,
         None,
     )
@@ -678,7 +678,7 @@ async fn fachebenen_kritis_aus_dem_bestand() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/kritis?bbox=6.9,50.9,7.0,51.0",
+        "/api/map/overlays/kritis?bbox=6.9,50.9,7.0,51.0",
         None,
         None,
     )
@@ -721,7 +721,7 @@ async fn fachebenen_gecachter_stand_nennt_seinen_abrufzeitpunkt() {
     lifeline_hub::karte::cache::setze(&cache, "autobahn", &gecacht).await;
 
     let app = app_mit(pool().await, dir);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/autobahn", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["status"], "ok");
@@ -758,7 +758,7 @@ async fn fachebenen_hochwasser_wird_bedient() {
     );
     lifeline_hub::karte::cache::setze(&cache_pool, "hochwasser", &gesetzt).await;
 
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/hochwasser", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/hochwasser", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["quelle"], "hochwasser");
@@ -796,7 +796,7 @@ async fn fachebenen_luftqualitaet_wird_bedient() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/luftqualitaet",
+        "/api/map/overlays/luftqualitaet",
         None,
         None,
     )
@@ -841,7 +841,7 @@ async fn fachebenen_odl_wird_bedient() {
     let leer = lifeline_hub::karte::odl_grundpegel::GrundpegelKarte::new();
     lifeline_hub::karte::cache::setze_wert(&cache_pool, "odl:grundpegel", &leer).await;
 
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/odl", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/odl", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["quelle"], "odl");
@@ -892,7 +892,7 @@ async fn fachebenen_odl_bewertet_gegen_den_grundpegel() {
     )]);
     lifeline_hub::karte::cache::setze_wert(&cache_pool, "odl:grundpegel", &karte).await;
 
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/odl", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/odl", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let mit = &v["features"]["features"][0]["properties"];
@@ -911,7 +911,7 @@ async fn fachebenen_odl_bewertet_gegen_den_grundpegel() {
 #[tokio::test]
 async fn fachebenen_energie_ohne_bbox_ist_400() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/energie", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/energie", None, None).await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     // Der Grund muss die bbox sein — ein 400 „Unbekannte Quelle" sähe sonst genauso aus.
     let fehler = json(res).await["error"].as_str().unwrap().to_string();
@@ -922,7 +922,7 @@ async fn fachebenen_energie_ohne_bbox_ist_400() {
 async fn fachebenen_energie_kaputte_bbox_ist_400() {
     let app = app_mit_pool(pool().await);
     for bbox in ["1,2,3", "7.3,51.45,6.9,51.65", "a,b,c,d"] {
-        let uri = format!("/api/karte/fachebenen/energie?bbox={bbox}");
+        let uri = format!("/api/map/overlays/energie?bbox={bbox}");
         let res = anfrage(&app, "GET", &uri, None, None).await;
         assert_eq!(res.status(), StatusCode::BAD_REQUEST, "bbox {bbox}");
         let fehler = json(res).await["error"].as_str().unwrap().to_string();
@@ -980,7 +980,7 @@ async fn fachebenen_energie_wird_aus_beiden_teilen_bedient() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/energie?bbox=6.9,51.45,7.3,51.65",
+        "/api/map/overlays/energie?bbox=6.9,51.45,7.3,51.65",
         None,
         None,
     )
@@ -1030,7 +1030,7 @@ async fn online_crud_durchlauf() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"OFM","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM","sortier":3}"#),
     )
@@ -1046,7 +1046,7 @@ async fn online_crud_durchlauf() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         None,
     )
@@ -1059,7 +1059,7 @@ async fn online_crud_durchlauf() {
     let res = anfrage(
         &app,
         "PATCH",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         Some(r#"{"name":"Neu","url":"https://x/neu","typ":"raster","attribution":"© BKG","sortier":1,"aktiv":false}"#),
     )
@@ -1074,7 +1074,7 @@ async fn online_crud_durchlauf() {
     let res = anfrage(
         &app,
         "DELETE",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         None,
     )
@@ -1083,7 +1083,7 @@ async fn online_crud_durchlauf() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         None,
     )
@@ -1098,7 +1098,7 @@ async fn online_quelle_anlegen(app: &axum::Router, cookie: &str, body: &str) -> 
     let res = anfrage(
         app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(cookie),
         Some(body),
     )
@@ -1124,7 +1124,7 @@ async fn patch_ohne_proxy_behaelt_proxy_false() {
     let res = anfrage(
         &app,
         "PATCH",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         Some(r#"{"name":"Direkt neu","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM"}"#),
     )
@@ -1157,7 +1157,7 @@ async fn patch_proxy_true_prueft_gespeicherte_url_gegen_ssrf() {
     let res = anfrage(
         &app,
         "PATCH",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         Some(r#"{"proxy":true}"#),
     )
@@ -1173,7 +1173,7 @@ async fn patch_proxy_true_prueft_gespeicherte_url_gegen_ssrf() {
         anfrage(
             &app,
             "GET",
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             Some(&cookie),
             None,
         )
@@ -1198,7 +1198,7 @@ async fn patch_ohne_attribution_bleibt_gueltig() {
     let res = anfrage(
         &app,
         "PATCH",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         Some(r#"{"name":"A2"}"#),
     )
@@ -1225,7 +1225,7 @@ async fn patch_attribution_null_ist_400() {
         let res = anfrage(
             &app,
             "PATCH",
-            &format!("/api/karte/online-quellen/{id}"),
+            &format!("/api/map/online-sources/{id}"),
             Some(&cookie),
             Some(body),
         )
@@ -1242,7 +1242,7 @@ async fn patch_attribution_null_ist_400() {
 /// Reihenfolge auf 0 zurück. NOT-NULL-Spalte, fällt gegen HEAD hart durch.
 /// LLH-1486: Eine Online-Quelle gilt als hell, bis sie als dunkel markiert ist. `dunkel` wird
 /// angelegt, per Teil-Patch umgeschaltet, von einem Patch ohne das Feld nicht angefasst und in
-/// `/api/karte/config` nur gesendet, wenn es gilt.
+/// `/api/map/config` nur gesendet, wenn es gilt.
 #[tokio::test]
 async fn online_quelle_dunkel_bis_in_die_config() {
     let (app, cookie) = admin_app().await;
@@ -1255,7 +1255,7 @@ async fn online_quelle_dunkel_bis_in_die_config() {
     let stil = erster_online_stil(&app, &cookie).await;
     assert!(stil.get("dunkel").is_none(), "hell → absent: {stil:?}");
 
-    let uri = format!("/api/karte/online-quellen/{id}");
+    let uri = format!("/api/map/online-sources/{id}");
     let akt = patch_json(&app, &cookie, &uri, r#"{"dunkel":true}"#).await;
     assert_eq!(akt["dunkel"], true);
     let akt = patch_json(&app, &cookie, &uri, r#"{"name":"Dunkel"}"#).await;
@@ -1271,7 +1271,7 @@ async fn online_quelle_dunkel_bis_in_die_config() {
 }
 
 async fn erster_online_stil(app: &axum::Router, cookie: &str) -> serde_json::Value {
-    let res = anfrage(app, "GET", "/api/karte/config", Some(cookie), None).await;
+    let res = anfrage(app, "GET", "/api/map/config", Some(cookie), None).await;
     assert_eq!(res.status(), StatusCode::OK);
     json(res).await["online_styles"][0].clone()
 }
@@ -1295,7 +1295,7 @@ async fn patch_ohne_sortier_behaelt_sortier() {
     let res = anfrage(
         &app,
         "PATCH",
-        &format!("/api/karte/online-quellen/{id}"),
+        &format!("/api/map/online-sources/{id}"),
         Some(&cookie),
         Some(r#"{"name":"S neu","url":"https://tiles.example/s","typ":"vektor","attribution":"© OSM","proxy":false}"#),
     )
@@ -1324,7 +1324,7 @@ async fn patch_ohne_url_und_proxy_loescht_keine_slots() {
     let res = anfrage(
         &app,
         "PATCH",
-        "/api/karte/online-quellen/1",
+        "/api/map/online-sources/1",
         Some(&cookie),
         Some(r#"{"name":"Q neu","sortier":3}"#),
     )
@@ -1345,7 +1345,7 @@ async fn online_anlegen_ohne_attribution_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"X","url":"https://x","typ":"vektor"}"#),
     )
@@ -1363,7 +1363,7 @@ async fn online_anlegen_ungueltiger_typ_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"X","url":"https://x","typ":"wolke","attribution":"© X"}"#),
     )
@@ -1377,7 +1377,7 @@ async fn online_anlegen_leerer_name_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"   ","url":"https://x","typ":"vektor","attribution":"© X"}"#),
     )
@@ -1391,7 +1391,7 @@ async fn online_anlegen_whitespace_attribution_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"X","url":"https://x","typ":"vektor","attribution":"   "}"#),
     )
@@ -1409,7 +1409,7 @@ async fn online_anlegen_leere_url_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"X","url":"   ","typ":"vektor","attribution":"© X"}"#),
     )
@@ -1423,7 +1423,7 @@ async fn online_aktualisieren_unbekannt_ist_404() {
     let res = anfrage(
         &app,
         "PATCH",
-        "/api/karte/online-quellen/999",
+        "/api/map/online-sources/999",
         Some(&cookie),
         Some(r#"{"name":"X","url":"https://x","typ":"vektor","attribution":"© X"}"#),
     )
@@ -1437,7 +1437,7 @@ async fn online_loeschen_unbekannt_ist_404() {
     let res = anfrage(
         &app,
         "DELETE",
-        "/api/karte/online-quellen/999",
+        "/api/map/online-sources/999",
         Some(&cookie),
         None,
     )
@@ -1451,7 +1451,7 @@ async fn online_katalog_liefert_eintraege() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/online-quellen/katalog",
+        "/api/map/online-sources/catalog",
         Some(&cookie),
         None,
     )
@@ -1472,7 +1472,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(r#"{"name":"DE","pfad":"de.pmtiles","lizenz":"© OpenStreetMap contributors (ODbL)"}"#),
     )
@@ -1493,7 +1493,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let res = anfrage(
         &app,
         "POST",
-        &format!("/api/karte/offline-karten/{id}/aktivieren"),
+        &format!("/api/map/offline-maps/{id}/activate"),
         Some(&cookie),
         None,
     )
@@ -1504,7 +1504,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         None,
     )
@@ -1514,7 +1514,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let res = anfrage(
         &app,
         "DELETE",
-        &format!("/api/karte/offline-karten/{id}"),
+        &format!("/api/map/offline-maps/{id}"),
         Some(&cookie),
         None,
     )
@@ -1531,7 +1531,7 @@ async fn offline_neu_laden_gibt_es_nicht_mehr() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(r#"{"name":"DE","pfad":"de.pmtiles","lizenz":"© OpenStreetMap contributors (ODbL)"}"#),
     )
@@ -1542,7 +1542,7 @@ async fn offline_neu_laden_gibt_es_nicht_mehr() {
     let res = anfrage(
         &app,
         "POST",
-        &format!("/api/karte/offline-karten/{id}/neu-laden"),
+        &format!("/api/map/offline-maps/{id}/neu-laden"),
         Some(&cookie),
         Some(r#"{"url":"https://example.test/de.pmtiles"}"#),
     )
@@ -1556,7 +1556,7 @@ async fn offline_registrieren_ohne_pfad_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(r#"{"name":"DE","pfad":"  "}"#),
     )
@@ -1571,7 +1571,7 @@ async fn offline_registrieren_ohne_lizenz_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(r#"{"name":"DE","pfad":"de.pmtiles"}"#),
     )
@@ -1585,7 +1585,7 @@ async fn offline_aktivieren_unbekannt_ist_404() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/999/aktivieren",
+        "/api/map/offline-maps/999/activate",
         Some(&cookie),
         None,
     )
@@ -1599,7 +1599,7 @@ async fn offline_loeschen_unbekannt_ist_404() {
     let res = anfrage(
         &app,
         "DELETE",
-        "/api/karte/offline-karten/999",
+        "/api/map/offline-maps/999",
         Some(&cookie),
         None,
     )
@@ -1615,7 +1615,7 @@ async fn offline_katalog_zeigt_nur_lieferbare() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten/katalog",
+        "/api/map/offline-maps/catalog",
         Some(&cookie),
         None,
     )
@@ -1646,7 +1646,7 @@ async fn offline_katalog_zeigt_nur_lieferbare() {
 #[tokio::test]
 async fn offline_katalog_ohne_session_ist_401() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/offline-karten/katalog", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/offline-maps/catalog", None, None).await;
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -1656,7 +1656,7 @@ async fn offline_download_ohne_lizenz_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/download",
+        "/api/map/offline-maps/download",
         Some(&cookie),
         Some(r#"{"name":"DE","url":"https://example.test/de.pmtiles","lizenz":"  "}"#),
     )
@@ -1675,7 +1675,7 @@ async fn offline_registrieren_ungueltiges_format_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(r#"{"name":"X","pfad":"x.mbtiles","lizenz":"© Test","format":"gif"}"#),
     )
@@ -1701,7 +1701,7 @@ async fn offline_download_interne_url_ist_400_ssrf() {
         let res = anfrage(
             &app,
             "POST",
-            "/api/karte/offline-karten/download",
+            "/api/map/offline-maps/download",
             Some(&cookie),
             Some(&body),
         )
@@ -1716,7 +1716,7 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/999/abbrechen",
+        "/api/map/offline-maps/999/cancel",
         Some(&cookie),
         None,
     )
@@ -1737,7 +1737,7 @@ async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(
             r#"{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
@@ -1751,7 +1751,7 @@ async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
         anfrage(
             &app,
             "GET",
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             Some(&cookie),
             None,
         )
@@ -1773,7 +1773,7 @@ async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten",
+        "/api/map/offline-maps",
         Some(&cookie),
         Some(&format!(
             r#"{{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
@@ -1787,7 +1787,7 @@ async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
         anfrage(
             &app,
             "GET",
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             Some(&cookie),
             None,
         )
@@ -1804,7 +1804,7 @@ async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
 #[tokio::test]
 async fn online_quellen_ohne_session_ist_401() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/online-quellen", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/online-sources", None, None).await;
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -1828,7 +1828,7 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&frieda),
         None,
     )
@@ -1843,7 +1843,7 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&frieda),
         Some(r#"{"name":"X","url":"https://x","typ":"vektor","attribution":"© X"}"#),
     )
@@ -1873,7 +1873,7 @@ async fn online_anlegen_proxy_interne_url_ist_400_ssrf() {
         let res = anfrage(
             &app,
             "POST",
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             Some(&cookie),
             Some(&body),
         )
@@ -1892,7 +1892,7 @@ async fn online_anlegen_proxy_gueltig_ist_201_mit_proxy_true() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
     )
@@ -1909,7 +1909,7 @@ async fn online_anlegen_default_proxy_true() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"OFM","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM"}"#),
     )
@@ -1928,7 +1928,7 @@ async fn online_anlegen_proxy_unbekannter_platzhalter_ist_400() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&cookie),
         Some(r#"{"name":"R","url":"https://h/{z}/{quadkey}.png","typ":"raster","attribution":"© X","proxy":true}"#),
     )
@@ -1957,7 +1957,7 @@ async fn config_proxy_quelle_gibt_relative_url_und_verbirgt_key() {
         .execute(&pool).await.unwrap();
 
     let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/config", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/config", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
     let roh = String::from_utf8(bytes.to_vec()).unwrap();
@@ -1975,14 +1975,14 @@ async fn config_proxy_quelle_gibt_relative_url_und_verbirgt_key() {
     let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     let styles = v["online_styles"].as_array().unwrap();
     assert_eq!(styles.len(), 3);
-    // Vektor-proxy → /api/karte/proxy/{id}/style.json, Attribution erhalten.
+    // Vektor-proxy → /api/map/proxy/{id}/style.json, Attribution erhalten.
     assert!(styles[0]["url"]
         .as_str()
         .unwrap()
-        .starts_with("/api/karte/proxy/"));
+        .starts_with("/api/map/proxy/"));
     assert!(styles[0]["url"].as_str().unwrap().ends_with("/style.json"));
     assert_eq!(styles[0]["attribution"], "© MapTiler");
-    // Raster-proxy → /api/karte/proxy/{id}/raster/{z}/{x}/{y}
+    // Raster-proxy → /api/map/proxy/{id}/raster/{z}/{x}/{y}
     assert!(styles[1]["url"]
         .as_str()
         .unwrap()
@@ -1997,7 +1997,7 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/online-quellen",
+        "/api/map/online-sources",
         Some(&admin),
         Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
     )
@@ -2006,7 +2006,7 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
 
     // Admin sieht die volle url (er hat sie eingegeben und muss sie editieren können).
     let liste =
-        json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&admin), None).await).await;
+        json(anfrage(&app, "GET", "/api/map/online-sources", Some(&admin), None).await).await;
     assert!(
         liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
         "Admin sieht den Key voll"
@@ -2028,7 +2028,7 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
         anfrage(
             &app,
             "GET",
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             Some(&frieda),
             None,
         )
@@ -2114,16 +2114,16 @@ async fn proxy_ohne_sitzung_ist_401_ohne_abruf() {
     let (app, cookie) = proxy_app(pool).await;
 
     let pfade = [
-        "/api/karte/proxy/2/style.json",
-        "/api/karte/proxy/1/raster/3/7/7",
-        "/api/karte/proxy/2/tile/1/3/7/7",
-        "/api/karte/proxy/2/tilejson/2",
-        "/api/karte/proxy/2/sprite/3.json",
-        "/api/karte/proxy/2/glyphs/4/Arial/0-255",
+        "/api/map/proxy/2/style.json",
+        "/api/map/proxy/1/raster/3/7/7",
+        "/api/map/proxy/2/tile/1/3/7/7",
+        "/api/map/proxy/2/tilejson/2",
+        "/api/map/proxy/2/sprite/3.json",
+        "/api/map/proxy/2/glyphs/4/Arial/0-255",
     ];
     for pfad in pfade.iter().chain(&[
-        "/api/karte/proxy/999/style.json",
-        "/api/karte/proxy/1/raster/64/0/0",
+        "/api/map/proxy/999/style.json",
+        "/api/map/proxy/1/raster/64/0/0",
     ]) {
         let res = anfrage(&app, "GET", pfad, None, None).await;
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{pfad}");
@@ -2143,7 +2143,7 @@ async fn proxy_style_unbekannte_id_ist_404() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/999/style.json",
+        "/api/map/proxy/999/style.json",
         Some(&cookie),
         None,
     )
@@ -2174,7 +2174,7 @@ async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
         let res = anfrage(
             &app,
             "GET",
-            &format!("/api/karte/proxy/{id}/style.json"),
+            &format!("/api/map/proxy/{id}/style.json"),
             Some(&cookie),
             None,
         )
@@ -2205,7 +2205,7 @@ async fn proxy_style_interne_gespeicherte_url_ist_fehler() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/style.json",
+        "/api/map/proxy/1/style.json",
         Some(&cookie),
         None,
     )
@@ -2230,7 +2230,7 @@ async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/tile/1/1/1/1",
+        "/api/map/proxy/1/tile/1/1/1/1",
         Some(&cookie),
         None,
     )
@@ -2240,7 +2240,7 @@ async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/2/tile/1/1/1/1",
+        "/api/map/proxy/2/tile/1/1/1/1",
         Some(&cookie),
         None,
     )
@@ -2265,7 +2265,7 @@ async fn proxy_raster_nicht_numerisches_z_ist_400() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/raster/abc/1/1",
+        "/api/map/proxy/1/raster/abc/1/1",
         Some(&cookie),
         None,
     )
@@ -2299,18 +2299,18 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
     let (app, cookie) = proxy_app(pool).await;
 
     for pfad in [
-        "/api/karte/proxy/1/raster/64/0/0",
-        "/api/karte/proxy/1/raster/-1/0/0",
-        "/api/karte/proxy/1/raster/25/0/0",
-        "/api/karte/proxy/1/raster/3/8/0",
-        "/api/karte/proxy/1/raster/3/0/8",
-        "/api/karte/proxy/1/raster/3/-1/0",
-        "/api/karte/proxy/2/tile/1/-1/0/0",
-        "/api/karte/proxy/2/tile/1/64/0/0",
-        "/api/karte/proxy/2/tile/1/2/4/0",
-        "/api/karte/proxy/2/tile/1/2/0/-1",
+        "/api/map/proxy/1/raster/64/0/0",
+        "/api/map/proxy/1/raster/-1/0/0",
+        "/api/map/proxy/1/raster/25/0/0",
+        "/api/map/proxy/1/raster/3/8/0",
+        "/api/map/proxy/1/raster/3/0/8",
+        "/api/map/proxy/1/raster/3/-1/0",
+        "/api/map/proxy/2/tile/1/-1/0/0",
+        "/api/map/proxy/2/tile/1/64/0/0",
+        "/api/map/proxy/2/tile/1/2/4/0",
+        "/api/map/proxy/2/tile/1/2/0/-1",
         // Auch vor der Quellenprüfung: eine unbekannte Quelle liefert hier kein 404.
-        "/api/karte/proxy/999/raster/64/0/0",
+        "/api/map/proxy/999/raster/64/0/0",
     ] {
         let res = anfrage(&app, "GET", pfad, Some(&cookie), None).await;
         assert_eq!(res.status(), StatusCode::NO_CONTENT, "{pfad}");
@@ -2320,7 +2320,7 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/raster/3/7/7",
+        "/api/map/proxy/1/raster/3/7/7",
         Some(&cookie),
         None,
     )
@@ -2329,7 +2329,7 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/2/tile/1/3/7/7",
+        "/api/map/proxy/2/tile/1/3/7/7",
         Some(&cookie),
         None,
     )
@@ -2346,7 +2346,7 @@ async fn proxy_glyphs_ungueltiger_range_ist_400() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/glyphs/1/Arial/0_255",
+        "/api/map/proxy/1/glyphs/1/Arial/0_255",
         Some(&cookie),
         None,
     )
@@ -2374,7 +2374,7 @@ async fn online_patch_und_delete_purgen_proxy_slots() {
         .is_some());
     // PATCH mit GEÄNDERTER url → Handler purged die (jetzt stale) Slots.
     let res = anfrage(
-        &app, "PATCH", "/api/karte/online-quellen/1", Some(&cookie),
+        &app, "PATCH", "/api/map/online-sources/1", Some(&cookie),
         Some(r#"{"name":"Q","url":"https://x/anders.json?key=K2","typ":"vektor","attribution":"© X","proxy":true}"#),
     ).await;
     assert_eq!(res.status(), StatusCode::OK);
@@ -2397,7 +2397,7 @@ async fn online_patch_und_delete_purgen_proxy_slots() {
     let res = anfrage(
         &app,
         "DELETE",
-        "/api/karte/online-quellen/1",
+        "/api/map/online-sources/1",
         Some(&cookie),
         None,
     )
@@ -2423,7 +2423,7 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/proxy/1/tile/1/1/1/1",
+        "/api/map/proxy/1/tile/1/1/1/1",
         Some(&cookie),
         None,
     )
@@ -2435,7 +2435,7 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     );
 }
 
-// ===== POST /api/karte/offline-karten/bauen (Region-Bau-Trigger → karten-service, LFH-203/B2) =====
+// ===== POST /api/map/offline-maps/build (Region-Bau-Trigger → karten-service, LFH-203/B2) =====
 
 /// Wie `admin_app`, aber mit konfiguriertem karten-service (`url`+`token`) — für den
 /// Bau-Trigger-Test braucht es EINE konkrete (Mock-)Adresse statt der toten `127.0.0.1:1` aus
@@ -2496,7 +2496,7 @@ async fn offline_bauen_forwardet_an_karten_service_und_liefert_202() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/bauen",
+        "/api/map/offline-maps/build",
         Some(&cookie),
         Some(r#"{"slug":"bayern"}"#),
     )
@@ -2513,7 +2513,7 @@ async fn offline_bauen_ohne_service_config_ist_501() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/bauen",
+        "/api/map/offline-maps/build",
         Some(&cookie),
         Some(r#"{"slug":"bayern"}"#),
     )
@@ -2529,7 +2529,7 @@ async fn offline_bauen_lehnt_leeren_slug_ab() {
     let res = anfrage(
         &app,
         "POST",
-        "/api/karte/offline-karten/bauen",
+        "/api/map/offline-maps/build",
         Some(&cookie),
         Some(r#"{"slug":""}"#),
     )
@@ -2537,7 +2537,7 @@ async fn offline_bauen_lehnt_leeren_slug_ab() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
-// ===== GET /api/karte/offline-karten/baubare-regionen + /bau-status (Read-Proxies, LFH-203/B3) =====
+// ===== GET /api/map/offline-maps/buildable-regions + /bau-status (Read-Proxies, LFH-203/B3) =====
 
 #[tokio::test]
 async fn baubare_regionen_ohne_service_config_liefert_leere_liste() {
@@ -2547,7 +2547,7 @@ async fn baubare_regionen_ohne_service_config_liefert_leere_liste() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten/baubare-regionen",
+        "/api/map/offline-maps/buildable-regions",
         Some(&cookie),
         None,
     )
@@ -2566,7 +2566,7 @@ async fn bau_status_ohne_service_config_liefert_leere_liste() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten/bau-status",
+        "/api/map/offline-maps/build-status",
         Some(&cookie),
         None,
     )
@@ -2642,7 +2642,7 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
     let regionen_res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten/baubare-regionen",
+        "/api/map/offline-maps/buildable-regions",
         Some(&cookie),
         None,
     )
@@ -2657,7 +2657,7 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
     let status_res = anfrage(
         &app,
         "GET",
-        "/api/karte/offline-karten/bau-status",
+        "/api/map/offline-maps/build-status",
         Some(&cookie),
         None,
     )
@@ -2721,9 +2721,9 @@ async fn zwei_regionen_verschraenkt_liefern_je_ihre_kachel() {
     let b = heruntergeladene_karte(&pool, dir.path(), &[0xBB]).await;
     let app = app_mit(pool, dir.path().to_path_buf());
     for _ in 0..3 {
-        let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+        let (s, d) = kachel(&app, &format!("/api/map/offline/{a}/tiles/1/0/0")).await;
         assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
-        let (s, d) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+        let (s, d) = kachel(&app, &format!("/api/map/offline/{b}/tiles/1/0/0")).await;
         assert_eq!((s, d), (StatusCode::OK, vec![0xBB]));
     }
 }
@@ -2742,7 +2742,7 @@ async fn symlink_aus_dem_karten_dir_heraus_liefert_nichts() {
     registriere_und_aktiviere(&pool, "link.mbtiles", "pbf").await;
     let app = app_mit(pool, dir.path().to_path_buf());
     for _ in 0..2 {
-        let (s, d) = kachel(&app, "/api/karte/offline/tiles/1/0/0").await;
+        let (s, d) = kachel(&app, "/api/map/offline/tiles/1/0/0").await;
         assert_eq!(s, StatusCode::NO_CONTENT);
         assert!(d.is_empty());
     }
@@ -2768,7 +2768,7 @@ async fn neustart_raeumt_teildatei_einer_bereiten_karte() {
     let k = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
     assert_eq!(k.status, "bereit");
     let app = app_mit(pool, dir.path().to_path_buf());
-    let (s, d) = kachel(&app, &format!("/api/karte/offline/{id}/tiles/1/0/0")).await;
+    let (s, d) = kachel(&app, &format!("/api/map/offline/{id}/tiles/1/0/0")).await;
     assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
 }
 
@@ -2797,7 +2797,7 @@ async fn loeschen_bei_laufendem_download_ist_422() {
     let f = Arc::new(Fortschritt::default());
     fortschritt.write().unwrap().insert(id, f.clone());
 
-    let uri = format!("/api/karte/offline-karten/{id}");
+    let uri = format!("/api/map/offline-maps/{id}");
     let res = anfrage(&app, "DELETE", &uri, Some(&cookie), None).await;
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert!(json(res).await["error"]
@@ -2813,7 +2813,7 @@ async fn loeschen_bei_laufendem_download_ist_422() {
     let res = anfrage(
         &app,
         "POST",
-        &format!("/api/karte/offline-karten/{id}/abbrechen"),
+        &format!("/api/map/offline-maps/{id}/cancel"),
         Some(&cookie),
         None,
     )
@@ -2844,7 +2844,7 @@ async fn symlink_nach_cache_treffer_liefert_nichts() {
     schreibe_fixture_mbtiles(&ziel, &[0xEE]).await;
     let id = heruntergeladene_karte(&pool, dir.path(), &[0xAA]).await;
     let app = app_mit(pool, dir.path().to_path_buf());
-    let uri = format!("/api/karte/offline/{id}/tiles/1/0/0");
+    let uri = format!("/api/map/offline/{id}/tiles/1/0/0");
     assert_eq!(kachel(&app, &uri).await, (StatusCode::OK, vec![0xAA]));
 
     let datei = dir.path().join(format!("karte-{id}.mbtiles"));
@@ -2869,15 +2869,15 @@ async fn loeschen_verwirft_den_reader_der_karte() {
     // b zuerst: a trägt die höchste rowid und wird nach dem Löschen neu vergeben.
     let b = heruntergeladene_karte(&pool, &karten_dir, &[0xBB]).await;
     let a = heruntergeladene_karte(&pool, &karten_dir, &[0xAA]).await;
-    let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+    let (s, d) = kachel(&app, &format!("/api/map/offline/{a}/tiles/1/0/0")).await;
     assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
-    let (s, _) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+    let (s, _) = kachel(&app, &format!("/api/map/offline/{b}/tiles/1/0/0")).await;
     assert_eq!(s, StatusCode::OK);
 
     let res = anfrage(
         &app,
         "DELETE",
-        &format!("/api/karte/offline-karten/{a}"),
+        &format!("/api/map/offline-maps/{a}"),
         Some(&cookie),
         None,
     )
@@ -2890,9 +2890,9 @@ async fn loeschen_verwirft_den_reader_der_karte() {
         neu, a,
         "ohne AUTOINCREMENT vergibt SQLite max(rowid) + 1 neu"
     );
-    let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+    let (s, d) = kachel(&app, &format!("/api/map/offline/{a}/tiles/1/0/0")).await;
     assert_eq!((s, d), (StatusCode::OK, vec![0xCC]));
-    let (s, d) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+    let (s, d) = kachel(&app, &format!("/api/map/offline/{b}/tiles/1/0/0")).await;
     assert_eq!((s, d), (StatusCode::OK, vec![0xBB]));
 }
 
@@ -2900,12 +2900,12 @@ async fn loeschen_verwirft_den_reader_der_karte() {
 #[tokio::test]
 async fn fachebenen_copernicus_ohne_oder_mit_zu_grosser_bbox_ist_400() {
     let app = app_mit_pool(pool().await);
-    let res = anfrage(&app, "GET", "/api/karte/fachebenen/copernicus", None, None).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/copernicus", None, None).await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
     let fehler = json(res).await["error"].as_str().unwrap().to_string();
     assert!(fehler.contains("bbox"), "{fehler}");
     for bbox in ["1,2,3", "9.4,48.7,9.1,48.9", "6.0,47.0,10.0,49.0"] {
-        let uri = format!("/api/karte/fachebenen/copernicus?bbox={bbox}");
+        let uri = format!("/api/map/overlays/copernicus?bbox={bbox}");
         let res = anfrage(&app, "GET", &uri, None, None).await;
         assert_eq!(res.status(), StatusCode::BAD_REQUEST, "bbox {bbox}");
         let fehler = json(res).await["error"].as_str().unwrap().to_string();
@@ -2953,7 +2953,7 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/copernicus?bbox=9.1,48.7,9.4,48.9",
+        "/api/map/overlays/copernicus?bbox=9.1,48.7,9.4,48.9",
         None,
         None,
     )
@@ -2964,7 +2964,7 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
     let res = anfrage(
         &app,
         "GET",
-        "/api/karte/fachebenen/copernicus?bbox=9.1,48.7,9.4,48.9&archiv=1",
+        "/api/map/overlays/copernicus?bbox=9.1,48.7,9.4,48.9&archiv=1",
         None,
         None,
     )
