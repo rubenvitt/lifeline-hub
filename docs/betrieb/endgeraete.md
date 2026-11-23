@@ -1,14 +1,15 @@
 # Betrieb: Endgeräte (LFH-1094)
 
 Gilt für jedes Gerät, auf dem Lifeline Hub läuft: Laptop, Tablet und Handy im Browser, die
-[Desktop-App](desktop-app.md), die [iOS-App](ios-app.md) auf iPhone und iPad, gekoppelte Geräte
-an UHS oder Lagemonitor. Für den Rechner, der den **Server**
-trägt, gilt zusätzlich [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
+[Desktop-App](desktop-app.md), die [iOS-App](ios-app.md) auf iPhone und iPad, die
+[Android-App](android-app.md) auf Handy und Tablet, gekoppelte Geräte an UHS oder Lagemonitor.
+Für den Rechner, der den **Server** trägt, gilt zusätzlich [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
 
 ## Was auf dem Gerät liegt
 
 Damit die Arbeit ohne Netz weitergeht, hält das Gerät im Browserprofil (bzw. im Webview der
-Desktop-App oder der iOS-App, dort je Server getrennt) **im Klartext**:
+Desktop-App, der iOS-App oder der Android-App, in den beiden Mobil-Apps je Server getrennt)
+**im Klartext**:
 
 - das **Lagebild**: ETB, Meldebild, Aufträge, Lagekarte, Betreuung, UHS, Kommunikationsplan und
   die **Betroffenen mit Personen- und Gesundheitsdaten** (Name, Geburtsdatum, Sichtung,
@@ -41,7 +42,7 @@ laufende App wirkt. Herleitung: Bedrohungsmodell im Ticket LFH-1003.
 | Windows Home | „Geräteverschlüsselung“ (Einstellungen → Datenschutz und Sicherheit) |
 | macOS | FileVault |
 | iOS/iPadOS | Gerätecode gesetzt (verschlüsselt dann immer); gilt auch für die iOS-App |
-| Android ab 10 | Bildschirmsperre mit PIN, Muster oder Passwort |
+| Android ab 10 | Bildschirmsperre mit PIN, Muster oder Passwort; gilt auch für die Android-App |
 | Linux | LUKS2 für das Home-Verzeichnis und den Swap |
 
 **Windows prüfen:** Ohne TPM oder mit einem **lokalen Konto** ist die Geräteverschlüsselung oft

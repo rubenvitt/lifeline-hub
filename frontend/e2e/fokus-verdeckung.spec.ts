@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { waehleIn } from './auswahl-kern';
 import {
   detailBereit,
@@ -2719,9 +2720,7 @@ test('Unterkunft planen (LLH-1525): kein Ziel verdeckt im Dialog „Nachforderun
   await unterkunftSeite(page, 'handschuh');
 
   await page.getByRole('button', { name: 'Nachforderungen anlegen', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: `Nachforderungen für ${UNTERKUNFT_STELLE}` });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, `Nachforderungen für ${UNTERKUNFT_STELLE}`);
 
   const ziele = await markiereTabZiele(dialog);
   await expect(dialog.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
@@ -2887,9 +2886,7 @@ for (const dialog of ['Posten anlegen', 'Schichten erzeugen'] as const) {
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
     await page.getByRole('button', { name: dialog, exact: true }).click();
-    const modal = page.getByRole('dialog', { name: dialog });
-    await expect(modal).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const modal = await dialogSteht(page, dialog);
 
     const ziele = await markiereTabZiele(modal);
     await expect(modal.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);

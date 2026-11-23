@@ -2941,17 +2941,6 @@ mod tests {
     }
 }
 
-/// Grund, mit dem die Rücknahme eines Statuswechsels sein Zeitachsen-Ereignis streicht (LLH-1781).
-pub const GRUND_STATUS_RUECKNAHME: &str = "Statuswechsel zurückgenommen";
-
-fn status_ruecknahme_conflict() -> AppError {
-    AppError::Conflict(
-        "Der Statuswechsel lässt sich nicht mehr zurücknehmen: nur direkt danach und nur von \
-         der Person, die gewechselt hat"
-            .into(),
-    )
-}
-
 /// Ergebnis der Rücknahme eines Statuswechsels: für die Live-Meldungen nach dem Commit.
 #[derive(Debug, Default)]
 pub struct StatusRuecknahme {
@@ -3018,50 +3007,31 @@ pub async fn status_zuruecknehmen_tx(
     let (status_id, status_seit, gesetzt_von, vorher_id, vorher_seit, ereignis, einheit_id) =
         zeile.ok_or(AppError::NotFound)?;
     // Inzwischen anders gesetzt: ein CAS-Konflikt (`src/AGENTS.md`, Statuscode-Konvention).
-    if status_id != Some(beleg.status_id)
-        || status_seit.as_deref() != Some(beleg.status_seit.as_str())
-    {
-        return Err(AppError::Veraltet);
-    }
-    if gesetzt_von != Some(benutzer_id)
-        || !crate::entlassung::is_in_ruecknahme_frist(&beleg.status_seit, jetzt)
-    {
-        return Err(status_ruecknahme_conflict());
-    }
+    crate::status_ruecknahme::pruefe(
+        &crate::status_ruecknahme::Gemerkt {
+            status: status_id,
+            kennung: status_seit,
+            gesetzt_von,
+        },
+        &Some(beleg.status_id),
+        &beleg.status_seit,
+        benutzer_id,
+        jetzt,
+    )?;
 
     let mut ergebnis = StatusRuecknahme {
         einheit_id,
         ..Default::default()
     };
-    if let (Some(ereignis), Some(eid)) = (ereignis, einheit_id) {
-        let offen: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse \
-             WHERE id = ? AND einsatz_id = ? AND einheit_id = ? AND gestrichen_at IS NULL)",
+    if let Some(eid) = einheit_id {
+        ergebnis.beruehrt = crate::status_ruecknahme::streiche_ereignis_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            crate::zeitachse::repo::Kraft::Einheit(eid),
+            ereignis,
         )
-        .bind(ereignis)
-        .bind(einsatz_id)
-        .bind(eid)
-        .fetch_one(&mut *conn)
         .await?;
-        if offen {
-            let g = crate::zeitachse::repo::streiche_tx(
-                conn,
-                einsatz_id,
-                benutzer_id,
-                crate::zeitachse::repo::Kraft::Einheit(eid),
-                ereignis,
-                GRUND_STATUS_RUECKNAHME,
-                false,
-            )
-            .await
-            .map_err(|e| match e {
-                AppError::UnprocessableEntity(m) | AppError::Conflict(m) => AppError::Conflict(
-                    format!("Der Statuswechsel lässt sich nicht zurücknehmen: {m}"),
-                ),
-                andere => andere,
-            })?;
-            ergebnis.beruehrt = g.beruehrt;
-        }
     }
 
     let r = sqlx::query(

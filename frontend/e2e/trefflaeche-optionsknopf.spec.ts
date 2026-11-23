@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { FUEKW, SUBPIXEL, anmelden, einsatzAnlegen, ladeInDichte } from './trefflaeche-kern';
 import { zeigeLeistenAnsicht } from './leisten-kern';
 
@@ -32,10 +33,8 @@ async function oeffneLoeschDialog(page: Page) {
   await zeigeLeistenAnsicht(page, 'Ebenen');
   await page.getByRole('button', { name: 'Ansichts-Aktionen' }).click();
   await page.getByRole('menuitem', { name: /Löschen/ }).click();
-  const dialog = page.getByRole('dialog', { name: /^Ansicht „Optionsknopf. löschen$/ });
-  await expect(dialog).toBeVisible();
   // Erst nach der Zoom-Einblendung messen: währenddessen ist der Dialog skaliert.
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, /^Ansicht „Optionsknopf. löschen$/);
   return dialog;
 }
 

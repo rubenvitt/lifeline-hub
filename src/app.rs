@@ -1142,6 +1142,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen",
+            post(routes::einsatz_personal::status_zuruecknehmen),
+        )
+        .route(
             "/api/einsaetze/{id}/personal/{ep_id}/entlassen",
             post(routes::einsatz_personal::entlassen),
         )
@@ -1230,6 +1234,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/material/{em_id}/nachforderung",
             post(routes::einsatz_material::verknuepfen).delete(routes::einsatz_material::loesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen",
+            post(routes::einsatz_material::status_zuruecknehmen),
         )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
@@ -2603,6 +2611,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/status",
             put(routes::einsatz_einheit::status_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+            post(routes::einsatz_einheit::status_zuruecknehmen),
         )
         // Kräfte-Zeitachse (LFH-552) unter dem Einheiten-Präfix.
         .route(

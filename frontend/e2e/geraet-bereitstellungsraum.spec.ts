@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import { haeltStufe, ladeInDichte, stelleDichte } from './trefflaeche-kern';
@@ -263,7 +264,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
     const dialog = tablet.getByRole('dialog', { name: 'Eintreffen buchen' });
     await expect(dialog.getByRole('searchbox', { name: 'Suche' })).toBeFocused();
     // Gemessen erst, wenn die Einblendung steht (sonst skaliert `ant-zoom` den Kasten).
-    await expect(tablet.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await eingeblendet(dialog);
     const treffer = dialog.getByRole('button', { name: 'Eintreffen HLF Musterstadt' });
     await haeltStufe(treffer, 72, 'Trefferknopf „Eintreffen“ (handschuh)');
     await treffer.click();
@@ -506,7 +507,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
       tablet.getByRole('button', { name: 'Abruf zurücknehmen für HLF Deich' }),
     ).toHaveCount(0);
     const ausruecken = tablet.getByRole('button', { name: 'Ausrücken buchen für HLF Deich' });
-    await expect(tablet.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await eingeblendet(ausruecken);
     await haeltStufe(ausruecken, 72, 'Knopf „Ausrücken buchen“ (handschuh)');
     await ausruecken.click();
     await expect(tablet.getByText('Einheit „HLF Deich“ ausgerückt')).toBeVisible();

@@ -819,6 +819,11 @@ fn serde_wire_gleich_as_str() {
         Aus => "aus",
         ArtUnbekannt => "art_unbekannt",
     });
+    // LLH-2026: was zur laufenden Störung schon gemeldet ist (`adapter.gemeldet`).
+    enum_wire!(lifeline_hub::adapter::zustand::AdapterGemeldet {
+        Gestoert => "gestoert",
+        Eingriff => "eingriff",
+    });
     enum_wire!(lifeline_hub::adapter::art::FeldTyp {
         Text => "text",
         Zahl => "zahl",
@@ -1748,6 +1753,9 @@ fn benachrichtigung_wire() {
         FuehrungUngueltig => "fuehrung_ungueltig",
         FuehrungUebernommen => "fuehrung_uebernommen",
         FuehrungAngefragt => "fuehrung_angefragt",
+        AdapterEingriff => "adapter_eingriff",
+        AdapterGestoert => "adapter_gestoert",
+        AdapterWiederOk => "adapter_wieder_ok",
     } in lifeline_hub::benachrichtigung::BenachrichtigungArt::ALLE);
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp {
         Einsatz => "einsatz",
@@ -1779,6 +1787,7 @@ fn benachrichtigung_wire() {
         Einheit => "einheit",
         Fahrzeug => "fahrzeug",
         ChatNachricht => "chat_nachricht",
+        Adapter => "adapter",
     } in lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp::ALLE);
 }
 

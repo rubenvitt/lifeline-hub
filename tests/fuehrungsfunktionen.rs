@@ -605,7 +605,8 @@ async fn fuehrungsstelle_als_katalogwert() {
     .await;
     assert_eq!(e["meine_fuehrungsstelle"], "Fachberater: THW");
 
-    // Rollenwechsel ohne Feld behält die Stelle.
+    // Rollenwechsel aus der Führung heraus macht die Funktion zur Bezeichnung (LLH-2064): die
+    // Vorbelegung bleibt „Fachberater: THW“, jetzt als Freitext.
     rolle_setzen(&app, &admin, einsatz, frieda, "beobachter").await;
     let (_, e) = anfrage(
         &app,
@@ -801,4 +802,152 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     .unwrap();
     assert_eq!(code.as_deref(), Some("fachberater"), "Code überlebt");
     assert_eq!(text, None, "Bezeichnung (Scrub) ist weg");
+}
+
+// ---------- Nur die Führung trägt eine Funktion (LLH-2064) ----------
+//
+// Entwurf: docs/superpowers/specs/2026-11-22-u195f4et-funktion-nur-mit-schreibrecht-design.md D2.
+
+async fn mitglied_von(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value {
+    let (status, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    json.as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["benutzer_id"] == id)
+        .cloned()
+        .unwrap_or_else(|| panic!("Mitglied {id} fehlt"))
+}
+
+#[tokio::test]
+async fn mitarbeit_und_beobachter_mit_funktion_sind_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/mitglieder/{frieda}");
+
+    for rolle in ["mitarbeit", "beobachter"] {
+        let body = serde_json::json!({"einsatz_rolle": rolle, "fuehrungsfunktion": "s4"});
+        let (status, json) = anfrage(&app, "PUT", &pfad, &admin, Some(&body.to_string())).await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{rolle}: {json:?}"
+        );
+    }
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|m| m["benutzer_id"] != frieda),
+        "eine abgelehnte Aufnahme legt keine Mitgliedschaft an"
+    );
+}
+
+#[tokio::test]
+async fn mitarbeit_mit_freitext_ist_erlaubt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{frieda}"),
+        &admin,
+        Some(r#"{"einsatz_rolle":"mitarbeit","fuehrungsstelle":"Funk ELW 2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let m = mitglied_von(&app, &admin, einsatz, frieda).await;
+    assert_eq!(m["fuehrungsstelle"], "Funk ELW 2");
+    assert!(m.get("fuehrungsfunktion").is_none(), "{m:?}");
+}
+
+#[tokio::test]
+async fn rollenwechsel_macht_die_funktion_zur_bezeichnung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = mitglied_fuehrt(&app, &admin, einsatz, "s4", "Annika").await;
+    auftrag_an(
+        &app,
+        &admin,
+        einsatz,
+        serde_json::json!({"empfaenger_typ": "funktion", "funktion": "s4"}),
+    )
+    .await;
+    assert_eq!(
+        erster_auftrag(&app, &admin, einsatz).await["empfaenger"][0]["aktuelle_besetzung"]["name"],
+        "Annika"
+    );
+
+    rolle_setzen(&app, &admin, einsatz, anna, "mitarbeit").await;
+
+    let m = mitglied_von(&app, &admin, einsatz, anna).await;
+    assert!(m.get("fuehrungsfunktion").is_none(), "{m:?}");
+    assert_eq!(m["fuehrungsstelle"], "S4");
+    let a = erster_auftrag(&app, &admin, einsatz).await;
+    assert_eq!(
+        a["empfaenger"][0]["aktuelle_besetzung"]["zustand"], "nicht_vergeben",
+        "{a:?}"
+    );
+}
+
+#[tokio::test]
+async fn rollenwechsel_in_der_fuehrung_behaelt_die_funktion() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = mitglied_fuehrt(&app, &admin, einsatz, "s4", "Annika").await;
+    rolle_setzen(&app, &admin, einsatz, anna, "einsatzleitung").await;
+    let m = mitglied_von(&app, &admin, einsatz, anna).await;
+    assert_eq!(m["fuehrungsfunktion"], "s4");
+}
+
+#[tokio::test]
+async fn herabgestufte_funktion_bekommt_keinen_hinweis() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = mitglied_fuehrt(&app, &admin, einsatz, "s4", "Annika").await;
+    rolle_setzen(&app, &admin, einsatz, anna, "mitarbeit").await;
+    // Die Aufnahme meldet sich selbst; gezählt wird nur der Hinweis zum Auftrag.
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (status, json) = auftrag_an(
+        &app,
+        &admin,
+        einsatz,
+        serde_json::json!({"empfaenger_typ": "funktion", "funktion": "s4"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let an_anna: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE benutzer_id = ?")
+            .bind(anna)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(an_anna, 0);
 }

@@ -20,11 +20,14 @@ export function ladeErinnerungTitel(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
   qc?: QueryClient | null,
 ): Promise<string | null> {
-  if (e.art !== 'erinnerung_faellig' || e.bezug_typ !== 'erinnerung') return Promise.resolve(null);
-  const holen = () => listeOffeneErinnerungen(e.einsatz_id);
+  const einsatzId = e.einsatz_id;
+  if (e.art !== 'erinnerung_faellig' || e.bezug_typ !== 'erinnerung' || einsatzId == null) {
+    return Promise.resolve(null);
+  }
+  const holen = () => listeOffeneErinnerungen(einsatzId);
   const liste: Promise<Erinnerung[]> = qc
     ? qc.fetchQuery({
-        queryKey: einsatzKeys.erinnerungenPhase(e.einsatz_id, 'offen'),
+        queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'offen'),
         queryFn: holen,
         // Eine Liste, die Überblick oder Erinnerungsseite gerade geholt haben, reicht.
         staleTime: 30_000,

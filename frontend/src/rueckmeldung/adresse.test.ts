@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   beendeHuelle,
+  starteAndroidHuelle,
   starteIosHuelle,
   starteMacHuelle,
   starteWindowsHuelle,
@@ -81,6 +82,11 @@ describe('Oberfläche der Rückmeldung je Hülle (t39ltxxi)', () => {
   it('nennt in der iOS-Hülle die iOS-App (ausgeliefertes Init-Skript)', () => {
     starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
     expect(oberflaeche()).toBe('iOS-App');
+  });
+
+  it('nennt in der Android-Hülle die Android-App (ausgeliefertes Init-Skript)', () => {
+    starteAndroidHuelle({ bruecke: { postMessage: vi.fn() } });
+    expect(oberflaeche()).toBe('Android-App');
   });
 
   it('nennt in einer Desktop-Hülle ohne Plattform (vor LLH-1982) weiter die Desktop-App', () => {

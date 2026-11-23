@@ -1,0 +1,24 @@
+# Android-Prüfung nach dem Merge (LLH-1989, Entwurf D10: „dazu auf alpha“): ein Push auf `alpha`,
+# der die Android-Hülle, ihre Skripte oder die gemeinsamen Fälle ändert, fährt dieselben Jobs wie
+# am PR (`android-pruefung.yml`, dort steht alles Weitere). Eigener Workflow, weil ein Workflow nie
+# auf `pull_request` und `push` zugleich hört (ADR-0048). Kein Pflicht-Check, hält keinen Release
+# auf: rot heißt, der nächste Release signiert einen Stand, dessen App-Tests nicht grün sind.
+name: Android-Prüfung (alpha)
+
+on:
+  push:
+    branches: [alpha]
+    paths:
+      - "android/**"
+      - "src-tauri/faelle/**"
+      - "scripts/android/**"
+      - ".github/workflows/android-pruefung.yml"
+      - ".github/workflows/android-pruefung-alpha.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pruefung:
+    name: Android-Prüfung
+    uses: ./.github/workflows/android-pruefung.yml

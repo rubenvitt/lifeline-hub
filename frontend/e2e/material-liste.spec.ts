@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -136,8 +137,7 @@ test('Aufteilen mit Ort: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t
   await expect(liste(page).getByText('Wolldecke')).toBeVisible();
   await liste(page).getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }).click();
   await page.getByRole('menuitem', { name: 'Aufteilen …' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Wolldecke aufteilen' });
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Wolldecke aufteilen');
   await dialog.getByRole('spinbutton', { name: 'Menge abteilen' }).fill('20');
   // Das Feld „Ort“ steht auf dem Ort des Postens; gewählt wird der sichtbare Eintrag.
   const ort = dialog.getByRole('combobox', { name: 'Ort' });

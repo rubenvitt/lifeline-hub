@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Grund des dauerdunklen Rahmens aus der Marke (rahmenFarben.grund); der Marken-Wächter prüft es. -->
+    <color name="kopf_schwarz">#0c0e11</color>
+</resources>

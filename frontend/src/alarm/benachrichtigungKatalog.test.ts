@@ -33,11 +33,46 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(zielVon({ art: 'vermisstenmeldung', bezug_typ: 'person' })).toBe('personen');
   });
 
-  it('Org-Arten sind Aufnahme und neuer Einsatz', () => {
+  it('Org-Arten sind Aufnahme, neuer Einsatz und die Störungen einer Anbindung', () => {
     expect(ALLE_ARTEN.filter((a) => BENACHRICHTIGUNG_ARTEN[a].org)).toEqual([
       'einsatz_aufnahme',
       'einsatz_neu',
+      'adapter_eingriff',
+      'adapter_gestoert',
+      'adapter_wieder_ok',
     ]);
+  });
+
+  describe('Störung einer Anbindung (LLH-2026)', () => {
+    const ARTEN = ['adapter_eingriff', 'adapter_gestoert', 'adapter_wieder_ok'] as const;
+
+    it('ist ein abschaltbarer Eingang', () => {
+      for (const art of ARTEN) {
+        expect(BENACHRICHTIGUNG_ARTEN[art]).toMatchObject({
+          stufe: 'hinweis',
+          org: true,
+          einstellbar: true,
+        });
+      }
+      expect(BENACHRICHTIGUNG_ARTEN.adapter_eingriff.name).toBe('Anbindung braucht Eingriff');
+    });
+
+    it('springt zu den Anbindungen, nie in einen Einsatz', () => {
+      for (const art of ARTEN) {
+        expect(zielVon({ art, bezug_typ: 'adapter' })).toBe('anbindungen');
+        const pfad = ersatzPfad({ art, bezug_typ: 'adapter', bezug_id: 3, einsatz_id: null });
+        expect(pfad).toBe('/admin/einstellungen/anbindungen');
+      }
+      expect(zielPfad('anbindungen', null)).toBe('/admin/einstellungen/anbindungen');
+      expect(zielPfad('anbindungen', 4)).toBe('/admin/einstellungen/anbindungen');
+      expect(ZIEL_SPRUENGE.find((z) => z.ziel === 'anbindungen')?.text).toBe('Zu Anbindungen');
+    });
+
+    it('eine Org-Art ohne Einsatz springt nie nach /einsaetze/null', () => {
+      expect(
+        ersatzPfad({ art: 'einsatz_neu', bezug_typ: 'einsatz', bezug_id: 3, einsatz_id: null }),
+      ).not.toContain('null');
+    });
   });
 
   it('jeder Name ist eindeutig', () => {
@@ -116,7 +151,8 @@ describe('Katalog der Benachrichtigungsarten', () => {
 
   it('jeder Sprung führt in den Einsatz, außerhalb in die Einsatzliste', () => {
     for (const { ziel } of ZIEL_SPRUENGE) {
-      if (ziel === 'einsaetze') continue;
+      // Die Anbindungen liegen außerhalb jedes Einsatzes (LLH-2026, eigener Test oben).
+      if (ziel === 'einsaetze' || ziel === 'anbindungen') continue;
       expect(zielPfad(ziel, 4)).toMatch(/^\/einsaetze\/4(\/|$)/);
       expect(zielPfad(ziel, null)).toBe('/einsaetze');
     }

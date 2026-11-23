@@ -24,6 +24,9 @@ MIGK="$WF/migrationen-kanal.yml"
 RULESET="$WF/ruleset.yml"
 IOS="$WF/ios-pruefung.yml"
 IOSREL="$WF/ios.yml"
+ANDROID="$WF/android-pruefung.yml"
+ANDROIDALPHA="$WF/android-pruefung-alpha.yml"
+ANDROIDREL="$WF/android.yml"
 ART="$WF/artefakte.yml"
 fehler=0
 
@@ -34,7 +37,7 @@ pruefe() { # <name> <bedingung …>
   if "$@"; then ok "$name"; else fehl "$name"; fi
 }
 
-for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS" "$IOSREL" "$ART"; do
+for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS" "$IOSREL" "$ANDROID" "$ANDROIDALPHA" "$ANDROIDREL" "$ART"; do
   [ -f "$datei" ] || { echo "FEHLER: $datei fehlt." >&2; fehler=$((fehler + 1)); }
 done
 [ "$fehler" = 0 ] || { echo "==> FEHLER: $fehler Datei(en) fehlen im Selbsttest ci-stufen." >&2; exit 1; }
@@ -167,9 +170,9 @@ pruefe "env in ci.yml und pr.yml gleich" \
 pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$PR" "$SUITEN" "$E2E")" "ci-auswahl.sh"
 
 echo "==> ci-stufen: suiten.yml"
-pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, berichte" \
-  gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios berichte"
-for id in runner rust frontend e2e ios; do
+pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, android, berichte" \
+  gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios android berichte"
+for id in runner rust frontend e2e ios android; do
   pruefe "$id: kein if (der Aufrufer entscheidet)" test -z "$(job_if "$SUITEN" "$id")"
 done
 pruefe "berichte nur ohne Abbruch" gleich "$(job_if "$SUITEN" berichte)" "\${{ !cancelled() }}"
@@ -189,9 +192,14 @@ pruefe "ios: Swift-Kern über check-all.sh" enthaelt "$(job "$SUITEN" ios)" "run
 pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLICHT: "1"'
 pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" 'image: swift@sha256:'
 pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
+# Der Kotlin-Kern der Android-Hülle (LLH-1989): wie der Swift-Kern, ein fehlendes JDK ist rot.
+pruefe "android: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" android)" "ci-android-$JE_BRANCH|true"
+pruefe "android: Kotlin-Kern über check-all.sh" enthaelt "$(job "$SUITEN" android)" "run: ./scripts/check-all.sh --nur android"
+pruefe "android: JDK Pflicht" enthaelt "$(job "$SUITEN" android)" 'ANDROID_KERN_PFLICHT: "1"'
+pruefe "android: vorinstalliertes JDK über jdk-waehlen.sh" enthaelt "$(job "$SUITEN" android)" "run: ./scripts/android/jdk-waehlen.sh"
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 # Nur GitHub (ADR-0078): jeder Job der Suiten läuft auf `ubuntu-latest`, keine Runner-Wahl.
-for id in rust frontend ios berichte; do
+for id in rust frontend ios android berichte; do
   pruefe "$id: läuft auf GitHub" enthaelt "$(job "$SUITEN" "$id")" "    runs-on: ubuntu-latest"
 done
 pruefe "keine Runner-Wahl mehr" test -z "$(job "$SUITEN" runner)"
@@ -277,6 +285,105 @@ pruefe "ios.yml: verteilen löscht den Schlüssel immer" \
   enthaelt "$(job "$IOSREL" verteilen)" "if: \${{ always() }}"
 pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
+
+echo "==> ci-stufen: android-pruefung.yml"
+# Der App-Lauf der Android-Hülle (LLH-1989, Entwurf D10): am PR und nach dem Merge auf `alpha`, nur
+# bei Änderungen an der Hülle, ihren Skripten oder den gemeinsamen Fällen, nie Pflicht, nie
+# signiert. Den Push fängt ein eigener Workflow (ADR-0048) und ruft dieselben Jobs; kein Job fragt
+# nach dem Ereignis.
+pruefe "android-pruefung.yml: pull_request und Aufruf" nur_ausloeser "$ANDROID" "pull_request workflow_call "
+pruefe "android-pruefung-alpha.yml hört nur auf push" nur_ausloeser "$ANDROIDALPHA" "push "
+pruefe "android-pruefung-alpha.yml: nur auf alpha" enthaelt "$(kopf_code "$ANDROIDALPHA")" "branches: [alpha]"
+pruefe "android-pruefung-alpha.yml ruft android-pruefung.yml" \
+  enthaelt "$(job "$ANDROIDALPHA" pruefung)" "uses: ./.github/workflows/android-pruefung.yml"
+pruefe "android-pruefung-alpha.yml: Aufruf ohne if" test -z "$(job_if "$ANDROIDALPHA" pruefung)"
+pruefe "android-pruefung-alpha.yml liest nur" test "$(code_ohne_kommentar "$ANDROIDALPHA" | grep -cE ': write')" = 0
+for pfad in '"android/**"' '"src-tauri/faelle/**"' '"scripts/android/**"' '".github/workflows/android-pruefung.yml"'; do
+  for datei in "$ANDROID" "$ANDROIDALPHA"; do
+    pruefe "$(basename "$datei"): Pfadfilter $pfad" enthaelt "$(kopf_code "$datei")" "      - $pfad"
+  done
+done
+pruefe "android-pruefung-alpha.yml: Pfadfilter für sich selbst" \
+  enthaelt "$(kopf_code "$ANDROIDALPHA")" '      - ".github/workflows/android-pruefung-alpha.yml"'
+pruefe "android-pruefung.yml: Gruppe je Ref mit Abbruch (Job-Ebene, auch im Aufruf)" \
+  gleich "$(job_gruppe "$ANDROID" app)" "android-pruefung-\${{ github.ref }}|true"
+for id in $(job_ids "$ANDROID"); do
+  pruefe "android-pruefung.yml: Job $id ohne if" test -z "$(job_if "$ANDROID" "$id")"
+  pruefe "android-pruefung.yml: Job $id läuft auf GitHub" enthaelt "$(job "$ANDROID" "$id")" "    runs-on: ubuntu-latest"
+done
+pruefe "android-pruefung.yml liest nur" test "$(code_ohne_kommentar "$ANDROID" | grep -cE ': write')" = 0
+pruefe "android-pruefung.yml bekommt keine Geheimnisse" fehlt "$(code_ohne_kommentar "$ANDROID")" "secrets."
+pruefe "android-pruefung.yml: App-Tests und Release-APK" \
+  enthaelt "$(job "$ANDROID" app)" ":app:testDebugUnitTest :app:assembleRelease"
+pruefe "android-pruefung.yml: Kotlin-Kern" enthaelt "$(job "$ANDROID" app)" "-p android/kern test"
+pruefe "android-pruefung.yml: Bilder als android-bilder" enthaelt "$(job "$ANDROID" app)" "name: android-bilder"
+pruefe "android-pruefung.yml: SDK über das Skript" enthaelt "$(job "$ANDROID" app)" "run: ./scripts/android/sdk-installieren.sh"
+pruefe "Android-App ist kein Pflicht-Check" fehlt "$(cat "$SKRIPTE/ruleset-pruefen.sh")" "Android-App"
+
+echo "==> ci-stufen: android.yml (APK)"
+# Bau, Signatur und Ablage der APK (LLH-1989, Entwurf D9): aus artefakte.yml nach der Freigabe
+# jedes Tags oder per Handstart; ein roter Bau hält das Release nicht auf. Ein Fehler fiele erst
+# am nächsten Release oder an der ersten App auf, die kein Update bekommt.
+pruefe "android.yml: Aufruf und Handstart" nur_ausloeser "$ANDROIDREL" "workflow_call workflow_dispatch "
+pruefe "android.yml: Eingabe tag bei beiden Auslösern" test \
+  "$(kopf_code "$ANDROIDREL" | grep -cE '^      tag:')" = 2
+pruefe "android.yml: oben nur lesen" enthaelt "$(kopf_code "$ANDROIDREL")" "  contents: read"
+pruefe "android.yml baut mit scripts/android/release-apk.sh" \
+  enthaelt "$(job "$ANDROIDREL" bauen)" "./scripts/android/release-apk.sh --tag"
+for geheim in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+  pruefe "android.yml reicht $geheim an das Skript" \
+    enthaelt "$(job "$ANDROIDREL" bauen)" "$geheim: \${{ secrets.$geheim }}"
+  pruefe "android.yml: $geheim nur im Bau" \
+    test "$(code_ohne_kommentar "$ANDROIDREL" | grep -c "secrets.$geheim")" = 1
+done
+pruefe "android.yml: Bau ohne Schreibrecht" fehlt "$(job "$ANDROIDREL" bauen)" "contents: write"
+pruefe "android.yml: Release-Bau ohne Cache" fehlt "$(code_ohne_kommentar "$ANDROIDREL")" "cache: gradle"
+pruefe "android.yml: ablegen nach dem Bau" enthaelt "$(job "$ANDROIDREL" ablegen)" "needs: bauen"
+pruefe "android.yml: Manifest aus android-kanal.mjs" \
+  enthaelt "$(job "$ANDROIDREL" ablegen)" "node scripts/release/android-kanal.mjs --manifest"
+pruefe "android.yml: Kanäle aus android-kanal.mjs" \
+  enthaelt "$(job "$ANDROIDREL" ablegen)" "node scripts/release/android-kanal.mjs --kanaele-fuer"
+k="$(job "$ANDROIDREL" kanal)"
+pruefe "android.yml: kanal je Kanal eine Gruppe ohne Abbruch" \
+  gleich "$(job_gruppe "$ANDROIDREL" kanal)" "android-kanal-\${{ matrix.kanal }}|false"
+pruefe "android.yml: feste APK nach android-kanal.mjs, nur vorwärts (gegen den Kanal-Stand)" \
+  enthaelt "$k" 'android-kanal.mjs --apk-ersetzen "$KANAL" --neu neu/android.json --alt alt/android.json'
+pruefe "android.yml: Manifest im Kanal nach android-kanal.mjs" enthaelt "$k" "android-kanal.mjs --kanal"
+pruefe "android.yml: Kanal-Release nie latest" enthaelt "$k" "--prerelease --latest=false"
+# Ein zweiter Bau desselben Tags überschreibt die versionierte APK nie (andere sha256 als in den
+# Kanälen); liegt sie schon da, schreibt der Lauf auch die Kanäle nicht fort.
+a="$(job "$ANDROIDREL" ablegen)"
+pruefe "android.yml: APK über apk-ablegen.sh" enthaelt "$a" "./scripts/android/apk-ablegen.sh --tag"
+pruefe "android.yml: ablegen überschreibt nichts" fehlt "$(grep -Ev '^[[:space:]]*#' <<< "$a")" "--clobber"
+pruefe "android.yml: Kanäle nur, wenn abgelegt" enthaelt "$a" 'ABGELEGT: ${{ steps.apk.outputs.abgelegt }}'
+pruefe "android.yml: ohne Ablage keine Kanäle" enthaelt "$a" 'if [ "$ABGELEGT" != ja ]; then'
+# Stabil hat ein eigenes Kanal-Release; `releases/latest/download/` stünde nach der Freigabe bis
+# zum fertigen Bau leer.
+pruefe "android.yml: kein Manifest unter latest" fehlt "$(code_ohne_kommentar "$ANDROIDREL")" "latest/download"
+pruefe "android.yml: Kanal-Release android-stabil" enthaelt "$k" 'android-stabil) titel="Stabil"'
+# Ein Tag außerhalb der drei Kanäle (`-rc.1`) wird übersprungen, nicht rot.
+pruefe "android.yml: fremde Vorabtags übersprungen" enthaelt "$(job "$ANDROIDREL" bauen)" 'echo "bauen=nein" >> "$GITHUB_OUTPUT"'
+pruefe "android.yml: ablegen nur nach einem Bau" enthaelt "$a" "if: \${{ needs.bauen.outputs.bauen == 'ja' }}"
+pruefe "artefakte.yml: Job android ruft android.yml" enthaelt "$(job "$ART" android)" "uses: ./.github/workflows/android.yml"
+pruefe "artefakte.yml: android erbt die Secrets" enthaelt "$(job "$ART" android)" "secrets: inherit"
+pruefe "artefakte.yml: android nach freigeben" enthaelt "$(job "$ART" android)" "needs: [vorbereiten, freigeben]"
+pruefe "artefakte.yml: android darf ans Release schreiben" enthaelt "$(job "$ART" android)" "contents: write"
+android_if="$(job_if "$ART" android)"
+for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'"; do
+  pruefe "artefakte.yml: android nur wenn $teil" enthaelt "$android_if" "$teil"
+done
+pruefe "artefakte.yml: android für jeden Kanal" fehlt "$android_if" "needs.vorbereiten.outputs.vorab"
+pruefe "artefakte.yml: freigeben wartet nicht auf android" \
+  fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "android"
+
+# Keine Action fürs JDK: eine Action außerhalb der Freigabeliste ließe `ci.yml` (über suiten.yml)
+# und `artefakte.yml` (über android.yml) gar nicht starten (startup_failure an PR #1483).
+for datei in "$SUITEN" "$ANDROID" "$ANDROIDREL"; do
+  pruefe "$(basename "$datei"): keine Action fürs JDK" fehlt "$(code_ohne_kommentar "$datei")" "setup-java"
+done
+for datei in "$ANDROID" "$ANDROIDREL"; do
+  pruefe "$(basename "$datei"): JDK über jdk-waehlen.sh" enthaelt "$(code_ohne_kommentar "$datei")" "run: ./scripts/android/jdk-waehlen.sh"
+done
 
 echo "==> ci-stufen: ruleset.yml"
 pruefe "ruleset.yml: Push auf alpha, Zeitplan, Anstoß" nur_ausloeser "$RULESET" "push schedule workflow_dispatch "
