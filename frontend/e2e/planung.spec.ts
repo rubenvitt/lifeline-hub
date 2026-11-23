@@ -64,7 +64,7 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   const planungId = Number(/\/planungen\/(\d+)/.exec(page.url())![1]);
   const lade = async () =>
-    (await (await page.request.get(`/api/planungen/${planungId}`)).json()) as PlanungWire;
+    (await (await page.request.get(`/api/plans/${planungId}`)).json()) as PlanungWire;
 
   // ── Posten ─────────────────────────────────────────────────────────────────────────────────
   await page.getByRole('tab', { name: /^Posten/ }).click();
@@ -161,24 +161,24 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
     expect(r.ok(), `${pfad}: ${r.status()} ${await r.text()}`).toBeTruthy();
     return r.json();
   };
-  const plan = await api('/api/planungen', {
+  const plan = await api('/api/plans', {
     bezeichnung: name,
     ort: 'Marktplatz',
     von: `${tag} 06:00:00`,
     bis: `${tag} 22:00:00`,
   });
   const planungId: number = plan.kopf.id;
-  const helfer = await api(`/api/planungen/${planungId}/helfer`, {
+  const helfer = await api(`/api/plans/${planungId}/helpers`, {
     name: 'Hanna Stadtfest',
     organisation: 'Helferkreis',
   });
-  const mitPosten = await api(`/api/planungen/${planungId}/posten`, {
+  const mitPosten = await api(`/api/plans/${planungId}/posts`, {
     bezeichnung: 'Streife Markt',
     art: 'einheit',
     abschnitt: 'Festmeile',
     soll_anzahl: 2,
   });
-  await api(`/api/planungen/${planungId}/bloecke`, {
+  await api(`/api/plans/${planungId}/blocks`, {
     posten_id: mitPosten.posten[0].id,
     von: `${tag} 10:00:00`,
     bis: `${tag} 14:00:00`,
@@ -224,7 +224,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page.getByRole('button', { name: 'Planung bearbeiten' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
   await expect(ablauf.getByRole('button', { name: 'Programmpunkt', exact: true })).toHaveCount(0);
-  const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
+  const nochmal = await page.request.post(`/api/plans/${planungId}/transfer`, {
     data: { ziel: { art: 'neu' }, stand: 0 },
   });
   expect(nochmal.status()).toBe(409);
@@ -246,7 +246,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   // Derselbe Zeitpunkt wie in der Planung; welche UTC-Zeit 22:30 ist, hängt an der Zone.
   const paar = (punkte: { bezeichnung: string; zeitpunkt_at: string }[]) =>
     punkte.map((p) => [p.bezeichnung, p.zeitpunkt_at]);
-  const geplant = await (await page.request.get(`/api/planungen/${planungId}`)).json();
+  const geplant = await (await page.request.get(`/api/plans/${planungId}`)).json();
   const programm = await (
     await page.request.get(`/api/einsaetze/${einsatzId}/programmpunkte`)
   ).json();
@@ -290,11 +290,11 @@ test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter
   const vorher = (await unterZeiger.boundingBox())!;
 
   // Der „andere Schirm“ legt am Fußtrupp gleich anschließend 12–14 Uhr an.
-  const stand = (await (await page.request.get(`/api/planungen/${planung.id}`)).json()) as {
+  const stand = (await (await page.request.get(`/api/plans/${planung.id}`)).json()) as {
     posten: { id: number; bezeichnung: string }[];
   };
   const fusstrupp = stand.posten.find((p) => p.bezeichnung === 'Fußtrupp')!.id;
-  const antwort = await page.request.post(`/api/planungen/${planung.id}/bloecke`, {
+  const antwort = await page.request.post(`/api/plans/${planung.id}/blocks`, {
     data: {
       posten_id: fusstrupp,
       von: wireZeit(zeitpunktAm(planung.tag, 12)),
@@ -356,7 +356,7 @@ test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, n
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page);
   const bezeichnung = `E2E Planung Schleuse ${Date.now()}`;
-  const p = await sende<PlanungAntwort>(page, 'post', '/api/planungen', {
+  const p = await sende<PlanungAntwort>(page, 'post', '/api/plans', {
     bezeichnung,
     von: wocheVorausUm(6),
     bis: wocheVorausUm(22),
@@ -364,13 +364,13 @@ test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, n
   const id = p.kopf.id;
   const postenIds: number[] = [];
   for (const name of ['RTW 1', 'RTW 2']) {
-    const a = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+    const a = await sende<PlanungAntwort>(page, 'post', `/api/plans/${id}/posts`, {
       bezeichnung: name,
       art: 'einheit',
     });
     const postenId = a.posten.find((x) => x.bezeichnung === name)!.id;
     postenIds.push(postenId);
-    await sende(page, 'post', `/api/planungen/${id}/bloecke`, {
+    await sende(page, 'post', `/api/plans/${id}/blocks`, {
       posten_id: postenId,
       von: wocheVorausUm(8),
       bis: wocheVorausUm(12),
@@ -393,12 +393,12 @@ test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, n
   const vorher = (await unterZeiger.boundingBox())!;
 
   // Der andere Schirm legt „KTW 9“ an, setzt ihn an die erste Stelle und RTW 2 vor RTW 1.
-  const neu = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+  const neu = await sende<PlanungAntwort>(page, 'post', `/api/plans/${id}/posts`, {
     bezeichnung: 'KTW 9',
     art: 'einheit',
   });
   const ktw = neu.posten.find((x) => x.bezeichnung === 'KTW 9')!.id;
-  await sende(page, 'put', `/api/planungen/${id}/posten/reihenfolge`, {
+  await sende(page, 'put', `/api/plans/${id}/posts/order`, {
     posten_ids: [ktw, postenIds[1], postenIds[0]],
   });
 

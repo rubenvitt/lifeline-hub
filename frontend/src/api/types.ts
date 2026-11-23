@@ -1135,7 +1135,7 @@ export interface PlanungUebernehmenBody extends PlanungUebernahmeBody {
   stand: number;
 }
 
-/** Kein Backend-Schema: `POST /api/planungen`; Einsatzart fehlt = Sanitätsdienst. */
+/** Kein Backend-Schema: `POST /api/plans`; Einsatzart fehlt = Sanitätsdienst. */
 export interface PlanungBody {
   bezeichnung: string;
   einsatzart?: Einsatzart;
@@ -1146,7 +1146,7 @@ export interface PlanungBody {
   min_ruhe_minuten?: number;
 }
 
-/** Kein Backend-Schema: `PATCH /api/planungen/{id}`; `version` Pflicht (409), `null` = leeren. */
+/** Kein Backend-Schema: `PATCH /api/plans/{id}`; `version` Pflicht (409), `null` = leeren. */
 export interface PlanungAendernBody {
   version: number;
   bezeichnung?: string;

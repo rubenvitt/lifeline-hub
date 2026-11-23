@@ -12,7 +12,7 @@ use tower::ServiceExt;
 mod common;
 use common::*;
 
-const PFAD: &str = "/api/planungen";
+const PFAD: &str = "/api/plans";
 
 const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
@@ -42,7 +42,7 @@ async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (
     let (s, v) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         body.clone(),
     )
     .await;
@@ -53,7 +53,7 @@ async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (
     };
     let mut body = body;
     body["stand"] = json!(stand);
-    post(app, cookie, &format!("{PFAD}/{p}/uebernahme"), body).await
+    post(app, cookie, &format!("{PFAD}/{p}/transfer"), body).await
 }
 
 /// Eine leere Planung am 13.03.2027.
@@ -73,7 +73,7 @@ async fn punkt(app: &axum::Router, cookie: &str, p: i64, b: &str, z: &str) -> (S
     post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/programmpunkte"),
+        &format!("{PFAD}/{p}/program-items"),
         json!({"bezeichnung": b, "zeitpunkt_at": z}),
     )
     .await
@@ -117,7 +117,7 @@ async fn pflegen_mit_grenzen_und_rechten() {
     );
 
     // Ändern und löschen.
-    let einzeln = format!("{PFAD}/{p}/programmpunkte/{}", feuerwerk["id"]);
+    let einzeln = format!("{PFAD}/{p}/program-items/{}", feuerwerk["id"]);
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
@@ -132,7 +132,7 @@ async fn pflegen_mit_grenzen_und_rechten() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("{PFAD}/{p}/programmpunkte/{}", aufbau["id"]),
+        &format!("{PFAD}/{p}/program-items/{}", aufbau["id"]),
         &admin,
         None,
     )
@@ -141,7 +141,7 @@ async fn pflegen_mit_grenzen_und_rechten() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("{PFAD}/{p}/programmpunkte/{}", aufbau["id"]),
+        &format!("{PFAD}/{p}/program-items/{}", aufbau["id"]),
         &admin,
         None,
     )
@@ -260,7 +260,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": {"art": "neu"}}),
     )
     .await;
@@ -319,7 +319,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{PFAD}/{p}/programmpunkte/{erster}"),
+        &format!("{PFAD}/{p}/program-items/{erster}"),
         &admin,
         Some(&json!({"bezeichnung": "Anders"})),
     )
@@ -328,7 +328,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("{PFAD}/{p}/programmpunkte/{erster}"),
+        &format!("{PFAD}/{p}/program-items/{erster}"),
         &admin,
         None,
     )
@@ -365,7 +365,7 @@ async fn laufender_einsatz_ueberspringt_gleiche_punkte() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         ziel.clone(),
     )
     .await;
@@ -420,7 +420,7 @@ async fn mehr_als_fuenfzig_sperren_die_uebernahme() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         ziel.clone(),
     )
     .await;

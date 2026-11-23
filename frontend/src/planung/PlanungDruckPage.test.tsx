@@ -94,7 +94,7 @@ function setup(route = planungDruckPfad(5)) {
   server.use(
     meHandler(adminFixture()),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
-    http.get('/api/planungen/5', () => HttpResponse.json(PLANUNG)),
+    http.get('/api/plans/5', () => HttpResponse.json(PLANUNG)),
     http.get('/api/qualifikationen', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -141,7 +141,7 @@ describe('PlanungDruckPage (LLH-1593)', () => {
     setup();
     // Nach `setup`, damit dieser Handler vorgeht; der Abruf startet erst nach dem Rendern.
     server.use(
-      http.get('/api/planungen/5', () =>
+      http.get('/api/plans/5', () =>
         HttpResponse.json({ ...PLANUNG, kopf: { ...PLANUNG.kopf, einsatzart: 'uebung' } }),
       ),
     );
@@ -168,7 +168,7 @@ describe('PlanungDruckPage (LLH-1593)', () => {
   it('eine fremde oder gelöschte Planung (404) sagt, dass es sie nicht gibt', async () => {
     setup();
     server.use(
-      http.get('/api/planungen/5', () =>
+      http.get('/api/plans/5', () =>
         HttpResponse.json({ fehler: 'nicht gefunden' }, { status: 404 }),
       ),
     );

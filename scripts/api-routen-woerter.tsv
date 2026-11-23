@@ -9,6 +9,7 @@ app-code	-
 audit	-
 auth	-
 backup	-
+blocks	Blöcke
 briefings	Lagebesprechungen
 bulk	-
 callback	-
@@ -41,9 +42,11 @@ finish	-
 fonts	-
 forces	Kräfte
 gauges	Pegel
+generate	erzeugen
 glyphs	-
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 import	-
 incidents	Einsätze
 info-line	Infotelefon
@@ -66,6 +69,7 @@ me	-
 mirror	Spiegel
 oidc	-
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
 pair	koppeln
 pairings	Kopplungen
@@ -77,6 +81,8 @@ plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+preview	Vorschau
+program-items	Programmpunkte
 providers	-
 proxy	-
 raster	-
@@ -116,6 +122,7 @@ tile	-
 tilejson	-
 tiles	-
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 uhs	UHS
