@@ -60,9 +60,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
-  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
-  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen (ADR-0071,
-  LLH-1972). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `meta` 11, `monoKlein` 12, `mono` 13,
+  `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen (LLH-1972). **Boden 11 px**
+  (`SCHRIFT_BODEN`, LLH-2044): keine Stufe darunter, Augenbraue und Rail-Etikett 11, Seitentitel
+  16/600; darunter bleiben nur Druck, Zeichnungen mit eigenem Maßstab und der Lagemonitor
+  (ADR-0087). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
   `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
   Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven

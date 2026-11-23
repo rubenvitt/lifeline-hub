@@ -243,7 +243,7 @@ rasten ein: `lagekarte.css` (Maßstab 10 → `--lfh-typo-meta-*`), `wetter/Verla
 (Prognose-Beschriftung 9 → `monoStil('meta')`), `lagekarte/KartenDetailCard.tsx` (Kachel 9 →
 `monoStil('meta')`, Kachel 38 px).
 
-Nächste ADR-Nummer: ADR-0085 (höchste auf `alpha` 0084).
+ADR-Nummer: ADR-0087 (0085 belegt der offene PR #1614, 0084 steht auf `alpha` doppelt und wird umnummeriert).
 
 **Review Focus (Teil 3):**
 1. Ein Rail-Etikett („ERFASSUNG“) läuft bei 11 px über die 64-px-Rail → `e2e/rail-etikett.spec.ts`
@@ -293,12 +293,12 @@ ohne sie). Export `export const SCHRIFT_BODEN = 11;` in `theme/tokens.ts`.
 - [ ] **Step 2:** die drei Stellen auf Stufen; Ratsche und betroffene Tests grün.
 - [ ] **Step 3: Commit** `refactor(frontend): Schriftgrößen unter 11 px auf Stufen (LLH-2044)`.
 
-### Task 10: ADR-0085, Regel
+### Task 10: ADR-0087, Regel
 
-- [ ] ADR-0085 „Text hat einen Boden von 11 px“ ersetzt ADR-0071: übernimmt deren Regeln (Mono-Stufen
+- [ ] ADR-0087 „Text hat einen Boden von 11 px“ ersetzt ADR-0071: übernimmt deren Regeln (Mono-Stufen
   jetzt `meta` 11 bis `monoGross` 14), neu „MUST NOT: eine Stufe der `schriftskala` unter 11 px“,
   Prüfung mit den Pins von ADR-0071 plus `SCHRIFT_BODEN = 11`; ADR-0071 `status: ersetzt`,
-  `ersetzt_durch: ADR-0085`. `frontend/AGENTS.md`, „`schriftskala`“: Boden, Werte, Verweis.
+  `ersetzt_durch: ADR-0087`. `frontend/AGENTS.md`, „`schriftskala`“: Boden, Werte, Verweis.
   `scripts/check-all.sh --nur schnell` bzw. `scripts/check-architektur.sh` → grün. Commit.
 
 ### Task 11: Design System, Anwender-Bilder

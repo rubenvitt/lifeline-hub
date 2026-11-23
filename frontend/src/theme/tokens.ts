@@ -852,8 +852,8 @@ export const schriftskala = {
   augenbraue: { groesse: 11, gewicht: 600, familie: 'text', sperrung: '0.08em', versal: true },
   /** Etikett unter dem Rail-Icon: 11 px Versalien, Sperrung .04em (LLH-2044, Rail 64 px). */
   railEtikett: { groesse: 11, gewicht: 500, familie: 'text', sperrung: '0.04em', versal: true },
-  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text; auch Unterzeilen wie „Stand“ (vorher
-   *  `metaKlein` 10, entfallen mit dem Boden, LLH-2044). */
+  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text; auch Unterzeilen wie „Stand“ (die
+   *  10-px-Stufe darunter entfiel mit dem Boden, LLH-2044). */
   meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
   /** Mono neben `textKlein`: Zähler und Zeiten in dichten Zeilen (LLH-1972). */
   monoKlein: { groesse: 12, gewicht: 400, familie: 'zahl' },
@@ -873,7 +873,7 @@ export const schriftskala = {
 export type Schriftstufenname = keyof typeof schriftskala;
 
 /**
- * Schriftboden in px (LLH-2044, ADR-0085): keine Stufe der `schriftskala` liegt darunter. Ausnahmen
+ * Schriftboden in px (LLH-2044, ADR-0087): keine Stufe der `schriftskala` liegt darunter. Ausnahmen
  * stehen nicht in der Skala, sondern als Nicht-Ziele im Entwurf: Druck (pt), Zeichnungen mit
  * eigenem Maßstab (Kartenstile, taktische Zeichen, Fernmeldeskizze, Lagekarten-Griffe und
  * Cluster) und die Fernsicht des Lagemonitors.

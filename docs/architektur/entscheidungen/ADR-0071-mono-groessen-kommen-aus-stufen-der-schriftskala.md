@@ -1,9 +1,10 @@
 ---
 id: ADR-0071
 titel: Text, Mono, Abstand und Feldbreite kommen aus benannten Stufen, die Bausteine nehmen keine Zahl an
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-19
 ersetzt: ADR-0065
+ersetzt_durch: ADR-0087
 gilt_fuer:
   - frontend/src/theme/tokens.ts
   - frontend/src/theme/rollen.css
