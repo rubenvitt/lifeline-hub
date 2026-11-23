@@ -118,6 +118,10 @@ export function umgebungRaeumen(laufSchluessel: string) {
  * zweite Sicherung: der Abbruch hängt nicht allein an der Größe, und lokal ließ er sich nicht
  * nachstellen. Er ist eine V8-Option und in NODE_OPTIONS verboten, deshalb startet der Befehl
  * Node selbst (`process.execPath`, dieselbe gepinnte Version).
+ *
+ * `LIFELINE_MODULE_OHNE_CACHE` liefert die eigenen Module mit `no-store` aus (LLH-1932): Beim
+ * Revalidieren der rund 1.200 Module je Seitenladung brach Chromium unter Last ab und zu den
+ * Modulgraphen ab, und die Seite blieb schwarz (gemessen in `e2e/dev-server-cache.spec.ts`).
  */
 export function viteServer(frontendPort: number, backendUrl: string) {
   return {
@@ -128,7 +132,11 @@ export function viteServer(frontendPort: number, backendUrl: string) {
     url: `http://127.0.0.1:${frontendPort}`,
     // Proxy-Ziel auf das Backend des Laufs umbiegen (vite.config.ts liest die Variablen,
     // process.env hat dort Vorrang vor .env.local).
-    env: { LIFELINE_BACKEND_URL: backendUrl, LIFELINE_DEPS_OHNE_SOURCEMAP: '1' },
+    env: {
+      LIFELINE_BACKEND_URL: backendUrl,
+      LIFELINE_DEPS_OHNE_SOURCEMAP: '1',
+      LIFELINE_MODULE_OHNE_CACHE: '1',
+    },
     reuseExistingServer: false,
     timeout: 60_000,
   };

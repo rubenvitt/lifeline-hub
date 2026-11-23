@@ -68,6 +68,37 @@ public struct Serverliste: Codable, Equatable, Sendable {
         eintraege[index].bestaetigterVertrag = vertrag
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case eintraege, aktivID
+    }
+
+    /// Ein Eintrag, dessen Adresse die Prüfung heute ablehnt (etwa ein gesperrter Port,
+    /// LLH-1987), fällt heraus, statt die ganze Liste unlesbar zu machen; wie
+    /// `verbindung::bekannte` der Desktop-Hülle. Jeder andere Fehler bleibt einer, damit
+    /// `Serverablage.loadOrRecover` die Datei beiseitelegt statt sie still zu kürzen. War der
+    /// verworfene Eintrag aktiv, wird der erste übrige aktiv, wie bei `add`.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        eintraege = try container.decode([LossyEntry].self, forKey: .eintraege).compactMap(\.value)
+        let gespeichert = try container.decodeIfPresent(UUID.self, forKey: .aktivID)
+        let verworfen = gespeichert.map { id in !eintraege.contains { $0.id == id } } ?? false
+        aktivID = verworfen ? eintraege.first?.id : gespeichert
+    }
+
+    private struct LossyEntry: Decodable {
+        let value: ServerEintrag?
+
+        init(from decoder: Decoder) throws {
+            do {
+                value = try ServerEintrag(from: decoder)
+            } catch let DecodingError.dataCorrupted(context)
+                where context.codingPath.last?.stringValue == "adresse"
+            {
+                value = nil
+            }
+        }
+    }
+
     private func eintrag(id: UUID) -> ServerEintrag? { eintraege.first { $0.id == id } }
 
     private func index(_ id: UUID) throws(ListError) -> Int {

@@ -9,15 +9,28 @@ import Foundation
 public struct ShellInfo: Decodable, Equatable, Sendable {
     public let version: String
     public let shellContract: Int
+    /// Assets für den Start ohne Server (LLH-1980); `nil` bei einem Server, der das Feld noch
+    /// nicht kennt. Geprüft wird die Liste erst in `Vorrat.offlineAssets`.
+    public let assets: [String]?
 
-    public init(version: String, shellContract: Int) {
+    public init(version: String, shellContract: Int, assets: [String]? = nil) {
         self.version = version
         self.shellContract = shellContract
+        self.assets = assets
     }
 
     enum CodingKeys: String, CodingKey {
         case version
         case shellContract = "shell_contract"
+        case assets
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(String.self, forKey: .version)
+        shellContract = try c.decode(Int.self, forKey: .shellContract)
+        // Eine unlesbare Liste nimmt dem Server nicht den Vertrag, nur den Start ohne Server.
+        assets = try? c.decodeIfPresent([String].self, forKey: .assets)
     }
 }
 

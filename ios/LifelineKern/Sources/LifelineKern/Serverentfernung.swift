@@ -10,6 +10,8 @@ public protocol Entfernungsdienste: AnyObject {
     func closeWebView(datenspeicher id: UUID)
     /// `WKWebsiteDataStore.remove(forIdentifier:)`.
     func removeDatenspeicher(_ id: UUID) async throws
+    /// Löscht die gespeicherte Oberfläche des Servers (LLH-1980); ohne Ablage nichts.
+    func removeVorrat(_ id: UUID)
     /// Nimmt den Eintrag aus der Liste und speichert sie.
     func removeEintrag(_ id: UUID) throws(Serverliste.ListError)
 }
@@ -17,8 +19,9 @@ public protocol Entfernungsdienste: AnyObject {
 /// Entfernen eines Servers (Entwurf D3; Spec `ios-huelle`, „Mehrere Server lassen sich
 /// verwalten“, „Jeder Server hat seinen eigenen Datenspeicher“). Reihenfolge: Webview des
 /// Speichers schließen (`remove(forIdentifier:)` scheitert, solange ein Webview ihn benutzt),
-/// Speicher löschen, erst dann den Eintrag. Scheitert das Löschen, bleibt der Eintrag, und die App
-/// meldet den Fehler; so bleibt kein Speicher ohne Eintrag zurück, und ein zweiter Versuch geht.
+/// Speicher löschen, dann die gespeicherte Oberfläche (LLH-1980), erst dann den Eintrag. Scheitert
+/// das Löschen des Speichers, bleibt der Eintrag, und die App meldet den Fehler; so bleibt kein
+/// Speicher ohne Eintrag zurück, und ein zweiter Versuch geht.
 public enum Serverentfernung {
     public enum Fehler: Error, Equatable, LocalizedError, Sendable {
         case unbekannt
@@ -65,6 +68,7 @@ public enum Serverentfernung {
         } catch {
             throw .datenspeicher(name: eintrag.name, grund: error.localizedDescription)
         }
+        dienste.removeVorrat(id)
         do {
             try dienste.removeEintrag(id)
         } catch .aktivNichtEntfernbar {

@@ -34,6 +34,8 @@ final class AppModell {
     let testzustand: Testzustand?
 
     @ObservationIgnored private let ablage: Serverablage?
+    /// Start ohne Server (LLH-1980); `nil` im Testzustand.
+    @ObservationIgnored private let vorrat: Vorratsdienst?
     @ObservationIgnored private var wiederholung: Task<Void, Never>?
     @ObservationIgnored private var rueckkehr = Rueckkehr()
     @ObservationIgnored private var gestartet = false
@@ -52,11 +54,14 @@ final class AppModell {
         testzustand = Testzustand(argumente: argumente)
         if testzustand != nil {
             ablage = nil
+            vorrat = nil
             liste = Self.beispielliste()
         } else {
-            let ablage = Serverablage(
-                verzeichnis: URL.applicationSupportDirectory.appendingPathComponent("Lifeline"))
+            let verzeichnis = URL.applicationSupportDirectory.appendingPathComponent("Lifeline")
+            let ablage = Serverablage(verzeichnis: verzeichnis)
             self.ablage = ablage
+            vorrat = Vorratsdienst(
+                ablage: Vorratsablage(verzeichnis: verzeichnis.appendingPathComponent("Oberflaechen")))
             liste = ablage.loadOrRecover()
         }
         anmelder = Anmelder(
@@ -91,11 +96,12 @@ final class AppModell {
     }
 
     func send(_ event: Ablauf.Event) {
-        let schritt = Ablauf.next(seite, event)
+        let vorhanden = seite.eintrag.flatMap { vorrat?.version(fuer: $0.id) }
+        let schritt = Ablauf.next(seite, event, vorrat: vorhanden)
         seite = schritt.seite
-        if case .web = seite {} else { closeWebView() }
-        if case .status(_, .nichtErreichbar) = seite {} else { wiederholung?.cancel() }
-        if case .web = seite {} else { zeigtZurOberflaeche = false }
+        if !seite.zeigtWebview { closeWebView() }
+        if !seite.wiederholt { wiederholung?.cancel() }
+        if !seite.zeigtWebview { zeigtZurOberflaeche = false }
         for effekt in schritt.effects { perform(effekt) }
     }
 
@@ -135,6 +141,10 @@ final class AppModell {
             } else {
                 webView.load(URLRequest(url: eintrag.adresse.url))
             }
+        case .loadVorrat(let eintrag):
+            loadVorrat(eintrag)
+        case .vorwaermen(let eintrag, let info):
+            vorwaermen(eintrag, info)
         case .markVerbunden(let id, let vertrag):
             try? liste.markVerbunden(id, am: .now, vertrag: vertrag)
             save()
@@ -147,6 +157,45 @@ final class AppModell {
             }
         case .showZurOberflaeche, .hideZurOberflaeche:
             break
+        }
+    }
+
+    // MARK: Start ohne Server (LLH-1980)
+
+    /// Neuer Webview mit dem Datenspeicher des Servers, gespeicherte Oberfläche laden, dann
+    /// prüfen, ob sie hochfährt. Scheitert das, gilt sie für diesen Lauf nicht mehr.
+    private func loadVorrat(_ eintrag: ServerEintrag) {
+        guard let vorrat else { return }
+        closeWebView()
+        let webView = Webviewfabrik.make(
+            fuer: eintrag,
+            skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
+            empfang: empfang, navigation: navigation)
+        self.webView = webView
+        let geladen = vorrat.loadVorrat(eintrag, in: webView)
+        Task {
+            let gestartet = geladen ? await vorrat.isGestartet(webView) : false
+            guard !gestartet, webView === self.webView else { return }
+            vorrat.markGescheitert(eintrag.id)
+            send(.vorratGescheitert(fuer: eintrag.id))
+        }
+    }
+
+    /// Nach dem Laden vom Server, sobald die Seite fertig ist: vorwärmen und ablegen.
+    private func vorwaermen(_ eintrag: ServerEintrag, _ info: ShellInfo) {
+        guard let vorrat else { return }
+        // Sofort, unabhängig davon, ob das Vorwärmen danach läuft (Review LLH-1980).
+        vorrat.verwirfVeraltete(eintrag, version: info.version)
+        guard let webView else { return }
+        Task {
+            // `isLoading` steht erst nach dem Start der Navigation; vorher kurz warten.
+            try? await Task.sleep(for: .seconds(1))
+            let beginn = ContinuousClock.now
+            while webView.isLoading, ContinuousClock.now - beginn < .seconds(60) {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            guard webView === self.webView, !webView.isLoading else { return }
+            await vorrat.vorwaermen(eintrag, info: info, in: webView)
         }
     }
 
@@ -365,6 +414,11 @@ extension AppModell: Entfernungsdienste {
     func removeDatenspeicher(_ id: UUID) async throws {
         guard testzustand == nil else { return }
         try await Datenspeicher.remove(id)
+    }
+
+    /// Die gespeicherte Oberfläche des Servers (LLH-1980).
+    func removeVorrat(_ id: UUID) {
+        vorrat?.ablage.remove(id)
     }
 
     func removeEintrag(_ id: UUID) throws(Serverliste.ListError) {
