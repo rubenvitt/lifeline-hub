@@ -65,7 +65,6 @@ import { ErfassungsModal } from '../components/Erfassung';
 import {
   nichtGefundenInhalt,
   SeitenFehler,
-  SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import {
@@ -116,6 +115,7 @@ import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 
 /**
  * Besatzung als Urteil (`Status` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
@@ -804,7 +804,7 @@ function FahrzeugeInhalt() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    return <ModulGerippeSeite modulKey="fahrzeuge" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (

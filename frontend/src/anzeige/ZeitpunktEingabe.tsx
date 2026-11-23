@@ -57,6 +57,15 @@ import './ZeitpunktEingabe.css';
 
 export type { ZeitArt } from './zeitParser';
 
+/**
+ * Was das Feld neben der Eingabe sagt: der Grund einer unlesbaren Eingabe, die Deutung beim Tippen
+ * („= 171430okt26 · gestern“) oder „gestern“/„morgen“ am geltenden Wert.
+ */
+export interface ZeitHinweis {
+  art: 'grund' | 'deutung' | 'tag';
+  text: string;
+}
+
 /** Kanonischer Name einer Zone (Aliasse wie `Etc/UTC` → `UTC`), damit der Hinweis nicht flackert. */
 function kanonisch(zone: string): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
@@ -162,6 +171,12 @@ export interface ZeitpunktEingabeProps {
    * Spec `zeiteingabe` unverändert: gesendet wird der geltende Wert.
    */
   onDiscard?: (grund: string | null) => void;
+  /**
+   * Das Feld zeigt seinen Hinweis nicht selbst, sondern meldet ihn (`null`, wenn keiner steht); der
+   * Aufrufer zeigt ihn und verweist per `aria-describedby` darauf. Für schmale Felder, in denen der
+   * Hinweis die Eingabe verdrängte (ETB-Feldzeile, LLH-1917). Der rote Rahmen bleibt am Feld.
+   */
+  onHinweis?: (hinweis: ZeitHinweis | null) => void;
   /** Ereignis (Vergangenheit) oder Frist (Zukunft): wohin eine Uhrzeit ohne Tag fällt. */
   art?: ZeitArt;
   /** Tage nach „heute“ (Kalender der Anzeigezone) sind nicht wählbar; ohne `art` = Ereignis. */
@@ -215,6 +230,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     onChange,
     onOk,
     onDiscard,
+    onHinweis,
     art,
     keineZukunftstage,
     schnellwahl,
@@ -365,16 +381,33 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** „gestern“/„morgen“ am geltenden Wert, solange nicht getippt wird (LLH-1768). */
   const tagHinweis =
     wert && !nurTag && deutung === null ? tagNachbar(wert, z.zone, serverJetzt()) : null;
-  const grundImFormular = stelleZeigtGrund && discarded !== null && grund === discarded;
-  const hinweisText = grund
-    ? grundImFormular
-      ? ''
-      : grund
+  const hinweis: ZeitHinweis | null = grund
+    ? { art: 'grund', text: grund }
     : deutung?.ok && deutung.zeitpunkt
-      ? `= ${nurTag ? formatTag(deutung.zeitpunkt, z.zone) : formatDtg(deutung.zeitpunkt, z.zone)}${
-          deutung.hinweis ? ` · ${deutung.hinweis}` : ''
-        }`
-      : (tagHinweis ?? '');
+      ? {
+          art: 'deutung',
+          text: `= ${nurTag ? formatTag(deutung.zeitpunkt, z.zone) : formatDtg(deutung.zeitpunkt, z.zone)}${
+            deutung.hinweis ? ` · ${deutung.hinweis}` : ''
+          }`,
+        }
+      : tagHinweis
+        ? { art: 'tag', text: tagHinweis }
+        : null;
+  // Gemeldet wird nur ein anderer Hinweis; beim Aushängen steht keiner mehr.
+  const onHinweisRef = useRef(onHinweis);
+  useLayoutEffect(() => {
+    onHinweisRef.current = onHinweis;
+  });
+  const hinweisArt = hinweis?.art ?? null;
+  const hinweisWort = hinweis?.text ?? null;
+  useEffect(() => {
+    onHinweisRef.current?.(
+      hinweisArt && hinweisWort !== null ? { art: hinweisArt, text: hinweisWort } : null,
+    );
+  }, [hinweisArt, hinweisWort]);
+  useEffect(() => () => onHinweisRef.current?.(null), []);
+  const grundImFormular = stelleZeigtGrund && discarded !== null && grund === discarded;
+  const hinweisText = onHinweis || grundImFormular ? '' : (hinweis?.text ?? '');
   // Das Suffix steht IMMER im DOM: antds `Input` baut sein Gerüst um, sobald ein Suffix kommt oder
   // geht, und das Feld verlöre mitten im Tippen den Fokus.
   const suffix = (

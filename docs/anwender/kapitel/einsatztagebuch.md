@@ -119,11 +119,13 @@ der Zeitachse erscheinen wird.
    Zeitfeld (etwa „1420“, „14:20“, „101420“, „-10“ für zehn Minuten vor jetzt). Weicht die Zeit ab,
    wird das Feld gelb, die Fußzeile nennt „Nachtrag · Ereignis vor 14 min“ und der Knopf heißt
    „Erfassen als 1912“. Ein geleertes Feld gilt wieder „jetzt“. Liegt die Zeit an einem anderen Tag,
-   zeigt das Feld den Tag mit, etwa „162350okt26“. Eine unlesbare Zeit, etwa „14:3x“, übernimmt das
-   Feld nicht: es zeigt wieder den alten Wert und nennt den Grund, und die Erfassung sendet nicht,
-   bis die Zeit stimmt. Dann steht in der Fußzeile „Zeit nicht übernommen“, und das Feld hat den
-   Cursor. Eine lesbare Zeit eintippen oder das Feld leeren (dann gilt „jetzt“); Enter oder Escape im
-   Feld behalten die gezeigte Zeit, bei einem leeren Feld also „jetzt“.
+   zeigt das Feld den Tag mit, etwa „162350okt26“. Beim Tippen nennt die Fußzeile, wie die Zeit
+   gelesen wird, etwa „Zeit = 171912okt26“. Eine unlesbare Zeit, etwa „14:3x“, übernimmt das Feld
+   nicht: der Text bleibt im rot umrandeten Feld stehen, die Fußzeile nennt den Grund („Zeit: nicht
+   lesbar“), und die Erfassung sendet nicht, bis die Zeit stimmt. Nach einem Sendeversuch steht dort
+   „Zeit nicht übernommen“, und das Feld hat den Cursor. Eine lesbare Zeit eintippen oder das Feld
+   leeren (dann gilt „jetzt“); Escape im Feld verwirft den Text und behält die vorige Zeit, bei einem
+   leeren Feld also „jetzt“.
 3. Schneller geht ein Nachtrag mit „/zeit“ an beliebiger Stelle im Text: „/zeit 1420 Pumpe läuft“
    oder „Pumpe läuft /zeit 1420“ trägt 1420 in „Zeit“ ein, der Rest der Zeile bleibt der Inhalt.
    Steht der Befehl am Ende, übernimmt Enter bzw. „Erfassen“ erst die Zeit ins Feld und sendet

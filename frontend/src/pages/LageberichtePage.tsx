@@ -1,4 +1,4 @@
-import { Breadcrumb, Spin, Typography } from 'antd';
+import { Breadcrumb, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -22,12 +22,12 @@ import {
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { modulName } from '../einsatz/modulRegistry';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 import NeuerLagevortragKnopf, { VORGABE_VORLAGE } from '../lageberichte/NeuerLagevortragKnopf';
 import LageberichtUebersicht from '../lageberichte/LageberichtUebersicht';
 import { loadStartinhalt } from '../lageberichte/startinhalt';
 import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/uebersicht';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
-import { flaeche } from '../theme/tokens';
 
 /**
  * Lageberichte: Übersicht und Anlegen (LLH-1064).
@@ -146,13 +146,9 @@ export default function LageberichtePage() {
     fortschreibenMutation.mutate({ einsatzId, id: berichtId }, { onError: loese });
   };
 
-  if (einsatzQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
+  // Kopf sofort statt Ladekreisel (LLH-2005, `frontend/AGENTS.md`, „Modulwechsel zeigt sofort Kopf
+  // und Gerippe“).
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="lageberichte" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <Typography.Text type="danger">Einsatz nicht gefunden oder kein Zugriff.</Typography.Text>

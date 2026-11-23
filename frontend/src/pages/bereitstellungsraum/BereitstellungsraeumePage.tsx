@@ -16,12 +16,7 @@ import { listeEinheiten } from '../../api/einheiten';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrListenEintrag, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
-import {
-  SeitenFehler,
-  SeitenLeer,
-  SeitenSkeleton,
-  SeitenStandVeraltet,
-} from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
 import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../../components/listenGedaechtnis';
@@ -34,6 +29,7 @@ import { KennungsLink } from '../../components/kennungsLink';
 import { useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
 import { Status } from '../../components/instrument/Status';
+import { ModulGerippeSeite } from '../../einsatz/ModulWechselGerippe';
 
 /** Status in der Reihenfolge des Lebenslaufs (geplant → aktiv → aufgelöst), nicht nach Alphabet. */
 const STATUS_FOLGE = Object.keys(brStatus) as BrStatus[];
@@ -240,7 +236,7 @@ export default function BereitstellungsraeumePage() {
   // Zwei Ebenen: der Seitenzustand hängt nur an `einsatzQuery` (Breadcrumb, Schreibrecht) und
   // rechtfertigt einen Frühausstieg. Der Zustand von `brQuery` gehört an die Stelle der Liste
   // (unten), nicht vor die ganze Seite.
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="bereitstellungsraeume" />;
   if (einsatzQuery.error) {
     return (
       <SeitenFehler

@@ -262,6 +262,29 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(Ctor).not.toHaveBeenCalled();
   });
 
+  it('Auftrag überfällig nennt in der Alarmzone Nummer und Anfang des Auftragstexts (LLH-1909)', async () => {
+    const ueberfaellig = benachrichtigung(42, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([ueberfaellig]);
+    server.use(
+      http.get('/api/einsaetze/:id/auftraege/:aid', () =>
+        HttpResponse.json({
+          id: 7,
+          lfd_nr: 7,
+          auftrag_text: 'Sandsäcke an der Pegelstelle auffüllen',
+          empfaenger: [],
+        }),
+      ),
+    );
+    stubMeldungen();
+    renderZentrale();
+    live(ueberfaellig);
+
+    const n = await waitFor(() => notice('Auftrag überfällig'));
+    expect(
+      await within(n).findByText(/#7 · Sandsäcke an der Pegelstelle auffüllen/),
+    ).toBeInTheDocument();
+  });
+
   it('Alarm, Tab verdeckt: OS-Meldung unter dem tag der Benachrichtigung', async () => {
     const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
     serverMit([ueberfaellig]);

@@ -1,7 +1,6 @@
 import { Spin, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { ladePerson } from '../api/einsatzPerson';
-import { einsatzKeys } from '../api/queryKeys';
+import { personDetailQueryOptions } from './personDetailQuery';
 import { GESCHLECHT_WORT, personStatusDarstellung } from './personMeta';
 import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import Patientenkopf from './Patientenkopf';
@@ -20,7 +19,8 @@ import { Stapel } from '../components/instrument';
  * Sichtung mit Zeit, „Zustand / Verdacht“, Aufenthalt bzw. Verbleib, letzte Notiz. Darunter die
  * Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“ — kein
  * `Descriptions` (`frontend/src/personen/AGENTS.md`, „Personen-Detail“). Derselbe Query-Key wie
- * Liste und Drawer-Titel (`einsatzKeys.person`): ein Cache-Fach, ein Detail-GET je Öffnung.
+ * Liste und Drawer-Titel (`einsatzKeys.person`): ein Cache-Fach, ein Detail-GET je Öffnung, kein
+ * Neuladen bei Fokus (`personDetailQueryOptions`, LLH-1984).
  */
 export default function PersonVorschau({
   einsatzId,
@@ -30,10 +30,7 @@ export default function PersonVorschau({
   personId: number;
 }) {
   const { token } = theme.useToken();
-  const detailQuery = useQuery({
-    queryKey: einsatzKeys.person(einsatzId, personId),
-    queryFn: () => ladePerson(einsatzId, personId),
-  });
+  const detailQuery = useQuery(personDetailQueryOptions(einsatzId, personId));
   const p = detailQuery.data;
 
   return (
