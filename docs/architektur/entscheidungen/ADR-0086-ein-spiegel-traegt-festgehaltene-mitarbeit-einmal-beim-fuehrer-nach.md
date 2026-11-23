@@ -5,7 +5,7 @@ status: akzeptiert
 datum: 2026-11-22
 gilt_fuer:
   - src/instanz/spiegel/nachtrag.rs
-  - migrations/0364_mitarbeit_nachtrag.sql
+  - migrations/0366_mitarbeit_nachtrag.sql
 herleitung:
   - docs/superpowers/specs/2026-11-22-s110uic4-mitarbeit-nachtrag-fuehrer-design.md
 ---
