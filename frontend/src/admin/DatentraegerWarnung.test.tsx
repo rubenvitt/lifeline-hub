@@ -30,7 +30,7 @@ function setup(me: BenutzerAnzeige, status: DatentraegerStatus) {
       sitzung += 1;
       return HttpResponse.json(me);
     }),
-    http.get('/api/system/datentraeger', () => {
+    http.get('/api/system/storage', () => {
       abrufe += 1;
       return HttpResponse.json(status);
     }),

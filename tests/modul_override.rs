@@ -1119,7 +1119,7 @@ async fn live_payloads_tragen_keinen_klartext() {
 
 // ----------------------------- Task 11: Org-Modul-Default über HTTP-Route erzwungen -----------------------------
 
-/// PUT /api/org-modul-einstellungen/:modul_key; liefert nur den Status.
+/// PUT /api/org-module-settings/:modul_key; liefert nur den Status.
 async fn org_default_setzen(
     app: &axum::Router,
     admin_cookie: &str,
@@ -1135,7 +1135,7 @@ async fn org_default_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/org-modul-einstellungen/{modul_key}"))
+                .uri(format!("/api/org-module-settings/{modul_key}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie.to_string())
                 .body(Body::from(body))
@@ -1248,7 +1248,7 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        "/api/org-modul-einstellungen/etb",
+        "/api/org-module-settings/etb",
         &admin,
         Some(r#"{"benoetigte_rolle":null,"sichtbar":false}"#),
     )
@@ -1289,11 +1289,11 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
 async fn set_org_vorgaben(app: &axum::Router, admin: &str) {
     for (pfad, body) in [
         (
-            "/api/org-modul-einstellungen/lagebesprechung",
+            "/api/org-module-settings/lagebesprechung",
             r#"{"benoetigte_rolle":null,"sichtbar":false}"#,
         ),
         (
-            "/api/org-modul-einstellungen/lagemeldungen",
+            "/api/org-module-settings/lagemeldungen",
             r#"{"benoetigte_rolle":"einsatzfuehrung","sichtbar":true}"#,
         ),
     ] {
@@ -1346,7 +1346,7 @@ async fn modul_vorgaben_oeffnen_kein_org_weites_leserecht() {
         load_modul_vorgaben(&app, &lotta, eid).await.0,
         StatusCode::OK
     );
-    for pfad in ["/api/org-modul-einstellungen", "/api/org-einstellungen"] {
+    for pfad in ["/api/org-module-settings", "/api/org-settings"] {
         assert_eq!(
             get_status(&app, &lotta, pfad).await,
             StatusCode::FORBIDDEN,
@@ -1425,8 +1425,7 @@ async fn modul_vorgaben_gleichen_dem_org_endpunkt() {
     set_org_vorgaben(&app, &admin).await;
 
     let (s_einsatz, am_einsatz) = load_modul_vorgaben(&app, &admin, eid).await;
-    let (s_org, an_der_org) =
-        anfrage(&app, "GET", "/api/org-modul-einstellungen", &admin, None).await;
+    let (s_org, an_der_org) = anfrage(&app, "GET", "/api/org-module-settings", &admin, None).await;
     assert_eq!(s_einsatz, StatusCode::OK);
     assert_eq!(s_org, StatusCode::OK);
     assert_eq!(am_einsatz, an_der_org);

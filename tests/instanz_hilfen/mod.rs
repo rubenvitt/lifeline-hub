@@ -265,7 +265,7 @@ pub async fn konto(i: &Instanz, name: &str) -> i64 {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &i.admin,
         Some(&json!({"anzeigename": name, "benutzername": name,
                      "passwort": format!("{name}-pw-123"), "org_rolle": "keine"})),

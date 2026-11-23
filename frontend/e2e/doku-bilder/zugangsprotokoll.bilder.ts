@@ -45,7 +45,7 @@ async function login(api: APIRequestContext, benutzername: string, passwort: str
 
 /** Spielt die Zugangsgeschichte der Person einmal je Lauf durch. */
 async function zugangsgeschichte(page: Page): Promise<void> {
-  const liste = await page.request.get('/api/benutzer');
+  const liste = await page.request.get('/api/users');
   expect(liste.ok(), `Benutzerliste: ${liste.status()}`).toBe(true);
   const vorhanden = ((await liste.json()) as { benutzername: string }[]).some(
     (b) => b.benutzername === PERSON.benutzername,
@@ -67,15 +67,15 @@ async function zugangsgeschichte(page: Page): Promise<void> {
     expect((await login(fremd, 'k.beispeil', PASSWORT)).status()).toBe(401);
 
     // Der Admin beendet die Anmeldung am Windows-Rechner.
-    const sitzungen = await page.request.get(`/api/benutzer/${id}/sitzungen`);
+    const sitzungen = await page.request.get(`/api/users/${id}/sessions`);
     expect(sitzungen.ok(), `Sitzungen: ${sitzungen.status()}`).toBe(true);
     const amRechner = ((await sitzungen.json()) as { kennung: string; geraet?: string }[]).find(
       (s) => s.geraet?.includes('Windows'),
     );
     expect(amRechner, 'Sitzung am Windows-Rechner').toBeTruthy();
-    await fuelle(page, 'delete', `/api/benutzer/${id}/sitzungen/${amRechner!.kennung}`);
+    await fuelle(page, 'delete', `/api/users/${id}/sessions/${amRechner!.kennung}`);
 
-    await fuelle(page, 'patch', `/api/benutzer/${id}`, { org_rolle: 'fuehrungskraft' });
+    await fuelle(page, 'patch', `/api/users/${id}`, { org_rolle: 'fuehrungskraft' });
 
     // Die Person wechselt am iPad ihr Passwort und meldet sich ab.
     const wechsel = await ipad.post('/api/auth/password', {
@@ -85,8 +85,8 @@ async function zugangsgeschichte(page: Page): Promise<void> {
     const abmeldung = await ipad.post('/api/auth/logout');
     expect(abmeldung.ok(), `Abmeldung: ${abmeldung.status()}`).toBe(true);
 
-    await fuelle(page, 'post', `/api/benutzer/${id}/deaktivieren`);
-    await fuelle(page, 'patch', `/api/benutzer/${id}`, { aktiv: true });
+    await fuelle(page, 'post', `/api/users/${id}/deactivate`);
+    await fuelle(page, 'patch', `/api/users/${id}`, { aktiv: true });
     await fuelle(page, 'put', '/api/auth/providers/passwort', { aktiviert: true });
   } finally {
     for (const api of [ipad, windows, fremd]) await api.dispose();

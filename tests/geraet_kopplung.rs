@@ -26,11 +26,11 @@ struct Antwort {
     body: Value,
 }
 
-/// `POST /api/geraete/koppeln` ohne Sitzung, optional von einer festen Adresse.
+/// `POST /api/devices/pair` ohne Sitzung, optional von einer festen Adresse.
 async fn koppeln(app: &axum::Router, code: &str, peer: Option<SocketAddr>) -> Antwort {
     let mut req = Request::builder()
         .method("POST")
-        .uri("/api/geraete/koppeln")
+        .uri("/api/devices/pair")
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(json!({ "code": code }).to_string()))
         .unwrap();
@@ -1656,7 +1656,7 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
         ("GET", format!("/api/einsaetze/{einsatz}/geraete")),
         ("GET", format!("/api/einsaetze/{einsatz}/module-defaults")),
         ("GET", "/api/einsaetze".to_string()),
-        ("GET", "/api/benutzer".to_string()),
+        ("GET", "/api/users".to_string()),
         ("POST", format!("/api/einsaetze/{einsatz}/close")),
         ("GET", "/api/live".to_string()),
     ] {
@@ -1740,7 +1740,7 @@ async fn ein_bericht_aus_einer_geraetesitzung_wird_mit_204_angenommen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/client-fehler",
+        "/api/client-errors",
         &monitor,
         Some(&json!({
             "route": "/geraet/lagemonitor",
@@ -1933,7 +1933,7 @@ async fn geraetekonto_ist_keine_person() {
     .await;
     let (konto, benutzername) = geraetekonto(&pool, id).await;
 
-    let (s, v) = anfrage(&app, "GET", "/api/benutzer", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/users", &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(
         v.as_array().unwrap().iter().all(|b| b["id"] != konto),
@@ -1942,11 +1942,11 @@ async fn geraetekonto_ist_keine_person() {
     for (methode, uri, body) in [
         (
             "PATCH",
-            format!("/api/benutzer/{konto}"),
+            format!("/api/users/{konto}"),
             Some(r#"{"anzeigename":"X"}"#),
         ),
-        ("POST", format!("/api/benutzer/{konto}/deaktivieren"), None),
-        ("POST", format!("/api/benutzer/{konto}/totp/reset"), None),
+        ("POST", format!("/api/users/{konto}/deactivate"), None),
+        ("POST", format!("/api/users/{konto}/totp/reset"), None),
         (
             "PUT",
             format!("/api/einsaetze/{einsatz}/mitglieder/{konto}"),

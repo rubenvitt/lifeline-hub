@@ -55,5 +55,5 @@ export function widerrufeKopplung(einsatzId: number, kopplungId: number): Promis
 
 /** Löst einen Kopplungscode ein; der Server setzt dabei das Sitzungscookie des Geräts. */
 export function koppeln(code: string): Promise<GeraetAnzeige> {
-  return apiSend<GeraetAnzeige>('/api/geraete/koppeln', 'POST', { code });
+  return apiSend<GeraetAnzeige>('/api/devices/pair', 'POST', { code });
 }

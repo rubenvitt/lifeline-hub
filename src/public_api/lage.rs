@@ -1,9 +1,9 @@
-//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`, ADR-0035): das Lagebild des Einsatzes,
+//! `GET /api/v1/situation` (LLH-1638, Spec `lage-schnittstelle`, ADR-0035): das Lagebild des Einsatzes,
 //! den die Einsatzleitung für den Zugang freigegeben hat ([`super::freigabe`]).
 //!
 //! Die Zahlen kommen aus derselben Verdichtung wie beim gekoppelten Lagemonitor
 //! (`routes::lagemonitor::verdichte`). **Keine Namen, keine Personenkennungen, keine freien
-//! Notizen** (ADR-0022): gezeigt werden nur Bezeichnungen (Einsatz, Abschnitte, UHS) und die
+//! Notizen** (ADR-0096): gezeigt werden nur Bezeichnungen (Einsatz, Abschnitte, UHS) und die
 //! Zusammenfassung des jüngsten freigegebenen Lageberichts, die für die Weitergabe geschrieben
 //! ist. Die Karte trägt die Koordinate des Einsatzorts, nicht seine Adresse.
 //!
@@ -123,7 +123,7 @@ fn zone_kind(typ: LageZoneTyp) -> Option<LageZoneKind> {
     }
 }
 
-/// Antwort von `GET /api/v1/lage`.
+/// Antwort von `GET /api/v1/situation`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LageResponse {
     /// Zeitpunkt der Berechnung (UTC, `JJJJ-MM-TT hh:mm:ss`).
@@ -300,7 +300,7 @@ pub enum LageKarteProperties {
     Zeichen { id: i64, zeichen_spec: String },
 }
 
-/// Abfrage von `GET /api/v1/lage`.
+/// Abfrage von `GET /api/v1/situation`.
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct LageParams {
@@ -464,7 +464,7 @@ fn lage_einsatz(
 /// die Freigabe, ändert sich die Antwort beim nächsten Abruf.
 #[utoipa::path(
     get,
-    path = "/api/v1/lage",
+    path = "/api/v1/situation",
     tag = "Lage",
     operation_id = "get_lage",
     security(("machine" = ["lage:read"])),

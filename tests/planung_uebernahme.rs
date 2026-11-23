@@ -92,7 +92,7 @@ async fn einsatz_anzahl(app: &axum::Router, cookie: &str) -> usize {
 
 /// Importiert die Lage Stadtfest und liefert die Kennung der Demo-Planung.
 async fn stadtfest_planung(app: &axum::Router, admin: &str) -> i64 {
-    let (s, v) = anfrage(app, "POST", "/api/demo-daten/stadtfest", admin, None).await;
+    let (s, v) = anfrage(app, "POST", "/api/demo-data/stadtfest", admin, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     get(app, admin, PFAD)
         .await

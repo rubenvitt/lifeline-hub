@@ -64,7 +64,7 @@ function handler(benutzer: typeof admin) {
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
     http.get('/api/schichtmodelle', () => HttpResponse.json([])),
-    http.get('/api/organisation', () =>
+    http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'Muster', tz_organisation: 'feuerwehr' }),
     ),
   );

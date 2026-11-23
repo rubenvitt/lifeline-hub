@@ -132,7 +132,7 @@ export const adminBenutzer = { key: 'benutzer', label: 'Benutzer' } as const;
 
 /**
  * Demo-Daten: Sonder-Eintrag neben {@link adminBenutzer}, sichtbar nur für den System-Admin UND
- * bei 200 von `GET /api/demo-daten`. Kein Eintrag in {@link adminGruppen}, deren Sektionen jede
+ * bei 200 von `GET /api/demo-data`. Kein Eintrag in {@link adminGruppen}, deren Sektionen jede
  * Person mit Verwaltungsrecht sieht. Die Seite schützt sich zusätzlich selbst.
  */
 export const adminDemoDaten = { key: 'demo-daten', label: 'Demo-Daten' } as const;

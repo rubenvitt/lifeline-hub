@@ -44,7 +44,7 @@ async fn logo_upload_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/organisation/logo")
+                .uri("/api/organization/logo")
                 .header(header::COOKIE, admin.as_str())
                 .header(
                     header::CONTENT_TYPE,
@@ -64,8 +64,8 @@ async fn logo_upload_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
     );
 
     // Scan vor dem Schreiben: der abgelehnte Upload hinterlässt nichts.
-    let (status, _) = anfrage(&app, "GET", "/api/organisation/logo", &admin, None).await;
+    let (status, _) = anfrage(&app, "GET", "/api/organization/logo", &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    let (_, org) = anfrage(&app, "GET", "/api/organisation", &admin, None).await;
+    let (_, org) = anfrage(&app, "GET", "/api/organization", &admin, None).await;
     assert!(!org.as_object().unwrap().contains_key("logo"));
 }

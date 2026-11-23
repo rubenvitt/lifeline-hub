@@ -30,13 +30,13 @@ function handler(anfang: BenutzerEinstellungen | 'fehler') {
   let serverStand = anfang;
   return [
     meHandler(nutzer),
-    http.get('/api/benutzer-einstellungen', () => {
+    http.get('/api/user-settings', () => {
       gets += 1;
       return serverStand === 'fehler'
         ? HttpResponse.json({ fehler: 'kaputt' }, { status: 500 })
         : HttpResponse.json(serverStand);
     }),
-    http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+    http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
       if (serverStand !== 'fehler') {
@@ -118,11 +118,11 @@ describe('useSchnellaktionZaehler', () => {
     let serverStand = stand({ 'aktion:etb': 2 });
     server.use(
       meHandler(nutzer),
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         gets += 1;
         return HttpResponse.json(serverStand);
       }),
-      http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+      http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
         const body = (await request.json()) as { wert: string };
         puts.push({ schluessel: String(params.schluessel), wert: body.wert });
         serverStand = stand(JSON.parse(body.wert) as Record<string, number>);

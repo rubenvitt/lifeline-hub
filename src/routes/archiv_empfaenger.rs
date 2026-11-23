@@ -3,10 +3,10 @@
 //!
 //! | Methode | Pfad | Zweck |
 //! |---|---|---|
-//! | GET    | `/api/org-archiv-schluessel` | Liste |
-//! | POST   | `/api/org-archiv-schluessel` | Eintragen; liefert die Schlüsselprobe |
-//! | POST   | `/api/org-archiv-schluessel/{id}/pruefen` | Code der Probe eingeben |
-//! | DELETE | `/api/org-archiv-schluessel/{id}` | Entfernen |
+//! | GET    | `/api/org-archive-keys` | Liste |
+//! | POST   | `/api/org-archive-keys` | Eintragen; liefert die Schlüsselprobe |
+//! | POST   | `/api/org-archive-keys/{id}/check` | Code der Probe eingeben |
+//! | DELETE | `/api/org-archive-keys/{id}` | Entfernen |
 
 use crate::app::AppState;
 use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
@@ -28,7 +28,7 @@ fn angaben(e: &ArchivEmpfaengerAnzeige) -> Option<ZugangsAngaben> {
     })
 }
 
-/// GET /api/org-archiv-schluessel
+/// GET /api/org-archive-keys
 pub async fn liste(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -43,7 +43,7 @@ pub struct NeuerSchluessel {
     pub bezeichnung: String,
 }
 
-/// POST /api/org-archiv-schluessel — trägt einen Schlüssel ein (gilt erst nach der Probe).
+/// POST /api/org-archive-keys — trägt einen Schlüssel ein (gilt erst nach der Probe).
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -77,7 +77,7 @@ pub struct Probe {
     pub code: String,
 }
 
-/// POST /api/org-archiv-schluessel/{id}/pruefen — Code der Probe; richtig: der Schlüssel gilt.
+/// POST /api/org-archive-keys/{id}/check — Code der Probe; richtig: der Schlüssel gilt.
 pub async fn pruefen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -103,7 +103,7 @@ pub async fn pruefen(
     Ok(Json(geprueft))
 }
 
-/// DELETE /api/org-archiv-schluessel/{id}
+/// DELETE /api/org-archive-keys/{id}
 pub async fn entfernen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,

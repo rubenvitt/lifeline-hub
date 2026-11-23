@@ -1,9 +1,9 @@
 //! HTTP-Routen der Benachrichtigungen (LLH-1207, design.md D2).
 //!
-//! GET  /api/benachrichtigungen                    — eigene der letzten 12 h (`?offen=true`:
+//! GET  /api/notifications                    — eigene der letzten 12 h (`?offen=true`:
 //!                                                    nur unquittierte, `?einsatz_id=`)
-//! GET  /api/benachrichtigungen/{id}               — eine eigene samt Text
-//! POST /api/benachrichtigungen/{id}/quittieren    — quittieren, Ereignis an die eigenen Tabs
+//! GET  /api/notifications/{id}               — eine eigene samt Text
+//! POST /api/notifications/{id}/acknowledge    — quittieren, Ereignis an die eigenen Tabs
 //! GET  /api/einsaetze/{id}/notifications     — Verlauf samt Zahl der ungelesenen Eingänge
 //!                                                    (LLH-1143, design.md D3)
 //! POST /api/einsaetze/{id}/notifications/read — „alle gelesen“ bis `bis_id` (D4)
@@ -52,7 +52,7 @@ pub struct ListeParams {
 
 /// Macht aus einer eigenen Zeile die Anzeige, wenn `benutzer` Einsatz und Bezugsmodul (noch)
 /// lesen darf; sonst `None`. Auch der iOS-Push bildet Titel, Detail und Pfad hier
-/// (`ios_push::inhalt`), damit sie gleich `GET /api/benachrichtigungen/{id}` sind.
+/// (`ios_push::inhalt`), damit sie gleich `GET /api/notifications/{id}` sind.
 pub(crate) async fn anzeige(
     pool: &SqlitePool,
     recht: &Leserecht,
@@ -128,7 +128,7 @@ async fn leserecht(pool: &SqlitePool, einsatz_id: i64) -> Result<Option<Leserech
     }
 }
 
-/// GET /api/benachrichtigungen — die eigenen Benachrichtigungen der letzten 12 h, jüngste
+/// GET /api/notifications — die eigenen Benachrichtigungen der letzten 12 h, jüngste
 /// zuerst, mit Text; ohne die, deren Einsatz oder Modul der Nutzer nicht (mehr) lesen darf.
 pub async fn liste(
     State(state): State<AppState>,
@@ -167,7 +167,7 @@ pub async fn liste(
     Ok(Json(aus))
 }
 
-/// GET /api/benachrichtigungen/{id} — eine eigene Benachrichtigung samt Text. Fremd, unbekannt
+/// GET /api/notifications/{id} — eine eigene Benachrichtigung samt Text. Fremd, unbekannt
 /// oder ohne Recht am Einsatz bzw. am Modul des Bezugs: 404.
 pub async fn lesen(
     State(state): State<AppState>,
@@ -193,7 +193,7 @@ pub async fn lesen(
         .ok_or(AppError::NotFound)
 }
 
-/// POST /api/benachrichtigungen/{id}/quittieren — quittiert eine eigene Benachrichtigung
+/// POST /api/notifications/{id}/acknowledge — quittiert eine eigene Benachrichtigung
 /// (idempotent, 204). Beim ersten Quittieren geht dasselbe Ereignis mit `quittiert: true` an
 /// alle Verbindungen des Nutzers, damit der Toast überall verschwindet. Fremd: 404.
 ///

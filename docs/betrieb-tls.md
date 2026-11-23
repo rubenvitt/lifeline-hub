@@ -19,7 +19,7 @@ Setzt ein Proxy den Kopf nicht, erzwingt `--cookie-secure`
 
 ## Einwurf nur über TLS (LLH-1654, ADR-0023)
 
-Der Schlüssel eines Einwurf-Zugangs steht in der URL (`/api/v1/einwurf/<schlüssel>/…`,
+Der Schlüssel eines Einwurf-Zugangs steht in der URL (`/api/v1/intake/<schlüssel>/…`,
 `docs/api/einwurf.md`). Der Server nimmt einen Einwurf deshalb nur an, wenn er
 verschlüsselt ankam, sonst antwortet er mit `403 tls_required`
 (`src/public_api/einwurf/routen.rs`, `is_tls_nachgewiesen` in `src/extract.rs`):
@@ -44,7 +44,7 @@ Die Seite „Anbindungen“ zeigt im Paneel „Einwurf-Zugänge“ auch den Fall
 Instanz weder TLS terminiert noch einen vertrauten Proxy kennt: Dann werden Einwürfe
 abgelehnt.
 
-### Der Proxy protokolliert unter `/api/v1/einwurf/` nichts
+### Der Proxy protokolliert unter `/api/v1/intake/` nichts
 
 Der Server selbst schreibt den Schlüssel in kein Protokoll
 (`docs/betrieb/observability.md`, „Request-Log“). Das Zugriffsprotokoll und die Traces
@@ -56,14 +56,17 @@ Zugriffsprotokoll und ohne Traces, zeigt auf denselben Dienst:
 
 ```yaml
 labels:
-  - 'traefik.http.routers.lifeline-einwurf.rule=Host(`hub.example`) && PathPrefix(`/api/v1/einwurf/`)'
+  - 'traefik.http.routers.lifeline-einwurf.rule=Host(`hub.example`) && PathPrefix(`/api/v1/intake/`)'
   - 'traefik.http.routers.lifeline-einwurf.service=lifeline'
   - 'traefik.http.routers.lifeline-einwurf.observability.accesslogs=false'
   - 'traefik.http.routers.lifeline-einwurf.observability.tracing=false'
 ```
 
 Bei anderen Proxys gilt dasselbe Ziel: kein Eintrag im Zugriffsprotokoll für Pfade
-unter `/api/v1/einwurf/`, auch nicht bei Fehlern.
+unter `/api/v1/intake/`, auch nicht bei Fehlern.
+
+Bis November 2026 hieß der Pfad `/api/v1/einwurf/` (LLH-2054). Eine Proxy-Regel, die noch
+auf den alten Pfad zeigt, schützt nichts mehr: Regel und Absender ziehen zusammen um.
 
 ## Cert-Beschaffung (Präzedenz)
 

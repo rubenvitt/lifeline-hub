@@ -2,8 +2,8 @@
 //!
 //! | Methode | Pfad | Zweck |
 //! |---|---|---|
-//! | GET | `/api/zugangsprotokoll/anmeldungen` | Anmeldespur (`auth_audit`) |
-//! | GET | `/api/zugangsprotokoll/zugangsaenderungen` | Admin-Spur (`admin_audit`) |
+//! | GET | `/api/access-log/logins` | Anmeldespur (`auth_audit`) |
+//! | GET | `/api/access-log/access-changes` | Admin-Spur (`admin_audit`) |
 //!
 //! Filter: `von`, `bis` (ISO-8601, einschließlich), `konto` (Teil des Benutzernamens), `ereignis` bzw.
 //! `aktion`; Cursor `vor_id`, Seitengröße `limit`. Nur System-Admin (`AdminUser`): die Spuren
@@ -77,7 +77,7 @@ fn leer_als_none(wert: Option<&str>) -> Option<&str> {
     wert.filter(|w| !w.trim().is_empty())
 }
 
-/// GET /api/zugangsprotokoll/anmeldungen — Anmeldespur, neueste zuerst.
+/// GET /api/access-log/logins — Anmeldespur, neueste zuerst.
 pub async fn anmeldungen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -94,7 +94,7 @@ pub async fn anmeldungen(
     ))
 }
 
-/// GET /api/zugangsprotokoll/zugangsaenderungen — Admin-Spur, neueste zuerst.
+/// GET /api/access-log/access-changes — Admin-Spur, neueste zuerst.
 pub async fn zugangsaenderungen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,

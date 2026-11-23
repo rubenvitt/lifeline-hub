@@ -523,7 +523,7 @@ async fn lagemonitor(i: &Instanz, einsatz: i64) -> String {
         .oneshot(
             axum::http::Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
                 .body(axum::body::Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -2931,7 +2931,7 @@ async fn etb_nummern(i: &Instanz, einsatz: i64) -> Vec<i64> {
 async fn gemeinsames_konto(hub: &Instanz, elw: &Instanz, name: &str) -> (i64, String) {
     let (s, v) = post(
         hub,
-        "/api/benutzer",
+        "/api/users",
         json!({"anzeigename": name, "benutzername": name, "passwort": format!("{name}pw12345")}),
     )
     .await;

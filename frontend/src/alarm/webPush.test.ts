@@ -81,13 +81,13 @@ function serverMitPush(angemeldet = false, inhalt = false, ueberHub = false, stu
         ...(ueberHub ? { ueber_hub: HUB } : {}),
       }),
     ),
-    http.put('/api/web-push/abo', async ({ request }) => {
+    http.put('/api/web-push/subscription', async ({ request }) => {
       const anmeldung = (await request.json()) as { inhalt: boolean; stumm: string[] };
       anmeldungen.push(anmeldung);
       Object.assign(abo, { angemeldet: true, inhalt: anmeldung.inhalt, stumm: anmeldung.stumm });
       return new HttpResponse(null, { status: 204 });
     }),
-    http.delete('/api/web-push/abo', () => {
+    http.delete('/api/web-push/subscription', () => {
       abmeldungen++;
       Object.assign(abo, { angemeldet: false, inhalt: false, stumm: [] });
       return new HttpResponse(null, { status: 204 });
@@ -340,7 +340,7 @@ describe('webPush: „Stumm auf diesem Gerät“ geht mit dem Abo (LLH-1482)', (
       ersteFrei = frei;
     });
     server.use(
-      http.put('/api/web-push/abo', async ({ request }) => {
+      http.put('/api/web-push/subscription', async ({ request }) => {
         offen++;
         gleichzeitig = Math.max(gleichzeitig, offen);
         const koerper = await request.json();

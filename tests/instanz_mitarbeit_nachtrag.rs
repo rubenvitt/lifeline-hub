@@ -136,7 +136,7 @@ async fn erika(hub: &Instanz, elw: &Instanz) -> (i64, i64) {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erika-pw-12345", "org_rolle": "keine"})),

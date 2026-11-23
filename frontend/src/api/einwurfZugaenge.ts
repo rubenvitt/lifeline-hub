@@ -8,7 +8,7 @@ import { apiGet, apiSend } from './client';
 
 // Einwurf-Zugänge: Absender ohne Signatur (BOSWatch, FE2, Divera-Webhook, OsmAnd) werfen über
 // einen Schlüssel im Pfad ein (LLH-1654, Spec `einwurf-zugang`, ADR-0023). Die Verwaltung macht
-// der System-Admin; die Einwürfe selbst laufen unter `/api/v1/einwurf/`.
+// der System-Admin; die Einwürfe selbst laufen unter `/api/v1/intake/`.
 
 /** Die Zwecke eines Einwurf-Zugangs; genau einer je Zugang. */
 export type EinwurfZweck = Extract<Scope, 'alarmmeldungen:write' | 'positionen:write'>;
@@ -51,7 +51,7 @@ export function widerrufeEinwurfZugang(id: string): Promise<EinwurfZugangAnzeige
 
 /** Unterpfad der Route eines Zwecks; ein unbekannter Scope (neuerer Server) hat keinen. */
 const UNTERPFAD: Record<EinwurfZweck, string> = {
-  'alarmmeldungen:write': 'alarmmeldung',
+  'alarmmeldungen:write': 'alarm',
   'positionen:write': 'position',
 };
 
@@ -62,5 +62,5 @@ const UNTERPFAD: Record<EinwurfZweck, string> = {
  */
 export function einwurfAdresse(origin: string, schluessel: string, scope: Scope): string {
   const unterpfad = (UNTERPFAD as Partial<Record<Scope, string>>)[scope] ?? '';
-  return `${origin}/api/v1/einwurf/${schluessel}/${unterpfad}`;
+  return `${origin}/api/v1/intake/${schluessel}/${unterpfad}`;
 }

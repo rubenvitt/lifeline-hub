@@ -306,7 +306,7 @@ async fn mitarbeit_legt_normale_meldung_an() {
     assert_eq!(m["lagerelevant"], serde_json::json!(false));
 
     // Eine Mitarbeit hört nicht auf „Neue Meldung“ (D5).
-    let (s, hinweise) = anfrage(&app, "GET", "/api/benachrichtigungen", &zweite_cookie, None).await;
+    let (s, hinweise) = anfrage(&app, "GET", "/api/notifications", &zweite_cookie, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(
         hinweise
@@ -812,7 +812,7 @@ async fn etb_anzeige_nennt_meldung_in_der_lage() {
 
 /// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
 async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
-    let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;
+    let (s, v) = anfrage(app, "GET", "/api/users", admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v:?}");
     let id = v
         .as_array()

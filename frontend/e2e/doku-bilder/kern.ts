@@ -192,9 +192,9 @@ function apiVon(quelle: Page | APIRequestContext): APIRequestContext {
   return 'goto' in quelle ? quelle.request : quelle;
 }
 
-/** Der Übungseinsatz aus `POST /api/demo-daten/starkregen` (eingespielt in `vorbereitung.ts`). */
+/** Der Übungseinsatz aus `POST /api/demo-data/starkregen` (eingespielt in `vorbereitung.ts`). */
 export async function demoEinsatz(quelle: Page | APIRequestContext): Promise<DemoEinsatz> {
-  const antwort = await apiVon(quelle).get('/api/demo-daten');
+  const antwort = await apiVon(quelle).get('/api/demo-data');
   expect(antwort.ok(), `Demo-Daten: ${antwort.status()}`).toBe(true);
   const status = (await antwort.json()) as {
     lagen: {

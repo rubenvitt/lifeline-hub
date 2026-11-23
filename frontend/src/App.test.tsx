@@ -91,7 +91,7 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       // Der Admin darf beide Einstellungen lesen. Die Default-403 stieße sonst die
       // Benutzerprüfung an (LLH-1360), und `/me` antwortet hier immer 401.
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
       http.get('/api/einsaetze/7/settings', () =>

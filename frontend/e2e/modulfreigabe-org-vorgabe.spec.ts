@@ -25,7 +25,7 @@ async function karteBereit(page: Page) {
 }
 
 async function orgVorgabe(page: Page, rolle: 'fuehrungskraft' | null) {
-  const antwort = await page.request.put('/api/org-modul-einstellungen/lagemeldungen', {
+  const antwort = await page.request.put('/api/org-module-settings/lagemeldungen', {
     data: { benoetigte_rolle: rolle },
   });
   expect(antwort.ok(), `Org-Vorgabe: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -128,7 +128,7 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   const zustand = { orgAus: false, eigen: null as boolean | null, puts: [] as unknown[] };
   const vorgaben = () =>
     zustand.orgAus ? { [MODUL]: { benoetigte_rolle: null, sichtbar: false } } : {};
-  await page.route('**/api/org-modul-einstellungen', async (route) => {
+  await page.route('**/api/org-module-settings', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     await route.fulfill({ json: vorgaben() });
   });
@@ -136,7 +136,7 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   await page.route(`**/api/einsaetze/${einsatzId}/module-defaults`, async (route) => {
     await route.fulfill({ json: vorgaben() });
   });
-  await page.route(`**/api/org-modul-einstellungen/${MODUL}`, async (route) => {
+  await page.route(`**/api/org-module-settings/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar?: boolean };
     zustand.puts.push(body);
     zustand.orgAus = body.sichtbar === false;

@@ -1,5 +1,5 @@
 //! Lagebild für Externe (LLH-1496, Spec `lagebild-extern`): Links der Einsatzleitung je Empfänger
-//! und der öffentliche Abruf `GET /api/extern/v1/lagebild`.
+//! und der öffentliche Abruf `GET /api/external/v1/situation-picture`.
 //!
 //! Herleitung: `/mnt/project-files/llh-1496/openspec/k11guwns-lagebild-extern/design.md`.
 
@@ -19,7 +19,7 @@ const POLY: &str =
     r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
 const STELLE_SANITAET: &str =
     r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
-const EXTERN: &str = "/api/extern/v1/lagebild";
+const EXTERN: &str = "/api/external/v1/situation-picture";
 
 /// `GET` mit Bearer-Kopf statt Sitzung, optional mit Kennung der Öffnung.
 async fn abruf_mit(
@@ -232,7 +232,7 @@ async fn ohne_gueltigen_schluessel_ist_401_und_der_schluessel_oeffnet_nichts_and
         "/api/einsaetze".to_string(),
         format!("/api/einsaetze/{einsatz}"),
         pfad(einsatz),
-        "/api/v1/lage".to_string(),
+        "/api/v1/situation".to_string(),
     ] {
         let (s, _) = abruf(&app, &uri, Some(&schluessel)).await;
         assert_eq!(s, StatusCode::UNAUTHORIZED, "{uri}");
@@ -555,7 +555,7 @@ async fn am_spiegel_gilt_der_link_hier_und_das_etb_geht_als_antrag_an_den_fuehre
     let (s, v) = anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erikapw12345"})),

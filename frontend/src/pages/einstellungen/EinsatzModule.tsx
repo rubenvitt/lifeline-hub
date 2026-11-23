@@ -71,7 +71,7 @@ export default function EinsatzModule() {
     queryFn: () => ladeModulOverrides(einsatzId),
   });
   // Org-Modul-Vorgaben am Einsatz (LLH-1183): lesbar auch ohne Org-Rolle, anders als
-  // `GET /api/org-modul-einstellungen`. Nicht blockierend; scheitert der Abruf, fehlen nur Hinweise.
+  // `GET /api/org-module-settings`. Nicht blockierend; scheitert der Abruf, fehlen nur Hinweise.
   const orgModulQuery = useQuery({
     queryKey: einsatzKeys.modulVorgaben(einsatzId),
     queryFn: () => fetchModulVorgaben(einsatzId),

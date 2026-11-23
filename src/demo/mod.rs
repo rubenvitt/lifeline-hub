@@ -3,7 +3,7 @@
 //! ([`DemoLage`]), jede mit eigenem Kopf, die nebeneinander bestehen.
 //!
 //! **Nur mit Schalter.** Die Routen existieren ausschließlich mit `--demo-daten`
-//! (`app::RouterOptionen`); ohne ihn antwortet `/api/demo-daten` wie ein unbekannter Pfad.
+//! (`app::RouterOptionen`); ohne ihn antwortet `/api/demo-data` wie ein unbekannter Pfad.
 //!
 //! Dieses Modul trägt die Antwortformen, den Import [`import::importieren_tx`], den Löschweg
 //! [`entfernen::entfernen_tx`], die Stammdaten-Anlage

@@ -20,7 +20,7 @@ export async function kontoAnlegen(
   },
 ): Promise<{ id: number }> {
   const start = `${daten.passwort}-start`;
-  const antwort = await admin.post('/api/benutzer', { data: { ...daten, passwort: start } });
+  const antwort = await admin.post('/api/users', { data: { ...daten, passwort: start } });
   expect(
     antwort.ok(),
     `Konto ${daten.benutzername}: ${antwort.status()} ${await antwort.text()}`,

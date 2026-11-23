@@ -403,7 +403,7 @@ async fn deaktivierung_am_hub_beendet_die_sitzung_am_elw() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/benutzer/{max}/deaktivieren"),
+        &format!("/api/users/{max}/deactivate"),
         &hub.admin,
         None,
     )
@@ -587,7 +587,7 @@ async fn einmalpasswort_am_elw_bleibt_bis_der_hub_das_passwort_aendert() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/benutzer/{lokal}/einmalpasswort"),
+        &format!("/api/users/{lokal}/one-time-password"),
         &elw.admin,
         None,
     )
@@ -720,7 +720,7 @@ async fn elw_verloren_macht_die_verteilten_geheimnisse_wertlos() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/benutzer/{max}/einmalpasswort"),
+        &format!("/api/users/{max}/one-time-password"),
         &hub.admin,
         None,
     )
@@ -746,7 +746,7 @@ async fn sso_konto_bekommt_am_elw_ein_einmalpasswort() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/benutzer/{lokal}/einmalpasswort"),
+        &format!("/api/users/{lokal}/one-time-password"),
         &elw.admin,
         None,
     )
@@ -1054,7 +1054,7 @@ async fn einmalpasswort_fuer_einen_admin_unter_passkey_pflicht_entfernt_seine_pa
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/benutzer/{anna}/einmalpasswort"),
+        &format!("/api/users/{anna}/one-time-password"),
         &hub.admin,
         None,
     )
@@ -1085,7 +1085,7 @@ async fn einmalpasswort_fuer_einen_admin_unter_passkey_pflicht_entfernt_seine_pa
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/benutzer/{berta}/einmalpasswort"),
+        &format!("/api/users/{berta}/one-time-password"),
         &elw.admin,
         None,
     )

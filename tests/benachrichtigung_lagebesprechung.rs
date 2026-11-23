@@ -187,7 +187,7 @@ async fn termin_14_uhr_kuendigt_um_13_50_und_um_14_00_je_einmal_an() {
 
     // Der Text, wie EL ihn liest.
     let anna = login_cookie(&w.app, "annika", "annikapw1").await;
-    let (s, liste) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &anna, None).await;
+    let (s, liste) = anfrage(&w.app, "GET", "/api/notifications", &anna, None).await;
     assert_eq!(s, StatusCode::OK, "{liste}");
     let titel: Vec<&str> = liste
         .as_array()
@@ -204,7 +204,7 @@ async fn termin_14_uhr_kuendigt_um_13_50_und_um_14_00_je_einmal_an() {
         );
     }
     let dora = login_cookie(&w.app, "dorothea", "dorotheapw1").await;
-    let (_, liste) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &dora, None).await;
+    let (_, liste) = anfrage(&w.app, "GET", "/api/notifications", &dora, None).await;
     assert_eq!(liste, json!([]), "Mitglied ohne Funktion");
 }
 

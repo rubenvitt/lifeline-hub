@@ -47,7 +47,7 @@ async fn load(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, Strin
 }
 
 async fn stadtfest(app: &axum::Router, admin: &str) -> i64 {
-    let (s, v) = anfrage(app, "POST", "/api/demo-daten/stadtfest", admin, None).await;
+    let (s, v) = anfrage(app, "POST", "/api/demo-data/stadtfest", admin, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     v["lagen"]
         .as_array()

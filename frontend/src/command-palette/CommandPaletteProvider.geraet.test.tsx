@@ -41,7 +41,7 @@ describe('Sprungpalette am Gerät (LFH-892)', () => {
     const gelesen = vi.fn();
     server.use(
       meHandler({ ...benutzerFixture({ anzeigename: 'UHS Nord · Tablet 1' }), geraet: GERAET }),
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         gelesen();
         return HttpResponse.json({ eintraege: {} });
       }),
@@ -58,7 +58,7 @@ describe('Sprungpalette am Gerät (LFH-892)', () => {
   it('öffnet sich für eine Person wie gewohnt (Gegenprobe)', async () => {
     server.use(
       meHandler(benutzerFixture({ anzeigename: 'EL' })),
-      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+      http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
     );
     const u = userEvent.setup();

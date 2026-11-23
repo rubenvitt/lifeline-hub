@@ -47,7 +47,7 @@ function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClien
     http.get('/api/einsaetze/5', () =>
       HttpResponse.json({ id: 5, bezeichnung: 'Stadtfest', status: 'aktiv' }),
     ),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
+    http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
     http.get('/api/einsaetze/5/abloesungen/schichtplan', () => HttpResponse.json(PLAN)),
     http.get('/api/einsaetze/5/abloesungen/vorgaben', () => HttpResponse.json([])),
     http.get('/api/einsaetze/5/einheiten', () => HttpResponse.json([])),

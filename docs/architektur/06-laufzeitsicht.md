@@ -263,7 +263,7 @@ sequenceDiagram
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
-  G->>BE: POST /api/geraete/koppeln {code}
+  G->>BE: POST /api/devices/pair {code}
   BE->>DB: session::anlegen_geraet (mit kopplung_id)
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
   G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
@@ -520,7 +520,7 @@ sequenceDiagram
 
 Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
 eigenen Tabellen (LLH-1652,
-[ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+[ADR-0096](entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 
 ```mermaid
@@ -530,7 +530,7 @@ sequenceDiagram
   participant F as Fremdsystem (crates/lifeline-machine-client)
   Admin->>Hub: POST /api/admin/integrations {name, scopes}
   Hub-->>Admin: Code (16 Zeichen, 15 min)
-  F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
+  F->>Hub: POST /api/v1/access/redeem {lookup, public_key, proof}
   Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
   Hub-->>F: zugang_id, instanz_id, Instanzschlüssel, Prüfwert
   F->>Hub: GET /api/v1/me (Authorization: Machine)
@@ -560,7 +560,7 @@ sequenceDiagram
   participant A as Absender (BOSWatch, FE2, OsmAnd)
   Admin->>Hub: POST /api/admin/intake-credentials {name, scope}
   Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
-  A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
+  A->>Hub: GET /api/v1/intake/<schlüssel>/alarm?…
   Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
   Hub->>Hub: ablage: roh ablegen oder als Wiederholung vermerken
   Hub-->>A: 204 ohne Body (Cache-Control: no-store)
@@ -603,7 +603,7 @@ sequenceDiagram
   Hub->>DB: nach einer Sekunde erneut lesen
   DB-->>Hub: einsatz.updated (4712)
   Hub-->>F: {cursor: 4712, events: [...]} (Lifeline-Signature)
-  F->>Hub: GET /api/v1/einsaetze/42
+  F->>Hub: GET /api/v1/incidents/42
   Hub-->>F: Einsatzkopf
 ```
 
@@ -621,8 +621,8 @@ sequenceDiagram
 - Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
   (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
   `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
-  baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
-  `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
+  baut neu auf: mit `einsaetze:read` über `GET /api/v1/incidents`, sonst über
+  `GET /api/v1/events` ohne `after` und `GET /api/v1/situation`. Stand und Zeilen liest der Abruf aus
   einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
 
 ## 6.6g Adapter ruft ab
@@ -718,7 +718,7 @@ sequenceDiagram
     N->>WP: versenden (nur Kennungen, RFC 8291)
     WP->>PD: POST an den Abo-Endpunkt
     PD-->>SW: push
-    SW->>BE: GET /api/benachrichtigungen/{id} (mit Sitzung)
+    SW->>BE: GET /api/notifications/{id} (mit Sitzung)
     SW->>SW: showNotification (Tag wie im Tab)
   end
 ```
@@ -799,7 +799,7 @@ sequenceDiagram
   BE->>BE: Upsert auf token, an Konto und Gerät
   Note over BE,IP: später: benachrichtigung::ausliefern
   BE->>IP: versenden (eigener Task, Filter wie Web Push)
-  IP->>IP: Klartext wie GET /api/benachrichtigungen/{id}, AES-256-GCM je Gerät
+  IP->>IP: Klartext wie GET /api/notifications/{id}, AES-256-GCM je Gerät
   opt noch kein Zugang
     IP->>R: POST /v1/server
     R-->>IP: server_id, geheimnis
