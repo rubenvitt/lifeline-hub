@@ -20,12 +20,12 @@ describe('rollenwerte', () => {
     expect(rollenwerte({ colorBgBase: '#fff' })).toBe(farbenHell);
   });
 
-  it('die Augenbraue kommt aus der Schriftskala: 10 px, 600, .14em, Versalien', () => {
+  it('die Augenbraue kommt aus der Schriftskala: 11 px, 600, .08em, Versalien (LLH-2044)', () => {
     expect(schriftStil('augenbraue')).toEqual({
       fontFamily: schrift.text,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: 600,
-      letterSpacing: '0.14em',
+      letterSpacing: '0.08em',
       textTransform: 'uppercase',
     });
   });

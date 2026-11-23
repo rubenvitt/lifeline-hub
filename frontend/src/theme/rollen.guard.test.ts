@@ -27,6 +27,7 @@ import {
   etbTypFarbenDunkel,
   etbTypFarbenHell,
   rahmenFarben,
+  SCHRIFT_BODEN,
   schriftskala,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
@@ -178,7 +179,6 @@ const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
   textKlein: '--lfh-typo-text-klein',
   augenbraue: '--lfh-typo-augenbraue',
   railEtikett: '--lfh-typo-rail-etikett',
-  metaKlein: '--lfh-typo-meta-klein',
   meta: '--lfh-typo-meta',
   monoKlein: '--lfh-typo-mono-klein',
   mono: '--lfh-typo-mono',
@@ -430,14 +430,23 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
   });
 
   it('pinnt die Entwurfswerte als Literale (umsetzung.md § Form & Typografie)', () => {
+    // LLH-2044: Boden 11 px; die Sperrung sinkt mit, damit die Breite etwa bleibt.
     expect(schriftskala.augenbraue).toEqual({
-      groesse: 10,
+      groesse: 11,
       gewicht: 600,
       familie: 'text',
-      sperrung: '0.14em',
+      sperrung: '0.08em',
       versal: true,
     });
-    expect(schriftskala.seitentitel).toMatchObject({ groesse: 14, gewicht: 600 });
+    expect(schriftskala.railEtikett).toEqual({
+      groesse: 11,
+      gewicht: 500,
+      familie: 'text',
+      sperrung: '0.04em',
+      versal: true,
+    });
+    // LLH-2044: der Seitentitel steht über dem Lauftext (14).
+    expect(schriftskala.seitentitel).toMatchObject({ groesse: 16, gewicht: 600 });
     // Spec `schriftstufen`: Titel einer Karte oder eines Listeneintrags (LLH-1810).
     expect(schriftskala.kartentitel).toEqual({ groesse: 15, gewicht: 600, familie: 'text' });
     expect(
@@ -451,22 +460,26 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
     ]);
   });
 
-  it('pinnt die Mono-Stufen 10 bis 14 (LLH-1972)', () => {
+  it('pinnt die Mono-Stufen 11 bis 14 (LLH-1972, Boden LLH-2044)', () => {
+    expect('metaKlein' in schriftskala).toBe(false);
     expect(
-      [
-        schriftskala.metaKlein,
-        schriftskala.meta,
-        schriftskala.monoKlein,
-        schriftskala.mono,
-        schriftskala.monoGross,
-      ].map((s) => [s.groesse, s.gewicht, s.familie]),
+      [schriftskala.meta, schriftskala.monoKlein, schriftskala.mono, schriftskala.monoGross].map(
+        (s) => [s.groesse, s.gewicht, s.familie],
+      ),
     ).toEqual([
-      [10, 400, 'zahl'],
       [11, 400, 'zahl'],
       [12, 400, 'zahl'],
       [13, 400, 'zahl'],
       [14, 400, 'zahl'],
     ]);
+  });
+
+  it('keine Stufe liegt unter dem Schriftboden von 11 px (LLH-2044)', () => {
+    expect(SCHRIFT_BODEN).toBe(11);
+    const darunter = Object.entries(schriftskala)
+      .filter(([, s]) => s.groesse < SCHRIFT_BODEN)
+      .map(([name, s]) => `${name} ${s.groesse}`);
+    expect(darunter).toEqual([]);
   });
 
   it('jeder Schnitt der Skala wird lokal ausgeliefert — kein künstlicher Fettdruck', () => {

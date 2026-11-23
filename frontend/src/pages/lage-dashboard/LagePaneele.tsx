@@ -118,7 +118,7 @@ export function GefahrenmatrixPaneel({
           <div
             aria-hidden="true"
             data-lfh="gefahrenlegende-erlaeuterung"
-            style={{ ...monoStil('metaKlein'), color: rollen.schwach }}
+            style={{ ...monoStil('meta'), color: rollen.schwach }}
           >
             <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
           </div>
@@ -460,7 +460,7 @@ export function VerlaufPaneel({
                       <span
                         aria-hidden="true"
                         style={{
-                          ...monoStil('metaKlein'),
+                          ...monoStil('meta'),
                           color: rollen.text2,
                           textAlign: 'center',
                           lineHeight: 1.2,
@@ -474,7 +474,7 @@ export function VerlaufPaneel({
                 <div
                   aria-hidden="true"
                   style={{
-                    ...monoStil('metaKlein'),
+                    ...monoStil('meta'),
                     textAlign: 'center',
                     borderTop: `1px solid ${rollen.linieStark}`,
                     paddingTop: 2,

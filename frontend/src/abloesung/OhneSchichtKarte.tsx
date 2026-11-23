@@ -63,7 +63,7 @@ export default function OhneSchichtKarte({
         </span>
         {/* So breit wie „eingetroffen“: sonst stünde die Spalte je nach Wort verschieden breit,
             und die Namen der Zeilen fluchteten nicht. */}
-        <span style={{ ...monoStil('metaKlein'), color: rollen.schwach, minWidth: '12ch' }}>
+        <span style={{ ...monoStil('meta'), color: rollen.schwach, minWidth: '12ch' }}>
           {eingetroffen ? 'eingetroffen' : 'alarmiert'}
         </span>
       </div>

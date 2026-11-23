@@ -113,7 +113,7 @@ export function LadePlatzhalterZeile({ stil, text }: { stil: CSSProperties; text
         <span style={{ fontSize: 12, lineHeight: 1.45, color: rollen.gedaempft }}>
           {text ? PANEEL_LADEN_TEXT : '\u00a0'}
         </span>
-        <span aria-hidden="true" style={monoStil('metaKlein')}>
+        <span aria-hidden="true" style={monoStil('meta')}>
           {'\u00a0'}
         </span>
       </span>
@@ -278,7 +278,7 @@ export function ListenAbschnitt<T>({
         <span data-lfh="abschnitt-zahl" style={{ ...monoStil(15, 500), color: rollen.text }}>
           {gesperrt || zahl == null ? '—' : zahl}
           {zahlWort && !gesperrt && zahl != null && (
-            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}> {zahlWort}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}> {zahlWort}</span>
           )}
         </span>
         <span
@@ -286,7 +286,7 @@ export function ListenAbschnitt<T>({
           style={{
             flex: '1 1 auto',
             minWidth: 0,
-            ...monoStil('metaKlein'),
+            ...monoStil('meta'),
             color: rollen.gedaempft,
           }}
         >

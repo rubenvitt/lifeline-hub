@@ -21,7 +21,7 @@ describe('Textstufe (Spec `schriftstufen`)', () => {
   it('setzt Sperrung und Versalien der Stufe, ohne den Wortlaut zu ändern', () => {
     renderMitProviders(<Textstufe stufe="augenbraue">Funk</Textstufe>);
     const el = screen.getByText('Funk');
-    expect(el.style.letterSpacing).toBe('0.14em');
+    expect(el.style.letterSpacing).toBe('0.08em');
     expect(el.style.textTransform).toBe('uppercase');
     expect(el.textContent).toBe('Funk');
   });
