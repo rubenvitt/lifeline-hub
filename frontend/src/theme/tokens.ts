@@ -840,21 +840,20 @@ interface Schriftstufe {
 export const schriftskala = {
   /** Große Überschrift (Einstiegsflächen). */
   ueberschrift: { groesse: 30, gewicht: 600, familie: 'text', sperrung: '-0.02em' },
-  /** Seitenkopf: Titel 14/600. */
-  seitentitel: { groesse: 14, gewicht: 600, familie: 'text' },
+  /** Seitenkopf: Titel 16/600, über dem Lauftext 14 (LLH-2044). */
+  seitentitel: { groesse: 16, gewicht: 600, familie: 'text' },
   /** Titel einer Karte oder eines Listeneintrags (Spec `schriftstufen`, LLH-1810). */
   kartentitel: { groesse: 15, gewicht: 600, familie: 'text' },
   /** Lauftext-Grundmaß des Entwurfs. */
   text: { groesse: 14, gewicht: 400, familie: 'text' },
   /** Dichter Lauftext in Listen und Paneelen. */
   textKlein: { groesse: 12, gewicht: 400, familie: 'text' },
-  /** Augenbraue: 10 px, 600, Versalien, Sperrung .14em, Farbe `schwach`. */
-  augenbraue: { groesse: 10, gewicht: 600, familie: 'text', sperrung: '0.14em', versal: true },
-  /** Etikett unter dem Rail-Icon: 9 px Versalien. */
-  railEtikett: { groesse: 9, gewicht: 500, familie: 'text', sperrung: '0.06em', versal: true },
-  /** Kleine Mono-Meta: Unterzeilen wie „Stand“, der Weg in der Zeitachse (LLH-1972). */
-  metaKlein: { groesse: 10, gewicht: 400, familie: 'zahl' },
-  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text. */
+  /** Augenbraue: 11 px (Boden, LLH-2044), 600, Versalien, Sperrung .08em, Farbe `schwach`. */
+  augenbraue: { groesse: 11, gewicht: 600, familie: 'text', sperrung: '0.08em', versal: true },
+  /** Etikett unter dem Rail-Icon: 11 px Versalien, Sperrung .04em (LLH-2044, Rail 64 px). */
+  railEtikett: { groesse: 11, gewicht: 500, familie: 'text', sperrung: '0.04em', versal: true },
+  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text; auch Unterzeilen wie „Stand“ (vorher
+   *  `metaKlein` 10, entfallen mit dem Boden, LLH-2044). */
   meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
   /** Mono neben `textKlein`: Zähler und Zeiten in dichten Zeilen (LLH-1972). */
   monoKlein: { groesse: 12, gewicht: 400, familie: 'zahl' },
@@ -872,6 +871,14 @@ export const schriftskala = {
 } as const satisfies Record<string, Schriftstufe>;
 
 export type Schriftstufenname = keyof typeof schriftskala;
+
+/**
+ * Schriftboden in px (LLH-2044, ADR-0085): keine Stufe der `schriftskala` liegt darunter. Ausnahmen
+ * stehen nicht in der Skala, sondern als Nicht-Ziele im Entwurf: Druck (pt), Zeichnungen mit
+ * eigenem Maßstab (Kartenstile, taktische Zeichen, Fernmeldeskizze, Lagekarten-Griffe und
+ * Cluster) und die Fernsicht des Lagemonitors.
+ */
+export const SCHRIFT_BODEN = 11;
 
 /**
  * Schrift der Eingabefelder auf grobem Zeiger in px (LLH-2043, `frontend/AGENTS.md`,

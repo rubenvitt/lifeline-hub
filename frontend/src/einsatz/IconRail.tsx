@@ -84,7 +84,7 @@ export function railZielStil(
 }
 
 /**
- * Das 9-px-Etikett unter dem Icon (Versalien, Sperrung .06em — `schriftskala.railEtikett`).
+ * Das 11-px-Etikett unter dem Icon (Versalien, Sperrung .04em — `schriftskala.railEtikett`, LLH-2044).
  *
  * `maxWidth: '100%'` hält das Etikett in der Zielbreite: ein zu langes Kurzetikett zeigt sich dann
  * als `scrollWidth > clientWidth` (gemessen in `e2e/rail-etikett.spec.ts`, LFH-644) statt still
