@@ -190,8 +190,8 @@ async fn ohne_admin_recht_403_aber_lesen_geht_nur_aktive() {
 
     for (methode, pfad, rumpf) in [
         ("PATCH", format!("/{v}"), r#"{"name":"Neu"}"#),
-        ("PUT", format!("/{v}/fahrzeuge"), r#"{"fahrzeug_ids":[]}"#),
-        ("PUT", format!("/{v}/personal"), r#"{"personal":[]}"#),
+        ("PUT", format!("/{v}/vehicles"), r#"{"fahrzeug_ids":[]}"#),
+        ("PUT", format!("/{v}/personnel"), r#"{"personal":[]}"#),
         ("PUT", format!("/{v}/material"), r#"{"material":[]}"#),
     ] {
         let (status, _) = send(&app, methode, &erika, &pfad, rumpf).await;
@@ -265,7 +265,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{zug}/fahrzeuge"),
+        &format!("/{zug}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{elw},{elw}]}}"#),
     )
     .await;
@@ -279,7 +279,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/fahrzeuge"),
+        &format!("/{staffel}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{elw}]}}"#),
     )
     .await;
@@ -293,7 +293,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/fahrzeuge"),
+        &format!("/{staffel}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{}]}}"#, zu_viele.join(",")),
     )
     .await;
@@ -304,7 +304,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/personal"),
+        &format!("/{staffel}/personnel"),
         &format!(r#"{{"personal":[{{"personal_id":{p},"fahrzeug_id":{rtw},"staerke_position":"fuehrer"}}]}}"#),
     )
     .await;
@@ -317,7 +317,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/personal"),
+        &format!("/{staffel}/personnel"),
         &format!(r#"{{"personal":[{{"personal_id":{p},"staerke_position":"f"}}]}}"#),
     )
     .await;
@@ -326,7 +326,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/fahrzeuge"),
+        &format!("/{staffel}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{rtw}]}}"#),
     )
     .await;
@@ -334,7 +334,7 @@ async fn zuordnungen_und_zusammenhangsfehler() {
         &app,
         "PUT",
         &admin,
-        &format!("/{staffel}/personal"),
+        &format!("/{staffel}/personnel"),
         &format!(r#"{{"personal":[{{"personal_id":{p},"fahrzeug_id":{rtw},"staerke_position":"unterfuehrer"}}]}}"#),
     )
     .await;
@@ -375,7 +375,7 @@ async fn material_der_vorlage_ueber_put() {
         &app,
         "PUT",
         &admin,
-        &format!("/{v}/fahrzeuge"),
+        &format!("/{v}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{rtw}]}}"#),
     )
     .await;
@@ -477,7 +477,7 @@ async fn org_grenze() {
         &app,
         "PUT",
         &bert,
-        &format!("/{a}/fahrzeuge"),
+        &format!("/{a}/vehicles"),
         r#"{"fahrzeug_ids":[]}"#,
     )
     .await;
@@ -486,7 +486,7 @@ async fn org_grenze() {
         &app,
         "PUT",
         &bert,
-        &format!("/{a}/personal"),
+        &format!("/{a}/personnel"),
         r#"{"personal":[]}"#,
     )
     .await;
@@ -538,7 +538,7 @@ async fn org_grenze() {
         &app,
         "PUT",
         &bert,
-        &format!("/{b}/fahrzeuge"),
+        &format!("/{b}/vehicles"),
         &format!(r#"{{"fahrzeug_ids":[{fremdes}]}}"#),
     )
     .await;
@@ -581,12 +581,12 @@ async fn stammdaten_nur_nach_erfolgreichem_schreiben() {
         ("PATCH", format!("/{v}"), r#"{"bemerkung":"x"}"#.to_string()),
         (
             "PUT",
-            format!("/{v}/fahrzeuge"),
+            format!("/{v}/vehicles"),
             format!(r#"{{"fahrzeug_ids":[{f}]}}"#),
         ),
         (
             "PUT",
-            format!("/{v}/personal"),
+            format!("/{v}/personnel"),
             format!(r#"{{"personal":[{{"personal_id":{p}}}]}}"#),
         ),
     ] {
