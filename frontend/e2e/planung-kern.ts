@@ -97,7 +97,7 @@ export interface SeededPlanung {
 /** Legt die Planung im Messzustand an (Tabelle im Kopf). */
 export async function seedPlanung(page: Page, bezeichnung: string): Promise<SeededPlanung> {
   const tag = planungsTag(7);
-  const p = await send<PlanungResponse>(page, 'post', '/api/planungen', {
+  const p = await send<PlanungResponse>(page, 'post', '/api/plans', {
     bezeichnung,
     ort: 'Stadtpark Messweg',
     von: wireZeit(zeitpunktAm(tag, 6)),
@@ -107,7 +107,7 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Seed
   const id = p.kopf.id;
   const postenIds: number[] = [];
   for (const posten of POSTEN) {
-    const antwort = await send<PlanungResponse>(page, 'post', `/api/planungen/${id}/posten`, {
+    const antwort = await send<PlanungResponse>(page, 'post', `/api/plans/${id}/posts`, {
       bezeichnung: posten.bezeichnung,
       abschnitt: posten.abschnitt,
       art: 'einheit',
@@ -118,14 +118,14 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Seed
   }
   const helferIds: number[] = [];
   for (const name of HELFER) {
-    const h = await send<{ id: number }>(page, 'post', `/api/planungen/${id}/helfer`, {
+    const h = await send<{ id: number }>(page, 'post', `/api/plans/${id}/helpers`, {
       name,
       organisation: 'DLRG',
     });
     helferIds.push(h.id);
   }
   const block = (posten: number, von: number, bis: number, helfer?: number) =>
-    send<PlanungResponse>(page, 'post', `/api/planungen/${id}/bloecke`, {
+    send<PlanungResponse>(page, 'post', `/api/plans/${id}/blocks`, {
       posten_id: postenIds[posten],
       von: wireZeit(zeitpunktAm(tag, von)),
       bis: wireZeit(zeitpunktAm(tag, bis)),
@@ -144,7 +144,7 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Seed
  * zehn Tagen, und die Liste nennt den Tag („wird am … gelöscht“, ab 14 Tagen vorher).
  */
 export async function seedAltePlanung(page: Page, bezeichnung: string): Promise<number> {
-  const p = await send<PlanungResponse>(page, 'post', '/api/planungen', {
+  const p = await send<PlanungResponse>(page, 'post', '/api/plans', {
     bezeichnung,
     von: wireZeit(zeitpunktAm(planungsTag(-81), 8)),
     bis: wireZeit(zeitpunktAm(planungsTag(-80), 8)),

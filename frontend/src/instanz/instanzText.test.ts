@@ -4,6 +4,8 @@ import {
   codeAusstellenSperre,
   codeVorOrtSperre,
   gefundenZeile,
+  iosPushHubBandText,
+  iosPushHubBandTitel,
   kopplungHinweise,
   kopplungZustandZeile,
   richtungText,
@@ -104,6 +106,40 @@ describe('instanzText', () => {
     expect(kopplungHinweise(kopplung({ ohne_gueltigen_schluessel: true }))).toEqual([
       'Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu koppeln',
     ]);
+  });
+
+  it('Hinweis: das Push-Relais sperrt den Hub (LLH-2074)', () => {
+    expect(
+      kopplungHinweise(
+        kopplung({ gegenueber_ios_push_gesperrt_seit: '2026-11-23 08:15:00' }),
+        true,
+        () => '08:15',
+      ),
+    ).toEqual([
+      'iOS-Push an Hub-Konten kommt nicht an: das Push-Relais sperrt den Hub (seit 08:15)',
+    ]);
+  });
+
+  it('keine Sperre an einer widerrufenen Kopplung oder Zuordnung (LLH-2074)', () => {
+    const gesperrt = { gegenueber_ios_push_gesperrt_seit: '2026-11-23 08:15:00' };
+    expect(
+      kopplungHinweise(kopplung({ ...gesperrt, zustand: 'widerrufen' }), true, () => '08:15'),
+    ).not.toContainEqual(expect.stringContaining('iOS-Push'));
+    const k = kopplung(gesperrt);
+    expect(
+      kopplungHinweise({ ...k, org: { ...k.org, widerrufen_at: '2026-11-23 09:00:00' } }, true),
+    ).not.toContainEqual(expect.stringContaining('iOS-Push'));
+  });
+
+  it('Band zur Sperre des Hubs: Titel und Text (LLH-2074)', () => {
+    expect(iosPushHubBandTitel('Hub Nord')).toBe(
+      'iOS-Push über den Hub „Hub Nord“ wird nicht zugestellt',
+    );
+    expect(iosPushHubBandText('08:15')).toBe(
+      'Das Push-Relais sperrt den Hub seit 08:15. Alarme erreichen iPhones von Hub-Konten nicht; ' +
+        'Web Push und die offene App bleiben. Wichtiges auf anderem Weg absichern und den ' +
+        'Betreiber des Hubs informieren.',
+    );
   });
 
   it('Schlüsselzeile eines wartenden Schlüssels nennt Zustand und Unterzeichner', () => {

@@ -19,6 +19,8 @@ audit	-
 auth	-
 auto-update	automatische Aktualisierung
 backup	-
+blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
@@ -30,8 +32,10 @@ care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
 check	prüfen
+check-in	melden
 client-errors	Client-Fehler
 close	abschließen
 closure	Abschluss
@@ -43,11 +47,15 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
+countersign	gegenzeichnen
 damages	Schäden
 deactivate	deaktivieren
+decline	ablehnen
 demo-data	Demo-Daten
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 download	-
 emergency-takeover	Notübernahme
@@ -65,10 +73,13 @@ follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 gauges	Pegel
+generate	erzeugen
 glyphs	-
 grant	Freigabe
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 import	-
 incidents	Einsätze
 info-line	Infotelefon
@@ -81,11 +92,13 @@ ios-push	-
 jwks.json	-
 key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 live	-
 login	-
 logins	Anmeldungen
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -100,12 +113,14 @@ module-defaults	Modulvorgaben
 module-overrides	Modul-Overrides
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
+object	widersprechen
 offline	-
 offline-maps	Offline-Karten
 oidc	-
 one-time-password	Einmalpasswort
 online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
 org-accommodation-guidelines	Org-Unterkunft-Richtwerte
 org-archive-keys	Org-Archiv-Schlüssel
@@ -113,6 +128,7 @@ org-command-roles	Org-Führungsfunktionen
 org-module-settings	Org-Modul-Einstellungen
 org-settings	Org-Einstellungen
 organization	Organisation
+origin	Herkunft
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -129,25 +145,30 @@ position	-
 positions	Stellen
 posts	Posten
 presence	Präsenz
+preview	Vorschau
 providers	-
 proxy	-
 raster	-
 read	gelesen
+reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
 register	-
 registration	-
 reimport	neu importieren
+reject	zurückweisen
 rejected	abgelehnt
 release-notes	Versionsstand
 reliefs	Ablösungen
 reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
@@ -160,6 +181,7 @@ set	festlegen
 settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
@@ -181,6 +203,7 @@ tile	-
 tilejson	-
 tiles	-
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 uhs	UHS

@@ -84,7 +84,7 @@ async fn gekoppelt() -> (Instanz, Instanz) {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -93,7 +93,7 @@ async fn gekoppelt() -> (Instanz, Instanz) {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
@@ -201,7 +201,7 @@ async fn rueckgabe_an_den_alten_hub() -> (Instanz, Instanz, i64) {
     );
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -296,7 +296,7 @@ async fn notuebernahme_durch_alte_instanz_traegt_mitarbeit_nach() {
     let (s, v) = common::anfrage(
         &elw.app,
         "GET",
-        "/api/admin/instanz/fuehrung",
+        "/api/admin/instance/command",
         &elw.admin,
         None,
     )
@@ -305,7 +305,7 @@ async fn notuebernahme_durch_alte_instanz_traegt_mitarbeit_nach() {
     let akte = v[0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;

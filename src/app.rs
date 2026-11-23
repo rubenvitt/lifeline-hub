@@ -1510,49 +1510,49 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1491: Führung je Einsatz zwischen gekoppelten Instanzen (Schalter
         // `LIFELINE_FUEHRUNG`, sonst 404). Bedienung ohne `fordere_aktiv`: sie geht auch, wenn eine
         // andere Instanz führt oder der Einsatz abgeschlossen ist.
-        .route("/api/einsaetze/{id}/fuehrung", get(routes::fuehrung::lesen))
+        .route("/api/einsaetze/{id}/command", get(routes::fuehrung::lesen))
         .route(
-            "/api/einsaetze/{id}/fuehrung/uebergeben",
+            "/api/einsaetze/{id}/command/hand-over",
             post(routes::fuehrung::uebergeben),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/code",
+            "/api/einsaetze/{id}/command/code",
             post(routes::fuehrung::code_abgeben),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/anfragen",
+            "/api/einsaetze/{id}/command/request",
             post(routes::fuehrung::anfragen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/anfrage/ablehnen",
+            "/api/einsaetze/{id}/command/request/decline",
             post(routes::fuehrung::anfrage_ablehnen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme",
+            "/api/einsaetze/{id}/command/emergency-takeover",
             post(routes::fuehrung::notuebernahme),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/zurueckholen",
+            "/api/einsaetze/{id}/command/reclaim",
             post(routes::fuehrung::zurueckholen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/start",
+            "/api/einsaetze/{id}/command/emergency-takeover/start",
             post(routes::fuehrung::notuebernahme_start),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/abschluss",
+            "/api/einsaetze/{id}/command/emergency-takeover/finish",
             post(routes::fuehrung::notuebernahme_abschluss),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/code",
+            "/api/einsaetze/{id}/command/emergency-takeover/code",
             post(routes::fuehrung::notuebernahme_code),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/bestaetigen",
+            "/api/einsaetze/{id}/command/confirm",
             post(routes::fuehrung::bestaetigen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/widersprechen",
+            "/api/einsaetze/{id}/command/object",
             post(routes::fuehrung::widersprechen),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
@@ -2097,112 +2097,112 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 // Erst danach: die Verfügbarkeit trägt weder Body- noch Upload-Grenze.
                 .get(routes::archiv_einspielen::verfuegbarkeit),
         )
-        .route("/api/admin/instanz", get(routes::instanz::uebersicht))
+        .route("/api/admin/instance", get(routes::instanz::uebersicht))
         // LLH-1491: Führung der Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
         .route(
-            "/api/admin/instanz/fuehrung",
+            "/api/admin/instance/command",
             get(routes::fuehrung::admin_liste),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/uebergeben",
+            "/api/admin/instance/command/{id}/hand-over",
             post(routes::fuehrung::admin_uebergeben),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/code",
+            "/api/admin/instance/command/{id}/code",
             post(routes::fuehrung::admin_code_abgeben),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/anfragen",
+            "/api/admin/instance/command/{id}/request",
             post(routes::fuehrung::admin_anfragen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/anfrage/ablehnen",
+            "/api/admin/instance/command/{id}/request/decline",
             post(routes::fuehrung::admin_anfrage_ablehnen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme",
+            "/api/admin/instance/command/{id}/emergency-takeover",
             post(routes::fuehrung::admin_notuebernahme),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/start",
+            "/api/admin/instance/command/{id}/emergency-takeover/start",
             post(routes::fuehrung::admin_notuebernahme_start),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/abschluss",
+            "/api/admin/instance/command/{id}/emergency-takeover/finish",
             post(routes::fuehrung::admin_notuebernahme_abschluss),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/code",
+            "/api/admin/instance/command/{id}/emergency-takeover/code",
             post(routes::fuehrung::admin_notuebernahme_code),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/bestaetigen",
+            "/api/admin/instance/command/{id}/confirm",
             post(routes::fuehrung::admin_bestaetigen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/widersprechen",
+            "/api/admin/instance/command/{id}/object",
             post(routes::fuehrung::admin_widersprechen),
         )
         .route(
-            "/api/admin/instanz/codes",
+            "/api/admin/instance/codes",
             post(routes::instanz::code_ausstellen),
         )
         .route(
-            "/api/admin/instanz/einloesen",
+            "/api/admin/instance/redeem",
             post(routes::instanz::einloesen),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/widerrufen",
+            "/api/admin/instance/pairings/{id}/revoke",
             post(routes::instanz::widerrufen),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/stammdaten-neu",
+            "/api/admin/instance/pairings/{id}/resync",
             post(routes::instanz::stammdaten_neu),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/verloren",
+            "/api/admin/instance/pairings/{id}/lost",
             post(routes::instanz::elw_verloren),
         )
         // LAN-Entdeckung (LLH-1497): Liste „Im Netz gefunden“.
-        .route("/api/admin/instanz/lan", get(routes::instanz::lan))
+        .route("/api/admin/instance/lan", get(routes::instanz::lan))
         .route(
-            "/api/instanz/stammdaten/herkunft",
+            "/api/instance/master-data/origin",
             get(routes::instanz::stammdaten_herkunft),
         )
         .route(
-            "/api/admin/instanz/unterschrift/registrieren/start",
+            "/api/admin/instance/signing-keys/register/start",
             post(routes::instanz::registrieren_start),
         )
         .route(
-            "/api/admin/instanz/unterschrift/registrieren/abschluss",
+            "/api/admin/instance/signing-keys/register/finish",
             post(routes::instanz::registrieren_abschluss),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/start",
+            "/api/admin/instance/signing-keys/{id}/countersign/start",
             post(routes::instanz::gegenzeichnen_start),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss",
+            "/api/admin/instance/signing-keys/{id}/countersign/finish",
             post(routes::instanz::gegenzeichnen_abschluss),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/widerrufen",
+            "/api/admin/instance/signing-keys/{id}/revoke",
             post(routes::instanz::unterschrift_widerrufen),
         )
         .route(
-            "/api/admin/instanz/letzte-schluessel",
+            "/api/admin/instance/last-keys",
             get(routes::instanz::letzte_schluessel),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/bestaetigen",
+            "/api/admin/instance/signing-keys/{id}/confirm",
             post(routes::instanz::unterschrift_bestaetigen),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/zurueckweisen",
+            "/api/admin/instance/signing-keys/{id}/reject",
             post(routes::instanz::unterschrift_zurueckweisen),
         )
         .route(
-            "/api/instanz/koppeln",
+            "/api/instance/pair",
             post(routes::instanz::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         .route(
@@ -2225,19 +2225,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Bruchstelle am Spiegel (LLH-1646): ansehen, nachreichen, verwerfen.
         .route(
-            "/api/einsaetze/{id}/bruchstelle",
+            "/api/einsaetze/{id}/breaks",
             get(routes::instanz::bruchstelle_liste),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/antraege",
+            "/api/einsaetze/{id}/breaks/requests",
             post(routes::instanz::bruchstelle_alle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/antrag",
+            "/api/einsaetze/{id}/breaks/{bruch_id}/request",
             post(routes::instanz::bruchstelle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen",
+            "/api/einsaetze/{id}/breaks/{bruch_id}/discard",
             post(routes::instanz::bruchstelle_verwerfen),
         )
         // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend, nur die eigenen.
@@ -2341,66 +2341,63 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
-            "/api/planungen",
+            "/api/plans",
             get(routes::planung::list).post(routes::planung::create),
         )
         .route(
-            "/api/planungen/{id}",
+            "/api/plans/{id}",
             get(routes::planung::load)
                 .patch(routes::planung::update)
                 .delete(routes::planung::delete),
         )
         .route(
-            "/api/planungen/{id}/posten",
+            "/api/plans/{id}/posts",
             post(routes::planung::create_posten),
         )
-        // `reihenfolge` ist ein festes Segment neben `{pid}`.
+        // `order` ist ein festes Segment neben `{pid}`.
         .route(
-            "/api/planungen/{id}/posten/reihenfolge",
+            "/api/plans/{id}/posts/order",
             put(routes::planung::reihenfolge),
         )
         .route(
-            "/api/planungen/{id}/posten/{pid}",
+            "/api/plans/{id}/posts/{pid}",
             patch(routes::planung::update_posten).delete(routes::planung::delete_posten),
         )
         .route(
-            "/api/planungen/{id}/bloecke",
+            "/api/plans/{id}/blocks",
             post(routes::planung::create_block),
         )
         .route(
-            "/api/planungen/{id}/bloecke/{bid}",
+            "/api/plans/{id}/blocks/{bid}",
             patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
+        .route("/api/plans/{id}/generate", post(routes::planung::erzeugen))
+        .route("/api/plans/{id}/export", get(routes::planung::export))
         .route(
-            "/api/planungen/{id}/erzeugen",
-            post(routes::planung::erzeugen),
-        )
-        .route("/api/planungen/{id}/export", get(routes::planung::export))
-        .route(
-            "/api/planungen/{id}/helfer",
+            "/api/plans/{id}/helpers",
             post(routes::planung::create_helfer),
         )
         .route(
-            "/api/planungen/{id}/helfer/{hid}",
+            "/api/plans/{id}/helpers/{hid}",
             patch(routes::planung::update_helfer).delete(routes::planung::delete_helfer),
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
-            "/api/planungen/{id}/programmpunkte",
+            "/api/plans/{id}/agenda-items",
             post(routes::planung::create_programmpunkt),
         )
         .route(
-            "/api/planungen/{id}/programmpunkte/{pid}",
+            "/api/plans/{id}/agenda-items/{pid}",
             patch(routes::planung::update_programmpunkt)
                 .delete(routes::planung::delete_programmpunkt),
         )
-        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
+        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `preview` schreibt nichts.
         .route(
-            "/api/planungen/{id}/uebernahme/vorschau",
+            "/api/plans/{id}/transfer/preview",
             post(routes::planung::uebernahme_vorschau),
         )
         .route(
-            "/api/planungen/{id}/uebernahme",
+            "/api/plans/{id}/transfer",
             post(routes::planung::uebernehmen),
         )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.

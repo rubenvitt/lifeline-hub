@@ -114,7 +114,7 @@ async fn uebernommene_zeile_ist_nur_lesbar_lokale_ergaenzung_nicht() {
     let (s, v) = common::anfrage(
         &elw.app,
         "GET",
-        "/api/instanz/stammdaten/herkunft",
+        "/api/instance/master-data/origin",
         &elw.admin,
         None,
     )
@@ -353,7 +353,7 @@ async fn gleicher_kontoname_bleibt_draussen_bis_zum_erneuten_abgleich() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{id}/stammdaten-neu"),
+        &format!("/api/admin/instance/pairings/{id}/resync"),
         &elw.admin,
         None,
     )
@@ -450,7 +450,7 @@ async fn nach_dem_widerruf_gehoeren_die_zeilen_dem_elw() {
     let (s, v) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{k}/revoke"),
         &elw.admin,
         None,
     )
@@ -567,7 +567,7 @@ async fn ohne_plattenbestaetigung_kommt_das_konto_ohne_geheimnis() {
         .await,
         lifeline_hub::auth::PASSWORT_HASH_KEIN_LOKALES
     );
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     assert_eq!(
         v["kopplungen"][0]["org"]["stammdaten"]["geheimnisse_verteilt"],
         false
@@ -671,7 +671,7 @@ async fn elw_verloren_macht_die_verteilten_geheimnisse_wertlos() {
     melden(&elw2).await;
     let (s, _) = login(&hub, "maxmuster", "maxmuster-pw-123").await;
     assert_eq!(s, StatusCode::OK);
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let k = v["kopplungen"]
         .as_array()
         .unwrap()
@@ -682,7 +682,7 @@ async fn elw_verloren_macht_die_verteilten_geheimnisse_wertlos() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{}/verloren", k["id"]),
+        &format!("/api/admin/instance/pairings/{}/lost", k["id"]),
         &hub.admin,
         None,
     )
@@ -922,12 +922,12 @@ async fn passkey_pflicht_bleibt_nach_dem_widerruf_wenn_der_hash_geliefert_wurde(
         .await,
         1
     );
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let k = v["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{k}/revoke"),
         &hub.admin,
         None,
     )
@@ -1011,12 +1011,12 @@ async fn elw_verloren_zaehlt_auch_frueher_gelieferte_geheimnisse() {
          FROM instanz_kopplung_org LIMIT 1",
     )
     .await;
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let k = v["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{k}/verloren"),
+        &format!("/api/admin/instance/pairings/{k}/lost"),
         &hub.admin,
         None,
     )
@@ -1231,24 +1231,24 @@ async fn elw_verloren_geht_auch_nach_dem_widerruf_aber_nur_einmal() {
     let (hub, elw) = gekoppelt_mit_platte(true).await;
     konto_bereit(&hub, "maxmuster").await;
     melden(&elw).await;
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let k = v["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{k}/revoke"),
         &hub.admin,
         None,
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     // Der Widerruf lässt die Passwörter dort gelten, also zählt die Kopplung sie weiter.
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     assert_eq!(
         v["kopplungen"][0]["org"]["stammdaten"]["konten_mit_geheimnis"],
         1
     );
-    let pfad = format!("/api/admin/instanz/kopplungen/{k}/verloren");
+    let pfad = format!("/api/admin/instance/pairings/{k}/lost");
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["konten"], 1, "{v}");
@@ -1386,7 +1386,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut() {
         .await,
         1
     );
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
     assert!(h.contains("Erneut an") && h.contains("Stammdaten"), "{h:?}");
 }
@@ -1462,7 +1462,7 @@ async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beide_stroeme() {
     )
     .await;
     melden(&elw).await;
-    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
     assert!(
         h.contains("Erneut an") && h.contains("Unterschriftsschlüssel, Stammdaten."),

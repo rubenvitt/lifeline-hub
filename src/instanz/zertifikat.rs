@@ -4,7 +4,7 @@
 //! Auf einer Direktkopplung zählt nicht das Vertrauen des Betriebssystems in das Zertifikat der
 //! erreichten Seite, sondern eine Aussage, die diese mit ihrem Instanzschlüssel signiert: „Ich
 //! zeige das Zertifikat mit diesem Fingerabdruck“ (beim Koppeln in der `KoppelnAntwort`, danach
-//! über `POST /api/instanz/zertifikat`). Der [`Verifier`] hier prüft die Handshake-Signaturen wie
+//! über `POST /api/instance/certificate`). Der [`Verifier`] hier prüft die Handshake-Signaturen wie
 //! rustls selbst, aber weder Kette noch Hostname; stattdessen vergleicht er den Fingerabdruck mit
 //! dem beglaubigten. Ohne erwarteten Wert (Erfassung) lässt er jedes Zertifikat zu: dann darf nur
 //! eine Anfrage ohne Nutzdaten hinaus, und der gesehene Fingerabdruck kommt über

@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/einsatz/nummer.rs, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/einsatz/nummer.rs, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/IosPushHubBand.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -480,6 +480,22 @@ Ein Admin vom Hub ist am ELW Admin, solange der ELW nur seine Organisation träg
 mehrere Organisationen, kommt das Konto dort ohne Admin-Rolle an, und die Kopplung zeigt
 „Konto „…“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.“
 
+### iOS-Push über den Hub
+
+Bietet der Hub iOS-Push an, bekommen Konten vom Hub ihre Push-Meldungen auf dem iPhone vom Hub,
+nicht vom Einsatzleitwagen: Die iPhones sind am Hub angemeldet. Sperrt das Push-Relais den Hub,
+kommt bei diesen iPhones nichts an, auch kein Alarm. Der Hub meldet die Sperre dem
+Einsatzleitwagen. Dort zeigt jeder Einsatz, dessen Hinweise über diesen Hub reisen, der
+Einsatzleitung und den Admins der Organisation das gelbe Band „iOS-Push über den Hub „…“ wird
+nicht zugestellt“. An der Kopplung steht „iOS-Push an Hub-Konten kommt nicht an: das Push-Relais
+sperrt den Hub (seit …)“. Die Zeit nennt, wann das Relais den Hub zuletzt abgewiesen hat. Web
+Push und die offene App bleiben. Der Einsatzleitwagen springt nicht selbst ein; wichtige
+Meldungen sichert die Einsatzleitung auf anderem Weg ab, etwa über Funk oder Telefon. Den
+Betreiber des Hubs informieren: Die Sperre hebt der Betreiber des Relais auf. Der Hub merkt das
+erst, wenn er wieder etwas sendet, frühestens einen Tag nach der letzten Abweisung. Danach
+verschwinden Band und Hinweis mit der nächsten Meldung des Einsatzleitwagens, auch in schon
+offenen Seiten.
+
 ### Spiegel
 
 Wer einen Einsatz anlegt, führt ihn: Die Installation, an der er angelegt wurde, liefert ihn an
@@ -749,7 +765,10 @@ oder Schwärzen des Einsatzes ist die Liste leer.
 ### Hinweise an einer Kopplung
 
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst
-nichts. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
+nichts. Liegt eine Seite noch vor der Umstellung der Schnittstelle (Ende November 2026),
+erreichen sich die Installationen gar nicht mehr, auch nicht zum Melden: An der Kopplung steht dann „Die andere Instanz kennt diesen Weg nicht, vermutlich hat sie
+einen anderen Softwarestand“, beim Einlösen eines Codes „… kennt den Weg zum Koppeln nicht“. Dann
+beide Installationen auf denselben Stand bringen. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
 Installationen einander ab.
 
 Nach dem Zurückspielen einer Sicherung zeigt die Kopplung meist „… hat schon spätere Führungsakten

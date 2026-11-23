@@ -46,7 +46,7 @@ describe('unterschreibeErklaerung (LLH-1490/1491)', () => {
     await gegenzeichne(7);
     expect(apiSend).toHaveBeenNthCalledWith(
       1,
-      '/api/admin/instanz/unterschrift/7/gegenzeichnen/start',
+      '/api/admin/instance/signing-keys/7/countersign/start',
       'POST',
       undefined,
     );
@@ -60,7 +60,7 @@ describe('unterschreibeErklaerung (LLH-1490/1491)', () => {
     });
     expect(apiSend).toHaveBeenNthCalledWith(
       2,
-      '/api/admin/instanz/unterschrift/7/gegenzeichnen/abschluss',
+      '/api/admin/instance/signing-keys/7/countersign/finish',
       'POST',
       { zeremonie: 'z1', assertion },
     );
@@ -70,13 +70,13 @@ describe('unterschreibeErklaerung (LLH-1490/1491)', () => {
     await uebernimmFuehrungMitUnterschrift({ akteId: 4, kennung: 'k-hub/3' }, 'ELW weg');
     expect(apiSend).toHaveBeenNthCalledWith(
       1,
-      '/api/admin/instanz/fuehrung/4/notuebernahme/start?kennung=k-hub%2F3',
+      '/api/admin/instance/command/4/emergency-takeover/start?kennung=k-hub%2F3',
       'POST',
       { grund: 'ELW weg' },
     );
     expect(apiSend).toHaveBeenNthCalledWith(
       2,
-      '/api/admin/instanz/fuehrung/4/notuebernahme/abschluss?kennung=k-hub%2F3',
+      '/api/admin/instance/command/4/emergency-takeover/finish?kennung=k-hub%2F3',
       'POST',
       { zeremonie: 'z1', assertion },
     );
@@ -85,9 +85,9 @@ describe('unterschreibeErklaerung (LLH-1490/1491)', () => {
   // LLH-1862: Die ID einer Akte vergibt der Server nach dem Löschen neu; die Kennung der
   // gezeigten Akte reist als Gegenprobe mit.
   it('bildet den Pfad am Einsatz oder an der Akte, dort mit der Kennung', () => {
-    expect(fuehrungPfad({ einsatzId: 7 }, 'anfragen')).toBe('/api/einsaetze/7/fuehrung/anfragen');
-    expect(fuehrungPfad({ akteId: 4, kennung: 'k-hub/3' }, 'anfragen')).toBe(
-      '/api/admin/instanz/fuehrung/4/anfragen?kennung=k-hub%2F3',
+    expect(fuehrungPfad({ einsatzId: 7 }, 'request')).toBe('/api/einsaetze/7/command/request');
+    expect(fuehrungPfad({ akteId: 4, kennung: 'k-hub/3' }, 'request')).toBe(
+      '/api/admin/instance/command/4/request?kennung=k-hub%2F3',
     );
   });
 });

@@ -317,7 +317,7 @@ async fn mit_einem_gegenueber_ohne_spiegel_wird_nicht_abgeglichen() {
     // Beide Seiten sagen es auf der Seite „Instanzkopplung“.
     for i in [&hub, &elw] {
         let (s, v) =
-            common::anfrage_json(&i.app, "GET", "/api/admin/instanz", &i.admin, None).await;
+            common::anfrage_json(&i.app, "GET", "/api/admin/instance", &i.admin, None).await;
         assert_eq!(s, StatusCode::OK, "{v}");
         assert_eq!(
             v["kopplungen"][0]["spiegel"]["hinweis"],
@@ -1137,7 +1137,7 @@ async fn widerruf_beendet_den_abgleich_der_spiegel_bleibt_lesbar() {
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{kopplung}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{kopplung}/revoke"),
         &hub.admin,
         None,
     )
@@ -1705,7 +1705,7 @@ async fn widerrufen_am_hub(hub: &Instanz, elw: &Instanz, cookie: &str) {
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{kopplung}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{kopplung}/revoke"),
         cookie,
         None,
     )
@@ -1717,12 +1717,13 @@ async fn widerrufen_am_hub(hub: &Instanz, elw: &Instanz, cookie: &str) {
 /// Der Admin am Hub (Cookie) stellt einen Code aus, der ELW löst ihn ein: dieselbe Kopplung, eine
 /// neue Zuordnung der Org des ELW an die Org dieses Admins.
 async fn neu_zuordnen(hub: &Instanz, elw: &Instanz, cookie: &str) {
-    let (st, v) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", cookie, None).await;
+    let (st, v) =
+        common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", cookie, None).await;
     assert_eq!(st, StatusCode::CREATED, "{v}");
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
