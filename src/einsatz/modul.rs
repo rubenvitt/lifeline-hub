@@ -264,7 +264,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Nicht übernommene Erfassungen nach einer Notübernahme (LLH-1646): modul-los. Jede Zeile
     // gehört einem anderen Modul; der Handler prüft das Modul je Zeile (Inhalt, Stellen,
     // Verwerfen) und das Modul der Antragsart.
-    ("/api/einsaetze/{id}/bruchstelle", None),
+    ("/api/einsaetze/{id}/breaks", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].
@@ -291,7 +291,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // die Präsenz an einer Einheit liegt unter `/einheiten` und erbt deren Key.
     ("/api/einsaetze/{id}/presence", None),
     // Führung je Einsatz (LLH-1491): Zustand der Instanzkopplung, modul-los wie der Abschluss.
-    ("/api/einsaetze/{id}/fuehrung", None),
+    ("/api/einsaetze/{id}/command", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/einsaetze/{id}/geraete", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.

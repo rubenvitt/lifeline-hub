@@ -26,11 +26,11 @@ import type {
  * (sonst 403), eine fremde Planung ist 404. Jeder Schreibweg an Planung, Posten und Blöcken liefert
  * die ganze Planung, weil sich Befunde und Kennzahlen mitändern; live kommt sie über `planung`.
  */
-const basis = (id: number) => `/api/planungen/${id}`;
+const basis = (id: number) => `/api/plans/${id}`;
 
 /** Offene zuerst, dann nach Beginn; ältere ohne gerechnete Kennzahlen. */
 export function listPlanungen(): Promise<PlanungListeneintrag[]> {
-  return apiGet<PlanungListeneintrag[]>('/api/planungen');
+  return apiGet<PlanungListeneintrag[]>('/api/plans');
 }
 
 export function loadPlanung(id: number): Promise<Planung> {
@@ -39,7 +39,7 @@ export function loadPlanung(id: number): Promise<Planung> {
 
 /** Bezeichnung doppelt (ohne Groß und Klein) ist 409, Zeitraum über 14 Tage 400. */
 export function createPlanung(body: PlanungBody): Promise<Planung> {
-  return apiSend<Planung>('/api/planungen', 'POST', body);
+  return apiSend<Planung>('/api/plans', 'POST', body);
 }
 
 export function updatePlanung(id: number, body: PlanungAendernBody): Promise<Planung> {
@@ -51,7 +51,7 @@ export function deletePlanung(id: number): Promise<void> {
 }
 
 export function createPlanungPosten(id: number, body: PlanungPostenBody): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/posten`, 'POST', body);
+  return apiSend<Planung>(`${basis(id)}/posts`, 'POST', body);
 }
 
 export function updatePlanungPosten(
@@ -59,7 +59,7 @@ export function updatePlanungPosten(
   postenId: number,
   body: PlanungPostenAendernBody,
 ): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/posten/${postenId}`, 'PATCH', body);
+  return apiSend<Planung>(`${basis(id)}/posts/${postenId}`, 'PATCH', body);
 }
 
 /** Mit Personen in seinen Blöcken nur mit `mitBloecken` (422 sonst). */
@@ -69,17 +69,17 @@ export function deletePlanungPosten(
   mitBloecken: boolean,
 ): Promise<void> {
   const query = mitBloecken ? '?mit_bloecken=true' : '';
-  return apiSend<void>(`${basis(id)}/posten/${postenId}${query}`, 'DELETE');
+  return apiSend<void>(`${basis(id)}/posts/${postenId}${query}`, 'DELETE');
 }
 
 /** Die ganze Reihenfolge, jeder Posten genau einmal (422 sonst). */
 export function updatePlanungPostenReihenfolge(id: number, postenIds: number[]): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/posten/reihenfolge`, 'PUT', { posten_ids: postenIds });
+  return apiSend<Planung>(`${basis(id)}/posts/order`, 'PUT', { posten_ids: postenIds });
 }
 
 /** Überschneidung am selben Posten (außer der Pause) ist 422. */
 export function createPlanungBlock(id: number, body: PlanungBlockBody): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/bloecke`, 'POST', body);
+  return apiSend<Planung>(`${basis(id)}/blocks`, 'POST', body);
 }
 
 /** Auch Verschieben an einen anderen Posten; veralteter Stand ist 409. */
@@ -88,23 +88,23 @@ export function updatePlanungBlock(
   blockId: number,
   body: PlanungBlockAendernBody,
 ): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/bloecke/${blockId}`, 'PATCH', body);
+  return apiSend<Planung>(`${basis(id)}/blocks/${blockId}`, 'PATCH', body);
 }
 
 export function deletePlanungBlock(id: number, blockId: number, version: number): Promise<void> {
-  return apiSend<void>(`${basis(id)}/bloecke/${blockId}?version=${version}`, 'DELETE');
+  return apiSend<void>(`${basis(id)}/blocks/${blockId}?version=${version}`, 'DELETE');
 }
 
 /** Füllt den Zeitraum am Posten (alles oder nichts; Konflikte als 422 mit Zeilen). */
 export function erzeugePlanungSchichten(id: number, body: PlanungErzeugenBody): Promise<Planung> {
-  return apiSend<Planung>(`${basis(id)}/erzeugen`, 'POST', body);
+  return apiSend<Planung>(`${basis(id)}/generate`, 'POST', body);
 }
 
 export function createPlanungHelfer(
   id: number,
   body: SchichtplanHelferBody,
 ): Promise<SchichtplanHelfer> {
-  return apiSend<SchichtplanHelfer>(`${basis(id)}/helfer`, 'POST', body);
+  return apiSend<SchichtplanHelfer>(`${basis(id)}/helpers`, 'POST', body);
 }
 
 export function updatePlanungHelfer(
@@ -112,12 +112,12 @@ export function updatePlanungHelfer(
   helferId: number,
   body: SchichtplanHelferAendernBody,
 ): Promise<SchichtplanHelfer> {
-  return apiSend<SchichtplanHelfer>(`${basis(id)}/helfer/${helferId}`, 'PATCH', body);
+  return apiSend<SchichtplanHelfer>(`${basis(id)}/helpers/${helferId}`, 'PATCH', body);
 }
 
 /** Nimmt den Helfer aus allen Blöcken. */
 export function deletePlanungHelfer(id: number, helferId: number): Promise<void> {
-  return apiSend<void>(`${basis(id)}/helfer/${helferId}`, 'DELETE');
+  return apiSend<void>(`${basis(id)}/helpers/${helferId}`, 'DELETE');
 }
 
 /**
@@ -128,7 +128,7 @@ export function createPlanungProgrammpunkt(
   id: number,
   daten: ProgrammpunktEingabe,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte`, 'POST', daten);
+  return apiSend<Programmpunkt>(`${basis(id)}/agenda-items`, 'POST', daten);
 }
 
 export function updatePlanungProgrammpunkt(
@@ -136,11 +136,11 @@ export function updatePlanungProgrammpunkt(
   punktId: number,
   daten: Partial<ProgrammpunktEingabe>,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte/${punktId}`, 'PATCH', daten);
+  return apiSend<Programmpunkt>(`${basis(id)}/agenda-items/${punktId}`, 'PATCH', daten);
 }
 
 export function deletePlanungProgrammpunkt(id: number, punktId: number): Promise<void> {
-  return apiSend<void>(`${basis(id)}/programmpunkte/${punktId}`, 'DELETE');
+  return apiSend<void>(`${basis(id)}/agenda-items/${punktId}`, 'DELETE');
 }
 
 /**
@@ -153,7 +153,7 @@ export function planungUebernahmeVorschau(
   id: number,
   body: PlanungUebernahmeBody,
 ): Promise<PlanungUebernahmeVorschau> {
-  return apiSend<PlanungUebernahmeVorschau>(`${basis(id)}/uebernahme/vorschau`, 'POST', body);
+  return apiSend<PlanungUebernahmeVorschau>(`${basis(id)}/transfer/preview`, 'POST', body);
 }
 
 /**
@@ -164,7 +164,7 @@ export function planungUebernehmen(
   id: number,
   body: PlanungUebernehmenBody,
 ): Promise<PlanungUebernahmeErgebnis> {
-  return apiSend<PlanungUebernahmeErgebnis>(`${basis(id)}/uebernahme`, 'POST', body);
+  return apiSend<PlanungUebernahmeErgebnis>(`${basis(id)}/transfer`, 'POST', body);
 }
 
 /** Zeit für das Schreiben einer großen Mappe, wie beim Schichtplan eines Einsatzes. */

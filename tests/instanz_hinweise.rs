@@ -319,6 +319,172 @@ async fn hub_ohne_push_meldet_keinen_push() {
     assert_eq!(faehigkeiten(&elw.i).await, (true, false));
 }
 
+// ── Sperre des Push-Relais am Hub (LLH-2074) ─────────────────────────────────────────────────
+
+const SPERRE_SEIT: &str = "2026-11-23 08:15:00";
+
+/// Der Hub wird vom Relais gesperrt (`403`), wie `ios_push::repo::relais_gesperrt_setzen` es
+/// festhält.
+async fn hub_sperren(hub: &Instanz) {
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO ios_push_relais (id, server_id, geheimnis, gesperrt_at) \
+             VALUES (1, 's', 'g', '{SPERRE_SEIT}') \
+             ON CONFLICT(id) DO UPDATE SET gesperrt_at = excluded.gesperrt_at"
+        ),
+    )
+    .await;
+}
+
+async fn sperre_am_elw(elw: &Instanz) -> Option<String> {
+    eine(
+        &elw.pool,
+        "SELECT gegenueber_ios_push_gesperrt_seit FROM instanz_kopplung LIMIT 1",
+    )
+    .await
+}
+
+#[tokio::test]
+async fn gesperrter_hub_meldet_seine_sperre_an_den_elw() {
+    let hub = seite_mit(false, true).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None, "vor der Sperre");
+    hub_sperren(&hub.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await.as_deref(), Some(SPERRE_SEIT));
+    exec(&hub.i.pool, "UPDATE ios_push_relais SET gesperrt_at = NULL").await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None, "die Sperre ist gefallen");
+}
+
+/// Ein Hub mit kaputtem oder überlangem Zeitwert (Review LLH-2074): die Sperre gilt trotzdem, der
+/// ELW speichert sie aber nur im kanonischen Format (ADR-0012), als „jetzt“, und behält einen schon
+/// gespeicherten Wert, statt ihn bei jeder Meldung neu zu setzen.
+#[tokio::test]
+async fn ungueltige_sperrzeit_vom_hub_gilt_als_sperre_im_kanonischen_format() {
+    let hub = seite_mit(false, true).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    for kaputt in ["kaputt".to_string(), "x".repeat(10_000)] {
+        exec(
+            &elw.i.pool,
+            "UPDATE instanz_kopplung SET gegenueber_ios_push_gesperrt_seit = NULL",
+        )
+        .await;
+        exec(
+            &hub.i.pool,
+            &format!(
+                "INSERT INTO ios_push_relais (id, server_id, geheimnis, gesperrt_at) \
+                 VALUES (1, 's', 'g', '{kaputt}') \
+                 ON CONFLICT(id) DO UPDATE SET gesperrt_at = excluded.gesperrt_at"
+            ),
+        )
+        .await;
+        melden(&elw.i).await;
+        let gespeichert = sperre_am_elw(&elw.i).await.expect("Sperre gilt");
+        assert!(
+            lifeline_hub::zeit::parse_streng(&gespeichert).is_some(),
+            "kanonisch: {gespeichert:.40}"
+        );
+        exec(
+            &elw.i.pool,
+            "UPDATE instanz_kopplung SET gegenueber_ios_push_gesperrt_seit = '2026-11-23 06:00:00'",
+        )
+        .await;
+        melden(&elw.i).await;
+        assert_eq!(
+            sperre_am_elw(&elw.i).await.as_deref(),
+            Some("2026-11-23 06:00:00"),
+            "ein gespeicherter Wert bleibt"
+        );
+    }
+}
+
+/// Ohne `--ios-push` zählt eine alte Zeile des Relais nicht: der Hub bietet den Kanal gar nicht an.
+#[tokio::test]
+async fn hub_ohne_ios_push_meldet_keine_sperre() {
+    let hub = seite(false).await;
+    let elw = seite(false).await;
+    schluessel(&hub.i).await;
+    koppeln(&hub.i, &elw.i).await;
+    hub_sperren(&hub.i).await;
+    melden(&elw.i).await;
+    assert_eq!(sperre_am_elw(&elw.i).await, None);
+}
+
+/// Der ELW zeigt die Sperre am gelieferten Einsatz (Detail und Liste gleich) und an der
+/// Kopplung; der Spiegel am Hub zeigt nichts. Fällt die Sperre, fällt die Anzeige.
+#[tokio::test]
+async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
+    let w = welt_mit((false, true), (false, false)).await;
+    hub_sperren(&w.hub.i).await;
+    melden(&w.elw.i).await;
+    let hub_name: String = eine(
+        &w.elw.i.pool,
+        "SELECT gegenueber_name FROM instanz_kopplung LIMIT 1",
+    )
+    .await;
+    let erwartet = json!([{"hub_name": hub_name, "since": SPERRE_SEIT}]);
+    let elw = &w.elw.i;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.einsatz),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ios_push_hub_gesperrt"], erwartet, "Detail");
+    let (_, liste) =
+        common::anfrage_json(&elw.app, "GET", "/api/einsaetze", &elw.admin, None).await;
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == json!(w.einsatz))
+        .expect("Einsatz in der Liste");
+    assert_eq!(eintrag["ios_push_hub_gesperrt"], erwartet, "Liste");
+    let (_, u) =
+        common::anfrage_json(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    assert_eq!(
+        u["kopplungen"][0]["gegenueber_ios_push_gesperrt_seit"],
+        json!(SPERRE_SEIT)
+    );
+    let hub = &w.hub.i;
+    let (_, spiegel) = common::anfrage_json(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.spiegel),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(
+        spiegel.get("ios_push_hub_gesperrt").is_none(),
+        "Spiegel am Hub: {spiegel}"
+    );
+    exec(&hub.pool, "UPDATE ios_push_relais SET gesperrt_at = NULL").await;
+    melden(elw).await;
+    let (_, v) = common::anfrage_json(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.einsatz),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert!(
+        v.get("ios_push_hub_gesperrt").is_none(),
+        "Sperre gefallen: {v}"
+    );
+}
+
 // ── Hinweise am Hub (Aufgaben 2.2, 3.3, 3.4) ────────────────────────────────────────────────
 
 /// Spec `benachrichtigungen`, „Hinweise zu einem Einsatz des ELW entstehen auch am Hub“: die
