@@ -393,9 +393,7 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     const { user, liste } = await bruchAufklappen();
     // Nach „Alle stellen“ ist nur noch die Meldung offen.
     server.use(
-      http.get('/api/einsaetze/1/breaks', () =>
-        HttpResponse.json([bruchliste[1], bruchliste[2]]),
-      ),
+      http.get('/api/einsaetze/1/breaks', () => HttpResponse.json([bruchliste[1], bruchliste[2]])),
     );
     await user.click(within(liste).getByRole('button', { name: 'Alle stellen' }));
     await waitFor(() =>

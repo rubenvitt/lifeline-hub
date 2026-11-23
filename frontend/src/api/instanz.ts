@@ -58,10 +58,7 @@ export function meldeElwVerloren(id: number): Promise<ElwVerlorenAntwort> {
 
 /** „Erneut abgleichen“ an der meldenden Seite (LLH-1493): holt alle Stammdaten neu. */
 export function gleicheStammdatenNeuAb(id: number): Promise<InstanzKopplungAnzeige> {
-  return apiSend<InstanzKopplungAnzeige>(
-    `/api/admin/instance/pairings/${id}/resync`,
-    'POST',
-  );
+  return apiSend<InstanzKopplungAnzeige>(`/api/admin/instance/pairings/${id}/resync`, 'POST');
 }
 
 /** Welche Stammdaten der eigenen Org vom Hub kommen (LLH-1493, design.md D9). */
