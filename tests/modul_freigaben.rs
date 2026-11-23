@@ -305,9 +305,9 @@ async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
     .unwrap();
     let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
 
-    for (modul, rolle) in [
-        ("schaeden", "fuehrungskraft"),
-        ("auftraege", "einsatzfuehrung"),
+    for (modul, pfad, rolle) in [
+        ("schaeden", "damages", "fuehrungskraft"),
+        ("auftraege", "auftraege", "einsatzfuehrung"),
     ] {
         modul_override(
             &app,
@@ -323,7 +323,7 @@ async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
             "{modul} auf {rolle}"
         );
         assert_eq!(
-            liste_status(&app, &fremd, einsatz, modul).await,
+            liste_status(&app, &fremd, einsatz, pfad).await,
             StatusCode::FORBIDDEN,
             "{modul} auf {rolle}"
         );

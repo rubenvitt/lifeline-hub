@@ -88,7 +88,7 @@ async fn widerrufen(app: &axum::Router, cookie: &str, einsatz: i64, fid: i64) ->
     anfrage(
         app,
         "POST",
-        &format!("{}/{fid}/widerrufen", pfad(einsatz)),
+        &format!("{}/{fid}/revoke", pfad(einsatz)),
         cookie,
         None,
     )

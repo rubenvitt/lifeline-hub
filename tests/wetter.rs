@@ -366,7 +366,7 @@ async fn modul_ausgeblendet_ist_403_pegel_bleiben_200() {
 
     let (status, _) = anfrage(&u.app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    for suffix in ["pegel", "pegel/verlauf"] {
+    for suffix in ["gauges", "gauges/history"] {
         let (status, _) = anfrage(
             &u.app,
             "GET",
