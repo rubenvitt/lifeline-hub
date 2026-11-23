@@ -4199,7 +4199,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "„Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes\nbis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von\n`POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein\nälterer Client liest es als deren Einzelquittung."
+            "description": "„Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes\nbis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von\n`POST …/notifications/read`; die übrigen Felder nennen die jüngste davon, ein\nälterer Client liest es als deren Einzelquittung."
           },
           "quittiert": {
             "type": "boolean",
@@ -11038,7 +11038,7 @@
       },
       "GelesenEingabe": {
         "type": "object",
-        "description": "Body von `POST …/benachrichtigungen/gelesen`.",
+        "description": "Body von `POST …/notifications/read`.",
         "required": [
           "bis_id"
         ],
@@ -23113,7 +23113,7 @@
       },
       "VorgabeEingabe": {
         "type": "object",
-        "description": "Body von `PUT …/benachrichtigung-vorgaben/{art}`.",
+        "description": "Body von `PUT …/notification-defaults/{art}`.",
         "required": [
           "still"
         ],

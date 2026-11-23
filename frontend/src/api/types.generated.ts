@@ -1597,7 +1597,7 @@ export interface components {
              * Format: int64
              * @description „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes
              *     bis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von
-             *     `POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein
+             *     `POST …/notifications/read`; die übrigen Felder nennen die jüngste davon, ein
              *     älterer Client liest es als deren Einzelquittung.
              */
             gelesen_bis?: number | null;
@@ -4405,7 +4405,7 @@ export interface components {
          * @enum {string}
          */
         GeheimnisspeicherZustand: "bereit" | "fehlt" | "passt_nicht";
-        /** @description Body von `POST …/benachrichtigungen/gelesen`. */
+        /** @description Body von `POST …/notifications/read`. */
         GelesenEingabe: {
             /**
              * Format: int64
@@ -9235,7 +9235,7 @@ export interface components {
             /** @description Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person. */
             snap_anzeige: string;
         };
-        /** @description Body von `PUT …/benachrichtigung-vorgaben/{art}`. */
+        /** @description Body von `PUT …/notification-defaults/{art}`. */
         VorgabeEingabe: {
             /**
              * @description Die Funktionen, für die die Art still ist (Wire-Werte von `VorgabeFunktion`); alle
