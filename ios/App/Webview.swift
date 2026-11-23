@@ -159,7 +159,12 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
         else { return }
         switch befehl {
         case .locationWatch(let id, let genau, let frist):
-            starteBeobachtung(id: id, highAccuracy: genau, timeout: frist, in: message.webView)
+            // Sofort festhalten: ein `clear` oder eine neue Seite vor der Freigabe verhindert den Start.
+            if beobachteterWebView !== message.webView { beendeStandort() }
+            beobachteterWebView = message.webView
+            let generation = beobachtung.angefragt(id: id)
+            starteBeobachtung(
+                id: id, highAccuracy: genau, timeout: frist, generation: generation, in: message.webView)
             return
         case .locationClear(let watch):
             fuehreAus(beobachtung.clear(watch: watch))
@@ -182,7 +187,9 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
 
     private static var jetzt: Double { ProcessInfo.processInfo.systemUptime }
 
-    private func starteBeobachtung(id: Int, highAccuracy: Bool, timeout: Duration?, in webView: WKWebView?) {
+    private func starteBeobachtung(
+        id: Int, highAccuracy: Bool, timeout: Duration?, generation: Int, in webView: WKWebView?
+    ) {
         let dienste = self.dienste
         Task { @MainActor [weak self, weak webView] in
             guard let self, let webView else { return }
@@ -195,12 +202,13 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
                     id: id, fehler: error as? Standortfehler ?? .unavailable, position: nil), an: webView)
                 return
             }
-            guard let server = self.aktiverServer(), self.istSeiteDesServers(webView) else { return }
-            if self.beobachteterWebView !== webView { self.beendeStandort() }
-            self.beobachteterWebView = webView
+            guard let server = self.aktiverServer(), self.istSeiteDesServers(webView),
+                self.beobachteterWebView === webView
+            else { return }
             self.fuehreAus(
                 self.beobachtung.start(
-                    id: id, highAccuracy: highAccuracy, timeout: timeout, server: server, jetzt: Self.jetzt))
+                    id: id, highAccuracy: highAccuracy, timeout: timeout, server: server,
+                    generation: generation, jetzt: Self.jetzt))
         }
     }
 

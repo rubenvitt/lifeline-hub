@@ -68,6 +68,10 @@ public struct Standortbeobachtung: Sendable {
 
     private var eintraege: [Int: Eintrag] = [:]
     private var server: ServerAdresse?
+    /// Beobachtungen, die die Seite angefragt hat, deren Start aber noch auf die Freigabe wartet.
+    private var angefragte: Set<Int> = []
+    /// Zählt Seiten: `reset` beginnt eine neue, Anfragen der alten starten danach nicht mehr.
+    private var generation = 0
 
     public init() {}
 
@@ -75,9 +79,20 @@ public struct Standortbeobachtung: Sendable {
 
     private var genau: Bool { eintraege.values.contains { $0.highAccuracy } }
 
+    /// Die Seite fragt `location_watch` an; die App startet erst nach der Freigabe und gibt dann
+    /// die Generation von hier zurück.
+    public mutating func angefragt(id: Int) -> Int {
+        angefragte.insert(id)
+        return generation
+    }
+
+    /// Startet eine angefragte Beobachtung. Hat die Seite sie inzwischen beendet (`clear`) oder ist
+    /// sie eine andere geworden (`reset`), geschieht nichts.
     public mutating func start(
-        id: Int, highAccuracy: Bool, timeout: Duration?, server: ServerAdresse, jetzt: Double
+        id: Int, highAccuracy: Bool, timeout: Duration?, server: ServerAdresse, generation: Int,
+        jetzt: Double
     ) -> Standortwirkung {
+        guard generation == self.generation, angefragte.remove(id) != nil else { return .keine }
         if self.server != server {
             eintraege = [:]
             self.server = server
@@ -90,6 +105,7 @@ public struct Standortbeobachtung: Sendable {
     }
 
     public mutating func clear(watch: Int) -> Standortwirkung {
+        angefragte.remove(watch)
         guard eintraege[watch] != nil else { return .keine }
         let vorher = genau
         eintraege[watch] = nil
@@ -98,6 +114,8 @@ public struct Standortbeobachtung: Sendable {
     }
 
     public mutating func reset() -> Standortwirkung {
+        generation += 1
+        angefragte = []
         guard !isLeer else { return .keine }
         eintraege = [:]
         server = nil
