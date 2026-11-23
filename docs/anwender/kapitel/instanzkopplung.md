@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/einsatz/nummer.rs, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/einsatz/nummer.rs, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/IosPushHubBand.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -479,6 +479,19 @@ Admin, hilft der Betrieb des Servers mit einem Notfallbefehl.
 Ein Admin vom Hub ist am ELW Admin, solange der ELW nur seine Organisation trägt. Trägt der ELW
 mehrere Organisationen, kommt das Konto dort ohne Admin-Rolle an, und die Kopplung zeigt
 „Konto „…“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.“
+
+### iOS-Push über den Hub
+
+Bietet der Hub iOS-Push an, bekommen Konten vom Hub ihre Push-Meldungen auf dem iPhone vom Hub,
+nicht vom Einsatzleitwagen: Die iPhones sind am Hub angemeldet. Sperrt das Push-Relais den Hub,
+kommt bei diesen iPhones nichts an, auch kein Alarm. Der Hub meldet die Sperre dem
+Einsatzleitwagen. Dort zeigt jeder Einsatz, dessen Hinweise über diesen Hub reisen, der
+Einsatzleitung und den Admins der Organisation das gelbe Band „iOS-Push über den Hub „…“ wird
+nicht zugestellt“. An der Kopplung steht „iOS-Push an Hub-Konten kommt nicht an: das Push-Relais
+sperrt den Hub (seit …)“. Web Push und die offene App bleiben. Der Einsatzleitwagen springt
+nicht selbst ein; wichtige Meldungen sichert die Einsatzleitung auf anderem Weg ab, etwa über
+Funk oder Telefon. Den Betreiber des Hubs informieren: Die Sperre hebt der Betreiber des Relais
+auf. Danach verschwinden Band und Hinweis mit der nächsten Meldung.
 
 ### Spiegel
 
