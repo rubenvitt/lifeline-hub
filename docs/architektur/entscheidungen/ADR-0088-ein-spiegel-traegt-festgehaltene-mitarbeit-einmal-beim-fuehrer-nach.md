@@ -1,5 +1,5 @@
 ---
-id: ADR-0086
+id: ADR-0088
 titel: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
 status: akzeptiert
 datum: 2026-11-22
@@ -10,7 +10,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-s110uic4-mitarbeit-nachtrag-fuehrer-design.md
 ---
 
-# ADR-0086: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
+# ADR-0088: Ein Spiegel trägt festgehaltene Mitarbeit einmal beim Führer nach, der Führer hebt nur unter engen Bedingungen an
 
 ## Regeln
 
@@ -20,7 +20,7 @@ herleitung:
 - MUST: Ein Führer hebt auf einen Nachtrag hin nur `beobachter` auf `mitarbeit`, nur wenn er den
   Einsatz führt, die Führung von der Kopplung des Absenders kam (`herkunft_kopplung_id`) und die
   Zeile seit `instanz_kopplung.mitarbeit_grenze_stand` unverändert ist. Die Grenze ist der Stand,
-  ab dem der Führer `mitarbeit` kennt (für Kopplungen von vor dem Aufrüsten die Migration 0364);
+  ab dem der Führer `mitarbeit` kennt (für Kopplungen von vor dem Aufrüsten die Migration 0366);
   ein späterer Wechsel der Fähigkeit verschiebt sie nicht.
 - MUST NOT: Ein Nachtrag ändert an der Mitgliedschaft keine andere Spalte und keine andere Rolle
   und schreibt in keine andere Tabelle als `einsatz_mitgliedschaft` und das Änderungslog

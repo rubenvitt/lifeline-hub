@@ -694,7 +694,7 @@ Herleitung in
   Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus. Hat ein
   Spiegel `mitarbeit` gegen einen älteren Führer festgehalten, meldet er sie beim selben Wechsel
   einmal nach (`spiegel::nachtrag`, Tabelle `mitarbeit_nachtrag`); der Führer hebt nur unter den
-  Bedingungen aus ADR-0086 an.
+  Bedingungen aus ADR-0088 an.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback),
   `tests/instanz_mitarbeit_nachtrag.rs` (Rückgabe und Notübernahme an eine ältere Instanz).
 

@@ -14964,8 +14964,8 @@ async fn migration_0357_koppelt_start_stichworte_behutsam() {
 /// des Mitarbeit-Nachtrags jeder bestehenden Kopplung auf den Stand des Aufrüstens. Was danach an
 /// einer Mitgliedschaft geschieht, wählte jemand, der `mitarbeit` schon kannte.
 #[tokio::test]
-async fn migration_0364_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruesten() {
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 363).await;
+async fn migration_0366_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruesten() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 365).await;
     sqlx::query(
         "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
          gegenueber_name, richtung, zustand) VALUES (1, 'gegen', 'x', 'Gegenstelle', \
@@ -14991,7 +14991,7 @@ async fn migration_0364_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruest
         .await
         .unwrap();
     assert!(hoechster > 0, "die Trigger haben ins Log geschrieben");
-    migriere_bis(&pool, 364).await;
+    migriere_bis(&pool, 366).await;
     let grenze: Option<i64> =
         sqlx::query_scalar("SELECT mitarbeit_grenze_stand FROM instanz_kopplung WHERE id = 1")
             .fetch_one(&pool)

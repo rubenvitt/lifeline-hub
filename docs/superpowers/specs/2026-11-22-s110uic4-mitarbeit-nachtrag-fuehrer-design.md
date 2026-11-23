@@ -238,7 +238,7 @@ dauerhaftes Auseinanderlaufen.
 
 Beim Umsetzen und im Review geändert, im Rahmen der Ziele und Anti-Ziele oben:
 
-- **Grenze (D4):** Sie liegt beim Aufrüsten, nicht beim ersten Melden danach. Die Migration 0364
+- **Grenze (D4):** Sie liegt beim Aufrüsten, nicht beim ersten Melden danach. Die Migration 0366
   setzt sie für bestehende Kopplungen; der Wechsel der Fähigkeit setzt sie nur, wenn sie noch leer
   ist. Sonst hätte ein Nachtrag eine Wahl überstimmt, die die Einsatzleitung an O nach dem
   Aufrüsten und vor dem ersten Melden traf (Anti-Ziel 2).

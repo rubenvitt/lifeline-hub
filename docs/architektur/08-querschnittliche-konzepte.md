@@ -35,7 +35,7 @@ Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfa
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
 Ein Spiegel, der `mitarbeit` gegen einen älteren Führer festgehalten hat, trägt sie nach dessen
 Aufrüsten einmal nach
-([ADR-0086](entscheidungen/ADR-0086-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
+([ADR-0088](entscheidungen/ADR-0088-ein-spiegel-traegt-festgehaltene-mitarbeit-einmal-beim-fuehrer-nach.md)).
 
 ## 8.3 Fehlervertrag und Statuscodes
 
