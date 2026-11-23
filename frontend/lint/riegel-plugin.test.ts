@@ -26,6 +26,12 @@ const VERSTOESSE = [
   "await page.getByLabel('Benutzername').fill('admin');",
 ].join('\n');
 
+/** LLH-2067: eigenes Warten auf antds Einblend-Klassen, als String- und als Regex-Literal. */
+const EINBLENDUNG = [
+  "await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);",
+  'await expect(page.locator(".ant-modal")).not.toHaveClass(/ant-zoom-big-appear/);',
+].join('\n');
+
 const MUSTER: Record<string, string> = {
   'e2e/probe-aussen.spec.ts': VERSTOESSE,
   // Steht in der Ausnahmeliste des Anmeldeformular-Riegels.
@@ -42,6 +48,10 @@ const MUSTER: Record<string, string> = {
     '// oxlint-disable-next-line lfh/e2e-riegel -- Probe: Unterdrücken mit Begründung',
     "await page.waitForLoadState('networkidle');",
   ].join('\n'),
+  // LLH-2067: antds Einblend-Klassen kennt nur der Dialog-Kern (und der Bildlauf).
+  'e2e/einblendung.spec.ts': EINBLENDUNG,
+  'e2e/dialog-kern.ts': EINBLENDUNG,
+  'e2e/doku-bilder/einblendung.bilder.ts': EINBLENDUNG,
   // Außerhalb von `e2e/` gilt kein Riegel.
   'src/probe.ts': "await page.waitForLoadState('networkidle');",
   // Wie unter ESLint: ein führender Unterstrich macht nichts unbenutzt-erlaubt (Review LLH-2020).
@@ -108,6 +118,15 @@ describe('Riegel-Plugin lfh (LLH-2020)', () => {
         '2 lfh(e2e-riegel)',
         '3 lfh(e2e-riegel)',
       ]);
+  });
+
+  it('verbietet das Warten auf Einblend-Klassen außer im Dialog-Kern und im Bildlauf', () => {
+    expect(von('e2e/einblendung.spec.ts')).toEqual([
+      '1 lfh(e2e-einblendung)',
+      '2 lfh(e2e-einblendung)',
+    ]);
+    expect(von('e2e/dialog-kern.ts')).toEqual([]);
+    expect(von('e2e/doku-bilder/einblendung.bilder.ts')).toEqual([]);
   });
 
   it('meldet nichts für andere Werte, Template-Literale, unterdrückte Zeilen und außerhalb von e2e', () => {

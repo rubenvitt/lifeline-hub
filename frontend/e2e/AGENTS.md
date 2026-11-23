@@ -66,7 +66,17 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
 - **Einen Einsatz über die Oberfläche legt nur `e2e/einsatz-kern.ts` an** (LFH-1114):
   `einsatzDialogOeffnen` wartet, bis der Dialog „Neuen Einsatz anlegen“ ausgezoomt ist; ein
   früherer Klick fiel unter Last neben „Anlegen“ (kein POST, Dialog offen). Wer die Oberfläche
-  nicht prüft, legt über die API an. Riegel `no-restricted-syntax` für `e2e/**`.
+  nicht prüft, legt über die API an. Riegel `lfh/e2e-riegel` für `e2e/**`. Allgemein gilt
+  der nächste Punkt.
+- **Erst klicken, wenn der Dialog steht** (LLH-2067, nach LFH-1114 und LLH-2065): in ein
+  antd-Modal, ein Popconfirm oder ein Popover erst klicken, tippen oder messen, wenn
+  `dialogSteht(page, name)` bzw. `eingeblendet(locator)` aus `e2e/dialog-kern.ts` ihn als
+  stehend meldet. Während der Einblendung (`ant-zoom-appear`, `ant-zoom-big-appear`) nimmt er
+  unter Last keinen Klick sicher an, und jeder Kasten ist skaliert. Geprüft wird am Ziel und
+  seinen Vorfahren, nie seitenweit. Riegel `lfh/e2e-einblendung`: kein Literal mit `ant-zoom`
+  in `e2e/**` außer `dialog-kern.ts` und `doku-bilder/` (eigener Kern mit angehaltener Uhr).
+  Specs, die heute ohne Wartezeit klicken, stellt um, wer sie ohnehin ändert. Herleitung:
+  `docs/superpowers/specs/2026-11-22-djjc6x03-dialog-erst-eingeblendet-design.md`.
 - **Der Bildlauf der Anwenderdoku ist kein e2e-Lauf** (LFH-1128): `e2e/doku-bilder/*.bilder.ts`
   laufen nur über `playwright.doku.config.ts` (`pnpm doku:bilder`, Backend mit Demo-Daten,
   eigene Temp-DB); `playwright.config.ts` schließt den Ordner aus. Regeln:

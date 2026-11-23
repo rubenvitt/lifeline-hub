@@ -1048,6 +1048,11 @@ pub async fn patche_tx(
 /// Ergebnis von [`setze_hand_status_tx`]: die Labels vor und nach dem Setzen.
 pub struct HandStatusWechsel {
     pub name: String,
+    /// Status vor dem Setzen (Beleg für „Rückgängig“, LLH-1986).
+    pub vorher_id: Option<i64>,
+    /// Lässt sich der Wechsel zurücknehmen? Nicht beim Löschen unter führenden Fahrzeugen: die
+    /// Rücknahme müsste einen Handstatus herstellen, den die Fahrzeuge verdrängen (LLH-1986).
+    pub zuruecknehmbar: bool,
     pub vorher: Option<String>,
     pub nachher: Option<String>,
     /// Kategorien vor und nach dem Setzen (Benachrichtigung `wieder_verfuegbar`, D11).
@@ -1058,12 +1063,15 @@ pub struct HandStatusWechsel {
 /// Setzt den Handstatus einer Einheit auf einer offenen Transaktion; `status_id` ist gegen den
 /// Katalog der Org geprüft (`None` = löschen). Mit Fahrzeugen führen die Fahrzeuge, SETZEN ist
 /// dann `UnprocessableEntity`; Löschen bleibt erlaubt. `status_seit` springt nur bei einem
-/// echten Wechsel. `None`, wenn der Status unverändert blieb.
+/// echten Wechsel, auf `jetzt`. Ein Wechsel merkt sich für „Rückgängig“ wer (`gesetzt_von`),
+/// wann und den Status samt „seit“ davor (LLH-1986). `None`, wenn der Status unverändert blieb.
 pub async fn setze_hand_status_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     status_id: Option<i64>,
+    gesetzt_von: Option<i64>,
+    jetzt: &str,
 ) -> Result<Option<HandStatusWechsel>, AppError> {
     let (name, alt_id, alt_label, alt_kategorie): (
         String,
@@ -1096,14 +1104,19 @@ pub async fn setze_hand_status_tx(
             "Die Einheit führt ihren Status über ihre Fahrzeuge".into(),
         ));
     }
+    let zuruecknehmbar = fahrzeuge == 0;
     sqlx::query(
         "UPDATE einsatz_einheit SET status_id = ?1, \
-         status_seit = CASE WHEN ?1 IS NULL THEN NULL ELSE datetime('now') END \
+         status_seit = CASE WHEN ?1 IS NULL THEN NULL ELSE ?4 END, \
+         status_gesetzt_von = ?5, status_gesetzt_at = ?4, status_vorher_id = status_id, \
+         status_vorher_seit = status_seit, status_ereignis_id = NULL \
          WHERE id = ?2 AND einsatz_id = ?3",
     )
     .bind(status_id)
     .bind(id)
     .bind(einsatz_id)
+    .bind(jetzt)
+    .bind(gesetzt_von.filter(|_| zuruecknehmbar))
     .execute(&mut *conn)
     .await?;
     let (neu_label, neu_kategorie): (Option<String>, Option<StatusKategorie>) = match status_id {
@@ -1118,11 +1131,119 @@ pub async fn setze_hand_status_tx(
     };
     Ok(Some(HandStatusWechsel {
         name,
+        vorher_id: alt_id,
+        zuruecknehmbar,
         vorher: alt_label,
         nachher: neu_label,
         vorher_kategorie: alt_kategorie,
         nachher_kategorie: neu_kategorie,
     }))
+}
+
+/// Merkt das Zeitachsen-Ereignis, das ein Wechsel des Handstatus geschrieben hat, in der
+/// Transaktion des Wechsels (LLH-1986).
+pub async fn merke_status_ereignis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    ereignis_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_einheit SET status_ereignis_id = ? WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ereignis_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Nimmt einen Wechsel des Handstatus zurück (LLH-1986), in der Transaktion des Aufrufers.
+/// Riegel über [`crate::status_ruecknahme::pruefe`] (Kennung `status_gesetzt_at`); das Ereignis
+/// des Wechsels wird gestrichen, Status und „seit“ von davor hergestellt und die Rücknahme-Spalten
+/// geleert. Eine aufgelöste Einheit → `Conflict`. Führen inzwischen Fahrzeuge den Status, gelingt
+/// nur eine Rücknahme zu „kein Status“, sonst `Conflict`. Liefert, was das Streichen berührt hat.
+pub async fn status_zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    beleg: &crate::status_ruecknahme::HandStatusRuecknahmeBeleg,
+) -> Result<crate::zeitachse::repo::Beruehrt, AppError> {
+    require_aktiv_tx(conn, einsatz_id, id).await?;
+    type Zeile = (
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+    );
+    let (status_id, gesetzt_at, gesetzt_von, vorher_id, vorher_seit, ereignis): Zeile =
+        sqlx::query_as(
+            "SELECT status_id, status_gesetzt_at, status_gesetzt_von, status_vorher_id, \
+                    status_vorher_seit, status_ereignis_id \
+             FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    crate::status_ruecknahme::pruefe(
+        &crate::status_ruecknahme::Gemerkt {
+            status: status_id,
+            kennung: gesetzt_at,
+            gesetzt_von,
+        },
+        &beleg.status_id,
+        &beleg.gesetzt_at,
+        benutzer_id,
+        jetzt,
+    )?;
+    if vorher_id.is_some() {
+        let fahrzeuge: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einheit_id = ? AND beendet_at IS NULL",
+        )
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if fahrzeuge > 0 {
+            return Err(AppError::Conflict(
+                "Der Statuswechsel lässt sich nicht zurücknehmen: Die Einheit führt ihren Status \
+                 inzwischen über ihre Fahrzeuge"
+                    .into(),
+            ));
+        }
+    }
+    let beruehrt = crate::status_ruecknahme::streiche_ereignis_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        crate::zeitachse::repo::Kraft::Einheit(id),
+        ereignis,
+    )
+    .await?;
+    let r = sqlx::query(
+        "UPDATE einsatz_einheit SET status_id = ?, status_seit = ?, status_gesetzt_von = NULL, \
+                status_gesetzt_at = NULL, status_vorher_id = NULL, status_vorher_seit = NULL, \
+                status_ereignis_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND status_id IS ? AND status_gesetzt_at = ?",
+    )
+    .bind(vorher_id)
+    .bind(vorher_id.and(vorher_seit))
+    .bind(id)
+    .bind(einsatz_id)
+    .bind(beleg.status_id)
+    .bind(&beleg.gesetzt_at)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Veraltet);
+    }
+    Ok(beruehrt)
 }
 
 /// Geo-/Symbol-Felder einer Einheit. `Some(None)` = NULL, `None` = unverändert.
@@ -1778,7 +1899,9 @@ pub async fn aufloesen_tx(
     .await?;
     sqlx::query(
         "UPDATE einsatz_einheit SET aufgeloest_at = ?, aufgeloest_von = ?, fuehrer_id = NULL, \
-                besetzung_festgehalten = 1 \
+                besetzung_festgehalten = 1, status_gesetzt_von = NULL, \
+                status_gesetzt_at = NULL, status_vorher_id = NULL, status_vorher_seit = NULL, \
+                status_ereignis_id = NULL \
          WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
     )
     .bind(jetzt)

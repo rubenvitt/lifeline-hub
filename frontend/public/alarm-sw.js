@@ -151,7 +151,12 @@ async function pushZeigen(d) {
     (inhalt && inhalt.titel) ||
     (text && text.titel) ||
     (d.stufe === 'alarm' ? 'Alarm' : 'Neue Benachrichtigung');
-  const pfad = (text && text.pfad) || `/einsaetze/${d.einsatz_id}`;
+  // Ohne Einsatz ist es die Störung einer Anbindung (LLH-2026): dann zu den Anbindungen.
+  const pfad =
+    (text && text.pfad) ||
+    (typeof d.einsatz_id === 'number'
+      ? `/einsaetze/${d.einsatz_id}`
+      : '/admin/einstellungen/anbindungen');
   const tag = `${d.einsatz_id}-b-${d.benachrichtigung_id}`;
   const optionen = {
     tag,

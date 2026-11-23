@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast } from './kontrast-kern';
 import { anmeldenPerApi } from './anmelde-kern';
@@ -172,20 +173,19 @@ async function menue(page: Page, ausloeser: string, eintrag: string) {
     .click();
 }
 
-/** Wartet, bis der Dialog steht: Zoom vorbei, aufgeklappter Bereich eingeschwungen. */
-async function dialogSteht(page: Page, dialog: Locator) {
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+/** Wartet, bis der Dialog steht: eingeblendet, aufgeklappter Bereich eingeschwungen. */
+async function bereichSteht(dialog: Locator) {
+  await eingeblendet(dialog);
   await expect(dialog.locator('.ant-motion-collapse')).toHaveCount(0);
 }
 
 /** Klappt „Weitere Angaben" auf, falls der Dialog den Bereich trägt. */
-async function weitereAufklappen(page: Page, dialog: Locator) {
+async function weitereAufklappen(dialog: Locator) {
   const kopf = dialog.getByRole('button', { name: 'Weitere Angaben' });
   if ((await kopf.count()) === 0) return false;
   await kopf.click();
   await expect(dialog.locator('.ant-collapse-item-active')).toHaveCount(1);
-  await dialogSteht(page, dialog);
+  await bereichSteht(dialog);
   return true;
 }
 
@@ -326,8 +326,8 @@ for (const modus of ['light', 'dark'] as const) {
 
     const stelleAnlegen = page.getByRole('dialog', { name: 'Betreuungsstelle anlegen' });
     await kopf.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }).click();
-    await dialogSteht(page, stelleAnlegen);
-    await weitereAufklappen(page, stelleAnlegen);
+    await bereichSteht(stelleAnlegen);
+    await weitereAufklappen(stelleAnlegen);
     await messeTexte(stelleAnlegen, 'Betreuungsstelle anlegen');
     await page.keyboard.press('Escape');
     await expect(stelleAnlegen).toBeHidden();
@@ -339,7 +339,7 @@ for (const modus of ['light', 'dark'] as const) {
     const schliessen = page.getByRole('dialog', {
       name: 'Betreuungsstelle Gemeindehaus Süd schließen',
     });
-    await dialogSteht(page, schliessen);
+    await bereichSteht(schliessen);
     const hinweis = schliessen.locator('.ant-alert');
     await expect(hinweis).toHaveCount(1);
     await expect(hinweis).toContainText('Die Stelle ist mit 150 Personen belegt.');
@@ -363,7 +363,7 @@ for (const modus of ['light', 'dark'] as const) {
     await messeTexte(offen, 'Zeilenmenü');
     await offen.getByRole('menuitem', { name: 'Stornieren' }).click();
     const storno = page.getByRole('dialog', { name: 'Betreuungsstelle Turnhalle Ost stornieren?' });
-    await dialogSteht(page, storno);
+    await bereichSteht(storno);
     await messeTexte(storno, 'Stornieren');
     await page.keyboard.press('Escape');
     await expect(storno).toBeHidden();
@@ -402,8 +402,8 @@ for (const modus of ['light', 'dark'] as const) {
     ] as const) {
       await ausloeser.click();
       const dialog = page.getByRole('dialog', { name: titel });
-      await dialogSteht(page, dialog);
-      await weitereAufklappen(page, dialog);
+      await bereichSteht(dialog);
+      await weitereAufklappen(dialog);
       await messeTexte(dialog, titel);
       await page.keyboard.press('Escape');
       await expect(dialog).toBeHidden();
@@ -671,9 +671,9 @@ for (const fall of DIALOGE) {
 
     await fall.oeffne(page);
     const dialog = page.getByRole('dialog', { name: fall.titel });
-    await dialogSteht(page, dialog);
+    await bereichSteht(dialog);
     await fall.vorbereiten?.(page, dialog);
-    const aufgeklappt = await weitereAufklappen(page, dialog);
+    const aufgeklappt = await weitereAufklappen(dialog);
 
     // Jedes Ziel, das der Browser per Tab anläuft, generisch markiert.
     const ziele = await dialog.evaluate((d) => {

@@ -128,7 +128,11 @@
       // LFH-385: Einsatzrouten halten einen SSE-Strom offen, `networkidle` tritt dort nur unter
       // Glück ein. Gewartet wird auf das Element, das der Test danach misst.
       "files": ["e2e/**/*.ts"],
-      "rules": { "lfh/e2e-riegel": "error", "lfh/e2e-anmeldeformular": "error" }
+      "rules": {
+        "lfh/e2e-riegel": "error",
+        "lfh/e2e-anmeldeformular": "error",
+        "lfh/e2e-einblendung": "error"
+      }
     },
     {
       // Specs, die die Anmeldung selbst prüfen (Formular, Kontrast der Anmeldeseite, Tabs,
@@ -144,6 +148,12 @@
         "e2e/doku-bilder/**/*.ts" // Bildlauf der Anwenderdoku, kein e2e-Lauf (LFH-1128)
       ],
       "rules": { "lfh/e2e-anmeldeformular": "off" }
+    },
+    {
+      // LLH-2067: der Dialog-Kern ist die eine Stelle, die die Einblend-Klassen kennt; der
+      // Bildlauf wartet mit angehaltener Uhr über seinen eigenen Kern (docs/anwender/AGENTS.md).
+      "files": ["e2e/dialog-kern.ts", "e2e/doku-bilder/**/*.ts"],
+      "rules": { "lfh/e2e-einblendung": "off" }
     },
     {
       // Regeln, die eslint recommended nur für JS-Dateien zusätzlich aktiviert (in TS prüft das

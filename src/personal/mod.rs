@@ -271,6 +271,16 @@ pub const RUECKNAHME_LISTE_MAX: usize = 200;
 /// echter Vorzustand darf nie abgelehnt werden.
 pub const RUECKNAHME_NAME_MAX: usize = 2_000;
 
+/// Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu
+/// der Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct PersonalPatchAntwort {
+    #[serde(flatten)]
+    pub personal: EinsatzPersonalAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_ruecknahme: Option<crate::status_ruecknahme::HandStatusRuecknahmeBeleg>,
+}
+
 /// Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungAntwort {
@@ -430,6 +440,21 @@ pub fn etb_text_entlassung_zurueckgenommen(
         "Person «{}»: Entlassung zurückgenommen{}",
         etb_bezeichnung(name, funktion),
         crate::entlassung::ohne_text(ausgelassen)
+    )
+}
+
+/// System-ETB der Rücknahme eines Statuswechsels (LLH-1986): `alt` ist der wiederhergestellte,
+/// `neu` der zurückgenommene Status.
+pub fn etb_text_statuswechsel_zurueckgenommen(
+    name: &str,
+    alt: Option<&str>,
+    neu: Option<&str>,
+) -> String {
+    format!(
+        "Person «{}»: Statuswechsel «{}» → «{}» zurückgenommen",
+        name,
+        alt.unwrap_or("—"),
+        neu.unwrap_or("—")
     )
 }
 

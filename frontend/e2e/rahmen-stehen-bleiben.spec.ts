@@ -19,6 +19,9 @@ import { abmeldenUeberMenue, benutzermenueAusloeser } from './menue-kern';
  * Mutationsprobe LLH-1728 (15.11.2026, Chromium): klebt der Einsatzkopf unter `md` wieder nicht,
  * rot bei 390 px als Admin und Beobachter, offline, in der Übung (auch offline) und die
  * einzeilige Zeile in allen drei Dichten; die Einsatzliste (App-Rahmen) bleibt zu Recht grün.
+ * Mutationsprobe LLH-2037 (22.11.2026, Chromium): mit der Einheit-Auswahl der ETB-Filterleiste
+ * wieder auf Feldstufe `schmal` rot im ETB-Fall bei 1180 × 600 („Filterleiste einzeilig“, 64
+ * statt 32 px); die übrigen Seitenköpfe bleiben grün.
  */
 
 const BREITEN = [
@@ -56,6 +59,26 @@ async function etbFuellen(page: Page, einsatzId: string) {
       },
     });
     expect(antwort.ok(), `ETB ${i}: ${antwort.status()}`).toBe(true);
+  }
+}
+
+/**
+ * Dreistellige Zähler wie im echten Einsatz (LLH-2037): zu den 80 Meldungen aus
+ * {@link etbFuellen} 45 weitere und je 12 Anordnungen und Lagefeststellungen — „Alle 149“,
+ * „Meldung 125“, „Anordnung 12“, „Lage 12“.
+ */
+async function etbDreistellig(page: Page, einsatzId: string) {
+  await etbFuellen(page, einsatzId);
+  const weitere = [
+    ...Array.from({ length: 45 }, () => 'meldung'),
+    ...Array.from({ length: 12 }, () => 'anordnung'),
+    ...Array.from({ length: 12 }, () => 'lage'),
+  ];
+  for (const [i, typ] of weitere.entries()) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: { typ, inhalt: `Zählerprobe ${i}`, von: 'ELW 1', an: 'Leitstelle' },
+    });
+    expect(antwort.ok(), `ETB ${typ} ${i}: ${antwort.status()}`).toBe(true);
   }
 }
 
@@ -412,17 +435,14 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
 
 for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) {
   // Das ETB klebt Seitenkopf, Filterleiste und Spaltenkopf nur GEMEINSAM und nur, solange sie mit
-  // der Kopfleiste höchstens ein Drittel der Fensterhöhe nehmen (`etb/etbKopfKleben.ts`). Bei
-  // 1180 px steht die Filterleiste auf der Umbruchkante: lokal einzeilig (53 + 44 + 48 + 26 = 171 px
-  // von 200), auf dem CI-Runner bricht die Volltextsuche um, und die Köpfe rollen bei 600 px Höhe
-  // regelgerecht mit (alpha rot am 22.11.2026, LLH-2034). Das ETB misst deshalb im Querformat des
-  // Tablets (1180 × 820, wie `BREITEN`): dort hält das Drittel auch die zweizeilige Leiste aus.
-  // Das Mitrollen im niedrigen Fenster prüft „niedriges Fenster: …“ unten.
-  const hoehe = ziel === 'etb' ? 820 : 600;
-  test(`Seitenkopf bleibt stehen: ${ziel} (1180 × ${hoehe})`, async ({ page }) => {
+  // der Kopfleiste höchstens ein Drittel der Fensterhöhe nehmen (`etb/etbKopfKleben.ts`): bei
+  // 600 px also nur mit EINZEILIGER Filterleiste (53 + 44 + 32 + 26 px). Gemessen mit
+  // dreistelligen Zählern wie im echten Einsatz; vorher brach die Leiste dort um (LLH-2034,
+  // LLH-2037). Das Mitrollen im niedrigen Fenster prüft „niedriges Fenster: …“ unten.
+  test(`Seitenkopf bleibt stehen: ${ziel} (1180 × 600)`, async ({ page }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Seitenkopf ${ziel} ${Date.now()}`);
-    if (ziel === 'etb') await etbFuellen(page, einsatzId);
+    if (ziel === 'etb') await etbDreistellig(page, einsatzId);
     if (ziel === 'personal') {
       for (let i = 0; i < 30; i += 1) {
         const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
@@ -444,7 +464,7 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
         expect(antwort.ok(), `Benutzer ${i}: ${antwort.status()}`).toBe(true);
       }
     }
-    await page.setViewportSize({ width: 1180, height: hoehe });
+    await page.setViewportSize({ width: 1180, height: 600 });
     await page.goto(
       ziel === 'verwaltung'
         ? '/admin/benutzer'
@@ -454,6 +474,19 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     );
     const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
     await expect(seitenkopf.getByRole('heading', { level: 1 })).toBeVisible();
+    if (ziel === 'etb') {
+      // Vorbedingung: die Zähler stehen, dreistellig. Ohne sie wäre die Typleiste schmaler.
+      const typleiste = page.locator('[data-lfh="etb-filter-typ"]');
+      await expect(typleiste).toContainText('149');
+      await expect(typleiste).toContainText('125');
+      // Die Leiste bleibt einzeilig: so hoch wie ihre Typleiste (LLH-2037). Bricht sie um, ist
+      // das hier rot und nicht erst als „klebt nicht“ unten.
+      const leiste = page.locator('[data-lfh="etb-filterleiste"]');
+      expect(
+        Math.round((await leiste.boundingBox())!.height),
+        'Filterleiste einzeilig bei 1180 px mit dreistelligen Zählern',
+      ).toBe(Math.round((await typleiste.boundingBox())!.height));
+    }
     // Vorbedingung: so weit gerollt, dass ein mitrollender Seitenkopf ganz hinter der Kopfleiste
     // läge. Gemessen vor dem Rollen, in Dokumentkoordinaten.
     const seitenkopfUnten = await seitenkopf.evaluate(

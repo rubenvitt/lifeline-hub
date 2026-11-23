@@ -50,9 +50,10 @@ export function gemerktesRoutenMuster(pfad: string): string {
   return routenMuster(gemerkteRouten, pfad.split(/[?#]/)[0]);
 }
 
-/** Oberfläche je Plattform der Hülle (iOS: t39ltxxi, Desktop: LLH-1982). */
+/** Oberfläche je Plattform der Hülle (iOS: t39ltxxi, Android: LLH-1989, Desktop: LLH-1982). */
 const OBERFLAECHE_JE_PLATTFORM: Readonly<Record<string, string>> = {
   ios: 'iOS-App',
+  android: 'Android-App',
   macos: 'Desktop-App (macOS)',
   windows: 'Desktop-App (Windows)',
 };

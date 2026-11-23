@@ -1744,3 +1744,154 @@ async fn nachlieferung_nutzt_das_frische_flag() {
         .collect();
     assert_eq!(rollen, ["\"mitarbeit\""]);
 }
+
+// ---------- Funktion nur in der Führung (LLH-2064, Entwurf D4) ----------
+
+fn mitgliedschaft_werte(
+    rolle: Option<&str>,
+    funktion: Option<&str>,
+    stelle: Option<&str>,
+) -> Vec<(String, serde_json::Value)> {
+    let mut werte = vec![
+        ("einsatz_id".to_string(), serde_json::json!(7)),
+        ("benutzer_id".to_string(), serde_json::json!(9)),
+        ("fuehrungsfunktion".to_string(), serde_json::json!(funktion)),
+        ("fuehrungsstelle".to_string(), serde_json::json!(stelle)),
+    ];
+    if let Some(r) = rolle {
+        werte.push(("einsatz_rolle".to_string(), serde_json::json!(r)));
+    }
+    werte
+}
+
+fn wert<'a>(werte: &'a [(String, serde_json::Value)], name: &str) -> &'a serde_json::Value {
+    &werte.iter().find(|(s, _)| s == name).unwrap().1
+}
+
+#[test]
+fn normalize_funktion_macht_beobachter_s4_zu_freitext() {
+    let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert_eq!(wert(&werte, "fuehrungsstelle"), "S4");
+}
+
+#[test]
+fn normalize_funktion_macht_mitarbeit_fachberater_zu_freitext() {
+    let mut werte = mitgliedschaft_werte(Some("mitarbeit"), Some("fachberater"), Some("THW"));
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert_eq!(wert(&werte, "fuehrungsstelle"), "Fachberater: THW");
+}
+
+#[test]
+fn normalize_funktion_laesst_fuehrung_stehen() {
+    let mut werte = mitgliedschaft_werte(Some("fuehrungspersonal"), Some("s4"), None);
+    let vorher = werte.clone();
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert_eq!(werte, vorher);
+}
+
+#[test]
+fn normalize_funktion_geschwaerzt_nur_code_weg() {
+    let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+    uebernehmen::normalize_funktion(&mut werte, true);
+    assert!(wert(&werte, "fuehrungsfunktion").is_null());
+    assert!(wert(&werte, "fuehrungsstelle").is_null());
+}
+
+#[test]
+fn normalize_funktion_ohne_rollenspalte_unveraendert() {
+    let mut werte = mitgliedschaft_werte(None, Some("s4"), None);
+    let vorher = werte.clone();
+    uebernehmen::normalize_funktion(&mut werte, false);
+    assert_eq!(werte, vorher);
+}
+
+/// Ein älteres Gegenüber kennt die Regel nicht und liefert Beobachter + `s4`: der Spiegel
+/// übernimmt die Zeile ohne Hinweis, die Funktion als Bezeichnung (LLH-2064, Entwurf D4/D7).
+#[tokio::test]
+async fn beobachter_mit_funktion_vom_alten_gegenueber_kommt_als_bezeichnung_an() {
+    let (f, s) = zwei_seiten().await;
+    let (erika_elw, erika_hub) = gemeinsames_konto(&f, &s, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    // Das Gegenüber hat den CHECK aus 0363 nicht; hier nur auf dieser einen Verbindung aus.
+    let mut c = f.acquire().await.unwrap();
+    sqlx::query("PRAGMA ignore_check_constraints = ON")
+        .execute(&mut *c)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+         fuehrungsfunktion) VALUES (?, ?, 'beobachter', 's4')",
+    )
+    .bind(einsatz)
+    .bind(erika_elw)
+    .execute(&mut *c)
+    .await
+    .unwrap();
+    sqlx::query("PRAGMA ignore_check_constraints = OFF")
+        .execute(&mut *c)
+        .await
+        .unwrap();
+    drop(c);
+
+    while abgleichen(&f, &s, 500).await > 0 {}
+
+    let (rolle, code, stelle): (String, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT einsatz_rolle, fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
+         WHERE benutzer_id = ?",
+    )
+    .bind(erika_hub)
+    .fetch_one(&s)
+    .await
+    .unwrap();
+    assert_eq!(rolle, "beobachter");
+    assert_eq!(code, None);
+    assert_eq!(stelle.as_deref(), Some("S4"));
+}
+
+/// Ist der Einsatz hier geschwärzt, fällt nur der Code weg; Text kommt nicht in die geschwärzte
+/// Spalte (LLH-2064, Entwurf D1/D4).
+#[tokio::test]
+async fn strip_funktion_liest_die_schwaerzung_am_lokalen_einsatz() {
+    let pool = crate::db::test_pool().await;
+    let mut conn = pool.acquire().await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let t = super::schema::schema(&mut conn)
+        .await
+        .unwrap()
+        .tabelle("einsatz_mitgliedschaft")
+        .unwrap()
+        .clone();
+    for (geschwaerzt, erwartet) in [
+        (false, serde_json::json!("S4")),
+        (true, serde_json::Value::Null),
+    ] {
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, geschwaerzt_at) \
+             VALUES (1, 'Lage', CASE WHEN ? THEN '2026-11-01 00:00:00' END) RETURNING id",
+        )
+        .bind(geschwaerzt)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+        let mut werte = mitgliedschaft_werte(Some("beobachter"), Some("s4"), None);
+        uebernehmen::strip_funktion(&mut conn, &t, einsatz, &mut werte)
+            .await
+            .unwrap();
+        assert!(wert(&werte, "fuehrungsfunktion").is_null());
+        assert_eq!(
+            wert(&werte, "fuehrungsstelle"),
+            &erwartet,
+            "geschwärzt={geschwaerzt}"
+        );
+    }
+}

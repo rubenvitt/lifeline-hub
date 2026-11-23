@@ -30,6 +30,7 @@ const oeffentlich = join(frontend, 'public');
 const huellenSymbole = join(repo, 'src-tauri', 'icons');
 const quellen = join(repo, 'scripts', 'marke');
 const iosAssets = join(repo, 'ios', 'App', 'Assets.xcassets');
+const androidRes = join(repo, 'android', 'app', 'src', 'main', 'res');
 
 const pwaManifest = JSON.parse(readFileSync(join(hier, 'pwaManifest.json'), 'utf8')) as {
   theme_color: string;
@@ -182,6 +183,99 @@ describe('Bildmarke — iOS-App (LLH-1978)', () => {
 
   it('das App-Symbol stammt aus der aktuellen Quelle (Stempel von erzeuge-symbol.sh)', () => {
     const stempel = readFileSync(join(repo, 'scripts', 'ios', 'symbol.sha256'), 'utf8')
+      .trim()
+      .split(/\s+/);
+    const summe = createHash('sha256')
+      .update(readFileSync(join(quellen, 'symbol.svg')))
+      .digest('hex');
+    expect(stempel).toEqual([summe, 'symbol.svg']);
+  });
+});
+
+/**
+ * Alle Pixel einer PNG mit 8 Bit RGBA ohne Zeilensprung, Zeile für Zeile entfiltert
+ * (Filter 0–4 der PNG-Norm). Reicht für die Symbole, die die Skripte erzeugen.
+ */
+function pngRgba(pfad: string): { breite: number; hoehe: number; pixel: Uint8Array } {
+  const daten = readFileSync(pfad);
+  const { breite, hoehe } = pngMasse(pfad);
+  expect(daten.readUInt8(24), `${pfad}: Bittiefe`).toBe(8);
+  expect(daten.readUInt8(25), `${pfad}: Farbtyp RGBA`).toBe(6);
+  expect(daten.readUInt8(28), `${pfad}: ohne Zeilensprung`).toBe(0);
+  const idat: Buffer[] = [];
+  for (let pos = 8; pos < daten.length;) {
+    const laenge = daten.readUInt32BE(pos);
+    if (daten.subarray(pos + 4, pos + 8).toString('ascii') === 'IDAT') {
+      idat.push(daten.subarray(pos + 8, pos + 8 + laenge));
+    }
+    pos += 12 + laenge;
+  }
+  const roh = inflateSync(Buffer.concat(idat));
+  const zeile = breite * 4;
+  const pixel = new Uint8Array(zeile * hoehe);
+  for (let y = 0; y < hoehe; y++) {
+    const filter = roh[y * (zeile + 1)];
+    const ein = roh.subarray(y * (zeile + 1) + 1, (y + 1) * (zeile + 1));
+    for (let i = 0; i < zeile; i++) {
+      const a = i >= 4 ? pixel[y * zeile + i - 4] : 0;
+      const b = y > 0 ? pixel[(y - 1) * zeile + i] : 0;
+      const c = i >= 4 && y > 0 ? pixel[(y - 1) * zeile + i - 4] : 0;
+      let vorhersage = 0;
+      if (filter === 1) vorhersage = a;
+      else if (filter === 2) vorhersage = b;
+      else if (filter === 3) vorhersage = (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const [pa, pb, pc] = [Math.abs(p - a), Math.abs(p - b), Math.abs(p - c)];
+        vorhersage = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      pixel[y * zeile + i] = (ein[i] + vorhersage) & 0xff;
+    }
+  }
+  return { breite, hoehe, pixel };
+}
+
+describe('Bildmarke — Android-App (LLH-1989)', () => {
+  const vordergrund = join(androidRes, 'mipmap-xxxhdpi', 'ic_launcher_vordergrund.png');
+
+  it('der Vordergrund hat 108 dp in xxxhdpi (432 px) und ist durchsichtig', () => {
+    const { breite, hoehe, pixel } = pngRgba(vordergrund);
+    expect({ breite, hoehe }).toEqual({ breite: 432, hoehe: 432 });
+    expect(pixel[3], 'Ecke links oben durchsichtig').toBe(0);
+  });
+
+  it('die Marke liegt ganz im sicheren Kreis (66 dp von 108 dp)', () => {
+    const { breite, hoehe, pixel } = pngRgba(vordergrund);
+    const radius = ((66 / 108) * breite) / 2;
+    let gedeckt = 0;
+    for (let y = 0; y < hoehe; y++) {
+      for (let x = 0; x < breite; x++) {
+        if (pixel[(y * breite + x) * 4 + 3] === 0) continue;
+        gedeckt++;
+        const abstand = Math.hypot(x + 0.5 - breite / 2, y + 0.5 - hoehe / 2);
+        expect(abstand, `Pixel (${x}, ${y})`).toBeLessThanOrEqual(radius);
+      }
+    }
+    expect(gedeckt, 'die Marke ist zu sehen').toBeGreaterThan(0);
+  });
+
+  it('das adaptive Symbol legt den Vordergrund auf Kopf-Schwarz', () => {
+    const symbol = readFileSync(join(androidRes, 'mipmap-anydpi-v26', 'ic_launcher.xml'), 'utf8');
+    expect(symbol).toContain('<background android:drawable="@color/kopf_schwarz" />');
+    expect(symbol).toContain('<foreground android:drawable="@mipmap/ic_launcher_vordergrund" />');
+    const farben = readFileSync(join(androidRes, 'values', 'colors.xml'), 'utf8');
+    expect(
+      /<color name="kopf_schwarz">(#[0-9a-f]{6})<\/color>/i.exec(farben)?.[1]?.toLowerCase(),
+    ).toBe(KOPF_SCHWARZ);
+  });
+
+  it('Fenster und Startbildschirm haben die Farbe Kopf-Schwarz', () => {
+    const thema = readFileSync(join(androidRes, 'values', 'themes.xml'), 'utf8');
+    expect(thema).toContain('<item name="android:windowBackground">@color/kopf_schwarz</item>');
+  });
+
+  it('das App-Symbol stammt aus der aktuellen Quelle (Stempel von erzeuge-symbol.sh)', () => {
+    const stempel = readFileSync(join(repo, 'scripts', 'android', 'symbol.sha256'), 'utf8')
       .trim()
       .split(/\s+/);
     const summe = createHash('sha256')

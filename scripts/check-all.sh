@@ -39,6 +39,8 @@ set -euo pipefail
 #                    von `rust`)
 #   --nur ios        Swift-Kern der iOS-Hülle (`swift test`, LLH-1978); ohne Swift eine Lücke,
 #                    mit IOS_SWIFT_PFLICHT=1 (CI) rot
+#   --nur android    Kotlin-Kern der Android-Hülle (`gradlew -p android/kern test`, LLH-1989);
+#                    ohne Java 17+ eine Lücke, mit ANDROID_KERN_PFLICHT=1 (CI) rot
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
 #                    Frontend-Typprüfung (schneller lokaler Test, ob ein Stand übersetzt;
 #                    gehört nicht zum vollen Lauf, Schritt 3, 4, 15 bauen dasselbe mit Tests)
@@ -112,7 +114,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=19
+SCHRITTE=20
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -127,7 +129,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die neunzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die zwanzig Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -304,7 +306,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung und Bildablage (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen, TestFlight-Verteilung, Bildablage, Android-Version, -Werkzeuge, -APK, -Ablage und -Kanäle (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -318,6 +320,10 @@ schritt_8() {
   # nur seine eigenen — ein Rückschritt, eine fehlende Plattform oder eine Beta im Alpha-Kanal
   # bliebe an jeder Vorab-Hülle still hängen.
   mise exec -- node --test "$ROOT/scripts/release/desktop-kanal.test.mjs"
+  # Die Update-Kanäle der Android-App (LLH-1989): dieselben Regeln wie die Desktop-Kanäle, dazu
+  # die feste APK, die nur der eigene Kanal ersetzt — ein Fehler bliebe an jeder App still hängen
+  # oder legte unter den Alpha-QR-Code eine stabile App.
+  mise exec -- node --test "$ROOT/scripts/release/android-kanal.test.mjs"
   # Das Nachziehen eines Alpha-Tags nach `beta` (LLH-1545): ein still aufgelöster Konflikt oder
   # eine Alpha-Version auf `beta` fiele erst beim nächsten Beta-Release auf. Ohne Netz.
   "$ROOT/scripts/release/kanal-nachziehen.test.sh"
@@ -352,6 +358,18 @@ schritt_8() {
   # Gründe roter Simulator-Tests (LLH-1978): mit iPhone und iPad hängen die Meldungen eine Ebene
   # tiefer, das Protokoll nannte dann nur die Namen. Ohne Xcode.
   "$ROOT/scripts/ios/fehlgruende.test.sh"
+  # Die Version der Android-App aus [workspace.package] (LLH-1989): ein `versionCode`, der nicht
+  # steigt, installiert Android nicht über die vorhandene App — das fiele erst am Gerät auf.
+  "$ROOT/scripts/android/version.test.sh"
+  # Die SDK-Plattform der CI passt zu compileSdk der App (LLH-1989): sonst scheitert der App-Bau erst
+  # auf dem Runner. Ohne SDK.
+  "$ROOT/scripts/android/sdk-version.test.sh"
+  # Die signierte Release-APK (LLH-1989): eine unsignierte APK am Release, eine fremde Version in
+  # der APK oder ein liegengebliebener Keystore fiele erst am Release auf. Attrappen, ohne SDK.
+  "$ROOT/scripts/android/release-apk.test.sh"
+  # Die versionierte APK am Release (LLH-1989): ein zweiter Bau desselben Tags überschriebe sie mit
+  # anderer sha256, und jede App verwürfe das Update, weil die Kanäle die alte nennen. `gh`-Attrappe.
+  "$ROOT/scripts/android/apk-ablegen.test.sh"
 }
 
 schritt_9() {
@@ -557,6 +575,35 @@ schritt_19() {
   ohne_dev_env cargo check -p karten-service
 }
 
+schritt_20() {
+  echo "==> [20/$SCHRITTE] Kotlin-Kern der Android-Hülle gegen die gemeinsamen Fälle (LLH-1989)"
+  # `gradlew -p android/kern test`: Adressprüfung gegen src-tauri/faelle/ (dieselben Fälle prüfen
+  # Desktop-Hülle in Schritt 4 und Swift-Kern in Schritt 18). Der Kern ist reines Kotlin/JVM und
+  # braucht nur ein JDK ab 17, kein Android-SDK. Ohne Java lokal eine Lücke, nie grün; die CI
+  # setzt ANDROID_KERN_PFLICHT=1, dort ist das Fehlen rot.
+  # Gefragt wird das JDK, das der Gradle-Wrapper nimmt: `JAVA_HOME`, sonst `java` im PATH. Ein
+  # `java`, das nicht läuft, zählt wie keins: macOS legt `/usr/bin/java` als Platzhalter an, der
+  # ohne JDK mit 1 endet; in einer Pipe hätte `pipefail` den Schritt dann ohne Meldung beendet.
+  # Deshalb die Ausgabe in einer Bedingung holen und ohne Pipe lesen.
+  local java="java" ausgabe="" version=""
+  [ -z "${JAVA_HOME:-}" ] || java="$JAVA_HOME/bin/java"
+  if command -v "$java" > /dev/null 2>&1 && ausgabe="$("$java" -version 2>&1)"; then
+    if [[ "$ausgabe" =~ version\ \"([0-9]+) ]]; then version="${BASH_REMATCH[1]}"; fi
+  fi
+  if [ -z "$version" ] || [ "$version" -lt 17 ]; then
+    if [ "${ANDROID_KERN_PFLICHT:-0}" = 1 ]; then
+      echo "FEHLER: Java 17 oder neuer fehlt ($java), ANDROID_KERN_PFLICHT=1 verlangt es." >&2
+      return 1
+    fi
+    echo "    ÜBERSPRUNGEN: Java 17 oder neuer fehlt ($java; JAVA_HOME oder PATH, JDK 17+)." >&2
+    echo "    Die CI prüft den Kotlin-Kern mit ANDROID_KERN_PFLICHT=1." >&2
+    return "$UEBERSPRUNGEN_RC"
+  fi
+  # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an (Testnamen als Satz); unter der
+  # Locale C scheitert das mit `InvalidPathException`. Deshalb immer mit UTF-8.
+  LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
@@ -570,14 +617,15 @@ BUENDEL_e2e="7"
 # 15 ohnehin übersetzen und testen.
 BUENDEL_baut="17"
 BUENDEL_ios="18"
+BUENDEL_android="20"
 # `binaer` ist ein Ausschnitt aus `rust` für den Pflicht-Check im PR und zählt unten nicht mit.
 BUENDEL_binaer="19"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18 19"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18 19 20"
 
-# SELBSTPRÜFUNG: die fünf Bündel ergeben zusammen genau die achtzehn Schritte von `alle`, jeden
+# SELBSTPRÜFUNG: die sechs Bündel ergeben zusammen genau die neunzehn Schritte von `alle`, jeden
 # einmal (`baut` und `binaer` zählen nicht mit) —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
-_summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e $BUENDEL_ios | sort -n | tr '\n' ' ')"
+_summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e $BUENDEL_ios $BUENDEL_android | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
 if [ "$_summe" != "$_soll" ]; then
   echo "FEHLER: die Bündel decken nicht genau die Schritte von 'alle' ab." >&2
@@ -607,6 +655,7 @@ geaendert_auswahl() {
   case "$bereiche" in *rust=true*) lauf="$lauf $BUENDEL_rust" ;; esac
   case "$bereiche" in *frontend=true*) lauf="$lauf $BUENDEL_frontend" ;; esac
   case "$bereiche" in *ios=true*) lauf="$lauf $BUENDEL_ios" ;; esac
+  case "$bereiche" in *android=true*) lauf="$lauf $BUENDEL_android" ;; esac
   case "$bereiche" in
     *e2e=true*)
       lauf="$lauf $BUENDEL_e2e"
@@ -633,9 +682,10 @@ case "$NUR" in
   baut)     lauf="$BUENDEL_baut" ;;
   binaer)   lauf="$BUENDEL_binaer" ;;
   ios)      lauf="$BUENDEL_ios" ;;
+  android)  lauf="$BUENDEL_android" ;;
   *)
     echo "FEHLER: unbekanntes Bündel '$NUR'." >&2
-    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, ios, baut, binaer" >&2
+    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, ios, android, baut, binaer" >&2
     exit 2
     ;;
 esac

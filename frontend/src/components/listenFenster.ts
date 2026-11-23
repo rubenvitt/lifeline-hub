@@ -9,11 +9,11 @@ import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query'
  * TanStack lädt bei einer Invalidierung jede gehaltene Seite einer `useInfiniteQuery` nacheinander
  * neu. Ohne Deckel kostete jedes Live-Ereignis nach tiefem Blättern eine Kette über alle Seiten, in
  * jedem Tab. Mit `maxPages` fällt beim Weiterblättern die vorderste Seite heraus. Diese Listen
- * haben keinen Cursor nach vorn (anders als das ETB, `etb/seitenfenster.ts`); den Weg zurück zum
+ * haben keinen Cursor nach vorn (anders als das ETB, Chat und Infotelefon); den Weg zurück zum
  * Neuesten bietet der Knopf `ZumKopfKnopf`, der das Fenster durch den Kopf ersetzt.
  *
  * Chat und Infotelefon blättern in beide Richtungen (`fensterBeideRichtungen.ts`, LLH-1886) und
- * nutzen von hier `zumKopf` und `useKopfBeimVerlassen`.
+ * nutzen von hier `zumKopf` und `useKopfBeimVerlassen`; das ETB (LLH-2036) nur `zumKopf`.
  *
  * Der Kopf ist die Seite mit dem Startparameter `undefined` (alle drei Listen beginnen dort).
  */
@@ -25,7 +25,7 @@ export function kopfVerlassen(daten: InfiniteData<unknown, unknown> | undefined)
 }
 
 /**
- * Ersetzt das Fenster durch den Kopf (Muster `zumKopf` in `pages/EtbPage.tsx`). Erst holen, dann
+ * Ersetzt das Fenster durch den Kopf (Muster aus dem ETB, LFH-947). Erst holen, dann
  * ersetzen: Scheitert der Abruf, bleibt das Fenster, wie es ist — kein `resetQueries`, das ließe
  * bei schlechtem Netz eine leere Liste zurück. Liefert, ob ersetzt wurde.
  *

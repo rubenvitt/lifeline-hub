@@ -8,6 +8,9 @@
  *   ein (parallel rot, `--workers=1` grün). Gewartet wird auf das Element, das der Test danach misst.
  * - LFH-1114: ein Klick in den noch einblendenden Dialog „Neuen Einsatz anlegen“ ging unter Last
  *   verloren.
+ * - LLH-2067: antds Einblend-Klassen kennt nur `e2e/dialog-kern.ts`. Die kopierte seitenweite
+ *   Warte-Zeile (`.ant-zoom-appear, .ant-zoom-enter`) übersah Popconfirm und Popover
+ *   (`ant-zoom-big-appear`) und wartete auf die ganze Seite statt auf den Dialog.
  * - LLH-1665 (Spec `e2e-zuschnitt`): angemeldet wird über die API, nicht über das Formular; jede
  *   Formular-Anmeldung kostete zwei volle App-Starts.
  */
@@ -32,6 +35,15 @@ const E2E_RIEGEL = [
       'Den Dialog „Neuen Einsatz anlegen“ über `einsatzDialogOeffnen`/`einsatzAnlegen` aus `e2e/einsatz-kern.ts` öffnen (LFH-1114): erst der eingeblendete Dialog nimmt Klicks sicher an.',
   },
 ];
+const E2E_RIEGEL_EINBLENDUNG_MELDUNG =
+  'Nicht selbst auf antds Einblend-Klassen warten (LLH-2067): `dialogSteht(page, name)` bzw. `eingeblendet(locator)` aus `e2e/dialog-kern.ts` (frontend/e2e/AGENTS.md, „Erst klicken, wenn der Dialog steht“).';
+
+/** Riegel gegen eigenes Warten auf Einblend-Klassen; Ausnahmen in `frontend/.oxlintrc.json`. */
+const E2E_RIEGEL_EINBLENDUNG = [
+  { selector: 'Literal[value=/ant-zoom/]', message: E2E_RIEGEL_EINBLENDUNG_MELDUNG },
+  { selector: 'Literal[regex.pattern=/ant-zoom/]', message: E2E_RIEGEL_EINBLENDUNG_MELDUNG },
+];
+
 /** Riegel gegen die Formular-Anmeldung; Ausnahmeliste in `frontend/.oxlintrc.json`. */
 const E2E_RIEGEL_ANMELDEFORMULAR = [
   {
@@ -58,5 +70,6 @@ export default {
   rules: {
     'e2e-riegel': riegel(E2E_RIEGEL),
     'e2e-anmeldeformular': riegel(E2E_RIEGEL_ANMELDEFORMULAR),
+    'e2e-einblendung': riegel(E2E_RIEGEL_EINBLENDUNG),
   },
 };

@@ -230,6 +230,34 @@ impl Funktionsangabe {
     pub fn ist_leer(&self) -> bool {
         self.funktion.is_none() && self.text.is_none()
     }
+
+    /// Die Angabe ohne Code, wenn die Funktion weichen muss, weil die Rolle sie nicht trägt
+    /// (LLH-2064, Entwurf `docs/superpowers/specs/2026-11-22-u195f4et-funktion-nur-mit-schreibrecht-design.md`
+    /// D1): EL und S1–S7 werden zum Kürzel, Führungshilfspersonal und Fachberater zu
+    /// „<Standardlabel>: <Bezeichnung>“ (ohne Bezeichnung nur das Label). Mandantenlabels liest
+    /// sie nicht, damit Migration 0363 dasselbe liefert. In einem geschwärzten Einsatz fällt nur
+    /// der Code weg: In die geschwärzte Spalte kommt nie wieder Text. Einzige Quelle im
+    /// laufenden Code (Mitgliederroute, Spiegel).
+    pub fn as_freitext(&self, geschwaerzt: bool) -> Funktionsangabe {
+        let Some(f) = self.funktion else {
+            return self.clone();
+        };
+        if geschwaerzt {
+            return Funktionsangabe {
+                funktion: None,
+                text: None,
+            };
+        }
+        let text = match (f.kuerzel(), self.text.as_deref()) {
+            (Some(k), _) => k.to_string(),
+            (None, Some(b)) => format!("{}: {b}", f.standard_label()),
+            (None, None) => f.standard_label().to_string(),
+        };
+        Funktionsangabe {
+            funktion: None,
+            text: Some(text.chars().take(TEXT_MAX).collect()),
+        }
+    }
 }
 
 /// Prüft Code und Text einer Funktionsangabe (Statuscodes nach LFH-267, design.md D3):

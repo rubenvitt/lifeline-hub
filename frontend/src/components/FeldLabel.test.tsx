@@ -26,16 +26,18 @@ describe('FeldLabel', () => {
     expect(screen.getByRole('textbox', { name: 'Fachaufgabe' })).toBeInTheDocument();
   });
 
-  it('trägt die Metadaten-Stimme aus E: gesperrte Versalien, kleine Schrift, gedämpfte Farbe', () => {
+  it('ist ein Feldetikett: gemischt geschrieben, 12 px, ohne Sperrung (LLH-2045)', () => {
     render(
       <FeldLabel text="Organisation" htmlFor="org">
         <input id="org" type="text" />
       </FeldLabel>,
     );
-    const stil = screen.getByText('Organisation').style;
-    expect(stil.textTransform).toBe('uppercase');
-    expect(stil.letterSpacing).toBe('2.2px');
-    expect(stil.fontSize).toBe('12px'); // token.fontSizeSM
+    const etikett = screen.getByText('Organisation');
+    expect(etikett).toHaveAttribute('data-lfh', 'feldetikett');
+    expect(etikett.style.textTransform).toBe('');
+    expect(etikett.style.letterSpacing).toBe('');
+    expect(etikett.style.fontSize).toBe('12px');
+    expect(screen.getByRole('textbox', { name: 'Organisation' })).toBeInTheDocument();
   });
 
   it('nimmt die Farbe aus dem Theme — hell und dunkel unterscheiden sich (Dunkelmodus-Defekt)', () => {

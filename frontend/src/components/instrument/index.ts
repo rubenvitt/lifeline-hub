@@ -5,6 +5,12 @@
  */
 export { default as Augenbraue, augenbraueStil } from './Augenbraue';
 export {
+  default as Feldetikett,
+  feldetikettStil,
+  type FeldetikettElement,
+  type FeldetikettProps,
+} from './Feldetikett';
+export {
   default as Paneel,
   PaneelZeile,
   paneelKopfStil,
