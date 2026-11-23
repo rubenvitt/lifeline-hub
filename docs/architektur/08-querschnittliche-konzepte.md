@@ -312,7 +312,7 @@ Schreibwege und Scheduler melden nach dem Commit über `benachrichtigung::melden
 (`src/benachrichtigung/`); zugestellt wird über die Live-Ströme, mit Schalter `--web-push` auch per
 Web Push an geschlossene Tabs (`src/web_push/`), mit Schalter `--ios-push` über das Push-Relais und
 APNs an die iOS-App bei geschlossener App (`src/ios_push/`, `push-relais/`, Inhalt Ende-zu-Ende
-verschlüsselt, [ADR-0088](entscheidungen/ADR-0088-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)),
+verschlüsselt, [ADR-0086](entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)),
 und in Desktop-, iOS- und Android-Hülle als native Meldung, in iOS- und Android-Hülle nur bei
 laufender App (8.31).
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitte „Benachrichtigungen“ und „iOS-Push“;

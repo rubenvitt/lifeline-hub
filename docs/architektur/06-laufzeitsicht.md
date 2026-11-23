@@ -775,7 +775,7 @@ sequenceDiagram
 ### 6.8b iOS-Push: anmelden, senden, tippen
 
 Die iOS-App bekommt Benachrichtigungen bei geschlossener App über das Push-Relais und APNs
-(LLH-1981, [ADR-0088](entscheidungen/ADR-0088-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)).
+(LLH-1981, [ADR-0086](entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)).
 
 ```mermaid
 sequenceDiagram
