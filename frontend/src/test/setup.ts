@@ -11,6 +11,7 @@ import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtig
 import { zoneZuruecksetzenFuerTests } from '../alarm/alarmZoneSpeicher';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
+import { erzeugeBildschleife } from './bildschleife';
 import { setzeStueckweise } from '../components/stueckweise';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import { installiereAnfragenGrenze, trenneOffeneAnfragen } from './offeneAnfragen';
@@ -86,53 +87,18 @@ HTMLCanvasElement.prototype.getContext = function getContext() {
   return null;
 } as typeof HTMLCanvasElement.prototype.getContext;
 
-// Bildschleife auf echten Timern (LLH-2023). jsdom 31 startet seine Schleife erst bei Bedarf über
-// Nodes globales `setInterval`. Fälschte ein Test `setInterval`, während ein Bild angefordert
-// wurde (etwa `vi.useFakeTimers({ toFake: ['Date', 'setInterval', …] })`), lief die Schleife auf
-// dem gefälschten Intervall weiter: nach `useRealTimers()` feuerte für den Rest der Datei kein
-// `requestAnimationFrame` mehr, und der späte `autoFocus` jedes Menüs blieb aus. Hier gelten die
-// beim Laden gesicherten Timer; Bilder, die im selben Takt angefordert werden, laufen wie im
-// Browser zusammen. Ein Test, der `requestAnimationFrame` selbst fälscht, ersetzt diese Fassung
-// solange. Wächter: ./bildschleife.test.ts.
+// Bildschleife auf echten Timern (LLH-2023); Begründung in ./bildschleife.ts. Beim Abbau der Datei
+// angehalten: ein danach fälliges Bild liefe sonst in die abgebaute Umgebung („Document is not
+// defined“). Ein Test, der `requestAnimationFrame` selbst fälscht, ersetzt diese Fassung solange.
 {
-  const echtesSetTimeout = globalThis.setTimeout;
-  const echtesClearTimeout = globalThis.clearTimeout;
-  const jetzt = performance.now.bind(performance);
-  const angefordert = new Map<number, FrameRequestCallback>();
-  let naechsteKennung = 0;
-  let takt: ReturnType<typeof setTimeout> | null = null;
-  const bild = () => {
-    takt = null;
-    const faellig = [...angefordert];
-    angefordert.clear();
-    const zeit = jetzt();
-    for (const [, rueckruf] of faellig) {
-      // Wie im Browser: ein werfender Rückruf hält die übrigen nicht auf, der Fehler bleibt laut.
-      try {
-        rueckruf(zeit);
-      } catch (fehler) {
-        queueMicrotask(() => {
-          throw fehler;
-        });
-      }
-    }
-  };
-  const requestAnimationFrame = (rueckruf: FrameRequestCallback): number => {
-    naechsteKennung += 1;
-    angefordert.set(naechsteKennung, rueckruf);
-    takt ??= echtesSetTimeout(bild, 1000 / 60);
-    return naechsteKennung;
-  };
-  const cancelAnimationFrame = (kennung: number): void => {
-    angefordert.delete(kennung);
-    if (angefordert.size === 0 && takt !== null) {
-      echtesClearTimeout(takt);
-      takt = null;
-    }
-  };
+  const schleife = erzeugeBildschleife();
   for (const ziel of new Set([globalThis, window])) {
-    Object.assign(ziel, { requestAnimationFrame, cancelAnimationFrame });
+    Object.assign(ziel, {
+      requestAnimationFrame: schleife.requestAnimationFrame,
+      cancelAnimationFrame: schleife.cancelAnimationFrame,
+    });
   }
+  afterAll(schleife.anhalten);
 }
 
 // Ein schließendes antd-Menü nimmt keinen Fokus (LLH-2023). Der späte `autoFocus` eines Dropdowns

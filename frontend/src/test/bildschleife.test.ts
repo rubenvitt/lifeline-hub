@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { erzeugeBildschleife } from './bildschleife';
 
 /**
- * Wächter für die Bildschleife der Suite (LLH-2023, `setup.ts`).
+ * Wächter für die Bildschleife der Suite (LLH-2023, `./bildschleife.ts`, eingesetzt in `setup.ts`).
  *
  * jsdom 31 startet seine eigene Bildschleife erst bei Bedarf, über Nodes globales `setInterval`.
  * Ein Test, der `setInterval` fälscht, während ein Bild angefordert wird, ließ sie auf dem
@@ -36,6 +37,19 @@ describe('Bildschleife der Suite (LLH-2023)', () => {
     cancelAnimationFrame(requestAnimationFrame(zurueckgenommen));
     expect(await naechstesBild()).toBe('feuert');
     expect(zurueckgenommen).not.toHaveBeenCalled();
+  });
+
+  it('angehalten feuert kein Bild mehr, auch kein schon angefordertes', async () => {
+    const schleife = erzeugeBildschleife();
+    const vorher = vi.fn();
+    const nachher = vi.fn();
+    schleife.requestAnimationFrame(vorher);
+    schleife.anhalten();
+    schleife.requestAnimationFrame(nachher);
+    expect(await naechstesBild()).toBe('feuert');
+    await naechstesBild();
+    expect(vorher).not.toHaveBeenCalled();
+    expect(nachher).not.toHaveBeenCalled();
   });
 
   it('ein Bild bekommt einen Zeitstempel wie im Browser', async () => {
