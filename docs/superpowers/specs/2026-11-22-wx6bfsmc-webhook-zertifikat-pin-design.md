@@ -123,7 +123,7 @@ hinterlegen können; dann zählt genau dieses Zertifikat, wie bei der Direktkopp
 
 ### D4 Fingerabdruck vom Ziel abrufen
 
-- Route `POST /api/admin/anbindungen/{id}/webhook/zertifikat-abrufen`, nur System-Admin, eigene
+- Route `POST /api/admin/integrations/{id}/webhook/fetch-certificate`, nur System-Admin, eigene
   Org, Zugang nicht widerrufen (wie `zugang_fuer_schreiben`). Body `{ url, lan_erlaubt }`, damit
   der Abruf im Einrichten-Dialog vor dem Anlegen und beim Bearbeiten mit geänderter URL
   funktioniert. Die URL besteht `check_url` wie beim Speichern (400 sonst).
