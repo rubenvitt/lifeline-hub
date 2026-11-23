@@ -1468,6 +1468,9 @@
           "maschinenzugang_webhook_wieder_aufgenommen",
           "maschinenzugang_webhook_lan_erlaubt",
           "maschinenzugang_webhook_lan_entzogen",
+          "maschinenzugang_webhook_pin_gesetzt",
+          "maschinenzugang_webhook_pin_entfernt",
+          "maschinenzugang_webhook_zertifikat_abgerufen",
           "adapter_angelegt",
           "adapter_geaendert",
           "adapter_geloescht",
@@ -22898,7 +22901,7 @@
       },
       "VersionsstandAnzeige": {
         "type": "object",
-        "description": "Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`.",
+        "description": "Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`.",
         "required": [
           "laufend"
         ],
@@ -24175,6 +24178,13 @@
             ],
             "description": "Ereignisse gingen verloren, bevor sie zugestellt waren; der Empfänger muss den Stand über\ndie Leserouten neu lesen."
           },
+          "zertifikat_pin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fingerabdruck des Zielzertifikats (SHA-256, Hex); gesetzt zählt nur dieses Zertifikat\n(LLH-1872). Nicht geheim: sieht jeder, der die Anbindung sieht."
+          },
           "zustand": {
             "$ref": "#/components/schemas/WebhookZustand"
           }
@@ -24299,6 +24309,28 @@
           },
           "test": {
             "type": "boolean"
+          }
+        }
+      },
+      "WebhookZertifikat": {
+        "type": "object",
+        "description": "Ergebnis des Abrufs: der Fingerabdruck, den das Ziel zeigt, oder warum keiner kam.",
+        "properties": {
+          "fehler_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WebhookFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fingerabdruck": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

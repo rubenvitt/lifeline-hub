@@ -485,6 +485,12 @@ pub async fn handle_abgleich(
         let (hinweis_quittungen, folgen) =
             super::hinweis::annehmen(conn, kopplung, &anfrage.hinweise, chrono::Utc::now()).await?;
         hinweis_folgen = folgen;
+        // Mitarbeit-Nachträge (LLH-2007): vor dem Liefern, damit eine angehobene Rolle in dieser
+        // Antwort hinausgeht.
+        super::nachtrag::delete_quittiert(conn, kopplung.id, &anfrage.mitarbeit_quittungen).await?;
+        let annahme =
+            super::nachtrag::accept(conn, kopplung.id, &anfrage.mitarbeit_nachtraege).await?;
+        uebernommen.einsaetze.extend(annahme.einsaetze);
         let bruch_antworten =
             super::fuehrung::beantworte_staende(conn, kopplung.id, &anfrage.staende).await?;
         let staende: HashMap<String, i64> = anfrage
@@ -568,6 +574,7 @@ pub async fn handle_abgleich(
         let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
         let ids: Vec<i64> = antraege.iter().map(|a| a.id).collect();
         super::antrag::markiere_zugestellt(conn, &ids).await?;
+        let mitarbeit_nachtraege = super::nachtrag::list_offene(conn, kopplung.id).await?;
         Ok(SpiegelPaket {
             staende: staende_antwort,
             lieferungen,
@@ -581,6 +588,8 @@ pub async fn handle_abgleich(
             hinweise: Vec::new(),
             hinweis_quittungen,
             akten,
+            mitarbeit_nachtraege,
+            mitarbeit_quittungen: annahme.quittungen,
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -619,6 +628,9 @@ pub async fn abgleich_einmal(
     // mit der nächsten Runde hinaus (LLH-1641, E6).
     let mut bruch_antworten: Vec<super::paket::BruchAntwort> = Vec::new();
     let mut hinweise_mehr = false;
+    // Quittungen der Mitarbeit-Nachträge aus der Antwort; sie gehen mit der nächsten Runde
+    // hinaus (LLH-2007).
+    let mut mitarbeit_quittungen: Vec<i64> = Vec::new();
     for runde in 0..RUNDEN_MAX {
         let jetzt = crate::zeit::jetzt();
         let anfrage = crate::write_retry!(pool, |conn| {
@@ -661,6 +673,7 @@ pub async fn abgleich_einmal(
             let (hinweise, mehr) =
                 super::hinweis::offene(conn, kopplung.id, chrono::Utc::now()).await?;
             hinweise_mehr = mehr;
+            let mitarbeit_nachtraege = super::nachtrag::list_offene(conn, kopplung.id).await?;
             Ok(SpiegelPaket {
                 staende,
                 lieferungen,
@@ -674,6 +687,8 @@ pub async fn abgleich_einmal(
                 hinweise,
                 hinweis_quittungen: Vec::new(),
                 akten,
+                mitarbeit_nachtraege,
+                mitarbeit_quittungen: mitarbeit_quittungen.clone(),
             })
         })
         .map_err(fehler)?;
@@ -743,6 +758,14 @@ pub async fn abgleich_einmal(
             .await?;
             uebernommen.einsaetze.extend(geklaert);
             uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
+            // Mitarbeit-Nachträge (LLH-2007): eigene quittierte löschen, die des Gegenübers
+            // annehmen; deren Quittungen gehen mit der nächsten Runde.
+            super::nachtrag::delete_quittiert(conn, kopplung.id, &antwort.mitarbeit_quittungen)
+                .await?;
+            let annahme =
+                super::nachtrag::accept(conn, kopplung.id, &antwort.mitarbeit_nachtraege).await?;
+            uebernommen.einsaetze.extend(annahme.einsaetze);
+            mitarbeit_quittungen = annahme.quittungen;
             bruch_antworten =
                 super::fuehrung::beantworte_staende(conn, kopplung.id, &antwort.staende).await?;
             let fertig =
@@ -819,6 +842,7 @@ pub async fn abgleich_einmal(
             || ausgefuehrt
             || !geloescht_offen.is_empty()
             || !bruch_antworten.is_empty()
+            || !mitarbeit_quittungen.is_empty()
             || hinweise_mehr;
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;

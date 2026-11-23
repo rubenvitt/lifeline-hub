@@ -1,0 +1,203 @@
+{
+  // Lint des Frontends (LLH-2020, ADR in docs/architektur/entscheidungen, Regeln in
+  // frontend/AGENTS.md, „Lint-Disziplin“). Die Regeln stehen einzeln da, damit ein oxlint-Update
+  // keine neuen einschaltet: das Set entspricht dem früheren ESLint-Stand (eslint recommended,
+  // typescript-eslint recommended, react-hooks rules-of-hooks/exhaustive-deps).
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react"],
+  // e2e-Riegel (LFH-385, LFH-1114, LLH-1665); Probe-Test: lint/riegel-plugin.test.ts.
+  "jsPlugins": ["./lint/riegel-plugin.js"],
+  "categories": { "correctness": "off" },
+  "ignorePatterns": [
+    "dist",
+    "playwright-report",
+    "node_modules",
+    "vite.config.js",
+    "vite.config.d.ts",
+    "*.tsbuildinfo",
+    "src/api/types.generated.ts"
+  ],
+  "rules": {
+    "for-direction": "error",
+    "no-async-promise-executor": "error",
+    "no-case-declarations": "error",
+    "no-compare-neg-zero": "error",
+    "no-cond-assign": "error",
+    "no-constant-binary-expression": "error",
+    "no-constant-condition": "error",
+    "no-control-regex": "error",
+    "no-debugger": "error",
+    "no-delete-var": "error",
+    "no-dupe-else-if": "error",
+    "no-duplicate-case": "error",
+    "no-empty": "error",
+    "no-empty-character-class": "error",
+    "no-empty-pattern": "error",
+    "no-empty-static-block": "error",
+    "no-ex-assign": "error",
+    "no-extra-boolean-cast": "error",
+    "no-fallthrough": "error",
+    "no-global-assign": "error",
+    "no-invalid-regexp": "error",
+    "no-irregular-whitespace": "error",
+    "no-loss-of-precision": "error",
+    "no-misleading-character-class": "error",
+    "no-nonoctal-decimal-escape": "error",
+    "no-prototype-builtins": "error",
+    "no-regex-spaces": "error",
+    "no-self-assign": "error",
+    "no-shadow-restricted-names": "error",
+    "no-sparse-arrays": "error",
+    "no-unassigned-vars": "error",
+    "no-unexpected-multiline": "error",
+    "no-unsafe-finally": "error",
+    "no-unsafe-optional-chaining": "error",
+    "no-unused-labels": "error",
+    "no-unused-private-class-members": "error",
+    "no-useless-assignment": "error",
+    "no-useless-backreference": "error",
+    "no-useless-catch": "error",
+    "no-useless-escape": "error",
+    "preserve-caught-error": "error",
+    "require-yield": "error",
+    "use-isnan": "error",
+    "valid-typeof": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    "typescript/ban-ts-comment": "error",
+    "no-array-constructor": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "no-unused-expressions": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        // Wie früher ESLint: ein führender Unterstrich erlaubt nichts (oxlint ignoriert sonst `^_`).
+        "varsIgnorePattern": "^\\b$",
+        "argsIgnorePattern": "^\\b$",
+        "caughtErrorsIgnorePattern": "^\\b$",
+        "destructuredArrayIgnorePattern": "^\\b$"
+      }
+    ],
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn"
+  },
+  "overrides": [
+    {
+      // LFH-288: `Select` nur über den Wrapper (components/Select), damit neue Selects die
+      // Combobox-Suche bekommen. LLH-1779: kein rohes `Tag` (Zustand → Status, Kennzeichnung →
+      // Marke). Ausnahmen nur zeilengenau mit Begründung (Select-Wrapper, SichtungsTag).
+      "files": ["**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "antd",
+                "importNames": ["Select"],
+                "message": "Select über den Wrapper importieren: import { Select } from '…/components/Select' — er schaltet die Combobox-Suche standardmäßig an (LFH-288)."
+              },
+              {
+                "name": "antd",
+                "importNames": ["Tag"],
+                "message": "Kein rohes antd-Tag: ein Zustand → Status, eine Kennzeichnung → Marke (components/instrument; frontend/AGENTS.md, Bausteinwahl)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // LFH-385: Einsatzrouten halten einen SSE-Strom offen, `networkidle` tritt dort nur unter
+      // Glück ein. Gewartet wird auf das Element, das der Test danach misst.
+      "files": ["e2e/**/*.ts"],
+      "rules": {
+        "lfh/e2e-riegel": "error",
+        "lfh/e2e-anmeldeformular": "error",
+        "lfh/e2e-einblendung": "error"
+      }
+    },
+    {
+      // Specs, die die Anmeldung selbst prüfen (Formular, Kontrast der Anmeldeseite, Tabs,
+      // Speicher), dürfen das Formular ausfüllen (LLH-1665).
+      "files": [
+        "e2e/rollen-kern.ts", // `anmeldenImFormular` für Specs, die die Anmeldeseite schon offen haben
+        "e2e/primaerknopf-kontrast.spec.ts",
+        "e2e/fokusring-kontrast.spec.ts",
+        "e2e/browserspeicher-gesperrt.spec.ts",
+        "e2e/einmalpasswort.spec.ts",
+        "e2e/sitzung-mehrere-tabs.spec.ts",
+        "e2e/kernfluss.spec.ts", // Smoke des Kernflusses: Anmeldung, Einsatz über den Dialog, ETB live
+        "e2e/doku-bilder/**/*.ts" // Bildlauf der Anwenderdoku, kein e2e-Lauf (LFH-1128)
+      ],
+      "rules": { "lfh/e2e-anmeldeformular": "off" }
+    },
+    {
+      // LLH-2067: der Dialog-Kern ist die eine Stelle, die die Einblend-Klassen kennt; der
+      // Bildlauf wartet mit angehaltener Uhr über seinen eigenen Kern (docs/anwender/AGENTS.md).
+      "files": ["e2e/dialog-kern.ts", "e2e/doku-bilder/**/*.ts"],
+      "rules": { "lfh/e2e-einblendung": "off" }
+    },
+    {
+      // Regeln, die eslint recommended nur für JS-Dateien zusätzlich aktiviert (in TS prüft das
+      // der Typecheck).
+      "files": ["**/*.{js,mjs,cjs}"],
+      "rules": {
+        "constructor-super": "error",
+        "getter-return": "error",
+        "no-class-assign": "error",
+        "no-const-assign": "error",
+        "no-dupe-class-members": "error",
+        "no-dupe-keys": "error",
+        "no-func-assign": "error",
+        "no-import-assign": "error",
+        "no-new-native-nonconstructor": "error",
+        "no-obj-calls": "error",
+        "no-redeclare": "error",
+        "no-setter-return": "error",
+        "no-this-before-super": "error",
+        "no-undef": "error",
+        "no-unreachable": "error",
+        "no-unsafe-negation": "error",
+        "no-with": "error"
+      }
+    },
+    {
+      // Service-Worker-Zusatz (LFH-1062), von Workbox per `importScripts` geladen.
+      "files": ["public/**/*.js"],
+      "globals": {
+        "self": "readonly",
+        "fetch": "readonly",
+        "URL": "readonly",
+        "AbortController": "readonly",
+        "setTimeout": "readonly",
+        "clearTimeout": "readonly"
+      }
+    },
+    {
+      "files": ["scripts/**/*.{js,mjs}"],
+      "globals": {
+        "process": "readonly",
+        "console": "readonly",
+        "URL": "readonly"
+      }
+    }
+  ]
+}

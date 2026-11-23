@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { type AstNode, parseSource, staticText, textOf, walk, lineOf } from '../../lib/sourceAst';
 
 /**
  * Die Abstände der rechten Kartenleiste und der Bausteine über der Karte kommen aus der
@@ -70,35 +70,46 @@ const ZAHL_STUECK = /(^|[^\w$.])(?!0(?![.\d]))\d+(\.\d+)?/;
 
 /** Ein fester Wert: Zahl, Zeichenkette oder Template mit Zahl, Array daraus — auch hinter
  *  `?:`, `as`, `satisfies` und Klammern. `null`, wenn der Wert nicht fest ist. */
-function festerWert(knoten: ts.Expression, sf: ts.SourceFile): string | null {
+function festerWert(knoten: AstNode | null, quelltext: string): string | null {
+  if (knoten == null) return null;
   if (
-    ts.isParenthesizedExpression(knoten) ||
-    ts.isAsExpression(knoten) ||
-    ts.isSatisfiesExpression(knoten)
+    knoten.type === 'ParenthesizedExpression' ||
+    knoten.type === 'TSAsExpression' ||
+    knoten.type === 'TSSatisfiesExpression'
   ) {
-    return festerWert(knoten.expression, sf);
+    return festerWert(knoten.expression as AstNode, quelltext);
   }
-  if (ts.isConditionalExpression(knoten)) {
-    return festerWert(knoten.whenTrue, sf) ?? festerWert(knoten.whenFalse, sf);
+  if (knoten.type === 'ConditionalExpression') {
+    return (
+      festerWert(knoten.consequent as AstNode, quelltext) ??
+      festerWert(knoten.alternate as AstNode, quelltext)
+    );
   }
-  if (ts.isArrayLiteralExpression(knoten)) {
-    const teile = knoten.elements.map((e) => festerWert(e, sf));
+  if (knoten.type === 'ArrayExpression') {
+    const teile = (knoten.elements as (AstNode | null)[]).map((e) => festerWert(e, quelltext));
     return teile.some((t) => t != null) ? `[${teile.map((t) => t ?? '…').join(', ')}]` : null;
   }
-  if (ts.isNumericLiteral(knoten)) return knoten.text === '0' ? null : knoten.text;
+  const isNumber = (k: AstNode) => k.type === 'Literal' && typeof k.value === 'number';
+  if (isNumber(knoten)) {
+    const roh = textOf(quelltext, knoten);
+    return roh === '0' ? null : roh;
+  }
   if (
-    ts.isPrefixUnaryExpression(knoten) &&
-    knoten.operator === ts.SyntaxKind.MinusToken &&
-    ts.isNumericLiteral(knoten.operand)
+    knoten.type === 'UnaryExpression' &&
+    knoten.operator === '-' &&
+    isNumber(knoten.argument as AstNode)
   ) {
-    return `-${knoten.operand.text}`;
+    return `-${textOf(quelltext, knoten.argument as AstNode)}`;
   }
-  if (ts.isStringLiteral(knoten) || ts.isNoSubstitutionTemplateLiteral(knoten)) {
-    return ZAHL_STUECK.test(knoten.text) ? `'${knoten.text}'` : null;
+  const statisch = staticText(knoten);
+  if (statisch !== undefined) {
+    return ZAHL_STUECK.test(statisch) ? `'${statisch}'` : null;
   }
-  if (ts.isTemplateExpression(knoten)) {
-    const stuecke = [knoten.head.text, ...knoten.templateSpans.map((t) => t.literal.text)];
-    return stuecke.some((t) => ZAHL_STUECK.test(t)) ? knoten.getText(sf) : null;
+  if (knoten.type === 'TemplateLiteral') {
+    const stuecke = (knoten.quasis as AstNode[]).map(
+      (t) => (t.value as { cooked: string | null; raw: string }).cooked ?? '',
+    );
+    return stuecke.some((t) => ZAHL_STUECK.test(t)) ? textOf(quelltext, knoten) : null;
   }
   return null;
 }
@@ -111,35 +122,47 @@ interface Fund {
 
 /** Alle festen Abstände einer Quelle, in Baumreihenfolge. */
 function festeAbstaende(datei: string, quelle: string): Fund[] {
-  const sf = ts.createSourceFile(datei, quelle, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const funde: Fund[] = [];
-  const zeile = (k: ts.Node) => sf.getLineAndCharacterOfPosition(k.getStart(sf)).line + 1;
+  const zeile = (k: AstNode) => lineOf(quelle, k.start);
 
-  const besuche = (k: ts.Node) => {
-    if (ts.isPropertyAssignment(k)) {
-      const name = ts.isIdentifier(k.name) || ts.isStringLiteral(k.name) ? k.name.text : undefined;
-      const wert = name && ABSTAND.test(name) ? festerWert(k.initializer, sf) : null;
-      if (name && wert) funde.push({ datei, zeile: zeile(k), was: `${name}: ${wert}` });
+  walk(parseSource(datei, quelle), (k, eltern) => {
+    if (
+      k.type === 'Property' &&
+      eltern?.type === 'ObjectExpression' &&
+      k.kind === 'init' &&
+      !k.method &&
+      !k.computed
+    ) {
+      const schluessel = k.key as AstNode;
+      const name =
+        schluessel.type === 'Identifier'
+          ? (schluessel.name as string)
+          : schluessel.type === 'Literal' && typeof schluessel.value === 'string'
+            ? schluessel.value
+            : undefined;
+      if (k.shorthand) {
+        // `{ gap }`: der Wert steht woanders, der Scan kann ihn nicht beurteilen — also Befund.
+        if (name && ABSTAND.test(name)) funde.push({ datei, zeile: zeile(k), was: `{ ${name} }` });
+      } else {
+        const wert = name && ABSTAND.test(name) ? festerWert(k.value as AstNode, quelle) : null;
+        if (name && wert) funde.push({ datei, zeile: zeile(k), was: `${name}: ${wert}` });
+      }
     }
-    // `{ gap }`: der Wert steht woanders, der Scan kann ihn nicht beurteilen — also Befund.
-    if (ts.isShorthandPropertyAssignment(k) && ABSTAND.test(k.name.text)) {
-      funde.push({ datei, zeile: zeile(k), was: `{ ${k.name.text} }` });
-    }
-    if (ts.isJsxOpeningElement(k) || ts.isJsxSelfClosingElement(k)) {
-      const tag = k.tagName.getText(sf);
+    if (k.type === 'JSXOpeningElement') {
+      const tag = textOf(quelle, k.name as AstNode);
       const prop = JSX_ABSTAND[tag];
-      for (const attr of prop ? k.attributes.properties : []) {
-        if (!ts.isJsxAttribute(attr) || attr.name.getText(sf) !== prop) continue;
-        const init = attr.initializer;
-        if (init && ts.isJsxExpression(init) && init.expression) {
-          const wert = festerWert(init.expression, sf);
+      for (const attr of prop ? (k.attributes as AstNode[]) : []) {
+        if (attr.type !== 'JSXAttribute' || textOf(quelle, attr.name as AstNode) !== prop) continue;
+        const init = attr.value as AstNode | null;
+        const ausdruck =
+          init?.type === 'JSXExpressionContainer' ? (init.expression as AstNode) : null;
+        if (ausdruck && ausdruck.type !== 'JSXEmptyExpression') {
+          const wert = festerWert(ausdruck, quelle);
           if (wert) funde.push({ datei, zeile: zeile(attr), was: `<${tag} ${prop}={${wert}}>` });
         }
       }
     }
-    ts.forEachChild(k, besuche);
-  };
-  besuche(sf);
+  });
   return funde;
 }
 

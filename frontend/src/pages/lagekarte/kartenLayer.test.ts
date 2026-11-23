@@ -58,7 +58,7 @@ function fakeMap(istGeladen: () => boolean, stil?: unknown) {
     getStyle: vi.fn(() => stil),
     feuere: (ev: string) => (handler[ev] ?? []).slice().forEach((h) => h()),
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line typescript/no-explicit-any
   return { map: map as any, addSource: map.addSource, setData };
 }
 

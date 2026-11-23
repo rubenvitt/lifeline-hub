@@ -48,6 +48,9 @@ pub const VERBINDUNG_ZEITLIMIT: Duration = Duration::from_secs(5);
 /// Höchstlänge der Ziel-URL (Zeichen).
 pub const URL_MAX: usize = 2048;
 
+/// Länge eines Fingerabdrucks (SHA-256, Hex) am Webhook (LLH-1872).
+pub const PIN_LAENGE: usize = 64;
+
 /// Kopf mit der Nummer des Ereignisses, zum Entdoppeln vor dem Parsen (nicht signiert;
 /// maßgeblich ist `id` im signierten Body).
 pub const EVENT_ID_KOPF: &str = "Lifeline-Event-Id";
