@@ -12,6 +12,8 @@ fn main() {
             "check_server",
             "erneut_versuchen",
             "server_wechseln",
+            "nicht_vertraeglich",
+            "update_suchen",
             "drucken",
             "anmeldung_im_browser",
             "benachrichtigung_zeigen",

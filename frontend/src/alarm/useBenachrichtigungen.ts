@@ -176,8 +176,10 @@ function eintragVon(
  * `hinweis`, LLH-1143 D7; bis dahin nur die Art `meldung`, LLH-1062). Org-Arten betreffen keinen
  * offenen Einsatz und stehen in der Alarmzone.
  */
-function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean {
-  return e.stufe === 'hinweis' && !istOrgArt(e.art);
+function istEingang<T extends Pick<BenachrichtigungEreignis, 'art' | 'stufe' | 'einsatz_id'>>(
+  e: T,
+): e is T & { einsatz_id: number } {
+  return e.stufe === 'hinweis' && !istOrgArt(e.art) && e.einsatz_id != null;
 }
 
 /**
@@ -185,7 +187,7 @@ function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean
  * Titel und Detailzeile des Servers mit dem Inhalt (`hinweisInhalt.ts`).
  */
 function eingangVon(
-  a: BenachrichtigungAnzeige,
+  a: BenachrichtigungAnzeige & { einsatz_id: number },
   opts: { uhrzeit: string | null; inhalt: HinweisInhalt | null },
 ): EingangEintrag {
   const inhalt = opts.inhalt;

@@ -229,7 +229,8 @@ describe('Guard: ein Fehler MIT Daten ist ein Stand', () => {
 
 describe('Guard: keine Mutationen auf der Platte (Review LFH-723, Befund 1)', () => {
   // Ohne eigene Regel nähme `dehydrate` jede PAUSIERTE Mutation samt `variables` mit — ohne
-  // Netz pausiert jede (networkMode 'online'), also Chat-Texte, Personen-PATCHes …
+  // Netz pausiert jede mit networkMode 'online' (TanStacks Vorgabe; `erzeugeQueryClient` setzt
+  // seit LLH-1950 'always', eine Mutation darf 'online' aber ausdrücklich wählen).
   it('schreibt eine ohne Netz pausierte Mutation nicht', async () => {
     const qc = new QueryClient();
     onlineManager.setOnline(false);

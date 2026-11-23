@@ -21,7 +21,8 @@ import { schwaerzungsWaechterStarten } from '../offline/schwaerzungsWaechter';
 
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
- *  Serverantworten und sämtliche Mutationen werden nie automatisch erneut gesendet. */
+ *  Serverantworten und sämtliche Mutationen werden nie automatisch erneut gesendet. Dass
+ *  Mutationen ohne Netz nicht pausieren, setzt `erzeugeQueryClient` (LLH-1950). */
 const queryClientDefaults = {
   queries: {
     retry: (fehlversuche: number, fehler: unknown) =>
@@ -137,7 +138,16 @@ export function erzeugeQueryClient(
   defaultOptions: DefaultOptions = queryClientDefaults,
 ): QueryClient {
   const client: QueryClient = new QueryClient({
-    defaultOptions,
+    // Mutationen pausieren nie (LLH-1950, `offline/AGENTS.md`, „Schreiben ohne Netz“): Mit
+    // TanStacks Vorgabe `'online'` hielte eine Mutation ohne Netz an, `isPending` bliebe stehen,
+    // die Erfassungshülle sperrte jeden Ausweg, und nach der Rückkehr des Netzes ginge sie still
+    // hinaus. Ohne Netz scheitert sie deshalb sofort mit `NetzFehler`. Die Vorgabe liegt in der
+    // Fabrik, damit sie auch für Testclients mit eigenen Vorgaben gilt; eine Mutation mit
+    // eigenem `networkMode` behält ihn.
+    defaultOptions: {
+      ...defaultOptions,
+      mutations: { networkMode: 'always', ...defaultOptions.mutations },
+    },
     queryCache: new QueryCache({
       onError: (fehler, query) => {
         behandleFehler(fehler);

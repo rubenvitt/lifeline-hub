@@ -25,6 +25,25 @@ const E2E_RIEGEL = [
 ];
 
 /**
+ * LLH-2067: antds Einblend-Klassen kennt nur `e2e/dialog-kern.ts`. Die kopierte seitenweite
+ * Warte-Zeile (`.ant-zoom-appear, .ant-zoom-enter`) übersah Popconfirm und Popover
+ * (`ant-zoom-big-appear`) und wartete auf die ganze Seite statt auf den Dialog.
+ */
+const E2E_RIEGEL_EINBLENDUNG_MELDUNG =
+  'Nicht selbst auf antds Einblend-Klassen warten (LLH-2067): `dialogSteht(page, name)` bzw. `eingeblendet(locator)` aus `e2e/dialog-kern.ts` (frontend/e2e/AGENTS.md, „Erst klicken, wenn der Dialog steht“).';
+const E2E_EINBLENDUNG_ERLAUBT = ['e2e/dialog-kern.ts', 'e2e/doku-bilder/**/*.ts'];
+const E2E_RIEGEL_EINBLENDUNG = [
+  {
+    selector: 'Literal[value=/ant-zoom/]',
+    message: E2E_RIEGEL_EINBLENDUNG_MELDUNG,
+  },
+  {
+    selector: 'Literal[regex.pattern=/ant-zoom/]',
+    message: E2E_RIEGEL_EINBLENDUNG_MELDUNG,
+  },
+];
+
+/**
  * LLH-1665 (Spec `e2e-zuschnitt`): angemeldet wird über die API, nicht über das Formular; jede
  * Formular-Anmeldung kostete zwei volle App-Starts. Nur die Specs, die die Anmeldung selbst
  * prüfen, stehen in {@link E2E_ANMELDEFORMULAR_ERLAUBT}.
@@ -106,12 +125,33 @@ export default tseslint.config(
     // danach misst.
     files: ['e2e/**/*.ts'],
     rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...E2E_RIEGEL,
+        ...E2E_RIEGEL_EINBLENDUNG,
+        E2E_RIEGEL_ANMELDEFORMULAR,
+      ],
+    },
+  },
+  {
+    // LLH-2067: der Dialog-Kern ist die eine Stelle, die die Einblend-Klassen kennt; der Bildlauf
+    // wartet mit angehaltener Uhr über seinen eigenen Kern (docs/anwender/AGENTS.md).
+    files: E2E_EINBLENDUNG_ERLAUBT,
+    rules: {
       'no-restricted-syntax': ['error', ...E2E_RIEGEL, E2E_RIEGEL_ANMELDEFORMULAR],
     },
   },
   {
     // Die Specs, die die Anmeldung selbst prüfen, dürfen das Formular ausfüllen (LLH-1665).
     files: E2E_ANMELDEFORMULAR_ERLAUBT,
+    ignores: E2E_EINBLENDUNG_ERLAUBT,
+    rules: {
+      'no-restricted-syntax': ['error', ...E2E_RIEGEL, ...E2E_RIEGEL_EINBLENDUNG],
+    },
+  },
+  {
+    // Beide Ausnahmen zugleich: Bildlauf-Kapitel, die die Anmeldung zeigen.
+    files: E2E_ANMELDEFORMULAR_ERLAUBT.filter((p) => p.startsWith('e2e/doku-bilder/')),
     rules: {
       'no-restricted-syntax': ['error', ...E2E_RIEGEL],
     },

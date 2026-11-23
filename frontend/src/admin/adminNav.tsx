@@ -25,6 +25,7 @@ import InstanzkopplungSeite from '../instanz/InstanzkopplungSeite';
 import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
 import { SeitenSkeleton } from '../components/SeitenZustand';
+import { adminSektionPfad } from './adminPfade';
 
 // Eigener Chunk wie `PlanungenPage` (App.tsx): nur der System-Admin kommt hierher, und der
 // Haupt-Chunk liegt an der Precache-Grenze (`maximumFileSizeToCacheInBytes` in vite.config.ts).
@@ -152,10 +153,7 @@ export const adminZugangsprotokoll = {
   label: 'Zugangsprotokoll',
 } as const;
 
-/** `/admin/<gruppe>/<sektion>`. */
-export function adminSektionPfad(gruppe: string, sektion: string): string {
-  return `/admin/${gruppe}/${sektion}`;
-}
+export { adminSektionPfad };
 
 /** `/admin/uebersicht`. */
 export function adminUebersichtPfad(): string {

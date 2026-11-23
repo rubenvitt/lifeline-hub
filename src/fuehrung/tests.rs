@@ -239,3 +239,77 @@ async fn check_listen_entsprechen_dem_katalog() {
         assert_eq!(liste, erwartet, "{tabelle}.{spalte}");
     }
 }
+
+// ---------- Funktion weicht → Freitext (LLH-2064, Entwurf D1) ----------
+
+fn angabe(funktion: Option<Fuehrungsfunktion>, text: Option<&str>) -> Funktionsangabe {
+    Funktionsangabe {
+        funktion,
+        text: text.map(str::to_string),
+    }
+}
+
+#[test]
+fn funktion_wird_zum_kuerzel() {
+    for (f, kuerzel) in [
+        (Fuehrungsfunktion::S4, "S4"),
+        (Fuehrungsfunktion::El, "EL"),
+        (Fuehrungsfunktion::S7, "S7"),
+    ] {
+        assert_eq!(
+            angabe(Some(f), None).as_freitext(false),
+            angabe(None, Some(kuerzel))
+        );
+    }
+}
+
+#[test]
+fn fachberater_wird_zu_label_mit_bezeichnung() {
+    assert_eq!(
+        angabe(Some(Fuehrungsfunktion::Fachberater), Some("THW")).as_freitext(false),
+        angabe(None, Some("Fachberater: THW"))
+    );
+    assert_eq!(
+        angabe(
+            Some(Fuehrungsfunktion::Fuehrungshilfspersonal),
+            Some("Funk")
+        )
+        .as_freitext(false),
+        angabe(None, Some("Führungshilfspersonal: Funk"))
+    );
+}
+
+#[test]
+fn ohne_bezeichnung_nur_das_label() {
+    assert_eq!(
+        angabe(Some(Fuehrungsfunktion::Fachberater), None).as_freitext(false),
+        angabe(None, Some("Fachberater"))
+    );
+}
+
+#[test]
+fn geschwaerzt_nur_code_weg() {
+    assert_eq!(
+        angabe(Some(Fuehrungsfunktion::S4), None).as_freitext(true),
+        angabe(None, None)
+    );
+    assert_eq!(
+        angabe(Some(Fuehrungsfunktion::Fachberater), None).as_freitext(true),
+        angabe(None, None)
+    );
+}
+
+#[test]
+fn freitext_bleibt_freitext() {
+    assert_eq!(
+        angabe(None, Some("ELW 2")).as_freitext(false),
+        angabe(None, Some("ELW 2"))
+    );
+}
+
+#[test]
+fn wird_auf_text_max_gekuerzt() {
+    let lang = "x".repeat(195);
+    let ergebnis = angabe(Some(Fuehrungsfunktion::Fachberater), Some(&lang)).as_freitext(false);
+    assert_eq!(ergebnis.text.unwrap().chars().count(), TEXT_MAX);
+}

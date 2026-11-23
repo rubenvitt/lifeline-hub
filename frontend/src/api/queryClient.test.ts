@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryObserver, onlineManager } from '@tanstack/react-query';
 import { lagebildDehydrierOptionen } from '../offline/lagebildFilter';
 import { ApiError, NetzFehler } from './client';
 import { ETB_FREI_GC_MS, erzeugeQueryClient } from './queryClient';
@@ -314,5 +314,43 @@ describe('erzeugeQueryClient — Object-URL des UHS-Plans (LFH-999)', () => {
     client.clear();
     expect(freigeben.mock.calls.flat()).toEqual(['blob:plan-a', 'blob:plan-a2', 'blob:plan-b']);
     freigeben.mockRestore();
+  });
+});
+
+describe('erzeugeQueryClient — Mutationen pausieren nie (LLH-1950)', () => {
+  /** Führt eine Mutation ohne Netz aus und gibt ihren Zustand zurück, sobald sie steht. */
+  async function ohneNetz(client: QueryClient, optionen: { networkMode?: 'online' } = {}) {
+    const mutationFn = vi.fn().mockRejectedValue(new NetzFehler());
+    onlineManager.setOnline(false);
+    try {
+      const mutation = client.getMutationCache().build(client, { mutationFn, ...optionen });
+      void mutation.execute(undefined).catch(() => {});
+      await new Promise((r) => setTimeout(r, 0));
+      return { mutationFn, state: mutation.state };
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  }
+
+  it('ruft die mutationFn ohne Netz sofort auf (Prod-Vorgaben)', async () => {
+    const { mutationFn, state } = await ohneNetz(erzeugeQueryClient());
+    expect(mutationFn).toHaveBeenCalledTimes(1);
+    expect(state.isPaused).toBe(false);
+    expect(state.status).toBe('error');
+  });
+
+  it('ruft die mutationFn ohne Netz sofort auf, auch mit eigenen Mutations-Vorgaben', async () => {
+    const { mutationFn, state } = await ohneNetz(
+      erzeugeQueryClient({ mutations: { retry: false } }),
+    );
+    expect(mutationFn).toHaveBeenCalledTimes(1);
+    expect(state.isPaused).toBe(false);
+    expect(state.status).toBe('error');
+  });
+
+  it('lässt ein ausdrückliches networkMode an der Mutation stehen', async () => {
+    const { mutationFn, state } = await ohneNetz(erzeugeQueryClient(), { networkMode: 'online' });
+    expect(mutationFn).not.toHaveBeenCalled();
+    expect(state.isPaused).toBe(true);
   });
 });

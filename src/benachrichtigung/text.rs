@@ -54,6 +54,9 @@ pub const fn titel(art: BenachrichtigungArt) -> &'static str {
         BenachrichtigungArt::FuehrungUebernommen => "Führung übernommen",
         BenachrichtigungArt::FuehrungAngefragt => "Führung angefragt",
         BenachrichtigungArt::Unwetter => "Unwetterwarnung",
+        BenachrichtigungArt::AdapterEingriff => "Anbindung braucht Eingriff",
+        BenachrichtigungArt::AdapterGestoert => "Anbindung gestört",
+        BenachrichtigungArt::AdapterWiederOk => "Anbindung läuft wieder",
     }
 }
 
@@ -101,6 +104,9 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::Lagebesprechung
         | BenachrichtigungBezugTyp::Gefahrengebiet
         | BenachrichtigungBezugTyp::ChatNachricht => None,
+        // Kein Einsatzobjekt: die Detailzeile bildet `benachrichtigung::adapter` aus der
+        // Adapterzeile (LLH-2026).
+        BenachrichtigungBezugTyp::Adapter => None,
     }
 }
 
@@ -387,6 +393,8 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         BenachrichtigungBezugTyp::Fahrzeug => format!("{basis}/fahrzeuge?fahrzeug={id}"),
         // Ohne gelesene Zeile der Chat; `bilden` setzt den Kanal der Nachricht ein.
         BenachrichtigungBezugTyp::ChatNachricht => format!("{basis}/chat"),
+        // Eine Adapterzeile hat keinen Einsatz; ihren Pfad bildet `benachrichtigung::adapter`.
+        BenachrichtigungBezugTyp::Adapter => basis,
     }
 }
 

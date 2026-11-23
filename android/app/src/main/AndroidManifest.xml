@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android-Hülle (LLH-1989). Rechte und Einstiege nach Entwurf D2a, D4, D7 und D9. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- QR-Code im Onboarding und Kamera der Oberfläche (WebView). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Benachrichtigungen der Oberfläche und Hinweis auf ein bereites Update. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Updater: installiert die APK aus dem eigenen Kanal (Entwurf D9). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Ab Android 12 Updates ohne Rückfrage, wenn die App sich selbst installiert hat. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Ab Android 14: andere Installationswege fragen vor dem Ersetzen der App nach. -->
+    <uses-permission android:name="android.permission.ENFORCE_UPDATE_OWNERSHIP" />
+
+    <!-- „System-WebView aktualisieren“ fragt, ob ein Store die Seite des WebViews öffnen kann (Entwurf D3). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <!-- „Im Browser anmelden“ sucht einen Browser mit Custom Tabs bzw. Auth Tab (Entwurf D7). -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
+    <!-- Kamera ist kein Muss: ohne sie bleibt die Eingabe der Adresse. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      Keine Sicherung der App-Daten: die WebView-Profile tragen die Sitzungen der Server, und die
+      gehören nicht in eine Cloud-Sicherung.
+    -->
+    <application
+        android:name=".LifelineApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Lifeline">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Deeplink mit vorbelegter Serveradresse (`lifeline://verbinden?server=…`). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="lifeline" android:host="verbinden" />
+            </intent-filter>
+            <!-- Rückkehr aus „Im Browser anmelden“, wenn der Custom Tab sie nicht selbst fängt. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="lifeline" android:host="anmeldung" />
+            </intent-filter>
+        </activity>
+
+        <!-- Downloads zum Teilen, nur aus `cacheDir/downloads/` (Entwurf D8). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.dateien"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/dateien" />
+        </provider>
+
+        <!-- Nach einem Update der App (Entwurf D9). -->
+        <receiver
+            android:name=".update.PaketErsetzt"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Ergebnis einer Installationssitzung des Updaters (nur über das eigene PendingIntent). -->
+        <receiver
+            android:name=".update.Installationsstatus"
+            android:exported="false" />
+    </application>
+</manifest>

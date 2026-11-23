@@ -29,4 +29,10 @@ describe('Augenbraue', () => {
     expect(screen.getByText('X')).toHaveStyle({ color: farbenHell.schwach });
     expect(augenbraueStil({ schwach: 'rot' }).color).toBe('rot');
   });
+
+  it('benennt kein Feld: `dt` gehört dem Feldetikett (LLH-2045)', () => {
+    // @ts-expect-error — ein Feld benennt das Feldetikett, die Augenbraue bleibt Köpfen.
+    renderMitProviders(<Augenbraue als="dt">Einsatzort</Augenbraue>);
+    expect(screen.getByText('Einsatzort')).toBeInTheDocument();
+  });
 });

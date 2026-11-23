@@ -418,6 +418,12 @@ pub struct DispositionPatch<'a> {
     /// Qualifikation einer Ad-hoc-Person (`snap_funktion`).
     pub funktion: Option<Option<&'a str>>,
     pub traegerorganisation: Option<Option<&'a str>>,
+    /// Wer den Status setzt (LLH-1986): bei einem echten Wechsel in `status_gesetzt_von`, damit
+    /// nur diese Person ihn zurücknimmt. `None` (etwa der Schichtplan-Vollzug) lässt keine
+    /// Rücknahme zu.
+    pub gesetzt_von: Option<i64>,
+    /// Zeitpunkt des Wechsels (`status_gesetzt_at`, Kennung der Rücknahme); `None` = jetzt.
+    pub gesetzt_at: Option<&'a str>,
 }
 
 impl DispositionPatch<'_> {
@@ -464,14 +470,23 @@ pub async fn update_tx(
     crate::feld_cas::check_zeile_tx(conn, "einsatz_personal", einsatz_id, ep_id, erwartet).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
-         SET status_id = COALESCE(?, status_id), \
-             staerke_position = CASE WHEN ? THEN ? ELSE staerke_position END, \
-             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
-             einsatzfunktion = CASE WHEN ? THEN ? ELSE einsatzfunktion END, \
-             snap_name = COALESCE(?, snap_name), \
-             snap_funktion = CASE WHEN ? THEN ? ELSE snap_funktion END, \
-             snap_traegerorganisation = CASE WHEN ? THEN ? ELSE snap_traegerorganisation END \
-         WHERE id = ? AND einsatz_id = ?",
+         SET status_gesetzt_von = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+                                       THEN ?15 ELSE status_gesetzt_von END, \
+             status_gesetzt_at = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+                                      THEN COALESCE(?16, datetime('now')) \
+                                      ELSE status_gesetzt_at END, \
+             status_vorher_id = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+                                     THEN status_id ELSE status_vorher_id END, \
+             status_ereignis_id = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+                                       THEN NULL ELSE status_ereignis_id END, \
+             status_id = COALESCE(?1, status_id), \
+             staerke_position = CASE WHEN ?2 THEN ?3 ELSE staerke_position END, \
+             bemerkung = CASE WHEN ?4 THEN ?5 ELSE bemerkung END, \
+             einsatzfunktion = CASE WHEN ?6 THEN ?7 ELSE einsatzfunktion END, \
+             snap_name = COALESCE(?8, snap_name), \
+             snap_funktion = CASE WHEN ?9 THEN ?10 ELSE snap_funktion END, \
+             snap_traegerorganisation = CASE WHEN ?11 THEN ?12 ELSE snap_traegerorganisation END \
+         WHERE id = ?13 AND einsatz_id = ?14",
     )
     .bind(patch.status_id)
     .bind(patch.staerke_position.is_some())
@@ -487,6 +502,8 @@ pub async fn update_tx(
     .bind(patch.traegerorganisation.flatten())
     .bind(ep_id)
     .bind(einsatz_id)
+    .bind(patch.gesetzt_von)
+    .bind(patch.gesetzt_at)
     .execute(&mut *conn)
     .await?;
     if resultat.rows_affected() == 0 {
@@ -779,6 +796,8 @@ async fn set_beendet_tx(
     // `zuletzt_entlassen_at` überdauert das erneute Disponieren (Storno-Sperre, design.md D3).
     let r = sqlx::query(
         "UPDATE einsatz_personal SET beendet_at = ?1, beendet_von = ?2, beendet_als = ?3, \
+             status_gesetzt_von = NULL, status_gesetzt_at = NULL, status_vorher_id = NULL, \
+             status_ereignis_id = NULL, \
              zuletzt_entlassen_at = CASE WHEN ?3 = 'entlassen' THEN ?1 \
                                          ELSE zuletzt_entlassen_at END \
          WHERE id = ?4 AND einsatz_id = ?5 AND beendet_at IS NULL",
@@ -1124,6 +1143,114 @@ pub async fn update_position(
         .into_iter()
         .find(|f| f.id == ep_id)
         .ok_or(AppError::NotFound)
+}
+
+// ── Rücknahme eines Statuswechsels (LLH-1986) ───────────────────────────────────────────────
+
+/// Merkt das Zeitachsen-Ereignis, das ein Statuswechsel geschrieben hat, in der Transaktion des
+/// Wechsels (LLH-1986, wie beim Fahrzeug).
+pub async fn merke_status_ereignis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    ereignis_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_personal SET status_ereignis_id = ? WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ereignis_id)
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Leert, was die Zeile für die Rücknahme ihres letzten Statuswechsels hält: ein Weg, der den
+/// Status ohne Person setzt, überholt den gemerkten Wechsel (LLH-1986, Design E1).
+pub async fn vergiss_statuswechsel_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_personal SET status_gesetzt_von = NULL, status_gesetzt_at = NULL, \
+                status_vorher_id = NULL, status_ereignis_id = NULL \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Nimmt einen Statuswechsel einer Person zurück (LLH-1986), in der Transaktion des Aufrufers.
+/// Riegel über [`crate::status_ruecknahme::pruefe`] (Kennung `status_gesetzt_at`); das Ereignis
+/// des Wechsels wird gestrichen, der Status von davor hergestellt und die Rücknahme-Spalten
+/// geleert. Eine beendete Kraft → `Conflict` wie jeder Schreibweg. Liefert, was das Streichen
+/// berührt hat.
+pub async fn status_zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    beleg: &crate::status_ruecknahme::HandStatusRuecknahmeBeleg,
+) -> Result<crate::zeitachse::repo::Beruehrt, AppError> {
+    require_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    type Zeile = (
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+    );
+    let (status_id, gesetzt_at, gesetzt_von, vorher_id, ereignis): Zeile = sqlx::query_as(
+        "SELECT status_id, status_gesetzt_at, status_gesetzt_von, status_vorher_id, \
+                status_ereignis_id \
+         FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    crate::status_ruecknahme::pruefe(
+        &crate::status_ruecknahme::Gemerkt {
+            status: status_id,
+            kennung: gesetzt_at,
+            gesetzt_von,
+        },
+        &beleg.status_id,
+        &beleg.gesetzt_at,
+        benutzer_id,
+        jetzt,
+    )?;
+    let beruehrt = crate::status_ruecknahme::streiche_ereignis_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        crate::zeitachse::repo::Kraft::Person(ep_id),
+        ereignis,
+    )
+    .await?;
+    let r = sqlx::query(
+        "UPDATE einsatz_personal SET status_id = ?, status_gesetzt_von = NULL, \
+                status_gesetzt_at = NULL, status_vorher_id = NULL, status_ereignis_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND status_id IS ? AND status_gesetzt_at = ?",
+    )
+    .bind(vorher_id)
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .bind(beleg.status_id)
+    .bind(&beleg.gesetzt_at)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Veraltet);
+    }
+    Ok(beruehrt)
 }
 
 #[cfg(test)]

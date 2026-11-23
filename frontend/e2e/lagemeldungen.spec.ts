@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import { waehleIn } from './auswahl-kern';
 
@@ -178,9 +179,7 @@ test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-132
   // und lässt ihn offen (wie `dialoge-handy.spec.ts`).
   const waehle = async (knopf: string) => {
     await zeitraum.click();
-    const dialog = page.getByRole('dialog', { name: 'Zeitraum' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+    const dialog = await dialogSteht(page, 'Zeitraum');
     await dialog.getByRole('button', { name: knopf }).click();
     await expect(dialog).toBeHidden();
   };
@@ -247,10 +246,8 @@ test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen a
 
   const zeitraum = page.locator('[data-lfh="lagemeldungen-zeitraum"]');
   await zeitraum.click();
-  const dialog = page.getByRole('dialog', { name: 'Zeitraum' });
-  await expect(dialog).toBeVisible();
   // Erst wählen, wenn der Aufklapper steht (wie oben).
-  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Zeitraum');
   await dialog.getByRole('button', { name: /^Seit letzter Lagebesprechung/ }).click();
   await expect(dialog).toBeHidden();
 

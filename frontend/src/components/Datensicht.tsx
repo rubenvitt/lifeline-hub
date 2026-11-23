@@ -22,7 +22,7 @@ import { Liste, ListenEintrag, type ListenKopf } from './Liste';
 import type { UnterEbene } from './Markdown';
 import { Select } from './Select';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
-import Augenbraue from './instrument/Augenbraue';
+import Feldetikett from './instrument/Feldetikett';
 import Filterhinweis from './instrument/Filterhinweis';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import Stapel from './instrument/Stapel';
@@ -2711,8 +2711,7 @@ export default function Datensicht<T extends object, const K extends string>(
                     data-lfh="datensicht-feld"
                     style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}
                   >
-                    {/* Feldetikett als Augenbraue, Versalien per CSS; der Wortlaut im DOM bleibt. */}
-                    <Augenbraue>{etikettVon(spalte) ?? spalte.key}</Augenbraue>
+                    <Feldetikett>{etikettVon(spalte) ?? spalte.key}</Feldetikett>
                     <span style={spalte.zahl ? monoStil(token.fontSize) : undefined}>
                       {zelle(spalte, zeile, index)}
                     </span>

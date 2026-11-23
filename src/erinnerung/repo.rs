@@ -606,12 +606,16 @@ pub async fn setze_auto_frist_tx(
 /// `zuletzt_ausgeloest_at` bleibt stehen: eine Rücknahme ist eine Korrektur, kein neuer
 /// Anlass zum Auslösen. Existiert schon eine offene Auto-Frist, passiert nichts. Liefert, ob
 /// eine Frist geöffnet wurde.
+///
+/// Räumt wie [`wieder_oeffnen_tx`] alle drei Achsen (LLH-2024): wurde die Frist von Hand erledigt,
+/// stünden Vollzug und Quittung sonst neben dem Status „offen“. Alles auf der Verbindung des
+/// Aufrufers, in seiner Transaktion.
 pub async fn oeffne_letzte_auto_tx(
     conn: &mut SqliteConnection,
     bezug_typ: &str,
     bezug_id: i64,
 ) -> Result<bool, AppError> {
-    let r = sqlx::query(
+    let geoeffnet: Option<(i64, i64)> = sqlx::query_as(
         "UPDATE erinnerung SET status = ?, erledigt_at = NULL \
          WHERE id = ( \
              SELECT id FROM erinnerung \
@@ -619,7 +623,8 @@ pub async fn oeffne_letzte_auto_tx(
              ORDER BY erledigt_at DESC, id DESC LIMIT 1) \
            AND NOT EXISTS ( \
              SELECT 1 FROM erinnerung \
-             WHERE quelle = 'auto_frist' AND status = ? AND bezug_typ = ? AND bezug_id = ?)",
+             WHERE quelle = 'auto_frist' AND status = ? AND bezug_typ = ? AND bezug_id = ?) \
+         RETURNING id, einsatz_id",
     )
     .bind(STATUS_OFFEN)
     .bind(STATUS_ERLEDIGT)
@@ -628,9 +633,14 @@ pub async fn oeffne_letzte_auto_tx(
     .bind(STATUS_OFFEN)
     .bind(bezug_typ)
     .bind(bezug_id)
-    .execute(&mut *conn)
+    .fetch_optional(&mut *conn)
     .await?;
-    Ok(r.rows_affected() > 0)
+    let Some((id, einsatz_id)) = geoeffnet else {
+        return Ok(false);
+    };
+    krepo::reset_vollzug_tx(conn, einsatz_id, OBJEKT_ERINNERUNG, id).await?;
+    krepo::loesche_quittung_tx(conn, einsatz_id, OBJEKT_ERINNERUNG, id).await?;
+    Ok(true)
 }
 
 /// Entfernt **alle** Auto-Fristen eines Bezugs, der selbst verschwindet (zurückgenommene
