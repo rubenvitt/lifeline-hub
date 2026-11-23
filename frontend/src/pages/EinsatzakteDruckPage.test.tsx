@@ -86,7 +86,7 @@ function quellen(freigaben = freigabenFixture()) {
     ),
     json('/personal/zeitachse', () => wert(roh, 'personalPerioden')),
     json('/fahrzeuge', () => wert(roh, 'fahrzeuge')),
-    json('/lageberichte', () => berichte),
+    json('/situation-reports', () => berichte),
     http.get(`/api/einsaetze/${E}/situation-reports/:lid`, ({ params }) => {
       zaehle(`/lageberichte/${String(params.lid)}`);
       return HttpResponse.json(berichte.find((b) => b.id === Number(params.lid)));
@@ -101,7 +101,7 @@ function quellen(freigaben = freigabenFixture()) {
     json('/evakuierung', () => wert(roh, 'evakuierung')),
     json('/betreuung', () => wert(roh, 'betreuung')),
     json('/verpflegung', () => wert(roh, 'verpflegung')),
-    json('/etb/zaehler', () => wert(roh, 'etbZaehler')),
+    json('/etb/counters', () => wert(roh, 'etbZaehler')),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
@@ -111,7 +111,7 @@ function quellen(freigaben = freigabenFixture()) {
           : [etbEintrag({ id: 200, lfd_nr: 1, typ: 'meldung', inhalt: 'Erstmeldung Halle 3' })],
       );
     }),
-    json('/auftraege', () => [
+    json('/tasks', () => [
       {
         id: 1,
         lfd_nr: 3,
@@ -122,7 +122,7 @@ function quellen(freigaben = freigabenFixture()) {
         empfaenger: [{ snap_anzeige: 'Zug 1' }],
       },
     ]),
-    json('/befehle', () => [
+    json('/orders', () => [
       befehl({}),
       befehl({ id: 12, titel: 'Befehl Entwurf', status: 'entwurf' }),
     ]),

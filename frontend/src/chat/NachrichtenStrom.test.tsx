@@ -929,7 +929,7 @@ describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
       strom();
       const anhang = screen
         .getAllByRole('link')
-        .find((a) => a.getAttribute('href')?.includes('/anhaenge/5'))!;
+        .find((a) => a.getAttribute('href')?.includes('/attachments/5'))!;
       expect(fireEvent.contextMenu(anhang, { button: 2 })).toBe(true);
     });
 

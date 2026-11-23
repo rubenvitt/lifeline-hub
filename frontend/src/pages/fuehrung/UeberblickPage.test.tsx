@@ -1673,6 +1673,10 @@ describe('UeberblickPage', () => {
     afterEach(() => localStorage.clear());
 
     // Seit LLH-1748 auch die Quellen der Marken: „Nächste Marken“ steht in Reihe 1 zuoberst.
+    // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
+    const route = (modul: string) =>
+      (({ auftraege: 'tasks', erinnerungen: 'reminders' }) as Record<string, string>)[modul] ??
+      modul;
     for (const quelle of [
       'abschnitte',
       'einheiten',
@@ -1687,7 +1691,7 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
-          http.get(`/api/einsaetze/1/${quelle}`, async () => {
+          http.get(`/api/einsaetze/1/${route(quelle)}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
           }),
@@ -1745,7 +1749,7 @@ describe('UeberblickPage', () => {
 
         server.use(
           http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
-          http.get(`/api/einsaetze/1/${modul}`, async () => {
+          http.get(`/api/einsaetze/1/${route(modul)}`, async () => {
             abrufe.n += 1;
             await tor;
             return HttpResponse.json(volleDaten[modul] as object);

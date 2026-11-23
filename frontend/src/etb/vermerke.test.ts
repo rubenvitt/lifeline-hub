@@ -136,7 +136,7 @@ describe('vermerkeVon — Verweise und Marken eines Eintrags', () => {
     expect(v.map((x) => x.text)).toEqual(['Anhang Lagefoto.jpg', 'Dokument „Lageskizze“']);
     expect(v[0].datei!.dateiname).toBe('Lagefoto.jpg');
     expect(v[0].datei!.name).toMatch(/^Lagefoto\.jpg, .+, Anhang zu Nr\. 42 herunterladen$/);
-    expect(v[0].datei!.href).toContain('/etb/1/anhaenge/9');
+    expect(v[0].datei!.href).toContain('/etb/1/attachments/9');
     expect(v[1].datei!.name).toMatch(/^Dokument „Lageskizze“, .+, zu Nr\. 42 herunterladen$/);
   });
 

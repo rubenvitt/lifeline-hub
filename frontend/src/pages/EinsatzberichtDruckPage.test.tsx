@@ -78,7 +78,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/evakuierung', 'evakuierung'),
     json('/betreuung', 'betreuung'),
     json('/verpflegung', 'verpflegung'),
-    json('/etb/zaehler', 'etbZaehler'),
+    json('/etb/counters', 'etbZaehler'),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
