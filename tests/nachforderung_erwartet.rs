@@ -1012,7 +1012,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
             .is_some_and(|t| t.contains("Einheiten übernommen")),
         "{j:?}"
     );
-    for (pfad, body) in [("ablehnen", r#"{"grund":"x"}"#), ("zurueckziehen", r#"{}"#)] {
+    for (pfad, body) in [("reject", r#"{"grund":"x"}"#), ("withdraw", r#"{}"#)] {
         let (s, j) = anfrage(
             &app,
             "POST",

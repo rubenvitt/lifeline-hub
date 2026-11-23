@@ -645,7 +645,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
 
     // Quittung: die Zeile der eigenen Einheit ja, die von Süd nicht.
-    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/recipients/{zid}/acknowledge");
     let (s, v) = anfrage(
         &app,
         "POST",
@@ -675,7 +675,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
 
     // Vollzug: eigener Auftrag ja, fremder 404, abnehmen gar nicht.
-    let vollzug = |aid: i64| format!("{basis}/{aid}/vollzug");
+    let vollzug = |aid: i64| format!("{basis}/{aid}/execution");
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -697,7 +697,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/abnehmen", id(&an_ost)),
+        &format!("{basis}/{}/accept", id(&an_ost)),
         &geraet,
         Some("{}"),
     )
@@ -794,7 +794,7 @@ async fn befehl_an(
     if !freigeben {
         return v;
     }
-    let (s, v) = anfrage(app, "POST", &format!("{basis}/{id}/freigeben"), admin, None).await;
+    let (s, v) = anfrage(app, "POST", &format!("{basis}/{id}/release"), admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v
 }
@@ -864,7 +864,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, neu) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/fortschreiben", id(&alt)),
+        &format!("{basis}/{}/revise", id(&alt)),
         &admin,
         Some("{}"),
     )
@@ -873,7 +873,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, neu) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/freigeben", id(&neu)),
+        &format!("{basis}/{}/release", id(&neu)),
         &admin,
         None,
     )
@@ -910,13 +910,13 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     }
 
     // Quittieren: die eigene Zeile ja, auch ein zweites Mal; die von Süd nicht.
-    let pfad = |bid: i64, vid: i64, wort: &str| format!("{basis}/{bid}/verteiler/{vid}/{wort}");
+    let pfad = |bid: i64, vid: i64, wort: &str| format!("{basis}/{bid}/distribution/{vid}/{wort}");
     let eigene = zeile(&gemischt, "einheit_id", l.zug_ost);
     for _ in 0..2 {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &pfad(id(&gemischt), eigene, "quittieren"),
+            &pfad(id(&gemischt), eigene, "acknowledge"),
             &geraet,
             None,
         )
@@ -948,7 +948,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
             zeile(&alt, "abschnitt_id", l.nord),
         ),
     ] {
-        for wort in ["quittieren", "zuruecknehmen"] {
+        for wort in ["acknowledge", "undo"] {
             let (s, _) = anfrage(&app, "POST", &pfad(bid, vid, wort), &geraet, None).await;
             assert_eq!(s, StatusCode::NOT_FOUND, "{wer} {wort}");
         }
@@ -971,7 +971,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &pfad(id(&gemischt), eigene, "undo"),
         &geraet,
         None,
     )
@@ -996,7 +996,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "quittieren"),
+        &pfad(id(&gemischt), eigene, "acknowledge"),
         &admin,
         None,
     )
@@ -1005,7 +1005,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &pfad(id(&gemischt), eigene, "undo"),
         &geraet,
         None,
     )
@@ -1024,9 +1024,9 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     for (m, p) in [
         ("POST", basis.clone()),
         ("PATCH", format!("{basis}/{}", id(&entwurf))),
-        ("POST", format!("{basis}/{}/freigeben", id(&entwurf))),
-        ("POST", format!("{basis}/{}/fortschreiben", id(&gemischt))),
-        ("GET", format!("{basis}/{}/anlagen", id(&gemischt))),
+        ("POST", format!("{basis}/{}/release", id(&entwurf))),
+        ("POST", format!("{basis}/{}/revise", id(&gemischt))),
+        ("GET", format!("{basis}/{}/enclosures", id(&gemischt))),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
@@ -7906,7 +7906,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
         "Auftrag an den Abschnitt der Einheit"
     );
 
-    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/recipients/{zid}/acknowledge");
     let (s, v) = anfrage(
         &app,
         "POST",
@@ -7929,7 +7929,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_zug)),
+        &format!("{basis}/{}/execution", id(&an_zug)),
         &geraet,
         Some(&json!({"status": "vollzogen", "vollzugsmeldung": "Pumpe läuft"})),
     )
@@ -7939,7 +7939,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_zug)),
+        &format!("{basis}/{}/execution", id(&an_zug)),
         &geraet,
         Some(&json!({"status": "in_arbeit"})),
     )
@@ -7958,7 +7958,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_abschnitt)),
+        &format!("{basis}/{}/execution", id(&an_abschnitt)),
         &geraet,
         Some(&json!({"status": "in_arbeit"})),
     )
@@ -7967,7 +7967,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/abnehmen", id(&an_zug)),
+        &format!("{basis}/{}/accept", id(&an_zug)),
         &geraet,
         Some("{}"),
     )

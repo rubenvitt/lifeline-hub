@@ -1,6 +1,6 @@
 //! Integrationstests der Quittung je Verteiler-Empfänger am Einsatzbefehl (LLH-1173, Spec
 //! `befehl-quittung`, Herleitung `openspec/changes/archive/2026-10-13-koiqi51u-befehl-quittung/design.md`) über
-//! `POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/{quittieren|zuruecknehmen}`:
+//! `POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/{acknowledge|undo}`:
 //! Quittung und Rücknahme samt ETB, Fassungsregel, Rechte, Liste und Live-Ereignis.
 
 use axum::http::StatusCode;
@@ -83,7 +83,7 @@ impl Umgebung {
 
     async fn freigegeben(&self) -> Value {
         let id = self.entwurf().await;
-        let (s, j) = self.post(&format!("{}/freigeben", self.befehl(id))).await;
+        let (s, j) = self.post(&format!("{}/release", self.befehl(id))).await;
         assert_eq!(s, StatusCode::OK, "{j:?}");
         j
     }
@@ -102,7 +102,7 @@ impl Umgebung {
     }
 
     fn quittung_pfad(&self, bid: i64, vid: i64, wort: &str) -> String {
-        format!("{}/verteiler/{vid}/{wort}", self.befehl(bid))
+        format!("{}/distribution/{vid}/{wort}", self.befehl(bid))
     }
 
     async fn quittieren(&self, bid: i64, vid: i64) -> (StatusCode, Value) {
@@ -298,7 +298,7 @@ async fn nur_die_juengste_freigegebene_fassung_ist_quittierbar() {
     assert_eq!(s, StatusCode::OK);
 
     // Nachfolgerin freigegeben: v1 ist überholt, ihre Quittungen bleiben stehen.
-    let (s, v2) = u.post(&format!("{}/freigeben", u.befehl(id(&v2)))).await;
+    let (s, v2) = u.post(&format!("{}/release", u.befehl(id(&v2)))).await;
     assert_eq!(s, StatusCode::OK, "{v2:?}");
     assert_eq!(v2["is_quittierbar"], true);
     assert!(!ist_quittiert(&v2, 0) && !ist_quittiert(&v2, 1), "{v2}");
@@ -452,11 +452,11 @@ async fn nach_einer_zweiten_fortschreibung_der_alten_fassung_gilt_nur_die_zuletz
     let u = umgebung().await;
     let v1 = u.freigegeben().await;
     let v2 = u.fortschreiben(id(&v1)).await;
-    let (s, _) = u.post(&format!("{}/freigeben", u.befehl(id(&v2)))).await;
+    let (s, _) = u.post(&format!("{}/release", u.befehl(id(&v2)))).await;
     assert_eq!(s, StatusCode::OK);
     // Die überholte v1 wird noch einmal fortgeschrieben und freigegeben (Seitenzweig der Kette).
     let zweig = u.fortschreiben(id(&v1)).await;
-    let (s, zweig) = u.post(&format!("{}/freigeben", u.befehl(id(&zweig)))).await;
+    let (s, zweig) = u.post(&format!("{}/release", u.befehl(id(&zweig)))).await;
     assert_eq!(s, StatusCode::OK, "{zweig:?}");
 
     assert_eq!(zweig["is_quittierbar"], true);

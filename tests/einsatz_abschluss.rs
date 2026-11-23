@@ -332,7 +332,15 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/{modul}"),
+            // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
+            &format!(
+                "/api/einsaetze/{e}/{}",
+                match modul {
+                    "meldungen" => "reports",
+                    "auftraege" => "tasks",
+                    andere => andere,
+                }
+            ),
             &lena,
             None,
         )

@@ -130,7 +130,7 @@ impl Welt {
         let (s, v) = anfrage_mit_offline_queue_benutzer(
             &self.app,
             "POST",
-            &self.pfad("meldungen"),
+            &self.pfad("reports"),
             &cookie,
             Some(
                 &json!({
@@ -161,7 +161,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad("auftraege"),
+            &self.pfad("tasks"),
             &cookie,
             Some(
                 &json!({
@@ -205,7 +205,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad("erinnerungen"),
+            &self.pfad("reminders"),
             &cookie,
             Some(&body.to_string()),
         )
@@ -249,7 +249,7 @@ async fn neue_sofortmeldung_alarmiert_alle_leser_ausser_der_erfasserin() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("meldungen"),
+        &w.pfad("reports"),
         &cookie,
         Some(
             &json!({
@@ -283,7 +283,7 @@ async fn sofortmeldung_erreicht_niemanden_ohne_modul_meldungen() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("meldungen"),
+        &w.pfad("reports"),
         &cookie,
         Some(
             &json!({
@@ -473,7 +473,7 @@ async fn erinnerung_von_hand_zu_meldung_oder_auftrag_bleibt_eine_erinnerung() {
     let (s, meldung) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("meldungen"),
+        &w.pfad("reports"),
         &cookie,
         Some(
             &json!({

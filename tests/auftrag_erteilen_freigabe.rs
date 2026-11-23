@@ -21,7 +21,7 @@ impl Quelle {
     fn segment(self) -> &'static str {
         match self {
             Quelle::Etb => "etb",
-            Quelle::Meldung => "meldungen",
+            Quelle::Meldung => "reports",
         }
     }
 
@@ -46,7 +46,7 @@ impl Quelle {
     }
 
     fn erteilen_pfad(self, einsatz: i64, id: i64) -> String {
-        format!("/api/einsaetze/{einsatz}/{}/{id}/auftrag", self.segment())
+        format!("/api/einsaetze/{einsatz}/{}/{id}/task", self.segment())
     }
 }
 

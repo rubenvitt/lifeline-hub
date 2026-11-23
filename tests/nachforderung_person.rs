@@ -214,7 +214,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, z) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({"rufnamen": ["RTW 1/83-1"], "leitstelle_einsatznummer": " 2611-0815 "}),
     )
     .await;
@@ -248,7 +248,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid2}/ablehnen", nachforderungen(e)),
+        &format!("{}/{nid2}/reject", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;
@@ -272,7 +272,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid3}/zurueckziehen", nachforderungen(e)),
+        &format!("{}/{nid3}/withdraw", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;
@@ -293,7 +293,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("{}/{ohne_id}/zusage", nachforderungen(e)),
+        &format!("{}/{ohne_id}/commitment", nachforderungen(e)),
         serde_json::json!({"leitstelle_einsatznummer": "4711"}),
     )
     .await;
@@ -306,7 +306,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({"leitstelle_einsatznummer": zu_lang}),
     )
     .await;
@@ -325,7 +325,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;

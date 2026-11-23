@@ -72,7 +72,7 @@ export function ladeEtbZaehler(
   filter: EtbFilterWerte = {},
 ): Promise<EtbZaehler> {
   const qs = filterParameter(filter).toString();
-  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/zaehler${qs ? `?${qs}` : ''}`);
+  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/counters${qs ? `?${qs}` : ''}`);
 }
 
 /**
@@ -81,7 +81,7 @@ export function ladeEtbZaehler(
  */
 export function zaehleEtb(einsatzId: number, params: EtbFilterWerte = {}): Promise<EtbAnzahl> {
   const qs = filterParameter(params).toString();
-  return apiGet<EtbAnzahl>(`/api/einsaetze/${einsatzId}/etb/anzahl${qs ? `?${qs}` : ''}`);
+  return apiGet<EtbAnzahl>(`/api/einsaetze/${einsatzId}/etb/count${qs ? `?${qs}` : ''}`);
 }
 
 export interface NeuerEintrag {
@@ -166,7 +166,7 @@ export function erteileAuftragAusEtb(
  * `kwc2yszv-etb-neuentwurf`, Review S4).
  */
 function lesemarkeAdresse(einsatzId: number, ohneSystem: boolean): string {
-  return `/api/einsaetze/${einsatzId}/etb/lesemarke${ohneSystem ? '?ohne_system=true' : ''}`;
+  return `/api/einsaetze/${einsatzId}/etb/read-marker${ohneSystem ? '?ohne_system=true' : ''}`;
 }
 
 /** Eigener Lesestand im Tagebuch: Marke, letzte Sichtung, fremde Einträge darüber. */

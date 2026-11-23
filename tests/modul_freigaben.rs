@@ -146,7 +146,7 @@ async fn ausgeblendetes_modul_admin_erreicht_es_sieht_es_aber_nicht() {
         json!({ "sichtbar": false, "zugriff": false })
     );
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "meldungen").await,
+        liste_status(&app, &erika, einsatz, "reports").await,
         StatusCode::FORBIDDEN
     );
 
@@ -156,7 +156,7 @@ async fn ausgeblendetes_modul_admin_erreicht_es_sieht_es_aber_nicht() {
         json!({ "sichtbar": false, "zugriff": true })
     );
     assert_eq!(
-        liste_status(&app, &admin, einsatz, "meldungen").await,
+        liste_status(&app, &admin, einsatz, "reports").await,
         StatusCode::OK
     );
 }
@@ -305,9 +305,10 @@ async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
     .unwrap();
     let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
 
-    for (modul, rolle) in [
-        ("schaeden", "fuehrungskraft"),
-        ("auftraege", "einsatzfuehrung"),
+    // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
+    for (modul, pfad, rolle) in [
+        ("schaeden", "schaeden", "fuehrungskraft"),
+        ("auftraege", "tasks", "einsatzfuehrung"),
     ] {
         modul_override(
             &app,
@@ -323,7 +324,7 @@ async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
             "{modul} auf {rolle}"
         );
         assert_eq!(
-            liste_status(&app, &fremd, einsatz, modul).await,
+            liste_status(&app, &fremd, einsatz, pfad).await,
             StatusCode::FORBIDDEN,
             "{modul} auf {rolle}"
         );
@@ -367,7 +368,7 @@ async fn org_ausblendung_wirkt_auf_laufenden_einsatz_ohne_eigenen_wert() {
         json!({ "sichtbar": false, "zugriff": false })
     );
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "meldungen").await,
+        liste_status(&app, &erika, einsatz, "reports").await,
         StatusCode::FORBIDDEN
     );
     // Die Zähler folgen derselben Auswertung: das Feld fehlt statt 0.
@@ -414,7 +415,7 @@ async fn einsatz_ueberstimmt_die_org_ausblendung() {
         json!({ "sichtbar": true, "zugriff": true })
     );
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "meldungen").await,
+        liste_status(&app, &erika, einsatz, "reports").await,
         StatusCode::OK
     );
 

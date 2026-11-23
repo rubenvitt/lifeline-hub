@@ -271,7 +271,7 @@ async fn kennzahlen_gleichen_der_auszaehlung_der_liste() {
         } else {
             format!("?richtung={richtung}")
         };
-        let (s, k) = get(&app, &admin, &format!("{basis}/kennzahlen{q}")).await;
+        let (s, k) = get(&app, &admin, &format!("{basis}/metrics{q}")).await;
         assert_eq!(s, StatusCode::OK, "{k}");
         let (_, liste) = get(&app, &admin, &format!("{basis}{q}")).await;
         assert_eq!(k, auszaehlen(&liste), "Richtung „{richtung}“");

@@ -430,10 +430,10 @@ async fn mitarbeit_bestaetigt_weist_zu_und_erteilt_keinen_auftrag() {
     let mid = m["id"].as_i64().unwrap();
 
     for (pfad, body) in [
-        ("bestaetigen", "{}".to_string()),
-        ("zuweisen", format!(r#"{{"bearbeiter_id":{id}}}"#)),
+        ("confirm", "{}".to_string()),
+        ("assign", format!(r#"{{"bearbeiter_id":{id}}}"#)),
         ("status", r#"{"status":"gesichtet"}"#.to_string()),
-        ("auftrag", "{}".to_string()),
+        ("task", "{}".to_string()),
     ] {
         let (s, v) = anfrage(
             &app,

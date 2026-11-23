@@ -635,14 +635,14 @@ async fn chat_zaehlt_je_benutzer() {
     post(
         &app,
         &karla,
-        &format!("{basis}/{kid}/nachrichten"),
+        &format!("{basis}/{kid}/messages"),
         r#"{"inhalt":"Eins"}"#,
     )
     .await;
     post(
         &app,
         &karla,
-        &format!("{basis}/{kid}/nachrichten"),
+        &format!("{basis}/{kid}/messages"),
         r#"{"inhalt":"Zwei"}"#,
     )
     .await;
@@ -657,14 +657,7 @@ async fn chat_zaehlt_je_benutzer() {
         Some(2)
     );
 
-    let (status, v) = anfrage(
-        &app,
-        "POST",
-        &format!("{basis}/{kid}/gelesen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (status, v) = anfrage(&app, "POST", &format!("{basis}/{kid}/read"), &admin, None).await;
     assert!(status.is_success(), "gelesen: {status} {v:?}");
     assert_eq!(
         zaehler(&app, &admin, einsatz).await["chat"]["ungelesen"].as_i64(),

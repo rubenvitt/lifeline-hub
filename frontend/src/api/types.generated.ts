@@ -1079,7 +1079,7 @@ export interface components {
             bearbeitungsstatus: components["schemas"]["AuftragBearbeitungsstatus"];
             /**
              * @description Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
-             *     nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).
+             *     nur dann nimmt `PATCH …/tasks/{aid}` eine Berichtigung an (LLH-1098).
              */
             berichtigbar: boolean;
             /** Format: int64 */
@@ -1172,7 +1172,7 @@ export interface components {
             snap_anzeige: string;
         };
         /**
-         * @description Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und
+         * @description Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und
          *     „Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
          */
         AuftragKennzahlen: {
@@ -3698,7 +3698,7 @@ export interface components {
             an?: string | null;
             /**
              * @description Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach
-             *     `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`.
+             *     `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/attachments/{aid}`.
              */
             anhaenge: components["schemas"]["AnhangAnzeige"][];
             /**
@@ -6089,7 +6089,7 @@ export interface components {
             status: components["schemas"]["MeldungStatus"];
         };
         /**
-         * @description Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie
+         * @description Kennzahlen der Meldungsseite (LFH-940, `GET …/reports/metrics`): dieselben Mengen wie
          *     das Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
          */
         MeldungKennzahlen: {
@@ -7811,7 +7811,7 @@ export interface components {
          */
         RichtwertHerkunft: "basis" | "org" | "einsatz";
         /**
-         * @description Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+         * @description Antwort von `GET …/reports/check-ins` (LFH-610). Einheiten ohne Eintrag haben
          *     noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
          *     gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
          */

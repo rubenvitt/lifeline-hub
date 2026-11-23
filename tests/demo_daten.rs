@@ -345,12 +345,12 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
         ("/bereitstellungsraeume", 1),
         ("/zonen", 2),
         ("/gefahrengebiete", 2),
-        ("/meldungen", 8),
-        ("/auftraege", 5),
-        ("/befehle", 1),
-        ("/lageberichte", 1),
+        ("/reports", 8),
+        ("/tasks", 5),
+        ("/orders", 1),
+        ("/situation-reports", 1),
         // Ohne Parameter nur offene (LFH-940); das Drehbuch zählt alle.
-        ("/erinnerungen?nur_offen=false", 3),
+        ("/reminders?nur_offen=false", 3),
     ] {
         assert_eq!(liste(&app, &admin, e, pfad).await.len(), n, "{pfad}");
     }
@@ -408,11 +408,11 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 
     // Befehl und Lagebericht freigegeben.
     assert_eq!(
-        liste(&app, &admin, e, "/befehle").await[0]["status"],
+        liste(&app, &admin, e, "/orders").await[0]["status"],
         "freigegeben"
     );
     assert_eq!(
-        liste(&app, &admin, e, "/lageberichte").await[0]["status"],
+        liste(&app, &admin, e, "/situation-reports").await[0]["status"],
         "freigegeben"
     );
 }

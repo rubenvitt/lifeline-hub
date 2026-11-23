@@ -271,7 +271,7 @@ async fn richtung_und_empfaenger_wirken_in_jeder_phase_und_in_den_kennzahlen() {
         "?richtung=intern",
         "?abschnitt_id=1",
     ] {
-        let (s, k) = get(&app, &admin, &format!("{basis}/kennzahlen{filter}")).await;
+        let (s, k) = get(&app, &admin, &format!("{basis}/metrics{filter}")).await;
         assert_eq!(s, StatusCode::OK, "{k}");
         let (_, liste) = get(&app, &admin, &format!("{basis}{filter}")).await;
         let liste = liste.as_array().unwrap();

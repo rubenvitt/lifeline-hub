@@ -856,8 +856,8 @@ async fn heraufstufen_ohne_freigabe_ist_403_vor_404() {
     nur_fuer_admins(&app, &admin, einsatz, "auftraege").await;
 
     for (pfad, body) in [
-        ("heraufstufen-etb", r#"{"typ":"meldung"}"#),
-        ("heraufstufen-auftrag", AUFTRAG_BODY),
+        ("promote-to-etb", r#"{"typ":"meldung"}"#),
+        ("promote-to-task", AUFTRAG_BODY),
     ] {
         let (s, _) = anfrage(
             &app,

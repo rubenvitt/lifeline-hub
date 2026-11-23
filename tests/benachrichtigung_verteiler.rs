@@ -1,7 +1,7 @@
 //! Benachrichtigungen zu Befehl und Lagebericht im Verteiler (LLH-1213, Change
 //! `kcjecn9e-benachrichtigungskonzept`, Spec `benachrichtigungen`, „Befehl oder Lagebericht im
 //! Verteiler“, „Der Server bestimmt die Empfänger“ und „Eigene Aktionen …“): Die Freigabe über
-//! `POST …/{befehle|lageberichte}/{id}/freigeben` meldet `befehl` bzw. `lagebericht` an die
+//! `POST …/{orders|situation-reports}/{id}/release` meldet `befehl` bzw. `lagebericht` an die
 //! Nutzer der Funktionen im Verteiler. Jeder Fall prüft auch, wer nichts bekommt.
 
 use axum::http::StatusCode;

@@ -33,7 +33,7 @@ async fn datei_laden(
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -129,7 +129,7 @@ async fn download_revalidiert_mit_304() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, &admin)
                 .header(header::IF_NONE_MATCH, &etag)
                 .body(Body::empty())
