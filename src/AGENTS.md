@@ -491,7 +491,10 @@ Herleitung in
   meldet sich; die erreichte Seite baut nie eine Verbindung auf.
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
   kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
-  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv. Einzige Ausnahme ist der Sprung
+  4 → 6 mit den englischen Wegen (LLH-2053, harter Schnitt in der Alpha, ADR-0085): Zwischen 4
+  und 6 geht auch Melden nicht; ein unsigniertes 404 beim Melden oder Einlösen heißt „anderer
+  Softwarestand“ (`melden::deute_unsigniert`, `routes::instanz`). Ab 1.0.0 bleibt ein umbenannter Weg als Alias erreichbar.
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
   haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
   gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein

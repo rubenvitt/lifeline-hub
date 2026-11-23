@@ -162,6 +162,9 @@ fall "Teilübersetzung tauscht eine Zeile, nur alte deutsche Segmente bleiben" g
 fall "Tausch gegen ein neues deutsches Segment" rot \
   "route_dazu '/api/einsaetze/{id}/fuehrung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/fuehrung' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '/fuehrung\"' src/app.rs > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/leitung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/leitung' > scripts/api-routen-bestand.txt" \
   "/api/einsaetze/{id}/leitung" "leitung"
+fall "neue Route aus alten deutschen Wörtern, während eine andere wegfällt" rot \
+  "route_dazu '/api/einsaetze/{id}/fuehrung' && route_dazu '/api/einsaetze/{id}/stab' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/fuehrung' '/api/einsaetze/{id}/stab' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '/fuehrung\"' src/app.rs | grep -v '/stab\"' > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/me' && route_dazu '/api/stab/{id}/fuehrung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/me' '/api/stab/{id}/fuehrung' > scripts/api-routen-bestand.txt" \
+  "/api/stab/{id}/fuehrung"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

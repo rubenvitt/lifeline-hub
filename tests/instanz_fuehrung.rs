@@ -737,7 +737,7 @@ async fn abschluss_der_unterschrift_ohne_admin_rolle_ist_403() {
         .unwrap();
     let (s, v) = post(
         &hub,
-        &format!("{pfad}/abschluss"),
+        &format!("{pfad}/finish"),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;

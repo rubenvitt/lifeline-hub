@@ -263,6 +263,19 @@ pub fn normalize_adresse(eingabe: &str) -> Result<String, AppError> {
 pub const ANDERER_STAND: &str = "Die andere Instanz kennt diesen Weg nicht, vermutlich hat sie \
      einen anderen Softwarestand. Beide Instanzen auf denselben Stand bringen.";
 
+/// Deutet eine Antwort ohne Signatur auf `pfad`. Melden kennt jeder Stand, ein 404 dort heißt
+/// also: anderer Weg, anderer Stand ([`ANDERER_STAND`]); auf anderen Wegen kann ein 404 auch
+/// „nicht gefunden“ heißen und bleibt, wie es ist.
+fn deute_unsigniert(pfad: &str, status: u16, text: String) -> SendError {
+    if (200..300).contains(&status) {
+        SendError::AntwortUngueltig("ohne Signatur".into())
+    } else if status == 404 && pfad == MELDEN_PFAD {
+        SendError::Abgelehnt(status, ANDERER_STAND.into())
+    } else {
+        SendError::Abgelehnt(status, text)
+    }
+}
+
 /// Warum eine Nachricht an das Gegenüber scheiterte.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError {
@@ -559,14 +572,7 @@ async fn send_signed_mit<A: Serialize, T: DeserializeOwned>(
             .ok()
             .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_string))
             .unwrap_or_default();
-        return Err(if (200..300).contains(&status) {
-            SendError::AntwortUngueltig("ohne Signatur".into())
-        } else if status == 404 && pfad == MELDEN_PFAD {
-            // Melden kennt jeder Stand, ein 404 heißt also: anderer Weg, anderer Stand.
-            SendError::Abgelehnt(status, ANDERER_STAND.into())
-        } else {
-            SendError::Abgelehnt(status, text)
-        });
+        return Err(deute_unsigniert(pfad, status, text));
     };
     let jetzt = Utc::now().timestamp();
     let claims = signatur::verify_antwort(
@@ -1762,6 +1768,29 @@ pub fn rolle_mitarbeit_fuer_tests(an: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Nur ein 404 auf Melden heißt „anderer Softwarestand“ (LLH-2053); auf einem anderen Weg
+    /// bleibt es „nicht gefunden“, ein 2xx ohne Signatur bleibt ungültig.
+    #[test]
+    fn unsigniertes_404_heisst_nur_beim_melden_anderer_stand() {
+        let nicht_gefunden = || "Nicht gefunden".to_string();
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 404, nicht_gefunden()),
+            SendError::Abgelehnt(404, ANDERER_STAND.into())
+        );
+        assert_eq!(
+            deute_unsigniert(crate::instanz::extractor::SPIEGEL_PFAD, 404, nicht_gefunden()),
+            SendError::Abgelehnt(404, nicht_gefunden())
+        );
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 500, nicht_gefunden()),
+            SendError::Abgelehnt(500, nicht_gefunden())
+        );
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 200, String::new()),
+            SendError::AntwortUngueltig("ohne Signatur".into())
+        );
+    }
 
     fn anfrage(orgs: &[&str], widerrufen: &[&str]) -> MeldenAnfrage {
         MeldenAnfrage {

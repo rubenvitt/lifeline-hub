@@ -17,13 +17,14 @@
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
 #   - ein Bestand mit mehr Zeilen als an der Merge-Base mit der Basis (Vorgabe `origin/alpha`),
-#     oder ein neuer Bestandseintrag mit einem deutschen Segment, das an der Merge-Base in keiner
-#     Bestandszeile stand: der Bestand wächst nicht. Ein Paket unter `/api/einsaetze/{id}/` tauscht
-#     so `…/fuehrung` gegen `…/command`, solange nur `einsaetze` deutsch bleibt (LLH-2053). Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
-#     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
-#     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
-#     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
-#     nicht, entfällt er;
+#     oder ein neuer Bestandseintrag, der keine Teilübersetzung einer gestrichenen Zeile ist
+#     (gleich viele Segmente, weniger deutsche, jedes an derselben Stelle wie dort): der Bestand
+#     wächst nicht. Ein Paket unter `/api/einsaetze/{id}/` tauscht so `…/fuehrung` gegen
+#     `…/command`, solange nur `einsaetze` deutsch bleibt (LLH-2053). Merge-Base statt Spitze,
+#     damit ein Paket, das auf der Basis schon Zeilen gestrichen hat, einen älteren Branch nicht
+#     rot macht. Ohne den Ref (flacher Checkout, so im Bündel `schnell` der CI) laut
+#     übersprungen; durchgesetzt wird der Vergleich im Workflow `migrationen.yml`, der die Basis
+#     holt. Trägt die Merge-Base die Datei noch nicht, entfällt er;
 #   - ein Glossar, das nicht nach `segment` sortiert ist, ein Segment oder einen deutschen
 #     Begriff doppelt führt (`-` darf mehrfach stehen) oder ein Segment außerhalb von
 #     `[a-z0-9]+([.-][a-z0-9]+)*` hat. Leerzeilen und Zeilen mit `#` sind Kommentar.
@@ -160,21 +161,42 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
       melde "Bestand wächst gegenüber $BASIS (Merge-Base): $alt_anzahl → $neu_anzahl Zeilen; er darf" \
         "nur schrumpfen (ADR-0085). Die neuen Routen englisch benennen."
     fi
-    # Eine neue Zeile ist nur die Teilübersetzung einer alten (etwa `…/{id}/fuehrung` →
-    # `…/{id}/command`, das Präfix `einsaetze` kommt zuletzt): Jedes deutsche Segment darin stand
-    # schon an der Merge-Base im Bestand.
+    # Eine neue Zeile ist nur die Teilübersetzung einer gestrichenen (etwa `…/{id}/fuehrung` →
+    # `…/{id}/command`, das Präfix `einsaetze` kommt zuletzt): gleich viele Segmente, jedes
+    # deutsche Segment steht an derselben Stelle der gestrichenen Zeile, und es sind weniger.
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF') <(printf '%s\n' "$bestand" | awk 'NF'))"
     if [ -n "$neu_zeilen" ]; then
-      neue_segmente="$(printf '%s\n' "$unbekannt" | awk -F'\t' '
-        FILENAME == "/dev/fd/3" { n = split($0, s, "/"); for (i = 1; i <= n; i++) alt[s[i]] = 1; next }
-        FILENAME == "/dev/fd/4" { neu[$0] = 1; next }
-        ($1 in neu) && !($2 in alt) { print $1 "\t" $2 }
-      ' /dev/fd/3 /dev/fd/4 - 3< <(printf '%s\n' "$alt") 4< <(printf '%s\n' "$neu_zeilen"))"
-      if [ -n "$neue_segmente" ]; then
-        while IFS="$(printf '\t')" read -r pfad seg; do
-          melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base) mit dem deutschen Segment" \
-            "'$seg'; der Bestand darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
-        done <<< "$neue_segmente"
+      weg_zeilen="$(comm -23 <(printf '%s\n' "$alt" | awk 'NF') <(printf '%s\n' "$bestand" | awk 'NF'))"
+      ohne_vorlage="$(printf '%s\n' "$neu_zeilen" | awk -F'\t' -v glossar="$GLOSSAR" '
+        function deutsch(s) { return s != "" && s !~ /^\{.*\}$/ && !(s in bekannt) }
+        BEGIN {
+          while ((getline zeile < glossar) > 0) {
+            if (zeile ~ /^[[:space:]]*(#|$)/) continue
+            split(zeile, f, "\t")
+            bekannt[f[1]] = 1
+          }
+        }
+        FILENAME == "/dev/fd/3" { if (NF) weg[++w] = $0; next }
+        NF {
+          n = split($0, neu, "/")
+          ok = 0
+          for (j = 1; j <= w && !ok; j++) {
+            if (split(weg[j], alt, "/") != n) continue
+            passt = 1; zahl_neu = 0; zahl_alt = 0
+            for (i = 1; i <= n; i++) {
+              if (deutsch(alt[i])) zahl_alt++
+              if (deutsch(neu[i])) { zahl_neu++; if (neu[i] != alt[i]) passt = 0 }
+            }
+            if (passt && zahl_neu < zahl_alt) ok = 1
+          }
+          if (!ok) print $0
+        }
+      ' /dev/fd/3 - 3< <(printf '%s\n' "$weg_zeilen"))"
+      if [ -n "$ohne_vorlage" ]; then
+        while IFS= read -r pfad; do
+          melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base) und keine Teilübersetzung einer" \
+            "gestrichenen Zeile; der Bestand darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+        done <<< "$ohne_vorlage"
       fi
     fi
   fi
