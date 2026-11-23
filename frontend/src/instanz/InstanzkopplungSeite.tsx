@@ -305,7 +305,7 @@ export default function InstanzkopplungSeite() {
               rowKey={(k) => k.id}
               emptyText="Noch keine Kopplung"
               renderItem={(k) => {
-                const hinweise = kopplungHinweise(k, u.datentraeger_bestaetigt);
+                const hinweise = kopplungHinweise(k, u.datentraeger_bestaetigt, zeit);
                 const stammdaten = stammdatenZeile(k);
                 const aktiv = k.org.widerrufen_at == null;
                 // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, solange die
