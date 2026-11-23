@@ -4048,8 +4048,12 @@
             "description": "Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt."
           },
           "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026)."
           },
           "erstellt_at": {
             "type": "string"
@@ -4079,7 +4083,7 @@
       },
       "BenachrichtigungArt": {
         "type": "string",
-        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)\nspiegelt `ALLE`.",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)\nspiegelt `ALLE`.",
         "enum": [
           "sofortmeldung",
           "sofortmeldung_eskaliert",
@@ -4109,7 +4113,10 @@
           "unwetter",
           "fuehrung_ungueltig",
           "fuehrung_uebernommen",
-          "fuehrung_angefragt"
+          "fuehrung_angefragt",
+          "adapter_eingriff",
+          "adapter_gestoert",
+          "adapter_wieder_ok"
         ]
       },
       "BenachrichtigungBezugTyp": {
@@ -4144,7 +4151,8 @@
           "person",
           "einheit",
           "fahrzeug",
-          "chat_nachricht"
+          "chat_nachricht",
+          "adapter"
         ]
       },
       "BenachrichtigungEreignis": {
@@ -4175,8 +4183,12 @@
             "$ref": "#/components/schemas/BenachrichtigungBezugTyp"
           },
           "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit\nClient und Service Worker denselben Tag bilden."
           },
           "gelesen_bis": {
             "type": [

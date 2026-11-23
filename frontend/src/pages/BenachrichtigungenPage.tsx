@@ -3,7 +3,11 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import AdminPage from '../components/AdminPage';
 import { Paneel, PaneelZeile, PaneelZustand, Stapel, Textstufe } from '../components/instrument';
 import { spieleAlarmTon } from '../alarm/alarmTon';
-import { ALLE_ARTEN, BENACHRICHTIGUNG_ARTEN } from '../alarm/benachrichtigungKatalog';
+import {
+  ALLE_ARTEN,
+  BENACHRICHTIGUNG_ARTEN,
+  istAdapterArt,
+} from '../alarm/benachrichtigungKatalog';
 import {
   desktopPermission,
   fordereDesktopPermission,
@@ -275,6 +279,9 @@ function Testbenachrichtigung({ zeile }: { zeile: CSSProperties }) {
 export default function BenachrichtigungenPage() {
   const { token } = theme.useToken();
   const e = useBenachrichtigungsEinstellungen();
+  // Die Störungen einer Anbindung erreichen nur System-Admins (LLH-2026): nur sie schalten sie.
+  const istAdmin = useAuthOptional()?.benutzer?.system_rolle === 'admin';
+  const hinweisArten = HINWEIS_ARTEN.filter((a) => istAdmin || !istAdapterArt(a));
   const zeile: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -304,7 +311,7 @@ export default function BenachrichtigungenPage() {
             leerText=""
             onNeuladen={e.neuLaden}
           >
-            {HINWEIS_ARTEN.map((art) => {
+            {hinweisArten.map((art) => {
               const name = BENACHRICHTIGUNG_ARTEN[art].name;
               const feldId = `benachrichtigung-${art}`;
               const fehler = e.fehlgeschlagen === art;
