@@ -27,6 +27,7 @@ import {
   Stapel,
   Textstufe,
   useRollen,
+  Kennung,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
 import type { WeitereAktionen } from '../../components/Datensicht';
@@ -642,7 +643,7 @@ export default function FahrzeugeBesatzung({
   /** Name eines Fahrzeugs: gelöst ohne Link und ohne Kontextmenü, in derselben Breite. */
   const renderFahrzeugName = (eintrag: FahrzeugEintrag, geloest: boolean) =>
     geloest ? (
-      <span style={monoStil('mono')}>{eintrag.funkrufname}</span>
+      <Kennung>{eintrag.funkrufname}</Kennung>
     ) : (
       // Eine Zeile mit Reglern trägt das Kontextmenü nur an ihrer Bezeichnung (Spec
       // `datensatz-aktionsmenue`).

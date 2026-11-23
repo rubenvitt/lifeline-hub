@@ -320,7 +320,10 @@ export default function BetroffeneZeile({
           <dl id={kuerzelId} data-lfh="kuerzel" aria-label="Kürzel" style={legendeStil}>
             {LEGENDE.map((z) => (
               <div key={z.zeichen} style={{ display: 'contents' }}>
-                <dt style={{ ...monoStil('mono'), color: rollen.bedien }}>{z.zeichen}</dt>{' '}
+                {/* Was man tippt, ist Eingabesyntax wie eine Kennung (ADR-0094): Mono bleibt. */}
+                <dt data-schrift="kennung" style={{ ...monoStil('mono'), color: rollen.bedien }}>
+                  {z.zeichen}
+                </dt>{' '}
                 <dd style={{ margin: 0, marginBlockEnd: istSchmal ? token.marginXS : 0 }}>
                   {z.bedeutung}
                 </dd>

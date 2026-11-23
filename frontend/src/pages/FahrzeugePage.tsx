@@ -34,7 +34,14 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { FELD_KLASSE, monoStil, Segmentleiste, Stapel, Knopfreihe } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  monoStil,
+  Segmentleiste,
+  Stapel,
+  Knopfreihe,
+  Kennung,
+} from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   FAHRZEUGE_ANSICHT_ERLAUBT,
@@ -1051,7 +1058,7 @@ function FahrzeugeInhalt() {
           kennung={
             <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {/* Funkrufname in Mono. */}
-              <span style={monoStil('mono')}>{ef.funkrufname}</span>
+              <Kennung>{ef.funkrufname}</Kennung>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>

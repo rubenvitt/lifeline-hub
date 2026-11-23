@@ -2,7 +2,7 @@ import { Button } from 'antd';
 import { Fragment, useId, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AusgabeEingabe, VerpflegungEmpfaenger, VerpflegungZeitfenster } from '../api/types';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, monoStil, useRollen, Kennung } from '../components/instrument';
 import {
   betreuungsstellenVon,
   staerkeAnzeige,
@@ -122,7 +122,7 @@ export default function EmpfaengerStand({
           <Teile
             teile={[
               z.name,
-              z.funkrufname && <span style={monoStil('mono')}>{z.funkrufname}</span>,
+              z.funkrufname && <Kennung>{z.funkrufname}</Kennung>,
               staerkeAnzeige(z.einheit) && (
                 <span style={monoStil('mono')}>{staerkeAnzeige(z.einheit)}</span>
               ),
@@ -180,7 +180,7 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     z.name,
-                    z.funkrufname && <span style={monoStil('mono')}>{z.funkrufname}</span>,
+                    z.funkrufname && <Kennung>{z.funkrufname}</Kennung>,
                     z.ausgaben.length > 0 && (
                       <span key="m" style={monoStil('mono', 500)}>
                         {ausgabenText(z.ausgaben, uhr)}

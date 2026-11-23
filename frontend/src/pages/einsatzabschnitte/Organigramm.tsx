@@ -138,7 +138,9 @@ function OrganigrammKopf({
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
         {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
         {fuehrungsstelle?.rufname && (
-          <div style={monoStil(token.fontSize)}>{fuehrungsstelle.rufname}</div>
+          <div data-schrift="kennung" style={monoStil(token.fontSize)}>
+            {fuehrungsstelle.rufname}
+          </div>
         )}
         {/* Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke: keine
             erfundene Leitung aus App-Rolle oder Stab. */}

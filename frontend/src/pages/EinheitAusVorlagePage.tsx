@@ -29,6 +29,7 @@ import {
   monoStil,
   useRollen,
   zielEinzug,
+  Kennung,
 } from '../components/instrument';
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -486,7 +487,7 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span style={monoStil('monoGross')}>{f.funkrufname}</span>
+                      <Kennung stufe="monoGross">{f.funkrufname}</Kennung>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}

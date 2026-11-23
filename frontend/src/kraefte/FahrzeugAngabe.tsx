@@ -2,7 +2,7 @@ import { Space, theme } from 'antd';
 import type { Einheit, EinsatzFahrzeug } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
-import { monoStil } from '../components/instrument';
+import { Kennung } from '../components/instrument';
 import { buildFahrzeugOptions, isFremdesFahrzeug } from './einteilungKern';
 import { Marke } from '../components/instrument/Marke';
 
@@ -49,7 +49,12 @@ export default function FahrzeugAngabe({
       wert={wert}
       anzeige={
         <Space size={token.marginXS} wrap>
-          <span style={monoStil('mono')}>{aktuell?.funkrufname ?? 'nicht geladen'}</span>
+          {/* Der Funkrufname ist eine Kennung (Mono, ADR-0094); fehlt er, steht das Wort in Text. */}
+          {aktuell?.funkrufname ? (
+            <Kennung>{aktuell.funkrufname}</Kennung>
+          ) : (
+            <span>nicht geladen</span>
+          )}
           {fremd && <Marke>andere Einheit</Marke>}
         </Space>
       }

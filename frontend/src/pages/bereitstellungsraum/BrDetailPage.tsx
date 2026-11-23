@@ -57,6 +57,7 @@ import {
   sammelbannerKurz,
   Stapel,
   useRollen,
+  Kennung,
 } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
@@ -722,7 +723,7 @@ export default function BrDetailPage() {
   );
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
-      <span style={monoStil('mono')}>{f.funkrufname}</span>
+      <Kennung>{f.funkrufname}</Kennung>
       {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Marke>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Marke>}
     </>
   );
