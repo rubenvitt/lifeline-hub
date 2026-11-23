@@ -1,11 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { monoStil, useRollen } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Aufgliederung und Balken — die zwei Mengenbilder des Neuentwurfs.
  *
  * **Aufgliederung** (S1 „Kennzahl-Kachel", S2): ein gestapelter Balken, Segmente per
- * `flex` nach ihrem Wert, 2-px-Fugen, darunter eine Mono-Legende. „Zahl führt,
+ * `flex` nach ihrem Wert, 2-px-Fugen, darunter eine Legende. „Zahl führt,
  * Aufgliederung folgt" — der Balken ersetzt nie die Zahl.
  *
  * **Balken** (S4 Tagesbilanz): Anteil einer Menge. Spur
@@ -97,7 +97,7 @@ export function Aufgliederung({ segmente, titel, hoehe = 5, legende, style }: Au
         <div
           aria-hidden="true"
           data-lfh="aufgliederung-legende"
-          style={{ ...monoStil('meta'), color: rollen.gedaempft }}
+          style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
         >
           {legendenInhalt}
         </div>
@@ -149,7 +149,7 @@ export function Balken({
         <span style={{ width: breite, background: farbe }} />
       </div>
       {label != null && (
-        <span aria-hidden="true" style={{ ...monoStil('meta'), color: rollen.schwach }}>
+        <span aria-hidden="true" style={{ ...monoStil('monoFein'), color: rollen.schwach }}>
           {label}
         </span>
       )}

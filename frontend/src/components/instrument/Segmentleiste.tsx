@@ -459,7 +459,7 @@ export function SegmentUmschalter({
             />
           )}
           {label}
-          {zahl != null && <span style={monoStil('meta')}>{zahl}</span>}
+          {zahl != null && <span style={monoStil('monoFein')}>{zahl}</span>}
         </button>
       </span>
     </div>

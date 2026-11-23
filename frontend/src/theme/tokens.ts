@@ -825,6 +825,8 @@ interface Schriftstufe {
   sperrung?: string;
   /** Versalien (`text-transform: uppercase`). */
   versal?: boolean;
+  /** Gleich breite Ziffern auch in der Textschrift (`tabular-nums`, LLH-2046). Mono hat sie immer. */
+  ziffern?: 'tabellarisch';
 }
 
 /**
@@ -852,9 +854,11 @@ export const schriftskala = {
   augenbraue: { groesse: 11, gewicht: 600, familie: 'text', sperrung: '0.08em', versal: true },
   /** Etikett unter dem Rail-Icon: 11 px Versalien, Sperrung .04em (LLH-2044, Rail 64 px). */
   railEtikett: { groesse: 11, gewicht: 500, familie: 'text', sperrung: '0.04em', versal: true },
-  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text; auch Unterzeilen wie „Stand“ (die
-   *  10-px-Stufe darunter entfiel mit dem Boden, LLH-2044). */
-  meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
+  /** Meta: Unterzeilen, Zeitpunkte, Zähler neben Text, in der Textschrift mit gleich breiten
+   *  Ziffern (LLH-2046; vorher Mono). Eine reine Zahl, Zeit oder Kennung nimmt `monoFein`. */
+  meta: { groesse: 11, gewicht: 400, familie: 'text', ziffern: 'tabellarisch' },
+  /** Mono in Meta-Größe: Zahl, Zeit, Kennung neben `meta` (LLH-2046). */
+  monoFein: { groesse: 11, gewicht: 400, familie: 'zahl' },
   /** Mono neben `textKlein`: Zähler und Zeiten in dichten Zeilen (LLH-1972). */
   monoKlein: { groesse: 12, gewicht: 400, familie: 'zahl' },
   /** Mono neben `text`: Funkrufname, PAT, „seit …“. JetBrains Mono 13 steht optisch wie
