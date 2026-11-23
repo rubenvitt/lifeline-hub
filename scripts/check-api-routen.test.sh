@@ -151,6 +151,17 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+fall "Bestand wächst mit schon bekannten deutschen Segmenten" rot \
+  "route_dazu '/api/einsaetze/{id}/me' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/me' > scripts/api-routen-bestand.txt" \
+  "wächst"
+# Pakete unter /api/einsaetze/{id}/ übersetzen erst die Segmente nach {id}, das Präfix zuletzt
+# (LLH-2053): Die Zeile wechselt, deutsch bleibt nur ein Segment, das schon im Bestand stand.
+fall "Teilübersetzung tauscht eine Zeile, nur alte deutsche Segmente bleiben" gruen \
+  "route_dazu '/api/einsaetze/{id}/fuehrung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/fuehrung' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '/fuehrung\"' src/app.rs > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/me' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/me' > scripts/api-routen-bestand.txt" \
+  "OK"
+fall "Tausch gegen ein neues deutsches Segment" rot \
+  "route_dazu '/api/einsaetze/{id}/fuehrung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/fuehrung' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '/fuehrung\"' src/app.rs > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/leitung' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/leitung' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/leitung" "leitung"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

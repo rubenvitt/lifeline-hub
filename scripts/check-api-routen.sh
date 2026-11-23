@@ -16,8 +16,10 @@
 #     `scripts/api-routen-bestand.txt` steht;
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
-#   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
-#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
+#   - ein Bestand mit mehr Zeilen als an der Merge-Base mit der Basis (Vorgabe `origin/alpha`),
+#     oder ein neuer Bestandseintrag mit einem deutschen Segment, das an der Merge-Base in keiner
+#     Bestandszeile stand: der Bestand wächst nicht. Ein Paket unter `/api/einsaetze/{id}/` tauscht
+#     so `…/fuehrung` gegen `…/command`, solange nur `einsaetze` deutsch bleibt (LLH-2053). Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
@@ -151,12 +153,29 @@ fi
 if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
-    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
+    alt="$(printf '%s\n' "$alt" | awk 'NF' | sort -u)"
+    alt_anzahl="$(printf '%s\n' "$alt" | awk 'NF' | wc -l | tr -d ' ')"
+    neu_anzahl="$(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ')"
+    if [ "$neu_anzahl" -gt "$alt_anzahl" ]; then
+      melde "Bestand wächst gegenüber $BASIS (Merge-Base): $alt_anzahl → $neu_anzahl Zeilen; er darf" \
+        "nur schrumpfen (ADR-0085). Die neuen Routen englisch benennen."
+    fi
+    # Eine neue Zeile ist nur die Teilübersetzung einer alten (etwa `…/{id}/fuehrung` →
+    # `…/{id}/command`, das Präfix `einsaetze` kommt zuletzt): Jedes deutsche Segment darin stand
+    # schon an der Merge-Base im Bestand.
+    neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF') <(printf '%s\n' "$bestand" | awk 'NF'))"
     if [ -n "$neu_zeilen" ]; then
-      while IFS= read -r pfad; do
-        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0085). Die Route englisch benennen."
-      done <<< "$neu_zeilen"
+      neue_segmente="$(printf '%s\n' "$unbekannt" | awk -F'\t' '
+        FILENAME == "/dev/fd/3" { n = split($0, s, "/"); for (i = 1; i <= n; i++) alt[s[i]] = 1; next }
+        FILENAME == "/dev/fd/4" { neu[$0] = 1; next }
+        ($1 in neu) && !($2 in alt) { print $1 "\t" $2 }
+      ' /dev/fd/3 /dev/fd/4 - 3< <(printf '%s\n' "$alt") 4< <(printf '%s\n' "$neu_zeilen"))"
+      if [ -n "$neue_segmente" ]; then
+        while IFS="$(printf '\t')" read -r pfad seg; do
+          melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base) mit dem deutschen Segment" \
+            "'$seg'; der Bestand darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+        done <<< "$neue_segmente"
+      fi
     fi
   fi
 else
