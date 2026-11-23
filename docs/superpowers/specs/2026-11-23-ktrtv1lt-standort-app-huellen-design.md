@@ -106,19 +106,34 @@ Befehle. Die neue Kern-Entscheidung betrifft dort vor allem die laufende Beobach
 **Plist** (`ios/project.yml`):
 `NSLocationWhenInUseUsageDescription: "Lifeline zeigt deinen Standort auf der Lagekarte und
 übernimmt ihn auf Wunsch in Ortsfelder. Er bleibt auf dem Gerät, bis du ihn selbst speicherst."`
-Kein `Always`, kein `UIBackgroundModes location`. Das Privacy-Manifest bleibt unverändert, weil
-der Standort nicht gesammelt wird.
+Kein `Always`, kein `UIBackgroundModes location`, kein `NSLocationTemporaryUsageDescriptionDictionary`.
+
+**Genauigkeit (Entscheidung 23.11.2026):** Schaltet die Person „Genauer Standort“ aus, gilt das wie
+unter Android. Die App fragt nicht nach (kein `requestTemporaryFullAccuracyAuthorization`), und der
+Genauigkeitskreis auf der Lagekarte zeigt ehrlich, wie grob die Position ist.
+
+**Datenschutzangaben (Entscheidung 23.11.2026):** Der Standort gilt vorsichtig als erhoben, weil
+Ortsfeld und „Mein Standort“ ihn auf Knopfdruck an den Server schicken. `PrivacyInfo.xcprivacy`
+bekommt `NSPrivacyCollectedDataTypePreciseLocation` mit dem Zweck
+`NSPrivacyCollectedDataTypePurposeAppFunctionality`. `Linked` steht auf `true`, weil Meldung und
+Formular am angemeldeten Konto hängen (meine Wahl), `Tracking` auf `false`. Die Angaben in
+App Store Connect richten sich danach; sie gehören in die Prüfliste von `docs/betrieb/ios-app.md`.
 
 **Wire-Format** (Kopf von `huelle.js`, englisch und danach fest):
 
-- `location_current` `{ id, high_accuracy }` liefert genau eine Antwort. Erfüllt mit
+- `location_current` `{ id, high_accuracy, timeout }` liefert genau eine Antwort. Erfüllt mit
   `{ latitude, longitude, accuracy, altitude, altitude_accuracy, heading, speed, timestamp }`
   (Zahlen; `null`, wo das Gerät nichts weiß; `timestamp` in ms seit 1970). Abgelehnt mit
-  `denied` | `unavailable`.
-- `location_watch` `{ id, high_accuracy }` startet eine Beobachtung mit dem Schlüssel `id`. Es
+  `denied` | `unavailable` | `timeout`. `timeout` (ms oder `null`) zählt die **Hülle**, und zwar
+  erst ab erteilter Freigabe. Wie in der Web-API zählt die Zeit, in der der Systemdialog offen
+  steht, nicht mit (meine Wahl; sonst schaltet die Lagekarte nach 15 s ab, während die Person
+  den Dialog noch liest).
+- `location_watch` `{ id, high_accuracy, timeout }` startet eine Beobachtung mit dem Schlüssel `id`. Es
   gibt keine Antwort über `__LIFELINE_REPLY__`. Positionen und Fehler kommen fortlaufend über
   `window.__LIFELINE_LOCATION__(id, fehler, position)` (`fehler` `null` oder `denied` |
-  `unavailable`, `position` wie oben). Nach `denied` endet die Beobachtung in der Hülle.
+  `unavailable` | `timeout`, `position` wie oben). `timeout` gilt je Warten auf die nächste
+Position nach der Freigabe; die Beobachtung läuft danach weiter. Nach `denied` endet sie in der
+Hülle.
 - `location_clear` `{ watch }` beendet die Beobachtung `watch`, ohne Antwort.
 
 **Polyfill in `huelle.js`:** Er ersetzt `navigator.geolocation` per `Object.defineProperty` auf
@@ -128,14 +143,23 @@ Web-API:
 - Rückgabewerte haben die Form von `GeolocationPosition` und `GeolocationPositionError` (`code`
   1/2/3 samt Konstanten `PERMISSION_DENIED`, `POSITION_UNAVAILABLE`, `TIMEOUT`, dazu `message`).
   `denied` wird 1, `unavailable` wird 2.
-- `options.timeout` setzt der Polyfill selbst mit `setTimeout` um (Code 3). Eine Antwort, die
-  danach kommt, verwirft er.
+- `options.timeout` geht als `timeout` an die Hülle (`Infinity` oder fehlend als `null`). Die
+  Hülle meldet `timeout`, das wird Code 3. Der Polyfill stellt keine eigene Uhr.
 - `options.maximumAge`: Ist die letzte Position dieses Seitenlaufs jung genug, kommt sie sofort.
 - `options.enableHighAccuracy` wird zu `high_accuracy`.
 - `watchPosition` gibt eine eigene Zahl zurück, und `clearWatch` schickt `location_clear`.
   Unbekannte Kennungen tun nichts.
 - Ohne Message-Handler (Browser) bleibt `navigator.geolocation` unangetastet, wie heute schon
   für das ganze Skript.
+- **Fremde Origin im Hauptframe** (meine Wahl): Die Brücke verwirft deren Nachrichten weiter
+  stumm, und die Regel bleibt unverändert. Eine Abfrage dort kehrt nie zurück. Das schadet
+  niemandem, denn auf fremden Seiten läuft nicht die Oberfläche, und für die Seite heißt das
+  „kein Standort“.
+- **Unterframes** (meine Wahl): Mit dem Plist-Schlüssel hätte ein Unterframe sonst die
+  WebKit-eigene Ortung samt eigenem Dialog. Ein zweites, kleines `WKUserScript` mit
+  `forMainFrameOnly: false` ersetzt dort `navigator.geolocation` durch eine Attrappe, die immer
+  Code 1 meldet (`ios/App/Huelle/unterframe-standort.js`, Vitest wie `huelle.js`). Im Hauptframe
+  tut es nichts.
 
 **Kern (`ios/LifelineKern`):**
 
@@ -197,6 +221,8 @@ mit echtem Standort ist dort nicht nötig, siehe „Dem Bauenden überlassen“.
 - **ADR-0093** (Nummer vorläufig, der Wächter vergibt): „Die App-Hüllen geben den Standort nur
   der Seite des aktiven Servers und nur im Vordergrund“. Sie hält die Abwägung zwischen anbieten
   und sperren sowie zwischen Brücke und WebKit-eigen fest.
+- **Kein Knopf „Einstellungen öffnen“:** Der abgestimmte Hinweis ist nur Text, es kommt kein neuer
+  Befehl der Brücke dazu.
 - Anwenderdoku `lagekarte.md`: Prüfen, ob dort steht, wie man den Standort im Browser freigibt.
   Wenn ja, einen Satz für die App ergänzen.
 
