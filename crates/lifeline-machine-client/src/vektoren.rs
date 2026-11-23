@@ -75,7 +75,7 @@ fn berechne() -> Value {
     let post = anfrage(
         &cred,
         "POST",
-        "/api/v1/alarms?dry_run=1",
+        "/api/v1/alarm?dry_run=1",
         post_body,
         1_794_423_740,
         "EBESExQVFhcYGRobHB0eHw",
