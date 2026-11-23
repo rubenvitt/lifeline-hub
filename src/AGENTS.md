@@ -806,9 +806,17 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Dabei zählt nur, wer im Einsatz schreiben darf (`darf_schreiben`, LLH-2008): Mitarbeit,
   Beobachter und Nicht-Mitglieder (auch der Admin, LFH-1118) erreicht die Funktion nicht, ein
   solcher Einsatzleiter gilt als nicht da. Dieselbe Quelle liest die Anzeige
-  (`fuehrung::aufloesung`, Regeln in `frontend/src/fuehrung/AGENTS.md`), aber ohne diesen Filter:
-  bis LLH-2064 (Funktion für Rollen ohne Schreibrecht sperren) nennt sie auch Mitarbeit und
-  Beobachter. Eine zweite Zuordnung „Funktion → Person“ gibt es nicht.
+  (`fuehrung::aufloesung`, Regeln in `frontend/src/fuehrung/AGENTS.md`); eine zweite Zuordnung
+  „Funktion → Person“ gibt es nicht.
+- **Eine Funktion tragen nur Einsatzleitung und Führungspersonal** (LLH-2064, Entwurf
+  `docs/superpowers/specs/2026-11-22-u195f4et-funktion-nur-mit-schreibrecht-design.md`): CHECK
+  in `einsatz_mitgliedschaft` (Migration 0363), 422 in `mitglied_setzen`, Normalisieren beim
+  Übernehmen aus dem Spiegel (`spiegel::uebernehmen::strip_funktion`). Muss eine Funktion weichen
+  (Rollenwechsel, älteres Gegenüber), bleibt ihre Angabe als Freitext, nur über
+  `Funktionsangabe::as_freitext` (in einem geschwärzten Einsatz nur der Code weg). Anzeige und
+  Hinweise nennen dadurch für die Mitgliedschaft dieselben Personen; der Filter aus LLH-2008
+  bleibt als zweite Sicherung. Ein neuer Schreibweg der Funktion prüft die Rolle selbst, der
+  CHECK fängt den Rest mit 422.
 - **Kein Text in der Tabelle:** eine Zeile je Empfänger mit Art, Stufe und Bezug. Titel,
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
   (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein

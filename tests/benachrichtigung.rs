@@ -267,13 +267,18 @@ async fn el_erreicht_den_einsatzleiter_vor_der_mitgliedschaft() {
 }
 
 /// Mitarbeit und Beobachter können nicht handeln (kein Schreibrecht): eine Funktion erreicht sie
-/// nicht, auch wenn die Mitgliedschaft sie trägt (LLH-2008, `src/AGENTS.md`, „Erfassungs-Gate“).
+/// nicht (LLH-2008, `src/AGENTS.md`, „Erfassungs-Gate“). Seit LLH-2064 tragen sie keine mehr:
+/// wer mit S4 herabgestuft wird, behält „S4“ nur als Bezeichnung.
 #[tokio::test]
 async fn funktion_erreicht_mitarbeit_und_beobachter_nicht() {
     let w = welt().await;
     let carla = benutzer_anlegen(&w.app, &w.admin, "carla", "keine").await;
-    w.rolle_mit_funktion(w.anna, "mitarbeit", "s4").await;
-    w.rolle_mit_funktion(w.bert, "beobachter", "s4").await;
+    w.rolle_mit_funktion(w.anna, "fuehrungspersonal", "s4")
+        .await;
+    w.rolle_mit_funktion(w.bert, "fuehrungspersonal", "s4")
+        .await;
+    rolle_setzen(&w.app, &w.admin, w.einsatz, w.anna, "mitarbeit").await;
+    rolle_setzen(&w.app, &w.admin, w.einsatz, w.bert, "beobachter").await;
     w.rolle_mit_funktion(carla, "fuehrungspersonal", "s4").await;
     let an = w
         .melden(
