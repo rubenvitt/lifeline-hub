@@ -1,3 +1,4 @@
+import { anbindungenPfad } from '../admin/adminPfade';
 import type {
   BenachrichtigungArt,
   BenachrichtigungBezugTyp,
@@ -162,7 +163,32 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     org: false,
     einstellbar: true,
   },
+  // Störung einer Anbindung (LLH-2026): an die Admins der Org, ohne Einsatz.
+  adapter_eingriff: {
+    name: 'Anbindung braucht Eingriff',
+    stufe: 'hinweis',
+    org: true,
+    einstellbar: true,
+  },
+  adapter_gestoert: { name: 'Anbindung gestört', stufe: 'hinweis', org: true, einstellbar: true },
+  adapter_wieder_ok: {
+    name: 'Anbindung läuft wieder',
+    stufe: 'hinweis',
+    org: true,
+    einstellbar: true,
+  },
 };
+
+/** Die Störungen einer Anbindung (LLH-2026): nur für Admins, ohne Einsatz. */
+export const ADAPTER_ARTEN: readonly BenachrichtigungArt[] = [
+  'adapter_eingriff',
+  'adapter_gestoert',
+  'adapter_wieder_ok',
+];
+
+export function istAdapterArt(art: BenachrichtigungArt): boolean {
+  return ADAPTER_ARTEN.includes(art);
+}
 
 /** Alle Arten in Katalogreihenfolge. */
 export const ALLE_ARTEN = Object.keys(BENACHRICHTIGUNG_ARTEN) as BenachrichtigungArt[];
@@ -192,7 +218,8 @@ export type AlarmZiel =
   | 'fahrzeuge'
   | 'chat'
   | 'einsatz'
-  | 'einsaetze';
+  | 'einsaetze'
+  | 'anbindungen';
 
 /** Knopftext je Ziel, in der Reihenfolge des Sammeltoasts. */
 export const ZIEL_SPRUENGE: readonly { ziel: AlarmZiel; text: string }[] = [
@@ -213,10 +240,15 @@ export const ZIEL_SPRUENGE: readonly { ziel: AlarmZiel; text: string }[] = [
   { ziel: 'chat', text: 'Zum Chat' },
   { ziel: 'einsatz', text: 'Zum Einsatz' },
   { ziel: 'einsaetze', text: 'Zu Einsätzen' },
+  { ziel: 'anbindungen', text: 'Zu Anbindungen' },
 ];
 
-/** Pfad eines Sammel-Sprungs; `einsatzId` `null` (Org-Layout) führt in die Einsatzliste. */
+/**
+ * Pfad eines Sammel-Sprungs; `einsatzId` `null` (Org-Layout) führt in die Einsatzliste. Die
+ * Anbindungen liegen außerhalb jedes Einsatzes (LLH-2026).
+ */
 export function zielPfad(ziel: AlarmZiel, einsatzId: number | null): string {
+  if (ziel === 'anbindungen') return anbindungenPfad();
   if (einsatzId == null) return einsaetzePfad();
   switch (ziel) {
     case 'meldungen':
@@ -291,6 +323,7 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   einheit: 'einheiten',
   fahrzeug: 'fahrzeuge',
   chat_nachricht: 'chat',
+  adapter: 'anbindungen',
 };
 
 /**
@@ -304,6 +337,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
 export function ersatzPfad(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
 ): string {
+  if (istAdapterArt(e.art) || e.bezug_typ === 'adapter') return anbindungenPfad();
+  if (e.einsatz_id == null) return einsaetzePfad();
   if (istOrgArt(e.art)) return einsatzPfad(e.einsatz_id);
   const ziel = zielVon(e);
   if (e.bezug_typ === 'schichtplan_wechsel') {
@@ -319,6 +354,7 @@ export function ersatzPfad(
 
 /** Sammel-Ziel einer Benachrichtigung: das Modul ihres Bezugs, Org-Arten die Einsatzliste. */
 export function zielVon(e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ'>): AlarmZiel {
+  if (istAdapterArt(e.art)) return 'anbindungen';
   if (istOrgArt(e.art)) return 'einsaetze';
   return BEZUG_ZIEL[e.bezug_typ] ?? 'einsatz';
 }

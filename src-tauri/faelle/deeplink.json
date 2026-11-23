@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle des Deeplinks lifeline://verbinden?server=… (src-tauri/src/deeplink.rs, ios/LifelineKern). „deute“ liest den Link (ziel null: wirkungslos), „entscheide“ legt fest, was ein gültiger Link gegenüber dem gespeicherten Server bewirkt. Adressen stehen in normalisierter Form.",
+  "zweck": "Gemeinsame Fälle des Deeplinks lifeline://verbinden?server=… (src-tauri/src/deeplink.rs, ios/LifelineKern, android/kern). „deute“ liest den Link (ziel null: wirkungslos), „entscheide“ legt fest, was ein gültiger Link gegenüber dem gespeicherten Server bewirkt. Adressen stehen in normalisierter Form.",
   "deute": [
     {
       "beschreibung": "verbinden mit Server wird gelesen",

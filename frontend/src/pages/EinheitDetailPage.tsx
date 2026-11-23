@@ -8,6 +8,8 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import KraftZeitachse from '../kraefte/KraftZeitachse';
+import { useEinheitStatusQuittung } from '../kraefte/useStatusQuittung';
+import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -423,12 +425,19 @@ function EinheitAnsicht({
       message.success(`${v.etikett} gespeichert`);
     },
   });
+  // Der Katalog für die Quittung „S2 → S3“ (LLH-1986); derselbe Cache wie das Statusmenü.
+  const statusKatalogQuery = useQuery({
+    queryKey: globalKeys.fahrzeugStatus(),
+    queryFn: listeFahrzeugStatus,
+  });
+  const quittiereHandStatus = useEinheitStatusQuittung(einsatzId, statusKatalogQuery.data);
   const handStatus = useMutation({
     mutationFn: (statusId: number | null) => setzeEinheitStatus(einsatzId, einheitId, statusId),
-    onSuccess: (neu) => {
+    // Die Einheit ohne Beleg in den Cache, dann die Quittung mit Rückweg (LLH-1986).
+    onSuccess: ({ status_ruecknahme, ...neu }) => {
       setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      message.success('Status gespeichert');
+      quittiereHandStatus({ ...neu, status_ruecknahme });
     },
     // Lehnt der Server ab (etwa weil inzwischen ein Fahrzeug zugeordnet ist), holt die Seite den
     // Stand, der die Ablehnung erklärt.

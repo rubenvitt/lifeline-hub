@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "nicht-vertraeglich",
+  "description": "Nur die lokale Seite „nicht verträglich“ (LLH-1982), in jedem Fenster: zeigen, erneut prüfen, nach Update suchen, zur Maske. Setzt keine Adresse.",
+  "windows": ["main", "neben-*"],
+  "permissions": [
+    "core:default",
+    "allow-nicht-vertraeglich",
+    "allow-erneut-versuchen",
+    "allow-update-suchen",
+    "allow-server-wechseln"
+  ]
+}

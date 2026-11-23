@@ -2189,3 +2189,262 @@ async fn etb_eintraege_des_personals_gehen_live_hinaus() {
         etb.pruefe(&app, &admin, einsatz, was).await;
     }
 }
+
+// ── Statuswechsel zurücknehmen (LLH-1986) ────────────────────────────────────────────────────
+
+/// Id eines Personalstatus nach Label.
+fn personalstatus(stati: &serde_json::Value, label: &str) -> i64 {
+    stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == label)
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap()
+}
+
+/// Eine Ad-hoc-Kraft (Startstatus „alarmiert“), „im Einsatz“ trägt die Marke `eintreffen`.
+/// Liefert (app, pool, admin, einsatz, ep, alarmiert, im Einsatz, Pause).
+async fn personalstatus_welt() -> (
+    axum::Router,
+    sqlx::SqlitePool,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+) {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Anna Muster").await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (alarmiert, im_einsatz, pause) = (
+        personalstatus(&stati, "alarmiert"),
+        personalstatus(&stati, "im Einsatz"),
+        personalstatus(&stati, "Pause"),
+    );
+    sqlx::query("UPDATE personal_status SET zeitachse_marke = 'eintreffen' WHERE id = ?")
+        .bind(im_einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    (app, pool, admin, einsatz, ep, alarmiert, im_einsatz, pause)
+}
+
+async fn personalstatus_zuruecknehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ep: i64,
+    beleg: &serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}/status/zuruecknehmen"),
+        cookie,
+        Some(&beleg.to_string()),
+    )
+    .await
+}
+
+async fn status_wechseln(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ep: i64,
+    status: i64,
+) -> serde_json::Value {
+    let (s, json) = patch_kraft(
+        app,
+        cookie,
+        einsatz,
+        ep,
+        &format!(r#"{{"status_id":{status}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    json
+}
+
+/// Ereignisse der Person: (Art, gestrichen?).
+async fn person_ereignisse(pool: &sqlx::SqlitePool, ep: i64) -> Vec<(String, bool)> {
+    sqlx::query_as::<_, (String, bool)>(
+        "SELECT art, gestrichen_at IS NOT NULL FROM einsatz_kraft_zeitachse \
+         WHERE personal_id = ? ORDER BY id",
+    )
+    .bind(ep)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn personalstatus_zuruecknehmen_stellt_status_her_und_streicht_das_ereignis() {
+    let (app, pool, admin, einsatz, ep, alarmiert, im_einsatz, _) = personalstatus_welt().await;
+    let vorher_ereignisse = person_ereignisse(&pool, ep).await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    let beleg = wechsel["status_ruecknahme"].clone();
+    assert_eq!(beleg["vorher_status_id"], alarmiert, "{wechsel}");
+    assert_eq!(beleg["status_id"], im_einsatz);
+    assert!(beleg["gesetzt_at"].is_string(), "{beleg}");
+    assert!(beleg.get("ereignis_id").is_none(), "{beleg}");
+    assert_eq!(
+        wechsel["name"], "Anna Muster",
+        "die Anzeige steht flach in der Antwort"
+    );
+    let mut erwartet = vorher_ereignisse.clone();
+    erwartet.push(("eintreffen".into(), false));
+    assert_eq!(person_ereignisse(&pool, ep).await, erwartet);
+
+    let (s, json) = personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], alarmiert);
+    let mut erwartet = vorher_ereignisse.clone();
+    erwartet.push(("eintreffen".into(), true));
+    assert_eq!(person_ereignisse(&pool, ep).await, erwartet);
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter().any(|t| t
+            == "Person «Anna Muster»: Statuswechsel «alarmiert» → «im Einsatz» zurückgenommen"),
+        "{etb:?}"
+    );
+
+    // Ein zweites Mal: der Status steht nicht mehr → 409 veraltet.
+    let (s, json) = personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn personalstatus_ohne_marke_ist_zuruecknehmbar() {
+    let (app, pool, admin, einsatz, ep, alarmiert, _, pause) = personalstatus_welt().await;
+    let vorher_ereignisse = person_ereignisse(&pool, ep).await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, pause).await;
+    let (s, json) =
+        personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &wechsel["status_ruecknahme"])
+            .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], alarmiert);
+    assert_eq!(person_ereignisse(&pool, ep).await, vorher_ereignisse);
+}
+
+/// Zwei Wechsel hintereinander: nur der letzte lässt sich zurücknehmen, und er führt auf den
+/// mittleren Status, nicht auf den ersten.
+#[tokio::test]
+async fn zwei_wechsel_erster_beleg_veraltet_zweiter_stellt_den_mittleren_her() {
+    let (app, _pool, admin, einsatz, ep, _, im_einsatz, pause) = personalstatus_welt().await;
+    let erster = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    let zweiter = status_wechseln(&app, &admin, einsatz, ep, pause).await;
+    let (s, json) =
+        personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &erster["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(json["grund"], "veraltet", "{json}");
+    let (s, json) =
+        personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &zweiter["status_ruecknahme"])
+            .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], im_einsatz);
+}
+
+#[tokio::test]
+async fn personalstatus_andere_person_409() {
+    let (app, _pool, admin, einsatz, ep, _, im_einsatz, _) = personalstatus_welt().await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    let id = benutzer_anlegen(&app, &admin, "fritz", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "fuehrungspersonal").await;
+    let fritz = login_cookie(&app, "fritz", "fritzpw1").await;
+    let (s, json) =
+        personalstatus_zuruecknehmen(&app, &fritz, einsatz, ep, &wechsel["status_ruecknahme"])
+            .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn personalstatus_nach_elf_minuten_409() {
+    let (app, pool, admin, einsatz, ep, _, im_einsatz, _) = personalstatus_welt().await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    sqlx::query(
+        "UPDATE einsatz_personal SET status_gesetzt_at = datetime('now', '-11 minutes') \
+         WHERE id = ?",
+    )
+    .bind(ep)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["gesetzt_at"] = sqlx::query_scalar::<_, String>(
+        "SELECT status_gesetzt_at FROM einsatz_personal WHERE id = ?",
+    )
+    .bind(ep)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .into();
+    let (s, json) = personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(json["grund"], "veraltet", "{json}");
+}
+
+#[tokio::test]
+async fn personalstatus_gleicher_status_ohne_beleg() {
+    let (app, _pool, admin, einsatz, ep, alarmiert, _, _) = personalstatus_welt().await;
+    let json = status_wechseln(&app, &admin, einsatz, ep, alarmiert).await;
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+}
+
+/// Ein Wechsel ohne Person (Schichtplan-Vollzug, `update_tx` ohne `gesetzt_von`) überholt den
+/// gemerkten: er ist nicht zurückzunehmen, und der Beleg davor ist veraltet.
+#[tokio::test]
+async fn schichtplan_wechsel_ist_nicht_zuruecknehmbar() {
+    let (app, pool, admin, einsatz, ep, _, im_einsatz, pause) = personalstatus_welt().await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    let mut conn = pool.acquire().await.unwrap();
+    lifeline_hub::personal::disposition_repo::update_tx(
+        &mut conn,
+        einsatz,
+        ep,
+        lifeline_hub::personal::disposition_repo::DispositionPatch {
+            status_id: Some(pause),
+            ..Default::default()
+        },
+        &lifeline_hub::feld_cas::ExpectedValues::new(),
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let von: Option<i64> =
+        sqlx::query_scalar("SELECT status_gesetzt_von FROM einsatz_personal WHERE id = ?")
+            .bind(ep)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(von, None);
+    let (s, _) =
+        personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &wechsel["status_ruecknahme"])
+            .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn entlassene_person_rueckname_409() {
+    let (app, _pool, admin, einsatz, ep, _, im_einsatz, _) = personalstatus_welt().await;
+    let wechsel = status_wechseln(&app, &admin, einsatz, ep, im_einsatz).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) =
+        personalstatus_zuruecknehmen(&app, &admin, einsatz, ep, &wechsel["status_ruecknahme"])
+            .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}

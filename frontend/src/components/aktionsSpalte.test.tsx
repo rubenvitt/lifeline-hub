@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { antdToken, dichten, farbenHell } from '../theme/tokens';
 import { menueSpaltenBreite } from './menueSpalte';
 import {
   AktionsInhalt,
@@ -21,15 +22,29 @@ describe('aktionsSpaltenBreite (LLH-1789)', () => {
   });
 
   it('mit Primäraktion: Menüspalte plus Knopf (Beschriftung, Polster, Rand) plus Fuge', () => {
-    // „Stand melden“: 12 Zeichen × 7 = 84, + 32 Polster/Rand = 116, + 16 Fuge.
-    expect(aktionsSpaltenBreite({ dichte: 'kompakt', primaer: 'Stand melden', messen })).toBe(
-      menueSpaltenBreite('kompakt') + 116 + 16,
-    );
+    // „Stand melden“: 12 Zeichen × 7 = 84, + 32 Polster/Rand = 116, + Fuge `abstand.md`.
+    for (const d of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const knopf = Math.max(dichten[d].kleineZeilenhoehe, 116);
+      expect(aktionsSpaltenBreite({ dichte: d, primaer: 'Stand melden', messen }), d).toBe(
+        menueSpaltenBreite(d) + knopf + dichten[d].abstand.md,
+      );
+    }
+  });
+
+  it('die Fuge ist die Lücke, die antd für `Space size="middle"` setzt (`token.padding`, LLH-1961)', () => {
+    // Kompakt 12, komfortabel 20, handschuh 24 px: ein festes Maß stimmte in keiner Stufe.
+    for (const d of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const ohneFuge = menueSpaltenBreite(d) + 116;
+      expect(
+        aktionsSpaltenBreite({ dichte: d, primaer: 'Stand melden', messen }) - ohneFuge,
+        d,
+      ).toBe(antdToken(farbenHell, d)?.padding);
+    }
   });
 
   it('ein kurzes Etikett hält mindestens den Knopfboden der Stufe', () => {
     expect(aktionsSpaltenBreite({ dichte: 'handschuh', primaer: 'X', messen })).toBe(
-      menueSpaltenBreite('handschuh') + 72 + 16,
+      menueSpaltenBreite('handschuh') + 72 + 24,
     );
   });
 });

@@ -1,4 +1,5 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext, Locator, Page } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
 import { waehleIn } from '../auswahl-kern';
 import {
   anmelden,
@@ -37,20 +38,56 @@ import {
 
 const KAPITEL = 'nachforderung';
 
+/** Die Nachforderungen aus `beforeAll`, über die die Aufnahmen ihre Karten finden. */
+interface Gesaet {
+  lindenstrasse: number;
+  pumpen: number;
+  saecke: number;
+}
+
+const LINDENSTRASSE = 'Sandsäcke gefüllt für Unterführung Lindenstraße';
+const PUMPEN = '3 Tauchpumpen für Keller Hauptstraße';
+const SAECKE = 'Sandsäcke für Deich Nord';
+
+/** Die Nachforderungen des Demo-Einsatzes, mit Bezeichnung und Kennung. */
+async function vorhandene(
+  api: APIRequestContext,
+  einsatzId: number,
+): Promise<{ id: number; bezeichnung: string }[]> {
+  const pfad = `/api/einsaetze/${einsatzId}/nachforderungen`;
+  const antwort = await api.get(pfad);
+  expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
+  return (await antwort.json()) as { id: number; bezeichnung: string }[];
+}
+
 /**
  * Demo-Lücke (D3): der Demo-Einsatz hat keine Nachforderung. Drei kommen über die API dazu, in
  * den Stufen Angefordert, Zugesagt und Unterwegs. Von den RTW ist einer zugesagt, mit Rufname und
  * einem schon verstrichenen Eintreffen (LLH-1097): das Board zeigt „überfällig“ und den Rest.
+ *
+ * Einmal je Datenbank (LLH-1983): nach einem roten Fall verwirft Playwright den Worker, und der
+ * neue fährt `beforeAll` erneut. Ein zweites Säen stellte jede Karte doppelt aufs Board, und alle
+ * Aufnahmen danach scheiterten an der Doppelung statt an ihrem eigenen Befund. Stehen die Karten
+ * schon, liefert es nur ihre Kennungen.
  */
-async function nachforderungenFuellen(api: APIRequestContext) {
+async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
   const demo = await demoEinsatz(api);
+  const da = await vorhandene(api, demo.id);
+  const kennung = (bezeichnung: string) => da.find((n) => n.bezeichnung === bezeichnung)?.id;
+  const [lindenstrasse, pumpenDa, saeckeDa] = [LINDENSTRASSE, PUMPEN, SAECKE].map(kennung);
+  if (lindenstrasse != null && pumpenDa != null && saeckeDa != null) {
+    return { lindenstrasse, pumpen: pumpenDa, saecke: saeckeDa };
+  }
+  expect(da, 'Nachforderungen nur zum Teil gesät; Lauf mit frischer Datenbank wiederholen').toEqual(
+    [],
+  );
   const basis = `/api/einsaetze/${demo.id}/nachforderungen`;
   const anlegen = (daten: Record<string, unknown>) =>
     fuelle<{ id: number }>(api, 'post', basis, daten);
-  await anlegen({
+  const linden = await anlegen({
     art: 'Sandsäcke',
     anzahl: 500,
-    bezeichnung: 'Sandsäcke gefüllt für Unterführung Lindenstraße',
+    bezeichnung: LINDENSTRASSE,
     ziel_text: 'Unterführung Lindenstraße',
     adressat_kategorie: 'leitstelle',
     adressat_bezeichnung: 'Leitstelle Musterstadt',
@@ -93,7 +130,7 @@ async function nachforderungenFuellen(api: APIRequestContext) {
   const pumpen = await anlegen({
     art: 'Tauchpumpe',
     anzahl: 3,
-    bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
+    bezeichnung: PUMPEN,
     adressat_kategorie: 'leitstelle',
     prioritaet: 'dringend',
   });
@@ -101,7 +138,7 @@ async function nachforderungenFuellen(api: APIRequestContext) {
   const saecke = await anlegen({
     art: 'Sandsäcke',
     anzahl: 2000,
-    bezeichnung: 'Sandsäcke für Deich Nord',
+    bezeichnung: SAECKE,
     adressat_kategorie: 'uebergeordnet',
     adressat_bezeichnung: 'Kreisbereitschaftsleitung',
     prioritaet: 'dringend',
@@ -120,6 +157,7 @@ async function nachforderungenFuellen(api: APIRequestContext) {
     einheit_id: staffel!.id,
     nachforderung_id: saecke.id,
   });
+  return { lindenstrasse: linden.id, pumpen: pumpen.id, saecke: saecke.id };
 }
 
 /**
@@ -127,7 +165,9 @@ async function nachforderungenFuellen(api: APIRequestContext) {
  * Bereitstellungsraum des Demo-Einsatzes als Ziel und den Rufnamen der Zusage; mit `uebernommen`
  * sind so viele davon schon als Einheiten übernommen. Erst im Test angelegt, nicht in
  * `beforeAll`: das Board-Bild zeigt den Stand ohne sie. Die Rufnamen sind andere als die der
- * Demo-Fahrzeuge („Musterstadt 83-1“), sonst lehnte der Server die Übernahme ab.
+ * Demo-Fahrzeuge („Musterstadt 83-1“), sonst lehnte der Server die Übernahme ab. Steht sie schon
+ * (dieselbe Aufnahme noch einmal in derselben Datenbank, LLH-1983), nimmt sie die vorhandene:
+ * eine zweite Übernahme derselben Rufnamen lehnte der Server ab.
  */
 async function einheitNachforderung(
   art: 'RTW' | 'KTW',
@@ -138,6 +178,11 @@ async function einheitNachforderung(
   const api = await apiAlsAdmin();
   const demo = await demoEinsatz(api);
   const basis = `/api/einsaetze/${demo.id}`;
+  const schon = (await vorhandene(api, demo.id)).find((n) => n.bezeichnung === bezeichnung);
+  if (schon) {
+    await api.dispose();
+    return schon.id;
+  }
   const lies = async <T>(pfad: string): Promise<T> => {
     const antwort = await api.get(pfad);
     expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
@@ -203,16 +248,71 @@ async function nachforderungenOeffnen(page: Page) {
   await expect(saeckePosten).toContainText('übernommen 1200 von 2000');
 }
 
+/** Die Karte einer Nachforderung, über ihre Kennung statt über den Text (LLH-1983). */
+function karteZu(page: Page, id: number): Locator {
+  return page.locator(`[data-nachforderung-id="${id}"]`);
+}
+
+/**
+ * Öffnet einen Dialog über seinen Knopf und wartet, bis er ausgezoomt steht. Bleibt er aus, hängt
+ * der Fall den Zustand der Seite an (LLH-1983): im Sammellauf blieb „Als Material übernehmen“
+ * dreimal aus, ließ sich aber nicht nachstellen, auch nicht unter Last oder 12-fach gedrosselt.
+ * Kein zweiter Klick: er verdeckte einen echten Fehler der Seite.
+ */
+async function dialogOeffnen(page: Page, knopf: Locator, dialog: Locator) {
+  await knopf.click();
+  try {
+    await expect(dialog).toBeVisible();
+  } catch (fehler) {
+    const zustand = await page.evaluate(() => ({
+      adresse: location.href,
+      fokus: document.activeElement?.outerHTML.slice(0, 300) ?? null,
+      dialoge: [...document.querySelectorAll('[role="dialog"], .ant-modal-wrap')].map((d) => ({
+        rolle: d.getAttribute('role'),
+        klasse: d.className,
+        titel: d.querySelector('.ant-modal-title')?.textContent ?? null,
+        anzeige: getComputedStyle(d).display,
+        ariaVersteckt: d.closest('[aria-hidden="true"]') != null,
+      })),
+      meldungen: [
+        ...document.querySelectorAll('.ant-message-notice, .ant-notification-notice'),
+      ].map((m) => m.textContent),
+    }));
+    // Als Dateien im Ausgabeordner: der Reporter `list` nennt nur Anhänge mit Pfad.
+    const info = test.info();
+    const anzahl = await knopf.count();
+    const zustandDatei = info.outputPath('seitenzustand-ohne-dialog.json');
+    writeFileSync(
+      zustandDatei,
+      JSON.stringify(
+        { zustand, knopf: { anzahl, gesperrt: anzahl === 1 ? await knopf.isDisabled() : null } },
+        null,
+        2,
+      ),
+    );
+    await info.attach('seitenzustand-ohne-dialog', {
+      path: zustandDatei,
+      contentType: 'application/json',
+    });
+    const bildDatei = info.outputPath('seite-ohne-dialog.png');
+    await page.screenshot({ path: bildDatei });
+    await info.attach('seite-ohne-dialog', { path: bildDatei, contentType: 'image/png' });
+    throw fehler;
+  }
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+}
+
 /** Leert den Fokus, damit kein Fokusring und kein Cursor im Bild steht. */
 async function fokusWeg(page: Page) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
 test.describe(KAPITEL, () => {
-  // Einmal je Lauf, die Datenbank teilen alle Tests.
+  // Einmal je Datenbank, die teilen alle Tests; ein neuer Worker findet die Karten wieder.
+  let gesaet: Gesaet;
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
-    await nachforderungenFuellen(api);
+    gesaet = await nachforderungenFuellen(api);
     await api.dispose();
   });
 
@@ -220,9 +320,10 @@ test.describe(KAPITEL, () => {
     await nachforderungenOeffnen(page);
     await expect(page.getByRole('button', { name: 'Eintreffen melden' })).toBeVisible();
     await expect(page.locator('[data-lfh="board-ueberfaellig"]')).toContainText('1');
-    await expect(
-      page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"] [data-nachforderung-id]'),
-    ).toHaveCount(2);
+    const eingetroffen = page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"]');
+    for (const id of [gesaet.pumpen, gesaet.saecke]) {
+      await expect(eingetroffen.locator(`[data-nachforderung-id="${id}"]`)).toBeVisible();
+    }
     await fotografiere(page, KAPITEL, 'nachforderungen-board');
   });
 
@@ -241,9 +342,7 @@ test.describe(KAPITEL, () => {
 
   test('Formular „Zusage erfassen“ an der Karte', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    const karte = page.locator('[data-nachforderung-id]', {
-      hasText: 'Sandsäcke gefüllt für Unterführung Lindenstraße',
-    });
+    const karte = karteZu(page, gesaet.lindenstrasse);
     await karte.getByRole('button', { name: 'Zusage erfassen' }).click();
     const formular = karte.getByRole('region', { name: /^Zusage zu / });
     await formular.getByRole('spinbutton', { name: 'Zugesagt' }).fill('300');
@@ -270,13 +369,12 @@ test.describe(KAPITEL, () => {
 
   test('Dialog „Als Material übernehmen“', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    const karte = page.locator('[data-nachforderung-id]', {
-      hasText: '3 Tauchpumpen für Keller Hauptstraße',
-    });
-    await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
     const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await dialogOeffnen(
+      page,
+      karteZu(page, gesaet.pumpen).getByRole('button', { name: 'Als Material übernehmen' }),
+      dialog,
+    );
     await dialog.getByRole('radio', { name: 'Gerät' }).click();
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('1');
     await waehleIn(
@@ -289,7 +387,7 @@ test.describe(KAPITEL, () => {
 
   test('Karte mit übernommenem Posten', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    const karte = page.locator('[data-nachforderung-id]', { hasText: 'Sandsäcke für Deich Nord' });
+    const karte = karteZu(page, gesaet.saecke);
     await expect(karte).toContainText('übernommen 1200 von 2000');
     await expect(karte.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeVisible();
     await fokusWeg(page);
@@ -302,11 +400,12 @@ test.describe(KAPITEL, () => {
       'Nachbarstadt 83-2',
     ]);
     await nachforderungenOeffnen(page);
-    const karte = page.locator(`[data-nachforderung-id="${id}"]`);
-    await karte.getByRole('button', { name: 'Als Einheit übernehmen' }).click();
     const dialog = page.getByRole('dialog', { name: '„RTW“ als Einheit übernehmen' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await dialogOeffnen(
+      page,
+      karteZu(page, id).getByRole('button', { name: 'Als Einheit übernehmen' }),
+      dialog,
+    );
     // Vorbelegt: die Rufnamen der Zusage, der Typ aus der Art und der Haken für den Raum.
     await expect(dialog).toContainText('Nachbarstadt 83-1');
     await expect(dialog).toContainText('Nachbarstadt 83-2');
@@ -326,7 +425,7 @@ test.describe(KAPITEL, () => {
       2,
     );
     await nachforderungenOeffnen(page);
-    const karte = page.locator(`[data-nachforderung-id="${id}"]`);
+    const karte = karteZu(page, id);
     await expect(karte).toContainText(
       'Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗',
     );

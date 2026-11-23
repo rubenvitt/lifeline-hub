@@ -238,6 +238,65 @@ printf '#!/bin/sh\necho cargo-rot; exit 101\n' > "$ARBEIT/s19/bin/cargo"
 rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
 pruefe "17 Schritt 19 rot, wenn das Binary nicht übersetzt" 1 "$rc"
 
+# 18 — Schritt 19 prüft auch den karten-service ohne Dev-Abhängigkeiten (LLH-2038): er hat
+# `tokio/test-util` und `tower/util` nur über sie und wird sonst erst im Release ohne Testziele
+# gebaut. In EIGENEM Aufruf: mit dem Hauptpaket zusammen vereinigte Cargo die Features beider.
+printf '#!/bin/sh\necho "cargo-lief $*"\n' > "$ARBEIT/s19/bin/cargo"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "18 Schritt 19 grün mit karten-service" 0 "$rc"
+enthaelt "18 Schritt 19 prüft den karten-service" '^cargo-lief check -p karten-service$'
+fehlt "18 karten-service nicht im selben Aufruf wie das Binary" 'cargo-lief .*lifeline-hub.*karten-service|cargo-lief .*karten-service.*lifeline-hub'
+printf '#!/bin/sh\ncase "$*" in *karten-service*) echo karten-rot; exit 101 ;; esac\necho "cargo-lief $*"\n' > "$ARBEIT/s19/bin/cargo"
+rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
+pruefe "18 Schritt 19 rot, wenn der karten-service nicht übersetzt" 1 "$rc"
+
+# 19 — Schritt 20, der Kotlin-Kern der Android-Hülle (LLH-1989): eigenes Bündel `android`, Teil des
+# vollen Laufs und von `--geaendert`, nicht von `schnell`; ohne Java lokal eine Lücke, in der CI
+# mit ANDROID_KERN_PFLICHT=1 rot; mit Java fährt er den Gradle-Wrapper im Kern.
+rc=0; "$CHECK_ALL" --nur android --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "19 Bündel android ist bekannt" 0 "$rc"
+enthaelt "19 Bündel android fährt nur den Kotlin-Schritt" '^Schritte: 20$'
+rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "19 voller Lauf fährt den Kotlin-Schritt" '^Schritte: .*\b20\b'
+rc=0; "$CHECK_ALL" --nur schnell --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+fehlt "19 schnell fährt den Kotlin-Schritt nicht" '^Schritte: .*\b20\b'
+mkdir -p "$ARBEIT/s20/android" "$ARBEIT/s20/leer" "$ARBEIT/s20/gruen"
+printf '#!/bin/sh\necho "gradlew-lief $* "\n' > "$ARBEIT/s20/android/gradlew"
+printf '#!/bin/sh\necho "openjdk version \\"21.0.1\\" 2026-01-01" >&2\n' > "$ARBEIT/s20/gruen/java"
+chmod +x "$ARBEIT/s20/android/gradlew" "$ARBEIT/s20/gruen/java"
+schritt_20_def="$(sed -n '/^schritt_20() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_20_def" ] || { echo "FAIL 19 schritt_20 fehlt in check-all.sh" >&2; fehler=1; }
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; JAVA_HOME=; ANDROID_KERN_PFLICHT=0; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 ohne java → Exit 0" 0 "$rc"
+enthaelt "19 ohne java → übersprungen, nicht grün" '\[20/9\] +übersprungen'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; JAVA_HOME=; ANDROID_KERN_PFLICHT=1; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 ohne java mit ANDROID_KERN_PFLICHT=1 → rot" 1 "$rc"
+enthaelt "19 ANDROID_KERN_PFLICHT nennt den Grund" 'ANDROID_KERN_PFLICHT'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/gruen':\"\$PATH\"; JAVA_HOME=; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 mit java → grün" 0 "$rc"
+enthaelt "19 mit java → gradlew testet den Kern" "^gradlew-lief -p $ARBEIT/s20/android/kern test"
+# Ein `java`, das nicht läuft (macOS legt `/usr/bin/java` als Platzhalter an, der ohne JDK mit 1
+# endet), zählt wie keins: Lücke bzw. rot mit Grund, nie ein Abbruch ohne Meldung unter pipefail.
+mkdir -p "$ARBEIT/s20/platzhalter" "$ARBEIT/s20/jdk11/bin" "$ARBEIT/s20/jdk21/bin"
+printf '#!/bin/sh\necho "The operation couldn’t be completed. Unable to locate a Java Runtime." >&2\nexit 1\n' > "$ARBEIT/s20/platzhalter/java"
+printf '#!/bin/sh\necho "openjdk version \\"11.0.2\\" 2019-01-15" >&2\n' > "$ARBEIT/s20/jdk11/bin/java"
+cp "$ARBEIT/s20/gruen/java" "$ARBEIT/s20/jdk21/bin/java"
+chmod +x "$ARBEIT/s20/platzhalter/java" "$ARBEIT/s20/jdk11/bin/java" "$ARBEIT/s20/jdk21/bin/java"
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/platzhalter'; JAVA_HOME=; ANDROID_KERN_PFLICHT=0; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 java-Platzhalter ohne JDK → Exit 0" 0 "$rc"
+enthaelt "19 java-Platzhalter ohne JDK → übersprungen, nicht rot" '\[20/9\] +übersprungen'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/platzhalter'; JAVA_HOME=; ANDROID_KERN_PFLICHT=1; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 java-Platzhalter mit ANDROID_KERN_PFLICHT=1 → rot" 1 "$rc"
+enthaelt "19 java-Platzhalter: rot mit Grund" 'ANDROID_KERN_PFLICHT'
+# Gradle nimmt `JAVA_HOME`, also fragt der Schritt dasselbe JDK: JAVA_HOME auf 11 und 21 im PATH
+# ist eine Lücke, JAVA_HOME auf 21 ohne java im PATH baut.
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/gruen'; JAVA_HOME='$ARBEIT/s20/jdk11'; ANDROID_KERN_PFLICHT=0; $schritt_20_def" 0 20 || rc=$?
+enthaelt "19 JAVA_HOME auf JDK 11 → übersprungen, auch mit 21 im PATH" '\[20/9\] +übersprungen'
+fehlt "19 JAVA_HOME auf JDK 11 → kein Gradle" '^gradlew-lief'
+rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; JAVA_HOME='$ARBEIT/s20/jdk21'; ANDROID_KERN_PFLICHT=1; $schritt_20_def" 0 20 || rc=$?
+pruefe "19 JAVA_HOME auf JDK 21 ohne java im PATH → grün" 0 "$rc"
+enthaelt "19 JAVA_HOME auf JDK 21 → gradlew testet den Kern" "^gradlew-lief -p $ARBEIT/s20/android/kern test"
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1

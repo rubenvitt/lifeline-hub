@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vertrauen der Hülle (Entwurf D2a): System-CAs und vom Nutzer installierte CAs (eigene CA eines
+  Einsatzservers), keine Ausnahmen, kein Pinning, kein Klartext. Der Updater lädt nur von GitHub
+  (`Updateentscheidung.ERLAUBTE_HOSTS`); dort gelten nur die CAs des Systems, damit eine vom Nutzer
+  installierte CA (Einsatz-LAN, Firmen-Proxy) Manifest und APK nicht austauschen kann.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">github.com</domain>
+        <domain includeSubdomains="false">objects.githubusercontent.com</domain>
+        <domain includeSubdomains="false">release-assets.githubusercontent.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -1546,8 +1546,8 @@ describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
     } finally {
       setzeOnline(true);
     }
-    // Mutationsprobe: das Senden ohne Netz nicht sperren — die pausierte Mutation holt nach der
-    // Rückkehr still nach, rot.
+    // Mutationsprobe: das Senden ohne Netz nicht sperren — die Mutation geht hinaus (hier
+    // antwortet MSW, im Feld scheiterte sie mit `NetzFehler`), rot.
     await act(async () => {
       await new Promise((r) => setTimeout(r, 30));
     });

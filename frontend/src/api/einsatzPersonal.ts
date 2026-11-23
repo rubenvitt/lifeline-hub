@@ -1,6 +1,8 @@
 import type {
   EinsatzPersonal,
   FuehrungskraftKarte,
+  HandStatusRuecknahmeBeleg,
+  PersonalPatchAntwort,
   PersonalEntlassungAntwort,
   PersonalEntlassungRuecknahmeAntwort,
   PersonalEntlassungVorzustand,
@@ -72,18 +74,37 @@ export type DispositionErwartet = Partial<Omit<DispositionPatch, 'status_id' | '
 
 /**
  * Ändert eine Disposition. Mit `erwartet` antwortet der Server 409 `veraltet`, wenn ein anderer
- * eine dieser Angaben inzwischen geändert hat; ohne schreibt er ohne Vergleich.
+ * eine dieser Angaben inzwischen geändert hat; ohne schreibt er ohne Vergleich. Bei einem echten
+ * Statuswechsel trägt die Antwort den Beleg `status_ruecknahme` für „Rückgängig“ (LLH-1986,
+ * {@link nimmPersonalStatuswechselZurueck}).
  */
 export function updateDisposition(
   einsatzId: number,
   epId: number,
   felder: DispositionPatch,
   erwartet?: DispositionErwartet,
-): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(
+): Promise<PersonalPatchAntwort> {
+  return apiSend<PersonalPatchAntwort>(
     `/api/einsaetze/${einsatzId}/personal/${epId}`,
     'PATCH',
     erwartet ? { ...felder, erwartet } : felder,
+  );
+}
+
+/**
+ * „Rückgängig“ nach einem Statuswechsel einer Kraft (LLH-1986): der Status von davor, das
+ * Zeitachsen-Ereignis gestrichen. Nur direkt danach und nur für die Person, die gewechselt hat;
+ * inzwischen geändert → 409 `veraltet`, sonst 409 mit Grund.
+ */
+export function nimmPersonalStatuswechselZurueck(
+  einsatzId: number,
+  epId: number,
+  beleg: HandStatusRuecknahmeBeleg,
+): Promise<EinsatzPersonal> {
+  return apiSend<EinsatzPersonal>(
+    `/api/einsaetze/${einsatzId}/personal/${epId}/status/zuruecknehmen`,
+    'POST',
+    beleg,
   );
 }
 

@@ -24,9 +24,11 @@ use tokio::task::JoinHandle;
 use super::art::{check_einstellungen, AdapterArt, Fehlschlag, Uebernahme};
 use super::repo::{self, Adapter, Versuch};
 use super::ziel::AbrufKontext;
-use super::zustand::{nach_fehlschlag, AdapterFehler};
+use super::zustand::{meldung_nach_fehlschlag, nach_fehlschlag, AdapterFehler, AdapterGemeldet};
 use super::Rahmen;
+use crate::benachrichtigung::{self, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug};
 use crate::error::AppError;
+use crate::live::LiveHub;
 use crate::zeit;
 
 /// Abstand der Durchgänge.
@@ -40,7 +42,12 @@ type Laufend = Arc<Mutex<HashSet<String>>>;
 
 /// Startet den Lauf. Springt `stopp` auf `true` (oder fällt sein Sender), beginnt kein neuer
 /// Abruf mehr, und der Lauf endet, sobald die laufenden fertig sind.
-pub fn start(pool: SqlitePool, rahmen: Rahmen, mut stopp: watch::Receiver<bool>) -> JoinHandle<()> {
+pub fn start(
+    pool: SqlitePool,
+    rahmen: Rahmen,
+    live: LiveHub,
+    mut stopp: watch::Receiver<bool>,
+) -> JoinHandle<()> {
     let laufend: Laufend = Arc::default();
     let plaetze = Arc::new(Semaphore::new(PARALLEL));
     tokio::spawn(async move {
@@ -60,7 +67,7 @@ pub fn start(pool: SqlitePool, rahmen: Rahmen, mut stopp: watch::Receiver<bool>)
                 }
                 _ = ticker.tick() => {
                     laufende.retain(|h| !h.is_finished());
-                    match takt(&pool, &rahmen, Utc::now(), &laufend, &plaetze).await {
+                    match takt(&pool, &rahmen, &live, Utc::now(), &laufend, &plaetze).await {
                         Ok(neu) => laufende.extend(neu),
                         Err(e) => tracing::error!("Adapter-Durchgang fehlgeschlagen: {e}"),
                     }
@@ -96,11 +103,12 @@ pub async fn beim_start(pool: &SqlitePool, rahmen: &Rahmen) -> Result<(), AppErr
 pub async fn durchgang(
     pool: &SqlitePool,
     rahmen: &Rahmen,
+    live: &LiveHub,
     jetzt: DateTime<Utc>,
 ) -> Result<(), AppError> {
     let laufend: Laufend = Arc::default();
     let plaetze = Arc::new(Semaphore::new(PARALLEL));
-    for handle in takt(pool, rahmen, jetzt, &laufend, &plaetze).await? {
+    for handle in takt(pool, rahmen, live, jetzt, &laufend, &plaetze).await? {
         let _ = handle.await;
     }
     Ok(())
@@ -109,6 +117,7 @@ pub async fn durchgang(
 async fn takt(
     pool: &SqlitePool,
     rahmen: &Rahmen,
+    live: &LiveHub,
     jetzt: DateTime<Utc>,
     laufend: &Laufend,
     plaetze: &Arc<Semaphore>,
@@ -126,7 +135,7 @@ async fn takt(
         {
             continue;
         }
-        let (pool, rahmen) = (pool.clone(), rahmen.clone());
+        let (pool, rahmen, live) = (pool.clone(), rahmen.clone(), live.clone());
         let (laufend, plaetze) = (laufend.clone(), plaetze.clone());
         let gestartet = Instant::now();
         handles.push(tokio::spawn(async move {
@@ -134,7 +143,7 @@ async fn takt(
             if let Ok(_platz) = plaetze.acquire_owned().await {
                 let jetzt_echt =
                     jetzt + chrono::Duration::from_std(gestartet.elapsed()).unwrap_or_default();
-                let lauf = run_one(&pool, &rahmen, &*art, adapter, jetzt_echt);
+                let lauf = run_one(&pool, &rahmen, &live, &*art, adapter, jetzt_echt);
                 match AssertUnwindSafe(lauf).catch_unwind().await {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => {
@@ -245,6 +254,7 @@ fn dauer_ms(gestartet: Instant) -> i64 {
 async fn run_one(
     pool: &SqlitePool,
     rahmen: &Rahmen,
+    live: &LiveHub,
     art: &dyn AdapterArt,
     adapter: Adapter,
     beginn: DateTime<Utc>,
@@ -274,14 +284,15 @@ async fn run_one(
             let uebernommen = crate::write_retry!(pool, |conn| {
                 // Hat ein Admin inzwischen angehalten oder etwas geändert, gilt das Ergebnis nicht:
                 // nur der Versuch bleibt stehen.
-                let n = if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
-                    let n = uebernahme.uebernehmen(&mut *conn, &a).await?;
+                let war_gemeldet = if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
+                    uebernahme.uebernehmen(&mut *conn, &a).await?;
                     repo::save_erfolg(&mut *conn, &a, geliefert, &jetzt).await?;
-                    n
+                    // Die Störung ist vorbei (LLH-2026): nach dem Commit entwarnen.
+                    repo::clear_gemeldet(&mut *conn, &a.id).await?
                 } else {
-                    0
+                    false
                 };
-                repo::save_versuch(
+                let versuch_id = repo::save_versuch(
                     &mut *conn,
                     &a.id,
                     &Versuch {
@@ -294,16 +305,29 @@ async fn run_one(
                     },
                 )
                 .await?;
-                Ok(n)
+                Ok((war_gemeldet, versuch_id))
             });
             match uebernommen {
-                Ok(_) => Ok(()),
+                Ok((war_gemeldet, versuch_id)) => {
+                    if war_gemeldet {
+                        melden_stoerung(
+                            pool,
+                            live,
+                            &a,
+                            BenachrichtigungArt::AdapterWiederOk,
+                            versuch_id,
+                        )
+                        .await;
+                    }
+                    Ok(())
+                }
                 // Die Übernahme scheiterte in der Datenbank: als Fehler des Adapters festhalten,
                 // nicht still verlieren; der nächste Versuch kommt mit Wartezeit.
                 Err(e) => {
                     tracing::error!(adapter = %a.id, "Übernahme fehlgeschlagen: {e}");
                     record_failure(
                         pool,
+                        live,
                         &a,
                         Fehlschlag::new(AdapterFehler::Intern),
                         &jetzt,
@@ -313,12 +337,13 @@ async fn run_one(
                 }
             }
         }
-        Err(f) => record_failure(pool, &a, f, &jetzt, dauer).await,
+        Err(f) => record_failure(pool, live, &a, f, &jetzt, dauer).await,
     }
 }
 
 async fn record_failure(
     pool: &SqlitePool,
+    live: &LiveHub,
     a: &Adapter,
     f: Fehlschlag,
     jetzt: &str,
@@ -331,11 +356,18 @@ async fn record_failure(
         a.fehlversuche,
         jetzt,
     );
-    crate::write_retry!(pool, |conn| {
+    let meldung = crate::write_retry!(pool, |conn| {
+        let mut meldung = None;
         if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
             repo::save_fehlschlag(&mut *conn, a, f.art, f.status, &nach, jetzt).await?;
+            // Einmal je Störung (LLH-2026): nur wer den Merker setzt, meldet nach dem Commit.
+            if let Some(stufe) = meldung_nach_fehlschlag(f.art, &nach, a.gemeldet(), jetzt) {
+                if repo::mark_gemeldet(&mut *conn, &a.id, stufe).await? {
+                    meldung = Some(stufe);
+                }
+            }
         }
-        repo::save_versuch(
+        let versuch_id = repo::save_versuch(
             &mut *conn,
             &a.id,
             &Versuch {
@@ -348,8 +380,33 @@ async fn record_failure(
             },
         )
         .await?;
-        Ok(())
-    })
+        Ok(meldung.map(|stufe| (stufe, versuch_id)))
+    })?;
+    if let Some((stufe, versuch_id)) = meldung {
+        let art = match stufe {
+            AdapterGemeldet::Gestoert => BenachrichtigungArt::AdapterGestoert,
+            AdapterGemeldet::Eingriff => BenachrichtigungArt::AdapterEingriff,
+        };
+        melden_stoerung(pool, live, a, art, versuch_id).await;
+    }
+    Ok(())
+}
+
+/// Meldet den Admins der Org eine Störung oder ihre Entwarnung (LLH-2026), nach dem Commit.
+/// „Braucht Eingriff“ und die Entwarnung erledigen vorher die offene Störungsmeldung, damit nur
+/// eine offen steht. Ein Fehler beim Melden lässt den Lauf weiterlaufen (geloggt in `melden`).
+async fn melden_stoerung(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    a: &Adapter,
+    art: BenachrichtigungArt,
+    versuch_id: i64,
+) {
+    if art != BenachrichtigungArt::AdapterGestoert {
+        benachrichtigung::erledigen_adapter(pool, live, a.org_id, &a.id).await;
+    }
+    let bezug = Bezug::neu(BenachrichtigungBezugTyp::Adapter, versuch_id);
+    benachrichtigung::melden(pool, live, Anlass::adapter(a.org_id, &a.id, art, bezug)).await;
 }
 
 /// „Verbindung prüfen“: ruft einmal ab, übernimmt nichts und lässt den Zustand, wie er ist. Der

@@ -241,6 +241,14 @@ sequenceDiagram
   Kartenkacheln liegen nicht im Browser; die Lagekarte holt sie vom Server (6.7).
 - Regeln, Fristen, Räumen: [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md).
   Spec: [`openspec/specs/lagebild-offline-lesen/`](../../openspec/specs/lagebild-offline-lesen/spec.md).
+- **iOS-App** (LLH-1980, [ADR-0082](entscheidungen/ADR-0082-die-ios-huelle-startet-ohne-server-aus-gespeicherter-index-html-und-dem-http-cache.md)):
+  Im WKWebView läuft kein Service Worker. Die Hülle wärmt nach jedem Laden vom Server die Liste
+  `assets` aus `GET /api/shell` im Webview vor (`ios/App/Huelle/vorwaermen.js`) und legt danach
+  die `index.html` je Server ab (`ios/LifelineKern/Sources/LifelineKern/Vorratsablage.swift`).
+  Antwortet der Server beim Start nicht, lädt sie diese per `loadSimulatedRequest` unter der
+  Adresse des Servers; ab da läuft der Ablauf oben unverändert. Kommt der Server mit derselben
+  Version zurück, bleibt die Seite stehen, mit einer anderen lädt die Hülle neu
+  (`ios/LifelineKern/Sources/LifelineKern/Ablauf.swift`).
 
 ## 6.6 Gerät koppeln und Funktionsansicht
 
@@ -724,6 +732,11 @@ sequenceDiagram
   Zeitlimit, der Push-Dienst hält die Nachricht 12 h, Abos nur bei Hosts in `PUSH_DIENSTE`
   (`src/web_push/mod.rs`). Erreicht der Service Worker den Server nicht, zeigt er den Titel der
   Stufe (`frontend/public/alarm-sw.js`).
+- Ohne Einsatz meldet nur der Adapter-Lauf (LLH-2026,
+  [ADR-0086](entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  `adapter::lauf` setzt in seiner Transaktion den Merker `adapter.gemeldet` und ruft danach
+  `melden(Anlass::adapter(…))`; Empfänger, Leserecht und Text stehen in
+  `src/benachrichtigung/adapter.rs`, zugestellt wird über den Org-Kanal, nie über den Hub.
 - Specs: [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md),
   [`web-push`](../../openspec/specs/web-push/spec.md); Betrieb:
   [`docs/betrieb/web-push.md`](../betrieb/web-push.md).

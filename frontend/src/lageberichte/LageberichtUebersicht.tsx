@@ -9,10 +9,10 @@ import Markdown from '../components/Markdown';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
 import {
-  Augenbraue,
   Balken,
   Datenfeld,
   Datenraster,
+  Feldetikett,
   Paneel,
   PaneelLink,
   PaneelZustand,
@@ -145,9 +145,9 @@ function AktuellPaneel({
           </Datenraster>
           {kern && auszug && (
             <div data-lfh="lagebericht-auszug">
-              <Augenbraue als="div" style={{ marginBlockEnd: token.marginXXS }}>
-                {kern.label}
-              </Augenbraue>
+              <div style={{ marginBlockEnd: token.marginXXS }}>
+                <Feldetikett als="div">{kern.label}</Feldetikett>
+              </div>
               {/* Unter dem Titel (h3) — `#` im Text wird h4. */}
               <Markdown variante="kompakt" unterEbene={3}>
                 {auszug.gekuerzt ? `${auszug.text} …` : auszug.text}

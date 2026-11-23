@@ -74,6 +74,22 @@ werden die Werte über `…/{einheiten,personal}/zeitachse/grenzwerte` (Key
 Wort; „Ruhe“, Einheit-Detail, Personenkopf, Überblick und Druck des Berichts bleiben neutral. Kein
 Hinweis in der AlarmZentrale, kein Modulzähler, keine Benachrichtigung (Alarmbudget).
 
+**Quittung und Rücknahme eines Statuswechsels** (LLH-1781 Fahrzeug, LLH-1986 Personal, Material,
+Einheit; Design `docs/superpowers/specs/2026-11-22-hau6f7rm-status-ruecknahme-handstatus-design.md`,
+Herkunft Spec `fahrzeugstatus-quittung`): Nach jedem Statuswechsel durch eine Person steht die
+Quittung „<Name>: <alt> → <neu> · Rückgängig“, überall, wo der Status gesetzt wird, auch auf der
+Geräte-Statusseite. Client: `kraefte/useStatusQuittung.ts` (`use…StatusQuittung` je Art,
+Schlüssel `lfh-status-quittung-<art>-<id>`); die Antwort des Wechsels kommt ohne
+`status_ruecknahme` in den Cache (`ohneBeleg`). Server: Die Zeile hält beim Wechsel selbst fest,
+was „Rückgängig“ herstellt (`status_gesetzt_von`, `status_gesetzt_at` bzw. beim Fahrzeug
+`status_seit`, Vorzustand, Zeitachsen-Ereignis; Migrationen 0356, 0365); der Beleg trägt nur
+Prüfwerte. Riegel und Streichen nur über `src/status_ruecknahme.rs` (`pruefe`,
+`streiche_ereignis_tx`): gleiche Person, höchstens zehn Minuten, Status und Kennung unverändert
+(sonst 409 `veraltet` bzw. 409 mit Grund). Ein Weg ohne Person (Schichtplan-Vollzug) setzt kein
+`gesetzt_von` und ist nicht zurückzunehmen; jeder andere Weg, der den gemerkten Wechsel überholt,
+leert die Spalten (Entlassen, Auflösen, beim Material Menge, Art und Aufteilen). Eine Einheit,
+deren Status inzwischen Fahrzeuge führen, nimmt nur zu „kein Status“ zurück.
+
 **Ablösung** (LFH-635, LLH-1122, Spec `kraefte-abloesung`): Der Rhythmus einer Schicht folgt
 der Rangfolge eigener Wert → Vorgabe des Abschnitts → Vorgabe des Einsatzes
 (`rhythmus_quelle` `einheit`/`abschnitt`/`einsatz`). Die Vorgabe des Einsatzes ist eine Kopie

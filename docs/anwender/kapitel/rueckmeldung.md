@@ -61,7 +61,7 @@ Ein Bildschirmfoto mit Demo-Daten ([Demo-Daten](demo-daten.md)) zeigt dasselbe o
 ### Was die Anwendung mitgibt
 
 „Rückmeldung geben“ füllt nur drei Felder vor: die Version, die Oberfläche (Browser, Desktop-App
-oder iOS-App) und den Bereich der App als Muster, etwa `/einsatz/:id/etb`: den Bereich, aus dem die
+mit macOS oder Windows, iOS-App) und den Bereich der App als Muster, etwa `/einsatz/:id/etb`: den Bereich, aus dem die
 Hilfe über das Benutzermenü geöffnet wurde, sonst die Hilfe selbst. Kennungen von Einsatz, Personen
 oder Einheiten stehen nicht darin, ebenso wenig Name, Benutzername oder die Adresse des Servers;
 auch als Herkunft (Referer) gibt der Aufruf die Adresse nicht weiter. Alles Weitere steht nur im
