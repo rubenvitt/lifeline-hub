@@ -134,7 +134,7 @@ Tests), React + antd + TanStack Query, Vitest.
 ### Task 3: Datenmodell — Spalte, Repo, Admin-Aktionen
 
 **Files:**
-- Create: `migrations/0364_webhook_zertifikat_pin.sql` (Nummer vor dem Anlegen mit
+- Create: `migrations/0366_webhook_zertifikat_pin.sql` (Nummer vor dem Anlegen mit
   `git fetch origin alpha && scripts/check-migrationen.sh` bestätigen)
 - Modify: `src/public_api/webhook/repo.rs`, `src/public_api/webhook/lauf.rs`,
   `src/auth/admin_audit.rs`
