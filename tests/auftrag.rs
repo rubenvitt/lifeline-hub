@@ -672,7 +672,7 @@ async fn auftrag_default_quittierfrist_aus_einstellungen() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )
@@ -722,7 +722,7 @@ async fn auftrag_explizite_frist_schlaegt_default() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )
@@ -756,7 +756,7 @@ async fn auto_etb_aus_unterdrueckt_anordnung_am_http_rand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -1008,7 +1008,7 @@ async fn zeitpunkte_ausserhalb_des_jahresbereichs_sind_400() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )

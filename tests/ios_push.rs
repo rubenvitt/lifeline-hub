@@ -134,7 +134,7 @@ async fn geraetekonto_403() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -445,7 +445,7 @@ async fn sitzungen_beenden_alle_loescht_alle_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{marlene_id}/sitzungen/beenden"),
+        &format!("/api/users/{marlene_id}/sessions/end"),
         &admin,
         None,
     )
@@ -578,7 +578,7 @@ async fn deaktivieren_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{marlene_id}/deaktivieren"),
+        &format!("/api/users/{marlene_id}/deactivate"),
         &admin,
         None,
     )
@@ -587,7 +587,7 @@ async fn deaktivieren_loescht_die_anmeldungen() {
     assert_eq!(zahl(&pool).await, 0);
 }
 
-/// Review M1: Deaktivieren über `PATCH /api/benutzer/{id}` mit `aktiv: false` nimmt die
+/// Review M1: Deaktivieren über `PATCH /api/users/{id}` mit `aktiv: false` nimmt die
 /// Anmeldungen mit wie `deaktivieren`; sonst pushte das alte Gerät nach einer Reaktivierung wieder.
 #[tokio::test]
 async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
@@ -603,7 +603,7 @@ async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{marlene_id}"),
+        &format!("/api/users/{marlene_id}"),
         &admin,
         Some(&json!({ "anzeigename": "Marlene M." }).to_string()),
     )
@@ -613,7 +613,7 @@ async fn bearbeiten_mit_aktiv_false_loescht_die_anmeldungen() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{marlene_id}"),
+        &format!("/api/users/{marlene_id}"),
         &admin,
         Some(&json!({ "aktiv": false }).to_string()),
     )
@@ -684,7 +684,7 @@ async fn relais_gesperrt_seit(pool: &sqlx::SqlitePool, seit: &str) {
 async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
     let (app, pool) = mit_ios_push().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(!v
         .as_object()
@@ -692,7 +692,7 @@ async fn verwaltung_der_instanz_zeigt_die_sperre_des_relais() {
         .contains_key("ios_push_relais_gesperrt_seit"));
 
     relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ios_push_relais_gesperrt_seit"], "2026-11-20 08:15:00");
 }
@@ -702,7 +702,7 @@ async fn ohne_ios_push_zeigt_die_verwaltung_keine_sperre() {
     let (app, pool, _live) = setup_mit_pool_und_live().await;
     relais_gesperrt_seit(&pool, "2026-11-20 08:15:00").await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, v) = anfrage(&app, "GET", "/api/admin/instanz", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/admin/instance", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(!v
         .as_object()
@@ -914,7 +914,7 @@ async fn still_erreicht_kein_geraet() {
     w.relais.keine().await;
 }
 
-/// Ziel 2: Titel, Detail und Pfad sind dieselben wie in `GET /api/benachrichtigungen/{id}`.
+/// Ziel 2: Titel, Detail und Pfad sind dieselben wie in `GET /api/notifications/{id}`.
 #[tokio::test]
 async fn nutzlast_entschluesselt_ergibt_titel_detail_pfad_wie_die_anzeige() {
     let mut w = versand().await;
@@ -933,7 +933,7 @@ async fn nutzlast_entschluesselt_ergibt_titel_detail_pfad_wie_die_anzeige() {
     let (s, anzeige) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &cookie,
         None,
     )
@@ -1196,7 +1196,7 @@ async fn kollaps_verraet_keine_ids() {
 
 /// LLH-2077: die Störung einer Anbindung hat keinen Einsatz und erreicht trotzdem das Gerät des
 /// Admins. Der Klartext trägt kein `e`; Titel, Detail und Pfad (zu den Anbindungen) sind dieselben
-/// wie in `GET /api/benachrichtigungen/{id}`.
+/// wie in `GET /api/notifications/{id}`.
 #[tokio::test]
 async fn stoerung_einer_anbindung_erreicht_den_admin_ohne_einsatz() {
     let mut w = versand().await;
@@ -1242,7 +1242,7 @@ async fn stoerung_einer_anbindung_erreicht_den_admin_ohne_einsatz() {
     let (s, anzeige) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &cookie,
         None,
     )

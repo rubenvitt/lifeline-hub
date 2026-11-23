@@ -1,37 +1,52 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accept	abnehmen
+access	Zugang
+access-changes	Zugangsänderungen
+access-log	Zugangsprotokoll
 accommodation	Unterkunft
 acknowledge	quittieren
 activate	aktivieren
 adapter	-
 admin	-
+administration	Verwaltung
+agenda-items	Programmpunkte
+alarm	Alarmmeldung
 animals	Tiere
 api	-
 app-code	-
 archive	Archiv
 assign	zuweisen
 attachments	Anhänge
+attachments.zip	Anlagen
 attempts	Versuche
 audit	-
 auth	-
 auto-update	automatische Aktualisierung
 backup	-
+blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
 buildable-regions	baubare Regionen
 bulk	-
+calculators	Rechner
 callback	-
 cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 channels	Kanäle
 chat	-
 check	prüfen
+check-in	melden
 check-ins	Rückmeldungen
+client-errors	Client-Fehler
+close	abschließen
+closure	Abschluss
 code	-
 codes	-
 command	Führung
@@ -45,15 +60,21 @@ config	-
 confirm	bestätigen
 count	Anzahl
 counters	Zähler
+countersign	gegenzeichnen
 damages	Schäden
+deactivate	deaktivieren
+decline	ablehnen
+demo-data	Demo-Daten
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 distribution	Verteiler
 documents	Dokumente
 download	-
 emergency-takeover	Notübernahme
-enclosures	Anlagen
+enclosures	Anlagen eines Dokuments
+end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
@@ -62,15 +83,21 @@ events	-
 execution	Vollzug
 existing	vorhandene
 export	-
+external	extern
 fetch-certificate	Zertifikat abrufen
 file	Datei
 finish	-
+follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 gauges	Pegel
+generate	erzeugen
 glyphs	-
+grant	Freigabe
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 import	-
 incidents	Einsätze
 info-line	Infotelefon
@@ -78,41 +105,67 @@ instance	Instanz
 intake	Einwurf
 intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
+inventory	Bestand
 ios-push	-
 jwks.json	-
 key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 live	-
 login	-
+logins	Anmeldungen
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
 material	Material
 matrix	-
 me	-
+member-selection	Mitglied-Auswahl
 messages	Nachrichten
 metrics	Kennzahlen
 mirror	Spiegel
+module-access	Modulfreigaben
+module-counts	Modulzähler
+module-defaults	Modulvorgaben
+module-overrides	Modul-Overrides
+notification-defaults	Benachrichtigungsvorgaben
+notifications	Benachrichtigungen
+object	widersprechen
 offline	-
 offline-maps	Offline-Karten
 oidc	-
+one-time-password	Einmalpasswort
 online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
+org-accommodation-guidelines	Org-Unterkunft-Richtwerte
+org-archive-keys	Org-Archiv-Schlüssel
+org-command-roles	Org-Führungsfunktionen
+org-module-settings	Org-Modul-Einstellungen
+org-settings	Org-Einstellungen
+organization	Organisation
+origin	Herkunft
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
 pause	anhalten
+person-search	Personensuche
 personnel	Personal
 persons	Personen
+place-preview	Ortsvorschau
+place-search	Ortssuche
 plan	-
 plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+presence	Präsenz
+preview	Vorschau
 promote-to-etb	zum ETB heraufstufen
 promote-to-task	zum Auftrag heraufstufen
 providers	-
@@ -121,23 +174,33 @@ raster	-
 read	gelesen
 read-marker	Lesemarke
 recipients	Empfänger
+reclaim	zurückholen
+redaction-requests	Schwärzungsanträge
 redeem	einlösen
 reference	Bezug
+reference-values	Richtwerte
 register	-
 registration	-
-reject	ablehnen
+reimport	neu importieren
+reject	zurückweisen
+rejected	abgelehnt
 release	freigeben
 release-notes	Versionsstand
 reliefs	Ablösungen
 reminders	Erinnerungen
 reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 rescind	aufheben
 reset	-
 resource-requests	Nachforderungen
+restore	wiederherstellen
 resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
+retention-categories	Aufbewahrungskategorien
+retention-period	Aufbewahrungsfrist
 revise	fortschreiben
 revoke	widerrufen
 seats	Plätze
@@ -148,6 +211,7 @@ set	festlegen
 settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
@@ -160,7 +224,9 @@ staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
 status	-
+storage	Datenträger
 style.json	-
+subscription	Abo
 system	-
 talk-groups	Sprechgruppen
 task	Auftrag
@@ -170,6 +236,7 @@ tile	-
 tilejson	-
 tiles	-
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 types	Arten
@@ -178,6 +245,7 @@ undo	zurücknehmen
 units	Einheiten
 unregister	-
 update-now	jetzt aktualisieren
+user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge

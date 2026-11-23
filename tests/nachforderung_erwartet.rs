@@ -232,7 +232,7 @@ async fn projektion_nennt_nur_zugesagte_und_unterwegs_des_raums_ohne_freitexte()
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests/{abgelehnt}/reject"),
+        &format!("/api/einsaetze/{e}/resource-requests/{abgelehnt}/decline"),
         &admin,
         Some(r#"{"grund":"keine"}"#),
     )
@@ -322,7 +322,7 @@ async fn projektion_verlangt_die_freigabe_nachforderungen() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{e}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1012,7 +1012,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
             .is_some_and(|t| t.contains("Einheiten übernommen")),
         "{j:?}"
     );
-    for (pfad, body) in [("reject", r#"{"grund":"x"}"#), ("withdraw", r#"{}"#)] {
+    for (pfad, body) in [("decline", r#"{"grund":"x"}"#), ("withdraw", r#"{}"#)] {
         let (s, j) = anfrage(
             &app,
             "POST",

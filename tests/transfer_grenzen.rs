@@ -243,7 +243,7 @@ async fn gedrosselter_geregelter_upload_endet_im_budget() {
     let antwort = app
         .clone()
         .oneshot(post(
-            "/api/organisation/logo",
+            "/api/organization/logo",
             &admin,
             gedrosselt(multipart("logo.png", MINI_PNG), STUECKE, PAUSE),
         ))

@@ -68,7 +68,7 @@ export async function seedKraefteGesperrt(
     art: 'eintritt',
   });
   for (const modul of module) {
-    const sperre = await page.request.put(`${basis}/modul-overrides/${modul}`, {
+    const sperre = await page.request.put(`${basis}/module-overrides/${modul}`, {
       data: { sichtbar: true, benoetigte_rolle: 'admin' },
     });
     // Ein still gescheitertes Seeding mäße den freien Zweig — grün durch Nichtstun.

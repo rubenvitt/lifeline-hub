@@ -19,7 +19,7 @@ pub struct OrgModulVorgabe {
     pub sichtbar: Option<bool>,
 }
 
-/// Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).
+/// Eine Vorgabe, wie `GET /api/org-module-settings` sie je Modul liefert (LLH-1179).
 /// `sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct OrgModulEinstellung {

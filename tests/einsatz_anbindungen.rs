@@ -1,5 +1,5 @@
 //! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0035,
-//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/anbindungen`, ein Einsatz je Zugang,
+//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/integrations`, ein Einsatz je Zugang,
 //! Ende der Freigabe, Anzeige an der Anbindung und das Verhalten an einem Spiegel.
 
 use axum::http::StatusCode;
@@ -17,7 +17,7 @@ use common::{
 const IP: &str = "198.51.100.7";
 
 fn liste_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/anbindungen")
+    format!("/api/einsaetze/{einsatz}/integrations")
 }
 
 async fn liste(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -35,7 +35,7 @@ async fn freigeben(
     anfrage(
         app,
         "PUT",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
@@ -51,7 +51,7 @@ async fn beenden(
     anfrage(
         app,
         "DELETE",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
@@ -65,7 +65,7 @@ async fn lage(app: &axum::Router, cred: &Credentials) -> Option<Value> {
         app,
         cred,
         "GET",
-        "/api/v1/lage?karte=none",
+        "/api/v1/situation?karte=none",
         jetzt(),
         &jti,
         IP,
@@ -270,7 +270,7 @@ async fn ein_zugang_liest_hoechstens_einen_einsatz_und_abschluss_beendet_die_fre
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{zweiter}/abschliessen"),
+        &format!("/api/einsaetze/{zweiter}/close"),
         &admin,
         None,
     )
@@ -685,7 +685,7 @@ async fn am_spiegel_gilt_die_freigabe_hier_und_das_etb_geht_als_antrag_an_den_fu
     let (s, v) = anfrage_json(
         &hub.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &hub.admin,
         Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
                      "passwort": "erikapw12345"})),

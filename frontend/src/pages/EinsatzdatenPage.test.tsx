@@ -211,7 +211,7 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
     http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
-    http.get('/api/einsaetze/:id/ort-vorschau', () =>
+    http.get('/api/einsaetze/:id/place-preview', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
     http.get('/api/einsaetze/7/fuehrungsstelle', () =>
@@ -1470,7 +1470,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Rufname: ohne Freigabe der Fahrzeuge nur die Organisation, kein Fehler (LFH-1187)', async () => {
     setup();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -1652,7 +1652,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Einsatzleiter: ohne Freigabe Personal nur Freitext, mit Grund', async () => {
     setup();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
       ),
     );
@@ -1738,7 +1738,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Fahrzeuge: ohne Freigabe gesperrt mit Grund, die übrigen Angaben bleiben bedienbar', async () => {
     setup();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -1850,9 +1850,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
   });
 
   function mitPruefung() {
-    server.use(
-      http.get('/api/einsaetze/7/abschluss/pruefung', () => HttpResponse.json(nichtsOffen)),
-    );
+    server.use(http.get('/api/einsaetze/7/closure/check', () => HttpResponse.json(nichtsOffen)));
   }
 
   const abschlussPaneel = async () =>
@@ -1870,7 +1868,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
     setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
     mitPruefung();
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () => {
+      http.post('/api/einsaetze/7/close', () => {
         abgeschlossen = true;
         return HttpResponse.json({ ...basisEinsatz, status: 'abgeschlossen' });
       }),
@@ -1918,7 +1916,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
     setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
     mitPruefung();
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () =>
+      http.post('/api/einsaetze/7/close', () =>
         HttpResponse.json({ error: 'Einsatz ist bereits abgeschlossen' }, { status: 409 }),
       ),
     );
@@ -1978,7 +1976,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
       einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(1) },
     });
     server.use(
-      http.post('/api/einsaetze/7/wiedereroeffnen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reopen', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({ ...basisEinsatz, status: 'aktiv' });
       }),
@@ -2013,7 +2011,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
       einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(1) },
     });
     server.use(
-      http.post('/api/einsaetze/7/wiedereroeffnen', () =>
+      http.post('/api/einsaetze/7/reopen', () =>
         HttpResponse.json(
           { error: 'Eine Datenkategorie dieses Einsatzes ist schon geschwärzt.' },
           { status: 422 },
@@ -2045,7 +2043,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
       http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
       http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
-      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+      http.get('/api/einsaetze/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
       http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
@@ -2057,9 +2055,9 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
         } satisfies Fuehrungsstelle),
       ),
       http.get('/api/einsaetze/:id/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
-      http.get('/api/einsaetze/:id/abschluss/pruefung', () => HttpResponse.json(nichtsOffen)),
+      http.get('/api/einsaetze/:id/closure/check', () => HttpResponse.json(nichtsOffen)),
       http.post(
-        '/api/einsaetze/7/abschliessen',
+        '/api/einsaetze/7/close',
         () =>
           new Promise<Response>((r) => {
             lehneAb = () =>
@@ -2129,7 +2127,7 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
   function geocoder() {
     const begriffe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/7/ort-suche', ({ request }) => {
+      http.get('/api/einsaetze/7/place-search', ({ request }) => {
         begriffe.push(new URL(request.url).searchParams.get('q')!);
         return HttpResponse.json({
           zustand: 'ok',
@@ -2317,7 +2315,7 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
   it('ohne Lagekarten-Recht kein Sprung', async () => {
     setup({ einsatz: { einsatzort_lat: 51.1, einsatzort_lon: 10.4 } });
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false, sichtbar: false } })),
       ),
     );
@@ -2371,7 +2369,7 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     const vorher = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = rolle;
     try {
-      server.use(http.get('/api/einsaetze/7/fuehrung', () => HttpResponse.json(fuehrung)));
+      server.use(http.get('/api/einsaetze/7/command', () => HttpResponse.json(fuehrung)));
       setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
       expect(await screen.findByRole('button', { name: 'Führung zurückholen …' })).toBeVisible();
       await waitFor(() =>
@@ -2389,7 +2387,7 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     Element.prototype.scrollIntoView = rolle;
     try {
       server.use(
-        http.get('/api/einsaetze/7/fuehrung', () => new HttpResponse(null, { status: 500 })),
+        http.get('/api/einsaetze/7/command', () => new HttpResponse(null, { status: 500 })),
       );
       setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
       await waitFor(() =>

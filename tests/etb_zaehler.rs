@@ -333,7 +333,7 @@ async fn ausgeblendetes_etb_modul_ist_403() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

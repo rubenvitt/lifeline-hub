@@ -57,7 +57,7 @@ test('ein Admin setzt den zweiten Faktor einer Person zurück', async ({ page })
   // nicht. Sonst käme eine Ablehnung unsichtbar an (LFH-1077).
   let freigeben: () => void = () => {};
   const freigabe = new Promise<void>((fertig) => (freigeben = fertig));
-  await page.route('**/api/benutzer/*/totp/reset', async (route) => {
+  await page.route('**/api/users/*/totp/reset', async (route) => {
     await freigabe;
     await route.continue();
   });

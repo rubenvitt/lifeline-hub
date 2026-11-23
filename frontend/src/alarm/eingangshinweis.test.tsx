@@ -103,12 +103,12 @@ function serverMit(liste: BenachrichtigungAnzeige[], meldungen: Record<number, M
       gesichtet.push(Number(params.id));
       return HttpResponse.json({ id: Number(params.id), status: 'gesichtet' });
     }),
-    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+    http.get('/api/notifications/:id', ({ params }) => {
       const b = liste.find((x) => x.id === Number(params.id));
       return b ? HttpResponse.json(b) : HttpResponse.json({ error: 'weg' }, { status: 404 });
     }),
-    http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
-    http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {
+    http.get('/api/notifications', () => HttpResponse.json([])),
+    http.post('/api/notifications/:id/acknowledge', ({ params }) => {
       quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -480,7 +480,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     };
     serverMit([b], {});
     server.use(
-      http.get('/api/benachrichtigungen', () => HttpResponse.json([b])),
+      http.get('/api/notifications', () => HttpResponse.json([b])),
       http.get('/api/einsaetze/:id/orders/:bid', () =>
         HttpResponse.json({ id: 7, titel: 'Räumung Nord' }),
       ),

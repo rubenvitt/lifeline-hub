@@ -5514,7 +5514,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   const seitenFrei = await freigegebeneDokumenteSaeen(page, frei);
   const [berichtGesperrt] = await freigegebeneDokumenteSaeen(page, gesperrt);
   // Modulsperre per Override (`e2e/AGENTS.md`, LFH-820): das ETB nur für Admins.
-  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/modul-overrides/etb`, {
+  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/module-overrides/etb`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();

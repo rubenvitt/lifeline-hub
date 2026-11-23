@@ -120,7 +120,7 @@ export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties
   };
 }
 
-/** Mono-Meta neben dem Titel (`schriftskala.meta`). */
+/** Meta neben dem Titel (`schriftskala.meta`: Textschrift, gleich breite Ziffern, LLH-2046). */
 export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProperties {
   return {
     fontFamily: schrift[schriftskala.meta.familie],

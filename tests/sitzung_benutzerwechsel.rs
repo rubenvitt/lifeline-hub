@@ -112,7 +112,7 @@ async fn current_user_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
 async fn admin_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let app = setup().await;
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
-    let vorher = anzahl(&app, &admin, "/api/benutzer").await;
+    let vorher = anzahl(&app, &admin, "/api/users").await;
 
     // Passwort aus dem Namen abgeleitet, wie `common::benutzer_anlegen`.
     let name = "carla";
@@ -127,26 +127,26 @@ async fn admin_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let (status, _) = anfrage_erwartet(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin,
         Some(body),
         &zweiter.to_string(),
     )
     .await;
     assert_eq!(status, StatusCode::PRECONDITION_FAILED);
-    assert_eq!(anzahl(&app, &admin, "/api/benutzer").await, vorher);
+    assert_eq!(anzahl(&app, &admin, "/api/users").await, vorher);
 
     let (status, _) = anfrage_erwartet(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin,
         Some(body),
         &admin_id.to_string(),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(anzahl(&app, &admin, "/api/benutzer").await, vorher + 1);
+    assert_eq!(anzahl(&app, &admin, "/api/users").await, vorher + 1);
 }
 
 #[tokio::test]

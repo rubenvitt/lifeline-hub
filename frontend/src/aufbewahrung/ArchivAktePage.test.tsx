@@ -89,9 +89,9 @@ function zeige(
   const liste = seiten ?? vorgabe;
   server.use(
     meHandler(ME_ADMIN),
-    http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akteWert)),
-    http.get('/api/aufbewahrung/einsaetze/7/schwaerzungsantraege', () => HttpResponse.json([])),
-    http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) => {
+    http.get('/api/retention/incidents/7', () => HttpResponse.json(akteWert)),
+    http.get('/api/retention/incidents/7/redaction-requests', () => HttpResponse.json([])),
+    http.get('/api/retention/incidents/7/etb', ({ request }) => {
       const url = new URL(request.url);
       etbAufrufe.push(url.search);
       const vor = url.searchParams.get('before_lfd_nr');
@@ -263,7 +263,7 @@ describe('ArchivAktePage — Inhalt', () => {
     const erste = Array.from({ length: 100 }, (_, i) => eintrag(200 - i));
     zeige('geschwaerzt', [erste]);
     server.use(
-      http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) =>
+      http.get('/api/retention/incidents/7/etb', ({ request }) =>
         new URL(request.url).searchParams.get('before_lfd_nr') == null
           ? HttpResponse.json(erste)
           : HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
@@ -322,10 +322,10 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
   it('Frist-Anzeige und Frist-Eingabe nennen dieselbe Berliner Uhrzeit', async () => {
     zeige('frist_laeuft');
     server.use(
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
     );
@@ -340,14 +340,14 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
   it('lesbare Einsatz-Zone sticht die der Organisation (Einsatz New York, Org Berlin)', async () => {
     zeige('frist_laeuft');
     server.use(
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           zeitzone: 'America/New_York',
           org_defaults: { org_id: 1, zeitzone: 'Europe/Berlin' },
         }),
       ),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
     );
@@ -386,7 +386,7 @@ describe('ArchivAktePage — Frist aufheben (LFH-756)', () => {
     const gesendet: unknown[] = [];
     zeige('faellig');
     server.use(
-      http.put('/api/einsaetze/7/aufbewahrungsfrist', async ({ request }) => {
+      http.put('/api/einsaetze/7/retention-period', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 7 });
       }),
@@ -408,7 +408,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
       const { client } = zeige('vorgemerkt');
       expect(await screen.findByText('R-001')).toBeInTheDocument();
       server.use(
-        http.get('/api/aufbewahrung/einsaetze/7', () =>
+        http.get('/api/retention/incidents/7', () =>
           HttpResponse.json({ error: 'Kein Zugriff' }, { status }),
         ),
       );
@@ -423,7 +423,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
     const { client } = zeige('vorgemerkt');
     expect(await screen.findByText('R-001')).toBeInTheDocument();
     server.use(
-      http.get('/api/aufbewahrung/einsaetze/7', () =>
+      http.get('/api/retention/incidents/7', () =>
         HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
       ),
     );
@@ -436,7 +436,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
     const { client } = zeige('geschwaerzt');
     expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
     server.use(
-      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+      http.get('/api/retention/incidents/7/etb', () =>
         HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
       ),
     );
@@ -449,7 +449,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
     const { client } = zeige('geschwaerzt');
     expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
     server.use(
-      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+      http.get('/api/retention/incidents/7/etb', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );

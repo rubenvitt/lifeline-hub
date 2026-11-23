@@ -148,7 +148,7 @@ async fn etb_ausblenden(app: &axum::Router, admin: &str, einsatz: i64) {
     let (s, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -223,7 +223,7 @@ async fn upload_im_abgeschlossenen_einsatz_ist_409_wie_das_erfassen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

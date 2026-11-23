@@ -21,7 +21,7 @@ test.describe(KAPITEL, () => {
   test('Reiter „Zugriff“ der Einstellungen', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await fuelle(page, 'post', '/api/benutzer', {
+    await fuelle(page, 'post', '/api/users', {
       anzeigename: 'Lea Probe',
       benutzername: 'l.probe',
       passwort: 'doku-passwort-123',

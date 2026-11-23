@@ -151,19 +151,20 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
-# Einsatz-Pakete (LLH-2058): übersetzt ein Paket nur die Segmente nach `/api/einsaetze/{id}/`,
-# bleibt der neue Pfad wegen des Präfixes im Bestand. Das ist erlaubt, solange `einsaetze` sein
-# einziges deutsches Segment ist und der Bestand nicht wächst.
-EINSATZ_BASIS="route_dazu '/api/einsaetze/{id}/meldungen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/meldungen' > scripts/api-routen-bestand.txt && git commit -qam meldungen && git update-ref refs/remotes/origin/alpha HEAD"
-fall "Einsatz-Paket: neuer Pfad nur mit Präfix einsaetze" gruen \
-  "$EINSATZ_BASIS && sed -i.bak 's#/meldungen#/reports#' src/app.rs && rm src/app.rs.bak && glossar \"api\${TAB}-\" \"auth\${TAB}Anmeldung\" \"health\${TAB}-\" \"login\${TAB}-\" \"me\${TAB}-\" \"reports\${TAB}Meldungen\" \"v1\${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/reports' > scripts/api-routen-bestand.txt" \
+fall "Bestand wächst nur in der Zahl (neue Route unter deutschem Präfix)" rot \
+  "route_dazu '/api/einsaetze/{id}/close' && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/close" "2 statt 1"
+# Ein Paket übersetzt Segmente unter einem Präfix, das erst ein späteres Paket umstellt: der Pfad
+# bleibt im Bestand, nur seine Zeile ändert sich (LLH-2060).
+fall "Segment unter deutschem Präfix übersetzt" gruen \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/close#' src/app.rs > x && mv x src/app.rs && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"close${TAB}abschließen\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/close' > scripts/api-routen-bestand.txt" \
   "OK"
-fall "Einsatz-Paket: Präfix-Zeile dazu, Bestand wächst" rot \
-  "$EINSATZ_BASIS && route_dazu '/api/einsaetze/{id}/reports' && glossar \"api\${TAB}-\" \"auth\${TAB}Anmeldung\" \"health\${TAB}-\" \"login\${TAB}-\" \"me\${TAB}-\" \"reports\${TAB}Meldungen\" \"v1\${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/meldungen' '/api/einsaetze/{id}/reports' > scripts/api-routen-bestand.txt" \
-  "der Bestand darf nur schrumpfen"
-fall "Einsatz-Paket: neuer Pfad mit weiterem deutschen Segment" rot \
-  "$EINSATZ_BASIS && sed -i.bak 's#/meldungen#/neu-deutsch#' src/app.rs && rm src/app.rs.bak && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/neu-deutsch' > scripts/api-routen-bestand.txt" \
-  "/api/einsaetze/{id}/neu-deutsch: neu im Bestand"
+fall "Segment unter deutschem Präfix in ein neues deutsches Wort umbenannt" rot \
+  "route_dazu '/api/einsaetze/{id}/abschliessen' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/abschliessen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/abschliessen#/beenden#' src/app.rs > x && mv x src/app.rs && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/beenden' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/beenden" "beenden" "origin/alpha"
+fall "neue deutsche Route bei gleicher Zeilenzahl, aus bekannten Wörtern" rot \
+  "route_dazu /api/alt-deutsch && printf '%s\n' '/api/alt-deutsch' '/api/einsaetze/{id}' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && grep -v '\"/api/alt-deutsch\"' src/app.rs > x && mv x src/app.rs && route_dazu '/api/einsaetze/{id}/alt-deutsch' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/alt-deutsch' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/alt-deutsch" "origin/alpha"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

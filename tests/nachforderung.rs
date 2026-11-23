@@ -291,7 +291,7 @@ async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
     let (status, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests/{nid}/reject"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/decline"),
         &admin,
         Some(r#"{"grund":"keine Reserven"}"#),
     )
@@ -374,7 +374,7 @@ async fn ablehnen_setzt_grund() {
     let (status, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests/{nid}/reject"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/decline"),
         &admin,
         Some(r#"{"grund":"keine Reserven"}"#),
     )
@@ -392,7 +392,7 @@ async fn ablehnen_mit_zu_langem_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let nid = absetzen(&app, &admin, e).await;
-    let url = format!("/api/einsaetze/{e}/resource-requests/{nid}/reject");
+    let url = format!("/api/einsaetze/{e}/resource-requests/{nid}/decline");
     let max = lifeline_hub::nachforderung::ABLEHNEN_GRUND_MAX;
 
     let lang = serde_json::json!({ "grund": "x".repeat(max + 1) }).to_string();

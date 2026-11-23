@@ -15,7 +15,7 @@
 import { useState, type PointerEvent } from 'react';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, schriftStil, useRollen } from '../components/instrument';
 import { wasserstandMeter, type TrendRichtung } from '../pegel/pegelKennzahl';
 
 /** Kleinste dargestellte Spanne in cm (Mindesthöhe der y-Achse). */
@@ -159,7 +159,7 @@ export default function Verlaufslinie({
   };
   const abgelesen = zeiger != null ? g.punkte[zeiger] : null;
   const zeit = (t: number) => zeitKurz(new Date(t).toISOString(), konv);
-  const meta = { ...monoStil('meta'), color: rollen.gedaempft };
+  const meta = { ...monoStil('monoFein'), color: rollen.gedaempft };
   const prognoseY = prognoseCm != null ? g.yFuer(prognoseCm) : null;
   const lage = beschriftungsHoehen(g, RAND, BESCHRIFTUNG_ABSTAND);
   const prozent = (y: number) => `${(y / (HOEHE + 2 * RAND)) * 100}%`;
@@ -208,7 +208,7 @@ export default function Verlaufslinie({
                 x={2}
                 y={prognoseY < 14 ? prognoseY + 12 : prognoseY - 3}
                 fill={rollen.gedaempft}
-                style={monoStil('meta')}
+                style={schriftStil('meta')}
               >
                 Prognose {wasserstandMeter(prognoseCm)} m
               </text>

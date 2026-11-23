@@ -7,7 +7,7 @@
 //!   Löschlauf.
 //! - [`ablage`]: was ein Einwurf speichert (Alarmmeldungen roh mit Doppelerkennung, die letzte
 //!   Position je Kennung).
-//! - [`routen`]: die vier Routen unter `/api/v1/einwurf/` und die Reihenfolge ihrer Prüfungen.
+//! - [`routen`]: die vier Routen unter `/api/v1/intake/` und die Reihenfolge ihrer Prüfungen.
 //!
 //! **Der Schlüssel steht in keinem Protokoll.** Kein `tracing`-Aufruf in diesem Modul nennt
 //! Pfad, Abfrage, Schlüssel oder Hash; wer etwas protokolliert, nennt die Kennung des Zugangs.
@@ -106,19 +106,19 @@ fn has_schluessel(abschnitt: &str) -> bool {
         || (abschnitt.contains('%') && percent_decode_ascii(abschnitt).contains(SCHLUESSEL_PRAEFIX))
 }
 
-/// Ersetzt im Pfad den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der das
+/// Ersetzt im Pfad den Abschnitt nach `/api/v1/intake/` und jeden Abschnitt, der das
 /// Schlüsselpräfix enthält, durch [`MASKE`]. Die zweite Regel fängt vertippte Pfade, die zu
 /// keiner Route führen und trotzdem im Protokoll landen.
 pub fn maskiere_pfad(pfad: &str) -> Cow<'_, str> {
     let einwurf = pfad
         .strip_prefix(super::PREFIX)
-        .and_then(|rest| rest.strip_prefix("/einwurf/"))
+        .and_then(|rest| rest.strip_prefix("/intake/"))
         .map(|rest| rest.split('/').next().unwrap_or_default())
         .filter(|abschnitt| !abschnitt.is_empty());
     if einwurf.is_none() && !pfad.split('/').any(has_schluessel) {
         return Cow::Borrowed(pfad);
     }
-    // Abschnitt 0 ist leer (führender Schrägstrich), 1–3 sind `api`, `v1`, `einwurf`.
+    // Abschnitt 0 ist leer (führender Schrägstrich), 1–3 sind `api`, `v1`, `intake`.
     let maskiert: Vec<&str> = pfad
         .split('/')
         .enumerate()
@@ -530,19 +530,19 @@ pub(crate) mod tests {
     fn pfad_wird_nach_einwurf_maskiert() {
         let s = neuer_schluessel();
         assert_eq!(
-            maskiere_pfad(&format!("/api/v1/einwurf/{s}/alarmmeldung")),
-            "/api/v1/einwurf/***/alarmmeldung"
+            maskiere_pfad(&format!("/api/v1/intake/{s}/alarm")),
+            "/api/v1/intake/***/alarm"
         );
-        // Auch ein Abschnitt, der kein Schlüssel ist: nach `/einwurf/` steht immer ein Geheimnis.
+        // Auch ein Abschnitt, der kein Schlüssel ist: nach `/intake/` steht immer ein Geheimnis.
         assert_eq!(
-            maskiere_pfad("/api/v1/einwurf/irgendwas/position"),
-            "/api/v1/einwurf/***/position"
+            maskiere_pfad("/api/v1/intake/irgendwas/position"),
+            "/api/v1/intake/***/position"
         );
         assert_eq!(
-            maskiere_pfad(&format!("/api/v1/einwurf/{s}")),
-            "/api/v1/einwurf/***"
+            maskiere_pfad(&format!("/api/v1/intake/{s}")),
+            "/api/v1/intake/***"
         );
-        assert_eq!(maskiere_pfad("/api/v1/einwurf/"), "/api/v1/einwurf/");
+        assert_eq!(maskiere_pfad("/api/v1/intake/"), "/api/v1/intake/");
     }
 
     #[test]
@@ -550,13 +550,13 @@ pub(crate) mod tests {
         let s = neuer_schluessel();
         for (pfad, erwartet) in [
             (
-                format!("/api/v1/einwurff/{s}/alarmmeldung"),
-                "/api/v1/einwurff/***/alarmmeldung",
+                format!("/api/v1/intakef/{s}/alarm"),
+                "/api/v1/intakef/***/alarm",
             ),
-            (format!("/einwurf/{s}"), "/einwurf/***"),
+            (format!("/intake/{s}"), "/intake/***"),
             (
-                format!("/api/v1/einwurf/x/{s}/alarmmeldung"),
-                "/api/v1/einwurf/***/***/alarmmeldung",
+                format!("/api/v1/intake/x/{s}/alarm"),
+                "/api/v1/intake/***/***/alarm",
             ),
             (format!("/{s}xyz"), "/***"),
         ] {
@@ -573,11 +573,11 @@ pub(crate) mod tests {
         let ganz_kodiert: String = s.bytes().map(|b| format!("%{b:02x}")).collect();
         for pfad in [
             // Schrägstrich zwischen Adresse und Schlüssel vergessen.
-            format!("/api/v1/einwurf{s}/alarmmeldung"),
-            format!("/api/v1/einwurf={s}/alarmmeldung"),
-            format!("/api/v1/einwurff/'{s}'/alarmmeldung"),
-            format!("/api/v1/einwurff/{kodiert}/alarmmeldung"),
-            format!("/api/v1/einwurff/{ganz_kodiert}/alarmmeldung"),
+            format!("/api/v1/intake{s}/alarm"),
+            format!("/api/v1/intake={s}/alarm"),
+            format!("/api/v1/intakef/'{s}'/alarm"),
+            format!("/api/v1/intakef/{kodiert}/alarm"),
+            format!("/api/v1/intakef/{ganz_kodiert}/alarm"),
         ] {
             let maskiert = maskiere_pfad(&pfad);
             assert!(maskiert.contains(MASKE), "{pfad}");
@@ -598,7 +598,7 @@ pub(crate) mod tests {
 
     #[test]
     fn fremder_pfad_bleibt_unveraendert() {
-        for pfad in ["/api/v1/me", "/api/einsaetze/7", "/", "", "/api/v1/einwurf"] {
+        for pfad in ["/api/v1/me", "/api/einsaetze/7", "/", "", "/api/v1/intake"] {
             assert!(matches!(maskiere_pfad(pfad), Cow::Borrowed(p) if p == pfad));
         }
     }

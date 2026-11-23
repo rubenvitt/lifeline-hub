@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 23.11.2026 (Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -153,10 +153,10 @@ sequenceDiagram
   B->>BE: GET /api/einsaetze/{id}/live
   B->>B: onopen leert den Präsenzstand
   BE-->>B: event: praesenz (Stand beim Verbinden, ohne id, nur wenn nicht leer)
-  A->>BE: PUT /api/einsaetze/{id}/praesenz beim Öffnen, dann alle 15 s
+  A->>BE: PUT /api/einsaetze/{id}/presence beim Öffnen, dann alle 15 s
   BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
   Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)
-  A->>BE: DELETE …/praesenz beim Schließen (pagehide mit keepalive)
+  A->>BE: DELETE …/presence beim Schließen (pagehide mit keepalive)
 ```
 
 - Der Stand lebt nur im Speicher (`src/live/praesenz.rs`, Ablauf 45 s, Aufräumtakt 5 s) und geht
@@ -263,7 +263,7 @@ sequenceDiagram
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
-  G->>BE: POST /api/geraete/koppeln {code}
+  G->>BE: POST /api/devices/pair {code}
   BE->>DB: session::anlegen_geraet (mit kopplung_id)
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
   G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
@@ -296,15 +296,15 @@ sequenceDiagram
   participant A as Instanz A (src/routes/instanz.rs)
   participant E as Instanz E (src/instanz/melden.rs)
   participant AE as frontend Admin E
-  AA->>A: POST /api/admin/instanz/codes (nur mit eigenem Unterschriftsschlüssel)
+  AA->>A: POST /api/admin/instance/codes (nur mit eigenem Unterschriftsschlüssel)
   A-->>AA: Code (16 Zeichen, 15 min), Fingerabdruck A
-  AE->>E: POST /api/admin/instanz/einloesen {adresse, code}
-  E->>A: POST /api/instanz/koppeln {suche, Schlüssel E, Prüfwert E}
+  AE->>E: POST /api/admin/instance/redeem {adresse, code}
+  E->>A: POST /api/instance/pair {suche, Schlüssel E, Prüfwert E}
   A->>A: Prüfwert E, Code verbrauchen, Kopplung angebahnt
   A-->>E: Schlüssel A, Org, Unterschriftsschlüssel, Prüfwert A (signiert)
   E->>E: Prüfwert A und Signatur, Kopplung aktiv
   loop alle 60 s (bei Fehlern verdoppelt bis 10 min)
-    E->>A: POST /api/instanz/melden (Anfrage-JWT)
+    E->>A: POST /api/instance/check-in (Anfrage-JWT)
     A->>A: Extractor: Signatur, Ziel, Pfad, Body-Hash, Zeit, jti
     A-->>E: Stand, Widerrufe, neue Unterschriftsschlüssel (signiert)
   end
@@ -326,15 +326,15 @@ zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
 sequenceDiagram
   participant E as ELW 2, meldet sich (src/instanz/melden.rs)
   participant A as ELW 1, erreicht (src/routes/instanz.rs)
-  E->>E: GET /api/admin/instanz/lan (src/instanz/entdeckung.rs, mDNS)
-  E->>A: POST /api/instanz/koppeln (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
+  E->>E: GET /api/admin/instance/lan (src/instanz/entdeckung.rs, mDNS)
+  E->>A: POST /api/instance/pair (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
   A-->>E: signiert: art vor_ort, tls_zertifikat = Fingerabdruck
   E->>E: Fingerabdruck = gesehenes Zertifikat? dann Pin speichern
   loop Melden und Abgleich
     E->>A: Anfrage nur über den Client mit Pin (src/instanz/zertifikat.rs)
   end
   Note over A: Neustart, neues Zertifikat
-  E->>A: POST /api/instanz/zertifikat (ohne Nutzdaten, ohne Pin)
+  E->>A: POST /api/instance/certificate (ohne Nutzdaten, ohne Pin)
   A-->>E: signiert: neuer Fingerabdruck
   E->>A: Meldung mit neuem Pin
 ```
@@ -367,7 +367,7 @@ sequenceDiagram
   H->>H: antrag::schicht: Spiegel, BEANTRAGBAR, Verweise lokal → fremd
   H-->>SB: 202 {antrag: ausstehend}
   loop Tick 1 s; je Kopplung 5 s bei Aktivität, sonst Takt der Meldung
-    E->>H: POST /api/instanz/spiegel {quittungen, antraege, staende, lieferungen ab spiegel_ziel, abrufe, anhang_teile}
+    E->>H: POST /api/instance/mirror {quittungen, antraege, staende, lieferungen ab spiegel_ziel, abrufe, anhang_teile}
     H->>H: Lieferung übernehmen (Merker, spiegel_herkunft, Stand nur vorwärts)
     H-->>E: {antraege (jetzt zugestellt), staende, abrufe, …} signiert
     E->>E: spiegel_ziel = staende der Antwort
@@ -451,7 +451,7 @@ sequenceDiagram
   H-->>AH: Erklärung, Challenge = SHA-256 der Erklärung
   AH->>H: …/notuebernahme/abschluss {Assertion}
   H->>H: Unterschrift gegen eigenen gültigen Schlüssel, Hub führt (n+1, Hub)
-  E->>H: POST /api/instanz/melden {fuehrung: Akten seit Quittung}
+  E->>H: POST /api/instance/check-in {fuehrung: Akten seit Quittung}
   H-->>E: Akte (n+1, Hub) mit Erklärung und Unterschrift
   alt Unterschrift von einem am ELW gültigen Schlüssel
     E->>E: offen halten, ELW schreibt weiter, Benachrichtigung „Führung übernommen“
@@ -520,7 +520,7 @@ sequenceDiagram
 
 Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
 eigenen Tabellen (LLH-1652,
-[ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+[ADR-0096](entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 
 ```mermaid
@@ -530,7 +530,7 @@ sequenceDiagram
   participant F as Fremdsystem (crates/lifeline-machine-client)
   Admin->>Hub: POST /api/admin/integrations {name, scopes}
   Hub-->>Admin: Code (16 Zeichen, 15 min)
-  F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
+  F->>Hub: POST /api/v1/access/redeem {lookup, public_key, proof}
   Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
   Hub-->>F: zugang_id, instanz_id, Instanzschlüssel, Prüfwert
   F->>Hub: GET /api/v1/me (Authorization: Machine)
@@ -560,7 +560,7 @@ sequenceDiagram
   participant A as Absender (BOSWatch, FE2, OsmAnd)
   Admin->>Hub: POST /api/admin/intake-credentials {name, scope}
   Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
-  A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
+  A->>Hub: GET /api/v1/intake/<schlüssel>/alarm?…
   Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
   Hub->>Hub: ablage: roh ablegen oder als Wiederholung vermerken
   Hub-->>A: 204 ohne Body (Cache-Control: no-store)
@@ -603,7 +603,7 @@ sequenceDiagram
   Hub->>DB: nach einer Sekunde erneut lesen
   DB-->>Hub: einsatz.updated (4712)
   Hub-->>F: {cursor: 4712, events: [...]} (Lifeline-Signature)
-  F->>Hub: GET /api/v1/einsaetze/42
+  F->>Hub: GET /api/v1/incidents/42
   Hub-->>F: Einsatzkopf
 ```
 
@@ -621,8 +621,8 @@ sequenceDiagram
 - Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
   (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
   `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
-  baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
-  `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
+  baut neu auf: mit `einsaetze:read` über `GET /api/v1/incidents`, sonst über
+  `GET /api/v1/events` ohne `after` und `GET /api/v1/situation`. Stand und Zeilen liest der Abruf aus
   einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
 
 ## 6.6g Adapter ruft ab
@@ -718,7 +718,7 @@ sequenceDiagram
     N->>WP: versenden (nur Kennungen, RFC 8291)
     WP->>PD: POST an den Abo-Endpunkt
     PD-->>SW: push
-    SW->>BE: GET /api/benachrichtigungen/{id} (mit Sitzung)
+    SW->>BE: GET /api/notifications/{id} (mit Sitzung)
     SW->>SW: showNotification (Tag wie im Tab)
   end
 ```
@@ -757,7 +757,7 @@ sequenceDiagram
   EN->>EA: melden(Anlass): ziele, vormerken (hinweis_ausgang)
   EA->>ET: wecken
   EN->>EN: Zeilen und Live wie immer; Push an alle, die der Hub nicht erreicht
-  ET->>H: POST /api/instanz/spiegel {lieferungen, hinweise}
+  ET->>H: POST /api/instance/mirror {lieferungen, hinweise}
   H->>H: Zeilen übernehmen, dann hinweis::annehmen (abbilden, hinweis_eingang)
   H-->>ET: hinweis_quittungen (ELW löscht sie aus dem Ausgang)
   H->>HN: nach dem Commit melden bzw. erledigen
@@ -766,6 +766,12 @@ sequenceDiagram
 
 - Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort je Kanal
   (`MeldenAntwort.hinweise`, `web_push`, `ios_push`); die meldende Seite merkt es an der Kopplung.
+- Sperrt das Push-Relais den Hub, nennt er es mit (`MeldenAntwort.ios_push_gesperrt_seit`,
+  LLH-2074). Der ELW merkt es an der Kopplung und zeigt es an jedem Einsatz, dessen Hinweise über
+  diesen Hub reisen (`EinsatzAnzeige.ios_push_hub_gesperrt`, Band für Einsatzleitung und Admins),
+  pusht Hub-Konten aber nicht selbst: ihre Geräte sind am Hub angemeldet. Beginn und Ende der
+  Sperre melden den Einsatzkopf (`hinweis::sperre_melden`); Entscheidung:
+  [ADR-0095](entscheidungen/ADR-0095-ein-am-relais-gesperrter-hub-wird-am-elw-angezeigt-nicht-ersetzt.md).
 - Bietet der Hub einen Kanal an, lässt der ELW den Push in diesem Kanal nur an Konten aus, die aus
   der Kopplung stammen (`hinweis::konten_am_hub` mit `hinweis::Kanal`). Konten nur am ELW, einen
   Kanal, den der Hub nicht anbietet, und ein gescheitertes Vormerken pusht er selbst.
@@ -793,7 +799,7 @@ sequenceDiagram
   BE->>BE: Upsert auf token, an Konto und Gerät
   Note over BE,IP: später: benachrichtigung::ausliefern
   BE->>IP: versenden (eigener Task, Filter wie Web Push)
-  IP->>IP: Klartext wie GET /api/benachrichtigungen/{id}, AES-256-GCM je Gerät
+  IP->>IP: Klartext wie GET /api/notifications/{id}, AES-256-GCM je Gerät
   opt noch kein Zugang
     IP->>R: POST /v1/server
     R-->>IP: server_id, geheimnis
@@ -813,7 +819,7 @@ sequenceDiagram
   `403` (gesperrt) beendet den Versand für `SPERRE_GILT_STUNDEN` (24 h), danach versucht der
   nächste Versand es einmal mit demselben Zugang (angenommen: Sperre weg; wieder `403`: sie gilt
   ab jetzt neu). Solange sie steht, meldet `GET /api/ios-push` `relais_gesperrt`, und
-  `GET /api/admin/instanz` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
+  `GET /api/admin/instance` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
 - Das Relais setzt `apns-expiration` auf 12 Stunden, `apns-priority` 10 und für einen Alarm
   `interruption-level: time-sensitive`, für einen Hinweis `active` (`push-relais/src/apns.rs`).
   Ohne Extension oder Schlüssel bleibt der Rückfalltitel „Alarm“ bzw. „Neue Benachrichtigung“.

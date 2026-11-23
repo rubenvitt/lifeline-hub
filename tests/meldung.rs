@@ -998,7 +998,7 @@ async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -1409,7 +1409,7 @@ async fn bestaetigung_frist_default_aus_einstellungen_schlaegt_konstante() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
     )
@@ -1439,7 +1439,7 @@ async fn bestaetigung_frist_request_override_schlaegt_einstellung() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
     )
@@ -1589,7 +1589,7 @@ async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )

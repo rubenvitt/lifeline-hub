@@ -13,7 +13,7 @@ import { anmeldenPerApi } from './anmelde-kern';
  *
  * GEMESSEN (beide Zustände per `page.route`, ohne Backend-Schalter):
  *  · Info: „Zu den Demo-Daten“ im Demo-Hinweis der Einsatzliste (Knopf in der Beschreibung).
- *    `GET /api/demo-daten` antwortet „nicht importiert“, sonst ist die Route ohne
+ *    `GET /api/demo-data` antwortet „nicht importiert“, sonst ist die Route ohne
  *    `--demo-daten` gar nicht registriert.
  *  · Fehler: „Erneut abrufen“ im Ladefehler der Einsatzliste (Knopf im `action`-Slot).
  *    `GET /api/einsaetze` antwortet 500.
@@ -53,7 +53,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     test('Info: Demo-Hinweis der Einsatzliste', async ({ page }) => {
       await page.route(
-        (url) => url.pathname === '/api/demo-daten',
+        (url) => url.pathname === '/api/demo-data',
         (route) =>
           route.request().method() === 'GET'
             ? route.fulfill({

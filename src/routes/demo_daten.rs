@@ -5,7 +5,7 @@
 //! Die Org ist die des Admins (`benutzer.org_id`). Jede Schreibaktion läuft in genau einem
 //! `write_retry!`, und jede Antwort trägt den Status aus derselben Transaktion.
 //!
-//! **Lage im Pfad (LLH-1576):** Schreibwege nennen die Lage (`/api/demo-daten/{lage}`) und
+//! **Lage im Pfad (LLH-1576):** Schreibwege nennen die Lage (`/api/demo-data/{lage}`) und
 //! wirken nur auf sie; eine unbekannte Lage ist 404. Der Status nennt immer alle Lagen.
 //!
 //! **`lagged` nach Entfernen und Neu-Import:** nach dem Commit geht [`LiveEvent::Lagged`] mit
@@ -158,7 +158,7 @@ fn resync_senden(state: &AppState, alt: Option<i64>) {
     }
 }
 
-/// GET /api/demo-daten — Stand der Demo-Daten der eigenen Organisation, je Lage. 200.
+/// GET /api/demo-data — Stand der Demo-Daten der eigenen Organisation, je Lage. 200.
 pub async fn status(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -167,7 +167,7 @@ pub async fn status(
     Ok(Json(status_tx(&mut conn, benutzer.org_id).await?))
 }
 
-/// POST /api/demo-daten/{lage} — eine Demo-Lage importieren. 201; 404 bei unbekannter Lage, 409
+/// POST /api/demo-data/{lage} — eine Demo-Lage importieren. 201; 404 bei unbekannter Lage, 409
 /// bei aktivem Import dieser Lage, 422 bei fehlendem Katalogeintrag.
 pub async fn importieren(
     State(state): State<AppState>,
@@ -188,7 +188,7 @@ pub async fn importieren(
     Ok((StatusCode::CREATED, Json(status)))
 }
 
-/// POST /api/demo-daten/{lage}/neu — eine Lage entfernen und neu importieren in EINER
+/// POST /api/demo-data/{lage}/reimport — eine Lage entfernen und neu importieren in EINER
 /// Transaktion: scheitert der Import, rollt auch das Entfernen zurück. Ohne aktiven Import der
 /// Lage nur der Import. 200; 404 bei unbekannter Lage, 422 bei fehlendem Katalogeintrag.
 pub async fn neu_importieren(
@@ -225,7 +225,7 @@ pub async fn neu_importieren(
     Ok(Json(status))
 }
 
-/// DELETE /api/demo-daten/{lage} — eine Demo-Lage entfernen. 200; 404 bei unbekannter Lage,
+/// DELETE /api/demo-data/{lage} — eine Demo-Lage entfernen. 200; 404 bei unbekannter Lage,
 /// 409, wenn die Lage nicht importiert ist.
 pub async fn entfernen(
     State(state): State<AppState>,

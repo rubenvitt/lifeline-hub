@@ -213,7 +213,7 @@ function eingangVon(
 
 /**
  * Benachrichtigungen in einer Zentrale (design.md D5). Hört auf das Live-Ereignis (über
- * `live/benachrichtigungListener.ts`), holt den Text (`GET /api/benachrichtigungen/{id}`), zeigt
+ * `live/benachrichtigungListener.ts`), holt den Text (`GET /api/notifications/{id}`), zeigt
  * den Eintrag in der Alarmzone (LLH-1735) und spielt den Ton der Stufe; das Quittier-Ereignis nimmt ihn
  * weg. Eine fremde oder aufgeräumte Benachrichtigung (4xx) bleibt still.
  *

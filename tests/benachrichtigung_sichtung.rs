@@ -68,7 +68,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/personen", w.einsatz),
+        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -157,14 +157,7 @@ async fn hochstufung_auf_sk1_erreicht_die_leser_der_personen() {
     w.pruefe_gegenseite(&zeilen);
 
     let bert = w.cookie("bertram").await;
-    let (s, offen) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &bert,
-        None,
-    )
-    .await;
+    let (s, offen) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &bert, None).await;
     assert_eq!(s, StatusCode::OK, "{offen}");
     let liste = offen.as_array().unwrap();
     assert_eq!(liste.len(), 1, "{offen}");

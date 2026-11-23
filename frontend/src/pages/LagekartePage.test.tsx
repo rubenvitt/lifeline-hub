@@ -437,11 +437,11 @@ function basisHandler(
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ stellen: [] })),
     http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [] })),
-    http.get('/api/organisation', () =>
+    http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
     http.get('/api/map/config', () => HttpResponse.json(config)),
-    http.get('/api/einsaetze/1/einstellungen', () => HttpResponse.json(EINSTELLUNGEN)),
+    http.get('/api/einsaetze/1/settings', () => HttpResponse.json(EINSTELLUNGEN)),
     http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
     // Standardansicht mit basemap_modus=null → useKartenAnsicht hydratisiert auf den
@@ -1135,7 +1135,7 @@ describe('LagekartePage', () => {
   it('zeigt die taktischen Layer-Toggles und ein nicht-verortetes taktisches Objekt in der Liste', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.get('/api/organisation', () => HttpResponse.json(ORG_DRK)),
+      http.get('/api/organization', () => HttpResponse.json(ORG_DRK)),
     ]);
     objekteVorn();
     localStorage.removeItem('lfh:lagekarte:leiste-ansicht');
@@ -1561,7 +1561,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=betreuungsstelle: ohne Modul Betreuung kein Platziermodus (LFH-673)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -1816,7 +1816,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=bereitstellungsraum: ohne Modul Bereitstellungsräume kein Platziermodus (LLH-1107)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ bereitstellungsraeume: { zugriff: false } })),
       ),
     ]);
@@ -1839,7 +1839,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=tier: ohne Modul Tiere kein Platziermodus, der Auftrag wird geräumt (LLH-1123)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ tiere: { zugriff: false } })),
       ),
     ]);
@@ -1863,7 +1863,7 @@ describe('LagekartePage', () => {
     // Schreibrecht im Einsatz reicht nicht: der PATCH einer Person verlangt das Modul, ohne es endete
     // der Klick auf die Karte in einem 403.
     basisHandler([
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -2291,7 +2291,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
       http.get('/api/einsaetze/1', () =>
         HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
       ),
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ einsatzdaten: { zugriff: false } })),
       ),
     ]);
@@ -2760,7 +2760,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     let anfragen = 0;
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
       http.get('/api/einsaetze/1/personen', () => {
@@ -3021,7 +3021,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
 
   it('ohne Modul „Personen“ kein Modus und kein Personenmarker', async () => {
     auftragsHandler([
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: true, zugriff: false } })),
       ),
     ]);
@@ -3701,7 +3701,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('ohne Freigabe des Moduls Evakuierung: kein Modus, Parameter geräumt', async () => {
     basisHandler([
       mitBezirken(),
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -4854,7 +4854,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?platzieren=schaden:10',
       // Die Modulfreigaben ändern sich (ein anderes Modul wird gesperrt).
       handler: () => [
-        http.get('/api/einsaetze/1/modul-freigaben', () =>
+        http.get('/api/einsaetze/1/module-access', () =>
           HttpResponse.json(freigabenFixture(runde > 0 ? { personen: { zugriff: false } } : {})),
         ),
       ],
@@ -4881,7 +4881,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?zentrum=52.52,13.405',
       // Das Koordinatenformat des Einsatzes ändert sich (`EinsatzAnzeigeProvider`): neue Formatter.
       handler: () => [
-        http.get('/api/einsaetze/1/einstellungen', () =>
+        http.get('/api/einsaetze/1/settings', () =>
           HttpResponse.json({
             ...EINSTELLUNGEN,
             koordinatenformat: runde > 0 ? 'utm' : null,

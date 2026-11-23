@@ -1,14 +1,14 @@
 //! HTTP-Routen der Benachrichtigungen (LLH-1207, design.md D2).
 //!
-//! GET  /api/benachrichtigungen                    — eigene der letzten 12 h (`?offen=true`:
+//! GET  /api/notifications                    — eigene der letzten 12 h (`?offen=true`:
 //!                                                    nur unquittierte, `?einsatz_id=`)
-//! GET  /api/benachrichtigungen/{id}               — eine eigene samt Text
-//! POST /api/benachrichtigungen/{id}/quittieren    — quittieren, Ereignis an die eigenen Tabs
-//! GET  /api/einsaetze/{id}/benachrichtigungen     — Verlauf samt Zahl der ungelesenen Eingänge
+//! GET  /api/notifications/{id}               — eine eigene samt Text
+//! POST /api/notifications/{id}/acknowledge    — quittieren, Ereignis an die eigenen Tabs
+//! GET  /api/einsaetze/{id}/notifications     — Verlauf samt Zahl der ungelesenen Eingänge
 //!                                                    (LLH-1143, design.md D3)
-//! POST /api/einsaetze/{id}/benachrichtigungen/gelesen — „alle gelesen“ bis `bis_id` (D4)
-//! GET  /api/einsaetze/{id}/benachrichtigung-vorgaben — Vorgabe je Funktion (LLH-1421, D4)
-//! PUT  /api/einsaetze/{id}/benachrichtigung-vorgaben/{art} — Vorgabe einer Art setzen
+//! POST /api/einsaetze/{id}/notifications/read — „alle gelesen“ bis `bis_id` (D4)
+//! GET  /api/einsaetze/{id}/notification-defaults — Vorgabe je Funktion (LLH-1421, D4)
+//! PUT  /api/einsaetze/{id}/notification-defaults/{art} — Vorgabe einer Art setzen
 //!
 //! **Berechtigung ist die Empfängerzeile:** die `benutzer_id` stammt aus der Sitzung; eine
 //! fremde oder unbekannte Benachrichtigung ist 404, nie 403 (kein Hinweis, dass es sie gibt).
@@ -52,7 +52,7 @@ pub struct ListeParams {
 
 /// Macht aus einer eigenen Zeile die Anzeige, wenn `benutzer` Einsatz und Bezugsmodul (noch)
 /// lesen darf; sonst `None`. Auch der iOS-Push bildet Titel, Detail und Pfad hier
-/// (`ios_push::inhalt`), damit sie gleich `GET /api/benachrichtigungen/{id}` sind.
+/// (`ios_push::inhalt`), damit sie gleich `GET /api/notifications/{id}` sind.
 pub(crate) async fn anzeige(
     pool: &SqlitePool,
     recht: &Leserecht,
@@ -128,7 +128,7 @@ async fn leserecht(pool: &SqlitePool, einsatz_id: i64) -> Result<Option<Leserech
     }
 }
 
-/// GET /api/benachrichtigungen — die eigenen Benachrichtigungen der letzten 12 h, jüngste
+/// GET /api/notifications — die eigenen Benachrichtigungen der letzten 12 h, jüngste
 /// zuerst, mit Text; ohne die, deren Einsatz oder Modul der Nutzer nicht (mehr) lesen darf.
 pub async fn liste(
     State(state): State<AppState>,
@@ -167,7 +167,7 @@ pub async fn liste(
     Ok(Json(aus))
 }
 
-/// GET /api/benachrichtigungen/{id} — eine eigene Benachrichtigung samt Text. Fremd, unbekannt
+/// GET /api/notifications/{id} — eine eigene Benachrichtigung samt Text. Fremd, unbekannt
 /// oder ohne Recht am Einsatz bzw. am Modul des Bezugs: 404.
 pub async fn lesen(
     State(state): State<AppState>,
@@ -193,7 +193,7 @@ pub async fn lesen(
         .ok_or(AppError::NotFound)
 }
 
-/// POST /api/benachrichtigungen/{id}/quittieren — quittiert eine eigene Benachrichtigung
+/// POST /api/notifications/{id}/acknowledge — quittiert eine eigene Benachrichtigung
 /// (idempotent, 204). Beim ersten Quittieren geht dasselbe Ereignis mit `quittiert: true` an
 /// alle Verbindungen des Nutzers, damit der Toast überall verschwindet. Fremd: 404.
 ///
@@ -250,7 +250,7 @@ pub async fn quittieren(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/einsaetze/{id}/benachrichtigungen — der Verlauf des Nutzers in diesem Einsatz
+/// GET /api/einsaetze/{id}/notifications — der Verlauf des Nutzers in diesem Einsatz
 /// (LLH-1143, design.md D3): seine jüngsten Benachrichtigungen samt Text und die Zahl der
 /// ungelesenen Eingänge darunter. Nur wer den Einsatz lesen darf (sonst 404); ein Eintrag, dessen
 /// Modul der Nutzer nicht (mehr) lesen darf, fehlt und zählt nicht.
@@ -279,7 +279,7 @@ pub async fn verlauf(
     }))
 }
 
-/// Body von `POST …/benachrichtigungen/gelesen`.
+/// Body von `POST …/notifications/read`.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GelesenEingabe {
@@ -287,7 +287,7 @@ pub struct GelesenEingabe {
     pub bis_id: i64,
 }
 
-/// POST /api/einsaetze/{id}/benachrichtigungen/gelesen — „alle gelesen“ (LLH-1143, design.md
+/// POST /api/einsaetze/{id}/notifications/read — „alle gelesen“ (LLH-1143, design.md
 /// D4): quittiert die eigenen Eingänge (und Stilles) dieses Einsatzes bis `bis_id`, nie einen
 /// Alarm, und meldet es den eigenen Verbindungen mit einem Ereignis. Idempotent, 204. Ein
 /// persönlicher Lesestand, deshalb Lese- statt Schreibrecht und auch am abgeschlossenen Einsatz.
@@ -312,7 +312,7 @@ pub async fn gelesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/einsaetze/{id}/benachrichtigung-vorgaben — die wirksame Vorgabe je Funktion für jede
+/// GET /api/einsaetze/{id}/notification-defaults — die wirksame Vorgabe je Funktion für jede
 /// einstellbare Art (LLH-1421, design.md D4): gespeicherte Zeile, sonst Katalog. Lesen darf, wer
 /// den Einsatz lesen darf, auch am abgeschlossenen Einsatz.
 pub async fn vorgaben_laden(
@@ -326,7 +326,7 @@ pub async fn vorgaben_laden(
     ))
 }
 
-/// Body von `PUT …/benachrichtigung-vorgaben/{art}`.
+/// Body von `PUT …/notification-defaults/{art}`.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VorgabeEingabe {
@@ -335,7 +335,7 @@ pub struct VorgabeEingabe {
     pub still: Vec<String>,
 }
 
-/// PUT /api/einsaetze/{id}/benachrichtigung-vorgaben/{art} — setzt die Vorgabe einer Art: eine
+/// PUT /api/einsaetze/{id}/notification-defaults/{art} — setzt die Vorgabe einer Art: eine
 /// Zeile je Funktion, ersetzt den Stand der Art; 200 mit dem neuen Stand (LLH-1421, design.md
 /// D4). Recht wie die übrigen Einstellungen (`EinsatzVerwaltungszugriff`: Schreibrolle oder
 /// System-Admin der Einsatz-Org, abgeschlossen 409). Unbekannte Art oder Funktion, mehr Einträge

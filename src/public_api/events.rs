@@ -374,8 +374,8 @@ fn cursor_abgelaufen() -> ApiError {
     ApiError::new(
         ErrorCode::CursorExpired,
         "Der Cursor ist abgelaufen. Den Stand neu aufbauen: mit „Einsätze lesen“ über \
-         GET /api/v1/einsaetze und dessen Cursor, sonst über GET /api/v1/events ohne after und \
-         danach GET /api/v1/lage.",
+         GET /api/v1/incidents und dessen Cursor, sonst über GET /api/v1/events ohne after und \
+         danach GET /api/v1/situation.",
     )
 }
 
@@ -572,7 +572,7 @@ fn parse_wait(roh: Option<&str>) -> Result<Duration, ApiError> {
     security(("machine" = ["events:read"])),
     params(
         ("after" = Option<i64>, Query,
-            description = "Cursor aus der letzten Antwort oder aus `GET /api/v1/einsaetze`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse."),
+            description = "Cursor aus der letzten Antwort oder aus `GET /api/v1/incidents`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse."),
         ("wait" = Option<u8>, Query, maximum = 25,
             description = "Höchste Wartezeit in ganzen Sekunden (0 bis 25), bis ein Ereignis vorliegt. Ohne ihn wartet der Abruf nicht."),
     ),
@@ -584,7 +584,7 @@ fn parse_wait(roh: Option<&str>) -> Result<Duration, ApiError> {
         (status = 400, description = "`after` oder `wait` ungültig (`invalid_field`)", body = super::ApiErrorBody),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt `events:read` (`missing_scope`)", body = super::ApiErrorBody),
-        (status = 410, description = "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/einsaetze` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/lage`", body = super::ApiErrorBody),
+        (status = 410, description = "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/incidents` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/situation`", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),

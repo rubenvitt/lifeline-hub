@@ -77,7 +77,7 @@ async fn einsatzleitung_ohne_systemrolle_bekommt_genau_die_aufnehmbaren() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &format!("/api/users/{inaktiv}/deactivate"),
         &admin,
         None,
     )
@@ -201,7 +201,7 @@ async fn abgeschlossener_einsatz_verweigert_die_auswahl() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &leitung,
         None,
     )
@@ -213,10 +213,10 @@ async fn abgeschlossener_einsatz_verweigert_die_auswahl() {
 }
 
 // ── Auswahl beim Anlegen (LLH-1820) ─────────────────────────────────────────────────────────
-// `GET /api/einsaetze/mitglied-auswahl`: dieselbe Grundmenge wie oben, aber für einen Einsatz,
+// `GET /api/einsaetze/member-selection`: dieselbe Grundmenge wie oben, aber für einen Einsatz,
 // den es noch nicht gibt — die Org der anfragenden Person, ohne sie selbst.
 
-const ANLAGE_URI: &str = "/api/einsaetze/mitglied-auswahl";
+const ANLAGE_URI: &str = "/api/einsaetze/member-selection";
 
 #[tokio::test]
 async fn anlage_auswahl_bietet_die_org_ohne_mich() {
@@ -228,7 +228,7 @@ async fn anlage_auswahl_bietet_die_org_ohne_mich() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &format!("/api/users/{inaktiv}/deactivate"),
         &admin,
         None,
     )

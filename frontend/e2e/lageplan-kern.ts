@@ -84,7 +84,7 @@ async function mitWiederholung(anfrage: () => Promise<APIResponse>): Promise<API
  */
 export async function logoSetzen(page: Page) {
   const antwort = await mitWiederholung(() =>
-    page.request.post('/api/organisation/logo', {
+    page.request.post('/api/organization/logo', {
       multipart: {
         datei: { name: 'logo.png', mimeType: 'image/png', buffer: pngMitMassen(97, 41) },
       },
@@ -133,7 +133,7 @@ export async function einsatzMitLage(page: Page, bezeichnung: string): Promise<s
   await a.patch(`abschnitte/${abschnitt}/flaeche`, {
     flaeche_geojson: JSON.stringify(rechteck(0.002, 0.001, 0.003)),
   });
-  await a.put('modul-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
+  await a.put('module-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
   return einsatzId;
 }
 

@@ -55,8 +55,8 @@ function zeige(
   let stand = aus === null ? {} : { benachrichtigungen_aus: JSON.stringify(aus) };
   server.use(
     meHandler(benutzerFixture(benutzer)),
-    http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: stand })),
-    http.put('/api/benutzer-einstellungen/benachrichtigungen_aus', async ({ request }) => {
+    http.get('/api/user-settings', () => HttpResponse.json({ eintraege: stand })),
+    http.put('/api/user-settings/benachrichtigungen_aus', async ({ request }) => {
       const { wert } = (await request.json()) as { wert: string };
       geschrieben.push(JSON.parse(wert) as string[]);
       stand = { ...stand, benachrichtigungen_aus: wert };
@@ -161,7 +161,7 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
   it('lehnt der Server ab, springt nur dieser Schalter zurück und die Zeile sagt es', async () => {
     zeige();
     server.use(
-      http.put('/api/benutzer-einstellungen/benachrichtigungen_aus', () =>
+      http.put('/api/user-settings/benachrichtigungen_aus', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

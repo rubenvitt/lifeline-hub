@@ -1,4 +1,4 @@
-//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`): das Lagebild des freigegebenen
+//! `GET /api/v1/situation` (LLH-1638, Spec `lage-schnittstelle`): das Lagebild des freigegebenen
 //! Einsatzes für einen Maschinenzugang mit `lage:read`. Die Freigabe selbst (Routen der
 //! Einsatzleitung, Spiegel, Ende) prüft `tests/einsatz_anbindungen.rs`.
 
@@ -13,7 +13,7 @@ use common::{
     stammpersonal_disponieren,
 };
 
-const LAGE: &str = "/api/v1/lage";
+const LAGE: &str = "/api/v1/situation";
 const IP: &str = "198.51.100.7";
 const POLY: &str =
     r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
@@ -304,7 +304,7 @@ async fn ohne_scope_403_mit_bearer_401_und_ein_abgeschlossener_einsatz_ist_null(
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -386,7 +386,7 @@ async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
     use lifeline_hub::public_api::scope::Scope;
 
     /// Routen, deren Einsatz allein aus `public_api::freigabe` kommt.
-    const UEBER_FREIGABE: &[&str] = &[LAGE, "/api/v1/einsaetze", "/api/v1/einsaetze/{id}"];
+    const UEBER_FREIGABE: &[&str] = &[LAGE, "/api/v1/incidents", "/api/v1/incidents/{id}"];
 
     let dokument = serde_json::to_value(lifeline_hub::public_api::openapi()).unwrap();
     let mut scopes_im_dokument = Vec::new();
@@ -457,11 +457,11 @@ async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
                     "{pfad} liest ohne Freigabe: {v}"
                 );
             }
-            "/api/v1/einsaetze" => {
+            "/api/v1/incidents" => {
                 assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
                 assert_eq!(v.get("einsaetze"), Some(&json!([])), "{pfad}: {v}");
             }
-            "/api/v1/einsaetze/{id}" => {
+            "/api/v1/incidents/{id}" => {
                 assert_eq!(s, StatusCode::NOT_FOUND, "{pfad}: {v}");
                 assert_eq!(v["code"], "not_found", "{pfad}: {v}");
             }

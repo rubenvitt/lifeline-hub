@@ -45,7 +45,7 @@ const LISTE: PlanungListeneintrag[] = [
 function setup(liste = LISTE) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/planungen', () => HttpResponse.json(liste)),
+    http.get('/api/plans', () => HttpResponse.json(liste)),
   );
   return renderMitProviders(
     <Routes>
@@ -87,7 +87,7 @@ describe('PlanungenPage (LLH-1586)', () => {
   it('Anlegen schickt Bezeichnung und Zeitraum und öffnet die neue Planung', async () => {
     let body: unknown;
     server.use(
-      http.post('/api/planungen', async ({ request }) => {
+      http.post('/api/plans', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(
           {
@@ -123,7 +123,7 @@ describe('PlanungenPage (LLH-1586)', () => {
   it('ein Zeitraum über 14 Tage wird abgewiesen, bevor er hinausgeht', async () => {
     const post = vi.fn();
     server.use(
-      http.post('/api/planungen', () => {
+      http.post('/api/plans', () => {
         post();
         return HttpResponse.json({}, { status: 500 });
       }),

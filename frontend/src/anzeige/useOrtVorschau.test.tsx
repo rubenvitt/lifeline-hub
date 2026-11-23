@@ -22,7 +22,7 @@ describe('useOrtVorschau', () => {
   it('ruft nach Debounce und liefert die Antwort', async () => {
     const treffer = vi.fn();
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () => {
+      http.get('/api/einsaetze/1/place-preview', () => {
         treffer();
         return HttpResponse.json({
           peilung: { distanz_m: 1200, richtung: 'NO', bezug_label: 'Einsatzort' },
@@ -42,7 +42,7 @@ describe('useOrtVorschau', () => {
   it('feuert keinen Call bei ungültiger (null) Koordinate', async () => {
     const treffer = vi.fn();
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () => {
+      http.get('/api/einsaetze/1/place-preview', () => {
         treffer();
         return HttpResponse.json({ peilung: null, ortsname: null });
       }),
@@ -56,7 +56,7 @@ describe('useOrtVorschau', () => {
   it('feuert nicht vor Ablauf des Debounce-Fensters, aber danach genau einmal', async () => {
     const treffer = vi.fn();
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () => {
+      http.get('/api/einsaetze/1/place-preview', () => {
         treffer();
         return HttpResponse.json({ peilung: null, ortsname: null });
       }),
@@ -77,7 +77,7 @@ describe('useOrtVorschau', () => {
 
   it('persistiert den Ortsnamen im Local-Store bei Erfolg', async () => {
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5, Musterstadt' }),
       ),
     );
@@ -93,7 +93,7 @@ describe('useOrtVorschau', () => {
 
   it('legt mit `merken: false` nichts im Local-Store ab (eigene Position, LLH-1567)', async () => {
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5, Musterstadt' }),
       ),
     );
@@ -109,7 +109,7 @@ describe('useOrtVorschau', () => {
   it('fällt auf den persistierten Ortsnamen zurück, wenn die Live-Antwort ortsname=null hat', async () => {
     await setzeOrt(ortKeyVon(48.1, 11.6), 'Aus Local-Store');
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({
           peilung: { distanz_m: 100, richtung: 'N', bezug_label: 'X' },
           ortsname: null,
@@ -157,7 +157,7 @@ describe('useOrtVorschau', () => {
           laeuft_ab_at: '2026-10-08 12:00:00',
         },
       }),
-      http.get('/api/einsaetze/1/ort-vorschau', () => {
+      http.get('/api/einsaetze/1/place-preview', () => {
         treffer();
         return HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5' });
       }),

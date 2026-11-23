@@ -98,7 +98,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/org-archiv-schluessel",
+        "/api/org-archive-keys",
         &admin,
         Some(&json!({
             "schluessel": identitaet.to_public().to_string(),
@@ -120,7 +120,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/org-archiv-schluessel/{sid}/pruefen"),
+        &format!("/api/org-archive-keys/{sid}/check"),
         &admin,
         Some(&json!({ "code": code.trim() })),
     )
@@ -131,7 +131,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -155,7 +155,7 @@ async fn umgebung() -> Umgebung {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/aufbewahrung/einsaetze/{id}/archiv"))
+                .uri(format!("/api/retention/incidents/{id}/archive"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),

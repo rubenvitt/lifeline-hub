@@ -1,5 +1,5 @@
 //! Rechner-API Unterkunft und Zelte für Fremdsysteme (LLH-1524, Spec `rechner-api-unterkunft`):
-//! `POST /api/v1/rechner/unterkunft` und `GET /api/v1/rechner/unterkunft/richtwerte`, signiert
+//! `POST /api/v1/calculators/accommodation` und `GET /api/v1/calculators/accommodation/reference-values`, signiert
 //! als Maschinenzugang mit dem Scope `rechner:use`.
 //!
 //! Die Prüfung der Eingabe im Einzelnen und die Gleichheit mit dem Rechner der Oberfläche belegen
@@ -16,8 +16,8 @@ use common::{
     anfrage, anfrage_json, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie, setup_mit_pool,
 };
 
-const RECHNEN: &str = "/api/v1/rechner/unterkunft";
-const RICHTWERTE: &str = "/api/v1/rechner/unterkunft/richtwerte";
+const RECHNEN: &str = "/api/v1/calculators/accommodation";
+const RICHTWERTE: &str = "/api/v1/calculators/accommodation/reference-values";
 
 /// Router, Pool, Admin-Sitzung und ein Zugang mit `rechner:use`. `n` unterscheidet Schlüssel und
 /// Quelle je Test: die Zähler je Quelle gelten prozessweit.
@@ -64,7 +64,7 @@ async fn org_wert_setzen(app: &axum::Router, admin: &str, schluessel: &str, wert
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/org-unterkunft-richtwerte/{schluessel}"),
+        &format!("/api/org-accommodation-guidelines/{schluessel}"),
         admin,
         Some(&json!({ "wert": wert })),
     )
@@ -415,7 +415,7 @@ async fn groesste_anfrage_passt_in_den_body() {
     assert_eq!(v["code"], "payload_too_large");
 }
 
-/// Jeder Abruf steht im Abrufprotokoll des Zugangs, je Route (ADR-0022).
+/// Jeder Abruf steht im Abrufprotokoll des Zugangs, je Route (ADR-0096).
 #[tokio::test]
 async fn abrufe_stehen_im_abrufprotokoll() {
     let (app, pool, _admin, cred, ip) = aufbau(209).await;
@@ -455,7 +455,7 @@ async fn einsatz_freigeben(app: &axum::Router, admin: &str, einsatz: i64, cred: 
         app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         admin,
@@ -602,7 +602,7 @@ async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             nur_rechner.zugang_id
         ),
         &admin,
@@ -655,7 +655,7 @@ async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

@@ -40,7 +40,7 @@ pub struct AppState {
     pub einsatzakte_bau: crate::einsatzakte::BauSperre,
     /// Öffentliche Schlüssel, an die `GET /api/backup` verschlüsselt (LFH-1002); leer → Klartext.
     pub backup_empfaenger: crate::backup::Empfaenger,
-    /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/datentraeger`.
+    /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/storage`.
     pub datentraeger: crate::datentraeger::Stand,
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
@@ -54,7 +54,7 @@ pub struct AppState {
 /// Test-Binary prüfen ließe.
 #[derive(Debug, Clone, Default)]
 pub struct RouterOptionen {
-    /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
+    /// Registriert die Routen unter `/api/demo-data` (`--demo-daten`). Ohne den Schalter
     /// antworten sie wie jeder unbekannte `/api/`-Pfad mit 404, auch angemeldet.
     pub demo_daten: bool,
     /// Zeitbudget der Zulassungssteuerung; `None` = [`crate::zulassung::REQUEST_BUDGET`]. Nur
@@ -142,12 +142,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/health", get(routes::health::health))
         .route("/api/shell", get(routes::shell::load_shell))
         .route("/api/backup", get(routes::backup::download))
+        .route("/api/system/storage", get(routes::system::datentraeger))
         .route(
-            "/api/system/datentraeger",
-            get(routes::system::datentraeger),
-        )
-        .route(
-            "/api/client-fehler",
+            "/api/client-errors",
             post(routes::client_fehler::melde).layer(DefaultBodyLimit::max(CLIENT_FEHLER_BODY_MAX)),
         )
         .route(
@@ -175,7 +172,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LFH-892: ein Gerät löst seinen Kopplungscode ein (öffentlich, Rate-Limit je Quelle).
         .route(
-            "/api/geraete/koppeln",
+            "/api/devices/pair",
             post(routes::geraet::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
@@ -238,45 +235,45 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             delete(routes::sitzung::eigene_beenden),
         )
         .route(
-            "/api/verwaltung/bereitschaft",
+            "/api/administration/inventory",
             get(routes::verwaltung::bereitschaft),
         )
-        .route("/api/benutzer", get(routes::benutzer::liste))
-        .route("/api/benutzer", post(routes::benutzer::anlegen))
-        .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))
+        .route("/api/users", get(routes::benutzer::liste))
+        .route("/api/users", post(routes::benutzer::anlegen))
+        .route("/api/users/{id}", patch(routes::benutzer::bearbeiten))
         .route(
-            "/api/benutzer/{id}/deaktivieren",
+            "/api/users/{id}/deactivate",
             post(routes::benutzer::deaktivieren),
         )
         .route(
-            "/api/benutzer/{id}/totp/reset",
+            "/api/users/{id}/totp/reset",
             post(routes::benutzer::totp_reset),
         )
         // LFH-1121: Einmalpasswort mit Änderungszwang. Nachweis tests/einmalpasswort.rs.
         .route(
-            "/api/benutzer/{id}/einmalpasswort",
+            "/api/users/{id}/one-time-password",
             post(routes::benutzer::einmalpasswort),
         )
         // Zugangsprotokoll (LFH-1097): Anmelde- und Admin-Spur lesen, nur System-Admin, das
         // Lesen selbst unprotokolliert. Nachweis tests/zugangsprotokoll.rs.
         .route(
-            "/api/zugangsprotokoll/anmeldungen",
+            "/api/access-log/logins",
             get(routes::zugangsprotokoll::anmeldungen),
         )
         .route(
-            "/api/zugangsprotokoll/zugangsaenderungen",
+            "/api/access-log/access-changes",
             get(routes::zugangsprotokoll::zugangsaenderungen),
         )
         .route(
-            "/api/benutzer/{id}/sitzungen",
+            "/api/users/{id}/sessions",
             get(routes::sitzung::admin_liste),
         )
         .route(
-            "/api/benutzer/{id}/sitzungen/beenden",
+            "/api/users/{id}/sessions/end",
             post(routes::sitzung::admin_alle_beenden),
         )
         .route(
-            "/api/benutzer/{id}/sitzungen/{kennung}",
+            "/api/users/{id}/sessions/{kennung}",
             delete(routes::sitzung::admin_beenden),
         )
         .route("/api/release-notes", get(routes::versionsstand::lesen))
@@ -285,48 +282,45 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::versionsstand::gelesen),
         )
         .route(
-            "/api/benutzer-einstellungen",
+            "/api/user-settings",
             get(routes::benutzer_einstellungen::lesen),
         )
         .route(
-            "/api/benutzer-einstellungen/{schluessel}",
+            "/api/user-settings/{schluessel}",
             put(routes::benutzer_einstellungen::setzen),
         )
         // Benachrichtigungen (LLH-1207, design.md D2): nur die eigene Empfängerzeile, fremd 404.
+        .route("/api/notifications", get(routes::benachrichtigung::liste))
         .route(
-            "/api/benachrichtigungen",
-            get(routes::benachrichtigung::liste),
-        )
-        .route(
-            "/api/benachrichtigungen/{id}",
+            "/api/notifications/{id}",
             get(routes::benachrichtigung::lesen),
         )
         .route(
-            "/api/benachrichtigungen/{id}/quittieren",
+            "/api/notifications/{id}/acknowledge",
             post(routes::benachrichtigung::quittieren),
         )
         // Verlauf und „alle gelesen“ eines Einsatzes (LLH-1143, design.md D3/D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen",
+            "/api/einsaetze/{id}/notifications",
             get(routes::benachrichtigung::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen/gelesen",
+            "/api/einsaetze/{id}/notifications/read",
             post(routes::benachrichtigung::gelesen),
         )
         // Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben",
+            "/api/einsaetze/{id}/notification-defaults",
             get(routes::benachrichtigung::vorgaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben/{art}",
+            "/api/einsaetze/{id}/notification-defaults/{art}",
             put(routes::benachrichtigung::vorgabe_setzen),
         )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
         .route("/api/web-push", get(routes::web_push::stand))
         .route(
-            "/api/web-push/abo",
+            "/api/web-push/subscription",
             put(routes::web_push::anmelden).delete(routes::web_push::abmelden),
         )
         // iOS-Push (LLH-2040): ohne `--ios-push` 404 aus dem Handler. `unregister` ist öffentlich
@@ -344,23 +338,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route(
-            "/api/einsaetze/mitglied-auswahl",
+            "/api/einsaetze/member-selection",
             get(routes::einsatz::mitglied_auswahl_anlage),
         )
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
         .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
-            "/api/einsaetze/{id}/abschliessen",
+            "/api/einsaetze/{id}/close",
             post(routes::einsatz::abschliessen),
         )
         // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
         .route(
-            "/api/einsaetze/{id}/wiedereroeffnen",
+            "/api/einsaetze/{id}/reopen",
             post(routes::einsatz::wiedereroeffnen),
         )
         // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
         .route(
-            "/api/einsaetze/{id}/abschluss/pruefung",
+            "/api/einsaetze/{id}/closure/check",
             get(routes::einsatz::abschluss_pruefung),
         )
         .route(
@@ -370,7 +364,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
         .route(
-            "/api/einsaetze/{id}/praesenz",
+            "/api/einsaetze/{id}/presence",
             put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
         )
         .route(
@@ -380,11 +374,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.
         .route(
-            "/api/einsaetze/{id}/programmpunkte",
+            "/api/einsaetze/{id}/agenda-items",
             get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/programmpunkte/{pid}",
+            "/api/einsaetze/{id}/agenda-items/{pid}",
             patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
         )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
@@ -394,23 +388,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist",
+            "/api/einsaetze/{id}/retention-period",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/nachbereitung",
+            "/api/einsaetze/{id}/follow-up",
             put(routes::einsatz::nachbereitung_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}",
+            "/api/einsaetze/{id}/retention-period/{kategorie}",
             put(routes::einsatz::kategorie_frist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrung-kategorien",
+            "/api/einsaetze/{id}/retention-categories",
             get(routes::einsatz::kategorien_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/einstellungen",
+            "/api/einsaetze/{id}/settings",
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
@@ -422,19 +416,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::unterkunft_richtwerte::einsatz_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides",
+            "/api/einsaetze/{id}/module-overrides",
             get(routes::einsatz::modul_overrides_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-freigaben",
+            "/api/einsaetze/{id}/module-access",
             get(routes::einsatz::modul_freigaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-vorgaben",
+            "/api/einsaetze/{id}/module-defaults",
             get(routes::einsatz::load_modul_vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides/{modul_key}",
+            "/api/einsaetze/{id}/module-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
         .route(
@@ -464,7 +458,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
-            "/api/einsaetze/{id}/modul-zaehler",
+            "/api/einsaetze/{id}/module-counts",
             get(routes::modul_zaehler::liste),
         )
         // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
@@ -1038,12 +1032,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::meldung::lage_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/ort-vorschau",
+            "/api/einsaetze/{id}/place-preview",
             get(routes::ort_vorschau::vorschau),
         )
         // Ortssuche des Ortsfelds (LFH-1175): Recht der Einsatzdaten, kein Modul.
         .route(
-            "/api/einsaetze/{id}/ort-suche",
+            "/api/einsaetze/{id}/place-search",
             get(routes::ort_suche::im_einsatz),
         )
         .route(
@@ -1064,7 +1058,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::nachforderung::status),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}/reject",
+            "/api/einsaetze/{id}/resource-requests/{nid}/decline",
             post(routes::nachforderung::ablehnen),
         )
         .route(
@@ -1293,7 +1287,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::export),
         )
         .route(
-            "/api/einsaetze/{id}/einsatzakte/anlagen.zip",
+            "/api/einsaetze/{id}/case-file/attachments.zip",
             get(routes::einsatzakte::anlagen_zip),
         )
         .route(
@@ -1516,49 +1510,49 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1491: Führung je Einsatz zwischen gekoppelten Instanzen (Schalter
         // `LIFELINE_FUEHRUNG`, sonst 404). Bedienung ohne `fordere_aktiv`: sie geht auch, wenn eine
         // andere Instanz führt oder der Einsatz abgeschlossen ist.
-        .route("/api/einsaetze/{id}/fuehrung", get(routes::fuehrung::lesen))
+        .route("/api/einsaetze/{id}/command", get(routes::fuehrung::lesen))
         .route(
-            "/api/einsaetze/{id}/fuehrung/uebergeben",
+            "/api/einsaetze/{id}/command/hand-over",
             post(routes::fuehrung::uebergeben),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/code",
+            "/api/einsaetze/{id}/command/code",
             post(routes::fuehrung::code_abgeben),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/anfragen",
+            "/api/einsaetze/{id}/command/request",
             post(routes::fuehrung::anfragen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/anfrage/ablehnen",
+            "/api/einsaetze/{id}/command/request/decline",
             post(routes::fuehrung::anfrage_ablehnen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme",
+            "/api/einsaetze/{id}/command/emergency-takeover",
             post(routes::fuehrung::notuebernahme),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/zurueckholen",
+            "/api/einsaetze/{id}/command/reclaim",
             post(routes::fuehrung::zurueckholen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/start",
+            "/api/einsaetze/{id}/command/emergency-takeover/start",
             post(routes::fuehrung::notuebernahme_start),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/abschluss",
+            "/api/einsaetze/{id}/command/emergency-takeover/finish",
             post(routes::fuehrung::notuebernahme_abschluss),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/notuebernahme/code",
+            "/api/einsaetze/{id}/command/emergency-takeover/code",
             post(routes::fuehrung::notuebernahme_code),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/bestaetigen",
+            "/api/einsaetze/{id}/command/confirm",
             post(routes::fuehrung::bestaetigen),
         )
         .route(
-            "/api/einsaetze/{id}/fuehrung/widersprechen",
+            "/api/einsaetze/{id}/command/object",
             post(routes::fuehrung::widersprechen),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
@@ -1581,11 +1575,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(
-            "/api/einsaetze/{id}/anbindungen",
+            "/api/einsaetze/{id}/integrations",
             get(routes::einsatz_anbindungen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/anbindungen/{zid}/freigabe",
+            "/api/einsaetze/{id}/integrations/{zid}/grant",
             put(routes::einsatz_anbindungen::freigeben)
                 .delete(routes::einsatz_anbindungen::freigabe_beenden),
         )
@@ -1971,33 +1965,33 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
         // Wiederherstellen und Löschersuchen (Antrag, Rücknahme; die Suche ist POST, liest aber
         // nur). Guard in tests/aufbewahrung.rs.
-        .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
+        .route("/api/retention", get(routes::aufbewahrung::uebersicht))
         .route(
-            "/api/aufbewahrung/einsaetze/{id}",
+            "/api/retention/incidents/{id}",
             get(routes::aufbewahrung::akte),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/etb",
+            "/api/retention/incidents/{id}/etb",
             get(routes::aufbewahrung::etb),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/wiederherstellen",
+            "/api/retention/incidents/{id}/restore",
             post(routes::aufbewahrung::wiederherstellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege",
+            "/api/retention/incidents/{id}/redaction-requests",
             get(routes::aufbewahrung::antraege).post(routes::aufbewahrung::antrag_stellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen",
+            "/api/retention/incidents/{id}/redaction-requests/{aid}/undo",
             post(routes::aufbewahrung::antrag_zuruecknehmen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/personensuche",
+            "/api/retention/incidents/{id}/person-search",
             post(routes::aufbewahrung::personensuche),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/archiv",
+            "/api/retention/incidents/{id}/archive",
             get(routes::aufbewahrung::archiv_herunterladen).route_layer(download_grenze()),
         )
         // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der
@@ -2087,7 +2081,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
         // dem Link (`lagebild_extern::LagebildZugriff`), IP-Sperre wie die Gerätekopplung.
         .route(
-            "/api/extern/v1/lagebild",
+            "/api/external/v1/situation-picture",
             get(routes::lagebild_extern::abruf),
         )
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
@@ -2103,112 +2097,112 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 // Erst danach: die Verfügbarkeit trägt weder Body- noch Upload-Grenze.
                 .get(routes::archiv_einspielen::verfuegbarkeit),
         )
-        .route("/api/admin/instanz", get(routes::instanz::uebersicht))
+        .route("/api/admin/instance", get(routes::instanz::uebersicht))
         // LLH-1491: Führung der Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
         .route(
-            "/api/admin/instanz/fuehrung",
+            "/api/admin/instance/command",
             get(routes::fuehrung::admin_liste),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/uebergeben",
+            "/api/admin/instance/command/{id}/hand-over",
             post(routes::fuehrung::admin_uebergeben),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/code",
+            "/api/admin/instance/command/{id}/code",
             post(routes::fuehrung::admin_code_abgeben),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/anfragen",
+            "/api/admin/instance/command/{id}/request",
             post(routes::fuehrung::admin_anfragen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/anfrage/ablehnen",
+            "/api/admin/instance/command/{id}/request/decline",
             post(routes::fuehrung::admin_anfrage_ablehnen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme",
+            "/api/admin/instance/command/{id}/emergency-takeover",
             post(routes::fuehrung::admin_notuebernahme),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/start",
+            "/api/admin/instance/command/{id}/emergency-takeover/start",
             post(routes::fuehrung::admin_notuebernahme_start),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/abschluss",
+            "/api/admin/instance/command/{id}/emergency-takeover/finish",
             post(routes::fuehrung::admin_notuebernahme_abschluss),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/notuebernahme/code",
+            "/api/admin/instance/command/{id}/emergency-takeover/code",
             post(routes::fuehrung::admin_notuebernahme_code),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/bestaetigen",
+            "/api/admin/instance/command/{id}/confirm",
             post(routes::fuehrung::admin_bestaetigen),
         )
         .route(
-            "/api/admin/instanz/fuehrung/{id}/widersprechen",
+            "/api/admin/instance/command/{id}/object",
             post(routes::fuehrung::admin_widersprechen),
         )
         .route(
-            "/api/admin/instanz/codes",
+            "/api/admin/instance/codes",
             post(routes::instanz::code_ausstellen),
         )
         .route(
-            "/api/admin/instanz/einloesen",
+            "/api/admin/instance/redeem",
             post(routes::instanz::einloesen),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/widerrufen",
+            "/api/admin/instance/pairings/{id}/revoke",
             post(routes::instanz::widerrufen),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/stammdaten-neu",
+            "/api/admin/instance/pairings/{id}/resync",
             post(routes::instanz::stammdaten_neu),
         )
         .route(
-            "/api/admin/instanz/kopplungen/{id}/verloren",
+            "/api/admin/instance/pairings/{id}/lost",
             post(routes::instanz::elw_verloren),
         )
         // LAN-Entdeckung (LLH-1497): Liste „Im Netz gefunden“.
-        .route("/api/admin/instanz/lan", get(routes::instanz::lan))
+        .route("/api/admin/instance/lan", get(routes::instanz::lan))
         .route(
-            "/api/instanz/stammdaten/herkunft",
+            "/api/instance/master-data/origin",
             get(routes::instanz::stammdaten_herkunft),
         )
         .route(
-            "/api/admin/instanz/unterschrift/registrieren/start",
+            "/api/admin/instance/signing-keys/register/start",
             post(routes::instanz::registrieren_start),
         )
         .route(
-            "/api/admin/instanz/unterschrift/registrieren/abschluss",
+            "/api/admin/instance/signing-keys/register/finish",
             post(routes::instanz::registrieren_abschluss),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/start",
+            "/api/admin/instance/signing-keys/{id}/countersign/start",
             post(routes::instanz::gegenzeichnen_start),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss",
+            "/api/admin/instance/signing-keys/{id}/countersign/finish",
             post(routes::instanz::gegenzeichnen_abschluss),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/widerrufen",
+            "/api/admin/instance/signing-keys/{id}/revoke",
             post(routes::instanz::unterschrift_widerrufen),
         )
         .route(
-            "/api/admin/instanz/letzte-schluessel",
+            "/api/admin/instance/last-keys",
             get(routes::instanz::letzte_schluessel),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/bestaetigen",
+            "/api/admin/instance/signing-keys/{id}/confirm",
             post(routes::instanz::unterschrift_bestaetigen),
         )
         .route(
-            "/api/admin/instanz/unterschrift/{id}/zurueckweisen",
+            "/api/admin/instance/signing-keys/{id}/reject",
             post(routes::instanz::unterschrift_zurueckweisen),
         )
         .route(
-            "/api/instanz/koppeln",
+            "/api/instance/pair",
             post(routes::instanz::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         .route(
@@ -2231,28 +2225,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Bruchstelle am Spiegel (LLH-1646): ansehen, nachreichen, verwerfen.
         .route(
-            "/api/einsaetze/{id}/bruchstelle",
+            "/api/einsaetze/{id}/breaks",
             get(routes::instanz::bruchstelle_liste),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/antraege",
+            "/api/einsaetze/{id}/breaks/requests",
             post(routes::instanz::bruchstelle_alle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/antrag",
+            "/api/einsaetze/{id}/breaks/{bruch_id}/request",
             post(routes::instanz::bruchstelle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen",
+            "/api/einsaetze/{id}/breaks/{bruch_id}/discard",
             post(routes::instanz::bruchstelle_verwerfen),
         )
         // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend, nur die eigenen.
         .route(
-            "/api/antraege/abgelehnt",
+            "/api/requests/rejected",
             get(routes::instanz::antraege_abgelehnt),
         )
         .route(
-            "/api/antraege/abgelehnt/{antrag_id}",
+            "/api/requests/rejected/{antrag_id}",
             delete(routes::instanz::antrag_abgelehnt_verwerfen),
         )
         // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
@@ -2262,36 +2256,36 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 crate::instanz::spiegel::paket::SPIEGEL_MAX,
             )),
         )
-        .route("/api/organisation", get(routes::organisation::lesen))
+        .route("/api/organization", get(routes::organisation::lesen))
         .route(
-            "/api/organisation",
+            "/api/organization",
             patch(routes::organisation::aktualisieren),
         )
         // Logo der Organisation: 1 MiB Nutzlast plus 64 KiB Multipart-Rahmen. Die Größengrenze
         // prüft
         // der Handler (400); das Limit fängt nur Übergrößen ab.
         .route(
-            "/api/organisation/logo",
+            "/api/organization/logo",
             get(routes::organisation::logo_lesen)
                 .post(routes::organisation::logo_hochladen)
                 .delete(routes::organisation::logo_entfernen)
                 .layer(DefaultBodyLimit::max(1024 * 1024 + 64 * 1024)),
         )
         .route(
-            "/api/org-einstellungen",
+            "/api/org-settings",
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
         )
         // Archiv-Schlüssel der Org (LLH-1494): nur System-Admins, Admin-Spur.
         .route(
-            "/api/org-archiv-schluessel",
+            "/api/org-archive-keys",
             get(routes::archiv_empfaenger::liste).post(routes::archiv_empfaenger::anlegen),
         )
         .route(
-            "/api/org-archiv-schluessel/{id}",
+            "/api/org-archive-keys/{id}",
             delete(routes::archiv_empfaenger::entfernen),
         )
         .route(
-            "/api/org-archiv-schluessel/{id}/pruefen",
+            "/api/org-archive-keys/{id}/check",
             post(routes::archiv_empfaenger::pruefen),
         )
         .route(
@@ -2299,7 +2293,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::fuehrungsfunktion::katalog),
         )
         .route(
-            "/api/org-fuehrungsfunktionen/{funktion}",
+            "/api/org-command-roles/{funktion}",
             put(routes::fuehrungsfunktion::setzen),
         )
         // Richtwerte des Unterkunftsrechners (LLH-1520, design.md D2).
@@ -2308,15 +2302,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::unterkunft_richtwerte::org_lesen),
         )
         .route(
-            "/api/org-unterkunft-richtwerte/{schluessel}",
+            "/api/org-accommodation-guidelines/{schluessel}",
             put(routes::unterkunft_richtwerte::org_setzen),
         )
         .route(
-            "/api/org-modul-einstellungen",
+            "/api/org-module-settings",
             get(routes::org_einstellungen::modul_einstellungen_lesen),
         )
         .route(
-            "/api/org-modul-einstellungen/{modul_key}",
+            "/api/org-module-settings/{modul_key}",
             put(routes::org_einstellungen::modul_einstellung_setzen),
         )
         // Ortssuche ohne Einsatz, für „Einsatz anlegen“ (LFH-1175).
@@ -2347,66 +2341,63 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
-            "/api/planungen",
+            "/api/plans",
             get(routes::planung::list).post(routes::planung::create),
         )
         .route(
-            "/api/planungen/{id}",
+            "/api/plans/{id}",
             get(routes::planung::load)
                 .patch(routes::planung::update)
                 .delete(routes::planung::delete),
         )
         .route(
-            "/api/planungen/{id}/posten",
+            "/api/plans/{id}/posts",
             post(routes::planung::create_posten),
         )
-        // `reihenfolge` ist ein festes Segment neben `{pid}`.
+        // `order` ist ein festes Segment neben `{pid}`.
         .route(
-            "/api/planungen/{id}/posten/reihenfolge",
+            "/api/plans/{id}/posts/order",
             put(routes::planung::reihenfolge),
         )
         .route(
-            "/api/planungen/{id}/posten/{pid}",
+            "/api/plans/{id}/posts/{pid}",
             patch(routes::planung::update_posten).delete(routes::planung::delete_posten),
         )
         .route(
-            "/api/planungen/{id}/bloecke",
+            "/api/plans/{id}/blocks",
             post(routes::planung::create_block),
         )
         .route(
-            "/api/planungen/{id}/bloecke/{bid}",
+            "/api/plans/{id}/blocks/{bid}",
             patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
+        .route("/api/plans/{id}/generate", post(routes::planung::erzeugen))
+        .route("/api/plans/{id}/export", get(routes::planung::export))
         .route(
-            "/api/planungen/{id}/erzeugen",
-            post(routes::planung::erzeugen),
-        )
-        .route("/api/planungen/{id}/export", get(routes::planung::export))
-        .route(
-            "/api/planungen/{id}/helfer",
+            "/api/plans/{id}/helpers",
             post(routes::planung::create_helfer),
         )
         .route(
-            "/api/planungen/{id}/helfer/{hid}",
+            "/api/plans/{id}/helpers/{hid}",
             patch(routes::planung::update_helfer).delete(routes::planung::delete_helfer),
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
-            "/api/planungen/{id}/programmpunkte",
+            "/api/plans/{id}/agenda-items",
             post(routes::planung::create_programmpunkt),
         )
         .route(
-            "/api/planungen/{id}/programmpunkte/{pid}",
+            "/api/plans/{id}/agenda-items/{pid}",
             patch(routes::planung::update_programmpunkt)
                 .delete(routes::planung::delete_programmpunkt),
         )
-        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
+        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `preview` schreibt nichts.
         .route(
-            "/api/planungen/{id}/uebernahme/vorschau",
+            "/api/plans/{id}/transfer/preview",
             post(routes::planung::uebernahme_vorschau),
         )
         .route(
-            "/api/planungen/{id}/uebernahme",
+            "/api/plans/{id}/transfer",
             post(routes::planung::uebernehmen),
         )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
@@ -2701,14 +2692,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     // — kein 401/403/405, das seine Existenz verriete.
     let router = if opt.demo_daten {
         router
-            .route("/api/demo-daten", get(routes::demo_daten::status))
+            .route("/api/demo-data", get(routes::demo_daten::status))
             // LLH-1576: die Lage steht im Pfad, unbekannte Lagen sind 404 aus dem Handler.
             .route(
-                "/api/demo-daten/{lage}",
+                "/api/demo-data/{lage}",
                 post(routes::demo_daten::importieren).delete(routes::demo_daten::entfernen),
             )
             .route(
-                "/api/demo-daten/{lage}/neu",
+                "/api/demo-data/{lage}/reimport",
                 post(routes::demo_daten::neu_importieren),
             )
     } else {
@@ -3192,23 +3183,20 @@ mod tests {
     fn pfad_fuer_das_log_traegt_keinen_einwurf_schluessel() {
         let schluessel = crate::public_api::einwurf::neuer_schluessel();
         assert_eq!(
-            pfad_fuer_protokoll(&format!("/api/v1/einwurf/{schluessel}/alarmmeldung")),
-            "/api/v1/einwurf/***/alarmmeldung"
+            pfad_fuer_protokoll(&format!("/api/v1/intake/{schluessel}/alarm")),
+            "/api/v1/intake/***/alarm"
         );
         // Ein Schlüssel nahe der Längengrenze: maskiert passt der Pfad, also wird er nicht gekürzt.
         let lang = format!("/{}/{schluessel}/x", "a".repeat(PFAD_MAX_ZEICHEN - 20));
         let maskiert = pfad_fuer_protokoll(&lang);
         assert!(maskiert.ends_with("/***/x"), "{maskiert}");
         // Ein langer Pfad mit Schlüssel am Anfang: maskiert und gekürzt.
-        let sehr_lang = format!("/api/v1/einwurf/{schluessel}/{}", "a".repeat(400));
+        let sehr_lang = format!("/api/v1/intake/{schluessel}/{}", "a".repeat(400));
         let gekuerzt = pfad_fuer_protokoll(&sehr_lang);
-        assert!(
-            gekuerzt.starts_with("/api/v1/einwurf/***/aaa"),
-            "{gekuerzt}"
-        );
+        assert!(gekuerzt.starts_with("/api/v1/intake/***/aaa"), "{gekuerzt}");
         assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN);
         // Auch ohne Schrägstrich vor dem Schlüssel.
-        let pfad = format!("/api/v1/einwurf{schluessel}/alarmmeldung");
+        let pfad = format!("/api/v1/intake{schluessel}/alarm");
         let verklebt = pfad_fuer_protokoll(&pfad);
         assert!(!verklebt.contains(&schluessel[7..]), "{verklebt}");
     }
@@ -3285,7 +3273,7 @@ mod tests {
             async move {
                 let mut req = Request::builder()
                     .uri(format!(
-                        "/api/v1/einwurf/{schluessel}/alarmmeldung?text=GEHEIMER-ALARMTEXT"
+                        "/api/v1/intake/{schluessel}/alarm?text=GEHEIMER-ALARMTEXT"
                     ))
                     .body(Body::empty())
                     .unwrap();
@@ -3312,7 +3300,7 @@ mod tests {
 
         let log = puffer.text();
         assert!(
-            log.contains("pfad=/api/v1/einwurf/***/alarmmeldung"),
+            log.contains("pfad=/api/v1/intake/***/alarm"),
             "der Span nennt den maskierten Pfad:\n{log}"
         );
         for schluessel in unbekannte.iter().chain([&gueltig]) {

@@ -133,7 +133,7 @@ async fn lesbare_einsaetze(
 /// für `GET /api/v1/events`. Dient dem ersten Aufbau und dem Neuaufbau nach `cursor_expired`.
 #[utoipa::path(
     get,
-    path = "/api/v1/einsaetze",
+    path = "/api/v1/incidents",
     tag = "Einsätze",
     operation_id = "get_einsaetze",
     security(("machine" = ["einsaetze:read"])),
@@ -160,7 +160,7 @@ pub async fn liste(
 /// Ein laufender Einsatz, der für den Zugang freigegeben ist.
 #[utoipa::path(
     get,
-    path = "/api/v1/einsaetze/{id}",
+    path = "/api/v1/incidents/{id}",
     tag = "Einsätze",
     operation_id = "get_einsatz",
     security(("machine" = ["einsaetze:read"])),

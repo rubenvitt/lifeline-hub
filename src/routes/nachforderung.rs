@@ -450,7 +450,7 @@ pub struct AblehnenReq {
     pub grund: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/resource-requests/{nid}/reject — Abzweig „abgelehnt".
+/// POST /api/einsaetze/{id}/resource-requests/{nid}/decline — Abzweig „abgelehnt".
 pub async fn ablehnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Nachforderungen>,

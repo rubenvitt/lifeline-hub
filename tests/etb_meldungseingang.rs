@@ -75,7 +75,7 @@ async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -132,7 +132,7 @@ async fn meldung_aus_dem_etb_ist_sonstige_und_zaehlt_als_offen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let zaehler = |app: axum::Router, admin: String| async move {
-        lesen(&app, &admin, &format!("/api/einsaetze/{e}/modul-zaehler")).await["meldungen"]
+        lesen(&app, &admin, &format!("/api/einsaetze/{e}/module-counts")).await["meldungen"]
             ["offen"]
             .as_i64()
             .unwrap()
@@ -238,7 +238,7 @@ async fn auto_etb_aus_aendert_nichts_am_einen_eintrag() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )

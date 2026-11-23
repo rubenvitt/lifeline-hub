@@ -333,7 +333,7 @@ describe('Einheitengerät — Kontakte', () => {
     stelleBereit();
     const freigaben = freigabenFixture();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json({ ...freigaben, meldungen: { ...freigaben.meldungen, zugriff: false } }),
       ),
     );

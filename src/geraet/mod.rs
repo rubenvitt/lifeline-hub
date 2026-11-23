@@ -82,9 +82,9 @@ pub struct Stelle {
 pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
-    ("POST", "/api/client-fehler"),
-    ("GET", "/api/organisation"),
-    ("GET", "/api/organisation/logo"),
+    ("POST", "/api/client-errors"),
+    ("GET", "/api/organization"),
+    ("GET", "/api/organization/logo"),
     ("GET", "/api/fahrzeug-status"),
     ("GET", "/api/map/config"),
     ("GET", "/api/map/offline/tiles/{z}/{x}/{y}"),
@@ -108,8 +108,8 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
 /// [`Funktionsansicht::lese_module`] zu.
 pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}"),
-    ("GET", "/api/einsaetze/{id}/modul-freigaben"),
-    ("GET", "/api/einsaetze/{id}/modul-zaehler"),
+    ("GET", "/api/einsaetze/{id}/module-access"),
+    ("GET", "/api/einsaetze/{id}/module-counts"),
     ("GET", "/api/einsaetze/{id}/live"),
     // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
     ("GET", "/api/einsaetze/{id}/requests"),
@@ -695,7 +695,7 @@ mod tests {
     fn nicht_gelistete_route_ist_verboten() {
         for a in Funktionsansicht::ALLE {
             assert!(!darf_route(a, "GET", "/api/einsaetze/{id}/etb"));
-            assert!(!darf_route(a, "GET", "/api/benutzer"));
+            assert!(!darf_route(a, "GET", "/api/users"));
             assert!(!darf_route(a, "PATCH", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/auth/me"));

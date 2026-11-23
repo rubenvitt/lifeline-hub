@@ -89,7 +89,7 @@ test.describe('Orientierung (LFH-954)', () => {
   }) => {
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page, `Abgeschlossen ${Date.now()}`);
-    const zu = await page.request.post(`/api/einsaetze/${id}/abschliessen`);
+    const zu = await page.request.post(`/api/einsaetze/${id}/close`);
     expect(zu.ok(), `Abschließen: ${zu.status()}`).toBe(true);
     for (const route of ['tiere', 'etb', 'lagekarte']) {
       await page.goto(`/einsaetze/${id}/${route}`);

@@ -110,7 +110,7 @@ export function SkTag({ p }: { p: Pick<Person, 'aktuelle_sichtung'> }) {
   return k ? <SichtungsTag kategorie={k} /> : <Typography.Text type="secondary">—</Typography.Text>;
 }
 
-/** Personenzelle: Name (Stufe `text`) + Geschlecht/Alter Mono 11, darunter ggf. der Lückenvermerk. */
+/** Personenzelle: Name (Stufe `text`) + Geschlecht/Alter Meta 11, darunter ggf. der Lückenvermerk. */
 function PersonZelle({ p }: { p: Person }) {
   const { token, rollen } = useRollen();
   const ga = geschlechtAlter(p);
@@ -119,14 +119,14 @@ function PersonZelle({ p }: { p: Person }) {
     <div style={{ minWidth: 0 }}>
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
         <Textstufe ton={nameText(p) ? 'text' : 'gedaempft'}>{nameText(p) ?? 'unbekannt'}</Textstufe>
-        {ga && <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{ga}</span>}
+        {ga && <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>{ga}</span>}
         {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
             `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
             in Liste, Karte und Patientenliste am Gerät. */}
         {p.kontamination === true && <Status darstellung={kontamination} />}
       </span>
       {offen && (
-        <div data-lfh="luecke" style={{ ...monoStil('meta'), color: rollen.achtungText }}>
+        <div data-lfh="luecke" style={{ ...schriftStil('meta'), color: rollen.achtungText }}>
           {offen}
         </div>
       )}
@@ -163,7 +163,7 @@ function FundortZelle({ p }: { p: Person }) {
         </Textstufe>
       )}
       {koordinate && (
-        <div data-lfh="koordinate" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
+        <div data-lfh="koordinate" style={{ ...monoStil('monoFein'), color: rollen.gedaempft }}>
           {koordinate}
         </div>
       )}

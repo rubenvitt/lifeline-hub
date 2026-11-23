@@ -139,7 +139,7 @@ test('„Alle gelesen“ im ersten Tab räumt Band und Zahl im zweiten (LLH-1143
   const verlauf = page.getByRole('region', { name: 'Eingänge' });
   await expect(verlauf.getByRole('list', { name: 'Neu' }).getByRole('listitem')).toHaveCount(2);
   const gelesen = page.waitForResponse((r) =>
-    r.url().endsWith(`/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`),
+    r.url().endsWith(`/api/einsaetze/${einsatzId}/notifications/read`),
   );
   await verlauf.getByRole('button', { name: 'Alle gelesen' }).click();
   expect((await gelesen).status()).toBe(204);

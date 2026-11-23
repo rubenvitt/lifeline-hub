@@ -183,19 +183,33 @@ test('doppelte Stunde: „0247“ um 02:50 Winterzeit ist im Ereignisfeld drei M
   await page.clock.install({ time: gestellt });
   // `serverJetzt` misst die Serveruhr am `Date`-Header; stünde dort die echte Zeit, rechnete die
   // Seite die gestellte Uhr zurück. Die Antworten tragen deshalb die gestellte Zeit. Der Live-Strom
-  // (`EventSource`) misst nicht und bleibt offen, er geht unverändert durch.
-  await page.route('**/api/**', async (route) => {
-    if (route.request().headers()['accept']?.includes('text/event-stream')) {
-      await route.continue();
-      return;
-    }
-    const antwort = await route.fetch();
-    const jetzt = new Date(gestellt + (Date.now() - echtAb));
-    await route.fulfill({
-      response: antwort,
-      headers: { ...antwort.headers(), date: jetzt.toUTCString() },
-    });
-  });
+  // (`EventSource`) misst nicht und bleibt offen, er geht unverändert durch. Nur der Pfad `/api/`:
+  // `**/api/**` träfe auch die Module unter `src/api/`, die der Dev-Server ausliefert.
+  await page.route(
+    (url) => url.pathname.startsWith('/api/'),
+    async (route) => {
+      if (route.request().headers()['accept']?.includes('text/event-stream')) {
+        await route.continue();
+        return;
+      }
+      // Der Umweg über `route.fetch` ist Netz, nicht Prüfgegenstand: reißt der Dev-Server die
+      // Verbindung ab, bekommt die Seite den Abriss wie im echten Netz (Abfragen wiederholen sich,
+      // `queryClient.ts`), statt dass der Handler den Test beendet. In der CI (alpha 8115b5ae)
+      // endeten sieben gleichzeitige Startabfragen nach einem Neuladen mit `read ECONNRESET`.
+      let antwort;
+      try {
+        antwort = await route.fetch();
+      } catch {
+        await route.abort('connectionreset').catch(() => {});
+        return;
+      }
+      const jetzt = new Date(gestellt + (Date.now() - echtAb));
+      await route.fulfill({
+        response: antwort,
+        headers: { ...antwort.headers(), date: jetzt.toUTCString() },
+      });
+    },
+  );
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await page

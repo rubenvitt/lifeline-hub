@@ -170,7 +170,7 @@ function setupMSW() {
     // Auftrags-Ziele für das ETB→Auftrag-Formular.
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     // Standard-Rufname gesetzt (LFH-894): ohne ihn sperrte die Von/An-Pflicht jedes Absenden.
-    http.get('/api/benutzer-einstellungen', () =>
+    http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },
       }),
@@ -368,8 +368,8 @@ describe('EtbPage', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }),
       ),
-      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
-      http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+      http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
+      http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
         gespeichert = ((await request.json()) as { wert: string }).wert;
         return HttpResponse.json({
           eintraege: { [String(params.schluessel)]: gespeichert },
@@ -1998,7 +1998,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('fragt ohne Modulrecht Abschnitte und Einheiten nicht ab (kein 403, LLH-1839)', async () => {
     const abgefragt: string[] = [];
     const { client } = setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(
           freigabenFixture({
             einsatzabschnitte: { zugriff: false },
@@ -2026,7 +2026,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('fragt ohne Modulrecht `dokumente` keine Dokumente ab und zeigt keinen Verweis', async () => {
     let abgefragt = false;
     const { client } = setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ dokumente: { zugriff: false } })),
       ),
       http.get('/api/einsaetze/7/documents', () => {
@@ -2708,7 +2708,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
   it('nennt Nachträge vor der Lagebesprechung unter „seit LB“', async () => {
     setup('/einsaetze/7/etb?von=2026-05-23%2011%3A30%3A00', [
       zaehlerJeFilter(),
-      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/7/lagebesprechung', () =>
         HttpResponse.json({
           anzahl_lagebesprechungen: 1,

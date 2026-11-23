@@ -1,4 +1,4 @@
-//! Integrationstests für GET/PUT /api/org-einstellungen.
+//! Integrationstests für GET/PUT /api/org-settings.
 //!
 //! Berechtigungsmatrix:
 //!   GET  — admin ✓, fuehrungskraft ✓, nicht eingeloggt → 401
@@ -30,7 +30,7 @@ async fn benutzer_anlegen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(body))
@@ -46,11 +46,9 @@ async fn benutzer_anlegen(
     common::zwang_aufheben(benutzername).await;
 }
 
-/// GET /api/org-einstellungen mit Cookie; liefert (StatusCode, Body).
+/// GET /api/org-settings mit Cookie; liefert (StatusCode, Body).
 async fn get_einstellungen(app: &axum::Router, cookie: Option<&str>) -> (StatusCode, Value) {
-    let mut builder = Request::builder()
-        .method("GET")
-        .uri("/api/org-einstellungen");
+    let mut builder = Request::builder().method("GET").uri("/api/org-settings");
     if let Some(c) = cookie {
         builder = builder.header(header::COOKIE, c);
     }
@@ -69,7 +67,7 @@ async fn get_einstellungen(app: &axum::Router, cookie: Option<&str>) -> (StatusC
     (status, body)
 }
 
-/// PUT /api/org-einstellungen mit Cookie und Body; liefert (StatusCode, Body).
+/// PUT /api/org-settings mit Cookie und Body; liefert (StatusCode, Body).
 async fn put_einstellungen(
     app: &axum::Router,
     cookie: &str,
@@ -80,7 +78,7 @@ async fn put_einstellungen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri("/api/org-einstellungen")
+                .uri("/api/org-settings")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie)
                 .body(Body::from(body.to_string()))
@@ -195,7 +193,7 @@ async fn get_ohne_login_ist_401() {
 
 // ─── Modul-Rollen-Defaults ─────────────────────────────────────────────────
 
-/// PUT /api/org-modul-einstellungen/:modul_key mit Cookie und Body; liefert (StatusCode, Body).
+/// PUT /api/org-module-settings/:modul_key mit Cookie und Body; liefert (StatusCode, Body).
 async fn put_modul_einstellung(
     app: &axum::Router,
     cookie: &str,
@@ -207,7 +205,7 @@ async fn put_modul_einstellung(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/org-modul-einstellungen/{modul_key}"))
+                .uri(format!("/api/org-module-settings/{modul_key}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie)
                 .body(Body::from(body.to_string()))
@@ -234,14 +232,7 @@ async fn modul_get_als_fuehrungskraft_liefert_200() {
     benutzer_anlegen(&app, &admin_cookie, "fk2", "fkpw5678", "fuehrungskraft").await;
     let fk_cookie = login_cookie(&app, "fk2", "fkpw5678").await;
 
-    let (status, body) = anfrage(
-        &app,
-        "GET",
-        "/api/org-modul-einstellungen",
-        &fk_cookie,
-        None,
-    )
-    .await;
+    let (status, body) = anfrage(&app, "GET", "/api/org-module-settings", &fk_cookie, None).await;
     assert_eq!(status, StatusCode::OK, "body={body}");
     // Leere Map, noch kein Default gesetzt.
     assert!(body.is_object(), "Antwort muss ein Objekt sein");
@@ -282,14 +273,8 @@ async fn modul_put_als_admin_gueltig_persistiert() {
     assert_eq!(status, StatusCode::OK, "PUT muss 200 liefern; body={body}");
 
     // Persistenz: Re-GET enthält den Eintrag.
-    let (get_status, get_body) = anfrage(
-        &app,
-        "GET",
-        "/api/org-modul-einstellungen",
-        &admin_cookie,
-        None,
-    )
-    .await;
+    let (get_status, get_body) =
+        anfrage(&app, "GET", "/api/org-module-settings", &admin_cookie, None).await;
     assert_eq!(get_status, StatusCode::OK);
     assert_eq!(
         get_body["etb"],
@@ -329,14 +314,7 @@ async fn modul_put_ungueltige_rolle_ist_400() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     // Nichts gespeichert (Spec `modul-freigabe`, LFH-1150): die Map bleibt ohne `etb`.
-    let (_, map) = anfrage(
-        &app,
-        "GET",
-        "/api/org-modul-einstellungen",
-        &admin_cookie,
-        None,
-    )
-    .await;
+    let (_, map) = anfrage(&app, "GET", "/api/org-module-settings", &admin_cookie, None).await;
     assert!(map.get("etb").is_none(), "map={map}");
 }
 
@@ -354,21 +332,14 @@ async fn modul_put_einsatzfuehrung_ist_gueltig() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "body={body}");
-    let (_, get_body) = anfrage(
-        &app,
-        "GET",
-        "/api/org-modul-einstellungen",
-        &admin_cookie,
-        None,
-    )
-    .await;
+    let (_, get_body) = anfrage(&app, "GET", "/api/org-module-settings", &admin_cookie, None).await;
     assert_eq!(
         get_body["schaeden"]["benoetigte_rolle"], "einsatzfuehrung",
         "body={get_body}"
     );
 }
 
-/// GET /api/org-einstellungen als Benutzer mit org_rolle=keine → 403.
+/// GET /api/org-settings als Benutzer mit org_rolle=keine → 403.
 #[tokio::test]
 async fn get_als_keine_liefert_403() {
     let app = setup().await;
@@ -381,7 +352,7 @@ async fn get_als_keine_liefert_403() {
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
-/// GET /api/org-modul-einstellungen als Benutzer mit org_rolle=keine → 403.
+/// GET /api/org-module-settings als Benutzer mit org_rolle=keine → 403.
 #[tokio::test]
 async fn modul_get_als_keine_liefert_403() {
     let app = setup().await;
@@ -390,14 +361,8 @@ async fn modul_get_als_keine_liefert_403() {
     benutzer_anlegen(&app, &admin_cookie, "kein2", "keinpw12", "keine").await;
     let kein_cookie = login_cookie(&app, "kein2", "keinpw12").await;
 
-    let (status, _body) = anfrage(
-        &app,
-        "GET",
-        "/api/org-modul-einstellungen",
-        &kein_cookie,
-        None,
-    )
-    .await;
+    let (status, _body) =
+        anfrage(&app, "GET", "/api/org-module-settings", &kein_cookie, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -462,7 +427,7 @@ async fn modul_put_nicht_ausblendbar_key_ist_erlaubt() {
 // ─── Sichtbarkeits-Vorgabe je Modul (LLH-1179) ───────────────────────────────
 
 async fn modul_vorgaben(app: &axum::Router, cookie: &str) -> Value {
-    let (status, body) = anfrage(app, "GET", "/api/org-modul-einstellungen", cookie, None).await;
+    let (status, body) = anfrage(app, "GET", "/api/org-module-settings", cookie, None).await;
     assert_eq!(status, StatusCode::OK, "body={body}");
     body
 }

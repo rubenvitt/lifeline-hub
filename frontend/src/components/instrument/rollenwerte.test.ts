@@ -37,8 +37,15 @@ describe('rollenwerte', () => {
       fontWeight: 500,
       fontVariantNumeric: 'tabular-nums',
     });
-    expect(monoStil('meta')).toEqual({
+    expect(monoStil('monoFein')).toEqual({
       fontFamily: schrift.zahl,
+      fontSize: 11,
+      fontWeight: 400,
+      fontVariantNumeric: 'tabular-nums',
+    });
+    // LLH-2046: meta steht in der Textschrift, behält aber gleich breite Ziffern.
+    expect(schriftStil('meta')).toEqual({
+      fontFamily: schrift.text,
       fontSize: 11,
       fontWeight: 400,
       fontVariantNumeric: 'tabular-nums',

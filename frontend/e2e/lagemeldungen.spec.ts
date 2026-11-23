@@ -214,7 +214,7 @@ test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen a
     bezeichnung: `E2E Lage-Nachtrag ${Date.now()}`,
   });
   const freigaben = (await (
-    await page.request.get(`/api/einsaetze/${id}/modul-freigaben`)
+    await page.request.get(`/api/einsaetze/${id}/module-access`)
   ).json()) as Record<string, { zugriff: boolean }>;
   expect(freigaben.lagebesprechung?.zugriff, 'Vorbedingung: Lagebesprechung frei').toBe(true);
   // Die Besprechung vor fünf Minuten; beide Meldungen gehen erst danach in die Lage.

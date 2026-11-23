@@ -13,7 +13,7 @@ async fn einstellungen_setzen(app: &axum::Router, cookie: &str, einsatz: i64, bo
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einstellungen"),
+        &format!("/api/einsaetze/{einsatz}/settings"),
         cookie,
         Some(body),
     )

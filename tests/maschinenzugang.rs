@@ -448,7 +448,7 @@ async fn code_einloesen_und_signiert_me_abrufen() {
     let (s, _, b) = senden(
         &app,
         "GET",
-        "/api/v1/instanz/jwks.json",
+        "/api/v1/instance/jwks.json",
         None,
         vec![],
         "198.51.100.10",
@@ -479,7 +479,7 @@ async fn code_gilt_einmal_und_ein_falscher_pruefwert_laesst_ihn_offen() {
     let (s, _, b) = senden(
         &app,
         "POST",
-        "/api/v1/zugang/redeem",
+        "/api/v1/access/redeem",
         None,
         serde_json::to_vec(&anfrage).unwrap(),
         "198.51.100.20",
@@ -1037,7 +1037,7 @@ async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &admin,

@@ -109,7 +109,7 @@ function serverMit(
         ? HttpResponse.json({ id: Number(params.id), ...m })
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
-    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+    http.get('/api/notifications/:id', ({ params }) => {
       const id = Number(params.id);
       abgerufen.push(id);
       const b = liste.find((x) => x.id === id);
@@ -117,11 +117,11 @@ function serverMit(
         ? HttpResponse.json(b)
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
-    http.get('/api/benachrichtigungen', () => {
+    http.get('/api/notifications', () => {
       offeneAbrufe.anzahl += 1;
       return HttpResponse.json(offen);
     }),
-    http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {
+    http.post('/api/notifications/:id/acknowledge', ({ params }) => {
       quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -358,7 +358,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
   });
 
   it('ohne Text vom Server (Netzfehler) steht der Name der Art mit Sprung ins Modul', async () => {
-    server.use(http.get('/api/benachrichtigungen/:id', () => HttpResponse.error()));
+    server.use(http.get('/api/notifications/:id', () => HttpResponse.error()));
     renderZentrale();
     live(benachrichtigung(43, 'auftrag_ueberfaellig', 'auftrag', 7));
 

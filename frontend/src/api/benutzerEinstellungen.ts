@@ -2,7 +2,7 @@ import type { BenutzerEinstellungen } from './types';
 import { apiGet, apiSend } from './client';
 
 /**
- * Präferenzen des ANGEMELDETEN Benutzers laden (GET /api/benutzer-einstellungen).
+ * Präferenzen des ANGEMELDETEN Benutzers laden (GET /api/user-settings).
  *
  * Es gibt keinen Endpunkt für ein fremdes Fach — die `benutzer_id` stammt serverseitig
  * ausschliesslich aus der Sitzung. Deshalb nimmt diese Funktion kein Argument, und deshalb
@@ -12,11 +12,11 @@ import { apiGet, apiSend } from './client';
  * `geaendert_at` (kein 404): „noch nie geschrieben" ist der Normalfall beim ersten Login.
  */
 export function ladeBenutzerEinstellungen(): Promise<BenutzerEinstellungen> {
-  return apiGet<BenutzerEinstellungen>('/api/benutzer-einstellungen');
+  return apiGet<BenutzerEinstellungen>('/api/user-settings');
 }
 
 /**
- * Einen Schlüssel setzen (PUT /api/benutzer-einstellungen/{schluessel}, UPSERT).
+ * Einen Schlüssel setzen (PUT /api/user-settings/{schluessel}, UPSERT).
  *
  * Der Server antwortet mit dem VOLLEN neuen Stand, nicht nur mit dem geschriebenen
  * Schlüssel — ein zweiter Request nach dem Schreiben ist also nie nötig.
@@ -30,7 +30,7 @@ export function setzeBenutzerEinstellung(
   wert: string,
 ): Promise<BenutzerEinstellungen> {
   return apiSend<BenutzerEinstellungen>(
-    `/api/benutzer-einstellungen/${encodeURIComponent(schluessel)}`,
+    `/api/user-settings/${encodeURIComponent(schluessel)}`,
     'PUT',
     { wert },
   );

@@ -37,7 +37,7 @@ async function mitgliedMitFunktion(
 ): Promise<number> {
   let id = benutzerId;
   if (id == null) {
-    const konto = await page.request.post('/api/benutzer', {
+    const konto = await page.request.post('/api/users', {
       data: {
         anzeigename: name,
         benutzername: `e2e-funktion-${Date.now()}-${name.toLowerCase().replace(/\W/g, '')}`,

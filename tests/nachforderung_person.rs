@@ -68,7 +68,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -248,7 +248,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid2}/reject", nachforderungen(e)),
+        &format!("{}/{nid2}/decline", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;

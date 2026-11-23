@@ -56,7 +56,7 @@ export function lehneNachforderungAb(
   grund?: string,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/reject`,
+    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/decline`,
     'POST',
     { grund },
   );

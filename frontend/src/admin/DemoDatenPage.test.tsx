@@ -146,13 +146,13 @@ function demoServer(start: DemoDatenStatus | 'aus'): Zaehler {
       return HttpResponse.json(jetzt, { status: code });
     };
   server.use(
-    http.get('/api/demo-daten', () => {
+    http.get('/api/demo-data', () => {
       z.get += 1;
       return jetzt === 'aus' ? aus() : HttpResponse.json(jetzt);
     }),
-    http.post('/api/demo-daten/:lage', schreibe('post', 201)),
-    http.post('/api/demo-daten/:lage/neu', schreibe('neu')),
-    http.delete('/api/demo-daten/:lage', schreibe('delete')),
+    http.post('/api/demo-data/:lage', schreibe('post', 201)),
+    http.post('/api/demo-data/:lage/reimport', schreibe('neu')),
+    http.delete('/api/demo-data/:lage', schreibe('delete')),
   );
   return z;
 }
@@ -223,7 +223,7 @@ describe('DemoDatenPage — Menüeintrag (D13)', () => {
     expect(z.get).toBe(1);
   });
 
-  it('Führungskraft: kein Eintrag und keine Anfrage an /api/demo-daten', async () => {
+  it('Führungskraft: kein Eintrag und keine Anfrage an /api/demo-data', async () => {
     const z = demoServer(NICHT_IMPORTIERT);
     setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
     // Ankerpunkt: die Anmeldung ist aufgelöst, das Menü steht.
@@ -254,7 +254,7 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
   it('500: Fehlerbild mit „Erneut abrufen“, keine Aktion, keine Umleitung', async () => {
     let gets = 0;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         gets += 1;
         return HttpResponse.json({ error: 'Datenbank nicht erreichbar' }, { status: 500 });
       }),
@@ -279,7 +279,7 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
   it('Netzfehler: Fehlerbild mit „Erneut abrufen“, keine Aktion, keine Umleitung, kein Menüeintrag', async () => {
     let gets = 0;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         gets += 1;
         return HttpResponse.error();
       }),
@@ -307,7 +307,7 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
     // Deeplink erreichbar und zeigt dort das Fehlerbild.
     let gets = 0;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         gets += 1;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),
@@ -434,7 +434,7 @@ describe('DemoDatenPage — importiert', () => {
     expect(z.delete).toBe(0);
   });
 
-  it('Neu importieren: Rückfrage mit danger-Knopf, POST /neu erst nach Bestätigung', async () => {
+  it('Neu importieren: Rückfrage mit danger-Knopf, POST /reimport erst nach Bestätigung', async () => {
     const z = demoServer(IMPORTIERT);
     setup(admin);
     await userEvent.click(await knopfIn('Neu importieren'));
@@ -460,7 +460,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
   it('409 beim Import: Alert an der Seite mit Servertext, nicht in der Message-Queue', async () => {
     demoServer(NICHT_IMPORTIERT);
     server.use(
-      http.post('/api/demo-daten/starkregen', () =>
+      http.post('/api/demo-data/starkregen', () =>
         HttpResponse.json({ error: 'Demo-Daten sind bereits importiert' }, { status: 409 }),
       ),
     );
@@ -477,7 +477,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
   it('422 beim Neu-Import: Alert an der Seite, der Dialog ist zu', async () => {
     demoServer(IMPORTIERT);
     server.use(
-      http.post('/api/demo-daten/starkregen/neu', () =>
+      http.post('/api/demo-data/starkregen/reimport', () =>
         HttpResponse.json(
           { error: 'Katalogeintrag fehlt: Einheitstyp „Betreuungszug“' },
           { status: 422 },
@@ -503,12 +503,12 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     const z = demoServer(IMPORTIERT);
     let deletes = 0;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         z.get += 1;
         // Ab dem gescheiterten DELETE liefert der Server den Stand des anderen Tabs.
         return HttpResponse.json(deletes > 0 ? ENTFERNT : IMPORTIERT);
       }),
-      http.delete('/api/demo-daten/starkregen', () => {
+      http.delete('/api/demo-data/starkregen', () => {
         deletes += 1;
         return HttpResponse.json({ error: 'Es sind keine Demo-Daten importiert' }, { status: 409 });
       }),
@@ -529,7 +529,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     demoServer(NICHT_IMPORTIERT);
     let erster = true;
     server.use(
-      http.post('/api/demo-daten/starkregen', () => {
+      http.post('/api/demo-data/starkregen', () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Kurz belegt' }, { status: 409 });
@@ -549,7 +549,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
 describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
   it('nennt unter „Import fehlgeschlagen“ den Netzfehler, nicht „Speichern fehlgeschlagen“', async () => {
     demoServer(NICHT_IMPORTIERT);
-    server.use(http.post('/api/demo-daten/starkregen', () => HttpResponse.error()));
+    server.use(http.post('/api/demo-data/starkregen', () => HttpResponse.error()));
     setup(admin);
     await userEvent.click(await knopfIn('Importieren'));
     expect(await screen.findByText('Import Starkregen fehlgeschlagen')).toBeInTheDocument();
@@ -579,11 +579,11 @@ describe('DemoDatenPage — nach jedem Fehler wird neu geladen (D13)', () => {
     const z = demoServer(NICHT_IMPORTIERT);
     let serverStand: DemoDatenStatus = NICHT_IMPORTIERT;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         z.get += 1;
         return HttpResponse.json(serverStand);
       }),
-      http.post('/api/demo-daten/starkregen', () => {
+      http.post('/api/demo-data/starkregen', () => {
         // Die Antwort geht verloren, die Transaktion stand schon.
         serverStand = IMPORTIERT;
         return HttpResponse.error();
@@ -605,7 +605,7 @@ describe('DemoDatenPage — nach jedem Fehler wird neu geladen (D13)', () => {
   it('500 beim Entfernen: Stand neu geladen, Abfragen des alten Demo-Einsatzes invalidiert', async () => {
     const z = demoServer(IMPORTIERT);
     server.use(
-      http.delete('/api/demo-daten/starkregen', () =>
+      http.delete('/api/demo-data/starkregen', () =>
         HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 }),
       ),
     );
@@ -632,7 +632,7 @@ describe('DemoDatenPage — zwei Lagen nebeneinander (LLH-1576)', () => {
         name: 'ÜBUNG – Sanitätsdienst Stadtfest Musterstadt',
       }),
     ).toHaveAttribute('href', '/einsaetze/60');
-    expect(z.pfade).toEqual(['POST /api/demo-daten/stadtfest']);
+    expect(z.pfade).toEqual(['POST /api/demo-data/stadtfest']);
     expect(toastsMit('Demo-Lage Stadtfest importiert')).toHaveLength(1);
     // Der Starkregen steht unverändert daneben.
     const regen = screen.getByRole('region', { name: 'Starkregen' });
@@ -654,7 +654,7 @@ describe('DemoDatenPage — zwei Lagen nebeneinander (LLH-1576)', () => {
     await userEvent.click(await knopfIn('Entfernen', 'Stadtfest'));
     const dialog = await offenerDialog('Demo-Lage Stadtfest entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
-    await waitFor(() => expect(z.pfade).toEqual(['DELETE /api/demo-daten/stadtfest']));
+    await waitFor(() => expect(z.pfade).toEqual(['DELETE /api/demo-data/stadtfest']));
     const fest = screen.getByRole('region', { name: 'Stadtfest' });
     expect(await within(fest).findByText('Nicht importiert')).toBeInTheDocument();
     expect(toastsMit('Demo-Lage Stadtfest entfernt')).toHaveLength(1);
@@ -671,7 +671,7 @@ describe('DemoDatenPage — zwei Lagen nebeneinander (LLH-1576)', () => {
   it('ein Fehler nennt die Lage im Titel', async () => {
     demoServer(IMPORTIERT);
     server.use(
-      http.post('/api/demo-daten/stadtfest', () =>
+      http.post('/api/demo-data/stadtfest', () =>
         HttpResponse.json(
           { error: 'Diese Demo-Lage ist für die Organisation bereits importiert.' },
           { status: 409 },
@@ -690,7 +690,7 @@ describe('DemoDatenPage — zwei Lagen nebeneinander (LLH-1576)', () => {
     demoServer(IMPORTIERT);
     let freigeben: () => void = () => {};
     server.use(
-      http.delete('/api/demo-daten/starkregen', async () => {
+      http.delete('/api/demo-data/starkregen', async () => {
         await new Promise<void>((r) => {
           freigeben = r;
         });
@@ -716,7 +716,7 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     let freigeben: () => void = () => {};
     let posts = 0;
     server.use(
-      http.post('/api/demo-daten/starkregen', async () => {
+      http.post('/api/demo-data/starkregen', async () => {
         posts += 1;
         await new Promise<void>((r) => {
           freigeben = r;
@@ -748,7 +748,7 @@ describe('DemoDatenPage — laufender Vorgang sperrt beide Knöpfe sichtbar', ()
     demoServer(IMPORTIERT);
     let freigeben: () => void = () => {};
     server.use(
-      http.delete('/api/demo-daten/starkregen', async () => {
+      http.delete('/api/demo-data/starkregen', async () => {
         await new Promise<void>((r) => {
           freigeben = r;
         });

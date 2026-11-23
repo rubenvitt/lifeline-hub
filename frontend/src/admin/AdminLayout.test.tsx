@@ -221,7 +221,7 @@ describe('AdminLayout — Inhalt wartet auf den Datenträger-Befund', () => {
       freigeben = fertig;
     });
     server.use(
-      http.get('/api/system/datentraeger', async () => {
+      http.get('/api/system/storage', async () => {
         await tor;
         return antwort();
       }),
@@ -264,7 +264,7 @@ describe('AdminLayout — Inhalt wartet auf den Datenträger-Befund', () => {
   it('wer die Prüfung nicht abfragt, wartet auch nicht auf sie', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/system/datentraeger', () => {
+      http.get('/api/system/storage', () => {
         abrufe += 1;
         return new Promise<Response>(() => {});
       }),

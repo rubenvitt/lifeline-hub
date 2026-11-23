@@ -93,14 +93,14 @@ describe('api/einsaetze · Abschlussprüfung und Wiederöffnen (LLH-1814)', () =
   it('fragt die offenen Punkte per GET am Abschluss des Einsatzes ab', async () => {
     await loadAbschlussPruefung(7);
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/einsaetze/7/abschluss/pruefung');
+    expect(pfad).toBe('/api/einsaetze/7/closure/check');
     expect(init?.method ?? 'GET').toBe('GET');
   });
 
   it('öffnet per POST mit dem Grund im Body wieder', async () => {
     await oeffneEinsatzWieder(7, 'Falscher Einsatz abgeschlossen');
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/einsaetze/7/wiedereroeffnen');
+    expect(pfad).toBe('/api/einsaetze/7/reopen');
     expect(init?.method).toBe('POST');
     expect(JSON.parse(init?.body as string)).toEqual({ grund: 'Falscher Einsatz abgeschlossen' });
   });

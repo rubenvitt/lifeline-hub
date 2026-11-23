@@ -19,13 +19,13 @@ pub struct OrganisationAnzeige {
     pub name: String,
     pub tz_organisation: Option<String>,
     /// Logo der Organisation (LFH-22) ohne Bytes; fehlt, wenn keines hinterlegt ist. Die
-    /// Bytes liefert `GET /api/organisation/logo`.
+    /// Bytes liefert `GET /api/organization/logo`.
     #[sqlx(skip)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logo: Option<OrgLogoAnzeige>,
 }
 
-/// GET /api/organisation — Org-Stammdaten inkl. DV-102-Org-Default.
+/// GET /api/organization — Org-Stammdaten inkl. DV-102-Org-Default.
 /// Jeder eingeloggte Nutzer.
 pub async fn lesen(
     State(state): State<AppState>,
@@ -72,7 +72,7 @@ const ERLAUBTE_ORG: &[&str] = &[
     "zivil",
 ];
 
-/// PATCH /api/organisation — Name und/oder Org-Default setzen. Nur Admin.
+/// PATCH /api/organization — Name und/oder Org-Default setzen. Nur Admin.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -121,7 +121,7 @@ pub async fn aktualisieren(
 // Alle drei Routen lesen die Organisation aus `benutzer.org_id` und nehmen keine Org-Kennung
 // entgegen: ein Admin ändert nur das Logo seiner eigenen Org.
 
-/// POST /api/organisation/logo — Logo setzen oder ersetzen. Nur Admin. Multipart-Feld
+/// POST /api/organization/logo — Logo setzen oder ersetzen. Nur Admin. Multipart-Feld
 /// `datei`; PNG oder JPEG (am Inhalt erkannt), 1 Byte bis 1 MiB, vor dem Speichern
 /// gescannt. Gespeichert werden nur die von Metadaten bereinigten Bytes (LLH-1640); ein Bild,
 /// das sich nicht bereinigen lässt, ist 422. Antwort: die `OrganisationAnzeige` mit dem neuen
@@ -159,7 +159,7 @@ pub async fn logo_hochladen(
     Ok(Json(lade_anzeige(&state.pool, benutzer.org_id).await?))
 }
 
-/// GET /api/organisation/logo — die Bytes des eigenen Logos, für jede angemeldete Person. Passt
+/// GET /api/organization/logo — die Bytes des eigenen Logos, für jede angemeldete Person. Passt
 /// `If-None-Match` zu den Metadaten, antwortet die Route 304, ohne den BLOB zu lesen. Sonst
 /// kommen Typ, Prüfsumme und Bytes in EINER Abfrage, damit Kopfzeilen und Bytes auch bei einem
 /// parallelen Ersetzen zusammenpassen. Kein Logo → 404.
@@ -213,7 +213,7 @@ fn logo_kopf(sha256: &str) -> Result<HeaderMap, AppError> {
     Ok(headers)
 }
 
-/// DELETE /api/organisation/logo — Logo entfernen. Nur Admin. 204, auch ohne Logo.
+/// DELETE /api/organization/logo — Logo entfernen. Nur Admin. 204, auch ohne Logo.
 pub async fn logo_entfernen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

@@ -45,7 +45,7 @@ test('ein Konto unter Änderungszwang hält bei der Anmeldung an, nicht erst auf
   const benutzername = `e2e-zwang-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const passwort = 'e2e-zwang-passwort-123';
   // Ohne Erstwechsel (`konto-anlegen.ts` absichtlich nicht): das Konto steht unter Änderungszwang.
-  const angelegt = await page.request.post('/api/benutzer', {
+  const angelegt = await page.request.post('/api/users', {
     data: { anzeigename: 'E2E Zwang', benutzername, passwort },
   });
   expect(angelegt.ok(), `Konto: ${angelegt.status()} ${await angelegt.text()}`).toBe(true);

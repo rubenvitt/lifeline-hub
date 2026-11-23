@@ -22,7 +22,7 @@ describe('api/organisation', () => {
   it('aendereOrganisation schickt NUR den Namen, wenn nur er übergeben ist', async () => {
     await aendereOrganisation({ name: 'DRK Kreisverband Musterstadt' });
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/organisation');
+    expect(pfad).toBe('/api/organization');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ name: 'DRK Kreisverband Musterstadt' });
   });
@@ -45,7 +45,7 @@ describe('api/organisation', () => {
     const datei = new File([new Uint8Array([0x89, 0x50])], 'logo.png', { type: 'image/png' });
     await ladeOrgLogoHoch(datei);
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/organisation/logo');
+    expect(pfad).toBe('/api/organization/logo');
     expect(init.method).toBe('POST');
     expect(init.body).toBeInstanceOf(FormData);
     expect((init.body as FormData).get('datei')).toBe(datei);
@@ -57,11 +57,11 @@ describe('api/organisation', () => {
     fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
     await entferneOrgLogo();
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/organisation/logo');
+    expect(pfad).toBe('/api/organization/logo');
     expect(init.method).toBe('DELETE');
   });
 
   it('orgLogoPfad hängt den sha256 als Cache-Brecher an', () => {
-    expect(orgLogoPfad('abc123')).toBe('/api/organisation/logo?v=abc123');
+    expect(orgLogoPfad('abc123')).toBe('/api/organization/logo?v=abc123');
   });
 });

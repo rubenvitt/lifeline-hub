@@ -165,7 +165,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
         },
       ]),
     );
-    const adresse = `${window.location.origin}/api/v1/einwurf/${SCHLUESSEL}/position`;
+    const adresse = `${window.location.origin}/api/v1/intake/${SCHLUESSEL}/position`;
     const box = (await screen.findByText(adresse)).closest<HTMLElement>(
       '[data-lfh="einwurf-adresse"]',
     )!;
@@ -244,7 +244,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     expect(aufrufe).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: 'Schlüssel wechseln' }));
     await waitFor(() => expect(aufrufe).toEqual([{ pfad: 'wechseln', body: null }]));
-    const adresse = `${window.location.origin}/api/v1/einwurf/${SCHLUESSEL_NEU}/alarmmeldung`;
+    const adresse = `${window.location.origin}/api/v1/intake/${SCHLUESSEL_NEU}/alarm`;
     expect(await screen.findByText(adresse)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Fertig' }));
     await waitFor(() =>
@@ -490,10 +490,10 @@ describe('Einwurf-Zugänge · Wortlaut und Adresse', () => {
 
   it('die Adresse trägt den Unterpfad des Zwecks', () => {
     expect(einwurfAdresse('https://hub.example', SCHLUESSEL, 'alarmmeldungen:write')).toBe(
-      `https://hub.example/api/v1/einwurf/${SCHLUESSEL}/alarmmeldung`,
+      `https://hub.example/api/v1/intake/${SCHLUESSEL}/alarm`,
     );
     expect(einwurfAdresse('https://hub.example', SCHLUESSEL, 'positionen:write')).toBe(
-      `https://hub.example/api/v1/einwurf/${SCHLUESSEL}/position`,
+      `https://hub.example/api/v1/intake/${SCHLUESSEL}/position`,
     );
   });
 });

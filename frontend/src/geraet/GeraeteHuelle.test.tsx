@@ -1111,7 +1111,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     stelleBereit(vGeraet);
     const nachforderungen = vi.fn();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(
           freigabenFixture({
             nachforderungen: { zugriff: false },

@@ -694,7 +694,7 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
   it('Ort der Ausgabe: Enter sucht im Einsatz, der Treffer geht nur als Text hinaus', async () => {
     const suchen: string[] = [];
     server.use(
-      http.get('/api/einsaetze/:eid/ort-suche', ({ params, request }) => {
+      http.get('/api/einsaetze/:eid/place-search', ({ params, request }) => {
         suchen.push(`${params.eid}:${new URL(request.url).searchParams.get('q')}`);
         return HttpResponse.json({
           zustand: 'ok',

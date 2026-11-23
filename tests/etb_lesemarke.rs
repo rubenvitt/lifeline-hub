@@ -235,7 +235,7 @@ async fn beobachter_darf_setzen_auch_im_abgeschlossenen_einsatz() {
     let (status, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -305,7 +305,7 @@ async fn ausgeblendetes_etb_modul_sperrt_lesemarke() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
