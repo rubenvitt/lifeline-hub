@@ -50,7 +50,7 @@ beforeEach(() => {
         { id: 5, einsatz_id: 1, name: 'EA Süd' },
       ]),
     ),
-    http.get('/api/einsaetze/1/einheiten', () =>
+    http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),
     // Ahmt den Server nach wie `DokumentAblegenModal.test.tsx`: `q` sucht ganze Wörter,

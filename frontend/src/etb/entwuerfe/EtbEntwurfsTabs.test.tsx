@@ -32,8 +32,8 @@ beforeEach(async () => {
   localStorage.clear();
   server.use(
     meHandler(ich),
-    http.get('/api/einsaetze/:id/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
   );
 });
 

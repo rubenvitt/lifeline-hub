@@ -211,7 +211,7 @@ pub struct EinsatzPersonalAnzeige {
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
     /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.
-    /// Nur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+    /// Nur `GET …/personnel?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beendet_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -271,7 +271,7 @@ pub const RUECKNAHME_LISTE_MAX: usize = 200;
 /// echter Vorzustand darf nie abgelehnt werden.
 pub const RUECKNAHME_NAME_MAX: usize = 2_000;
 
-/// Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu
+/// Antwort des PATCH einer Disposition (`PATCH …/personnel/{ep_id}`): die Kraft wie bisher, dazu
 /// der Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalPatchAntwort {
@@ -281,14 +281,14 @@ pub struct PersonalPatchAntwort {
     pub status_ruecknahme: Option<crate::status_ruecknahme::HandStatusRuecknahmeBeleg>,
 }
 
-/// Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).
+/// Antwort von `POST …/personnel/{ep_id}/release` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungAntwort {
     pub personal: EinsatzPersonalAnzeige,
     pub vorzustand: PersonalEntlassungVorzustand,
 }
 
-/// Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922).
+/// Antwort von `POST …/personnel/{ep_id}/release/undo` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungRuecknahmeAntwort {
     pub personal: EinsatzPersonalAnzeige,

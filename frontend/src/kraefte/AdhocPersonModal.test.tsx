@@ -13,7 +13,7 @@ describe('AdhocPersonModal', () => {
   it('meldet die angelegte Disposition zurück und schliesst', async () => {
     let body: unknown;
     server.use(
-      http.post('/api/einsaetze/1/personal', async ({ request }) => {
+      http.post('/api/einsaetze/1/personnel', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: 77, einsatz_id: 1, name: 'Dr. Schmidt' }, { status: 201 });
       }),
@@ -37,7 +37,7 @@ describe('AdhocPersonModal', () => {
   it('nennt das Freitextfeld „Qualifikation“ und begrenzt die Texte (LLH-1067)', async () => {
     let body: unknown;
     server.use(
-      http.post('/api/einsaetze/1/personal', async ({ request }) => {
+      http.post('/api/einsaetze/1/personnel', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: 78, einsatz_id: 1, name: 'Dr. Schmidt' }, { status: 201 });
       }),
@@ -90,7 +90,7 @@ describe('AdhocPersonModal', () => {
     }
 
     const ablehnen = () =>
-      http.post('/api/einsaetze/1/personal', () =>
+      http.post('/api/einsaetze/1/personnel', () =>
         HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 }),
       );
 
@@ -113,7 +113,7 @@ describe('AdhocPersonModal', () => {
     it('das nächste Absenden räumt den Grund', async () => {
       let zweiter = false;
       server.use(
-        http.post('/api/einsaetze/1/personal', async () => {
+        http.post('/api/einsaetze/1/personnel', async () => {
           if (!zweiter) {
             zweiter = true;
             return HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 });

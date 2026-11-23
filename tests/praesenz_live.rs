@@ -173,7 +173,7 @@ fn pfad(eid: i64) -> String {
 }
 
 fn einheit_pfad(eid: i64, einheit: i64) -> String {
-    format!("/api/einsaetze/{eid}/einheiten/{einheit}/praesenz")
+    format!("/api/einsaetze/{eid}/units/{einheit}/presence")
 }
 
 #[tokio::test]

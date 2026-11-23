@@ -444,7 +444,7 @@ async fn berichtigen(
 
 // ── Einheiten ───────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/einheiten/zeitachse — Perioden je Einheit (Meldebild).
+/// GET /api/einsaetze/{id}/units/timeline — Perioden je Einheit (Meldebild).
 pub async fn einheiten_perioden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Einheiten>,
@@ -454,7 +454,7 @@ pub async fn einheiten_perioden(
     ))
 }
 
-/// GET /api/einsaetze/{id}/einheiten/zeitachse/grenzwerte — wirksame Grenzwerte des
+/// GET /api/einsaetze/{id}/units/timeline/limits — wirksame Grenzwerte des
 /// Schichtplans für die Einstufung im Meldebild (LLH-730); ohne das Modul Ablösung.
 pub async fn einheiten_grenzwerte(
     State(state): State<AppState>,
@@ -465,7 +465,7 @@ pub async fn einheiten_grenzwerte(
     ))
 }
 
-/// GET /api/einsaetze/{id}/einheiten/{eid}/zeitachse
+/// GET /api/einsaetze/{id}/units/{eid}/timeline
 pub async fn einheit_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Einheiten>,
@@ -476,7 +476,7 @@ pub async fn einheit_laden(
     ))
 }
 
-/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse — Nachtrag (mit Fan-out).
+/// POST /api/einsaetze/{id}/units/{eid}/timeline — Nachtrag (mit Fan-out).
 pub async fn einheit_nachtragen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -494,7 +494,7 @@ pub async fn einheit_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/periode — Periode nachtragen (LLH-1538).
+/// POST /api/einsaetze/{id}/units/{eid}/timeline/period — Periode nachtragen (LLH-1538).
 pub async fn einheit_periode_nachtragen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -512,7 +512,7 @@ pub async fn einheit_periode_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/streichen
+/// POST /api/einsaetze/{id}/units/{eid}/timeline/{zid}/void
 pub async fn einheit_streichen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -532,7 +532,7 @@ pub async fn einheit_streichen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/berichtigen (LLH-1455)
+/// POST /api/einsaetze/{id}/units/{eid}/timeline/{zid}/correct (LLH-1455)
 pub async fn einheit_berichtigen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -554,7 +554,7 @@ pub async fn einheit_berichtigen(
 
 // ── Personal ────────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/personal/zeitachse — Perioden je Person (Personal-Seite).
+/// GET /api/einsaetze/{id}/personnel/timeline — Perioden je Person (Personal-Seite).
 pub async fn personal_perioden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personal>,
@@ -564,7 +564,7 @@ pub async fn personal_perioden(
     ))
 }
 
-/// GET /api/einsaetze/{id}/personal/zeitachse/grenzwerte — wirksame Grenzwerte des
+/// GET /api/einsaetze/{id}/personnel/timeline/limits — wirksame Grenzwerte des
 /// Schichtplans für die Einstufung auf der Personal-Seite (LLH-730); ohne das Modul Ablösung.
 pub async fn personal_grenzwerte(
     State(state): State<AppState>,
@@ -575,7 +575,7 @@ pub async fn personal_grenzwerte(
     ))
 }
 
-/// GET /api/einsaetze/{id}/personal/{ep_id}/zeitachse
+/// GET /api/einsaetze/{id}/personnel/{ep_id}/timeline
 pub async fn person_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personal>,
@@ -586,7 +586,7 @@ pub async fn person_laden(
     ))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse — Nachtrag.
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline — Nachtrag.
 pub async fn person_nachtragen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
@@ -604,7 +604,7 @@ pub async fn person_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/periode — Periode nachtragen (LLH-1538).
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline/period — Periode nachtragen (LLH-1538).
 pub async fn person_periode_nachtragen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
@@ -622,7 +622,7 @@ pub async fn person_periode_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/streichen
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/void
 pub async fn person_streichen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
@@ -642,7 +642,7 @@ pub async fn person_streichen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/berichtigen (LLH-1455)
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/correct (LLH-1455)
 pub async fn person_berichtigen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,

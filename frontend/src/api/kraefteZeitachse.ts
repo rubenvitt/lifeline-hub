@@ -21,12 +21,12 @@ function kraftPfad(einsatzId: number, art: KraftArt, id: number): string {
 
 /** Perioden je Einheit (nur Einheiten mit Ereignissen) — Spalte „Im Einsatz" im Meldebild. */
 export function listeEinheitenPerioden(einsatzId: number): Promise<EinheitPerioden[]> {
-  return apiGet<EinheitPerioden[]>(`/api/einsaetze/${einsatzId}/einheiten/zeitachse`);
+  return apiGet<EinheitPerioden[]>(`/api/einsaetze/${einsatzId}/units/timeline`);
 }
 
 /** Perioden je Person (nur Personen mit Ereignissen) — Personal-Seite. */
 export function listePersonalPerioden(einsatzId: number): Promise<PersonPerioden[]> {
-  return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personal/zeitachse`);
+  return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personnel/timeline`);
 }
 
 /**

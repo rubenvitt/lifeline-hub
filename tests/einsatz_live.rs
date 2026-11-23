@@ -500,7 +500,7 @@ async fn kopf_patch_mit_termin_feuert_nichts() {
 // ---------- Mitgliedschaft (LFH-854) ----------
 
 fn mitglied_pfad(einsatz: i64, benutzer: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer}")
+    format!("/api/einsaetze/{einsatz}/members/{benutzer}")
 }
 
 /// Setzt die Rolle eines Mitglieds (Vorbedingung: 200).
@@ -1035,7 +1035,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"Florian Extern 1"}}"#),
     )
@@ -1046,7 +1046,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Nord"}"#),
     )
@@ -1055,19 +1055,19 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
     for (methode, pfad, body) in [
         (
             "POST",
-            format!("bereitstellungsraeume/{br}/status"),
+            format!("staging-areas/{br}/status"),
             Some(r#"{"status":"aktiv"}"#.to_string()),
         ),
         (
             "POST",
-            format!("bereitstellungsraeume/{br}/belegung"),
+            format!("staging-areas/{br}/occupancy"),
             Some(format!(
                 r#"{{"objekt_typ":"einheit","objekt_id":{einheit},"art":"eintritt"}}"#
             )),
         ),
         // Das Fahrzeug steht über seine Einheit im Raum (LLH-1288: einzeln eingetreten und dann
         // zugeordnet, träte es aus).
-        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
+        ("PUT", format!("units/{einheit}/vehicles/{ef}"), None),
         (
             "PATCH",
             "fuehrungsstelle".to_string(),
@@ -1090,7 +1090,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
                 &admin,
                 Some(body),
             )

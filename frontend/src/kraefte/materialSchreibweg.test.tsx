@@ -167,24 +167,24 @@ function mitschnitt(hier: EinsatzMaterial) {
   const einheitenRouten: string[] = [];
   server.use(
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([FREI, hier])),
-    http.get('/api/einsaetze/1/einheiten', () =>
+    http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 10, name: '1. Zug', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/fahrzeuge', () =>
+    http.get('/api/einsaetze/1/vehicles', () =>
       HttpResponse.json([{ id: 20, funkrufname: 'Florian 1', beendet_at: null }]),
     ),
     http.get('/api/einsaetze/1/uhs', () =>
       HttpResponse.json([{ id: 3, bezeichnung: 'Turnhalle', status: 'aktiv', storniert_at: null }]),
     ),
-    http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+    http.get('/api/einsaetze/1/staging-areas', () =>
       HttpResponse.json([{ id: 4, bezeichnung: 'BR Nord', status: 'geplant', storniert_at: null }]),
     ),
     http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
       gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
       return HttpResponse.json({});
     }),
-    http.all('/api/einsaetze/1/einheiten/:eid/material/:emId', ({ request }) => {
+    http.all('/api/einsaetze/1/units/:eid/material/:emId', ({ request }) => {
       einheitenRouten.push(`${request.method} ${new URL(request.url).pathname}`);
       return new HttpResponse(null, { status: 204 });
     }),

@@ -67,7 +67,7 @@ describe.each([
   },
   {
     was: 'Bereitstellungsraum',
-    pfad: '/api/einsaetze/1/bereitstellungsraeume',
+    pfad: '/api/einsaetze/1/staging-areas',
     zeige: () => renderMitProviders(<BrAnlegenModal einsatzId={1} open onClose={vi.fn()} />),
   },
 ])('$was anlegen · Standort als Ortsfeld (LLH-1114)', ({ pfad, zeige }) => {

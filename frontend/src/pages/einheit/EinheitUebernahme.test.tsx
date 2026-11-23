@@ -35,11 +35,11 @@ function zeige({
   const koerper: unknown[] = [];
   const abgewiesen: number[] = [];
   server.use(
-    http.post('/api/einsaetze/1/einheiten/20/uebernehmen', async ({ request }) => {
+    http.post('/api/einsaetze/1/units/20/take-over', async ({ request }) => {
       koerper.push(await request.json());
       return HttpResponse.json({ ...NEU, nicht_uebernommen_seit: null, abschnitt_id: 3 });
     }),
-    http.post('/api/einsaetze/1/einheiten/20/abweisen', () => {
+    http.post('/api/einsaetze/1/units/20/reject', () => {
       abgewiesen.push(20);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -121,7 +121,7 @@ describe('EinheitUebernahme (LLH-1075, design.md D14)', () => {
   it('eine Ablehnung steht am Ort, ohne Toast', async () => {
     zeige();
     server.use(
-      http.post('/api/einsaetze/1/einheiten/20/abweisen', () =>
+      http.post('/api/einsaetze/1/units/20/reject', () =>
         HttpResponse.json({ error: 'Einheit ist schon übernommen' }, { status: 409 }),
       ),
     );

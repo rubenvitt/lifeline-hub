@@ -10,7 +10,7 @@ export async function einheitMitZuordnungen(page: Page) {
   }
   const einsatzId = await post('/api/einsaetze', { bezeichnung: `E2E 446 ${Date.now()}` });
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheitId = await post(`${basis}/einheiten`, { name: 'Messzug 446' });
+  const einheitId = await post(`${basis}/units`, { name: 'Messzug 446' });
   const namen = { personal: 'Messperson 446', fahrzeug: 'Florian 446', material: 'Messkiste 446' };
   const zugeordnet: Record<string, number> = {};
   for (const [modul, zuordnung, adhoc] of [
@@ -31,9 +31,7 @@ export async function einheitMitZuordnungen(page: Page) {
       if (!frei && modul === 'material') {
         zugeordnet[modul] = id;
       } else if (!frei) {
-        const antwort = await page.request.put(
-          `${basis}/einheiten/${einheitId}/${zuordnung}/${id}`,
-        );
+        const antwort = await page.request.put(`${basis}/units/${einheitId}/${zuordnung}/${id}`);
         expect(antwort.ok(), `Zuordnung ${modul}: ${await antwort.text()}`).toBeTruthy();
         zugeordnet[modul] = id;
       }
@@ -41,7 +39,7 @@ export async function einheitMitZuordnungen(page: Page) {
   }
   // Die Person sitzt auf dem Fahrzeug: Fahrzeug- und Personenzeile stehen direkt untereinander.
   const besatzung = await page.request.put(
-    `${basis}/fahrzeuge/${zugeordnet.fahrzeuge}/besatzung/${zugeordnet.personal}`,
+    `${basis}/vehicles/${zugeordnet.fahrzeuge}/crew/${zugeordnet.personal}`,
   );
   expect(besatzung.ok(), `Besatzung: ${await besatzung.text()}`).toBeTruthy();
   return { pfad: `/einsaetze/${einsatzId}/einheiten/${einheitId}`, namen };

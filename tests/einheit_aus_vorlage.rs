@@ -1,6 +1,6 @@
 //! Einheit aus Vorlage bilden (LLH-1049, Spec `kraefte-disposition`, „Einheit aus Vorlage
-//! bilden“, und `einheit-vorlagen`, „Vorschau im Einsatz“): `GET …/einheiten/aus-vorlage/{id}`
-//! und `POST …/einheiten/aus-vorlage`. Die Regeln der Planung prüfen die Repo-Tests in
+//! bilden“, und `einheit-vorlagen`, „Vorschau im Einsatz“): `GET …/units/from-template/{id}`
+//! und `POST …/units/from-template`. Die Regeln der Planung prüfen die Repo-Tests in
 //! `src/einheit/aus_vorlage/tests.rs`; hier Statuscodes, Rechte, ETB und Ereignisse.
 
 use axum::http::StatusCode;
@@ -191,7 +191,7 @@ async fn vorschau(app: &axum::Router, cookie: &str, einsatz: i64, v: i64) -> (St
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage/{v}"),
+        &format!("/api/einsaetze/{einsatz}/units/from-template/{v}"),
         cookie,
         None,
     )
@@ -207,7 +207,7 @@ async fn bilden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage"),
+        &format!("/api/einsaetze/{einsatz}/units/from-template"),
         cookie,
         Some(&body.to_string()),
     )
@@ -255,7 +255,7 @@ async fn fahrzeug_im_einsatz(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fid}}}"#)),
     )
@@ -266,7 +266,7 @@ async fn fahrzeug_im_einsatz(
         let (s, _) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
             admin,
             None,
         )
@@ -625,7 +625,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{}}}"#, v.notarzt)),
     )
@@ -635,7 +635,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/release"),
         &admin,
         None,
     )
@@ -678,7 +678,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/release"),
         &admin,
         None,
     )
@@ -708,7 +708,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     assert_eq!(fahrzeuge[0]["einheit_id"], staffel);
     let personal = liste(&app, &admin, einsatz, "personal").await;
     assert_eq!(personal[0]["fahrzeug_id"], ef, "Besatzung nach der Vorlage");
-    let entlassene = liste(&app, &admin, einsatz, "fahrzeuge?entlassene=1").await;
+    let entlassene = liste(&app, &admin, einsatz, "vehicles?entlassene=1").await;
     assert!(entlassene.is_empty(), "{entlassene:?}");
 }
 

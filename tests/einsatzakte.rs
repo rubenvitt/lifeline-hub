@@ -438,7 +438,7 @@ async fn gekoppeltes_geraet_bekommt_kein_zip() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/geraete"),
+        &format!("/api/einsaetze/{e}/devices"),
         &admin,
         Some(
             &serde_json::json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"}),

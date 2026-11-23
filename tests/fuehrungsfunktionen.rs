@@ -572,7 +572,7 @@ async fn fuehrungsstelle_als_katalogwert() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, einsatz, frieda, "fuehrungspersonal").await;
-    let mitglied_pfad = format!("/api/einsaetze/{einsatz}/mitglieder/{frieda}");
+    let mitglied_pfad = format!("/api/einsaetze/{einsatz}/members/{frieda}");
 
     let (status, json) = anfrage(
         &app,
@@ -695,7 +695,7 @@ async fn mandantenlabel_in_mitgliederliste_und_kopf() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &format!("/api/einsaetze/{einsatz}/members"),
         &admin,
         None,
     )
@@ -812,7 +812,7 @@ async fn mitglied_von(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &format!("/api/einsaetze/{einsatz}/members"),
         cookie,
         None,
     )
@@ -832,7 +832,7 @@ async fn mitarbeit_und_beobachter_mit_funktion_sind_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/mitglieder/{frieda}");
+    let pfad = format!("/api/einsaetze/{einsatz}/members/{frieda}");
 
     for rolle in ["mitarbeit", "beobachter"] {
         let body = serde_json::json!({"einsatz_rolle": rolle, "fuehrungsfunktion": "s4"});
@@ -846,7 +846,7 @@ async fn mitarbeit_und_beobachter_mit_funktion_sind_422() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &format!("/api/einsaetze/{einsatz}/members"),
         &admin,
         None,
     )
@@ -870,7 +870,7 @@ async fn mitarbeit_mit_freitext_ist_erlaubt() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{frieda}"),
+        &format!("/api/einsaetze/{einsatz}/members/{frieda}"),
         &admin,
         Some(r#"{"einsatz_rolle":"mitarbeit","fuehrungsstelle":"Funk ELW 2"}"#),
     )

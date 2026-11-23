@@ -37,7 +37,7 @@ async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str, posit
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name, "funktion": "Sanitäter", "staerke_position": position}})),
     )
@@ -79,7 +79,7 @@ async fn personal(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) -> Va
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         None,
     )
@@ -104,7 +104,7 @@ async fn kraft_einer_einheit_zaehlt_an_der_uhs_und_bleibt_in_ihrer_einheit() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{seg}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/units/{seg}/personnel/{ep}"),
         &admin,
         None,
     )
@@ -129,7 +129,7 @@ async fn kraft_einer_einheit_zaehlt_an_der_uhs_und_bleibt_in_ihrer_einheit() {
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -170,7 +170,7 @@ async fn kraft_ohne_position_zaehlt_an_der_uhs_als_mannschaft() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&json!({"adhoc": {"name": "Ohne", "funktion": "Helfer"}})),
     )
@@ -207,7 +207,7 @@ async fn position_und_wechsel_aendern_die_staerke_ohne_pflege() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(&json!({"staerke_position": "unterfuehrer"})),
     )
@@ -409,7 +409,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{seg}/personal/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/units/{seg}/personnel/{ep}"),
             &admin,
             None,
         )

@@ -156,7 +156,7 @@ async fn mitglied(i: &Instanz, einsatz: i64, benutzer: i64, rolle: &str, stelle:
     let (s, v) = common::anfrage(
         &i.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer}"),
+        &format!("/api/einsaetze/{einsatz}/members/{benutzer}"),
         &i.admin,
         Some(
             &json!({"einsatz_rolle": rolle, "fuehrungsfunktion": null, "fuehrungsstelle": stelle})

@@ -90,7 +90,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   }
   // LFH-1045: zwei Kräfte an der UHS Nord; der Monitor zeigt nur ihre Zahl.
   for (const name of ['Kraft Eins', 'Kraft Zwei']) {
-    const kraft = await anlegen(page, `/api/einsaetze/${e}/personal`, {
+    const kraft = await anlegen(page, `/api/einsaetze/${e}/personnel`, {
       adhoc: { name, staerke_position: 'mannschaft' },
     });
     const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/kraefte/${kraft.id}`);
@@ -174,7 +174,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     name: 'UHS Turnhalle Nordufer',
     lagezustand: 'kritisch',
   });
-  const trupp = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Logistiktrupp' });
+  const trupp = await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Logistiktrupp' });
   const vorZweiStunden = new Date(Date.now() - 120 * 60_000).toISOString();
   await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
     absender: 'Logistiktrupp',
@@ -198,7 +198,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'lagemonitor', bezeichnung: 'Monitor Stab' },
   );
 
@@ -402,7 +402,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(monitor.getByRole('dialog', { name: 'Gerätemenü' })).toHaveCount(0);
 
     // Widerruf: „Kopplung beendet“ ohne Lagebild, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/geraete/${kopplung.kopplung.id}/widerrufen`);
+    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(monitor).toHaveURL(/\/kopplung-beendet$/);
     await expect(monitor.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
     await expect(monitor.getByText('UHS Nord')).toHaveCount(0);

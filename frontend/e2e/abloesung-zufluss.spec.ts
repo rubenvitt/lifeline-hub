@@ -81,9 +81,9 @@ for (const kontext of KONTEXTE) {
     };
     const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
     const einheit = async (name: string) =>
-      (await post('einheiten', { name, abschnitt_id: abschnitt.id }, name)).id;
+      (await post('units', { name, abschnitt_id: abschnitt.id }, name)).id;
     for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
-      await post('abloesungen', { einheit_id: await einheit(name), rhythmus_minuten: 360 }, name);
+      await post('reliefs', { einheit_id: await einheit(name), rhythmus_minuten: 360 }, name);
     }
     const fremdeEinheit = await einheit('Florian Süd 9');
 
@@ -107,11 +107,7 @@ for (const kontext of KONTEXTE) {
     };
 
     // Fremd angelegt, mit kürzerem Rhythmus → fällig vor den beiden gezeigten.
-    await post(
-      'abloesungen',
-      { einheit_id: fremdeEinheit, rhythmus_minuten: 30 },
-      'fremde Schicht',
-    );
+    await post('reliefs', { einheit_id: fremdeEinheit, rhythmus_minuten: 30 }, 'fremde Schicht');
 
     await expect(banner).toBeVisible();
     await expect(banner).toContainText('1 neue Schicht');
@@ -242,11 +238,11 @@ test.describe('fremde Rhythmusänderung', () => {
         const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
         const schichten: number[] = [];
         for (const name of ['Florian Nord 1', 'Florian Nord 2', 'Florian Nord 3']) {
-          const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
+          const einheit = await post('units', { name, abschnitt_id: abschnitt.id }, name);
           schichten.push(
             (
               await post(
-                'abloesungen',
+                'reliefs',
                 {
                   einheit_id: einheit.id,
                   rhythmus_minuten: 360,
@@ -302,7 +298,7 @@ test.describe('fremde Rhythmusänderung', () => {
         // Fremd geändert, am Frontend vorbei: 30 min Rhythmus → fällig vor den beiden anderen.
         const mitte = karten.nth(1);
         const aenderung = await page.request.patch(
-          `/api/einsaetze/${einsatzId}/abloesungen/${schichten[1]}`,
+          `/api/einsaetze/${einsatzId}/reliefs/${schichten[1]}`,
           { data: { rhythmus_minuten: 30 } },
         );
         expect(aenderung.ok(), `fremde Änderung: ${aenderung.status()}`).toBeTruthy();
@@ -375,25 +371,22 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     };
     const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
     // Der Abschnitt hat keine Vorgabe: die Schicht folgt der Vorgabe des Einsatzes.
-    const vorgabe = await page.request.put(
-      `/api/einsaetze/${einsatzId}/abloesungen/schichtmodell`,
-      {
-        data: {
-          schichtmodell: {
-            bezeichnung: 'Längster Rhythmus',
-            typ: 'rhythmus',
-            rhythmus_minuten: 7 * 24 * 60 - 1,
-          },
+    const vorgabe = await page.request.put(`/api/einsaetze/${einsatzId}/reliefs/shift-model`, {
+      data: {
+        schichtmodell: {
+          bezeichnung: 'Längster Rhythmus',
+          typ: 'rhythmus',
+          rhythmus_minuten: 7 * 24 * 60 - 1,
         },
       },
-    );
+    });
     expect(vorgabe.ok(), `Seeding Vorgabe: ${vorgabe.status()}`).toBeTruthy();
     const einheit = await post(
-      'einheiten',
+      'units',
       { name: 'Florian Nord 1', abschnitt_id: abschnitt.id },
       'Einheit',
     );
-    await post('abloesungen', { einheit_id: einheit.id }, 'Schicht');
+    await post('reliefs', { einheit_id: einheit.id }, 'Schicht');
 
     await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, dichte);
     const zeile = page.locator('[data-lfh="abloesung-rhythmus"]');

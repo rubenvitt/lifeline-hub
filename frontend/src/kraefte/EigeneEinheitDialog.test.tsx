@@ -39,7 +39,7 @@ let bodies: unknown[];
 function handler(typen = TYPEN) {
   server.use(
     http.get('/api/einheit-typen', () => HttpResponse.json(typen)),
-    http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
+    http.post('/api/einsaetze/1/units', async ({ request }) => {
       const body = (await request.json()) as { name: string };
       bodies.push(body);
       return HttpResponse.json({ id: 60, name: body.name }, { status: 201 });
@@ -167,7 +167,7 @@ describe('EigeneEinheitDialog — Als eigene Einheit führen (LLH-1073, design.m
   it('nennt den Grund am Fahrzeug, wenn es inzwischen einer Einheit angehört', async () => {
     handler();
     server.use(
-      http.post('/api/einsaetze/1/einheiten', () =>
+      http.post('/api/einsaetze/1/units', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Fahrzeuge lassen sich zuordnen',

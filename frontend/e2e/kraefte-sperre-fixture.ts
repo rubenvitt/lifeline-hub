@@ -52,17 +52,17 @@ export async function seedKraefteGesperrt(
     auftrag_text: 'Deich sichern',
     empfaenger: [{ empfaenger_typ: 'einheit', einheit_id: einheitId }],
   });
-  const zweite = await post('einheiten', { name: 'Zweitzug 446' });
-  const brId = await post('bereitstellungsraeume', {
+  const zweite = await post('units', { name: 'Zweitzug 446' });
+  const brId = await post('staging-areas', {
     bezeichnung: SPERR_NAMEN.br,
     standort: 'Sportplatz',
   });
   // Belegen geht nur im aktiven Raum (sonst 422).
-  const aktiv = await page.request.post(`${basis}/bereitstellungsraeume/${brId}/status`, {
+  const aktiv = await page.request.post(`${basis}/staging-areas/${brId}/status`, {
     data: { status: 'aktiv' },
   });
   expect(aktiv.ok(), `BR aktiv: ${aktiv.status()} ${await aktiv.text()}`).toBe(true);
-  await post(`bereitstellungsraeume/${brId}/belegung`, {
+  await post(`staging-areas/${brId}/occupancy`, {
     objekt_typ: 'einheit',
     objekt_id: zweite,
     art: 'eintritt',

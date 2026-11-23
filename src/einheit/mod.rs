@@ -38,17 +38,17 @@ use utoipa::ToSchema;
 
 /// Höchstlänge des Einheitsnamens nach dem Trimmen (`src/AGENTS.md`, „Eingabegrenzen“), wie
 /// `einheit_vorlage::NAME_MAX`. Gilt beim Bilden aus einer Vorlage (LLH-1049) und in
-/// `POST/PATCH …/einheiten` (LLH-1073 design.md D8). Spiegel:
+/// `POST/PATCH …/units` (LLH-1073 design.md D8). Spiegel:
 /// `EINHEIT_NAME_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const NAME_MAX: usize = 200;
 
 /// Höchstlänge der Bemerkung einer Einheit nach dem Trimmen (LLH-1075 design.md D2, wie
 /// `einheit_vorlage::BEMERKUNG_MAX`). Gilt beim Erfassen einer unangemeldeten Kraft am
-/// Bereitstellungsraum und in `POST/PATCH …/einheiten` (LLH-1242). Spiegel:
+/// Bereitstellungsraum und in `POST/PATCH …/units` (LLH-1242). Spiegel:
 /// `EINHEIT_BEMERKUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const BEMERKUNG_MAX: usize = 2_000;
 
-/// Höchstlänge des Funkrufnamens einer Einheit nach dem Trimmen, in `POST/PATCH …/einheiten`
+/// Höchstlänge des Funkrufnamens einer Einheit nach dem Trimmen, in `POST/PATCH …/units`
 /// (LLH-1242 design.md D1). So weit wie `fahrzeug::ADHOC_TEXT_MAX`, denn das Erfassen am
 /// Bereitstellungsraum übernimmt den Funkrufnamen des ersten Fahrzeugs; die Vorlage
 /// (`einheit_vorlage::FUNKRUFNAME_MAX`) liegt darunter. Spiegel: `EINHEIT_FUNKRUFNAME_MAX`.
@@ -187,7 +187,7 @@ pub struct EinheitMitgliedMaterial {
     pub ausgegeben: i64,
 }
 
-/// Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
+/// Antwort von `PUT …/units/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
 /// „Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinheitStatusAntwort {
@@ -259,7 +259,7 @@ pub struct EinheitAnzeige {
     /// Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus.
     pub status: EinheitStatus,
     /// Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur
-    /// `GET …/einheiten?aufgeloeste=1` liefert aufgelöste.
+    /// `GET …/units?aufgeloeste=1` liefert aufgelöste.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgeloest_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,7 +275,7 @@ pub struct EinheitAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
     /// Wer und was beim Auflösen dazugehörte (LLH-1266, Change
-    /// `oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/einheiten?aufgeloeste=1`
+    /// `oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/units?aufgeloeste=1`
     /// füllt es; es fehlt an aktiven Einheiten und an solchen, die aufgelöst wurden, bevor das
     /// System die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit.
     #[serde(skip_serializing_if = "Option::is_none")]

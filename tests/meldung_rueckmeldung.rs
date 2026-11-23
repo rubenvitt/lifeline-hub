@@ -122,7 +122,7 @@ async fn unbekannter_oder_fremder_bezug_wird_herabgestuft_statt_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e1}/einheiten/{aufgeloest}"),
+        &format!("/api/einsaetze/{e1}/units/{aufgeloest}"),
         &admin,
         None,
     )
@@ -316,7 +316,7 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/einheiten/{a}"),
+        &format!("/api/einsaetze/{e}/units/{a}"),
         &admin,
         None,
     )

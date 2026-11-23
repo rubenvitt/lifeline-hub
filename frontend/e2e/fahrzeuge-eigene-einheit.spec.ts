@@ -46,13 +46,13 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
   await anmeldenAlsAdmin(page);
   const { einsatzId, post, put } = await seedEinsatz(page);
   const funkrufname = 'Florian Nachbarstadt 44/1';
-  const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname } });
+  const fahrzeug = await post('vehicles', { adhoc: { funkrufname } });
   for (const [name, position] of [
     ['Berta Brandt', 'unterfuehrer'],
     ['Anna Arndt', 'mannschaft'],
   ] as const) {
-    const kraft = await post('personal', { adhoc: { name, staerke_position: position } });
-    await put(`fahrzeuge/${fahrzeug}/besatzung/${kraft}`);
+    const kraft = await post('personnel', { adhoc: { name, staerke_position: position } });
+    await put(`vehicles/${fahrzeug}/crew/${kraft}`);
   }
 
   await page.setViewportSize(BREIT);
@@ -74,7 +74,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
     region.getByRole('button', { name: `Einheit zu ${funkrufname} bearbeiten` }),
   ).toHaveText(funkrufname);
 
-  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
+  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/units`);
   expect(liste.ok()).toBeTruthy();
   const einheit = ((await liste.json()) as { id: number; name: string }[]).find(
     (e) => e.name === funkrufname,
@@ -107,16 +107,16 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
   expect(stamm.ok(), `Stamm-Fahrzeug: ${stamm.status()} ${await stamm.text()}`).toBeTruthy();
   const stammId = ((await stamm.json()) as { id: number }).id;
   const { einsatzId, post, put } = await seedEinsatz(page);
-  const fahrzeug = await post('fahrzeuge', { fahrzeug_id: stammId });
-  const einheit = await post('einheiten', { name: 'Rettungsstaffel' });
-  await put(`einheiten/${einheit}/fahrzeug/${fahrzeug}`);
+  const fahrzeug = await post('vehicles', { fahrzeug_id: stammId });
+  const einheit = await post('units', { name: 'Rettungsstaffel' });
+  await put(`units/${einheit}/vehicles/${fahrzeug}`);
   for (const [name, position] of [
     ['Ulla Ufer', 'unterfuehrer'],
     ['Ali Aksoy', null],
     ['Ben Brandt', null],
   ] as const) {
-    const kraft = await post('personal', { adhoc: { name, staerke_position: position } });
-    await put(`einheiten/${einheit}/personal/${kraft}`);
+    const kraft = await post('personnel', { adhoc: { name, staerke_position: position } });
+    await put(`units/${einheit}/personnel/${kraft}`);
   }
 
   await page.setViewportSize(BREIT);
@@ -166,12 +166,12 @@ for (const { dichte, hoehe, abstand } of [
     await anmeldenAlsAdmin(page, { startseite: false });
     const { einsatzId, post, put } = await seedEinsatz(page);
     const funkrufname = 'RTW 83-9';
-    const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname } });
-    const einheit = await post('einheiten', { name: 'Rettungsstaffel' });
-    await put(`einheiten/${einheit}/fahrzeug/${fahrzeug}`);
+    const fahrzeug = await post('vehicles', { adhoc: { funkrufname } });
+    const einheit = await post('units', { name: 'Rettungsstaffel' });
+    await put(`units/${einheit}/vehicles/${fahrzeug}`);
     for (const name of ['Ali Aksoy', 'Ben Brandt', 'Ulla Ufer']) {
-      const kraft = await post('personal', { adhoc: { name } });
-      await put(`einheiten/${einheit}/personal/${kraft}`);
+      const kraft = await post('personnel', { adhoc: { name } });
+      await put(`units/${einheit}/personnel/${kraft}`);
     }
     await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
     await page.setViewportSize({ width: 390, height: 844 });

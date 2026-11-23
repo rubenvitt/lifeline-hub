@@ -37,7 +37,7 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'uhs-laptop', uhs_id: nord.id, bezeichnung: 'Laptop 1' },
   );
 
@@ -114,12 +114,12 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
     bezeichnung: 'UHS Nord',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
     adhoc: { name: 'Anna Arzt', funktion: 'Notarzt', staerke_position: 'fuehrer' },
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'uhs-laptop', uhs_id: nord.id, bezeichnung: 'Laptop 1' },
   );
 

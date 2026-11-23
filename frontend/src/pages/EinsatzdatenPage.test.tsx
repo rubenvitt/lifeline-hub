@@ -207,8 +207,8 @@ function setup(opts: SetupOpts = {}) {
   server.use(
     meHandler(benutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
-    http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/members', () => HttpResponse.json(mitglieder)),
+    http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
     http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
@@ -223,8 +223,8 @@ function setup(opts: SetupOpts = {}) {
       } satisfies Fuehrungsstelle),
     ),
     http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeugListe)),
-    http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personalListe)),
+    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeugListe)),
+    http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personalListe)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(stammFahrzeuge)),
   );
   const routen = (
@@ -2041,8 +2041,8 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
       http.get('/api/einsaetze/:id', ({ params }) =>
         HttpResponse.json({ ...leitungEinsatz, id: Number(params.id) }),
       ),
-      http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json(mitglieder)),
-      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members', () => HttpResponse.json(mitglieder)),
+      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
       http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
       http.get('/api/einsaetze/:id/ort-vorschau', () =>

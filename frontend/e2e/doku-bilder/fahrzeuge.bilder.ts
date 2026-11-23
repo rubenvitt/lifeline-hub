@@ -75,17 +75,13 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     // Erst hier gefüllt, das Listenbild davor zeigt den Stand der Demo-Daten.
-    const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`);
+    const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/vehicles`);
     const rtw = fahrzeuge.find((f) => f.funkrufname.endsWith('83-1'));
     expect(rtw, 'RTW 83-1 im Demo-Einsatz').toBeDefined();
-    const personal = await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personal`);
+    const personal = await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personnel`);
     const lena = personal.find((p) => p.name === 'Lena Beispiel');
     expect(lena, 'Lena Beispiel im Demo-Einsatz').toBeDefined();
-    await fuelle(
-      page,
-      'put',
-      `/api/einsaetze/${demo.id}/fahrzeuge/${rtw!.id}/besatzung/${lena!.id}`,
-    );
+    await fuelle(page, 'put', `/api/einsaetze/${demo.id}/vehicles/${rtw!.id}/crew/${lena!.id}`);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     await page.getByRole('button', { name: /^Details zu .*83-1$/ }).click();
@@ -101,7 +97,7 @@ test.describe(KAPITEL, () => {
     // Demo-Lücke (LLH-1225): kein Demo-Fahrzeug trägt Material. Die Spec lädt zwei Posten auf den
     // RTW „83-1“, einen davon defekt, gibt von den Decken einen Teil aus und legt einen freien
     // Posten an, den die Auswahl anbietet.
-    const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`);
+    const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/vehicles`);
     const rtw = fahrzeuge.find((f) => f.funkrufname.endsWith('83-1'));
     expect(rtw, 'RTW 83-1 im Demo-Einsatz').toBeDefined();
     const basis = `/api/einsaetze/${demo.id}/material`;
@@ -169,14 +165,14 @@ test.describe(KAPITEL, () => {
   test('Block „Entlassen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const weg = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+    const weg = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/vehicles`, {
       adhoc: {
         funkrufname: 'Musterstadt 19-1',
         fahrzeugtyp: 'MTW',
         traegerorganisation: 'DRK Musterstadt',
       },
     });
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge/${weg.id}/entlassen`);
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/vehicles/${weg.id}/release`);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     const block = page.locator('[data-lfh="entlassen-block"]');
@@ -191,7 +187,7 @@ test.describe(KAPITEL, () => {
   test('Dialog „Angaben ändern“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/vehicles`, {
       adhoc: {
         funkrufname: 'Bereitschaft 12-1',
         fahrzeugtyp: 'GW-San',
@@ -214,7 +210,7 @@ test.describe(KAPITEL, () => {
   test('Dialog „Als eigene Einheit führen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const fahrzeug = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+    const fahrzeug = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/vehicles`, {
       adhoc: {
         funkrufname: 'Nachbarstadt 44/1',
         fahrzeugtyp: 'HLF 20',
@@ -222,13 +218,13 @@ test.describe(KAPITEL, () => {
       },
     });
     for (const name of ['Jonas Nachbar', 'Mia Nachbar']) {
-      const kraft = await fuelle<Person>(page, 'post', `/api/einsaetze/${demo.id}/personal`, {
+      const kraft = await fuelle<Person>(page, 'post', `/api/einsaetze/${demo.id}/personnel`, {
         adhoc: { name, traegerorganisation: 'FF Nachbarstadt' },
       });
       await fuelle(
         page,
         'put',
-        `/api/einsaetze/${demo.id}/fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`,
+        `/api/einsaetze/${demo.id}/vehicles/${fahrzeug.id}/crew/${kraft.id}`,
       );
     }
     await uhrAnhalten(page);
@@ -250,20 +246,16 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     // Die Besatzung des RTW „83-2“ aus den Demo-Daten steigt aus, damit der Dialog zwei freie
     // Kräfte der Staffel vorschlägt.
-    const rtw = (await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`)).find(
+    const rtw = (await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/vehicles`)).find(
       (f) => f.funkrufname.endsWith('83-2'),
     );
     expect(rtw, 'RTW 83-2 im Demo-Einsatz').toBeDefined();
     const besatzung = (
-      await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personal`)
+      await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personnel`)
     ).filter((p) => p.fahrzeug_id === rtw!.id);
     expect(besatzung, 'Besatzung des RTW 83-2').toHaveLength(2);
     for (const p of besatzung) {
-      await fuelle(
-        page,
-        'delete',
-        `/api/einsaetze/${demo.id}/fahrzeuge/${rtw!.id}/besatzung/${p.id}`,
-      );
+      await fuelle(page, 'delete', `/api/einsaetze/${demo.id}/vehicles/${rtw!.id}/crew/${p.id}`);
     }
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);

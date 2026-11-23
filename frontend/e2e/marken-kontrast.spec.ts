@@ -39,10 +39,10 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 891 ${modus} ${Date.now()}`,
     });
-    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personal`, {
+    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
       adhoc: { name: 'Albers, Anna', funktion: 'Truppführung', traegerorganisation: 'FF Muster' },
     });
-    const fahrzeug = await post(page, `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+    const fahrzeug = await post(page, `/api/einsaetze/${einsatzId}/vehicles`, {
       adhoc: { funkrufname: 'Florian Muster 1', fahrzeugtyp: 'LF 20' },
     });
 

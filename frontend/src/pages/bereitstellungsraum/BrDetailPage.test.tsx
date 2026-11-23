@@ -274,7 +274,7 @@ describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   it('zeigt bei 404 das Muster mit dem Weg zur Liste der Bereitstellungsräume', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/99', () =>
+      http.get('/api/einsaetze/1/staging-areas/99', () =>
         HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     );
@@ -285,7 +285,7 @@ describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/99', () =>
+      http.get('/api/einsaetze/1/staging-areas/99', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -304,14 +304,14 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     let capturedBody: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({
           id: 1,
@@ -346,10 +346,10 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
     const br = brDetail({ einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', () =>
         HttpResponse.json({
           id: 77,
           einsatz_id: 1,
@@ -365,16 +365,13 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
     );
     const zurueck: string[] = [];
     server.use(
-      http.post(
-        '/api/einsaetze/1/bereitstellungsraeume/1/belegung/:bid/zuruecknehmen',
-        ({ params }) => {
-          zurueck.push(String(params.bid));
-          return HttpResponse.json(
-            { error: 'Die Kraft ist inzwischen weiter gebucht' },
-            { status: 409 },
-          );
-        },
-      ),
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy/:bid/undo', ({ params }) => {
+        zurueck.push(String(params.bid));
+        return HttpResponse.json(
+          { error: 'Die Kraft ist inzwischen weiter gebucht' },
+          { status: 409 },
+        );
+      }),
     );
     renderBrDetail();
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
@@ -398,14 +395,14 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([frei])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([frei])),
     );
 
     let capturedBody: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({
           id: 2,
@@ -446,9 +443,9 @@ describe('BrDetailPage – Sidebar filtert auf aktueller_br_id == null (LFH-14)'
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei, anderswo])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([frei, anderswo])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -468,9 +465,9 @@ describe('BrDetailPage — Sidebar-Suche (LFH-347 · M58b)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([a, b])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([a, b])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -490,9 +487,9 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([frei])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     await warteAufListen(renderBrDetail());
@@ -512,9 +509,9 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: 'beobachter' }))),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([frei])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -552,9 +549,9 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, trupp])),
-      http.get('/api/einsaetze/1/fahrzeuge', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([zug, trupp])),
+      http.get('/api/einsaetze/1/vehicles', () =>
         HttpResponse.json([
           fahrzeug({ id: 5, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', aktueller_br_id: 1 }),
         ]),
@@ -607,9 +604,9 @@ describe('BrDetailPage — Stärke zählt nur Anwesende (LLH-1289)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, gruppe1, gruppe2])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([zug, gruppe1, gruppe2])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -643,9 +640,9 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug])), // Trupp 2 fehlt
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([zug])), // Trupp 2 fehlt
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -665,9 +662,9 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     renderBrDetail();
@@ -689,9 +686,9 @@ describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     setzeViewportBreite(600); // < md (768)
@@ -708,9 +705,9 @@ describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
 
     setzeViewportBreite(1024);
@@ -739,9 +736,9 @@ describe('BrDetailPage — Fahrzeuge der Einheiten zählen mit (LLH-1095)', () =
   beforeEach(() => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
   });
 
@@ -772,14 +769,14 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
   function seiteMit(br: BrDetail, aufrufe: string[]) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', async ({ request }) => {
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas/1/status', async ({ request }) => {
         aufrufe.push(`status ${((await request.json()) as { status: string }).status}`);
         return HttpResponse.json({ ...br, status: 'aufgeloest' });
       }),
-      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+      http.delete('/api/einsaetze/1/staging-areas/1', () => {
         aufrufe.push('storno');
         return new HttpResponse(null, { status: 204 });
       }),
@@ -859,9 +856,9 @@ describe('BrDetailPage — Belegung springt nicht unter dem Zeiger (LFH-1113)', 
   function stelleBereit(stand: { br: BrDetail }, einheiten: Einheit[] = []) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
   }
 
@@ -944,7 +941,7 @@ describe('BrDetailPage — Belegung springt nicht unter dem Zeiger (LFH-1113)', 
     const stand = { br: brDetail({ einheiten: [alpha] }) };
     stelleBereit(stand, [beta]);
     server.use(
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', () => {
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', () => {
         stand.br = brDetail({ einheiten: [alpha, { id: 30, name: 'Einheit Beta' }] });
         return HttpResponse.json({
           id: 3,
@@ -1017,10 +1014,10 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
   ) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', belegung),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json(fahrzeuge)),
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', belegung),
     );
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
@@ -1168,7 +1165,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
 
     // Der Stand holt die Seite ein: das Fahrzeug steht jetzt in einem anderen BR.
     server.use(
-      http.get('/api/einsaetze/1/fahrzeuge', () =>
+      http.get('/api/einsaetze/1/vehicles', () =>
         HttpResponse.json([{ ...frei, aktueller_br_id: 99 }]),
       ),
     );
@@ -1192,12 +1189,12 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     }
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+      http.get('/api/einsaetze/1/staging-areas/:brId', ({ params }) =>
         HttpResponse.json(brDetail({ id: Number(params.brId), einheiten: [alpha] })),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', abgelehnt('gebunden')),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', abgelehnt('gebunden')),
     );
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
@@ -1228,7 +1225,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
 
   it('Auflösen: der Grund steht im Abschnitt, kein Toast (LLH-1722)', async () => {
     server.use(
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', () =>
+      http.post('/api/einsaetze/1/staging-areas/1/status', () =>
         HttpResponse.json({ error: 'BR ist noch belegt' }, { status: 409 }),
       ),
     );
@@ -1246,7 +1243,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
   it('Storno: der Grund steht im Abschnitt, der nächste Versuch räumt ihn (LLH-1722)', async () => {
     let n = 0;
     server.use(
-      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', async () => {
+      http.delete('/api/einsaetze/1/staging-areas/1', async () => {
         n += 1;
         if (n === 1) return HttpResponse.json({ error: 'BR hat Belegungen' }, { status: 409 });
         await delay('infinite');
@@ -1276,7 +1273,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
   it('Storno mit Material im Raum: der Grund (422) steht im Abschnitt (LLH-1249)', async () => {
     const grundText = 'Storno nicht möglich — noch 2 Material-Posten im BR; erst lösen';
     server.use(
-      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+      http.delete('/api/einsaetze/1/staging-areas/1', () =>
         HttpResponse.json({ error: grundText }, { status: 422 }),
       ),
     );
@@ -1319,7 +1316,7 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
           : HttpResponse.json(einsatz({ meine_rolle: rolle })),
       ),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', async () => {
+      http.get('/api/einsaetze/1/staging-areas/1', async () => {
         stand.gets += 1;
         if (stand.scheitert === 'br')
           return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
@@ -1327,9 +1324,9 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
         if (stand.haengen) await delay('infinite');
         return HttpResponse.json(stand.br);
       }),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.patch('/api/einsaetze/1/bereitstellungsraeume/1', async ({ request }) => {
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.patch('/api/einsaetze/1/staging-areas/1', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         stand.bodies.push(body);
         if (patch) return patch(body);
@@ -1589,13 +1586,13 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     }
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+      http.get('/api/einsaetze/1/staging-areas/:brId', ({ params }) =>
         HttpResponse.json(
           brDetail({ id: Number(params.brId), bezeichnung: `BR ${String(params.brId)}` }),
         ),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
@@ -1719,15 +1716,15 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
       http.get('/api/einsaetze/1', () =>
         HttpResponse.json(einsatz({ meine_rolle: rolle as EinsatzAnzeige['meine_rolle'] })),
       ),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([
           { ...br, id: 1 },
           { ...br, id: 2, bezeichnung: 'BR Bravo' },
         ]),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => {
@@ -1928,12 +1925,12 @@ const BELEGT = brDetail({
 function stelleBelegtBereit(br: BrDetail = BELEGT, zaehler?: { detail: number }) {
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-    http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+    http.get('/api/einsaetze/1/staging-areas/1', () => {
       if (zaehler) zaehler.detail += 1;
       return HttpResponse.json(br);
     }),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
-    http.get('/api/einsaetze/1/fahrzeuge', () =>
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([ZUG, TRUPP])),
+    http.get('/api/einsaetze/1/vehicles', () =>
       HttpResponse.json([
         fahrzeug({
           id: 23,
@@ -2115,9 +2112,9 @@ describe('BrDetailPage — Zeile je Kraft mit Wartezeit (LLH-1095 D10)', () => {
     const stand = { br: BELEGT };
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
     const qc = renderBrDetail();
     await screen.findByText('Trupp 2');
@@ -2170,12 +2167,12 @@ describe('BrDetailPage — Verlauf (LLH-1095 D12)', () => {
   ) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzDaten)),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+      http.get('/api/einsaetze/1/staging-areas/:brId', ({ params }) =>
         HttpResponse.json({ ...BELEGT, id: Number(params.brId) }),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId/verlauf', () => {
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/:brId/history', () => {
         zaehler.verlauf += 1;
         return antwort();
       }),
@@ -2305,10 +2302,10 @@ describe('BrDetailPage — Druck mit Wartezeiten (LLH-1095 D14)', () => {
     const zaehler = { verlauf: 0 };
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1/verlauf', () => {
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1/history', () => {
         zaehler.verlauf += 1;
         return HttpResponse.json([]);
       }),
@@ -2368,12 +2365,12 @@ describe('BrDetailPage — „Eintreffen buchen“ im Kopf (LLH-1075, design.md 
   function seite(br: BrDetail, rolle: EinsatzAnzeige['meine_rolle'] = 'fuehrungspersonal') {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([einheit({ id: 30, name: 'Zug Nord' })]),
       ),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/einheiten/zeitachse', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units/timeline', () => HttpResponse.json([])),
     );
     renderBrDetail();
   }
@@ -2416,7 +2413,7 @@ describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D
   it('offen „nicht übernommen“, nach der Übernahme neutral „unangemeldet“, angemeldet nichts', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () =>
         HttpResponse.json(
           brDetail({
             einheiten: [
@@ -2432,8 +2429,8 @@ describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D
           }),
         ),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     );
     renderBrDetail();
     const zeile = async (name: string) =>
@@ -2483,15 +2480,15 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+      http.get('/api/einsaetze/1/staging-areas/1', () =>
         HttpResponse.json(brDetail({ status: 'aktiv' })),
       ),
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([einheit({ id: 30, name: 'Zug Nord' })]),
       ),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/einheiten/zeitachse', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/eintreffen', () => {
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units/timeline', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas/1/arrival', () => {
         gesendet += 1;
         return HttpResponse.json({}, { status: 201 });
       }),
@@ -2639,20 +2636,20 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
     const aufrufe = { abruf: [], aufheben: [], belegung: [] } as Omit<Aufrufe, 'qc'>;
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([DEICH])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/dispatch', async ({ request }) => {
         aufrufe.abruf.push(await request.json());
         return abruf();
       }),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf/aufheben', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/dispatch/withdraw', async ({ request }) => {
         aufrufe.aufheben.push(await request.json());
         return HttpResponse.json({});
       }),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/occupancy', async ({ request }) => {
         aufrufe.belegung.push(await request.json());
         return HttpResponse.json({}, { status: 201 });
       }),
@@ -2939,7 +2936,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
     const stand = { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) };
     const aufrufe = seite(stand);
     server.use(
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/dispatch', async ({ request }) => {
         aufrufe.abruf.push(await request.json());
         stand.br = brDetail({ einheiten: [{ id: 10, name: 'HLF 20', abruf: ABRUF }] });
         return HttpResponse.json(ABRUF_ERGEBNIS, { status: 201 });
@@ -2977,17 +2974,14 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     const gebucht: { br: string; daten: unknown }[] = [];
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(raeume)),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.post(
-        '/api/einsaetze/1/bereitstellungsraeume/:brId/belegung',
-        async ({ request, params }) => {
-          gebucht.push({ br: String(params.brId), daten: await request.json() });
-          return wechsel();
-        },
-      ),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json(raeume)),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas/:brId/occupancy', async ({ request, params }) => {
+        gebucht.push({ br: String(params.brId), daten: await request.json() });
+        return wechsel();
+      }),
     );
     const qc = renderBrDetail();
     return Object.assign(gebucht, { qc });
@@ -3107,7 +3101,7 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await verlegenWaehlen('HLF 20');
     await waehle('Ziel-Raum', 'BR Nord');
     server.use(
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([
           raum({ id: 1, bezeichnung: 'BR Alpha' }),
           { ...NORD, status: 'aufgeloest' },
@@ -3123,9 +3117,7 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
   it('verlegt jemand anderes die Kraft während der Wahl, sperrt der Dialog und bucht nichts', async () => {
     const stand = { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) };
     const gebucht = seite(stand.br);
-    server.use(
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
-    );
+    server.use(http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(stand.br)));
     await screen.findByText('HLF 20');
     await verlegenWaehlen('HLF 20');
     await waehle('Ziel-Raum', 'BR Nord');
@@ -3173,9 +3165,9 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
   ) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),

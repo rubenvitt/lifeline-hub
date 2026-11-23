@@ -522,7 +522,7 @@ async fn schicht(w: &Welt) -> i64 {
     let (s, einheit) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("einheiten"),
+        &w.pfad("units"),
         &w.admin,
         Some(r#"{"name":"Florian 1"}"#),
     )
@@ -531,7 +531,7 @@ async fn schicht(w: &Welt) -> i64 {
     let (s, schicht) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("abloesungen"),
+        &w.pfad("reliefs"),
         &w.admin,
         Some(
             &json!({

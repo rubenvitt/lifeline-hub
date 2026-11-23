@@ -71,12 +71,12 @@ async fn senden(app: &axum::Router, cookie: &str, methode: &str, pfad: &str, bod
 async fn einheit_mit_fuehrer(l: &Lage, name: &str, person: &str) -> (i64, i64) {
     let eid = einheit_bilden(&l.app, &l.admin, l.einsatz, name).await;
     let ep = stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, person).await;
-    let basis = format!("/api/einsaetze/{}/einheiten/{eid}", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/units/{eid}", l.einsatz);
     senden(
         &l.app,
         &l.admin,
         "PUT",
-        &format!("{basis}/personal/{ep}"),
+        &format!("{basis}/personnel/{ep}"),
         None,
     )
     .await;
@@ -107,7 +107,7 @@ async fn entlassen_des_fuehrers_vermerkt_fuehrer_und_einsatzleiter() {
     let admin_id = vermerk_einheit(&l.pool, eid, "fuehrer_id").await;
     assert_ne!(admin_id, Some(l.bert_id), "Vorbedingung");
 
-    let pfad = format!("/api/einsaetze/{}/personal/{ep}/entlassen", l.einsatz);
+    let pfad = format!("/api/einsaetze/{}/personnel/{ep}/release", l.einsatz);
     senden(&l.app, &l.bert, "POST", &pfad, None).await;
 
     assert_eq!(
@@ -126,7 +126,7 @@ async fn entlassen_eines_fahrzeugs_der_fuehrungsstelle_vermerkt_ihre_fahrzeuge()
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/fahrzeuge", l.einsatz),
+        &format!("/api/einsaetze/{}/vehicles", l.einsatz),
         &l.admin,
         Some(&json!({"adhoc": {"funkrufname": "Florian 10/1", "fahrzeugtyp": "ELW 1"}})),
     )
@@ -143,7 +143,7 @@ async fn entlassen_eines_fahrzeugs_der_fuehrungsstelle_vermerkt_ihre_fahrzeuge()
     )
     .await;
 
-    let pfad = format!("/api/einsaetze/{}/fahrzeuge/{ef}/entlassen", l.einsatz);
+    let pfad = format!("/api/einsaetze/{}/vehicles/{ef}/release", l.einsatz);
     senden(&l.app, &l.bert, "POST", &pfad, None).await;
 
     assert_eq!(
@@ -157,7 +157,7 @@ async fn aufloesen_vermerkt_die_ueber_einheit_der_kinder() {
     let l = lage().await;
     let zug = einheit_bilden(&l.app, &l.admin, l.einsatz, "1. Zug").await;
     let gruppe = einheit_bilden(&l.app, &l.admin, l.einsatz, "1. Gruppe").await;
-    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/units", l.einsatz);
     senden(
         &l.app,
         &l.admin,
@@ -178,7 +178,7 @@ async fn aufloesen_vermerkt_die_ueber_einheit_der_kinder() {
 #[tokio::test]
 async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
     let l = lage().await;
-    let br_basis = format!("/api/einsaetze/{}/bereitstellungsraeume", l.einsatz);
+    let br_basis = format!("/api/einsaetze/{}/staging-areas", l.einsatz);
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
@@ -214,7 +214,7 @@ async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
         &l.app,
         &l.admin,
         "PATCH",
-        &format!("/api/einsaetze/{}/einheiten/{rtw}", l.einsatz),
+        &format!("/api/einsaetze/{}/units/{rtw}", l.einsatz),
         Some(json!({"abschnitt_id": deich})),
     )
     .await;
@@ -229,7 +229,7 @@ async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
             &l.app,
             &l.admin,
             "POST",
-            &format!("{br_basis}/{br}/belegung"),
+            &format!("{br_basis}/{br}/occupancy"),
             Some(json!({"objekt_typ": "einheit", "objekt_id": eid, "art": "eintritt"})),
         )
         .await;
@@ -237,7 +237,7 @@ async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
             &l.app,
             &l.bert,
             "POST",
-            &format!("{br_basis}/{br}/abruf"),
+            &format!("{br_basis}/{br}/dispatch"),
             Some(json!({"objekt_typ": "einheit", "objekt_id": eid, "abschnitt_id": deich})),
         )
         .await;
@@ -258,14 +258,14 @@ async fn zuordnen_und_freigeben_vermerken_den_fuehrer() {
     let l = lage().await;
     let (zug, anna) = einheit_mit_fuehrer(&l, "1. Zug", "Anna").await;
     let gruppe = einheit_bilden(&l.app, &l.admin, l.einsatz, "1. Gruppe").await;
-    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/units", l.einsatz);
 
     // Anna wechselt in die Gruppe: ihre Führung im Zug endet.
     senden(
         &l.app,
         &l.bert,
         "PUT",
-        &format!("{basis}/{gruppe}/personal/{anna}"),
+        &format!("{basis}/{gruppe}/personnel/{anna}"),
         None,
     )
     .await;
@@ -279,7 +279,7 @@ async fn zuordnen_und_freigeben_vermerken_den_fuehrer() {
         &l.app,
         &l.admin,
         "PUT",
-        &format!("{basis}/{zug}/personal/{anna}?als_fuehrer=1"),
+        &format!("{basis}/{zug}/personnel/{anna}?als_fuehrer=1"),
         None,
     )
     .await;
@@ -291,7 +291,7 @@ async fn zuordnen_und_freigeben_vermerken_den_fuehrer() {
         &l.app,
         &l.bert,
         "DELETE",
-        &format!("{basis}/{zug}/personal/{anna}"),
+        &format!("{basis}/{zug}/personnel/{anna}"),
         None,
     )
     .await;
@@ -315,7 +315,7 @@ async fn ruecknahme_der_entlassung_vermerkt_fuehrer_und_einsatzleiter() {
     )
     .await;
     // Die Rücknahme darf nur, wer entlassen hat.
-    let pfad = format!("/api/einsaetze/{}/personal/{ep}/entlassen", l.einsatz);
+    let pfad = format!("/api/einsaetze/{}/personnel/{ep}/release", l.einsatz);
     let (s, entlassen) = anfrage_json(&l.app, "POST", &pfad, &l.bert, None).await;
     assert!(s.is_success(), "{s} {entlassen}");
     // Die Vermerke des Entlassens räumen: so belegt nur die Rücknahme einen neuen.
@@ -328,7 +328,7 @@ async fn ruecknahme_der_entlassung_vermerkt_fuehrer_und_einsatzleiter() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("{pfad}/zuruecknehmen"),
+        &format!("{pfad}/undo"),
         &l.bert,
         Some(&entlassen["vorzustand"]),
     )

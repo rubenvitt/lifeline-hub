@@ -89,8 +89,8 @@ async function saeen(page: Page, einsatzId: string) {
     status: 'betroffen',
     sichtung: 'sk2',
   });
-  const einheit = await sende(page, 'POST', `${basis}/einheiten`, { name: 'Zug Nord' });
-  await sende(page, 'POST', `${basis}/einheiten/${einheit.id}/zeitachse`, {
+  const einheit = await sende(page, 'POST', `${basis}/units`, { name: 'Zug Nord' });
+  await sende(page, 'POST', `${basis}/units/${einheit.id}/timeline`, {
     art: 'alarmierung',
     zeitpunkt_at: vorEinerStunde(),
   });
@@ -307,7 +307,7 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
   const einsatzId = await einsatzPerApi(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
   // Die Disposition setzt die Alarmierung selbst: die Kraft hat damit eine offene Periode.
-  await sende(page, 'POST', `${basis}/personal`, { adhoc: { name: 'Hanna Helferin' } });
+  await sende(page, 'POST', `${basis}/personnel`, { adhoc: { name: 'Hanna Helferin' } });
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);

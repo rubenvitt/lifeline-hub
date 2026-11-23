@@ -211,7 +211,7 @@ pub struct EinsatzFahrzeugAnzeige {
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
     /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
-    /// Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+    /// Nur `GET …/vehicles?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beendet_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -250,7 +250,7 @@ pub struct EntlassungVorzustand {
 /// Besatzung oder Beladung trägt kein Fahrzeug.
 pub const RUECKNAHME_LISTE_MAX: usize = 200;
 
-/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/release` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,
@@ -259,7 +259,7 @@ pub struct EntlassungAntwort {
 
 pub use crate::entlassung::RuecknahmeAusgelassen;
 
-/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/release/undo` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungRuecknahmeAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,
@@ -404,7 +404,7 @@ pub struct StatusRuecknahmeBeleg {
     pub status_seit: String,
 }
 
-/// Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+/// Antwort des Status-PATCH (`PATCH …/vehicles/{ef_id}`): das Fahrzeug wie bisher, dazu der
 /// Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FahrzeugPatchAntwort {

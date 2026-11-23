@@ -414,7 +414,7 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     else await zeile.hover();
     const vorher = await lage();
 
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
       data: {
         name: NEUE_EINHEIT,
         funkrufname: 'Florian Musterstadt 3/10',

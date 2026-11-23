@@ -938,24 +938,24 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     const brListe = vi.fn();
     const raumAbruf = vi.fn();
     server.use(
-      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () => {
+      http.get('/api/einsaetze/7/staging-areas/4', () => {
         raumAbruf();
         return HttpResponse.json(detail);
       }),
-      http.get('/api/einsaetze/7/bereitstellungsraeume', () => {
+      http.get('/api/einsaetze/7/staging-areas', () => {
         brListe();
         return HttpResponse.json([detail]);
       }),
-      http.get('/api/einsaetze/7/einheiten', () =>
+      http.get('/api/einsaetze/7/units', () =>
         HttpResponse.json([einheit(30, 'LF Nord', null), einheit(31, 'RTW 1', 4)]),
       ),
-      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/7/bereitstellungsraeume/4/belegung', async ({ request }) => {
+      http.post('/api/einsaetze/7/staging-areas/4/occupancy', async ({ request }) => {
         belegt.push(await request.json());
         return HttpResponse.json({}, { status: 201 });
       }),
-      http.post('/api/einsaetze/7/bereitstellungsraeume/4/status', async ({ request }) => {
+      http.post('/api/einsaetze/7/staging-areas/4/status', async ({ request }) => {
         status.push(await request.json());
         return HttpResponse.json({ ...detail, status: 'aktiv' });
       }),
@@ -1072,7 +1072,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
 
     // Die Einsatzleitung benennt den Raum um; die Sitzung (`/me`) nennt weiter den alten Namen.
     server.use(
-      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () =>
+      http.get('/api/einsaetze/7/staging-areas/4', () =>
         HttpResponse.json({ ...raum, bezeichnung: 'BR Festwiese' }),
       ),
     );

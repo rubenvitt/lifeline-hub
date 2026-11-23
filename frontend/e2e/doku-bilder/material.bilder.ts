@@ -105,7 +105,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
       // Ein Ort je Posten (LLH-1224 D6), gesetzt über den einen Weg (LLH-1225 D2).
       const einheiten = (await (
-        await api.get(`/api/einsaetze/${demo.id}/einheiten`)
+        await api.get(`/api/einsaetze/${demo.id}/units`)
       ).json()) as Einheit[];
       const einheit = einheiten.find((e) => !e.aufgeloest_at);
       expect(einheit, 'Demo-Einheit').toBeDefined();

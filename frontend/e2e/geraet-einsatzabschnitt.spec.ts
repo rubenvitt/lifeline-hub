@@ -35,8 +35,8 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
     ueber_abschnitt_id: nord.id,
   });
   const sued = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Süd' });
-  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Zug Ost', abschnitt_id: ost.id });
-  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Zug Süd', abschnitt_id: sued.id });
+  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Zug Ost', abschnitt_id: ost.id });
+  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Zug Süd', abschnitt_id: sued.id });
   await anlegen(page, `/api/einsaetze/${e}/auftraege`, {
     auftrag_text: 'Deich Nord sichern',
     empfaenger: [
@@ -50,7 +50,7 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'einsatzabschnitt', stelle_id: nord.id, bezeichnung: 'Tablet A' },
   );
 
@@ -152,7 +152,7 @@ test('LLH-1190: Abschnittsgerät quittiert einen Einsatzbefehl an seinen Bereich
     { empfaenger_typ: 'abschnitt', abschnitt_id: sued.id },
   ]);
   await befehl('Pumpstation Süd', [{ empfaenger_typ: 'abschnitt', abschnitt_id: sued.id }]);
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'einsatzabschnitt',
     stelle_id: nord.id,
     bezeichnung: 'Tablet B',

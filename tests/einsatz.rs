@@ -313,7 +313,7 @@ async fn mitglied_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/mitglieder/{ziel_id}"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/members/{ziel_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body))
@@ -411,7 +411,7 @@ async fn letzte_einsatzleitung_kann_nicht_entfernt_werden() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/einsaetze/{einsatz_id}/mitglieder/1"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/members/1"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -438,7 +438,7 @@ async fn einsatzleitung_entfernt_mitglied() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/einsaetze/{einsatz_id}/mitglieder/{erika_id}"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/members/{erika_id}"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -473,7 +473,7 @@ async fn mitgliederliste_nur_fuer_mitglieder() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}/mitglieder"))
+                .uri(format!("/api/einsaetze/{einsatz_id}/members"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),

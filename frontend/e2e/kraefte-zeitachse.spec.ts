@@ -17,7 +17,7 @@ async function seedeEinheit(page: Page): Promise<{ einsatzId: string; einheitId:
   });
   expect(einsatz.ok(), await einsatz.text()).toBe(true);
   const einsatzId = String(((await einsatz.json()) as { id: number }).id);
-  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
     data: { name: 'Zeitachsenzug' },
   });
   expect(einheit.ok(), await einheit.text()).toBe(true);

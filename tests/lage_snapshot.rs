@@ -672,7 +672,7 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     let (s, raum) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{e}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Sportplatz","lat":51.93,"lon":8.87}"#),
     )
@@ -682,7 +682,7 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{br}/status"),
+        &format!("/api/einsaetze/{e}/staging-areas/{br}/status"),
         &admin,
         Some(r#"{"status":"aktiv"}"#),
     )
@@ -692,7 +692,7 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{br}/belegung"),
+        &format!("/api/einsaetze/{e}/staging-areas/{br}/occupancy"),
         &admin,
         Some(&format!(
             r#"{{"objekt_typ":"einheit","objekt_id":{zug},"art":"eintritt"}}"#
@@ -747,7 +747,7 @@ async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
     let (s, raum) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{e}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Sportplatz","lat":51.93,"lon":8.87}"#),
     )
@@ -978,7 +978,7 @@ async fn snapshot_friert_die_eigene_funktion_nicht_ein() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/mitglieder/{ich}"),
+        &format!("/api/einsaetze/{e}/members/{ich}"),
         &cookie,
         Some(r#"{"einsatz_rolle":"einsatzleitung","fuehrungsfunktion":"fachberater","fuehrungsstelle":"THW"}"#),
     )

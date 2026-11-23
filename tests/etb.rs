@@ -450,7 +450,7 @@ async fn beobachter_darf_nicht_erfassen() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{erika_id}"))
+                .uri(format!("/api/einsaetze/{einsatz}/members/{erika_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
@@ -1066,7 +1066,7 @@ async fn beobachter_darf_lesen() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"))
+                .uri(format!("/api/einsaetze/{einsatz}/members/{beob_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
@@ -1198,7 +1198,7 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
-    let einheiten = format!("/api/einsaetze/{einsatz}/einheiten");
+    let einheiten = format!("/api/einsaetze/{einsatz}/units");
     let zug = anlegen_id(
         &app,
         &admin,
@@ -1254,7 +1254,7 @@ async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
     let fremde_einheit = anlegen_id(
         &app,
         &admin,
-        &format!("/api/einsaetze/{fremd}/einheiten"),
+        &format!("/api/einsaetze/{fremd}/units"),
         serde_json::json!({"name": "1. Zug"}),
     )
     .await;
@@ -1339,7 +1339,7 @@ async fn stream_fuer_beobachter_ist_200() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"))
+                .uri(format!("/api/einsaetze/{einsatz}/members/{beob_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))

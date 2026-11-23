@@ -18,7 +18,7 @@ export interface AdhocEingabe {
 }
 
 export function listeEinsatzFahrzeuge(einsatzId: number): Promise<EinsatzFahrzeug[]> {
-  return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge`);
+  return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/vehicles`);
 }
 
 /** Auswahl und Ziel-Einheit einer Sammel-Disposition (LLH-1100). */
@@ -35,14 +35,14 @@ export function disponiereFahrzeugeSammel(
   einsatzId: number,
   eingabe: SammelFahrzeugEingabe,
 ): Promise<EinsatzFahrzeug[]> {
-  return apiSend<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge/sammel`, 'POST', {
+  return apiSend<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/vehicles/bulk`, 'POST', {
     fahrzeug_ids: eingabe.fahrzeug_ids,
     einheit_id: eingabe.einheit_id ?? null,
   });
 }
 
 export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge`, 'POST', { adhoc });
+  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/vehicles`, 'POST', { adhoc });
 }
 
 /**
@@ -74,7 +74,7 @@ export function updateDisposition(
   erwartet?: Partial<Omit<DispositionPatch, 'status_id'>>,
 ): Promise<FahrzeugPatchAntwort> {
   return apiSend<FahrzeugPatchAntwort>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}`,
     'PATCH',
     erwartet ? { ...felder, erwartet } : felder,
   );
@@ -91,7 +91,7 @@ export function nimmStatuswechselZurueck(
   beleg: StatusRuecknahmeBeleg,
 ): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/status/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/status/undo`,
     'POST',
     beleg,
   );
@@ -99,7 +99,7 @@ export function nimmStatuswechselZurueck(
 
 /** Entlassene Fahrzeuge des Einsatzes (LLH-1079 Teil II, Block „Entlassen“). */
 export function listEntlasseneFahrzeuge(einsatzId: number): Promise<EinsatzFahrzeug[]> {
-  return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge?entlassene=1`);
+  return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/vehicles?entlassene=1`);
 }
 
 /**
@@ -108,10 +108,7 @@ export function listEntlasseneFahrzeuge(einsatzId: number): Promise<EinsatzFahrz
  * dem {@link nimmEntlassungZurueck} alles zurücknimmt (LLH-1722); deshalb ohne Rückfrage.
  */
 export function entlasseDisposition(einsatzId: number, efId: number): Promise<EntlassungAntwort> {
-  return apiSend<EntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/entlassen`,
-    'POST',
-  );
+  return apiSend<EntlassungAntwort>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/release`, 'POST');
 }
 
 /**
@@ -125,7 +122,7 @@ export function nimmEntlassungZurueck(
   vorzustand: EntlassungVorzustand,
 ): Promise<EntlassungRuecknahmeAntwort> {
   return apiSend<EntlassungRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/entlassen/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/release/undo`,
     'POST',
     vorzustand,
   );
@@ -133,13 +130,13 @@ export function nimmEntlassungZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Spur in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, efId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/stornieren`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/cancel`, 'POST');
 }
 
 /** Ein entlassenes oder storniertes Fahrzeug erneut disponieren (Block „Entlassen“): neuer Anfangsstatus, keine Bindung. */
 export function reaktiviereDisposition(einsatzId: number, efId: number): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/reaktivieren`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/reactivate`,
     'POST',
   );
 }
@@ -152,7 +149,7 @@ export function verorteFahrzeug(
   erwartet?: PositionPatch,
 ): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/position`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );
@@ -170,7 +167,7 @@ export function ordneBesatzungZu(
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}${zuruecknahmeQuery(optionen)}`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/crew/${epId}${zuruecknahmeQuery(optionen)}`,
     'PUT',
   );
 }
@@ -185,12 +182,12 @@ export function zuordnenBesatzungMenge(
   efId: number,
   epIds: number[],
 ): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung`, 'POST', {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/crew`, 'POST', {
     ep_ids: epIds,
   });
 }
 
 /** LFH-9: Gibt eine Kraft aus der Fahrzeug-Besatzung frei. */
 export function gibBesatzungFrei(einsatzId: number, efId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/crew/${epId}`, 'DELETE');
 }

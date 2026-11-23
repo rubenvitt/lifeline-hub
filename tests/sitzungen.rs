@@ -591,7 +591,7 @@ async fn geraet_koppeln(app: &axum::Router, admin: &str, einsatz: i64) -> (i64, 
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         admin,
         Some(&json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"})),
     )

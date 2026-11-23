@@ -48,7 +48,7 @@ const UNANGEMELDET = 'Florian Nachbarort 1/46-1';
 
 /** Ein geplanter Bereitstellungsraum, einmal je Lauf. */
 async function geplanterRaum(page: Page, einsatz: number): Promise<number> {
-  const pfad = `/api/einsaetze/${einsatz}/bereitstellungsraeume`;
+  const pfad = `/api/einsaetze/${einsatz}/staging-areas`;
   const liste = (await (await page.request.get(pfad)).json()) as {
     id: number;
     bezeichnung: string;
@@ -70,7 +70,7 @@ async function raumTablet(page: Page, browser: Browser) {
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/geraete`,
+    `/api/einsaetze/${demo.id}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: br, bezeichnung: 'Tablet Einweiser' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });
@@ -146,7 +146,7 @@ test.describe(KAPITEL, () => {
       // Die Einsatzleitung ruft eine der Kräfte ab (LLH-1085); das Tablet zeigt sie unter
       // „Abgerufen“ mit „Ausrücken buchen“.
       const raum = (await (
-        await page.request.get(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`)
+        await page.request.get(`/api/einsaetze/${einsatzId}/staging-areas/${brId}`)
       ).json()) as { einheiten: { id: number; name: string }[] };
       const kraft = raum.einheiten.find((x) => x.name !== UNANGEMELDET);
       expect(kraft, 'eine eingebuchte Einheit').toBeDefined();
@@ -155,17 +155,12 @@ test.describe(KAPITEL, () => {
       ).json()) as { id: number; name: string }[];
       const ziel = abschnitte.find((a) => a.name === 'Sanitätsdienst');
       expect(ziel, 'Abschnitt „Sanitätsdienst“').toBeDefined();
-      await fuelle(
-        page,
-        'post',
-        `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/abruf`,
-        {
-          objekt_typ: 'einheit',
-          objekt_id: kraft!.id,
-          abschnitt_id: ziel!.id,
-          auftrag_text: 'Verletztenablage Nord übernehmen',
-        },
-      );
+      await fuelle(page, 'post', `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch`, {
+        objekt_typ: 'einheit',
+        objekt_id: kraft!.id,
+        abschnitt_id: ziel!.id,
+        auftrag_text: 'Verletztenablage Nord übernehmen',
+      });
       const abgerufen = geraet.getByTestId('br-abgerufen');
       const ausruecken = abgerufen.getByRole('button', {
         name: `Ausrücken buchen für ${kraft!.name}`,

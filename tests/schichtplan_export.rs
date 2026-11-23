@@ -24,7 +24,7 @@ const CSV: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stad
 const XLSX_TYP: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan")
+    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
 }
 
 /// GET mit Bytes statt JSON.
@@ -128,7 +128,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
     let (s, adhoc) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         Some(
             &json!({"adhoc": {"name": "Notarzt Extern", "funktion": "Notarzt",
@@ -141,7 +141,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
     let (s, h) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/helfer", pfad(e)),
+        &format!("{}/helpers", pfad(e)),
         &admin,
         Some(&json!({"name": "Hanna Ohnekennung", "telefon": "0170 5", "organisation": "THW"})),
     )
@@ -161,7 +161,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{}/bloecke", pfad(e)),
+            &format!("{}/blocks", pfad(e)),
             &admin,
             Some(&body),
         )

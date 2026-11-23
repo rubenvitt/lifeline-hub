@@ -77,7 +77,7 @@ for (const breite of [1280, 390]) {
 
     // Ohne Standard ist die Führungsstelle der erste Vorschlag der Rufname-Abfrage.
     const konto = await benutzerAnlegen(page, 'fuehrungspersonal');
-    const eingetragen = await page.request.put(`/api/einsaetze/${b}/mitglieder/${konto.id}`, {
+    const eingetragen = await page.request.put(`/api/einsaetze/${b}/members/${konto.id}`, {
       data: { einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: 'Florian B' },
     });
     expect(eingetragen.ok(), await eingetragen.text()).toBeTruthy();

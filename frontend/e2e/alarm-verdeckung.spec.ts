@@ -31,8 +31,8 @@ async function seede(page: Page, anzahl: number): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, `E2E Alarmverdeckung ${Date.now()}`);
   const jetzt = Date.now();
   for (let i = 1; i <= anzahl; i++) {
-    const einheit = await post(page, einsatzId, 'einheiten', { name: `Florian Alarm ${i}` });
-    await post(page, einsatzId, 'abloesungen', {
+    const einheit = await post(page, einsatzId, 'units', { name: `Florian Alarm ${i}` });
+    await post(page, einsatzId, 'reliefs', {
       einheit_id: einheit,
       rhythmus_minuten: 360,
       beginn_at: new Date(jetzt - (400 + i) * 60_000).toISOString(),

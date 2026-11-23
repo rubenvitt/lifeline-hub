@@ -59,7 +59,7 @@ async fn rollen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<(i64, Str
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &format!("/api/einsaetze/{einsatz}/members"),
         cookie,
         None,
     )

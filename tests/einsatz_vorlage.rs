@@ -607,7 +607,7 @@ async fn einsatz_vorgabe(app: &axum::Router, cookie: &str, einsatz: i64) -> Opti
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtmodell"),
+        &format!("/api/einsaetze/{einsatz}/reliefs/shift-model"),
         cookie,
         None,
     )

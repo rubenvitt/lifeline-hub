@@ -19,7 +19,7 @@ use utoipa::ToSchema;
 
 // ─── Eingabe ────────────────────────────────────────────────────────────────
 
-/// Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
+/// Körper von `POST …/staging-areas/{bid}/arrival` (design.md D1). Genau eines von
 /// `kraft`, `unangemeldet` und `vorlage` (LLH-1300).
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct EintreffenEingabe {

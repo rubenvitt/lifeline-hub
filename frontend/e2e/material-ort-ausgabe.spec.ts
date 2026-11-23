@@ -26,7 +26,7 @@ async function seed(page: Page) {
   });
   const einsatzId = String(id);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheit = await post(page, `${basis}/einheiten`, { name: 'Staffel A' });
+  const einheit = await post(page, `${basis}/units`, { name: 'Staffel A' });
   await post(page, `${basis}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
   await post(page, `${basis}/material`, {
     adhoc: { bezeichnung: 'Wolldecke' },

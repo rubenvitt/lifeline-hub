@@ -11,7 +11,7 @@ import { apiGet, apiSend } from './client';
 // Herleitung: `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D3).
 
 export function ladeGeraete(einsatzId: number): Promise<GeraeteUebersicht> {
-  return apiGet<GeraeteUebersicht>(`/api/einsaetze/${einsatzId}/geraete`);
+  return apiGet<GeraeteUebersicht>(`/api/einsaetze/${einsatzId}/devices`);
 }
 
 /** Anlegefelder einer Kopplung. `stelle_id` genau bei den stellengebundenen Ansichten, die Art
@@ -26,12 +26,12 @@ export interface NeueKopplung {
 }
 
 export function legeKopplungAn(einsatzId: number, daten: NeueKopplung): Promise<KopplungMitCode> {
-  return apiSend<KopplungMitCode>(`/api/einsaetze/${einsatzId}/geraete`, 'POST', daten);
+  return apiSend<KopplungMitCode>(`/api/einsaetze/${einsatzId}/devices`, 'POST', daten);
 }
 
 /** Neuer Code für eine bestehende Kopplung; beim Einlösen enden die alten Sitzungen. */
 export function stelleCodeAus(einsatzId: number, kopplungId: number): Promise<KopplungMitCode> {
-  return apiSend<KopplungMitCode>(`/api/einsaetze/${einsatzId}/geraete/${kopplungId}/code`, 'POST');
+  return apiSend<KopplungMitCode>(`/api/einsaetze/${einsatzId}/devices/${kopplungId}/code`, 'POST');
 }
 
 export function verlaengereKopplung(
@@ -40,7 +40,7 @@ export function verlaengereKopplung(
   laeuftAbAt: string,
 ): Promise<KopplungAnzeige> {
   return apiSend<KopplungAnzeige>(
-    `/api/einsaetze/${einsatzId}/geraete/${kopplungId}/verlaengern`,
+    `/api/einsaetze/${einsatzId}/devices/${kopplungId}/extend`,
     'POST',
     { laeuft_ab_at: laeuftAbAt },
   );
@@ -48,7 +48,7 @@ export function verlaengereKopplung(
 
 export function widerrufeKopplung(einsatzId: number, kopplungId: number): Promise<KopplungAnzeige> {
   return apiSend<KopplungAnzeige>(
-    `/api/einsaetze/${einsatzId}/geraete/${kopplungId}/widerrufen`,
+    `/api/einsaetze/${einsatzId}/devices/${kopplungId}/revoke`,
     'POST',
   );
 }

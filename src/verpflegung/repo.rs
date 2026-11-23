@@ -442,7 +442,7 @@ struct EmpfaengerEinheitZeile {
 /// aufgelösten Einheiten und die aufgelösten, auf die eine Ausgabe verweist, in der Folge des
 /// Kräftebaums (`sortier`, `id`); alle Abschnitte; die nicht stornierten Betreuungsstellen nach
 /// Bezeichnung (LLH-1295). Stärken aus
-/// [`crate::einheit::repo::load_staerken_je_einheit`] (dieselbe Rechnung wie `GET …/einheiten`),
+/// [`crate::einheit::repo::load_staerken_je_einheit`] (dieselbe Rechnung wie `GET …/units`),
 /// Eintreffen aus der juengsten Einsatzperiode der Zeitachse. Liest bewusst keine Spalte mit
 /// Personenbezug (Führer, Erreichbarkeit, Kommunikationsmittel, Bemerkung, Mitglieder).
 pub async fn load_empfaenger(

@@ -331,18 +331,18 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     );
 
     // Einzige Mitgliedschaft.
-    let mitglieder = liste(&app, &admin, e, "/mitglieder").await;
+    let mitglieder = liste(&app, &admin, e, "/members").await;
     assert_eq!(mitglieder.len(), 1, "{mitglieder:?}");
 
     // Je Modul die Zahl aus dem Drehbuch.
     for (pfad, n) in [
         ("/abschnitte", 4),
-        ("/einheiten", 5),
-        ("/fahrzeuge", 8),
-        ("/personal", 12),
+        ("/units", 5),
+        ("/vehicles", 8),
+        ("/personnel", 12),
         ("/personen", 12),
         ("/uhs", 1),
-        ("/bereitstellungsraeume", 1),
+        ("/staging-areas", 1),
         ("/zonen", 2),
         ("/gefahrengebiete", 2),
         ("/meldungen", 8),
@@ -1255,7 +1255,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/fahrzeuge"),
+        format!("/api/einsaetze/{e}/vehicles"),
         format!(r#"{{"fahrzeug_id":{}}}"#, fz["id"]),
     )
     .await;
@@ -1265,7 +1265,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/personal"),
+        format!("/api/einsaetze/{e}/personnel"),
         format!(r#"{{"personal_id":{}}}"#, pers["id"]),
     )
     .await;

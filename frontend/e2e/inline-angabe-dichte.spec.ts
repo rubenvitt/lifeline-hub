@@ -170,13 +170,13 @@ test('InlineAngabe hält die Dichte-Staffel: Kartenfelder, Speichern ↔ Abbrech
   // Per API: der Spec prüft den Anlegedialog nicht (frontend/e2e/AGENTS.md, LFH-1114).
   const einsatzId = await einsatzAnlegen(page, `E2E InlineAngabe Abstände ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheit = await post(page, `${basis}/einheiten`, { name: EINHEIT });
-  const kraft = await post(page, `${basis}/personal`, {
+  const einheit = await post(page, `${basis}/units`, { name: EINHEIT });
+  const kraft = await post(page, `${basis}/personnel`, {
     adhoc: { name: KRAFT, traegerorganisation: 'DRK Kreisverband' },
   });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheit.id}/personal/${kraft.id}`);
+  const zuordnung = await page.request.put(`${basis}/units/${einheit.id}/personnel/${kraft.id}`);
   expect(zuordnung.ok(), await zuordnung.text()).toBeTruthy();
-  const position = await page.request.patch(`${basis}/personal/${kraft.id}`, {
+  const position = await page.request.patch(`${basis}/personnel/${kraft.id}`, {
     data: { staerke_position: 'fuehrer' },
   });
   expect(position.ok(), await position.text()).toBeTruthy();

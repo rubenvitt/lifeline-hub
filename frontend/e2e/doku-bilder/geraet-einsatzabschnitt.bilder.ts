@@ -93,7 +93,7 @@ async function abschnittTablet(page: Page, browser: Browser) {
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/geraete`,
+    `/api/einsaetze/${demo.id}/devices`,
     { ansicht: 'einsatzabschnitt', stelle_id: ea1.id, bezeichnung: 'Tablet EA 1' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });

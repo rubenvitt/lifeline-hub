@@ -176,8 +176,8 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       von: 'ELW 1',
       an: 'Leitstelle',
     });
-    const einheit = await post(page, `${basis}/einheiten`, { name: 'Offline-Probe Zug' });
-    const position = await page.request.patch(`${basis}/einheiten/${einheit}/position`, {
+    const einheit = await post(page, `${basis}/units`, { name: 'Offline-Probe Zug' });
+    const position = await page.request.patch(`${basis}/units/${einheit}/position`, {
       data: { lat: 53.0775, lon: 8.8 },
     });
     expect(position.ok(), await position.text()).toBeTruthy();
@@ -186,7 +186,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       auftrag_text: 'Offline-Probe Auftrag',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
     });
-    await post(page, `${basis}/bereitstellungsraeume`, { bezeichnung: 'Offline-Probe BR' });
+    await post(page, `${basis}/staging-areas`, { bezeichnung: 'Offline-Probe BR' });
 
     // (1) Online: jede Seite einmal wirklich laden und ihren Datenstand merken — per Navigation
     //     INNERHALB der App, wie im Betrieb. Ein `page.goto` je Seite lüde jedes Mal das ganze

@@ -19,7 +19,7 @@ async fn patchen(
     anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}"),
         cookie,
         Some(&body),
     )
@@ -30,7 +30,7 @@ async fn einheit(app: &axum::Router, cookie: &str, einsatz: i64, eid: i64) -> Va
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         None,
     )
@@ -57,7 +57,7 @@ async fn personal_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, eid: 
     let (s, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}/personnel/{ep}"),
         cookie,
         None,
     )

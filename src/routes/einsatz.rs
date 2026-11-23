@@ -1131,7 +1131,7 @@ pub struct MitgliedRolle {
     pub fuehrungsfunktion: Option<Option<String>>,
 }
 
-/// GET /api/einsaetze/{id}/mitglieder — Mitgliederliste; gemäß DSGVO-Lese-Policy.
+/// GET /api/einsaetze/{id}/members — Mitgliederliste; gemäß DSGVO-Lese-Policy.
 pub async fn mitglieder(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -1140,7 +1140,7 @@ pub async fn mitglieder(
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
-/// GET /api/einsaetze/{id}/mitglieder/auswahl — die Personen, die die Einsatzleitung aufnehmen
+/// GET /api/einsaetze/{id}/members/candidates — die Personen, die die Einsatzleitung aufnehmen
 /// kann (LFH-1141, Spec `einsatz-zugriff`). Dieselbe Tür wie [`mitglied_setzen`]: wer die Liste
 /// sieht, kann aus ihr aufnehmen, auch ohne Systemrolle; die Benutzerverwaltung bleibt admin-only.
 /// Gekoppelte Geräte erreichen die Route nicht (Positivliste in `src/geraet/mod.rs`).
@@ -1168,7 +1168,7 @@ pub async fn mitglied_auswahl_anlage(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/mitglieder/{benutzer_id} — Mitglied hinzufügen oder
+/// PUT /api/einsaetze/{id}/members/{benutzer_id} — Mitglied hinzufügen oder
 /// dessen Rolle ändern. Nur Einsatzleitung, nur bei aktivem Einsatz.
 /// Schützt die letzte Einsatzleitung vor Herabstufung.
 pub async fn mitglied_setzen(
@@ -1274,7 +1274,7 @@ pub async fn mitglied_setzen(
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
-/// DELETE /api/einsaetze/{id}/mitglieder/{benutzer_id} — Mitglied entfernen.
+/// DELETE /api/einsaetze/{id}/members/{benutzer_id} — Mitglied entfernen.
 /// Nur Einsatzleitung, nur bei aktivem Einsatz.
 /// Schützt die letzte Einsatzleitung vor Entfernung.
 pub async fn mitglied_entfernen(

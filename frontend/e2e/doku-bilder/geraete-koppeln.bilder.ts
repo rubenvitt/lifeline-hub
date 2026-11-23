@@ -52,28 +52,28 @@ async function einloesen(code: string) {
 async function geraeteAnlegen(page: Page, einsatz: number) {
   const basis = `/api/einsaetze/${einsatz}`;
   const uhs = await ersteId(page, `${basis}/uhs`);
-  const br = await ersteId(page, `${basis}/bereitstellungsraeume`);
-  const tablet = await fuelle<Kopplung>(page, 'post', `${basis}/geraete`, {
+  const br = await ersteId(page, `${basis}/staging-areas`);
+  const tablet = await fuelle<Kopplung>(page, 'post', `${basis}/devices`, {
     ansicht: 'uhs-tablet',
     stelle_id: uhs,
     bezeichnung: 'Tablet Aufnahme',
   });
   await einloesen(tablet.code.code);
-  const brTablet = await fuelle<Kopplung>(page, 'post', `${basis}/geraete`, {
+  const brTablet = await fuelle<Kopplung>(page, 'post', `${basis}/devices`, {
     ansicht: 'bereitstellungsraum',
     stelle_id: br,
     bezeichnung: 'Tablet BR',
   });
   await einloesen(brTablet.code.code);
-  await fuelle(page, 'post', `${basis}/geraete`, {
+  await fuelle(page, 'post', `${basis}/devices`, {
     ansicht: 'lagemonitor',
     bezeichnung: 'Monitor Stab',
   });
-  const verpflegung = await fuelle<Kopplung>(page, 'post', `${basis}/geraete`, {
+  const verpflegung = await fuelle<Kopplung>(page, 'post', `${basis}/devices`, {
     ansicht: 'verpflegung',
     bezeichnung: 'Ausgabe Schule',
   });
-  await fuelle(page, 'post', `${basis}/geraete/${verpflegung.kopplung.id}/widerrufen`);
+  await fuelle(page, 'post', `${basis}/devices/${verpflegung.kopplung.id}/revoke`);
 }
 
 test.describe(KAPITEL, () => {

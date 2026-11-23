@@ -162,7 +162,7 @@ export async function seedeGrund(
   }
   const zugId = zug
     ? (
-        await a.post('einheiten', {
+        await a.post('units', {
           name: '1. Zug',
           funkrufname: 'Florian 1/1',
           abschnitt_id: ea[0],

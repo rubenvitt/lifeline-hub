@@ -50,25 +50,25 @@ async function lageVerorten(page: Page, einsatzId: number) {
     einsatzort_lat: 50.9571,
     einsatzort_lon: 10.2525,
   });
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/units`);
   expect(antwort.ok()).toBe(true);
   const einheiten = (await antwort.json()) as { id: number; name: string }[];
   for (const [name, [lon, lat]] of Object.entries(EINHEITEN_ORT)) {
     const einheit = einheiten.find((e) => e.name === name);
     expect(einheit, `Demo-Einheit „${name}“ fehlt`).toBeTruthy();
-    await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/einheiten/${einheit!.id}/position`, {
+    await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/units/${einheit!.id}/position`, {
       lat,
       lon,
     });
   }
   // Der Demo-Bereitstellungsraum steht mit seinem Raumzeichen auf der Karte (LLH-1107).
-  const raeume = await page.request.get(`/api/einsaetze/${einsatzId}/bereitstellungsraeume`);
+  const raeume = await page.request.get(`/api/einsaetze/${einsatzId}/staging-areas`);
   expect(raeume.ok()).toBe(true);
   const raum = ((await raeume.json()) as { id: number; bezeichnung: string }[]).find(
     (r) => r.bezeichnung === BR_NAME,
   );
   expect(raum, `Demo-Bereitstellungsraum „${BR_NAME}“ fehlt`).toBeTruthy();
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${raum!.id}`, {
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/staging-areas/${raum!.id}`, {
     lat: BR_ORT[1],
     lon: BR_ORT[0],
   });

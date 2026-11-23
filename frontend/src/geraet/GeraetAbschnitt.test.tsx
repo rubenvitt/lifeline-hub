@@ -137,7 +137,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([NORD, NORD_OST])),
-    http.get('/api/einsaetze/7/einheiten', () =>
+    http.get('/api/einsaetze/7/units', () =>
       HttpResponse.json([
         einheit(5, { name: '2. Zug', abschnitt_id: 21, abschnitt_name: 'UA Nord-Ost' }),
         einheit(4, { name: '1. Zug', abschnitt_id: 20, abschnitt_name: 'EA Nord' }),
@@ -284,7 +284,7 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
   it('eine Untereinheit mit geerbtem Abschnitt: Abschnitt, „über …“ und eigene Stärke (LLH-1744)', async () => {
     stelleBereit();
     server.use(
-      http.get('/api/einsaetze/7/einheiten', () =>
+      http.get('/api/einsaetze/7/units', () =>
         HttpResponse.json([
           einheit(5, {
             name: '2. Zug',

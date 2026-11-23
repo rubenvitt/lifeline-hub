@@ -110,8 +110,8 @@ function stelleBereit(a: Aufbau = {}) {
     ),
     http.get('/api/schichtmodelle', () => HttpResponse.json(MODELLE)),
     // Das Paneel „Dienst und Ruhe“ liest nur `grenzwerte` aus dem Plan (LLH-1603, D2).
-    http.get('/api/einsaetze/1/abloesungen/schichtplan', () => HttpResponse.json({ grenzwerte })),
-    http.patch('/api/einsaetze/1/abloesungen/schichtplan/grenzwerte', async ({ request }) => {
+    http.get('/api/einsaetze/1/reliefs/shift-plan', () => HttpResponse.json({ grenzwerte })),
+    http.patch('/api/einsaetze/1/reliefs/shift-plan/limits', async ({ request }) => {
       const body = (await request.json()) as Record<string, number | null>;
       patches.push(body);
       const neu = { ...grenzwerte };
@@ -126,11 +126,11 @@ function stelleBereit(a: Aufbau = {}) {
       grenzwerte = neu;
       return HttpResponse.json({ grenzwerte });
     }),
-    http.get('/api/einsaetze/1/abloesungen/schichtmodell', () => {
+    http.get('/api/einsaetze/1/reliefs/shift-model', () => {
       lesend += 1;
       return HttpResponse.json(antwort());
     }),
-    http.put('/api/einsaetze/1/abloesungen/schichtmodell', async ({ request }) => {
+    http.put('/api/einsaetze/1/reliefs/shift-model', async ({ request }) => {
       const body = (await request.json()) as {
         schichtmodell_id?: number;
         schichtmodell?: Record<string, unknown> | null;

@@ -28,7 +28,7 @@ async fn schwaerzung_entfernt_fuehrungsstelle_nur_im_betroffenen_einsatz() {
                 &app,
                 &admin,
                 "PUT",
-                &format!("/api/einsaetze/{id}/mitglieder/1"),
+                &format!("/api/einsaetze/{id}/members/1"),
                 json!({"einsatz_rolle": "einsatzleitung", "fuehrungsstelle": name})
             )
             .await
@@ -109,7 +109,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
     let erika = common::login_cookie(&app, "erika", "erikapw1").await;
     for (eid, stelle) in [(aid, "Florian A"), (bid, "Florian B")] {
         let (status, mitglieder) = request(&app, &admin, "PUT",
-            &format!("/api/einsaetze/{eid}/mitglieder/{erika_id}"),
+            &format!("/api/einsaetze/{eid}/members/{erika_id}"),
             json!({"einsatz_rolle": "fuehrungspersonal", "fuehrungsstelle": format!("  {stelle}  ")})).await;
         assert_eq!(status, StatusCode::OK);
         let mitglied = mitglieder
@@ -153,7 +153,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             stelle
         );
     }
-    let uri = format!("/api/einsaetze/{aid}/mitglieder/{erika_id}");
+    let uri = format!("/api/einsaetze/{aid}/members/{erika_id}");
     let (status, _) = request(
         &app,
         &admin,
@@ -231,7 +231,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
     let eid = e["id"].as_i64().unwrap();
     let erika_id = common::benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = common::login_cookie(&app, "erika", "erikapw1").await;
-    let uri = format!("/api/einsaetze/{eid}/mitglieder/{erika_id}");
+    let uri = format!("/api/einsaetze/{eid}/members/{erika_id}");
     let body = json!({"einsatz_rolle": "fuehrungspersonal", "fuehrungsstelle": "Florian A"});
     assert_eq!(
         request(&app, &admin, "PUT", &uri, body.clone()).await.0,
@@ -262,7 +262,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
             &app,
             &admin,
             "PUT",
-            &format!("/api/einsaetze/{eid}/mitglieder/{fremd_id}"),
+            &format!("/api/einsaetze/{eid}/members/{fremd_id}"),
             body.clone()
         )
         .await

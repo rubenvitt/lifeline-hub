@@ -11,7 +11,7 @@ use utoipa::ToSchema;
 /// Höchstlänge der Bezeichnung eines Bereitstellungsraums nach dem Trimmen (LLH-1302, Spec
 /// `eingabegrenzen`), wie die übrigen Bezeichnungen (`verpflegung::STELLE_BEZEICHNUNG_MAX`).
 /// Steht in ETB-Texten der Inbetriebnahme und der Belegung. Gilt in `POST/PATCH
-/// …/bereitstellungsraeume`. Spiegel: `BR_BEZEICHNUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+/// …/staging-areas`. Spiegel: `BR_BEZEICHNUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const BEZEICHNUNG_MAX: usize = 200;
 
 /// Höchstlänge des Standorts (Adresse oder Freitext) nach dem Trimmen (LLH-1302), wie
@@ -166,7 +166,7 @@ pub struct BrAbrufKurz {
     pub mit_objekt_id: Option<i64>,
 }
 
-/// Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).
+/// Antwort von `POST …/staging-areas/{bid}/dispatch` (LLH-1085, design.md D2).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct BrAbrufErgebnis {
     /// Das Abruf-Ereignis der abgerufenen Kraft.
@@ -180,7 +180,7 @@ pub struct BrAbrufErgebnis {
     pub auftrag_nr: Option<i64>,
 }
 
-/// Body von `POST …/bereitstellungsraeume/{bid}/abruf` (handgepflegt, `src/AGENTS.md`,
+/// Body von `POST …/staging-areas/{bid}/dispatch` (handgepflegt, `src/AGENTS.md`,
 /// Typ-Codegen).
 #[derive(Debug, Deserialize)]
 pub struct BrAbrufEingabe {
@@ -195,7 +195,7 @@ pub struct BrAbrufEingabe {
     pub ausgerueckt: bool,
 }
 
-/// Body von `POST …/bereitstellungsraeume/{bid}/abruf/aufheben` (handgepflegt).
+/// Body von `POST …/staging-areas/{bid}/dispatch/withdraw` (handgepflegt).
 #[derive(Debug, Deserialize)]
 pub struct BrAbrufAufhebenEingabe {
     pub objekt_typ: String,
@@ -261,7 +261,7 @@ wire_enum! {
     try_from = |s| format!("Ungültige BrVerlaufArt: {s}");
 }
 
-/// Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
+/// Ein Eintrag im Verlauf eines Raums (`GET …/staging-areas/{bid}/history`, Spec
 /// `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct BrVerlaufEintrag {

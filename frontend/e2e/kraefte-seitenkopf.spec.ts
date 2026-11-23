@@ -45,10 +45,10 @@ async function einsatzMitKraeften(page: Page, dichte: string): Promise<string> {
   });
   expect(r.ok(), await r.text()).toBeTruthy();
   const einsatzId = String(((await r.json()) as { id: number }).id);
-  await seede(page, einsatzId, 'fahrzeuge', {
+  await seede(page, einsatzId, 'vehicles', {
     adhoc: { funkrufname: FUNKRUFNAME, fahrzeugtyp: 'LF 20' },
   });
-  await seede(page, einsatzId, 'personal', { adhoc: { name: KRAFT, funktion: 'Helfer' } });
+  await seede(page, einsatzId, 'personnel', { adhoc: { name: KRAFT, funktion: 'Helfer' } });
   await seede(page, einsatzId, 'material', { adhoc: { bezeichnung: MATERIAL }, menge: 4 });
   return einsatzId;
 }

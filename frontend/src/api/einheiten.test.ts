@@ -17,7 +17,7 @@ describe('api/einheiten — Einheit aus Vorlage (LLH-1049)', () => {
   it('trifft Methode, Pfad und Body von Vorschau und Bilden', async () => {
     const seen: string[] = [];
     server.use(
-      http.get('/api/einsaetze/:id/einheiten/aus-vorlage/:vorlageId', ({ request }) => {
+      http.get('/api/einsaetze/:id/units/from-template/:vorlageId', ({ request }) => {
         seen.push(`GET ${new URL(request.url).pathname}`);
         return HttpResponse.json({
           vorlage_id: 3,
@@ -26,7 +26,7 @@ describe('api/einheiten — Einheit aus Vorlage (LLH-1049)', () => {
           personal_gesperrt: false,
         });
       }),
-      http.post('/api/einsaetze/:id/einheiten/aus-vorlage', async ({ request }) => {
+      http.post('/api/einsaetze/:id/units/from-template', async ({ request }) => {
         seen.push(`POST ${new URL(request.url).pathname} ${await request.text()}`);
         return HttpResponse.json(
           { einheit_id: 11, einheit_ids: [11, 12], fahrzeuge: [], personal: [] },
@@ -48,8 +48,8 @@ describe('api/einheiten — Einheit aus Vorlage (LLH-1049)', () => {
     expect(vorschau.vorlage_id).toBe(3);
     expect(ergebnis.einheit_id).toBe(11);
     expect(seen).toEqual([
-      'GET /api/einsaetze/5/einheiten/aus-vorlage/3',
-      'POST /api/einsaetze/5/einheiten/aus-vorlage {"vorlage_id":3,"name":"1. Zug","abschnitt_id":null,"fahrzeuge":[{"fahrzeug_id":4,"umhaengen":true}],"personal":[{"personal_id":9,"umhaengen":false}],"material":[{"vorlage_material_id":7}]}',
+      'GET /api/einsaetze/5/units/from-template/3',
+      'POST /api/einsaetze/5/units/from-template {"vorlage_id":3,"name":"1. Zug","abschnitt_id":null,"fahrzeuge":[{"fahrzeug_id":4,"umhaengen":true}],"personal":[{"personal_id":9,"umhaengen":false}],"material":[{"vorlage_material_id":7}]}',
     ]);
   });
 });
@@ -58,7 +58,7 @@ describe('api/einheiten — Fahrzeug als eigene Einheit führen (LLH-1073, desig
   it('sendet die Fahrzeuge mit und liefert die Gründe je Fahrzeug aus `zeilen`', async () => {
     const seen: string[] = [];
     server.use(
-      http.post('/api/einsaetze/:id/einheiten', async ({ request }) => {
+      http.post('/api/einsaetze/:id/units', async ({ request }) => {
         seen.push(await request.text());
         return HttpResponse.json(
           {
@@ -105,7 +105,7 @@ describe('api/einheiten · patchEinheitZeichen', () => {
   it('schickt nur die Fachaufgabe per PATCH an …/position', async () => {
     await patchEinheitZeichen(1, 10, { tz_fachaufgabe: 'betreuung' });
     const { pfad, init } = aufruf();
-    expect(pfad).toBe('/api/einsaetze/1/einheiten/10/position');
+    expect(pfad).toBe('/api/einsaetze/1/units/10/position');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ tz_fachaufgabe: 'betreuung' });
   });
@@ -128,7 +128,7 @@ describe('api/einheiten — Übernehmen und Abweisen (LLH-1075, design.md D10, D
   it('übernimmt mit POST an …/uebernehmen und schickt nur die gewählte Unterstellung', async () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     await uebernehmeEinheit(5, 7, { abschnitt_id: 3 });
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/uebernehmen', 'POST', {
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/units/7/take-over', 'POST', {
       abschnitt_id: 3,
     });
   });
@@ -136,13 +136,13 @@ describe('api/einheiten — Übernehmen und Abweisen (LLH-1075, design.md D10, D
   it('übernimmt ohne Angabe mit leerem Körper', async () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     await uebernehmeEinheit(5, 7, {});
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/uebernehmen', 'POST', {});
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/units/7/take-over', 'POST', {});
   });
 
   it('weist mit POST an …/abweisen ab, ohne Körper', async () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue(undefined as never);
     await weiseEinheitAb(5, 7);
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/abweisen', 'POST');
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/units/7/reject', 'POST');
   });
 });
 

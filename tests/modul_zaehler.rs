@@ -99,14 +99,14 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
     post(
         &app,
         &admin,
-        &format!("{basis}/einheiten"),
+        &format!("{basis}/units"),
         r#"{"name":"1. Zug"}"#,
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/einheiten"),
+        &format!("{basis}/units"),
         r#"{"name":"2. Zug"}"#,
     )
     .await;
@@ -1045,14 +1045,14 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     post(
         &app,
         &admin,
-        &format!("{basis}/einheiten"),
+        &format!("{basis}/units"),
         r#"{"name":"1. Zug"}"#,
     )
     .await;
     let zweiter = post(
         &app,
         &admin,
-        &format!("{basis}/einheiten"),
+        &format!("{basis}/units"),
         r#"{"name":"2. Zug"}"#,
     )
     .await["id"]
@@ -1062,7 +1062,7 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     let kraft = post(
         &app,
         &admin,
-        &format!("{basis}/personal"),
+        &format!("{basis}/personnel"),
         r#"{"adhoc":{"name":"Anna"}}"#,
     )
     .await["id"]
@@ -1071,7 +1071,7 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("{basis}/einheiten/{zweiter}/personal/{kraft}"),
+        &format!("{basis}/units/{zweiter}/personnel/{kraft}"),
         &admin,
         None,
     )
@@ -1080,17 +1080,17 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("{basis}/einheiten/{zweiter}"),
+        &format!("{basis}/units/{zweiter}"),
         &admin,
         None,
     )
     .await;
     assert!(s.is_success(), "auflösen: {s} {v:?}");
-    let aufgeloeste = get(&app, &admin, &format!("{basis}/einheiten?aufgeloeste=1")).await;
+    let aufgeloeste = get(&app, &admin, &format!("{basis}/units?aufgeloeste=1")).await;
     assert_eq!(aufgeloeste.as_array().unwrap().len(), 1, "{aufgeloeste:?}");
 
     let v = zaehler(&app, &admin, einsatz).await;
     assert_eq!(v["einheiten"]["gesamt"].as_i64(), Some(1), "{v:?}");
-    let liste = get(&app, &admin, &format!("{basis}/einheiten")).await;
+    let liste = get(&app, &admin, &format!("{basis}/units")).await;
     assert_eq!(liste.as_array().unwrap().len(), 1, "{liste:?}");
 }

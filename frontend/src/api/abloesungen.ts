@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 /** Ablösung (LFH-635): Schichten von Einheiten, Rhythmus-Vorgaben je Abschnitt. */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/abloesungen`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/reliefs`;
 
 /**
  * Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend, beendete (LLH-1128) nach ihrem

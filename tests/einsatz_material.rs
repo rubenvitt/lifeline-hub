@@ -315,7 +315,7 @@ async fn entfernen_schreibt_etb() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/release"),
         &admin,
         None,
     )
@@ -394,7 +394,7 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/999999/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/material/999999/release"),
         &admin,
         None,
     )
@@ -463,7 +463,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -500,7 +500,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"),
+            &format!("/api/einsaetze/{einsatz}/units/{eid}"),
             &admin,
             None
         )
@@ -814,7 +814,7 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/material/{em}/release"),
                 &admin,
                 None,
             )
@@ -1129,7 +1129,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1160,7 +1160,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1171,7 +1171,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
         &admin,
         Some(&zwei_orte.to_string()),
     )
@@ -1210,7 +1210,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+                &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
                 &cookie,
                 Some(&vorzustand),
             )
@@ -1222,7 +1222,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/release"),
         &admin,
         None,
     )
@@ -1730,7 +1730,7 @@ async fn aufteilen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/aufteilen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/split"),
         cookie,
         Some(body),
     )
@@ -2275,7 +2275,7 @@ async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         cookie,
         Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
     )
@@ -2288,7 +2288,7 @@ async fn br_status(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, stat
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -2300,7 +2300,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(&format!(r#"{{"adhoc":{{"funkrufname":"{funkrufname}"}}}}"#)),
     )
@@ -2814,7 +2814,7 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{aufgeloest}"),
+        &format!("/api/einsaetze/{einsatz}/units/{aufgeloest}"),
         &admin,
         None,
     )
@@ -3414,7 +3414,7 @@ async fn stamm_geraet_mit_bestandsnummer_bleibt_geraet() {
 
 // ── Vorhandenen Posten mit einer Nachforderung verknüpfen (LLH-1259) ─────────────────────
 
-/// `POST …/material/{em}/nachforderung` mit rohem Body.
+/// `POST …/material/{em}/resource-request` mit rohem Body.
 async fn verknuepfen_roh(
     app: &axum::Router,
     cookie: &str,
@@ -3425,7 +3425,7 @@ async fn verknuepfen_roh(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/nachforderung"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/resource-request"),
         cookie,
         Some(body),
     )
@@ -3744,12 +3744,12 @@ async fn verknuepfen_mit_vorhandenem_posten_braucht_ergaenzen() {
 
 // ── Fehlzuordnung lösen (LLH-1403) ───────────────────────────────────────────────────────
 
-/// `DELETE …/material/{em}/nachforderung`.
+/// `DELETE …/material/{em}/resource-request`.
 async fn loesen(app: &axum::Router, cookie: &str, einsatz: i64, em: i64) -> (StatusCode, Value) {
     anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/nachforderung"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/resource-request"),
         cookie,
         None,
     )
@@ -3975,7 +3975,7 @@ async fn nach_dem_loesen_verknuepft_rueckgaengig_wieder() {
 }
 
 /// Spec `material-modell`, „Ein Schreibweg für den Ort“, Scenario „Frühere Einheiten-Route“
-/// (LLH-1253): `PUT`/`DELETE …/einheiten/{eid}/material/{em}` gibt es nicht mehr. Beide sind 404,
+/// (LLH-1253): `PUT`/`DELETE …/units/{eid}/material/{em}` gibt es nicht mehr. Beide sind 404,
 /// der Posten bleibt, wo er war, und kein ETB-Eintrag entsteht.
 #[tokio::test]
 async fn fruehere_einheiten_materialroute_ist_404_und_schreibt_nichts() {
@@ -4000,7 +4000,7 @@ async fn fruehere_einheiten_materialroute_ist_404_und_schreibt_nichts() {
         let (s, _) = anfrage(
             &app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{em}"),
+            &format!("/api/einsaetze/{einsatz}/units/{a}/material/{em}"),
             &admin,
             None,
         )
@@ -4050,7 +4050,7 @@ async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{em}"),
+        &format!("/api/einsaetze/{einsatz}/units/{a}/material/{em}"),
         &frieda,
         None,
     )
@@ -4288,7 +4288,7 @@ async fn material_etb_eintraege_gehen_live_hinaus() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
         &admin,
         Some(&json["vorzustand"].to_string()),
     )

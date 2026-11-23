@@ -37,7 +37,7 @@ async fn welt() -> Welt {
         let (s, v) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/mitglieder/{id}"),
+            &format!("/api/einsaetze/{einsatz}/members/{id}"),
             &admin,
             Some(
                 &json!({ "einsatz_rolle": "fuehrungspersonal", "fuehrungsfunktion": funktion })
@@ -83,7 +83,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/fahrzeuge", self.einsatz),
+            &format!("/api/einsaetze/{}/vehicles", self.einsatz),
             &self.admin,
             Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
         )
@@ -98,7 +98,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PATCH",
-            &format!("/api/einsaetze/{}/fahrzeuge/{ef}", self.einsatz),
+            &format!("/api/einsaetze/{}/vehicles/{ef}", self.einsatz),
             cookie,
             Some(&json!({ "status_id": sid }).to_string()),
         )
@@ -114,7 +114,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/einheiten/{einheit}/status", self.einsatz),
+            &format!("/api/einsaetze/{}/units/{einheit}/status", self.einsatz),
             &self.admin,
             Some(&json!({ "status_id": sid }).to_string()),
         )
@@ -233,7 +233,7 @@ async fn patch_ohne_status_bleibt_still() {
     let (s, v) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/fahrzeuge/{ef}", w.einsatz),
+        &format!("/api/einsaetze/{}/vehicles/{ef}", w.einsatz),
         &w.admin,
         Some(r#"{"bemerkung":"Tank halb voll"}"#),
     )
@@ -277,7 +277,7 @@ async fn abgeleiteter_einheitenstatus_meldet_nicht_noch_einmal() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/einheiten/{e}/fahrzeug/{ef}", w.einsatz),
+        &format!("/api/einsaetze/{}/units/{e}/vehicles/{ef}", w.einsatz),
         &w.admin,
         None,
     )
@@ -297,7 +297,7 @@ async fn s4_bekommt_nichts() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/fahrzeuge", w.einsatz),
+        &format!("/api/einsaetze/{}/vehicles", w.einsatz),
         &w.cookie("veronika").await,
         None,
     )

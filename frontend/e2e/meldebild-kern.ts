@@ -27,7 +27,7 @@ export { einsatzAnlegen } from './einsatz-kern';
  */
 export async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
   for (let i = 0; i < anzahl; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
       data: {
         adhoc: {
           name: `Kirchgassner-Wohlfahrt, Maximiliane ${i}`,
@@ -74,23 +74,23 @@ export async function seedKraeftebaum(page: Page, einsatzId: string): Promise<Ge
       `Zuordnung ${pfad}: ${antwort.status()} ${await antwort.text()}`,
     ).toBeTruthy();
   };
-  const zug = await neu('/einheiten', { name: '1. Zug Musterstadt-Nordwest' });
-  const gruppe = await neu('/einheiten', {
+  const zug = await neu('/units', { name: '1. Zug Musterstadt-Nordwest' });
+  const gruppe = await neu('/units', {
     name: '1. Gruppe Musterstadt-Nordwest',
     ueber_einheit_id: zug,
   });
-  const fahrzeug = await neu('/fahrzeuge', {
+  const fahrzeug = await neu('/vehicles', {
     adhoc: { funkrufname: 'Florian Musterstadt 1/46-1', fahrzeugtyp: 'HLF 20' },
   });
-  const fuehrer = await neu('/personal', {
+  const fuehrer = await neu('/personnel', {
     adhoc: { name: 'Zugführerin Berger', funktion: 'Zugführerin', staerke_position: 'fuehrer' },
   });
-  const helfer = await neu('/personal', {
+  const helfer = await neu('/personnel', {
     adhoc: { name: 'Helfer Okafor', staerke_position: 'mannschaft' },
   });
-  await setze(`/einheiten/${zug}/fahrzeug/${fahrzeug}`);
-  await setze(`/einheiten/${zug}/personal/${fuehrer}`);
-  await setze(`/fahrzeuge/${fahrzeug}/besatzung/${fuehrer}`);
-  await setze(`/einheiten/${gruppe}/personal/${helfer}`);
+  await setze(`/units/${zug}/vehicles/${fahrzeug}`);
+  await setze(`/units/${zug}/personnel/${fuehrer}`);
+  await setze(`/vehicles/${fahrzeug}/crew/${fuehrer}`);
+  await setze(`/units/${gruppe}/personnel/${helfer}`);
   return { zug, gruppe, fahrzeug, fuehrer, helfer };
 }

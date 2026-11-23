@@ -398,7 +398,7 @@ for (const flaeche of [
     const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
     const kopplung = await anlegen<{ code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/geraete`,
+      `/api/einsaetze/${e}/devices`,
       {
         ansicht: 'verpflegung',
         bezeichnung: 'Ausgabe Deich',
@@ -687,7 +687,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     // Die Kopplung endet in 45 min: „Kopplung noch 45 min“ ist die breiteste Restzeit (LLH-1734).
     const kopplung = await anlegen<{ code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/geraete`,
+      `/api/einsaetze/${e}/devices`,
       {
         ansicht: 'verpflegung',
         bezeichnung: 'Ausgabe Deich',

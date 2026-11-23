@@ -7,7 +7,7 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
 
-const PFAD = '/api/einsaetze/1/abloesungen/schichtplan';
+const PFAD = '/api/einsaetze/1/reliefs/shift-plan';
 
 const uhsVorlage: SchichtplanWechselVorlage = {
   block_id: 5,

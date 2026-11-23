@@ -93,7 +93,7 @@ async fn einheit_beim_anlegen_mit_name_und_abschnitt_aus_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/einheiten/{streife}"),
+        &format!("/api/einsaetze/{e}/units/{streife}"),
         &admin,
         Some(&json!({ "abschnitt_id": abschnitt }).to_string()),
     )
@@ -293,7 +293,7 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/einheiten/{streife}"),
+        &format!("/api/einsaetze/{e}/units/{streife}"),
         &admin,
         None,
     )
@@ -346,7 +346,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/{streife}/stornieren"),
+        &format!("/api/einsaetze/{e}/units/{streife}/cancel"),
         &admin,
         None,
     )
@@ -373,7 +373,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/{leer}/stornieren"),
+        &format!("/api/einsaetze/{e}/units/{leer}/cancel"),
         &admin,
         None,
     )
@@ -398,7 +398,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/einheiten/{a}"),
+        &format!("/api/einsaetze/{e}/units/{a}"),
         &admin,
         Some(&json!({ "abschnitt_id": abschnitt }).to_string()),
     )
@@ -407,7 +407,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/einheiten/{weg}"),
+        &format!("/api/einsaetze/{e}/units/{weg}"),
         &admin,
         None,
     )
@@ -527,7 +527,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/geraete"),
+        &format!("/api/einsaetze/{e}/devices"),
         admin,
         Some(&json!({"ansicht": ansicht, "uhs_id": uhs, "bezeichnung": "Gerät 1"}).to_string()),
     )

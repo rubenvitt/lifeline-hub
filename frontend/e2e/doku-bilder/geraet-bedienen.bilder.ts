@@ -48,7 +48,7 @@ function endeIn(minuten: number): string {
 
 /** Legt eine Kopplung als Einsatzleitung an. */
 async function kopplungAnlegen(page: Page, einsatz: number, daten: object): Promise<Kopplung> {
-  return fuelle<Kopplung>(page, 'post', `/api/einsaetze/${einsatz}/geraete`, daten);
+  return fuelle<Kopplung>(page, 'post', `/api/einsaetze/${einsatz}/devices`, daten);
 }
 
 /** Eigener Browserkontext für das Gerät (eigener Cookie-Jar), Uhr angehalten. */
@@ -196,7 +196,7 @@ test.describe(KAPITEL, () => {
     const { kontext, geraet } = await geraetOeffnen(browser);
     try {
       await koppeln(geraet, k.code.code);
-      await fuelle(page, 'post', `/api/einsaetze/${demo.id}/geraete/${k.kopplung.id}/widerrufen`);
+      await fuelle(page, 'post', `/api/einsaetze/${demo.id}/devices/${k.kopplung.id}/revoke`);
       // Ohne Neuladen: der Server schließt den Einsatzstrom, das Gerät prüft seine Sitzung.
       await expect(geraet).toHaveURL(/\/kopplung-beendet$/);
       const karte = geraet.locator('.login-karte');

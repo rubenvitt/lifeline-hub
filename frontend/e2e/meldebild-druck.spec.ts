@@ -346,7 +346,7 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   await seedeKraefte(page, einsatzId, KRAEFTE_LESBAR);
   // Eine Einheit mit langem Auftrag: der Auftrag wirbt um Breite, die Einheitenspalte muss ihren
   // Anteil trotzdem halten (ohne ihn verteilte die Tabelle allein nach Inhalt).
-  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
     data: { name: EINHEIT_LESBAR },
   });
   expect(einheit.ok(), `Seeding Einheit: ${einheit.status()}`).toBeTruthy();

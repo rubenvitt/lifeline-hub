@@ -41,14 +41,14 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
   await anmeldenAlsAdmin(page);
   const einsatz = await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR ${Date.now()}` });
   const e = einsatz.id;
-  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, { bezeichnung: 'BR Schule' });
-  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'LF Nord' });
+  await anlegen(page, `/api/einsaetze/${e}/staging-areas`, { bezeichnung: 'BR Schule' });
+  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'LF Nord' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: sportplatz.id, bezeichnung: 'Tablet BR' },
   );
 
@@ -115,9 +115,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await expect(tablet.getByText('Raum voll, weitere Kräfte zum BR Schule')).toBeVisible();
 
     // Die Einsatzleitung sieht den Raum als Status „aktiv“ und die Meldung mit dem Raum als Absender.
-    const raum = await page.request.get(
-      `/api/einsaetze/${e}/bereitstellungsraeume/${sportplatz.id}`,
-    );
+    const raum = await page.request.get(`/api/einsaetze/${e}/staging-areas/${sportplatz.id}`);
     expect(((await raum.json()) as { status: string }).status).toBe('aktiv');
     const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
@@ -130,7 +128,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     const kopf = tablet.locator('[data-lfh="kopf-stelle"]');
     await expect(kopf).toContainText('BR Sportplatz');
     const umbenannt = await page.request.patch(
-      `/api/einsaetze/${e}/bereitstellungsraeume/${sportplatz.id}`,
+      `/api/einsaetze/${e}/staging-areas/${sportplatz.id}`,
       { data: { bezeichnung: 'BR Festwiese' } },
     );
     expect(umbenannt.ok(), `${umbenannt.status()} ${await umbenannt.text()}`).toBeTruthy();
@@ -162,10 +160,10 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
   const e = (
     await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR Material ${Date.now()}` })
   ).id;
-  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  const schule = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const schule = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Schule',
   });
   await anlegen(page, `/api/einsaetze/${e}/material`, {
@@ -179,7 +177,7 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
     br_id: schule.id,
   });
   await anlegen(page, `/api/einsaetze/${e}/material`, { adhoc: { bezeichnung: 'Stromerzeuger' } });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'bereitstellungsraum',
     stelle_id: sportplatz.id,
     bezeichnung: 'Tablet BR',
@@ -237,17 +235,17 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
     bezeichnung: `E2E BR Tor ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
   await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
-  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Musterstadt' });
+  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Musterstadt' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
 
@@ -292,7 +290,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   }
 
   // Die Führung am Desktop.
-  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as {
+  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as {
     id: number;
     name: string;
   }[];
@@ -341,21 +339,21 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     bezeichnung: `E2E BR offline ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'LF Nachbarort' });
+  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'LF Nachbarort' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
   const einheitenNamens = async (name: string) =>
     (
-      (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as { name: string }[]
+      (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as { name: string }[]
     ).filter((x) => x.name === name).length;
 
   const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
@@ -384,14 +382,14 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     await expect(belegung.getByText('LF Nachbarort', { exact: true })).toBeVisible();
 
     // Abgerissene Antwort: der Server bucht, die Antwort erreicht das Tablet nicht.
-    const pfad = `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/eintreffen`;
+    const pfad = `/api/einsaetze/${e}/staging-areas/${raum.id}/arrival`;
     const angekommen: number[] = [];
     tablet.on('response', (r) => {
       if (new URL(r.url()).pathname === pfad) angekommen.push(r.status());
     });
     let ersterStatus = 0;
     await tablet.route(
-      `**/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/eintreffen`,
+      `**/api/einsaetze/${e}/staging-areas/${raum.id}/arrival`,
       async (route) => {
         ersterStatus = (await route.fetch()).status();
         await route.abort('connectionreset');
@@ -427,7 +425,7 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     'genau eine Meldung an die Einsatzleitung',
   ).toHaveLength(1);
   const detail = (await (
-    await page.request.get(`/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}`)
+    await page.request.get(`/api/einsaetze/${e}/staging-areas/${raum.id}`)
   ).json()) as { einheiten: { name: string }[] };
   expect(detail.einheiten.map((x) => x.name).sort()).toEqual([
     'Florian Nachbar 7',
@@ -453,22 +451,22 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
     bezeichnung: `E2E BR Abruf ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
   const deich = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Deich' });
-  const hlf = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Deich' });
-  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/belegung`, {
+  const hlf = await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Deich' });
+  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/occupancy`, {
     objekt_typ: 'einheit',
     objekt_id: hlf.id,
     art: 'eintritt',
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
 
@@ -526,7 +524,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
   }
 
   // Unterstellt und in keinem Raum mehr.
-  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as {
+  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as {
     id: number;
     abschnitt_id: number | null;
     aktueller_br_id: number | null;

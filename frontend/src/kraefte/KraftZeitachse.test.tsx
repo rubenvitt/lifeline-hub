@@ -15,7 +15,7 @@ import type { Zeitachse } from '../api/types';
 import KraftZeitachse, { ZEITACHSE_RECHTE_TEXT } from './KraftZeitachse';
 import { tippeZeit } from '../test/zeitEingabe';
 
-const PFAD = '/api/einsaetze/1/personal/7/zeitachse';
+const PFAD = '/api/einsaetze/1/personnel/7/timeline';
 
 const ZEITACHSE: Zeitachse = {
   ereignisse: [

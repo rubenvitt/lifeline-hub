@@ -57,12 +57,12 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const mitglieder = (await (
-      await page.request.get(`/api/einsaetze/${demo.id}/mitglieder`)
+      await page.request.get(`/api/einsaetze/${demo.id}/members`)
     ).json()) as { benutzer_id: number; einsatz_rolle: string; fuehrungsfunktion: string | null }[];
     const leitung = mitglieder.find((m) => m.einsatz_rolle === 'einsatzleitung');
     expect(leitung, 'der Demo-Einsatz hat eine Einsatzleitung').toBeDefined();
     if (!leitung!.fuehrungsfunktion) {
-      await fuelle(page, 'put', `/api/einsaetze/${demo.id}/mitglieder/${leitung!.benutzer_id}`, {
+      await fuelle(page, 'put', `/api/einsaetze/${demo.id}/members/${leitung!.benutzer_id}`, {
         einsatz_rolle: 'einsatzleitung',
         fuehrungsfunktion: 'el',
         fuehrungsstelle: null,

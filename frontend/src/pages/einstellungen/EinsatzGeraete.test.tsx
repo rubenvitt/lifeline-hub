@@ -76,7 +76,7 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/geraete', () => {
+    http.get('/api/einsaetze/1/devices', () => {
       gelesen.push('geraete');
       return HttpResponse.json({
         kopplungen: a.kopplungen ?? [kopplung(1, 'aktiv')],
@@ -100,7 +100,7 @@ function stelleBereit(a: Aufbau = {}) {
         ],
       }),
     ),
-    http.post('/api/einsaetze/1/geraete', async ({ request }) => {
+    http.post('/api/einsaetze/1/devices', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'anlegen', body });
       return HttpResponse.json(
@@ -111,7 +111,7 @@ function stelleBereit(a: Aufbau = {}) {
         { status: 201 },
       );
     }),
-    http.post('/api/einsaetze/1/geraete/1/widerrufen', () => {
+    http.post('/api/einsaetze/1/devices/1/revoke', () => {
       aufrufe.push({ pfad: 'widerrufen', body: null });
       return HttpResponse.json(
         kopplung(1, 'widerrufen', {
@@ -439,7 +439,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       let body: Record<string, unknown> | null = null;
       stelleBereit();
       server.use(
-        http.post('/api/einsaetze/1/geraete/1/verlaengern', async ({ request }) => {
+        http.post('/api/einsaetze/1/devices/1/extend', async ({ request }) => {
           body = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(kopplung(1, 'aktiv', { laeuft_ab_at: body.laeuft_ab_at }));
         }),
@@ -788,7 +788,7 @@ describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
   it('öffnet die Kopplung mit Ansicht und Einheit vorbelegt', async () => {
     const { aufrufe } = stelleBereit({ kopplungen: [], ansichten: MIT_EINHEIT });
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([
           { id: 11, name: 'Fußtrupp 1', funkrufname: 'Rotkreuz Musterstadt 74/1' },
           { id: 12, name: 'Melder' },
@@ -809,7 +809,7 @@ describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
   it('öffnet „Gerät koppeln“ danach wieder leer', async () => {
     stelleBereit({ kopplungen: [], ansichten: MIT_EINHEIT });
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([
           { id: 11, name: 'Fußtrupp 1', funkrufname: 'Rotkreuz Musterstadt 74/1' },
         ]),

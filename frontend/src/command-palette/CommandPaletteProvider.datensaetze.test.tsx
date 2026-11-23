@@ -53,9 +53,9 @@ beforeEach(() => {
     http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/meldungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/auftraege', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/fahrzeuge', () => HttpResponse.json([FAHRZEUG])),
-    http.get('/api/einsaetze/:id/personal', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([FAHRZEUG])),
+    http.get('/api/einsaetze/:id/personnel', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/etb', () => HttpResponse.json([ETB])),
   );
 });
@@ -212,7 +212,7 @@ describe('Kommandopalette Â· Rangvorteil des Moduls, in dem man steht (LFH-391 Â
    */
   async function florianZeilen(route: string): Promise<string[]> {
     const u = userEvent.setup();
-    server.use(http.get('/api/einsaetze/:id/personal', () => HttpResponse.json([KRAFT])));
+    server.use(http.get('/api/einsaetze/:id/personnel', () => HttpResponse.json([KRAFT])));
     zeigePalette(route);
 
     await suche(u, 'florian');

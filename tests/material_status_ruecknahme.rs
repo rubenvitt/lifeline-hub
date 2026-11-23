@@ -57,7 +57,7 @@ async fn zuruecknehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/status/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/status/undo"),
         c,
         Some(&beleg.to_string()),
     )
@@ -142,7 +142,7 @@ async fn materialstatus_nach_aufteilen_409_und_teilzeile_ohne_beleg() {
     let (s, teil) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/aufteilen"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/split"),
         &admin,
         Some(r#"{"menge":3}"#),
     )

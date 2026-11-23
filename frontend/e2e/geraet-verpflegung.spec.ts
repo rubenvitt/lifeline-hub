@@ -47,7 +47,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'verpflegung', bezeichnung: 'Ausgabe Deich' },
   );
 
@@ -145,7 +145,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     );
 
     // Widerruf durch die Einsatzleitung: das Gerät endet von selbst, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/geraete/${kopplung.kopplung.id}/widerrufen`);
+    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/);
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
   } finally {
@@ -187,7 +187,7 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
     data: { stelle_ids: [feldkueche] },
   });
   expect(zuordnung.ok(), `Zuordnung: ${zuordnung.status()}`).toBeTruthy();
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'verpflegung',
     bezeichnung: 'Ausgabe Turnhalle',
   });

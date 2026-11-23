@@ -22,7 +22,7 @@ const CSV: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stad
 const XLSX: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stadtfest.xlsx");
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan")
+    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
 }
 
 /// Demo-Lage Stadtfest importieren; liefert den Einsatz.
@@ -161,7 +161,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         &admin,
         None,
     )

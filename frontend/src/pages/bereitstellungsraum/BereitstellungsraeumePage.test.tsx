@@ -111,7 +111,7 @@ describe('BereitstellungsraeumePage', () => {
   it('zeigt die Bereitstellungsräume der Lage', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([br()])),
     );
     renderPage();
     expect(await screen.findByText('BR Ost')).toBeInTheDocument();
@@ -125,10 +125,7 @@ describe('BereitstellungsraeumePage', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get(
-        '/api/einsaetze/1/bereitstellungsraeume',
-        () => new HttpResponse(null, { status: 500 }),
-      ),
+      http.get('/api/einsaetze/1/staging-areas', () => new HttpResponse(null, { status: 500 })),
     );
     renderPage();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
@@ -138,7 +135,7 @@ describe('BereitstellungsraeumePage', () => {
   it('zeigt bei leerer Liste den Leertext und KEINEN Fehler', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
     );
     renderPage();
     expect(await screen.findByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
@@ -156,16 +153,13 @@ describe('BereitstellungsraeumePage', () => {
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([br()])),
     );
     const { client } = renderPage();
     await screen.findByText('BR Ost');
 
     server.use(
-      http.get(
-        '/api/einsaetze/1/bereitstellungsraeume',
-        () => new HttpResponse(null, { status: 500 }),
-      ),
+      http.get('/api/einsaetze/1/staging-areas', () => new HttpResponse(null, { status: 500 })),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
@@ -184,7 +178,7 @@ describe('BereitstellungsraeumePage', () => {
   it('behandelt eine ausschließlich stornierte Liste als Leerzustand', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([br({ storniert_at: '2026-07-29 10:00:00' })]),
       ),
     );
@@ -202,7 +196,7 @@ describe('BereitstellungsraeumePage', () => {
   it('misst an der ungefilterten Menge: alles storniert + Fehler ergibt Banner, nicht Seitenfehler', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([br({ storniert_at: '2026-07-29 10:00:00' })]),
       ),
     );
@@ -210,10 +204,7 @@ describe('BereitstellungsraeumePage', () => {
     await screen.findByText('Noch keine Bereitstellungsräume erfasst');
 
     server.use(
-      http.get(
-        '/api/einsaetze/1/bereitstellungsraeume',
-        () => new HttpResponse(null, { status: 500 }),
-      ),
+      http.get('/api/einsaetze/1/staging-areas', () => new HttpResponse(null, { status: 500 })),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
@@ -233,7 +224,7 @@ describe('BereitstellungsraeumePage', () => {
     function mitListe(e: EinsatzAnzeige = einsatz()) {
       server.use(
         http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
-        http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+        http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([br()])),
       );
     }
 
@@ -276,7 +267,7 @@ describe('BereitstellungsraeumePage', () => {
       let e = einsatz();
       server.use(
         http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
-        http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+        http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([br()])),
       );
       const { client } = renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1', {
         adresseSteht: true,
@@ -320,8 +311,8 @@ describe('BereitstellungsraeumePage', () => {
     let body: unknown = null;
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume', async ({ request }) => {
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(br({ id: 2, bezeichnung: 'BR West' }), { status: 201 });
       }),
@@ -340,7 +331,7 @@ describe('BereitstellungsraeumePage', () => {
       http.get('/api/einsaetze/:einsatzId', ({ params }) =>
         HttpResponse.json(einsatz({ id: Number(params.einsatzId) })),
       ),
-      http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:einsatzId/staging-areas', () => HttpResponse.json([])),
     );
     renderWechselPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
@@ -358,7 +349,7 @@ describe('BereitstellungsraeumePage', () => {
   it('schließt den BR-Dialog mit Provider per Escape und setzt das Formular zurück', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
     );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
@@ -375,8 +366,8 @@ describe('BereitstellungsraeumePage', () => {
   it('lässt den Dialog und die Bezeichnung bei einem Anlegefehler stehen', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json({ error: 'Bereitstellungsraum abgelehnt' }, { status: 500 }),
       ),
     );
@@ -403,8 +394,8 @@ describe('BereitstellungsraeumePage', () => {
     });
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume', async () => {
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(br({ id: 22 }), { status: 201 });
@@ -439,8 +430,8 @@ describe('BereitstellungsraeumePage', () => {
       http.get('/api/einsaetze/:einsatzId', ({ params }) =>
         HttpResponse.json(einsatz({ id: Number(params.einsatzId) })),
       ),
-      http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/bereitstellungsraeume', async () => {
+      http.get('/api/einsaetze/:einsatzId/staging-areas', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/staging-areas', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(br({ id: 23 }), { status: 201 });
@@ -548,8 +539,8 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
   function stelleBereit(raeume: BrListenEintrag[], einheiten: () => Response) {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(raeume)),
-      http.get('/api/einsaetze/1/einheiten', einheiten),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json(raeume)),
+      http.get('/api/einsaetze/1/units', einheiten),
     );
   }
 
@@ -719,8 +710,8 @@ describe('BereitstellungsraeumePage · Sortieren und Filtern (LLH-1096)', () => 
     setzeViewportBreite(1366);
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([OST, WEST])),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([OST, WEST])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
     );
   });
 

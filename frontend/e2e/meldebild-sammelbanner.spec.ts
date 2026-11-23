@@ -84,7 +84,7 @@ for (const viewport of BREITEN) {
     await ruheShifts(page);
     await setzeShiftsZurueck(page);
 
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
       data: { name: '2. Zug Musterstadt-Südost' },
     });
     expect(antwort.ok(), `Seeding Einheit: ${antwort.status()}`).toBeTruthy();

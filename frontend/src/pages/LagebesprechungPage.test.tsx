@@ -142,7 +142,7 @@ function rendere({
       if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/1/personal', () => {
+    http.get('/api/einsaetze/1/personnel', () => {
       zaehle('personal');
       return HttpResponse.json(lage.personal ?? []);
     }),

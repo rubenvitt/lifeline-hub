@@ -266,7 +266,7 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Fokus B2 ${Date.now()}`);
   for (let i = 0; i < 12; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
       data: {
         adhoc: {
           name: `Kirchgassner-Wohlfahrt, Maximiliane ${i}`,
@@ -338,7 +338,7 @@ test('Datensicht: kein Fokusziel verschwindet hinter der rechts fixierten Aktion
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Fokus Aktion ${Date.now()}`);
   for (let i = 0; i < 8; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
       data: {
         adhoc: {
           funkrufname: `Florian Musterstadt-Nordwest 44/${i}`,
@@ -2275,7 +2275,7 @@ test('Erste Zeile (LLH-1358): Einheiten — rückwärts steht kein Ziel unter de
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 14;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
       data: { name: `Einheit ${String(n).padStart(2, '0')}` },
     });
     expect(einheit.ok(), await einheit.text()).toBeTruthy();

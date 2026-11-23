@@ -249,7 +249,7 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/einheiten"),
+            &format!("/api/einsaetze/{einsatz}/units"),
             &admin,
             Some(&format!(r#"{{"name":"{name}"}}"#)),
         )

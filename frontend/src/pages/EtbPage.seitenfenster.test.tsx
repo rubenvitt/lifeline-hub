@@ -138,8 +138,8 @@ function setup(route: string) {
       }),
     ),
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     http.get('/api/benutzer-einstellungen', () =>
       HttpResponse.json({

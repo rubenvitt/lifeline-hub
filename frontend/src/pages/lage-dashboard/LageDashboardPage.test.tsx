@@ -207,9 +207,9 @@ function mockEndpunkte(d: Daten) {
       return new HttpResponse(null, { status: d.matrixStatus });
     }),
     http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte, 'lageberichte')),
-    http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten, 'einheiten')),
-    http.get('/api/einsaetze/1/personal', () => json(d.personal, 'personal')),
-    http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge, 'fahrzeuge')),
+    http.get('/api/einsaetze/1/units', () => json(d.einheiten, 'einheiten')),
+    http.get('/api/einsaetze/1/personnel', () => json(d.personal, 'personal')),
+    http.get('/api/einsaetze/1/vehicles', () => json(d.fahrzeuge, 'fahrzeuge')),
     http.get('/api/einsaetze/1/material', () => json(d.material, 'material')),
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte, 'abschnitte')),
     http.get('/api/einsaetze/1/modul-zaehler', () =>

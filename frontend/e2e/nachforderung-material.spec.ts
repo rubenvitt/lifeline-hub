@@ -34,7 +34,7 @@ async function seed(page: Page) {
   });
   const einsatzId = String(id);
   const basis = `/api/einsaetze/${einsatzId}`;
-  await post(page, `${basis}/einheiten`, { name: 'Staffel A' });
+  await post(page, `${basis}/units`, { name: 'Staffel A' });
   const nf = await post(page, `${basis}/nachforderungen`, {
     art: 'Tauchpumpe',
     bezeichnung: BEDARF,
@@ -127,7 +127,7 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
   await waehleIn(dialog.getByRole('combobox', { name: 'Posten' }), 'Tauchpumpe THW · 1 · ohne Ort');
   const antwort = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`${basis}/material/${posten.id}/nachforderung`) &&
+      r.url().endsWith(`${basis}/material/${posten.id}/resource-request`) &&
       r.request().method() === 'POST',
   );
   await dialog.getByRole('button', { name: 'Zuordnen' }).click();
@@ -181,7 +181,7 @@ test('Fehlzuordnung in der Materialliste lösen: der Posten bleibt, die Rücknah
     adhoc: { bezeichnung: 'Tauchpumpe THW' },
     menge: 1,
   });
-  await post(page, `${basis}/material/${posten.id}/nachforderung`, { nachforderung_id: nfId });
+  await post(page, `${basis}/material/${posten.id}/resource-request`, { nachforderung_id: nfId });
 
   await page.goto(`/einsaetze/${einsatzId}/material`);
   const zeile = page
@@ -191,7 +191,7 @@ test('Fehlzuordnung in der Materialliste lösen: der Posten bleibt, die Rücknah
   await zeile.getByRole('button', { name: 'Weitere Aktionen zu Tauchpumpe THW' }).click();
   const antwort = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`${basis}/material/${posten.id}/nachforderung`) &&
+      r.url().endsWith(`${basis}/material/${posten.id}/resource-request`) &&
       r.request().method() === 'DELETE',
   );
   await page.getByRole('menuitem', { name: 'Von Nachforderung lösen' }).click();

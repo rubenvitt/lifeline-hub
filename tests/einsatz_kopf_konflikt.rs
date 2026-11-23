@@ -242,7 +242,7 @@ async fn geraet(app: &axum::Router, admin: &str, einsatz: i64, body: Value) -> S
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         admin,
         Some(&body),
     )
@@ -273,7 +273,7 @@ async fn geraet_bekommt_keine_vermerke() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}"),
         &admin,
         Some(&json!({"funkrufname": "Florian 1"})),
     )
@@ -301,7 +301,7 @@ async fn geraet_bekommt_keine_vermerke() {
         for pfad in [
             format!("/api/einsaetze/{einsatz}"),
             format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
-            format!("/api/einsaetze/{einsatz}/einheiten"),
+            format!("/api/einsaetze/{einsatz}/units"),
         ] {
             let (s, j) = anfrage(&app, "GET", &pfad, &cookie, None).await;
             if s != StatusCode::OK {

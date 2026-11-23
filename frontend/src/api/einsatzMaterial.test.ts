@@ -79,7 +79,7 @@ describe('api/einsatzMaterial — vorhandenen Posten verknüpfen (LLH-1259 D1)',
   it('sendet die Nachforderung an den eigenen Schreibweg, ergaenzen nur als true', async () => {
     const aufrufe: { pfad: string; koerper: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/:id/material/:em/nachforderung', async ({ request, params }) => {
+      http.post('/api/einsaetze/:id/material/:em/resource-request', async ({ request, params }) => {
         aufrufe.push({
           pfad: `${String(params.id)}/${String(params.em)}`,
           koerper: await request.json(),
@@ -100,13 +100,16 @@ describe('api/einsatzMaterial — Fehlzuordnung lösen (LLH-1403 D1)', () => {
   it('sendet DELETE auf den Bezug, ohne Körper', async () => {
     const aufrufe: { pfad: string; koerper: string }[] = [];
     server.use(
-      http.delete('/api/einsaetze/:id/material/:em/nachforderung', async ({ request, params }) => {
-        aufrufe.push({
-          pfad: `${String(params.id)}/${String(params.em)}`,
-          koerper: await request.text(),
-        });
-        return HttpResponse.json({ id: Number(params.em), nachforderung_id: null });
-      }),
+      http.delete(
+        '/api/einsaetze/:id/material/:em/resource-request',
+        async ({ request, params }) => {
+          aufrufe.push({
+            pfad: `${String(params.id)}/${String(params.em)}`,
+            koerper: await request.text(),
+          });
+          return HttpResponse.json({ id: Number(params.em), nachforderung_id: null });
+        },
+      ),
     );
     await expect(loeseNachforderung(5, 7)).resolves.toMatchObject({ id: 7 });
     expect(aufrufe).toEqual([{ pfad: '5/7', koerper: '' }]);

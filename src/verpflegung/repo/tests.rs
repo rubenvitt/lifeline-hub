@@ -1513,7 +1513,7 @@ async fn ausgabe_ohne_empfaenger_serialisiert_ohne_die_felder() {
 }
 
 /// Spec „Liste mit Gliederung und Stärke“: Zug „Florian 1“ (1/0/1) mit zwei Gruppen (je 0/1/8)
-/// ergibt kumuliert 1/2/17. Die Stärken sind dieselben wie in `GET …/einheiten` (eine Heimat je
+/// ergibt kumuliert 1/2/17. Die Stärken sind dieselben wie in `GET …/units` (eine Heimat je
 /// Zahl); Abschnitte mit Über-Abschnitt; nichts aus einem anderen Einsatz.
 #[tokio::test]
 async fn empfaenger_mit_gliederung_und_staerke() {

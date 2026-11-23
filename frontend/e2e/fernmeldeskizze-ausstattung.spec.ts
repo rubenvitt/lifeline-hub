@@ -67,7 +67,7 @@ async function mitgliedMitFunktion(
   });
   expect(antwort.ok(), `Konto ${anzeigename}: ${antwort.status()}`).toBeTruthy();
   const { id } = (await antwort.json()) as { id: number };
-  await api(page, einsatzId).put(`mitglieder/${id}`, {
+  await api(page, einsatzId).put(`members/${id}`, {
     einsatz_rolle: 'fuehrungspersonal',
     fuehrungsfunktion: funktion,
   });
@@ -77,14 +77,14 @@ async function mitgliedMitFunktion(
 async function seedeAusstattung(page: Page, einsatzId: string) {
   const n = await seedeGrund(page, einsatzId);
   const a = api(page, einsatzId);
-  const leitung = (await a.post('personal', { adhoc: { name: LEITUNG } })).id;
+  const leitung = (await a.post('personnel', { adhoc: { name: LEITUNG } })).id;
   await a.patch(`abschnitte/${n.ea[0]}`, { leiter_id: leitung });
   const elw = (
-    await a.post('fahrzeuge', {
+    await a.post('vehicles', {
       adhoc: { funkrufname: 'Florian Musterstadt 11/1', fahrzeugtyp: 'ELW 1' },
     })
   ).id;
-  await a.put(`einheiten/${n.zug}/fahrzeug/${elw}`);
+  await a.put(`units/${n.zug}/vehicles/${elw}`);
   await mitgliedMitFunktion(page, einsatzId, S2_NAME, 's2');
   await mitgliedMitFunktion(page, einsatzId, 'Sabine Einsatz', 's3');
   await mitgliedMitFunktion(page, einsatzId, 'Lena Leitung', 'el');
@@ -171,11 +171,11 @@ test('Führungsstelle: der auf Einsatzdaten zugeordnete ELW 2 steht im Kasten �
   const a = api(page, einsatzId);
   // Am Zug des Abschnitts: ohne Zuordnung stünde er im Kasten des Abschnitts.
   const elw2 = (
-    await a.post('fahrzeuge', {
+    await a.post('vehicles', {
       adhoc: { funkrufname: 'Florian Musterstadt 10/1', fahrzeugtyp: 'ELW 2' },
     })
   ).id;
-  await a.put(`einheiten/${n.zug}/fahrzeug/${elw2}`);
+  await a.put(`units/${n.zug}/vehicles/${elw2}`);
 
   await page.goto(einsatzdatenPfad(Number(einsatzId)));
   const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
@@ -217,7 +217,7 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
   await mitgliedMitFunktion(page, einsatzId, 'Max Lagemann', 's2');
   let erstes = 0;
   for (let i = 1; i <= 8; i++) {
-    const leitung = (await a.post('personal', { adhoc: { name: `Leitung ${i}` } })).id;
+    const leitung = (await a.post('personnel', { adhoc: { name: `Leitung ${i}` } })).id;
     const ab = (
       await a.post('abschnitte', {
         name: `Einsatzabschnitt ${i} Nordwest`,
@@ -229,7 +229,7 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
     erstes ||= ab;
     for (let j = 1; j <= 3; j++) {
       const eh = (
-        await a.post('einheiten', {
+        await a.post('units', {
           name: `Einheit ${i}.${j}`,
           funkrufname: `Florian ${i}/${j}`,
           abschnitt_id: ab,
@@ -238,11 +238,11 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
       ).id;
       if (j === 1) {
         const fz = (
-          await a.post('fahrzeuge', {
+          await a.post('vehicles', {
             adhoc: { funkrufname: `Florian ${i}/11`, fahrzeugtyp: 'ELW 1' },
           })
         ).id;
-        await a.put(`einheiten/${eh}/fahrzeug/${fz}`);
+        await a.put(`units/${eh}/vehicles/${fz}`);
       }
     }
   }

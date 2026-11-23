@@ -114,8 +114,8 @@ export async function zonenAnlegen(page: Page, einsatzId: string, anzahl: number
 export async function einsatzMitLage(page: Page, bezeichnung: string): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, bezeichnung);
   const a = api(page, einsatzId);
-  const { id: einheit } = await a.post('einheiten', { name: 'LF Lageplan' });
-  await a.patch(`einheiten/${einheit}/position`, { lat: ORT.lat, lon: ORT.lon + 0.001 });
+  const { id: einheit } = await a.post('units', { name: 'LF Lageplan' });
+  await a.patch(`units/${einheit}/position`, { lat: ORT.lat, lon: ORT.lon + 0.001 });
   await a.post('zonen', {
     typ: 'gefahrengebiet',
     geometrie_typ: 'Polygon',

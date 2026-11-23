@@ -236,7 +236,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "eintreffen",
-        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+        "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
         &[("bid", "bereitstellungsraum")],
         &[
             BodyVerweis {

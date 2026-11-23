@@ -84,7 +84,7 @@ async fn anlegen(
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         cookie,
         Some(&body),
     )
@@ -123,7 +123,7 @@ async fn widerrufen(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete/{id}/widerrufen"),
+        &format!("/api/einsaetze/{einsatz}/devices/{id}/revoke"),
         cookie,
         None,
     )
@@ -170,7 +170,7 @@ async fn fuehrungspersonal_darf_nicht_koppeln() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &fp,
         None,
     )
@@ -248,7 +248,7 @@ async fn uebersicht_bietet_alle_ansichten() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         None,
     )
@@ -424,7 +424,7 @@ async fn einheit_anlegen(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         Some(&json!({"name": name, "abschnitt_id": abschnitt})),
     )
@@ -521,7 +521,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     let (s, v) = anfrage(&app, "GET", &format!("{basis}/abschnitte"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v, "name"), ["EA Nord", "UA Nord-Ost"]);
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/units"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v, "name"), ["1. Zug", "2. Zug"]);
 
@@ -549,7 +549,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let (_, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    let (_, v) = anfrage(&app, "GET", &format!("{basis}/units"), &geraet, None).await;
     assert_eq!(namen(&v, "name"), ["1. Zug"]);
 
     // Nicht gelistet: 403.
@@ -557,9 +557,9 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
         ("GET", format!("{basis}/etb")),
         ("GET", format!("{basis}/personen")),
         ("GET", format!("{basis}/uhs")),
-        ("GET", format!("{basis}/personal")),
+        ("GET", format!("{basis}/personnel")),
         ("PATCH", format!("{basis}/abschnitte/{}", l.nord)),
-        ("PUT", format!("{basis}/einheiten/{}/status", l.zug_nord)),
+        ("PUT", format!("{basis}/units/{}/status", l.zug_nord)),
         ("POST", format!("{basis}/auftraege")),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
@@ -1219,7 +1219,7 @@ async fn widerrufenes_abschnittsgeraet_verliert_jeden_zugriff() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (id, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let einheiten = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let einheiten = format!("/api/einsaetze/{}/units", l.einsatz);
     let (s, _) = anfrage(&app, "GET", &einheiten, &geraet, None).await;
     assert_eq!(s, StatusCode::OK);
     widerrufen(&app, &admin, l.einsatz, id).await;
@@ -1293,7 +1293,7 @@ async fn code_einloesen_gibt_eine_geraetesitzung() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         None,
     )
@@ -1398,7 +1398,7 @@ async fn neuer_code_beendet_das_alte_geraet() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete/{id}/code"),
+        &format!("/api/einsaetze/{einsatz}/devices/{id}/code"),
         &admin,
         None,
     )
@@ -1435,7 +1435,7 @@ async fn abgelaufene_kopplung_ist_401() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         None,
     )
@@ -1461,7 +1461,7 @@ async fn verlaengern_hebt_das_ende_an() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete/{id}/verlaengern"),
+        &format!("/api/einsaetze/{einsatz}/devices/{id}/extend"),
         &admin,
         Some(&json!({"laeuft_ab_at": ende})),
     )
@@ -1475,7 +1475,7 @@ async fn verlaengern_hebt_das_ende_an() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete/{id}/verlaengern"),
+        &format!("/api/einsaetze/{einsatz}/devices/{id}/extend"),
         &admin,
         Some(&json!({"laeuft_ab_at": zu_weit})),
     )
@@ -1653,7 +1653,7 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
 
     for (methode, uri) in [
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
-        ("GET", format!("/api/einsaetze/{einsatz}/geraete")),
+        ("GET", format!("/api/einsaetze/{einsatz}/devices")),
         ("GET", format!("/api/einsaetze/{einsatz}/modul-vorgaben")),
         ("GET", "/api/einsaetze".to_string()),
         ("GET", "/api/benutzer".to_string()),
@@ -1847,7 +1847,7 @@ async fn modulfreigabe_sperrt_zusaetzlich() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         None,
     )
@@ -1903,7 +1903,7 @@ async fn einsatzfuehrung_sperrt_das_geraet() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         None,
     )
@@ -1949,7 +1949,7 @@ async fn geraetekonto_ist_keine_person() {
         ("POST", format!("/api/benutzer/{konto}/totp/reset"), None),
         (
             "PUT",
-            format!("/api/einsaetze/{einsatz}/mitglieder/{konto}"),
+            format!("/api/einsaetze/{einsatz}/members/{konto}"),
             Some(r#"{"einsatz_rolle":"fuehrungspersonal"}"#),
         ),
     ] {
@@ -3212,7 +3212,7 @@ async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i6
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name, "funktion": "Notärztin"}})),
     )
@@ -3484,7 +3484,7 @@ async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
     // Außerhalb der Ansicht weiter 403, die fremde UHS weiter 404, das Gerät bleibt das Gerät.
     for (methode, pfad) in [
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
-        ("GET", format!("/api/einsaetze/{einsatz}/personal")),
+        ("GET", format!("/api/einsaetze/{einsatz}/personnel")),
         ("GET", format!("/api/einsaetze/{einsatz}/personen/export")),
         (
             "POST",
@@ -3519,7 +3519,7 @@ async fn entlassene_kraft_fehlt_in_der_auswahl_der_bestaetigenden() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{weg}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{weg}/release"),
         &admin,
         None,
     )
@@ -3616,7 +3616,7 @@ async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{aerztin}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{aerztin}/release"),
         &admin,
         None,
     )
@@ -3778,7 +3778,7 @@ async fn ohne_zeitachse_gilt_aktiv_jetzt() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{weg}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{weg}/release"),
         &admin,
         None,
     )
@@ -3824,7 +3824,7 @@ async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{zander}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{zander}"),
         &admin,
         Some(&json!({"einsatzfunktion": "Sprechfunker"})),
     )
@@ -3868,7 +3868,7 @@ async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str, a
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({"bezeichnung": bez})),
     )
@@ -3879,7 +3879,7 @@ async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str, a
         let (s, v) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+            &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
             cookie,
             Some(&json!({"status": "aktiv"})),
         )
@@ -3914,7 +3914,7 @@ async fn belegen(
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/occupancy"),
         cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit, "art": art})),
     )
@@ -3935,7 +3935,7 @@ async fn br_geraet_kennt_nur_den_eigenen_raum() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(ich["geraet"]["stelle"], "BR Sportplatz");
 
-    let liste = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume");
+    let liste = format!("/api/einsaetze/{einsatz}/staging-areas");
     let (s, v) = anfrage(&app, "GET", &liste, &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let ids: Vec<i64> = v
@@ -3967,7 +3967,7 @@ async fn br_geraet_kennt_nur_den_eigenen_raum() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("{liste}/{sportplatz}/verlauf"),
+        &format!("{liste}/{sportplatz}/history"),
         &geraet,
         None,
     )
@@ -3983,7 +3983,7 @@ async fn br_geraet_kennt_nur_den_eigenen_raum() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{liste}/{schule}/verlauf"),
+        &format!("{liste}/{schule}/history"),
         &geraet,
         None,
     )
@@ -4003,7 +4003,7 @@ async fn br_geraet_meldet_kraefte_im_eigenen_raum_an_und_ab() {
     let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
     let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
     let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
-    let detail = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let detail = format!("/api/einsaetze/{einsatz}/staging-areas/{sportplatz}");
 
     let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -4050,7 +4050,7 @@ async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", false).await;
     let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
-    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let raum = format!("/api/einsaetze/{einsatz}/staging-areas/{sportplatz}");
 
     let (s, _) = anfrage_json(
         &app,
@@ -4100,7 +4100,7 @@ async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+            format!("/api/einsaetze/{einsatz}/staging-areas"),
             Some(json!({"bezeichnung": "BR Neu"})),
         ),
     ] {
@@ -4126,7 +4126,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &geraet,
         None,
     )
@@ -4136,7 +4136,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &geraet,
         None,
     )
@@ -4146,12 +4146,12 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     for (m, pfad, body) in [
         (
             "PATCH",
-            format!("/api/einsaetze/{einsatz}/einheiten/{lf}"),
+            format!("/api/einsaetze/{einsatz}/units/{lf}"),
             Some(json!({"name": "LF Süd"})),
         ),
         (
             "PATCH",
-            format!("/api/einsaetze/{einsatz}/einheiten/{lf}/position"),
+            format!("/api/einsaetze/{einsatz}/units/{lf}/position"),
             Some(json!({"lat": 52.5, "lon": 13.4})),
         ),
         ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
@@ -4267,10 +4267,10 @@ async fn br_geraet_liest_nur_das_material_des_eigenen_raums() {
         ),
         (
             "POST",
-            format!("{material}/{lichtmast}/aufteilen"),
+            format!("{material}/{lichtmast}/split"),
             Some(json!({"menge": 1})),
         ),
-        ("POST", format!("{material}/{lichtmast}/entlassen"), None),
+        ("POST", format!("{material}/{lichtmast}/release"), None),
         (
             "POST",
             material.clone(),
@@ -4352,7 +4352,7 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/einheiten/aus-nachforderung"),
+            format!("/api/einsaetze/{einsatz}/units/from-resource-request"),
             Some(
                 json!({"nachforderung_id": nid, "einheiten": [{"name": "83-1"}],
                         "in_bereitstellungsraum": true}),
@@ -4416,7 +4416,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
         assert_eq!(s, StatusCode::OK, "{v}");
         ids.push(nid);
     }
-    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/erwartet");
+    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/staging-areas/{br}/expected");
 
     let (s, v) = anfrage_json(&app, "GET", &pfad(nord), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -4453,7 +4453,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{nord}/arrival"),
         &geraet,
         Some(
             &json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "83-1"}]},
@@ -4467,7 +4467,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{nord}/arrival"),
         &geraet,
         Some(
             &json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "83-2"}]},
@@ -4544,7 +4544,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
         .await
         .unwrap();
     let pfad = |br: i64, suche: &str| {
-        format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/stamm-treffer?suche={suche}")
+        format!("/api/einsaetze/{einsatz}/staging-areas/{br}/master-data-matches?suche={suche}")
     };
 
     let (s, v) = anfrage_json(
@@ -4574,7 +4574,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage/{vorlage}"),
+        &format!("/api/einsaetze/{einsatz}/units/from-template/{vorlage}"),
         &geraet,
         None,
     )
@@ -4588,7 +4588,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{nord}/arrival"),
         &geraet,
         Some(&json!({"vorlage": {"vorlage_id": vorlage}, "client_id": "st-1"})),
     )
@@ -4611,7 +4611,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
     let (s, w) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{nord}/arrival"),
         &geraet,
         Some(&json!({"vorlage": {"vorlage_id": vorlage}, "client_id": "st-1"})),
     )
@@ -4631,7 +4631,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{nord}/arrival"),
         &geraet,
         Some(&json!({"vorlage": {"vorlage_id": vorlage}})),
     )
@@ -4687,7 +4687,7 @@ async fn widerrufenes_br_geraet_verliert_den_raum() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
     let (id, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
-    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let raum = format!("/api/einsaetze/{einsatz}/staging-areas/{sportplatz}");
     let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
     assert_eq!(s, StatusCode::OK);
 
@@ -4760,7 +4760,7 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
         let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, e, "eintritt").await;
         assert_eq!(s, StatusCode::CREATED, "{v}");
     }
-    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let raum = format!("/api/einsaetze/{einsatz}/staging-areas/{sportplatz}");
     let anzahl = || async {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM br_belegung WHERE einsatz_id = ?")
             .bind(einsatz)
@@ -4771,7 +4771,7 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
 
     // Das Gerät ruft nicht ab und nimmt nicht zurück.
     let vorher = anzahl().await;
-    for pfad in [format!("{raum}/abruf"), format!("{raum}/abruf/aufheben")] {
+    for pfad in [format!("{raum}/dispatch"), format!("{raum}/dispatch/withdraw")] {
         let (s, v) = anfrage_json(
             &app,
             "POST",
@@ -4788,7 +4788,7 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{raum}/abruf"),
+        &format!("{raum}/dispatch"),
         &admin,
         Some(
             &json!({"objekt_typ": "einheit", "objekt_id": hlf, "abschnitt_id": deich,
@@ -4858,11 +4858,11 @@ async fn br_geraet_holt_abgerufene_kraft_nicht_per_wechsel_herein() {
         let (s, v) = belegen(&app, &admin, einsatz, sportplatz, e, "eintritt").await;
         assert_eq!(s, StatusCode::CREATED, "{v}");
     }
-    let alt = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let alt = format!("/api/einsaetze/{einsatz}/staging-areas/{sportplatz}");
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{alt}/abruf"),
+        &format!("{alt}/dispatch"),
         &admin,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": hlf})),
     )
@@ -4902,7 +4902,7 @@ async fn uhs_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name, "staerke_position": "mannschaft"}})),
     )
@@ -5223,7 +5223,7 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&json!({"adhoc": {"name": "Kraftohne"}})),
     )
@@ -7027,7 +7027,7 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
     let e = format!("/api/einsaetze/{einsatz}");
 
     for (m, pfad, body) in [
-        ("GET", format!("{e}/personal"), None),
+        ("GET", format!("{e}/personnel"), None),
         ("GET", format!("{e}/betreuung"), None),
         ("GET", format!("{e}/nachforderungen"), None),
         (
@@ -7043,7 +7043,7 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
         ("GET", format!("{e}/personen"), None),
         ("GET", format!("{e}/etb"), None),
         ("GET", format!("{e}/uhs"), None),
-        ("GET", format!("{e}/einheiten"), None),
+        ("GET", format!("{e}/units"), None),
         ("GET", format!("{e}/lagemonitor"), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
@@ -7254,7 +7254,7 @@ async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i
         let (s, v) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{gruppe}/personal/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/units/{gruppe}/personnel/{ep}"),
             admin,
             None,
         )
@@ -7264,7 +7264,7 @@ async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i
     let (s, v) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{gruppe}"),
+        &format!("/api/einsaetze/{einsatz}/units/{gruppe}"),
         admin,
         Some(&json!({
             "fuehrer_id": fuehrer,
@@ -7279,7 +7279,7 @@ async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i
 
 /// LLH-1055 D3, Spec `funktionsansichten` „Empfängerliste ohne Führernamen“ und „Keine
 /// Einheitenliste“: Das Verpflegungsgerät liest die Empfängerliste mit Einheitenname und Stärke,
-/// aber ohne Führer-, Mitgliedernamen und Verbindungen; `GET …/einheiten` bleibt 403.
+/// aber ohne Führer-, Mitgliedernamen und Verbindungen; `GET …/units` bleibt 403.
 #[tokio::test]
 async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -7321,7 +7321,7 @@ async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &geraet,
         None,
     )
@@ -7424,7 +7424,7 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_einheit() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &geraet,
         None,
     )
@@ -7446,7 +7446,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
     let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
     let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
-    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/eintreffen");
+    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/staging-areas/{br}/arrival");
     let einheiten = || async {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
             .bind(einsatz)
@@ -7526,7 +7526,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten/zeitachse"),
+        &format!("/api/einsaetze/{einsatz}/units/timeline"),
         &geraet,
         None,
     )
@@ -7537,7 +7537,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
         let (s, _) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{neu}/{aktion}"),
+            &format!("/api/einsaetze/{einsatz}/units/{neu}/{aktion}"),
             &geraet,
             Some(&json!({})),
         )
@@ -7800,7 +7800,7 @@ async fn einheitengeraet_sieht_nur_die_eigene_einheit() {
     assert_eq!(ich["geraet"]["stelle_id"], l.zug_ost);
     assert_eq!(ich["geraet"]["stelle"], "2. Zug");
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/units"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v, "name"), ["2. Zug"]);
 
@@ -7823,9 +7823,9 @@ async fn einheitengeraet_sieht_nur_die_eigene_einheit() {
         ("GET", format!("{basis}/befehle")),
         ("GET", format!("{basis}/zonen")),
         ("GET", format!("{basis}/etb")),
-        ("GET", format!("{basis}/personal")),
-        ("PATCH", format!("{basis}/einheiten/{}", l.zug_ost)),
-        ("DELETE", format!("{basis}/einheiten/{}", l.zug_ost)),
+        ("GET", format!("{basis}/personnel")),
+        ("PATCH", format!("{basis}/units/{}", l.zug_ost)),
+        ("DELETE", format!("{basis}/units/{}", l.zug_ost)),
         ("POST", format!("{basis}/auftraege")),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
@@ -7983,7 +7983,7 @@ async fn einheitengeraet_setzt_nur_den_eigenen_status() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/units", l.einsatz);
 
     let (s, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{stati}");
@@ -8041,7 +8041,7 @@ async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/units", l.einsatz);
     let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
     let status_id = stati.as_array().unwrap()[0]["id"].as_i64().unwrap();
 
@@ -8271,7 +8271,7 @@ async fn einheitengeraet_nur_an_aktive_einheit() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{}/einheiten/{}", l.einsatz, l.zug_sued),
+        &format!("/api/einsaetze/{}/units/{}", l.einsatz, l.zug_sued),
         &admin,
         None,
     )
@@ -8309,7 +8309,7 @@ async fn aufgeloeste_einheit_beendet_ihre_kopplung() {
         let (s, v) = anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{}/einheiten/{einheit}", l.einsatz),
+            &format!("/api/einsaetze/{}/units/{einheit}", l.einsatz),
             &admin,
             None,
         )
@@ -8927,7 +8927,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/einheiten"),
+            &format!("{basis}/units"),
             &admin,
             Some(&json!({ "name": name })),
         )
@@ -9065,7 +9065,7 @@ async fn lagemonitor_alarm_nennt_ausfall_ohne_personennamen() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/einheiten"),
+            &format!("{basis}/units"),
             &admin,
             Some(&json!({ "name": name })),
         )
@@ -9147,7 +9147,7 @@ async fn lagemonitor_alarm_laesst_ausgeblendetes_material_weg() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/einheiten"),
+            &format!("{basis}/units"),
             &admin,
             Some(&json!({ "name": name })),
         )
@@ -9203,7 +9203,7 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/einheiten"),
+        &format!("{basis}/units"),
         &admin,
         Some(&json!({ "name": "Logistiktrupp" })),
     )
@@ -9401,7 +9401,7 @@ async fn br_geraet_nimmt_nur_das_eigene_austragen_zurueck() {
     let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
     let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
     let zurueck = |br: i64, id: &Value| {
-        format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung/{id}/zuruecknehmen")
+        format!("/api/einsaetze/{einsatz}/staging-areas/{br}/occupancy/{id}/undo")
     };
 
     belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
@@ -9514,7 +9514,7 @@ async fn geraet_darf_keine_praesenz_melden() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/einheiten/{einheit}/praesenz"),
+        &format!("/api/einsaetze/{eid}/units/{einheit}/presence"),
         &geraet,
         Some(r#"{"felder":["bemerkung"],"fenster":"t"}"#),
     )

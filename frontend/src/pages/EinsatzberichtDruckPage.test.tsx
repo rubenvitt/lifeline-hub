@@ -55,13 +55,13 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     meHandler(kraft),
     json('', 'einsatz'),
     json('/fuehrungsstelle', 'fuehrungsstelle'),
-    json('/mitglieder', 'mitglieder'),
+    json('/members', 'mitglieder'),
     json('/lagebesprechungen', 'lagebesprechungen'),
-    mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
-    json('/einheiten/zeitachse', 'einheitenPerioden'),
-    mitBeendeten('/personal', 'personal', 'entlassene', 'personalEntlassen'),
-    json('/personal/zeitachse', 'personalPerioden'),
-    json('/fahrzeuge', 'fahrzeuge'),
+    mitBeendeten('/units', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
+    json('/units/timeline', 'einheitenPerioden'),
+    mitBeendeten('/personnel', 'personal', 'entlassene', 'personalEntlassen'),
+    json('/personnel/timeline', 'personalPerioden'),
+    json('/vehicles', 'fahrzeuge'),
     // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.
     http.get(`/api/einsaetze/${E}/lageberichte`, () => {
       zaehle('/lageberichte');

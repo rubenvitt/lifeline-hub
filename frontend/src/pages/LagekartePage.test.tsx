@@ -419,8 +419,8 @@ function basisHandler(
     http.get('/api/einsaetze/1', () => HttpResponse.json(EINSATZ)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([UHS_NICHT_VERORTET])),
     http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([SCHADEN_VERORTET])),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     // Fahrzeugstatus-Katalog für den Sprechwunsch im Paneel „Ausgewählt“ (eon26eat D2).
     http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
@@ -619,8 +619,8 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
         '/api/einsaetze/1',
         '/api/einsaetze/1/uhs',
         '/api/einsaetze/1/schaeden/marker',
-        '/api/einsaetze/1/einheiten',
-        '/api/einsaetze/1/fahrzeuge',
+        '/api/einsaetze/1/units',
+        '/api/einsaetze/1/vehicles',
         '/api/einsaetze/1/abschnitte',
         '/api/einsaetze/1/zonen',
         '/api/einsaetze/1/freie-zeichen',
@@ -1134,7 +1134,7 @@ describe('LagekartePage', () => {
 
   it('zeigt die taktischen Layer-Toggles und ein nicht-verortetes taktisches Objekt in der Liste', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
       http.get('/api/organisation', () => HttpResponse.json(ORG_DRK)),
     ]);
     objekteVorn();
@@ -1230,8 +1230,8 @@ describe('LagekartePage', () => {
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {
     let body: unknown = null;
     basisHandler([
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/einheiten/2/position', async ({ request }) => {
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/units/2/position', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ ...EINHEIT_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
       }),
@@ -1287,9 +1287,7 @@ describe('LagekartePage', () => {
   });
 
   it('Marker-Klick auf eine verortete Einheit öffnet den Inspector mit Fach-Modul-Link', async () => {
-    basisHandler([
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_VERORTET])),
-    ]);
+    basisHandler([http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_VERORTET]))]);
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-einheit-1'));
@@ -3782,8 +3780,8 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
 
   it('Verorten abgelehnt: Grund über der Karte, kein Toast', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
     objekteVorn();
@@ -4064,8 +4062,8 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
 
   it('Verorten abgelehnt, Platzieren abgebrochen: der Grund geht mit', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
     objekteVorn();
@@ -4652,7 +4650,7 @@ describe('LLH-1057: Abschnitt fokussieren', () => {
   const handler = () =>
     basisHandler([
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([NORD, SUED])),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([GRUPPE_SUED])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([GRUPPE_SUED])),
     ]);
   const band = () => document.querySelector('[data-lfh="fokus-band"]');
 

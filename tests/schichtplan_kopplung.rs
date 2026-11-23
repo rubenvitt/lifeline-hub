@@ -13,11 +13,11 @@ mod common;
 use common::*;
 
 fn abloesung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen")
+    format!("/api/einsaetze/{einsatz}/reliefs")
 }
 
 fn plan(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan")
+    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
 }
 
 fn f(t: DateTime<Utc>) -> String {
@@ -85,7 +85,7 @@ async fn block(
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("{}/bloecke", plan(e)),
+        &format!("{}/blocks", plan(e)),
         cookie,
         Some(&json!({"posten": {"art": "einheit", "einheit_id": einheit},
                      "von": von, "bis": bis, "personen": personen})),
@@ -106,7 +106,7 @@ async fn block_patch(app: &axum::Router, cookie: &str, e: i64, bid: i64, body: V
     let (s, p) = anfrage_json(
         app,
         "PATCH",
-        &format!("{}/bloecke/{bid}", plan(e)),
+        &format!("{}/blocks/{bid}", plan(e)),
         cookie,
         Some(&body),
     )
@@ -118,7 +118,7 @@ async fn block_loeschen(app: &axum::Router, cookie: &str, e: i64, bid: i64, vers
     let (s, p) = anfrage(
         app,
         "DELETE",
-        &format!("{}/bloecke/{bid}?version={version}", plan(e)),
+        &format!("{}/blocks/{bid}?version={version}", plan(e)),
         cookie,
         None,
     )
@@ -131,7 +131,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Op
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name}})),
     )
@@ -142,7 +142,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Op
         let (s, j) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{e}/einheiten/{einheit}/personal/{id}"),
+            &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{id}"),
             cookie,
             None,
         )
@@ -157,7 +157,7 @@ async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> V
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         cookie,
         None,
     )
@@ -360,7 +360,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, cem) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/helfer", plan(e)),
+        &format!("{}/helpers", plan(e)),
         &admin,
         Some(&json!({"name": "Cem", "organisation": "THW"})),
     )
@@ -400,7 +400,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/{aid}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{aid}/plan-template", abloesung_pfad(e)),
         &admin,
         None,
     )
@@ -418,7 +418,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
         ])
     );
 
-    let vollzug = format!("{}/{aid}/vollzug", abloesung_pfad(e));
+    let vollzug = format!("{}/{aid}/execution", abloesung_pfad(e));
     let uebernahme = json!([{"stamm_personal_id": ben}, {"plan_helfer_id": cem}]);
     for (body, code) in [
         (
@@ -444,7 +444,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         None,
     )
@@ -469,7 +469,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/{aid}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{aid}/plan-template", abloesung_pfad(e)),
         &frieda,
         None,
     )
@@ -499,7 +499,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         None,
     )
@@ -540,7 +540,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{vollzug}/zuruecknehmen"),
+        &format!("{vollzug}/undo"),
         &admin,
         None,
     )
@@ -564,7 +564,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/{aid}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{aid}/plan-template", abloesung_pfad(e)),
         &admin,
         None,
     )
@@ -605,7 +605,7 @@ async fn posten_endet_und_schicht_ohne_plan() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/{aid}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{aid}/plan-template", abloesung_pfad(e)),
         &admin,
         None,
     )
@@ -618,7 +618,7 @@ async fn posten_endet_und_schicht_ohne_plan() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/{aid}/vollzug", abloesung_pfad(e)),
+        &format!("{}/{aid}/execution", abloesung_pfad(e)),
         &admin,
         Some(&json!({})),
     )
@@ -632,7 +632,7 @@ async fn posten_endet_und_schicht_ohne_plan() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/{ohne}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{ohne}/plan-template", abloesung_pfad(e)),
         &admin,
         None,
     )
@@ -677,7 +677,7 @@ async fn alle_bleiben_im_folgeblock() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/{aid}/plan-vorlage", abloesung_pfad(e)),
+        &format!("{}/{aid}/plan-template", abloesung_pfad(e)),
         &admin,
         None,
     )
@@ -687,7 +687,7 @@ async fn alle_bleiben_im_folgeblock() {
     assert_eq!(v["gehen"], json!([]));
     assert_eq!(v["bleiben"], json!([{"personal_id": anna, "name": "Anna"}]));
 
-    let vollzug = format!("{}/{aid}/vollzug", abloesung_pfad(e));
+    let vollzug = format!("{}/{aid}/execution", abloesung_pfad(e));
     let (s, j) = anfrage_json(
         &app,
         "POST",

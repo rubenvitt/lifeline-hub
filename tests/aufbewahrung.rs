@@ -1515,7 +1515,7 @@ async fn wiederoeffnen_laesst_kopplung_und_api_freigabe_beendet() {
     let (s, v) = common::anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/geraete"),
+        &format!("/api/einsaetze/{id}/devices"),
         &admin,
         Some(&serde_json::json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
     )

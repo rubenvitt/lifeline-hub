@@ -27,7 +27,7 @@ async fn personal_disponieren(app: &axum::Router, cookie: &str, einsatz: i64, na
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&json!({ "adhoc": { "name": name } })),
     )

@@ -34,7 +34,7 @@ async function seede(page: Page): Promise<number> {
   });
   expect(einsatz.ok(), `Einsatz: ${await einsatz.text()}`).toBeTruthy();
   const einsatzId = ((await einsatz.json()) as { id: number }).id;
-  const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+  const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
     data: { adhoc: { funkrufname: RUFNAME, fahrzeugtyp: 'RTW' } },
   });
   expect(fahrzeug.ok(), `Fahrzeug: ${await fahrzeug.text()}`).toBeTruthy();
@@ -175,7 +175,7 @@ test('Personal: nach dem Wechsel steht die Quittung, und „Rückgängig“ stel
   });
   expect(einsatz.ok(), `Einsatz: ${await einsatz.text()}`).toBeTruthy();
   const einsatzId = ((await einsatz.json()) as { id: number }).id;
-  const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+  const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
     data: { adhoc: { name: NAME } },
   });
   expect(kraft.ok(), `Kraft: ${await kraft.text()}`).toBeTruthy();

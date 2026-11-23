@@ -65,7 +65,7 @@ async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
   await seede(
     page,
     einsatzId,
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: FUNKRUFNAME, fahrzeugtyp: 'LF 20' } },
     'Fahrzeug',
   );
@@ -73,7 +73,7 @@ async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
   const kraftId = await seede(
     page,
     einsatzId,
-    'personal',
+    'personnel',
     {
       adhoc: {
         name: KRAFT,
@@ -92,7 +92,7 @@ async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
     { adhoc: { bezeichnung: MATERIAL }, menge: 12 },
     'Material',
   );
-  await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');
+  await seede(page, einsatzId, 'units', { name: '1. Zug' }, 'Einheit');
   return kraftId;
 }
 
@@ -455,7 +455,7 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
     .first();
 
   const anzahlEinheiten = async () => {
-    const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
+    const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/units`);
     expect(antwort.ok()).toBeTruthy();
     return ((await antwort.json()) as unknown[]).length;
   };
@@ -490,7 +490,7 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
     .poll(anzahlEinheiten, { message: 'Absenden legt genau eine Einheit an' })
     .toBe(vorher + 1);
 
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/units`);
   const namen = ((await antwort.json()) as { name: string }[]).map((e) => e.name);
   expect(namen).toContain('2. Zug');
   expect(namen, 'kein Platzhalter-Datensatz').not.toContain('Neue Einheit');

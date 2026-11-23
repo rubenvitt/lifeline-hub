@@ -86,7 +86,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
+            &format!("/api/einsaetze/{}/personnel", self.einsatz),
             &self.admin,
             Some(&json!({ "personal_id": v["id"] }).to_string()),
         )
@@ -104,7 +104,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/mitglieder/{benutzer_id}", self.einsatz),
+            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": rolle, "fuehrungsfunktion": funktion }).to_string()),
         )
@@ -413,7 +413,7 @@ async fn geraetekonto_bleibt_still() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/geraete", w.einsatz),
+        &format!("/api/einsaetze/{}/devices", w.einsatz),
         &w.admin,
         Some(r#"{"ansicht":"lagemonitor","bezeichnung":"Monitor"}"#),
     )

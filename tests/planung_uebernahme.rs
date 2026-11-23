@@ -222,7 +222,7 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     assert_eq!(
@@ -379,7 +379,7 @@ async fn in_laufenden_einsatz_helfer_mit_herkunft_und_bestehende_einheit() {
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     let bloecke = plan["bloecke"].as_array().unwrap();
@@ -679,7 +679,7 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     let bloecke = plan["bloecke"].as_array().unwrap();
@@ -744,7 +744,7 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     assert_eq!(ergebnis["zaehlung"]["einheiten_neu"], 1, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["uhs_neu"], 1, "{ergebnis}");
     let neu = ergebnis["einsatz_id"].as_i64().unwrap();
-    let einheiten = get(&app, &admin, &format!("/api/einsaetze/{neu}/einheiten")).await;
+    let einheiten = get(&app, &admin, &format!("/api/einsaetze/{neu}/units")).await;
     assert!(einheiten.to_string().contains("\"Reserve\""), "{einheiten}");
     let uhs = get(&app, &admin, &format!("/api/einsaetze/{neu}/uhs")).await;
     assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
@@ -914,7 +914,7 @@ async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() 
     let schichtplan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     assert_eq!(

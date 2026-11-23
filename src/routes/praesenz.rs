@@ -25,7 +25,7 @@ pub struct PraesenzEinsatzBody {
     pub fenster: String,
 }
 
-/// PUT `…/einheiten/{eid}/praesenz`.
+/// PUT `…/units/{eid}/presence`.
 #[derive(Debug, Deserialize)]
 pub struct PraesenzFeldBody {
     pub felder: Vec<String>,
@@ -85,7 +85,7 @@ pub async fn einsatz_beenden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/einsaetze/{id}/einheiten/{eid}/praesenz — Präsenz an Angaben einer Einheit. Eine
+/// PUT /api/einsaetze/{id}/units/{eid}/presence — Präsenz an Angaben einer Einheit. Eine
 /// Einheit eines anderen Einsatzes ist 404, eine aufgelöste 409 (wie der PATCH daneben).
 pub async fn einheit_melden(
     State(state): State<AppState>,
@@ -111,7 +111,7 @@ pub async fn einheit_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/einheiten/{eid}/praesenz — idempotent, 204; Body wie beim PUT.
+/// DELETE /api/einsaetze/{id}/units/{eid}/presence — idempotent, 204; Body wie beim PUT.
 pub async fn einheit_beenden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,

@@ -53,7 +53,7 @@ pub struct ListeParams {
     entlassene: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/personal — aktives Personal (aufgelöst), mit `?entlassene=1` das
+/// GET /api/einsaetze/{id}/personnel — aktives Personal (aufgelöst), mit `?entlassene=1` das
 /// entlassene (Spec `kraefte-entlassung`). Stornierte liefert keine der beiden. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
@@ -86,7 +86,7 @@ pub struct DisponierenBody {
     pub adhoc: Option<AdhocBody>,
 }
 
-/// POST /api/einsaetze/{id}/personal — Stamm-Person disponieren ODER Ad-hoc anlegen.
+/// POST /api/einsaetze/{id}/personnel — Stamm-Person disponieren ODER Ad-hoc anlegen.
 /// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag.
 pub async fn disponieren(
     State(state): State<AppState>,
@@ -223,7 +223,7 @@ pub struct SammelBody {
     pub fahrzeug_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/personal/sammel — mehrere Stamm-Personen in einem Schritt
+/// POST /api/einsaetze/{id}/personnel/bulk — mehrere Stamm-Personen in einem Schritt
 /// disponieren und optional Einheit und Fahrzeug zuordnen (LLH-1100, Spec
 /// `kraefte-disposition`). Alles oder nichts: eine nicht disponierbare Person → 422 mit Gründen
 /// je Zeile. Mit Einheit gilt auch das Recht am Modul Einheiten, mit Fahrzeug das am Modul
@@ -346,7 +346,7 @@ pub struct DispoErwartet {
 const WIRKSAME_POSITION: &str = "COALESCE(staerke_position, (SELECT p.staerke_position \
      FROM personal p WHERE p.id = einsatz_personal.personal_id))";
 
-/// PATCH /api/einsaetze/{id}/personal/{ep_id} — Status, Stärke-Position, Bemerkung,
+/// PATCH /api/einsaetze/{id}/personnel/{ep_id} — Status, Stärke-Position, Bemerkung,
 /// Einsatzfunktion und bei Ad-hoc-Personen Name, Qualifikation und Träger (LLH-1067).
 /// Ein Statuswechsel schreibt seinen ETB-Eintrag, geänderte Personenangaben schreiben zusammen
 /// einen weiteren. Grenzen (400) vor dem Zusammenhang (422 an einer Stamm-Person).
@@ -548,7 +548,7 @@ pub async fn update(
     }))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen — „Rückgängig“ nach einem
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/status/undo — „Rückgängig“ nach einem
 /// Statuswechsel (LLH-1986, Regel `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines
 /// Statuswechsels“). Body ist der Beleg aus der Antwort des PATCH. Status inzwischen anders →
 /// 409 `veraltet`; andere Person, abgelaufene Frist oder eine Zeitachse, die das Streichen nicht
@@ -598,7 +598,7 @@ pub async fn status_zuruecknehmen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/release — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Bindungen gehen, Historie bleibt, die
 /// Zeitachse bekommt die Entlassung. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1922), der Block „Entlassen“
@@ -647,7 +647,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/release/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer Person zurücknehmen“): Body ist
 /// der Vorzustand aus der Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses
 /// Entlassen, höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, und nur, solange
@@ -741,7 +741,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/stornieren — Fehldisposition stornieren (LLH-1079,
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/cancel — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur ohne Bindung und Spur und in den ersten 15 Minuten, sonst 422 mit dem
 /// Grund; eine beendete Kraft → 409. Streicht die Ereignisse aus der Disposition. ETB-Eintrag.
 pub async fn stornieren(
@@ -770,7 +770,7 @@ pub async fn stornieren(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/einsaetze/{id}/personal/{ep_id}/reaktivieren — eine entlassene oder stornierte
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/reactivate — eine entlassene oder stornierte
 /// Kraft erneut disponieren (LLH-1079, design.md D7): Block „Entlassen“ und Rückgängig nach dem
 /// Entlassen. Initialstatus und Zeitachse neu, Stärke-Position bleibt. Aktiv → 409. ETB-Eintrag.
 pub async fn reaktivieren(
@@ -921,7 +921,7 @@ pub struct PositionBody {
     pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
-/// PATCH /api/einsaetze/{id}/personal/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
+/// PATCH /api/einsaetze/{id}/personnel/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
 /// Liefert die Karten-Sicht; jede aktive Person des Einsatzes ist verortbar (LFH-276).
 pub async fn position(
     State(state): State<AppState>,

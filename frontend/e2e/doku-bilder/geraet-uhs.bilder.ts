@@ -60,7 +60,7 @@ async function uhsGeraet(
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/geraete`,
+    `/api/einsaetze/${demo.id}/devices`,
     { ansicht, stelle_id: uhs.id, bezeichnung },
   );
   const kontext = await browser.newContext({ viewport });

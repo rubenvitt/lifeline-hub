@@ -37,10 +37,10 @@ async function seede(page: Page): Promise<number> {
     expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();
     return (await a.json()) as { id: number };
   };
-  const streife = await sende('einheiten', { name: 'Fußstreife 1' });
+  const streife = await sende('units', { name: 'Fußstreife 1' });
   const uhs = await sende('uhs', { typ: 'patientenablage', bezeichnung: 'UHS Marktplatz' });
-  const kraft = await sende('personal', { adhoc: { name: 'Anna Aushang' } });
-  const helfer = await sende('abloesungen/schichtplan/helfer', {
+  const kraft = await sende('personnel', { adhoc: { name: 'Anna Aushang' } });
+  const helfer = await sende('reliefs/shift-plan/helpers', {
     name: 'Cora Clausen',
     telefon: '0151 2345678',
     organisation: 'Sanitätszug West',
@@ -53,7 +53,7 @@ async function seede(page: Page): Promise<number> {
   const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
   const halbe = 30 * 60_000;
   for (let i = 0; i < UHS_SCHICHTEN; i++) {
-    await sende('abloesungen/schichtplan/bloecke', {
+    await sende('reliefs/shift-plan/blocks', {
       posten: { art: 'uhs', uhs_id: uhs.id },
       von: wire(beginn + i * halbe),
       bis: wire(beginn + (i + 1) * halbe),
@@ -61,14 +61,14 @@ async function seede(page: Page): Promise<number> {
       personen: i % 2 === 0 ? personen : [personen[1]],
     });
   }
-  await sende('abloesungen/schichtplan/bloecke', {
+  await sende('reliefs/shift-plan/blocks', {
     posten: { art: 'einheit', einheit_id: streife.id },
     von: wire(beginn),
     bis: wire(beginn + 4 * halbe),
     soll_anzahl: 2,
     personen: [personen[0]],
   });
-  await sende('abloesungen/schichtplan/bloecke', {
+  await sende('reliefs/shift-plan/blocks', {
     posten: { art: 'pause' },
     von: wire(beginn + 4 * halbe),
     bis: wire(beginn + 5 * halbe),

@@ -259,7 +259,7 @@ sequenceDiagram
   participant DB as SQLite
   participant G as frontend Gerät (frontend/src/geraet)
   participant Hub as LiveHub
-  EL->>BE: POST /api/einsaetze/{id}/geraete {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
+  EL->>BE: POST /api/einsaetze/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE

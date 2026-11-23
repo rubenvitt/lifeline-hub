@@ -49,7 +49,7 @@ export async function seedeGross(page: Page, einsatzId: string) {
     });
     abschnitte.push(id);
     for (let j = 1; j <= 3; j++) {
-      await post(page, einsatzId, 'einheiten', {
+      await post(page, einsatzId, 'units', {
         name: i === 1 && j === 1 ? EINHEIT : `Einheit ${i}.${j}`,
         funkrufname: i === 1 && j === 1 ? EINHEIT_RUF : `Florian ${i}/${j}`,
         abschnitt_id: id,
@@ -60,7 +60,7 @@ export async function seedeGross(page: Page, einsatzId: string) {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: abschnitte[0],
   });
-  await post(page, einsatzId, 'einheiten', { name: 'Gruppe Deich', abschnitt_id: unter });
+  await post(page, einsatzId, 'units', { name: 'Gruppe Deich', abschnitt_id: unter });
   return { abschnitte, unter };
 }
 

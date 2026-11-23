@@ -50,7 +50,7 @@ describe('useModulZaehler (LFH-612)', () => {
     // nur bei freigegebenem Modul (LFH-669, hier alle frei).
     await waitFor(() => expect(angefragt).toHaveLength(5));
     expect([...angefragt].sort()).toEqual([
-      '/api/einsaetze/7/abloesungen',
+      '/api/einsaetze/7/reliefs',
       '/api/einsaetze/7/betreuung',
       '/api/einsaetze/7/evakuierung',
       '/api/einsaetze/7/modul-zaehler',

@@ -34,7 +34,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/fahrzeuge", self.einsatz),
+            &format!("/api/einsaetze/{}/vehicles", self.einsatz),
             &self.admin,
             Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
         )

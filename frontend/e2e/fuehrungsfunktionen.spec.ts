@@ -47,7 +47,7 @@ async function mitgliedMitFunktion(
     expect(konto.ok(), `Konto: ${konto.status()} ${await konto.text()}`).toBeTruthy();
     id = ((await konto.json()) as { id: number }).id;
   }
-  const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/mitglieder/${id}`, {
+  const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/members/${id}`, {
     data: { einsatz_rolle: 'fuehrungspersonal', fuehrungsfunktion: funktion },
   });
   expect(antwort.ok(), `Mitglied: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

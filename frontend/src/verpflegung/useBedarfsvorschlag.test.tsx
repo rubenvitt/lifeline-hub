@@ -18,7 +18,7 @@ import { freigabenFixture } from '../test/fixtures';
  * was als Hinweis dasteht.
  */
 
-const P_PERSONAL = '/api/einsaetze/7/personal';
+const P_PERSONAL = '/api/einsaetze/7/personnel';
 const P_KOPFZAHL = '/api/einsaetze/7/betreuung/belegung';
 const P_KOSTFORMEN = '/api/einsaetze/7/betreuung/kostformen';
 

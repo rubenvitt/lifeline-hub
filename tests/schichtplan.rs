@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan")
+    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
 }
 
 async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
@@ -55,7 +55,7 @@ async fn disponieren(app: &axum::Router, cookie: &str, einsatz: i64, personal_id
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&json!({"personal_id": personal_id})),
     )
@@ -68,7 +68,7 @@ async fn block(app: &axum::Router, cookie: &str, einsatz: i64, body: Value) -> (
     anfrage_json(
         app,
         "POST",
-        &format!("{}/bloecke", pfad(einsatz)),
+        &format!("{}/blocks", pfad(einsatz)),
         cookie,
         Some(&body),
     )
@@ -210,7 +210,7 @@ async fn bloecke_an_einheit_uhs_und_pause_ohne_ueberschneidung() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     // Verschieben in eine andere Zeile: in die UHS überschneidet → 422, in die Pause gelingt.
-    let block_pfad = format!("{}/bloecke/{zweiter_id}", pfad(e));
+    let block_pfad = format!("{}/blocks/{zweiter_id}", pfad(e));
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
@@ -263,7 +263,7 @@ async fn bloecke_an_einheit_uhs_und_pause_ohne_ueberschneidung() {
     assert_eq!(s, StatusCode::OK);
 
     // Löschen mit CAS.
-    let loeschen = format!("{}/bloecke/{erster_id}", pfad(e));
+    let loeschen = format!("{}/blocks/{erster_id}", pfad(e));
     assert_eq!(
         anfrage(&app, "DELETE", &loeschen, &admin, None).await.0,
         StatusCode::BAD_REQUEST
@@ -350,7 +350,7 @@ async fn soll_aus_dem_posten_und_qualifikationsbefund() {
     let (s, plan) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{}/bloecke/{bid}", pfad(e)),
+        &format!("{}/blocks/{bid}", pfad(e)),
         &admin,
         Some(&json!({"version": 1, "personen": [{"art": "stamm", "personal_id": nora}]})),
     )
@@ -393,7 +393,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (s, cem) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/helfer", pfad(e)),
+        &format!("{}/helpers", pfad(e)),
         &admin,
         Some(&json!({"name": "Cem", "telefon": "0170 1", "organisation": "THW"})),
     )
@@ -403,7 +403,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (_, kraefte_vorher) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         None,
     )
@@ -447,7 +447,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         None,
     )
@@ -486,7 +486,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (s, plan) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{}/grenzwerte", pfad(e)),
+        &format!("{}/limits", pfad(e)),
         &admin,
         Some(&json!({"max_dienst_minuten": 60})),
     )
@@ -513,7 +513,7 @@ async fn personen_und_helfer_pruefen() {
     let (s, adhoc) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         Some(
             &json!({"adhoc": {"name": "Notarzt Extern", "funktion": "Notarzt",
@@ -579,7 +579,7 @@ async fn personen_und_helfer_pruefen() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 
     // Helfer: Pflichtname, Grenzen, Qualifikationen der eigenen Organisation.
-    let helfer = format!("{}/helfer", pfad(e));
+    let helfer = format!("{}/helpers", pfad(e));
     for (body, status) in [
         (json!({"name": "  "}), StatusCode::BAD_REQUEST),
         (json!({"name": "x".repeat(201)}), StatusCode::BAD_REQUEST),
@@ -647,7 +647,7 @@ async fn schichten_erzeugen_aus_laenge_und_schichtmodell() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let markt = uhs_anlegen(&app, &admin, e, "UHS Markt").await;
-    let erzeugen = format!("{}/erzeugen", pfad(e));
+    let erzeugen = format!("{}/generate", pfad(e));
     let posten = json!({"art": "uhs", "uhs_id": markt});
 
     // Ohne Schichtmodell und ohne Länge: 422; Länge außerhalb: 400.
@@ -735,7 +735,7 @@ async fn schichten_erzeugen_aus_laenge_und_schichtmodell() {
     let (s, json) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/abloesungen/schichtmodell"),
+        &format!("/api/einsaetze/{e}/reliefs/shift-model"),
         &admin,
         Some(
             &json!({"schichtmodell": {"bezeichnung": "4 h", "typ": "rhythmus",
@@ -791,7 +791,7 @@ async fn schichten_erzeugen_nennt_jeden_ueberschnittenen_block_einmal() {
     let e = einsatz_anlegen(&app, &admin).await;
     let markt = uhs_anlegen(&app, &admin, e, "UHS Markt").await;
     let posten = json!({"art": "uhs", "uhs_id": markt});
-    let erzeugen = format!("{}/erzeugen", pfad(e));
+    let erzeugen = format!("{}/generate", pfad(e));
 
     let mut ids = Vec::new();
     for (von, bis) in [
@@ -861,7 +861,7 @@ async fn grenzwerte_mit_etb_und_vorgabe() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let grenz = format!("{}/grenzwerte", pfad(e));
+    let grenz = format!("{}/limits", pfad(e));
     for body in [
         json!({"max_dienst_minuten": 59}),
         json!({"max_dienst_minuten": 1441}),
@@ -976,7 +976,7 @@ async fn rechte_module_und_abgeschlossener_einsatz() {
         anfrage_json(
             &app,
             "POST",
-            &format!("{}/helfer", pfad(e)),
+            &format!("{}/helpers", pfad(e)),
             &frieda,
             Some(&json!({"name": "Cem"}))
         )
@@ -999,7 +999,7 @@ async fn rechte_module_und_abgeschlossener_einsatz() {
     let (_, plan) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
     let pfad_von = |b: &Value| {
         format!(
-            "{}/bloecke/{}?version={}",
+            "{}/blocks/{}?version={}",
             pfad(e),
             b["id"].as_i64().unwrap(),
             b["version"].as_i64().unwrap()
@@ -1130,7 +1130,7 @@ async fn ueberschneidung_nennt_die_zeit_des_einsatzes_und_cas_text_ist_wortgleic
     let zweiter = finde(&plan, "einheit", "2026-11-06 14:00:00")["id"]
         .as_i64()
         .unwrap();
-    let zweiter_pfad = format!("{}/bloecke/{zweiter}", pfad(e));
+    let zweiter_pfad = format!("{}/blocks/{zweiter}", pfad(e));
     erwarte(
         anfrage_json(
             &app,
@@ -1150,7 +1150,7 @@ async fn ueberschneidung_nennt_die_zeit_des_einsatzes_und_cas_text_ist_wortgleic
     let (s, json) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/erzeugen", pfad(e)),
+        &format!("{}/generate", pfad(e)),
         &admin,
         Some(&json!({"posten": posten, "von": "2026-11-06 09:00:00",
                      "bis": "2026-11-06 11:00:00", "laenge_minuten": 60})),
@@ -1238,7 +1238,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     let (s, fremder_helfer) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/helfer", pfad(anderer)),
+        &format!("{}/helpers", pfad(anderer)),
         &admin,
         Some(&json!({"name": "Finn"})),
     )
@@ -1320,7 +1320,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     let bid = finde(&plan, "pause", "2026-11-06 10:00:00")["id"]
         .as_i64()
         .unwrap();
-    let block_pfad = format!("{}/bloecke/{bid}", pfad(e));
+    let block_pfad = format!("{}/blocks/{bid}", pfad(e));
     for (body, text) in [
         (
             json!({"version": 1, "soll_anzahl": 3}),
@@ -1352,7 +1352,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     }
 
     // Fremde Qualifikation am Helfer: beim Anlegen und beim Ändern.
-    let helfer = format!("{}/helfer", pfad(e));
+    let helfer = format!("{}/helpers", pfad(e));
     let quali_text = "Qualifikation gehört nicht zur Organisation";
     erwarte(
         anfrage_json(
@@ -1393,7 +1393,7 @@ async fn erzeugen_ohne_laenge_und_schichtmodell_nennt_den_einsatz() {
         anfrage_json(
             &app,
             "POST",
-            &format!("{}/erzeugen", pfad(e)),
+            &format!("{}/generate", pfad(e)),
             &admin,
             Some(&json!({"posten": {"art": "uhs", "uhs_id": markt},
                          "von": "2026-11-06 14:00:00", "bis": "2026-11-06 20:00:00"})),
@@ -1497,7 +1497,7 @@ async fn reihenfolge_der_bloecke_und_personen_im_einsatz() {
     let (s, kraft) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         &admin,
         Some(&json!({"adhoc": {"name": "Zora", "funktion": "Notarzt",
                                "staerke_position": "fuehrer"}})),
@@ -1508,7 +1508,7 @@ async fn reihenfolge_der_bloecke_und_personen_im_einsatz() {
     let (s, h) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/helfer", pfad(e)),
+        &format!("{}/helpers", pfad(e)),
         &admin,
         Some(&json!({"name": "Cem"})),
     )
@@ -1560,7 +1560,7 @@ async fn reihenfolge_der_bloecke_und_personen_im_einsatz() {
     let (s, plan) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{}/bloecke/{bid}", pfad(e)),
+        &format!("{}/blocks/{bid}", pfad(e)),
         &admin,
         Some(&json!({"version": 1,
                      "personen": [{"art": "einsatz", "einsatz_personal_id": zora},
@@ -1604,7 +1604,7 @@ async fn hoechstzahlen_je_einsatz() {
         anfrage_json(
             &app,
             "POST",
-            &format!("{}/erzeugen", pfad(e)),
+            &format!("{}/generate", pfad(e)),
             &admin,
             Some(&json!({"posten": {"art": "uhs", "uhs_id": markt},
                          "von": "2026-11-06 14:00:00", "bis": "2026-11-06 16:00:00",
@@ -1636,7 +1636,7 @@ async fn hoechstzahlen_je_einsatz() {
         anfrage_json(
             &app,
             "POST",
-            &format!("{}/helfer", pfad(e)),
+            &format!("{}/helpers", pfad(e)),
             &admin,
             Some(&json!({"name": "Einer zu viel"})),
         )

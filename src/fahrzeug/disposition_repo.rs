@@ -166,7 +166,7 @@ pub async fn liste(
 }
 
 /// Entlassene Fahrzeuge eines Einsatzes (aufgelöst), zuletzt entlassene zuerst — der Nachweis
-/// hinter `GET …/fahrzeuge?entlassene=1` (LLH-1079). Stornierte erscheinen nie.
+/// hinter `GET …/vehicles?entlassene=1` (LLH-1079). Stornierte erscheinen nie.
 pub async fn list_entlassene(
     pool: &SqlitePool,
     einsatz_id: i64,

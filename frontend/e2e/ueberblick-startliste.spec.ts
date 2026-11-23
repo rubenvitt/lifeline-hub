@@ -146,7 +146,7 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
   });
   expect(leiter.ok(), await leiter.text()).toBeTruthy();
   await post(page, `${basis}/abschnitte`, { name: 'EA Nord' });
-  await post(page, `${basis}/einheiten`, { name: 'Florian Nord 1' });
+  await post(page, `${basis}/units`, { name: 'Florian Nord 1' });
 
   // Erst mit dem Abo des Stroms schreiben (`e2e/AGENTS.md`, Live-Strom).
   const strom = page.waitForResponse((r) => r.url().endsWith(`${basis}/live`) && r.ok());

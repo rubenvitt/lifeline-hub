@@ -19,7 +19,7 @@ export interface AdhocEingabe {
 }
 
 export function listeEinsatzPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
-  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal`);
+  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel`);
 }
 
 /** Ziele und Auswahl einer Sammel-Disposition (LLH-1100). */
@@ -38,7 +38,7 @@ export function disponierePersonalSammel(
   einsatzId: number,
   eingabe: SammelPersonalEingabe,
 ): Promise<EinsatzPersonal[]> {
-  return apiSend<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal/sammel`, 'POST', {
+  return apiSend<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel/bulk`, 'POST', {
     personal_ids: eingabe.personal_ids,
     einheit_id: eingabe.einheit_id ?? null,
     fahrzeug_id: eingabe.fahrzeug_id ?? null,
@@ -46,7 +46,7 @@ export function disponierePersonalSammel(
 }
 
 export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal`, 'POST', { adhoc });
+  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personnel`, 'POST', { adhoc });
 }
 
 /**
@@ -85,7 +85,7 @@ export function updateDisposition(
   erwartet?: DispositionErwartet,
 ): Promise<PersonalPatchAntwort> {
   return apiSend<PersonalPatchAntwort>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}`,
     'PATCH',
     erwartet ? { ...felder, erwartet } : felder,
   );
@@ -102,7 +102,7 @@ export function nimmPersonalStatuswechselZurueck(
   beleg: HandStatusRuecknahmeBeleg,
 ): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}/status/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/status/undo`,
     'POST',
     beleg,
   );
@@ -110,7 +110,7 @@ export function nimmPersonalStatuswechselZurueck(
 
 /** Entlassene Kräfte des Einsatzes (LLH-1079, Block „Entlassen“); Stornierte liefert keine Liste. */
 export function listEntlassenesPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
-  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal?entlassene=1`);
+  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel?entlassene=1`);
 }
 
 /**
@@ -123,7 +123,7 @@ export function entlasseDisposition(
   epId: number,
 ): Promise<PersonalEntlassungAntwort> {
   return apiSend<PersonalEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}/entlassen`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/release`,
     'POST',
   );
 }
@@ -140,7 +140,7 @@ export function nimmEntlassungZurueck(
   vorzustand: PersonalEntlassungVorzustand,
 ): Promise<PersonalEntlassungRuecknahmeAntwort> {
   return apiSend<PersonalEntlassungRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}/entlassen/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/release/undo`,
     'POST',
     vorzustand,
   );
@@ -148,13 +148,13 @@ export function nimmEntlassungZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Bindung und Spur in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/personal/${epId}/stornieren`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/personnel/${epId}/cancel`, 'POST');
 }
 
 /** Eine entlassene oder stornierte Kraft erneut disponieren (Block „Entlassen“). */
 export function reaktiviereDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}/reaktivieren`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/reactivate`,
     'POST',
   );
 }
@@ -175,7 +175,7 @@ export function verortePerson(
   erwartet?: PositionPatch,
 ): Promise<FuehrungskraftKarte> {
   return apiSend<FuehrungskraftKarte>(
-    `/api/einsaetze/${einsatzId}/personal/${epId}/position`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/position`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );

@@ -115,8 +115,8 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     bezeichnung: `E2E Fundlage ${LAUF}`,
   });
   const basis = `/api/einsaetze/${einsatzId}`;
-  const { id: einheitId } = await senden(page, 'post', `${basis}/einheiten`, { name: 'Zug Mitte' });
-  await senden(page, 'patch', `${basis}/einheiten/${einheitId}/position`, {
+  const { id: einheitId } = await senden(page, 'post', `${basis}/units`, { name: 'Zug Mitte' });
+  await senden(page, 'patch', `${basis}/units/${einheitId}/position`, {
     lat: MITTE[1],
     lon: MITTE[0],
   });
@@ -162,7 +162,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     benutzername: NUTZER,
     passwort: NUTZER_PW,
   });
-  await senden(page, 'put', `${basis}/mitglieder/${nutzerId}`, {
+  await senden(page, 'put', `${basis}/members/${nutzerId}`, {
     einsatz_rolle: 'fuehrungspersonal',
   });
   await abmelden(page);
@@ -289,9 +289,9 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
     });
   }
   const mitte: [number, number] = [ort[0], ort[1] + 0.0002];
-  const { id: einheitId } = await senden(page, 'post', `${basis}/einheiten`, { name: 'Zug Rand' });
+  const { id: einheitId } = await senden(page, 'post', `${basis}/units`, { name: 'Zug Rand' });
   // Rund 34 px östlich bei Zoom 12 — unten nachgemessen und nachgestellt.
-  await senden(page, 'patch', `${basis}/einheiten/${einheitId}/position`, {
+  await senden(page, 'patch', `${basis}/units/${einheitId}/position`, {
     lat: mitte[1],
     lon: mitte[0] + 0.0117,
   });

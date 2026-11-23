@@ -272,7 +272,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   };
 
   await anlegen(
-    'personal',
+    'personnel',
     {
       adhoc: {
         name: 'Kirchgassner-Wohlfahrt, Maximiliane',
@@ -417,14 +417,14 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Abschnitt (Ablösung)',
     );
     const einheit = await post(
-      'einheiten',
+      'units',
       {
         name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
         abschnitt_id: abschnitt.id,
       },
       'Einheit (Ablösung)',
     );
-    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
+    await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
 
     // Ein Bezirk mit allen Sekundärfeldern (Modul Evakuierung, LLH-1034) und eine Stelle, deren
     // Belegung „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne
@@ -1346,8 +1346,8 @@ test.describe('Gate 1', () => {
             bezeichnung,
           );
         const schicht = async (abschnittId: number, name: string, rhythmus: number) => {
-          const einheit = await post('einheiten', { name, abschnitt_id: abschnittId }, name);
-          await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: rhythmus }, name);
+          const einheit = await post('units', { name, abschnitt_id: abschnittId }, name);
+          await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: rhythmus }, name);
         };
         let abschnittId = 0;
         if (modul === 'abloesung') {
@@ -1515,18 +1515,18 @@ async function seedeKraefte(page: Page): Promise<string> {
     ).toBeTruthy();
   };
   const fahrzeug = await post(
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: KRAFT_FAHRZEUG, kennzeichen: 'MU-NW 4611' } },
     'Fahrzeug',
   );
   const einheit = await post(
-    'einheiten',
+    'units',
     { name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest' },
     'Einheit',
   );
   // Lange Werte in jeder Spalte: Funktion, Träger, Fahrzeug mit Kennzeichen, Einheit.
   const kraft = await post(
-    'personal',
+    'personnel',
     {
       adhoc: {
         name: KRAFT,
@@ -1536,15 +1536,15 @@ async function seedeKraefte(page: Page): Promise<string> {
     },
     'Personal',
   );
-  await put(`fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`, 'Besatzung');
-  await put(`einheiten/${einheit.id}/personal/${kraft.id}`, 'Einheit');
+  await put(`vehicles/${fahrzeug.id}/crew/${kraft.id}`, 'Besatzung');
+  await put(`units/${einheit.id}/personnel/${kraft.id}`, 'Einheit');
   // Führer seiner Einheit: die Marke „Einheitsführer“ steht neben dem langen Einheitsnamen und
   // ist die breiteste Einteilung der Liste (LLH-1060 D3).
-  const fuehrer = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${einheit.id}`, {
+  const fuehrer = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${einheit.id}`, {
     data: { fuehrer_id: kraft.id },
   });
   expect(fuehrer.ok(), `Seeding Einheitsführer: ${await fuehrer.text()}`).toBeTruthy();
-  await post('personal', { adhoc: { name: KRAFT_KURZ } }, 'Personal (kurz)');
+  await post('personnel', { adhoc: { name: KRAFT_KURZ } }, 'Personal (kurz)');
   return String(einsatzId);
 }
 
@@ -1977,7 +1977,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       }[];
       const typ = (label: string) => typen.find((t) => t.label === label)!.id;
       const post = async (data: unknown) => {
-        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, { data });
+        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, { data });
         expect(antwort.ok(), `Seeding Einheit: ${await antwort.text()}`).toBeTruthy();
         return ((await antwort.json()) as { id: number }).id;
       };
@@ -2097,18 +2097,14 @@ async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
     staerke_unterfuehrer: 1,
     staerke_mannschaft: 8,
   });
-  const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+  const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/vehicles`, {
     fahrzeug_id: stamm.id,
   });
   for (const name of ['Kirchgassner-Wohlfahrt, Maximiliane', 'Meyer, Jan', 'Probe, Anna']) {
-    const kraft = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/personal`, {
+    const kraft = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/personnel`, {
       adhoc: { name },
     });
-    await seedeJson(
-      page,
-      'put',
-      `/api/einsaetze/${einsatzId}/fahrzeuge/${ef.id}/besatzung/${kraft.id}`,
-    );
+    await seedeJson(page, 'put', `/api/einsaetze/${einsatzId}/vehicles/${ef.id}/crew/${kraft.id}`);
   }
   return String(einsatzId);
 }
@@ -2250,16 +2246,16 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
         Verpflegungsgruppe: [3, 7, 12, 16],
       };
       for (const [i, name] of Object.keys(silben).entries()) {
-        const einheit = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/einheiten`, {
+        const einheit = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/units`, {
           name,
         });
-        const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+        const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/vehicles`, {
           adhoc: { funkrufname: `Musterstadt 83-${i + 1}` },
         });
         await seedeJson(
           page,
           'put',
-          `/api/einsaetze/${einsatzId}/einheiten/${einheit.id}/fahrzeug/${ef.id}`,
+          `/api/einsaetze/${einsatzId}/units/${einheit.id}/vehicles/${ef.id}`,
         );
       }
       await page.setViewportSize({ width: breite, height: 900 });
@@ -2369,28 +2365,28 @@ async function seedEigeneEinheit(page: Page): Promise<string> {
   await post('abschnitte', {
     name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2',
   });
-  const ohneEinheit = await post('fahrzeuge', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });
-  const mitEinheit = await post('fahrzeuge', { adhoc: { funkrufname: UEBERNAHME_FAHRZEUG } });
-  const einheit = await post('einheiten', {
+  const ohneEinheit = await post('vehicles', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });
+  const mitEinheit = await post('vehicles', { adhoc: { funkrufname: UEBERNAHME_FAHRZEUG } });
+  const einheit = await post('units', {
     name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
   });
-  await put(`einheiten/${einheit}/fahrzeug/${mitEinheit}`);
+  await put(`units/${einheit}/vehicles/${mitEinheit}`);
   for (const name of [
     'Kirchgassner-Wohlfahrt, Maximiliane',
     'Oberhauser-Brandstätter, Friedemann',
   ]) {
-    const kraft = await post('personal', { adhoc: { name } });
-    await put(`fahrzeuge/${ohneEinheit}/besatzung/${kraft}`);
+    const kraft = await post('personnel', { adhoc: { name } });
+    await put(`vehicles/${ohneEinheit}/crew/${kraft}`);
   }
   for (const name of ['Wohlgemuth-Kirchhoff, Annemarie', 'Brandstätter-Oberhauser, Konstantin']) {
-    const kraft = await post('personal', {
+    const kraft = await post('personnel', {
       adhoc: {
         name,
         funktion: 'Abschnittsleitung Technische Hilfeleistung',
         staerke_position: 'unterfuehrer',
       },
     });
-    await put(`einheiten/${einheit}/personal/${kraft}`);
+    await put(`units/${einheit}/personnel/${kraft}`);
   }
   return String(einsatzId);
 }

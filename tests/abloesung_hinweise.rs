@@ -79,7 +79,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad("einheiten"),
+            &self.pfad("units"),
             &self.admin,
             Some(&json!({ "name": name }).to_string()),
         )
@@ -93,7 +93,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad("abloesungen"),
+            &self.pfad("reliefs"),
             &self.admin,
             Some(
                 &json!({
@@ -113,7 +113,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PATCH",
-            &self.pfad(&format!("abloesungen/{schicht}")),
+            &self.pfad(&format!("reliefs/{schicht}")),
             &self.admin,
             Some(&body.to_string()),
         )
@@ -143,7 +143,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &self.pfad(&format!("einheiten/{einheit}/status")),
+            &self.pfad(&format!("units/{einheit}/status")),
             cookie,
             Some(&json!({ "status_id": status }).to_string()),
         )
@@ -443,14 +443,14 @@ async fn alarmierung_bereitstellungsraum_und_abruf_melden_je_einen_hinweis() {
     let (s, br) = anfrage_json(
         &w.app,
         "POST",
-        &w.pfad("bereitstellungsraeume"),
+        &w.pfad("staging-areas"),
         &w.admin,
         Some(&json!({ "bezeichnung": "BR Sportplatz" })),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{br}");
     let br = br["id"].as_i64().unwrap();
-    let br_pfad = w.pfad(&format!("bereitstellungsraeume/{br}"));
+    let br_pfad = w.pfad(&format!("staging-areas/{br}"));
     let (s, _) = anfrage_json(
         &w.app,
         "POST",
@@ -463,7 +463,7 @@ async fn alarmierung_bereitstellungsraum_und_abruf_melden_je_einen_hinweis() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("{br_pfad}/eintreffen"),
+        &format!("{br_pfad}/arrival"),
         &anna,
         Some(&json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": rs2 } })),
     )
@@ -484,7 +484,7 @@ async fn alarmierung_bereitstellungsraum_und_abruf_melden_je_einen_hinweis() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("{br_pfad}/abruf"),
+        &format!("{br_pfad}/dispatch"),
         &anna,
         Some(&json!({ "objekt_typ": "einheit", "objekt_id": rs2 })),
     )
@@ -520,7 +520,7 @@ async fn aufloesen_der_geplanten_einheit_meldet_planung_entfallen() {
     let (s, v) = anfrage(
         &w.app,
         "DELETE",
-        &w.pfad(&format!("einheiten/{rs2}")),
+        &w.pfad(&format!("units/{rs2}")),
         &anna,
         None,
     )
@@ -543,7 +543,7 @@ async fn aufloesen_der_geplanten_einheit_meldet_planung_entfallen() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &w.pfad("abloesungen?status=laufend"),
+        &w.pfad("reliefs?status=laufend"),
         &w.admin,
         None,
     )
@@ -674,7 +674,7 @@ async fn hinweis_planung_entfallen_nennt_die_entfallene_einheit() {
     let (s, v) = anfrage(
         &w.app,
         "DELETE",
-        &w.pfad(&format!("einheiten/{rs2}")),
+        &w.pfad(&format!("units/{rs2}")),
         &anna,
         None,
     )
@@ -701,7 +701,7 @@ async fn hinweis_einheit_bleibt_beim_aufloesen_stehen_und_ihre_id_frei() {
     let (s, v) = anfrage(
         &w.app,
         "DELETE",
-        &w.pfad(&format!("einheiten/{rs2}")),
+        &w.pfad(&format!("units/{rs2}")),
         &anna,
         None,
     )
@@ -734,7 +734,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PATCH",
-            &self.pfad(&format!("einheiten/{einheit}")),
+            &self.pfad(&format!("units/{einheit}")),
             &self.admin,
             Some(&json!({ "ueber_einheit_id": ueber }).to_string()),
         )
@@ -747,7 +747,7 @@ impl Welt {
         let (s, z) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("einheiten/{einheit}/zeitachse")),
+            &self.pfad(&format!("units/{einheit}/timeline")),
             cookie,
             Some(
                 &json!({
@@ -773,7 +773,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("einheiten/{einheit}/zeitachse/{zid}/streichen")),
+            &self.pfad(&format!("units/{einheit}/timeline/{zid}/void")),
             cookie,
             Some(r#"{"grund":"falsche Einheit erfasst"}"#),
         )
@@ -786,14 +786,14 @@ impl Welt {
         let (s, br) = anfrage_json(
             &self.app,
             "POST",
-            &self.pfad("bereitstellungsraeume"),
+            &self.pfad("staging-areas"),
             &self.admin,
             Some(&json!({ "bezeichnung": bezeichnung })),
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{br}");
         let pfad = self.pfad(&format!(
-            "bereitstellungsraeume/{}",
+            "staging-areas/{}",
             br["id"].as_i64().unwrap()
         ));
         let (s, _) = anfrage_json(
@@ -958,7 +958,7 @@ async fn raum_und_abruf_im_teilbaum_melden_je_einmal() {
         let (s, v) = anfrage_json(
             &w.app,
             "POST",
-            &format!("{br}/eintreffen"),
+            &format!("{br}/arrival"),
             &anna,
             Some(&json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": e } })),
         )
@@ -974,7 +974,7 @@ async fn raum_und_abruf_im_teilbaum_melden_je_einmal() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("{br}/abruf"),
+        &format!("{br}/dispatch"),
         &anna,
         Some(&json!({ "objekt_typ": "einheit", "objekt_id": st1 })),
     )

@@ -230,7 +230,7 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
 /// Eigene Ist-Stärke je Einheit und die Unterstellungskanten EINES Einsatzes — die eine Quelle
-/// der Stärken für `GET …/einheiten` und die Empfängerliste der Verpflegung (LLH-1055,
+/// der Stärken für `GET …/units` und die Empfängerliste der Verpflegung (LLH-1055,
 /// design.md D3: eine Heimat je Zahl). Aufgelöste Einheiten tragen keine Kräfte und keine Kanten.
 pub struct StaerkenJeEinheit {
     /// Eigene Ist-Stärke je Einheit; fehlender Eintrag = keine wertbaren Kräfte.
@@ -451,7 +451,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnze
 }
 
 /// Aufgelöste Einheiten eines Einsatzes, zuletzt aufgelöste zuerst — der Nachweis hinter
-/// `GET …/einheiten?aufgeloeste=1` (LLH-1079). Ohne Mitglieder: die Auflösung hat sie gelöst.
+/// `GET …/units?aufgeloeste=1` (LLH-1079). Ohne Mitglieder: die Auflösung hat sie gelöst.
 /// Wer und was zuletzt dazugehörte, steht in `letzte_besetzung` (LLH-1266, design.md D2).
 pub async fn list_aufgeloeste(
     pool: &SqlitePool,

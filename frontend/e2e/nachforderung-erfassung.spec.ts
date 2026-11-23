@@ -19,10 +19,10 @@ test('Schnellwahl, Anzahl, Enter: „2× RTW → BR Nord“ an Karte und ETB', a
     bezeichnung: `Nachforderung schnell ${Date.now()}`,
   });
   const basis = `/api/einsaetze/${einsatzId}`;
-  const { id: br } = await senden(page, `${basis}/bereitstellungsraeume`, {
+  const { id: br } = await senden(page, `${basis}/staging-areas`, {
     bezeichnung: 'BR Nord',
   });
-  await senden(page, `${basis}/bereitstellungsraeume/${br}/status`, { status: 'aktiv' });
+  await senden(page, `${basis}/staging-areas/${br}/status`, { status: 'aktiv' });
 
   await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
   await page.getByRole('button', { name: 'Nachforderung anlegen' }).click();

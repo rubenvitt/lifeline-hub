@@ -363,7 +363,7 @@ pub struct EmpfaengerEinheit {
     pub abschnitt_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_name: Option<String>,
-    /// Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`.
+    /// Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/units`.
     pub ist: Staerke,
     /// Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`).
     pub ist_kumuliert: Staerke,

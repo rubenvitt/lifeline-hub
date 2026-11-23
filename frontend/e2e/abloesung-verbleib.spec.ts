@@ -45,22 +45,22 @@ test('Ablösung: Vollzug mit Verbleib im Bereitstellungsraum und Rücknahme', as
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
-  const f1 = await sende('post', 'einheiten', { name: 'Florian 1' }, 'Florian 1');
-  const f2 = await sende('post', 'einheiten', { name: 'Florian 2' }, 'Florian 2');
+  await sende('put', 'reliefs/shift-model', { schichtmodell: null }, 'keine Vorgabe');
+  const f1 = await sende('post', 'units', { name: 'Florian 1' }, 'Florian 1');
+  const f2 = await sende('post', 'units', { name: 'Florian 2' }, 'Florian 2');
   for (const e of [f1, f2]) {
     await sende(
       'post',
-      `einheiten/${e.id}/zeitachse`,
+      `units/${e.id}/timeline`,
       { art: 'eintreffen', zeitpunkt_at: draht(120) },
       'Eintreffen',
     );
   }
-  await sende('post', 'abloesungen', { einheit_id: f1.id, rhythmus_minuten: 360 }, 'Schicht');
-  const raum = await sende('post', 'bereitstellungsraeume', { bezeichnung: 'Schule' }, 'Raum');
-  await sende('post', `bereitstellungsraeume/${raum.id}/status`, { status: 'aktiv' }, 'Raum aktiv');
+  await sende('post', 'reliefs', { einheit_id: f1.id, rhythmus_minuten: 360 }, 'Schicht');
+  const raum = await sende('post', 'staging-areas', { bezeichnung: 'Schule' }, 'Raum');
+  await sende('post', `staging-areas/${raum.id}/status`, { status: 'aktiv' }, 'Raum aktiv');
   const raumVon = async (id: number) => {
-    const antwort = await page.request.get(`${basis}/einheiten`);
+    const antwort = await page.request.get(`${basis}/units`);
     const liste = (await antwort.json()) as { id: number; aktueller_br_id?: number | null }[];
     return liste.find((e) => e.id === id)?.aktueller_br_id ?? null;
   };

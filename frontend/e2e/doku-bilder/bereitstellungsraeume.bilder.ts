@@ -60,7 +60,7 @@ const ZIEL_ABRUF = 'Betreuung';
 const WARTEN = 48 * 60_000 + 30_000;
 
 async function nachDerWartezeit(api: APIRequestContext, einsatzId: number, brId: number) {
-  const antwort = await api.get(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`);
+  const antwort = await api.get(`/api/einsaetze/${einsatzId}/staging-areas/${brId}`);
   expect(antwort.ok()).toBe(true);
   const { belegung } = (await antwort.json()) as { belegung: { laengste_seit_at?: string | null } };
   expect(belegung.laengste_seit_at, 'Belegung des Demo-BR').toBeTruthy();
@@ -81,7 +81,7 @@ async function liste(api: APIRequestContext, pfad: string): Promise<Benannt[]> {
 }
 
 async function demoBr(api: APIRequestContext, einsatzId: number): Promise<Benannt> {
-  const raeume = await liste(api, `/api/einsaetze/${einsatzId}/bereitstellungsraeume`);
+  const raeume = await liste(api, `/api/einsaetze/${einsatzId}/staging-areas`);
   const br = raeume.find((r) => r.bezeichnung === DEMO_BR);
   expect(br, `BR „${DEMO_BR}“ im Demo-Einsatz`).toBeDefined();
   return br!;
@@ -93,8 +93,8 @@ test.describe(KAPITEL, () => {
     try {
       const demo = await demoEinsatz(api);
       const br = await demoBr(api, demo.id);
-      const einheiten = await liste(api, `/api/einsaetze/${demo.id}/einheiten`);
-      const belegung = `/api/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}/belegung`;
+      const einheiten = await liste(api, `/api/einsaetze/${demo.id}/units`);
+      const belegung = `/api/einsaetze/${demo.id}/staging-areas/${br.id}/occupancy`;
       const id = (name: string) => {
         const einheit = einheiten.find((e) => e.name === name);
         expect(einheit, `Einheit „${name}“`).toBeDefined();
@@ -125,13 +125,13 @@ test.describe(KAPITEL, () => {
       const abschnitte = await liste(api, `/api/einsaetze/${demo.id}/abschnitte`);
       const betreuung = abschnitte.find((a) => a.name === ZIEL_ABRUF);
       expect(betreuung, `Abschnitt „${ZIEL_ABRUF}“`).toBeDefined();
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}/abruf`, {
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/staging-areas/${br.id}/dispatch`, {
         objekt_typ: 'einheit',
         objekt_id: id('Betreuungsgruppe'),
         abschnitt_id: betreuung!.id,
         auftrag_text: 'Notunterkunft Turnhalle Süd einrichten',
       });
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/bereitstellungsraeume`, {
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/staging-areas`, {
         bezeichnung: 'BR Ost',
         standort: 'Sportplatz Ost, Zufahrt Parkstraße',
       });

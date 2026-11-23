@@ -202,7 +202,7 @@ pub struct ListeParams {
     status: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/abloesungen
+/// GET /api/einsaetze/{id}/reliefs
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Abloesung>,
@@ -230,7 +230,7 @@ pub struct Beginnen {
     rhythmus_minuten: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/abloesungen — Schicht beginnen.
+/// POST /api/einsaetze/{id}/reliefs — Schicht beginnen.
 pub async fn beginnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -279,7 +279,7 @@ pub struct Aendern {
     besatzung_plan: Option<Vec<BesatzungZiel>>,
 }
 
-/// PATCH /api/einsaetze/{id}/abloesungen/{aid}
+/// PATCH /api/einsaetze/{id}/reliefs/{aid}
 pub async fn aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -510,7 +510,7 @@ fn vollzug_art(
     }
 }
 
-/// POST /api/einsaetze/{id}/abloesungen/{aid}/vollzug
+/// POST /api/einsaetze/{id}/reliefs/{aid}/execution
 pub async fn vollziehen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -599,7 +599,7 @@ pub async fn vollziehen(
     Ok(Json(anzeige))
 }
 
-/// GET /api/einsaetze/{id}/abloesungen/{aid}/plan-vorlage — der Besatzungswechsel aus dem
+/// GET /api/einsaetze/{id}/reliefs/{aid}/plan-template — der Besatzungswechsel aus dem
 /// Schichtplan zum Vorbelegen des Vollzugs (LLH-1555). Nennt Personen, also verlangt es die
 /// Freigabe Personal (403); eine Schicht ohne Plan ist 422.
 pub async fn plan_vorlage(
@@ -613,7 +613,7 @@ pub async fn plan_vorlage(
     ))
 }
 
-/// POST /api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen
+/// POST /api/einsaetze/{id}/reliefs/{aid}/execution/undo
 pub async fn zuruecknehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -627,7 +627,7 @@ pub async fn zuruecknehmen(
     Ok(Json(anzeige))
 }
 
-/// GET /api/einsaetze/{id}/abloesungen/vorgaben
+/// GET /api/einsaetze/{id}/reliefs/defaults
 pub async fn vorgaben(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Abloesung>,
@@ -644,7 +644,7 @@ pub struct VorgabeSetzen {
     rhythmus_minuten: Option<Option<i64>>,
 }
 
-/// PUT /api/einsaetze/{id}/abloesungen/vorgaben/{abschnitt_id}
+/// PUT /api/einsaetze/{id}/reliefs/defaults/{abschnitt_id}
 pub async fn vorgabe_setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -672,7 +672,7 @@ pub async fn vorgabe_setzen(
     Ok(Json(repo::vorgaben(&state.pool, einsatz_id).await?))
 }
 
-/// GET /api/einsaetze/{id}/abloesungen/schichtmodell — Vorgabe des Einsatzes (LLH-1122).
+/// GET /api/einsaetze/{id}/reliefs/shift-model — Vorgabe des Einsatzes (LLH-1122).
 pub async fn read_einsatz_vorgabe(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Abloesung>,
@@ -720,7 +720,7 @@ impl SetEinsatzVorgabe {
     }
 }
 
-/// PUT /api/einsaetze/{id}/abloesungen/schichtmodell — Vorgabe des Einsatzes setzen, aus den
+/// PUT /api/einsaetze/{id}/reliefs/shift-model — Vorgabe des Einsatzes setzen, aus den
 /// Stammdaten kopieren oder entfernen; Rechte wie die Abschnittsvorgabe. Laufende Schichten mit
 /// Quelle `einsatz` wandern mit (Repo).
 pub async fn set_einsatz_vorgabe(

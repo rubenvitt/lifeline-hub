@@ -553,7 +553,7 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
       http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
       http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     );

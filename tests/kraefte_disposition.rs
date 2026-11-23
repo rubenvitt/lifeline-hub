@@ -1,5 +1,5 @@
 //! Kräfte gesammelt disponieren (LLH-1100, Spec `kraefte-disposition`, `eingabegrenzen`):
-//! `POST …/personal/sammel` und `…/fahrzeuge/sammel`.
+//! `POST …/personnel/bulk` und `…/vehicles/bulk`.
 
 use axum::http::StatusCode;
 use serde_json::Value;
@@ -49,7 +49,7 @@ async fn fahrzeug_im_einsatz(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fid}}}"#)),
     )
@@ -60,7 +60,7 @@ async fn fahrzeug_im_einsatz(
         let (s, _) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
             admin,
             None,
         )
@@ -91,7 +91,7 @@ async fn personal(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> 
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         None,
     )
@@ -104,7 +104,7 @@ async fn fahrzeuge(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value>
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         None,
     )
@@ -258,7 +258,7 @@ async fn schon_disponierte_unbekannte_und_entlassene_personen_nennen_ihren_grund
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep_entlassen}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep_entlassen}/release"),
         &admin,
         None,
     )

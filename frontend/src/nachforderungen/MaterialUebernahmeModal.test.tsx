@@ -23,12 +23,12 @@ const ohneFehler = { error: null, isPending: false, reset: () => {} };
 /** Die Ort-Auswahl lädt ihre Orte wie die Materialliste (LLH-1225). */
 function orte() {
   server.use(
-    http.get('/api/einsaetze/1/einheiten', () =>
+    http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 1, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
   );
 }
 

@@ -407,7 +407,7 @@ pub async fn stammpersonal_disponieren(
     let (status, dispo) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&format!(r#"{{"personal_id":{pid}}}"#)),
     )
@@ -421,7 +421,7 @@ pub async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -474,7 +474,7 @@ pub async fn rolle_setzen(
     let (status, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{benutzer_id}"),
         leit_cookie,
         Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
     )
@@ -483,7 +483,7 @@ pub async fn rolle_setzen(
 }
 
 /// Setzt Rolle und Führungsfunktion (Katalogcode, `None` leert sie) eines Mitglieds über
-/// `PUT …/mitglieder/{benutzer_id}` — die eine Quelle der Auflösung S1–S6 → Person (i6k6mzed,
+/// `PUT …/members/{benutzer_id}` — die eine Quelle der Auflösung S1–S6 → Person (i6k6mzed,
 /// design.md D2).
 pub async fn funktion_setzen(
     app: &axum::Router,
@@ -501,7 +501,7 @@ pub async fn funktion_setzen(
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{benutzer_id}"),
         leit_cookie,
         Some(&body.to_string()),
     )

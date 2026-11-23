@@ -56,7 +56,7 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
   const kopplung = await senden<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'betreuungsstelle', stelle_id: nord, bezeichnung: 'Tablet NU' },
   );
 
@@ -151,7 +151,7 @@ test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigen
   const kopplung = await senden<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'betreuungsstelle', stelle_id: nord, bezeichnung: 'Tablet NU' },
   );
 

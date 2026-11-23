@@ -1,5 +1,5 @@
 //! Integrationstests zu LLH-1387 (Specs `nachforderung-einheit`, `bereitstellungsraum-belegung`):
-//! erwartete Kräfte aus Nachforderungen mit Ziel = Raum (`GET …/bereitstellungsraeume/{bid}/erwartet`,
+//! erwartete Kräfte aus Nachforderungen mit Ziel = Raum (`GET …/staging-areas/{bid}/expected`,
 //! design.md D1–D3), das Eintreffen mit Verweis auf die Nachforderung (D4) und die Sperre der
 //! Rückwege, solange eine Einheit verknüpft ist (D5). Das gekoppelte Gerät prüft
 //! `tests/geraet_kopplung.rs`.
@@ -14,7 +14,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({ "bezeichnung": name }).to_string()),
     )
@@ -24,7 +24,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({ "status": "aktiv" }).to_string()),
     )
@@ -104,7 +104,7 @@ async fn erwartet(app: &axum::Router, cookie: &str, einsatz: i64, br: i64) -> (S
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/erwartet"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/expected"),
         cookie,
         None,
     )
@@ -121,7 +121,7 @@ async fn eintreffen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/eintreffen"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/arrival"),
         cookie,
         Some(&body.to_string()),
     )
@@ -150,7 +150,7 @@ async fn einheit(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Val
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         None,
     )
@@ -463,7 +463,7 @@ async fn eintreffen_mit_nachforderung_setzt_den_verweis_beidseitig() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/aus-nachforderung"),
+        &format!("/api/einsaetze/{e}/units/from-resource-request"),
         &admin,
         Some(&json!({ "nachforderung_id": n, "einheiten": [{ "name": "83-9" }] }).to_string()),
     )
@@ -572,7 +572,7 @@ async fn pruefkette_des_verweises() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/belegung"),
+        &format!("/api/einsaetze/{e}/staging-areas/{nord}/occupancy"),
         &admin,
         Some(&json!({ "objekt_typ": "einheit", "objekt_id": lf, "art": "austritt" }).to_string()),
     )
@@ -592,7 +592,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
     )
@@ -646,7 +646,7 @@ async fn fahrzeug_ohne_einheit_wird_mit_verweis_zur_einheit() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/fahrzeuge/{ef}/besatzung/{anna}"),
+        &format!("/api/einsaetze/{e}/vehicles/{ef}/crew/{anna}"),
         &admin,
         None,
     )
@@ -829,7 +829,7 @@ async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/aus-nachforderung"),
+        &format!("/api/einsaetze/{e}/units/from-resource-request"),
         &admin,
         Some(&json!({ "nachforderung_id": n, "einheiten": [{ "name": "83-4" }] }).to_string()),
     )
@@ -920,7 +920,7 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/einheiten/{id}/uebernahme-stornieren"),
+            &format!("/api/einsaetze/{e}/units/{id}/cancel-takeover"),
             &admin,
             None,
         )
@@ -951,7 +951,7 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
     let (s, verlauf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/verlauf"),
+        &format!("/api/einsaetze/{e}/staging-areas/{nord}/history"),
         &admin,
         None,
     )

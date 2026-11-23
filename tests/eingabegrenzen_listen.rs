@@ -82,7 +82,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/einheiten/{eid}"),
+        &format!("/api/einsaetze/{e}/units/{eid}"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -163,7 +163,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         &admin,
         Some(&json!({ "name": "Zug 9", "sprechgruppe_ids": sg })),
     )
@@ -173,7 +173,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/einheiten/{eid}"),
+        &format!("/api/einsaetze/{e}/units/{eid}"),
         json!({ "sprechgruppe_ids": sg }),
     )
     .await;

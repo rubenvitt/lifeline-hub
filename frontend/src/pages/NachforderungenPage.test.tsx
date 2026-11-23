@@ -34,7 +34,7 @@ beforeEach(() => {
   // Vorschläge und Ziele der Erfassung (LLH-1089): leer, wenn ein Test nichts anderes setzt.
   server.use(
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
   );
 });
@@ -1234,10 +1234,10 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
         koerper.push(await request.json());
         return post ? post() : HttpResponse.json(posten({ id: 8 }), { status: 201 });
       }),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
     );
     return { koerper, abrufe };
   }
@@ -1329,7 +1329,7 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     materialServer(() => [posten({ nachforderung_id: verknuepft ? 4 : null })]);
     const aufrufe: { em: string; koerper: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:em/nachforderung', async ({ request, params }) => {
+      http.post('/api/einsaetze/1/material/:em/resource-request', async ({ request, params }) => {
         aufrufe.push({ em: String(params.em), koerper: await request.json() });
         verknuepft = true;
         return HttpResponse.json(posten());
@@ -1613,17 +1613,17 @@ describe('NachforderungenPage — Als Einheit übernehmen (LLH-1383)', () => {
   function einheitServer(einheiten: () => unknown[]) {
     const koerper: unknown[] = [];
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten())),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten())),
       http.get('/api/einheit-typen', () =>
         HttpResponse.json([
           { id: 1, label: 'KTW', sortier: 1 },
           { id: 2, label: 'RTW', sortier: 2 },
         ]),
       ),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+      http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([{ id: 3, einsatz_id: 1, bezeichnung: 'Nord' }]),
       ),
-      http.post('/api/einsaetze/1/einheiten/aus-nachforderung', async ({ request }) => {
+      http.post('/api/einsaetze/1/units/from-resource-request', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json(rtw({ einheit_ids: [11, 12] }), { status: 201 });
       }),

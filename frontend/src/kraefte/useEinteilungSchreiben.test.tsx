@@ -16,10 +16,10 @@ beforeEach(() => {
     return new HttpResponse(null, { status: 204 });
   };
   server.use(
-    http.put('/api/einsaetze/1/einheiten/:eid/personal/:ep', merke),
-    http.delete('/api/einsaetze/1/einheiten/:eid/personal/:ep', merke),
-    http.put('/api/einsaetze/1/fahrzeuge/:ef/besatzung/:ep', merke),
-    http.delete('/api/einsaetze/1/fahrzeuge/:ef/besatzung/:ep', merke),
+    http.put('/api/einsaetze/1/units/:eid/personnel/:ep', merke),
+    http.delete('/api/einsaetze/1/units/:eid/personnel/:ep', merke),
+    http.put('/api/einsaetze/1/vehicles/:ef/crew/:ep', merke),
+    http.delete('/api/einsaetze/1/vehicles/:ef/crew/:ep', merke),
     http.put('/api/einsaetze/1/uhs/:uid/kraefte/:ep', ({ request }) => {
       aufrufe.push(`PUT ${new URL(request.url).pathname}`);
       return HttpResponse.json({ id: 9 });
@@ -42,8 +42,8 @@ describe('useEinteilungSchreiben (LLH-1060, D3)', () => {
     await act(() => s.einheit(9)(12, 11));
     await act(() => s.einheit(9)(null, 12));
     expect(aufrufe).toEqual([
-      'PUT /api/einsaetze/1/einheiten/12/personal/9',
-      'DELETE /api/einsaetze/1/einheiten/12/personal/9',
+      'PUT /api/einsaetze/1/units/12/personnel/9',
+      'DELETE /api/einsaetze/1/units/12/personnel/9',
     ]);
   });
 
@@ -54,8 +54,8 @@ describe('useEinteilungSchreiben (LLH-1060, D3)', () => {
     await act(() => s.uhs(9)(3, null));
     await act(() => s.uhs(9)(null, 3));
     expect(aufrufe).toEqual([
-      'PUT /api/einsaetze/1/fahrzeuge/5/besatzung/9',
-      'DELETE /api/einsaetze/1/fahrzeuge/5/besatzung/9',
+      'PUT /api/einsaetze/1/vehicles/5/crew/9',
+      'DELETE /api/einsaetze/1/vehicles/5/crew/9',
       'PUT /api/einsaetze/1/uhs/3/kraefte/9',
       'DELETE /api/einsaetze/1/uhs/3/kraefte/9',
     ]);
@@ -70,7 +70,7 @@ describe('useEinteilungSchreiben (LLH-1060, D3)', () => {
 
   it('eine Ablehnung lehnt ab', async () => {
     server.use(
-      http.put('/api/einsaetze/1/einheiten/:eid/personal/:ep', () =>
+      http.put('/api/einsaetze/1/units/:eid/personnel/:ep', () =>
         HttpResponse.json({ error: 'Kraft ist entlassen' }, { status: 409 }),
       ),
     );

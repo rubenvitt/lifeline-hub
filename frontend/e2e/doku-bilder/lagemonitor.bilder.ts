@@ -94,7 +94,7 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/geraete`,
+    `/api/einsaetze/${demo.id}/devices`,
     { ansicht: 'lagemonitor', bezeichnung: 'Monitor Stab' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.lagemonitor });

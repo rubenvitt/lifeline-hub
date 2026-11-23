@@ -219,7 +219,7 @@ function zuordnungsPfad(einsatzId: number, ziel: ZuordnungsZiel, sprechgruppeId:
     case 'abschnitt':
       return `${e}/abschnitte/${ziel.id}/${sg}`;
     case 'einheit':
-      return `${e}/einheiten/${ziel.id}/${sg}`;
+      return `${e}/units/${ziel.id}/talk-groups/${sprechgruppeId}`;
     case 'fuehrungsstelle':
       return `${e}/fuehrungsstelle/${sg}`;
     case 'stelle':

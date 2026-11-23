@@ -204,7 +204,7 @@ impl LiveEvent {
             // Auch eine Mitgliedschaftsänderung feuert es (LFH-854): kein Leck, denn die
             // Mitgliederliste mit allen Rollen liegt ebenfalls hinter dieser Tür.
             LiveEvent::Einsatz => &[],
-            // Mitgliederliste (i6k6mzed, design.md D2): gehört keinem Modul. `GET …/mitglieder`
+            // Mitgliederliste (i6k6mzed, design.md D2): gehört keinem Modul. `GET …/members`
             // liegt hinter derselben Tür wie der Strom (`EinsatzLesezugriff` ohne Modul); dieselbe
             // Änderung meldet ohnehin `einsatz`. Nutzlast nur die Einsatzkennung.
             LiveEvent::Mitglieder => &[],

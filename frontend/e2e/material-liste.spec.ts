@@ -26,8 +26,8 @@ async function seed(page: Page, bezeichnung: string, menge: number) {
   });
   const einsatzId = String(id);
   const basis = `/api/einsaetze/${einsatzId}`;
-  await post(page, `${basis}/einheiten`, { name: 'Staffel A' });
-  await post(page, `${basis}/einheiten`, { name: 'Staffel B' });
+  await post(page, `${basis}/units`, { name: 'Staffel A' });
+  await post(page, `${basis}/units`, { name: 'Staffel B' });
   await post(page, `${basis}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
   await post(page, `${basis}/material`, { adhoc: { bezeichnung }, menge });
   return einsatzId;
@@ -122,7 +122,7 @@ test('Aufteilen mit Ort: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t
 }) => {
   const einsatzId = await seed(page, 'Wolldecke', 50);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheiten = (await (await page.request.get(`${basis}/einheiten`)).json()) as {
+  const einheiten = (await (await page.request.get(`${basis}/units`)).json()) as {
     id: number;
     name: string;
   }[];

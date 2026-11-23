@@ -46,7 +46,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({ "bezeichnung": name }).to_string()),
     )
@@ -59,7 +59,7 @@ async fn raum_status(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, st
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({ "status": status }).to_string()),
     )
@@ -290,7 +290,7 @@ async fn aufgeloester_oder_stornierter_raum_ist_409() {
     let (s, j) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{storniert}"),
+        &format!("/api/einsaetze/{e}/staging-areas/{storniert}"),
         &admin,
         None,
     )

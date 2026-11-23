@@ -1398,7 +1398,7 @@ async fn sprechgruppe_zuordnen(i: &Instanz, einsatz: i64, einheit: i64, sg: i64)
     let (s, v) = common::anfrage(
         &i.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/sprechgruppen/{sg}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}/talk-groups/{sg}"),
         &i.admin,
         None,
     )

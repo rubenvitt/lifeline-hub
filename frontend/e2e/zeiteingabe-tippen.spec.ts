@@ -138,12 +138,12 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
     return (await antwort.json()) as { id: number };
   };
   // Ohne Vorgabe beginnt mit dem Eintreffen keine Schicht (Spec `kraefte-abloesung`).
-  await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
-  const einheit = await sende('post', 'einheiten', { name: 'Florian Süd' }, 'Einheit');
+  await sende('put', 'reliefs/shift-model', { schichtmodell: null }, 'keine Vorgabe');
+  const einheit = await sende('post', 'units', { name: 'Florian Süd' }, 'Einheit');
   const beginn = umJetzt(-30);
   await sende(
     'post',
-    `einheiten/${einheit.id}/zeitachse`,
+    `units/${einheit.id}/timeline`,
     { art: 'eintreffen', zeitpunkt_at: draht(new Date(beginn.getTime() - 30 * 60_000)) },
     'Eintreffen',
   );
@@ -163,7 +163,7 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   await feld.press('Enter');
   await expect(dialog).toBeHidden();
 
-  const r = await page.request.get(`${basis}/abloesungen`);
+  const r = await page.request.get(`${basis}/reliefs`);
   const schicht = ((await r.json()) as { einheit_name: string; beginn_at: string }[]).find(
     (s) => s.einheit_name === 'Florian Süd',
   );

@@ -53,7 +53,7 @@ async fn verorten_erzeugt_keinen_etb() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}/position"),
         &admin,
         Some(r#"{"lat":52.5,"lon":13.4,"tz_fachaufgabe":"fuehrung"}"#),
     )
@@ -74,7 +74,7 @@ async fn geo_paar_partial_merge_und_unpaarig_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
-    let pos = format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position");
+    let pos = format!("/api/einsaetze/{einsatz}/units/{eid}/position");
 
     // 1) lat+lon gemeinsam setzen → 200.
     let (s, json) = anfrage(
@@ -133,7 +133,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{weg}"),
+            &format!("/api/einsaetze/{einsatz}/units/{weg}"),
             &admin,
             None
         )
@@ -144,7 +144,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -169,7 +169,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{bleibt}/personal/{chef}"),
+            &format!("/api/einsaetze/{einsatz}/units/{bleibt}/personnel/{chef}"),
             &admin,
             None
         )
@@ -180,7 +180,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{bleibt}"),
+        &format!("/api/einsaetze/{einsatz}/units/{bleibt}"),
         &admin,
         Some(&format!(r#"{{"name":"Bleibt","fuehrer_id":{chef}}}"#)),
     )
@@ -235,7 +235,7 @@ async fn personal_ohne_fuehrung_ist_verortbar() {
     let (s, body) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{helfer}/position"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{helfer}/position"),
         &admin,
         Some(r#"{"lat":50.1,"lon":8.6}"#),
     )
@@ -284,7 +284,7 @@ async fn fremder_org_nutzer_wird_abgewiesen() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/einheiten"),
+            &format!("/api/einsaetze/{einsatz}/units"),
             &fremd,
             None
         )
@@ -296,7 +296,7 @@ async fn fremder_org_nutzer_wird_abgewiesen() {
     let s = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}/position"),
         &fremd,
         Some(r#"{"lat":52.5,"lon":13.4}"#),
     )
@@ -332,7 +332,7 @@ async fn sse_feuert_bei_kum_mutation_und_geo_patch() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"),
+        &format!("/api/einsaetze/{einsatz}/units/{eid}/position"),
         &admin,
         Some(r#"{"lat":52.5,"lon":13.4}"#),
     )
@@ -349,7 +349,7 @@ async fn fahrzeug_adhoc(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
     )
@@ -422,9 +422,9 @@ async fn position_und_zeichen_pruefen_auf_zwischenzeitliche_aenderung() {
     let ef = fahrzeug_adhoc(&app, &admin, einsatz).await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
     for uri in [
-        format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"),
-        format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/position"),
-        format!("/api/einsaetze/{einsatz}/personal/{ep}/position"),
+        format!("/api/einsaetze/{einsatz}/units/{eid}/position"),
+        format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position"),
+        format!("/api/einsaetze/{einsatz}/personnel/{ep}/position"),
     ] {
         check_position_cas(&app, &admin, &uri).await;
     }
