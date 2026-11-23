@@ -1588,6 +1588,20 @@
           }
         }
       },
+      "AlarmQuelle": {
+        "type": "string",
+        "description": "Eine Quelle der Alarmzeile, benannt wie in `WasBrenntQuellen` (`lage/wasBrennt.ts`). Für\n[`LagemonitorAlarm::ausgeblendet`] (LLH-1964).",
+        "enum": [
+          "meldungen",
+          "auftraege",
+          "erinnerungen",
+          "nachforderungen",
+          "vermisst",
+          "kritisch",
+          "rueckmeldung",
+          "ausfall"
+        ]
+      },
       "AnbindungAblehnung": {
         "type": "object",
         "description": "Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6).",
@@ -13790,7 +13804,8 @@
           "nachforderungen_ueberfaellig",
           "rueckmeldung_ueberfaellig",
           "abschnitte_kritisch",
-          "ausfall"
+          "ausfall",
+          "ausgeblendet"
         ],
         "properties": {
           "abschnitte_kritisch": {
@@ -13810,6 +13825,13 @@
               "type": "string"
             },
             "description": "Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der\nEinheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie."
+          },
+          "ausgeblendet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlarmQuelle"
+            },
+            "description": "Quellen, deren Modul im Einsatz ausgeblendet ist (LLH-1964), in der Folge von\n[`AlarmQuelle`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer. Der\nMonitor lässt sie weg, ohne den Stand unvollständig zu nennen."
           },
           "bestaetigung_ueberfaellig": {
             "type": "integer",
