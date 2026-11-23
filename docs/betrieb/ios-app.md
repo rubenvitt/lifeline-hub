@@ -10,7 +10,7 @@ Meldung bei offener App, Meldungen bei geschlossener App über Apple Push (siehe
 Hintergrund“), die Zahl am App-Symbol und Haptik mit.
 
 Anforderungen: Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`, für den Push
-[ADR-0086](../architektur/entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md).
+[ADR-0090](../architektur/entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md).
 Quellcode und Regeln: `ios/` ([`ios/AGENTS.md`](../../ios/AGENTS.md)). Herleitung: `design.md`
 der Change `t39ltxxi-ios-huelle`, für den Push
 `docs/superpowers/specs/2026-11-22-mbbk7iwo-ios-apns-alarme-design.md`.

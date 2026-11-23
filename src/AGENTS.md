@@ -905,7 +905,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
 
 ## Backend — iOS-Push (LLH-1981)
 
-Entscheidung [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)
+Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)
 (Relais, Verschlüsselung, Opt-in, Bindung an Konto und Gerät), Design-Doc
 `docs/superpowers/specs/2026-11-22-mbbk7iwo-ios-apns-alarme-design.md`; `src/ios_push/`,
 `src/routes/ios_push.rs`. Das Relais selbst: `push-relais/AGENTS.md`, Betrieb

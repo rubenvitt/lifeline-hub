@@ -567,7 +567,7 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
 ### Task 12: Regeln, Architektur, Betriebs- und Anwenderdoku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0086-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md`
+- Create: `docs/architektur/entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md`
 - Modify: `src/AGENTS.md` (Abschnitt „iOS-Push“, Kopf-Tabelle), `ios/AGENTS.md` (Push-Befehle,
   Extension dünn, einzige native Netzanfrage), `AGENTS.md` (Tabelle: `src/AGENTS.md`-Inhalt um
   „iOS-Push“), `docs/architektur/` Kap. 3 (externer Dienst Push-Relais/APNs, Diagramm, Tabelle),
@@ -583,7 +583,7 @@ ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_ios_push INTEGER NOT NULL DEF
   (`verbiete 'tracing::.*token' src/ios_push push-relais/src` o. ä., sonst `manuell:`).
 - [ ] **Step 2:** Bereichsdateien und Doku nach den Festlegungen des Design-Docs.
 - [ ] **Step 3:** `scripts/check-adr-nummern.sh`, `scripts/adr-fuer.sh src/ios_push/mod.rs`
-  (nennt ADR-0086), Anwenderdoku-Wächter
+  (nennt ADR-0090), Anwenderdoku-Wächter
   `mise exec -- pnpm -C frontend exec vitest run src/hilfe/anwenderdoku.guard.test.ts`, Wächter der
   Architekturkapitel aus `check-all.sh --nur schnell`.
 - [ ] **Step 4: Commit** `docs: iOS-Push in Regeln, Architektur und Doku`.
