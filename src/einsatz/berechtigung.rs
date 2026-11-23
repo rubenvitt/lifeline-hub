@@ -593,6 +593,7 @@ mod tests {
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),
             spiegel: Default::default(),
+            ios_push_hub_gesperrt: Default::default(),
         }
     }
 

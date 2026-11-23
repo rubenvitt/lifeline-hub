@@ -1113,6 +1113,10 @@ pub struct InstanzKopplungAnzeige {
     /// Zustand des beglaubigten TLS-Zertifikats, nur an einer Direktkopplung (design.md D3).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zertifikat: Option<InstanzZertifikatZustand>,
+    /// Meldende Seite: das Push-Relais sperrt das Gegenüber seit (UTC, LLH-2074); iOS-Push an
+    /// Konten vom Hub kommt nicht an. Fehlt ohne Sperre und an der erreichten Seite.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gegenueber_ios_push_gesperrt_seit: Option<String>,
 }
 
 crate::wire_enum::wire_enum! {
@@ -1338,10 +1342,16 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile, konten_mit_geheimnis: i64) -> Insta
     let fingerabdruck = parse_b64(&k.gegenueber_schluessel)
         .map(|b| fingerabdruck(&b))
         .unwrap_or_default();
+    // Nur die meldende Seite kennt die Sperre ihres Hubs (LLH-2074).
+    let gegenueber_ios_push_gesperrt_seit = (k.richtung()
+        == Some(InstanzKopplungRichtung::MeldetSich))
+    .then(|| k.gegenueber_ios_push_gesperrt_seit.clone())
+    .flatten();
     InstanzKopplungAnzeige {
         id: k.id,
         art: k.art(),
         zertifikat: None,
+        gegenueber_ios_push_gesperrt_seit,
         richtung: k
             .richtung()
             .unwrap_or(InstanzKopplungRichtung::WirdGemeldet),

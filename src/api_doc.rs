@@ -288,6 +288,7 @@ use utoipa::OpenApi;
         crate::instanz::repo::InstanzSpiegelStand,
         crate::instanz::repo::InstanzSpiegelEinsatz,
         crate::instanz::spiegel::EinsatzSpiegelAnzeige,
+        crate::instanz::spiegel::hinweis::IosPushHubSperre,
         crate::instanz::spiegel::antrag::SpiegelAntragAnzeige,
         crate::instanz::spiegel::bruchstelle::BruchErfassung,
         crate::instanz::spiegel::bruchstelle::BruchAlleErgebnis,

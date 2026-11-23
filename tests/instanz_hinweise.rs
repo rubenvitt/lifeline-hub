@@ -373,6 +373,74 @@ async fn hub_ohne_ios_push_meldet_keine_sperre() {
     assert_eq!(sperre_am_elw(&elw.i).await, None);
 }
 
+/// Der ELW zeigt die Sperre am gelieferten Einsatz (Detail und Liste gleich) und an der
+/// Kopplung; der Spiegel am Hub zeigt nichts. Fällt die Sperre, fällt die Anzeige.
+#[tokio::test]
+async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
+    let w = welt_mit((false, true), (false, false)).await;
+    hub_sperren(&w.hub.i).await;
+    melden(&w.elw.i).await;
+    let hub_name: String = eine(
+        &w.elw.i.pool,
+        "SELECT gegenueber_name FROM instanz_kopplung LIMIT 1",
+    )
+    .await;
+    let erwartet = json!([{"hub_name": hub_name, "since": SPERRE_SEIT}]);
+    let elw = &w.elw.i;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.einsatz),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ios_push_hub_gesperrt"], erwartet, "Detail");
+    let (_, liste) =
+        common::anfrage_json(&elw.app, "GET", "/api/einsaetze", &elw.admin, None).await;
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == json!(w.einsatz))
+        .expect("Einsatz in der Liste");
+    assert_eq!(eintrag["ios_push_hub_gesperrt"], erwartet, "Liste");
+    let (_, u) =
+        common::anfrage_json(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    assert_eq!(
+        u["kopplungen"][0]["gegenueber_ios_push_gesperrt_seit"],
+        json!(SPERRE_SEIT)
+    );
+    let hub = &w.hub.i;
+    let (_, spiegel) = common::anfrage_json(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.spiegel),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(
+        spiegel.get("ios_push_hub_gesperrt").is_none(),
+        "Spiegel am Hub: {spiegel}"
+    );
+    exec(&hub.pool, "UPDATE ios_push_relais SET gesperrt_at = NULL").await;
+    melden(elw).await;
+    let (_, v) = common::anfrage_json(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{}", w.einsatz),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert!(
+        v.get("ios_push_hub_gesperrt").is_none(),
+        "Sperre gefallen: {v}"
+    );
+}
+
 // ── Hinweise am Hub (Aufgaben 2.2, 3.3, 3.4) ────────────────────────────────────────────────
 
 /// Spec `benachrichtigungen`, „Hinweise zu einem Einsatz des ELW entstehen auch am Hub“: die
