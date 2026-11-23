@@ -80,7 +80,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
   Flex-`div` mit `gap`.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
-  `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
+  `Augenbraue` (`als="h2…h6"`; nur Köpfe: Paneel, Kennzahl, Tabellen-, Gruppen- und
+  Abschnittskopf, Rail) · `Feldetikett` (benennt ein Feld: gemischt, `textKlein`, `gedaempft`, ohne
+  Sperrung, `als="dt"` im Datenraster, `als="label"` an einer Eingabe; kein `style`, LLH-2045;
+  die Augenbraue benennt kein Feld) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`Status` (`wort` Pflicht, Übersetzung
   nur in `statusFlaeche.ts`; `Status` randlos, getönt, Formzeichen, Größen `klein`/`normal`) ·
