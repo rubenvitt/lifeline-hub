@@ -2380,10 +2380,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/plans/{id}/blocks/{bid}",
             patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
-        .route(
-            "/api/plans/{id}/generate",
-            post(routes::planung::erzeugen),
-        )
+        .route("/api/plans/{id}/generate", post(routes::planung::erzeugen))
         .route("/api/plans/{id}/export", get(routes::planung::export))
         .route(
             "/api/plans/{id}/helpers",
