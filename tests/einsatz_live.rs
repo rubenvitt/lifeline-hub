@@ -746,7 +746,7 @@ async fn mitglieder_erreicht_jeden_leser_und_keine_fremde_org() {
         "PUT",
         &mitglied_pfad(einsatz, ziel),
         &admin,
-        Some(r#"{"einsatz_rolle":"beobachter","fuehrungsfunktion":"s3"}"#),
+        Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"s3"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::OK);

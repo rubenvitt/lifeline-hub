@@ -51,6 +51,33 @@ const alle: ZeilenRechte = {
 };
 
 describe('zeilenAktionen (LLH-1597, design.md D2)', () => {
+  describe('Mitarbeit berichtigt nur Eigenes außerhalb der Lage (LLH-1817, LLH-2008)', () => {
+    const zeile = (e: Partial<EtbEintragAnzeige>) =>
+      ({
+        art: 'eintrag',
+        schluessel: 'eintrag-4',
+        eintrag: { ...eintrag, erfasser_id: 9, ...e },
+      }) as EtbZeile;
+    const mitarbeit: ZeilenRechte = { ...alle, berichtigenNurErfasserId: 9 };
+    const keys = (z: EtbZeile, r: ZeilenRechte) => zeilenAktionen(z, r).map((a) => a.key);
+
+    it('eigener Eintrag: Berichtigen', () => {
+      expect(keys(zeile({}), mitarbeit)).toContain('berichtigen');
+    });
+
+    it('fremder Eintrag: kein Berichtigen', () => {
+      expect(keys(zeile({ erfasser_id: 2 }), mitarbeit)).not.toContain('berichtigen');
+    });
+
+    it('eigener Eintrag zu einer Meldung in der Lage: kein Berichtigen', () => {
+      expect(keys(zeile({ meldung_in_lage: true }), mitarbeit)).not.toContain('berichtigen');
+    });
+
+    it('die Einsatzleitung berichtigt auch in der Lage', () => {
+      expect(keys(zeile({ meldung_in_lage: true }), alle)).toContain('berichtigen');
+    });
+  });
+
   it('gesendeter Eintrag: Berichtigen, Wiedervorlage, Auftrag erteilen', () => {
     expect(zeilenAktionen(Z.eintrag, alle)).toEqual([
       { key: 'berichtigen', label: 'Berichtigen' },

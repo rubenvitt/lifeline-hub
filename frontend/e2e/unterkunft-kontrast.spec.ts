@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { kontrast } from './kontrast-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
@@ -124,9 +125,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     // (2) Dialog „Nachforderungen anlegen“.
     await kopf.getByRole('button', { name: 'Nachforderungen anlegen', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: `Nachforderungen für ${STELLE}` });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const dialog = await dialogSteht(page, `Nachforderungen für ${STELLE}`);
     await messeTexte(dialog, 'dialog');
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();

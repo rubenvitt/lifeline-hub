@@ -94,7 +94,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
-import { useFahrzeugStatusQuittung } from '../kraefte/useFahrzeugStatusQuittung';
+import { useFahrzeugStatusQuittung } from '../kraefte/useStatusQuittung';
 import { modulName } from '../einsatz/modulRegistry';
 import {
   abschnittDerEinheit,

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
@@ -62,10 +63,8 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
 
   // Erste Übernahme: vorbelegt mit Menge 3 als Verbrauchsgut; die Person führt ein Gerät.
   await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
-  const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
   // Erst nach der Zoom-Animation eingeben: sonst fängt der aufgehende Dialog den Klick ab.
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, '„Tauchpumpe“ als Material übernehmen');
   await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('3');
   await expect(dialog.getByRole('radio', { name: 'Verbrauchsgut' })).toBeChecked();
   await dialog.getByRole('radio', { name: 'Gerät' }).click();
@@ -84,9 +83,7 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
 
   // Zweiter Weg: bewusst ergänzen, Menge ist der Rest.
   await karte.getByRole('button', { name: 'Weiteren Posten übernehmen' }).click();
-  const weiter = page.getByRole('dialog', { name: 'Weiteren Posten „Tauchpumpe“ übernehmen' });
-  await expect(weiter).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const weiter = await dialogSteht(page, 'Weiteren Posten „Tauchpumpe“ übernehmen');
   await expect(weiter.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('2');
   await weiter.getByRole('radio', { name: 'Gerät' }).click();
   await weiter.getByRole('button', { name: 'Weiteren Posten übernehmen' }).click();
@@ -126,9 +123,7 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
   await expect(karte).toContainText(BEDARF);
 
   await karte.getByRole('button', { name: 'Erfassten Posten zuordnen …' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Erfassten Posten „Tauchpumpe“ zuordnen' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Erfassten Posten „Tauchpumpe“ zuordnen');
   await waehleIn(dialog.getByRole('combobox', { name: 'Posten' }), 'Tauchpumpe THW · 1 · ohne Ort');
   const antwort = page.waitForResponse(
     (r) =>

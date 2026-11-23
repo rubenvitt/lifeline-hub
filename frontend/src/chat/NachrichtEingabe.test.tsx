@@ -96,8 +96,8 @@ describe('NachrichtEingabe', () => {
   });
 
   it('verwirft keinen Nachtrag, der während des Sendens dazukam (LFH-795)', async () => {
-    // Offline pausiert die Mutation; wer währenddessen weiterschreibt oder anhängt, darf das nach
-    // dem Erfolg nicht verlieren. Geleert wird nur, was gesendet wurde.
+    // Eine langsame Antwort hält das Senden offen; wer währenddessen weiterschreibt oder anhängt,
+    // darf das nach dem Erfolg nicht verlieren. Geleert wird nur, was gesendet wurde.
     let erfuellen!: () => void;
     const onSenden = vi.fn(() => new Promise<void>((r) => (erfuellen = r)));
     renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);

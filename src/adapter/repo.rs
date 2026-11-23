@@ -6,7 +6,7 @@
 use serde_json::{Map, Value};
 use sqlx::{SqliteConnection, SqlitePool};
 
-use super::zustand::{AdapterFehler, NachFehlschlag};
+use super::zustand::{AdapterFehler, AdapterGemeldet, NachFehlschlag};
 use crate::error::AppError;
 
 /// Höchstzahl der gespeicherten Versuche je Adapter.
@@ -15,7 +15,7 @@ pub const VERSUCHE_MAX: i64 = 50;
 const SPALTEN: &str = "id, org_id, art, name, einstellungen, intervall_s, lan_erlaubt, zustand, \
      angehalten_grund, angehalten_at, fehler_seit, fehlversuche, naechster_abruf_at, \
      letzter_fehler_at, letzter_fehler_status, letzter_fehler_art, letzter_erfolg_at, \
-     letzte_anzahl, stand, angelegt_at, geaendert_at";
+     letzte_anzahl, stand, angelegt_at, geaendert_at, gemeldet";
 
 /// Eine Zeile von `adapter`.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -43,9 +43,15 @@ pub struct Adapter {
     pub stand: i64,
     pub angelegt_at: String,
     pub geaendert_at: String,
+    /// Was zur laufenden Störung den Admins schon gemeldet ist (LLH-2026, `AdapterGemeldet`).
+    pub gemeldet: Option<String>,
 }
 
 impl Adapter {
+    pub fn gemeldet(&self) -> Option<AdapterGemeldet> {
+        self.gemeldet.as_deref().and_then(AdapterGemeldet::parse)
+    }
+
     pub fn is_angehalten(&self) -> bool {
         self.zustand == "angehalten"
     }
@@ -600,14 +606,15 @@ pub struct Versuch {
 }
 
 /// Hält einen Versuch fest und kappt den Verlauf auf [`VERSUCHE_MAX`].
+/// Liefert die Kennung des Versuchs (Bezug einer Störungsmeldung, LLH-2026).
 pub async fn save_versuch(
     conn: &mut SqliteConnection,
     adapter_id: &str,
     v: &Versuch,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
+) -> Result<i64, sqlx::Error> {
+    let id: i64 = sqlx::query_scalar(
         "INSERT INTO adapter_versuch (adapter_id, at, probe, status, fehler_art, dauer_ms, anzahl) \
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(adapter_id)
     .bind(&v.at)
@@ -616,7 +623,7 @@ pub async fn save_versuch(
     .bind(&v.fehler_art)
     .bind(v.dauer_ms)
     .bind(v.anzahl)
-    .execute(&mut *conn)
+    .fetch_one(&mut *conn)
     .await?;
     sqlx::query(
         "DELETE FROM adapter_versuch WHERE adapter_id = ? AND id NOT IN \
@@ -627,7 +634,41 @@ pub async fn save_versuch(
     .bind(VERSUCHE_MAX)
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(id)
+}
+
+/// Merkt die Meldung `stufe` zur laufenden Störung vor (LLH-2026), nur wenn sie neu ist:
+/// „gestört“ nur ohne Meldung, „braucht Eingriff“ nur, wenn er noch nicht gemeldet ist. `true`,
+/// wenn die Zeile sich änderte: dann meldet der Aufrufer nach dem Commit.
+pub async fn mark_gemeldet(
+    conn: &mut SqliteConnection,
+    id: &str,
+    stufe: AdapterGemeldet,
+) -> Result<bool, sqlx::Error> {
+    let bedingung = match stufe {
+        AdapterGemeldet::Gestoert => "gemeldet IS NULL",
+        AdapterGemeldet::Eingriff => "gemeldet IS NOT 'eingriff'",
+    };
+    let n = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE adapter SET gemeldet = ? WHERE id = ? AND {bedingung}"
+    )))
+    .bind(stufe.as_str())
+    .bind(id)
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}
+
+/// Löscht den Merker der Störung (LLH-2026): der Adapter läuft wieder, oder ein Admin hat
+/// eingegriffen. `true`, wenn er gesetzt war: dann erledigt der Aufrufer die offene Meldung.
+pub async fn clear_gemeldet(conn: &mut SqliteConnection, id: &str) -> Result<bool, sqlx::Error> {
+    let n = sqlx::query("UPDATE adapter SET gemeldet = NULL WHERE id = ? AND gemeldet IS NOT NULL")
+        .bind(id)
+        .execute(conn)
+        .await?
+        .rows_affected();
+    Ok(n == 1)
 }
 
 /// Die letzten Versuche, neueste zuerst.

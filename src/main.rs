@@ -403,8 +403,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
              Geheimnisse lassen sich nicht speichern"
         ),
     }
-    let adapter_task =
-        lifeline_hub::adapter::lauf::start(pool.clone(), adapter_rahmen.clone(), stopp_empfang);
+    let adapter_task = lifeline_hub::adapter::lauf::start(
+        pool.clone(),
+        adapter_rahmen.clone(),
+        live.clone(),
+        stopp_empfang,
+    );
 
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.

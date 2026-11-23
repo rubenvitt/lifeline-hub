@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { kontrast, randKontrast } from './kontrast-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import {
@@ -198,9 +199,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     // (3) Dialog „Schichten erzeugen“.
     await page.getByRole('button', { name: 'Schichten erzeugen', exact: true }).click();
-    const erzeugen = page.getByRole('dialog', { name: 'Schichten erzeugen' });
-    await expect(erzeugen).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const erzeugen = await dialogSteht(page, 'Schichten erzeugen');
     await measureTexte(erzeugen, 'dialog-erzeugen');
     await page.keyboard.press('Escape');
     await expect(erzeugen).toBeHidden();
@@ -217,9 +216,7 @@ for (const modus of ['light', 'dark'] as const) {
     await expect(page.locator('[data-lfh="planung-posten"]').getByText('Fußtrupp')).toBeVisible();
     await measureTexte(inhalt, 'posten');
     await page.getByRole('button', { name: 'Posten anlegen', exact: true }).click();
-    const posten = page.getByRole('dialog', { name: 'Posten anlegen' });
-    await expect(posten).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const posten = await dialogSteht(page, 'Posten anlegen');
     await measureTexte(posten, 'dialog-posten');
     await page.keyboard.press('Escape');
     await expect(posten).toBeHidden();

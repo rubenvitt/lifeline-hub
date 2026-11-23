@@ -27,7 +27,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/infotelefon/AGENTS.md` | Informationstelefon: eigenes Modul, Fenster und Zählung, Funkprotokoll-Ordnung, Handschirm |
 | `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server |
 | `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
-| `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
+| `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Quittung und Rücknahme eines Statuswechsels, Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs), ihre Nummern und Prüfungen |
@@ -36,6 +36,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `migrations/AGENTS.md` | Migrationsvergabe (Nummern, Autofix, Stau-Wächter), Tabellenumbau und `-- no-transaction` |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Bauen nur auf macOS |
+| `android/AGENTS.md` | Android-Hülle: keine Anwendungslogik, Kern ohne SDK, ein Profil je Server, Brücke nur für den aktiven Server, Updater nie im Vordergrund, Signierschlüssel, lokal bauen |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |
 

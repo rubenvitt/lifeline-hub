@@ -45,6 +45,7 @@ import { abrufZustand, zustandNachFreigabe, type AbrufZustand } from '../api/abr
 import { ladeZeitachseGrenzwerte, listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import DauerMitEinstufung from '../kraefte/DauerMitEinstufung';
 import { useMeldebildFilter } from '../kraefte/useMeldebildFilter';
+import { useEinheitStatusQuittung } from '../kraefte/useStatusQuittung';
 import {
   ankerText,
   kraftDauern,
@@ -1103,11 +1104,16 @@ export default function KraefteuebersichtPage() {
    * „Rückwege und Fehler“).
    */
   const handFehler = useZeilenFehler<number>();
+  const quittiereHandStatus = useEinheitStatusQuittung(einsatzId, statusKatalogQuery.data);
   const handStatusMutation = useMutation({
     mutationFn: (v: { eid: number; statusId: number | null }) =>
       setzeEinheitStatus(einsatzId, v.eid, v.statusId),
     onMutate: (v) => handFehler.beginne(v.eid),
-    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+    // Die Quittung mit Rückweg (LLH-1986).
+    onSuccess: (antwort) => {
+      quittiereHandStatus(antwort);
+      return qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    },
     // Auch der Fehlerweg holt den Serverstand: ein 422 heißt meist, dass die Einheit inzwischen ein
     // Fahrzeug hat — ohne Refetch bliebe der Auslöser stehen.
     onError: (e, v) => {

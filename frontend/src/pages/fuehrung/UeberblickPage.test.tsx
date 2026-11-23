@@ -1720,6 +1720,93 @@ describe('UeberblickPage', () => {
       expect(await within(p).findByRole('alert')).toHaveTextContent('Stand unbekannt');
       expect(vorgaenge()).toBeInTheDocument();
     });
+
+    /*
+     * LLH-1955: die Schranke gilt nur beim ersten Aufbau der Seite je Einsatz. Wird mitten in der
+     * Sitzung ein Modul freigegeben, lädt seine Quelle zum ersten Mal; die Reihen bleiben dabei
+     * dieselben DOM-Knoten, nur das betroffene Paneel zeigt kurz seinen Ladezustand.
+     */
+    for (const [modul, paneelTitel] of [
+      ['fahrzeuge', 'Einsatzabschnitte'],
+      ['auftraege', 'Nächste Marken'],
+    ] as const) {
+      it(`${modul} wird live freigegeben: die Paneelreihen bleiben stehen, solange die Quelle lädt`, async () => {
+        let loslassen!: () => void;
+        const tor = new Promise<void>((f) => (loslassen = f));
+        const abrufe = { n: 0 };
+        stelleBereit(volleDaten, [
+          http.get('/api/einsaetze/1/modul-freigaben', () =>
+            HttpResponse.json(freigabenFixture({ [modul]: { zugriff: false } })),
+          ),
+        ]);
+        const { client } = rendern();
+        await waitFor(() => paneel(paneelTitel));
+        const reihe1 = document.querySelector('[data-lfh="ueberblick-paneele"]')!;
+        const reihe2 = document.querySelector('[data-lfh="ueberblick-paneele-gliederung"]')!;
+        expect(reihe1).not.toBeNull();
+        expect(reihe2).not.toBeNull();
+
+        server.use(
+          http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+          http.get(`/api/einsaetze/1/${modul}`, async () => {
+            abrufe.n += 1;
+            await tor;
+            return HttpResponse.json(volleDaten[modul] as object);
+          }),
+        );
+        await act(() => client.refetchQueries({ queryKey: einsatzKeys.modulFreigaben(1) }));
+        await waitFor(() => expect(abrufe.n).toBe(1));
+        expect(reihe1.isConnected).toBe(true);
+        expect(reihe2.isConnected).toBe(true);
+
+        loslassen();
+        await waitFor(() =>
+          expect(paneel(paneelTitel).querySelector('[aria-busy="true"]')).toBeNull(),
+        );
+        expect(reihe1.isConnected).toBe(true);
+        expect(reihe2.isConnected).toBe(true);
+      });
+    }
+
+    /*
+     * Erster Aufbau heißt: die Reihen standen schon einmal. Kommen die Freigaben erst nach dem
+     * ersten Bild (sonst hält sie der Rahmen bereit), fragen die gebundenen Quellen bis dahin
+     * nicht, und die Reihen stehen mit „wird abgerufen“. Laden die Quellen danach, bleiben sie.
+     */
+    it('Freigaben kommen spät: die schon stehenden Reihen bleiben, während die Quellen laden', async () => {
+      let freigabenLos!: () => void;
+      const freigabenTor = new Promise<void>((f) => (freigabenLos = f));
+      let abschnitteLos!: () => void;
+      const abschnitteTor = new Promise<void>((f) => (abschnitteLos = f));
+      const abrufe = { n: 0 };
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/modul-freigaben', async () => {
+          await freigabenTor;
+          return HttpResponse.json(freigabenFixture());
+        }),
+        http.get('/api/einsaetze/1/abschnitte', async () => {
+          abrufe.n += 1;
+          await abschnitteTor;
+          return HttpResponse.json(volleDaten.abschnitte);
+        }),
+      ]);
+      rendern();
+      await waitFor(() => paneel('Einsatzabschnitte'));
+      const reihe1 = document.querySelector('[data-lfh="ueberblick-paneele"]')!;
+      const reihe2 = document.querySelector('[data-lfh="ueberblick-paneele-gliederung"]')!;
+      expect(abrufe.n).toBe(0);
+
+      freigabenLos();
+      await waitFor(() => expect(abrufe.n).toBe(1));
+      expect(reihe1.isConnected).toBe(true);
+      expect(reihe2.isConnected).toBe(true);
+
+      abschnitteLos();
+      const p = await waitFor(() => paneel('Einsatzabschnitte'));
+      expect(await within(p).findByRole('link', { name: /Abschnitt Nord/ })).toBeInTheDocument();
+      expect(reihe1.isConnected).toBe(true);
+      expect(reihe2.isConnected).toBe(true);
+    });
   });
 
   /*
@@ -2686,6 +2773,53 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     await screen.findByRole('region', { name: 'Einsatz starten' });
     expect(zweiteReiheVorher.isConnected).toBe(true);
     expect(reihenVorher.isConnected).toBe(true);
+  });
+
+  /*
+   * LLH-1955: als aufgebaut gelten die Paneelreihen erst, wenn sie im Bild standen. Verdeckt die
+   * Startliste sie noch, und wird in der Zeit ein Modul freigegeben, wartet der erste Aufbau auch
+   * auf dessen Quelle; sonst erschienen die Reihen mit einem wachsenden Paneel.
+   */
+  it('während die Startliste lädt, wird ein Modul freigegeben: die Reihen warten auch auf seine Quelle', async () => {
+    let lageLos!: () => void;
+    const lageTor = new Promise<void>((f) => (lageLos = f));
+    let auftraegeLos!: () => void;
+    const auftraegeTor = new Promise<void>((f) => (auftraegeLos = f));
+    const abrufe = { lage: 0, auftraege: 0 };
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } })),
+      ),
+      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
+        abrufe.lage += 1;
+        await lageTor;
+        return HttpResponse.json([]);
+      }),
+    ]);
+    const { client } = rendern();
+    await screen.findByText('Hochwasser Weserlauf');
+    await waitFor(() => expect(abrufe.lage).toBe(1));
+    expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
+
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/1/auftraege', async () => {
+        abrufe.auftraege += 1;
+        await auftraegeTor;
+        return HttpResponse.json(leer.auftraege);
+      }),
+    );
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.modulFreigaben(1) }));
+    await waitFor(() => expect(abrufe.auftraege).toBe(1));
+
+    lageLos();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
+
+    auftraegeLos();
+    await waitFor(() => paneel('Nächste Marken'));
+    expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).not.toBeNull();
   });
 
   it('fragt die jüngste Lagefeststellung genau einmal ab: Typ „Lage“, ein Eintrag', async () => {

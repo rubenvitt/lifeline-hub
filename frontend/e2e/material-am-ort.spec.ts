@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -100,7 +101,7 @@ test('UHS-Reiter: Posten der Einheit zuordnen und Decken ausgeben; Einheit und E
   await zeile(page, 'Wolldecke').getByRole('button', { name: 'Wolldecke ausgeben' }).click();
   const ausgeben = page.getByRole('dialog', { name: 'Wolldecke ausgeben' });
   // Erst nach der Zoom-Animation tippen: währenddessen kann der Klick ins Feld danebengehen.
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await eingeblendet(ausgeben);
   await ausgeben.getByRole('spinbutton', { name: 'Menge ausgeben' }).fill('5');
   await ausgeben.getByRole('button', { name: 'Ausgeben' }).click();
   await expect(ausgeben).toHaveCount(0);
@@ -166,8 +167,7 @@ test('UHS: Teilmenge hierher – 20 von 50 Rettungsdecken, der Rest bleibt an de
   await expect(zeile(page, 'Wolldecke')).toContainText('20');
   // Ein aufteilbares Verbrauchsgut fragt die Menge, vorbelegt mit der ganzen.
   await zuordnen(page.locator('main'), page, 'Rettungsdecke · 50 · Staffel A');
-  const dialog = page.getByRole('dialog', { name: 'Rettungsdecke hierher' });
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Rettungsdecke hierher');
   const feld = dialog.getByRole('spinbutton', { name: 'Menge hierher' });
   await expect(feld).toHaveValue('50');
   await feld.fill('20');

@@ -23,6 +23,18 @@ describe('Datenraster', () => {
     expect(screen.getByText('Florian 1/44-1').tagName).toBe('DD');
   });
 
+  it('benennt jedes Feld mit dem Feldetikett, nicht mit der Augenbraue (LLH-2045)', () => {
+    renderMitProviders(
+      <Datenraster beschriftung="Kopfdaten">
+        <Datenfeld label="Stichwort">Brand</Datenfeld>
+      </Datenraster>,
+    );
+    const begriff = screen.getByText('Stichwort');
+    expect(begriff).toHaveAttribute('data-lfh', 'feldetikett');
+    expect(begriff).not.toHaveClass('lfh-augenbraue');
+    expect(begriff.style.textTransform).toBe('');
+  });
+
   it('setzt Mono nur, wo das Feld es verlangt', () => {
     renderMitProviders(
       <Datenraster>

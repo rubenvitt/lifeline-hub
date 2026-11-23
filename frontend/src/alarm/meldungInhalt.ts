@@ -120,8 +120,9 @@ export function meldungInhaltVon(
 export function ladeMeldungInhalt(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
 ): Promise<MeldungInhalt | null> {
-  if (!inhaltTitelWort(e.art, e.bezug_typ)) return Promise.resolve(null);
-  const abruf = ladeMeldung(e.einsatz_id, e.bezug_id).then(
+  const einsatzId = e.einsatz_id;
+  if (!inhaltTitelWort(e.art, e.bezug_typ) || einsatzId == null) return Promise.resolve(null);
+  const abruf = ladeMeldung(einsatzId, e.bezug_id).then(
     (m) => meldungInhaltVon(e.art, m, e.bezug_typ),
     () => null,
   );
