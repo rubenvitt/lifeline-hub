@@ -113,7 +113,9 @@ export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties
     fontFamily: schrift[schriftskala.seitentitel.familie],
     fontSize: schriftskala.seitentitel.groesse,
     fontWeight: schriftskala.seitentitel.gewicht,
-    lineHeight: 1.4,
+    // Ganze Pixel (16 × 1,375): mit 1,4 stand die Zeile bei 22,4 px, und alles darunter auf
+    // Bruchteilen; eine klebende Leiste sprang beim Wechsel zwischen Fluss und Kleben (LLH-2044).
+    lineHeight: '22px',
     color: farben.text,
   };
 }
@@ -632,6 +634,10 @@ export default function EinsatzSeite({
                 columnGap: token.marginXS * 3,
                 rowGap: 2,
                 minWidth: 0,
+                // Ganze Pixel: die geerbte Zeilenhöhe der Grundschrift (13,5 × 1,5714 = 21,5 px)
+                // stellte alles darunter auf Bruchteile, und eine klebende Leiste sprang beim
+                // Wechsel zwischen Fluss und Kleben um diesen Rest (LLH-2044).
+                lineHeight: '22px',
               }}
             >
               {/* Die Gruppe bricht um, ihre Teile nicht — eine lange Meta liefe bei 390 px sonst quer

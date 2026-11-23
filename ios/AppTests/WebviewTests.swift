@@ -12,6 +12,11 @@ final class WebviewTests: XCTestCase {
     let lager = try! ServerAdresse.parse("https://lager.example")
     let elwOrigin = SeitenOrigin(schema: "https", host: "elw.local", port: 8443)
 
+    /// Der erste Webview-Test fing sonst den Kaltstart von WebKit ab (`WebkitVorlauf`).
+    override func setUp() async throws {
+        await WebkitVorlauf.sicherstellen()
+    }
+
     func eintrag(_ adresse: ServerAdresse) -> ServerEintrag {
         var liste = Serverliste()
         return liste.add(adresse)
