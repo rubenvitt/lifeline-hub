@@ -460,7 +460,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   aus `addWebMessageListener` mit derselben Annahmeregel (`Bruecke.accepts` in
   `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Bruecke.kt`, Wire-Format im Kopf von
   `android/app/src/main/assets/huelle.js`); jeder Server hat dort ein eigenes WebView-Profil. Die
-  Anmeldung im Systembrowser (`POST /api/auth/app-code[/einloesen]`) nutzen alle Hüllen gleich.
+  Anmeldung im Systembrowser (`POST /api/auth/app-code[/redeem]`) nutzen alle Hüllen gleich.
 
 Adressprüfung, Deeplink und Linkregeln stehen in Rust (`src-tauri/src/adresse.rs`,
 `deeplink.rs`, `links.rs`), im Swift-Kern und im Kotlin-Kern; zusammengehalten werden sie von den

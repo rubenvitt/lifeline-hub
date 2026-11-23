@@ -33,7 +33,7 @@ export function login(
  *  neue dem bisherigen gleicht, `400` bei falscher Länge, `401` ohne gültigen Zwischenschritt —
  *  alle als {@link ApiError}. Request-DTO handgepflegt (Server: `PasswortFestlegen`). */
 export function passwortFestlegen(neuesPasswort: string): Promise<BenutzerAnzeige> {
-  return apiSend<BenutzerAnzeige>('/api/auth/passwort/festlegen', 'POST', {
+  return apiSend<BenutzerAnzeige>('/api/auth/password/set', 'POST', {
     neues_passwort: neuesPasswort,
   });
 }
@@ -86,7 +86,7 @@ export const PASSWORT_MIN_LAENGE = 8;
  *  Passwort, `400` bei zu kurzem neuen, beides als {@link ApiError}. Die eigene Sitzung bleibt,
  *  alle anderen Sitzungen des Kontos beendet der Server. */
 export function passwortAendern(altesPasswort: string, neuesPasswort: string): Promise<void> {
-  return apiSend<void>('/api/auth/passwort', 'POST', {
+  return apiSend<void>('/api/auth/password', 'POST', {
     altes_passwort: altesPasswort,
     neues_passwort: neuesPasswort,
   });

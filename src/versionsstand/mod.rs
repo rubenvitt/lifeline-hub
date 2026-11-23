@@ -9,7 +9,7 @@ pub mod repo;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`.
+/// Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct VersionsstandAnzeige {
     /// Die laufende Version des Servers.

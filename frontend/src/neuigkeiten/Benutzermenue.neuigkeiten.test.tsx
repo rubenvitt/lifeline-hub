@@ -17,7 +17,7 @@ describe('Benutzermenü · Neuigkeiten', () => {
   it('zeigt den Punkt, solange der Lesestand vor der laufenden Version liegt', async () => {
     server.use(
       meHandler(adminFixture()),
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.100' }),
       ),
     );
@@ -31,7 +31,7 @@ describe('Benutzermenü · Neuigkeiten', () => {
   it('zeigt keinen Punkt, wenn die laufende Version gelesen ist', async () => {
     server.use(
       meHandler(adminFixture()),
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.106' }),
       ),
     );
