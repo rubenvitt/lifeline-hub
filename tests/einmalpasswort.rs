@@ -80,7 +80,7 @@ async fn festlegen(app: &axum::Router, wechsel_cookie: &str, neu: &str) -> Antwo
     senden(
         app,
         "POST",
-        "/api/auth/passwort/festlegen",
+        "/api/auth/password/set",
         wechsel_cookie,
         Some(json!({"neues_passwort": neu})),
     )
@@ -703,7 +703,7 @@ async fn wechsel_im_profil_hebt_den_zwang_auf() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        "/api/auth/passwort",
+        "/api/auth/password",
         &sitzung,
         Some(&json!({"altes_passwort": "maximpw1", "neues_passwort": "selbst-gewaehlt"})),
     )

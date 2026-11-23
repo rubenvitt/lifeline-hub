@@ -22,6 +22,7 @@ use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
 
 use super::art::{check_einstellungen, AdapterArt, Fehlschlag, Uebernahme};
+use super::geheimnis::Geheimnisspeicher;
 use super::repo::{self, Adapter, Versuch};
 use super::ziel::AbrufKontext;
 use super::zustand::{meldung_nach_fehlschlag, nach_fehlschlag, AdapterFehler, AdapterGemeldet};
@@ -97,6 +98,59 @@ pub async fn beim_start(pool: &SqlitePool, rahmen: &Rahmen) -> Result<(), AppErr
         );
     }
     Ok(())
+}
+
+/// Ergebnis eines Schlüsselwechsels beim Start (LLH-2025).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Umschluesselt {
+    /// Geheimnisse, die jetzt am neuen Schlüssel liegen.
+    pub umgeschluesselt: u64,
+    /// Geheimnisse am alten Schlüssel, die sich nicht öffnen ließen; sie bleiben, wie sie sind.
+    pub unlesbar: u64,
+    /// Geheimnisse, die danach noch nicht am neuen Schlüssel liegen (die unlesbaren und solche an
+    /// einem dritten). Nur bei 0 kann der alte Schlüssel weg.
+    pub uebrig: u64,
+}
+
+/// Schlüsselwechsel (LLH-2025, ADR-0077): Ist ein alter Schlüssel geladen, liegen danach alle
+/// Geheimnisse, die er öffnet, am neuen; in einer Transaktion. Ohne alten Schlüssel nichts. Ein
+/// Geheimnis, das sich nicht öffnen lässt, bleibt und wird gezählt. Kein Wert verlässt die
+/// Funktion, auch nicht im Fehler.
+pub async fn umschluesseln(
+    pool: &SqlitePool,
+    speicher: &Geheimnisspeicher,
+) -> Result<Umschluesselt, sqlx::Error> {
+    let (Some(fp_alt), Some(fp_neu)) = (speicher.fingerabdruck_alt(), speicher.fingerabdruck())
+    else {
+        return Ok(Umschluesselt::default());
+    };
+    let mut ergebnis = Umschluesselt::default();
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    for (adapter_id, name, chiffrat) in repo::load_chiffrate_mit_fp(&mut tx, fp_alt).await? {
+        let s = speicher.clone();
+        let alt = fp_alt.to_string();
+        let neu = tokio::task::spawn_blocking(move || {
+            let wert = s.decrypt(&chiffrat, &alt).ok()?;
+            s.encrypt(&wert).ok()
+        })
+        .await
+        .ok()
+        .flatten();
+        match neu {
+            Some((chiffrat, fp)) if fp == fp_neu => {
+                if repo::update_chiffrat(&mut tx, &adapter_id, &name, &chiffrat, fp_neu, fp_alt)
+                    .await?
+                {
+                    ergebnis.umgeschluesselt += 1;
+                }
+            }
+            _ => ergebnis.unlesbar += 1,
+        }
+    }
+    tx.commit().await?;
+    ergebnis.uebrig =
+        u64::try_from(repo::count_fremde_chiffrate(pool, Some(fp_neu)).await?).unwrap_or_default();
+    Ok(ergebnis)
 }
 
 /// Ein Durchgang zum Zeitpunkt `jetzt`, der auf jeden gestarteten Abruf wartet (für Tests).

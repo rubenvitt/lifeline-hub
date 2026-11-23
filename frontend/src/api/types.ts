@@ -49,6 +49,7 @@ export type WebhookAnzeige = S['WebhookAnzeige'];
 export type WebhookLetzterFehler = S['WebhookLetzterFehler'];
 export type WebhookVersuch = S['WebhookVersuch'];
 export type WebhookTestErgebnis = S['WebhookTestErgebnis'];
+export type WebhookZertifikat = S['WebhookZertifikat'];
 export type WebhookZustand = S['WebhookZustand'];
 export type WebhookFehler = S['WebhookFehler'];
 export type RuhtGrund = S['RuhtGrund'];

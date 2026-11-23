@@ -178,7 +178,7 @@ export default function HilfePage() {
       { replace: true, state: isAppPfad(vonInAdresse) ? { von: vonInAdresse } : location.state },
     );
     // Nur der Parameter löst aus; Pfad, State und übrige Suche gelten zum selben Zeitpunkt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [vonInAdresse]);
 
   // „/“ springt in die Suche, wie in der Doku der Website.

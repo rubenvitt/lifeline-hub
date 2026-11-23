@@ -126,7 +126,7 @@ export function useZahlEingabe({
     // Erst prüfen, dann melden: `onGrund?.(pruefe(…))` überspränge ohne `onGrund` das Prüfen.
     const neu = pruefe(value, grenzen);
     onGrund?.(neu);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur ein neuer Wert von außen zählt
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- nur ein neuer Wert von außen zählt
   }, [value]);
   return {
     wert: nur && grund ? abgelehnt : value,

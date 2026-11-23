@@ -729,7 +729,7 @@ class AppModell(
             }
             Testzustand.WEB, Testzustand.FREMDE_SEITE -> {
                 // Den WebView baut `start()` (`zeigeBeispielseite`).
-                seite = Ablauf.Seite.Web(elw, vertrag = 1)
+                seite = Ablauf.Seite.Web(elw, vertrag = 2)
                 zeigtZurOberflaeche = testzustand == Testzustand.FREMDE_SEITE
             }
         }
@@ -779,8 +779,8 @@ class AppModell(
             val (mitLager, _) = mitElw.mit("https://lager.example", "Lager")
             val (alle, kv) = mitLager.mit("https://lifeline.kv.example", "Kreisverband")
             return alle
-                .markVerbunden(elw.id, zeit = 1_800_000_000_000, vertrag = 1)
-                .markVerbunden(kv.id, zeit = 1_799_400_000_000, vertrag = 1)
+                .markVerbunden(elw.id, zeit = 1_800_000_000_000, vertrag = 2)
+                .markVerbunden(kv.id, zeit = 1_799_400_000_000, vertrag = 2)
         }
     }
 }
