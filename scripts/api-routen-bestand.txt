@@ -187,6 +187,7 @@
 /api/einsaetze/{id}/einheiten/{eid}/praesenz
 /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg}
 /api/einsaetze/{id}/einheiten/{eid}/status
+/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen
 /api/einsaetze/{id}/einheiten/{eid}/stornieren
 /api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren
 /api/einsaetze/{id}/einheiten/{eid}/uebernehmen
@@ -283,6 +284,7 @@
 /api/einsaetze/{id}/material/{em_id}/entlassen/zuruecknehmen
 /api/einsaetze/{id}/material/{em_id}/nachforderung
 /api/einsaetze/{id}/material/{em_id}/reaktivieren
+/api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen
 /api/einsaetze/{id}/material/{em_id}/stornieren
 /api/einsaetze/{id}/meldungen
 /api/einsaetze/{id}/meldungen/kennzahlen
@@ -325,6 +327,7 @@
 /api/einsaetze/{id}/personal/{ep_id}/entlassen/zuruecknehmen
 /api/einsaetze/{id}/personal/{ep_id}/position
 /api/einsaetze/{id}/personal/{ep_id}/reaktivieren
+/api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen
 /api/einsaetze/{id}/personal/{ep_id}/stornieren
 /api/einsaetze/{id}/personal/{ep_id}/zeitachse
 /api/einsaetze/{id}/personal/{ep_id}/zeitachse/periode
