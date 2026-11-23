@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 22.11.2026 (Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -314,11 +314,14 @@ Umgebungsvariable; kein anderes Modul liest `std::env::var` (`tests/env_config_g
 
 Schreibwege und Scheduler melden nach dem Commit über `benachrichtigung::melden`
 (`src/benachrichtigung/`); zugestellt wird über die Live-Ströme, mit Schalter `--web-push` auch per
-Web Push an geschlossene Tabs (`src/web_push/`) und in Desktop-, iOS- und Android-Hülle als native
-Meldung, in iOS- und Android-Hülle nur bei laufender App (8.31).
-Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Benachrichtigungen“; Spec
-[`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md); Betrieb
-[`docs/betrieb/web-push.md`](../betrieb/web-push.md).
+Web Push an geschlossene Tabs (`src/web_push/`), mit Schalter `--ios-push` über das Push-Relais und
+APNs an die iOS-App bei geschlossener App (`src/ios_push/`, `push-relais/`, Inhalt Ende-zu-Ende
+verschlüsselt, [ADR-0090](entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md)),
+und in Desktop-, iOS- und Android-Hülle als native Meldung, in iOS- und Android-Hülle nur bei
+laufender App (8.31).
+Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitte „Benachrichtigungen“ und „iOS-Push“;
+Spec [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md); Betrieb
+[`docs/betrieb/web-push.md`](../betrieb/web-push.md), [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md).
 
 ## 8.20 Datensicherung
 
@@ -453,7 +456,7 @@ Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; dre
   LLH-1982, [ADR-0083](entscheidungen/ADR-0083-die-desktop-huelle-prueft-den-huellen-vertrag-und-holt-sonst-nichts-vom-server.md)).
 - **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
   (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, `platform` und
-  `version`, bei iOS und Android dazu `haptics`; Android ohne `setAppBadge`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
+  `version`, bei iOS und Android dazu `haptics`, bei iOS außerdem `push`; Android ohne `setAppBadge`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
   das Frontend unterscheidet die Hüllen nur darüber. Gesetzt wird sie von den Init-Skripten der
   Desktop-Hülle (`src-tauri/src/*.js`), von `ios/App/Huelle/huelle.js` und von
   `android/app/src/main/assets/huelle.js`; Vitest führt sie aus (`frontend/src/test/huelle.ts`).

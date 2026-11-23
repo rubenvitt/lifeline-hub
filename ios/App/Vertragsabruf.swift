@@ -60,3 +60,23 @@ final class Umleitungssperre: NSObject, URLSessionTaskDelegate, Sendable {
         return Vertragspruefung.followsRedirect(von: von, nach: request.url) ? request : nil
     }
 }
+
+extension Vertragsabruf {
+    /// `POST /api/ios-push/unregister` beim Entfernen eines Servers (Entwurf „iOS-Alarme über
+    /// APNs“): die einzige native Anfrage an einen Server, die keine Seite lädt. Ohne Sitzung, mit
+    /// dem Nachweis aus dem Schlüssel; einmal je Anlass, ohne Wiederholen. Liefert den Status
+    /// (`nil` ohne Antwort), über den `AusstehendeAbmeldung.isErledigt` entscheidet; gleiche
+    /// Sitzung wie der Abruf (keine Weiterleitung auf eine fremde Origin).
+    static func meldePushAb(_ adresse: ServerAdresse, kennung: String, nachweis: String) async
+        -> Int?
+    {
+        var anfrage = URLRequest(url: endpoint("/api/ios-push/unregister", adresse))
+        anfrage.httpMethod = "POST"
+        anfrage.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        anfrage.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "kennung": kennung, "nachweis": nachweis,
+        ])
+        guard let (_, antwort) = try? await session.data(for: anfrage) else { return nil }
+        return (antwort as? HTTPURLResponse)?.statusCode
+    }
+}

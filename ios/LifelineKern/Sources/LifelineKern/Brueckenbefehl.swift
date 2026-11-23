@@ -10,6 +10,10 @@ public enum Brueckenbefehl: Equatable, Sendable {
     case setAppBadge(id: Int, count: Int)
     case print(id: Int)
     case signInWithBrowser(id: Int)
+    /// Meldet die App am Push-Kanal an (Antwort: Kennung, Token, Umgebung, Schlüssel).
+    case pushRegister(id: Int)
+    case pushUnregister(id: Int)
+    case pushState(id: Int)
     /// Unbekannter Befehl oder fehlerhafte Felder; die Seite bekommt eine Ablehnung.
     case ungueltig(id: Int, grund: String)
 }
@@ -18,6 +22,8 @@ public enum Brueckenbefehl: Equatable, Sendable {
 public enum Antwortwert: Equatable, Sendable {
     case null
     case bool(Bool)
+    /// JSON-Objekt aus Textwerten (`push_register`, `push_state`).
+    case objekt([String: String])
 }
 
 /// Antwort an die Seite: `window.__LIFELINE_REPLY__(id, fehler, wert)`.
@@ -59,6 +65,12 @@ extension Bruecke {
             return .print(id: id)
         case "sign_in_with_browser":
             return .signInWithBrowser(id: id)
+        case "push_register":
+            return .pushRegister(id: id)
+        case "push_unregister":
+            return .pushUnregister(id: id)
+        case "push_state":
+            return .pushState(id: id)
         default:
             return .ungueltig(id: id, grund: "Unbekannter Befehl der Hülle: \(cmd)")
         }
@@ -72,8 +84,17 @@ extension Bruecke {
         switch antwort.wert {
         case .null: wert = "null"
         case .bool(let b): wert = b ? "true" : "false"
+        case .objekt(let felder): wert = jsObjekt(felder)
         }
         return "window.__LIFELINE_REPLY__?.(\(antwort.id), \(fehler), \(wert));"
+    }
+
+    /// JSON-Objekt mit sortierten Schlüsseln, gültig als JS-Literal (wie `jsString`).
+    private static func jsObjekt(_ felder: [String: String]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let daten = (try? encoder.encode(felder)) ?? Data("{}".utf8)
+        return String(decoding: daten, as: UTF8.self)
     }
 
     /// JSON-String, gültig als JS-Literal (JSONEncoder maskiert auch `/`, also `</script>`).
@@ -99,6 +120,37 @@ public enum Meldungsfreigabe: Equatable, Sendable {
     case verweigert
 }
 
+/// Die Anmeldung am Push-Kanal: Kennung der Anmeldung beim Server, Token von APNs, `umgebung`
+/// (`sandbox` oder `production`) und der Schlüssel, mit dem der Server die Nutzlast verschlüsselt.
+public struct PushRegistrierung: Equatable, Sendable {
+    public let kennung: String
+    public let token: String
+    public let umgebung: String
+    public let schluessel: String
+
+    public init(kennung: String, token: String, umgebung: String, schluessel: String) {
+        self.kennung = kennung
+        self.token = token
+        self.umgebung = umgebung
+        self.schluessel = schluessel
+    }
+}
+
+/// Warum sich die App nicht anmelden konnte; der Text geht als Fehlercode an die Seite.
+public enum PushFehler: Error, Equatable, Sendable, LocalizedError {
+    /// Die Person hat Meldungen nicht erlaubt.
+    case denied
+    /// APNs gibt kein Token (kein Netz, Simulator ohne Unterstützung).
+    case unavailable
+
+    public var errorDescription: String? {
+        switch self {
+        case .denied: "denied"
+        case .unavailable: "unavailable"
+        }
+    }
+}
+
 /// Die Systemdienste, die die Brücke braucht; die App setzt sie mit UIKit und UserNotifications
 /// um, die Tests mit einer Attrappe.
 @MainActor
@@ -116,6 +168,14 @@ public protocol Huellendienste: AnyObject, Sendable {
     /// Startet „Im Browser anmelden“ (`ASWebAuthenticationSession`, Entwurf D7); wirft, wenn die
     /// Sitzung nicht beginnt. Das Ergebnis meldet die App später als `Anmeldung.ereignis`.
     func startAnmeldung() throws
+    /// Fragt bei Bedarf nach der Berechtigung und holt Token und Schlüssel für den aktiven Server;
+    /// wirft `PushFehler`.
+    func registerPush() async throws -> PushRegistrierung
+    /// Nimmt die Anmeldung des aktiven Servers weg (Schlüssel, Kennung).
+    func unregisterPush() async throws
+    /// Berechtigung und Kennung des aktiven Servers, sobald die App eine angelegt hat (auch wenn
+    /// ihr Schlüssel fehlt: nur mit ihr meldet die Seite am Server ab); fragt nie.
+    func pushState() async -> (Meldungsfreigabe, kennung: String?)
 }
 
 /// Führt einen angenommenen Befehl aus (Spec `ios-huelle`, „Haptik nur auf Wunsch der Seite und
@@ -160,6 +220,32 @@ public enum Brueckenausfuehrung {
             return await antwort(id) {
                 try dienste.startAnmeldung()
                 return .null
+            }
+        case .pushRegister(let id):
+            return await antwort(id) {
+                let r = try await dienste.registerPush()
+                return .objekt([
+                    "registration_id": r.kennung, "token": r.token, "environment": r.umgebung,
+                    "key": r.schluessel,
+                ])
+            }
+        case .pushUnregister(let id):
+            return await antwort(id) {
+                try await dienste.unregisterPush()
+                return .null
+            }
+        case .pushState(let id):
+            return await antwort(id) {
+                let (freigabe, kennung) = await dienste.pushState()
+                let permission =
+                    switch freigabe {
+                    case .erlaubt: "granted"
+                    case .verweigert: "denied"
+                    case .offen: "undetermined"
+                    }
+                var felder = ["permission": permission]
+                if let kennung { felder["registration_id"] = kennung }
+                return .objekt(felder)
             }
         case .ungueltig(let id, let grund):
             return Brueckenantwort(id: id, fehler: grund, wert: .null)

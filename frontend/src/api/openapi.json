@@ -12092,6 +12092,13 @@
           "fingerabdruck": {
             "type": "string"
           },
+          "ios_push_relais_gesperrt_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Das Push-Relais nimmt diese Instanz nicht an (`403`, LLH-2040): seit wann, UTC. Nur mit\n`--ios-push`; die Verwaltung zeigt dann die Warnung."
+          },
           "kennung": {
             "type": "string"
           },
@@ -12140,6 +12147,58 @@
           "passt_nicht",
           "gegenstelle_kennt_aelteres"
         ]
+      },
+      "IosPushStand": {
+        "type": "object",
+        "description": "Stand von iOS-Push für dieses Gerät.",
+        "required": [
+          "eingeschaltet",
+          "angemeldet",
+          "an_dieser_sitzung",
+          "inhalt",
+          "stumm",
+          "relais_gesperrt"
+        ],
+        "properties": {
+          "an_dieser_sitzung": {
+            "type": "boolean",
+            "description": "Die Anmeldung hängt an der Sitzung dieser Anfrage; nur dann nimmt ein Logout sie mit.\nNach einem Sitzungsablauf und neuem Login ist sie `angemeldet`, hier aber `false`: der\nClient bindet sie dann per `PUT` neu. Ohne Anmeldung `false`."
+          },
+          "angemeldet": {
+            "type": "boolean",
+            "description": "Dieses Gerät ist für den angemeldeten Nutzer angemeldet."
+          },
+          "eingeschaltet": {
+            "type": "boolean",
+            "description": "Die Instanz verschickt iOS-Push (`--ios-push`); sonst antworten die Routen 404, das Feld\nist also in einer Antwort stets `true`."
+          },
+          "inhalt": {
+            "type": "boolean",
+            "description": "Die Anmeldung zeigt Absender und Wortlaut; ohne Anmeldung `false`."
+          },
+          "relais_gesperrt": {
+            "type": "boolean",
+            "description": "Das Relais hat diese Instanz gesperrt; Anmeldungen bleiben, es geht aber nichts hinaus."
+          },
+          "stumm": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungArt"
+            },
+            "description": "Die stummen Eingangsarten dieses Geräts, in Katalogreihenfolge; ohne Anmeldung leer."
+          },
+          "ueber_hub": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PushUeberHub",
+                "description": "Push für diesen Nutzer läuft über einen gekoppelten Hub; ein neues Gerät lehnt der Server\ndann mit 422 ab."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "JetztAktualisierenAntwort": {
         "type": "object",

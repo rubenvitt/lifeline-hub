@@ -39,7 +39,9 @@ public enum Ablauf {
         /// Kein Server gespeichert.
         case onboarding
         /// `GET /api/shell` läuft; noch nichts geladen.
-        case pruefung(ServerEintrag)
+        /// `pfad` ist der Pfad einer angetippten Meldung, der nach bestandener Prüfung geladen
+        /// wird (schon durch `Linkregeln.sichererPfad` gelaufen).
+        case pruefung(ServerEintrag, pfad: String? = nil)
         /// Die Oberfläche des Servers im Webview.
         case web(ServerEintrag, vertrag: Int)
         /// Der Server antwortet nicht; der Webview zeigt die gespeicherte Oberfläche dieses
@@ -51,7 +53,7 @@ public enum Ablauf {
         public var eintrag: ServerEintrag? {
             switch self {
             case .onboarding: nil
-            case .pruefung(let e), .web(let e, _), .ohneServer(let e, _), .status(let e, _): e
+            case .pruefung(let e, _), .web(let e, _), .ohneServer(let e, _), .status(let e, _): e
             }
         }
 
@@ -98,6 +100,10 @@ public enum Ablauf {
         case webProzessBeendet
         /// Die gespeicherte Oberfläche ist nach dem Laden nicht hochgefahren (LLH-1980).
         case vorratGescheitert(fuer: UUID)
+        /// Tipp auf eine Meldung: `eintrag` hat die App aus der Kennung der Meldung aufgelöst
+        /// (`PushAnmeldungen.server(zu:)`), `nil` für eine unbekannte Kennung. `pfad` ist
+        /// ungeprüft und kommt aus der Nutzlast.
+        case meldungAngetippt(ServerEintrag?, pfad: String?)
     }
 
     public enum Effect: Equatable, Sendable {
@@ -112,6 +118,9 @@ public enum Ablauf {
         /// `Vorrat.plan` es sagt (LLH-1980).
         case vorwaermen(ServerEintrag, ShellInfo)
         case reload
+        /// Den Pfad (schon abgesichert) auf dem Server des Eintrags laden; der Webview des
+        /// Eintrags steht, sonst baut die App ihn.
+        case ladePfad(ServerEintrag, String)
         case markVerbunden(UUID, vertrag: Int)
         /// Nach `wiederholIntervall` `wiederholen` melden.
         case scheduleRetry
@@ -202,6 +211,19 @@ public enum Ablauf {
             return status(eintrag, klasse == .zertifikat ? .zertifikat : .nichtErreichbar)
         case (.web, .webProzessBeendet):
             return Step(seite, [.reload])
+
+        case (_, .meldungAngetippt(nil, _)):
+            return Step(seite)
+        case (.web(let aktiv, _), .meldungAngetippt(let eintrag?, let pfad)) where aktiv.id == eintrag.id:
+            return Step(seite, [.ladePfad(aktiv, Linkregeln.sichererPfad(pfad, server: aktiv.adresse.url))])
+        case (_, .meldungAngetippt(let eintrag?, let pfad)):
+            // Sichtbar prüfen, dann den Pfad laden statt der Startseite. Das gilt auch auf der
+            // gespeicherten Oberfläche (`ohneServer`): sie hat keinen Server, der den Pfad
+            // liefern könnte, und die Meldung kam eben über ihn; antwortet er doch nicht, holt
+            // `result` sie ohne den Pfad zurück.
+            return Step(
+                .pruefung(eintrag, pfad: Linkregeln.sichererPfad(pfad, server: eintrag.adresse.url)),
+                [.check(eintrag)])
         default:
             return Step(seite)
         }
@@ -236,6 +258,12 @@ public enum Ablauf {
                     .markVerbunden(eintrag.id, vertrag: info.shellContract), .vorwaermen(eintrag, info),
                 ])
             }
+            if case .pruefung(_, let pfad?) = seite {
+                return Step(.web(eintrag, vertrag: info.shellContract), [
+                    .markVerbunden(eintrag.id, vertrag: info.shellContract),
+                    .ladePfad(eintrag, pfad), .vorwaermen(eintrag, info),
+                ])
+            }
             return loaded(eintrag, info)
         case .nichtErreichbar(let klasse) where geladen && klasse != .zertifikat:
             // Die geladene Oberfläche arbeitet ohne Netz weiter (Schreib-Queue, Lagebild aus
@@ -246,7 +274,8 @@ public enum Ablauf {
             if case .ohneServer = seite { return Step(seite, [.scheduleRetry]) }
             if let vorrat {
                 // Nur eine Oberfläche dieses Servers, nie bei Zertifikatsfehler oder
-                // unverträglichem Server (LLH-1980).
+                // unverträglichem Server (LLH-1980). Der Pfad einer angetippten Meldung entfällt
+                // hier wie auf jeder Status-Seite.
                 return Step(.ohneServer(eintrag, version: vorrat), [.loadVorrat(eintrag), .scheduleRetry])
             }
             return status(eintrag, .nichtErreichbar)

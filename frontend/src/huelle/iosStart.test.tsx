@@ -15,9 +15,10 @@ import { merkeRouten } from '../rueckmeldung/adresse';
 import { CLIENT_FEHLER_PFAD } from '../api/clientFehler';
 import { FEHLERGRENZE_TITEL } from '../components/Fehlergrenze';
 import { PUSH_SCHALTER } from '../pages/BenachrichtigungenPage';
-import { ladePushStand, pushAbgleichen, schliessePushMeldungen } from '../alarm/webPush';
+import { schliessePushMeldungen } from '../alarm/webPush';
+import { pushKanal } from '../alarm/pushKanal';
 import { desktopPermission, schliesseAlleDesktopAlarme } from '../alarm/desktopAlarm';
-import { beendeHuelle, starteIosHuelle } from '../test/huelle';
+import { antworteIosHuelle, beendeHuelle, starteIosHuelle } from '../test/huelle';
 
 /**
  * Start in der iOS-Hülle (Change t39ltxxi, design.md Fakt 1): im WKWebView einer App gibt es keinen
@@ -46,9 +47,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mitIosHuelleOhneServiceWorker() {
+function mitIosHuelleOhneServiceWorker({ push = false }: { push?: boolean } = {}) {
   expect('serviceWorker' in navigator).toBe(false);
   starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
+  // Eine ältere Hülle kennt kein `push`: ohne die Kennung bleibt Push still (Bestand).
+  if (!push) window.__LIFELINE_HUELLE__ = { ...window.__LIFELINE_HUELLE__, push: undefined };
   const berichte: unknown[] = [];
   server.use(
     meHandler(admin),
@@ -75,8 +78,8 @@ describe('Start in der iOS-Hülle ohne Service Worker', () => {
       // Registrierung wie in `main.tsx`.
       expect(() => registerSW({ immediate: true, onNeedRefresh: vi.fn() })).not.toThrow();
       // Web Push: kein Schalter, das Abgleichen nach der Anmeldung und das Schließen tun nichts.
-      await expect(ladePushStand()).resolves.toMatchObject({ zustand: 'fehlt' });
-      await expect(pushAbgleichen(admin.id)).resolves.toBeUndefined();
+      await expect(pushKanal().ladeStand()).resolves.toMatchObject({ zustand: 'fehlt' });
+      await expect(pushKanal().abgleichen(admin.id)).resolves.toBeUndefined();
       await expect(schliessePushMeldungen(41)).resolves.toBeUndefined();
       // Alarm: die Erlaubnis der Web-Notification fragt niemand ab, der Weg ohne Worker wirft nicht.
       expect(() => desktopPermission()).not.toThrow();
@@ -113,6 +116,48 @@ describe('Start in der iOS-Hülle ohne Service Worker', () => {
       // Kein Push-Schalter in der App-Hülle.
       expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
       await waitFor(() => expect(berichte).toEqual([]));
+    } finally {
+      ende();
+    }
+  });
+
+  it('mit Push in der Kennung und eingeschaltetem Server erscheint der Schalter', async () => {
+    setzeViewportBreite(1440);
+    const { berichte, unbehandelt, ende } = mitIosHuelleOhneServiceWorker({ push: true });
+    // Die Brücke der Hülle: Berechtigung gefragt, noch keine Registrierung.
+    const bruecke = (window as unknown as { webkit: { messageHandlers: { lifeline: unknown } } })
+      .webkit.messageHandlers.lifeline as { postMessage: ReturnType<typeof vi.fn> };
+    bruecke.postMessage.mockImplementation((n: { cmd: string; id: number }) => {
+      if (n.cmd === 'push_state') {
+        queueMicrotask(() => antworteIosHuelle(n.id, null, { permission: 'undetermined' }));
+      }
+    });
+    server.use(
+      http.get('/api/ios-push', () =>
+        HttpResponse.json({
+          eingeschaltet: true,
+          angemeldet: false,
+          an_dieser_sitzung: false,
+          inhalt: false,
+          stumm: [],
+          relais_gesperrt: false,
+        }),
+      ),
+    );
+    try {
+      const router = createMemoryRouter(appRouten, { initialEntries: ['/benachrichtigungen'] });
+      render(
+        <QueryClientProvider client={neuerQueryClient()}>
+          <ConfigProvider>
+            <AntApp>
+              <RouterProvider router={router} />
+            </AntApp>
+          </ConfigProvider>
+        </QueryClientProvider>,
+      );
+      expect(await screen.findByRole('switch', { name: PUSH_SCHALTER })).toBeInTheDocument();
+      expect(berichte).toEqual([]);
+      expect(unbehandelt).not.toHaveBeenCalled();
     } finally {
       ende();
     }

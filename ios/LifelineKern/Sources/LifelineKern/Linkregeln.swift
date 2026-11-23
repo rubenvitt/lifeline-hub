@@ -48,6 +48,24 @@ public enum Linkregeln {
         isEigeneOrigin(server: server, ziel: seite)
     }
 
+    /// Der Pfad einer Push-Meldung, den die Hülle auf dem Server laden darf; sonst die Startseite
+    /// `/` (gemeinsame Fälle `src-tauri/faelle/deeplink.json`, Abschnitt `push_pfad`). Die
+    /// Nutzlast ist nur durch den Schlüssel der Anmeldung geschützt; ein Pfad, der den Webview
+    /// auf eine fremde Adresse lenkt, wäre ein Weg zum Abgreifen der Anmeldung. Erlaubt ist nur ein
+    /// Pfad mit genau einem führenden `/`: kein Schema, kein `//host`, kein `\` (Browser lesen
+    /// `/\host` wie `//host`), keine Steuer- und Leerzeichen (Browser entfernen Tabulator und
+    /// Zeilenumbruch und machen aus `/⇥/host` ein `//host`). Zuletzt muss die aufgelöste Adresse
+    /// auf der Origin des Servers liegen.
+    public static func sichererPfad(_ pfad: String?, server: URL) -> String {
+        let startseite = "/"
+        guard let pfad, pfad.hasPrefix("/"), !pfad.hasPrefix("//"),
+            !pfad.unicodeScalars.contains(where: { $0.value <= 0x20 || $0.value == 0x7f || $0 == "\\" }),
+            let ziel = URL(string: pfad, relativeTo: server)?.absoluteURL,
+            isEigeneOrigin(server: server, ziel: ziel)
+        else { return startseite }
+        return pfad
+    }
+
     /// Gleiche Origin wie der Server. Das Schema wird eigens verlangt: `blob:` erbt die Origin der
     /// Seite, die ihn erzeugt hat, ist aber keine Adresse, die ein Webview laden kann.
     static func isEigeneOrigin(server: URL?, ziel: URL) -> Bool {

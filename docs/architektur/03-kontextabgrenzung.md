@@ -1,6 +1,6 @@
 # 3. Kontextabgrenzung
 
-Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
+Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Einwurf-Zugang, LLH-1654).
 
 Lifeline Hub ist ein einzelner Server (`lifeline-hub`), der Oberfläche, API und Live-Kanal
 ausliefert. An der Systemgrenze stehen Menschen an Geräten und Fremdsysteme, die der Server
@@ -14,7 +14,7 @@ es nicht (kein SMTP-Crate in [`Cargo.toml`](../../Cargo.toml)).
 
 | Partner | Was ausgetauscht wird |
 | --- | --- |
-| Einsatzleitung, Führungspersonal, Mitarbeit, Beobachter | Erfassen und lesen Einsatzdaten in Browser, PWA oder Desktop-Hülle; Rechte nach Rolle im Einsatz ([Kapitel 1](01-einfuehrung-und-ziele.md), Stakeholder) |
+| Einsatzleitung, Führungspersonal, Mitarbeit, Beobachter | Erfassen und lesen Einsatzdaten in Browser, PWA, Desktop- oder iOS-Hülle; Rechte nach Rolle im Einsatz ([Kapitel 1](01-einfuehrung-und-ziele.md), Stakeholder) |
 | Einsatzkräfte an gekoppelten Geräten | Erfassen für genau eine Stelle eines Einsatzes ohne Personenkonto (Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md)) |
 | Lagemonitor | Zeigt das Lagebild ohne Bedienung und ohne personenbezogene Daten (Spec [`lagemonitor`](../../openspec/specs/lagemonitor/spec.md)) |
 | Administration | Benutzer, Organisation, Karten, Aufbewahrung, Zugangsprotokoll |
@@ -22,6 +22,7 @@ es nicht (kein SMTP-Crate in [`Cargo.toml`](../../Cargo.toml)).
 | Amtliche und offene Datenquellen | Warnungen, Wetter, Pegel, Strahlung, Verkehr, Luftqualität, Energieanlagen, kritische Infrastruktur als Fachebenen der Lagekarte ([`docs/fachebenen-quellen.md`](../fachebenen-quellen.md)) |
 | Karten- und Ortsdienste | Hintergrundkarten online und als Offline-Datei, Ortsnamen zu Koordinaten und Adresssuche |
 | Push-Dienste der Browser-Hersteller | Benachrichtigungen bei geschlossener App, nur mit Schalter `--web-push` ([`docs/betrieb/web-push.md`](../betrieb/web-push.md)) |
+| Push-Relais des Projekts und Apple (APNs) | Benachrichtigungen an die iOS-App bei geschlossener App, nur mit Schalter `--ios-push`; der Inhalt ist für das Gerät verschlüsselt, Relais und Apple sehen Token, Stufe und Zeitpunkt, nicht den Inhalt ([ADR-0090](entscheidungen/ADR-0090-ios-push-laeuft-ueber-ein-relais-mit-ende-zu-ende-verschluesselter-nutzlast.md), [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md)) |
 
 ## 3.2 Technischer Kontext
 
@@ -30,6 +31,7 @@ flowchart LR
   subgraph geraete["Geräte"]
     browser["Browser / PWA<br/>frontend"]
     huelle["Desktop-Hülle<br/>src-tauri"]
+    ios["iOS-Hülle<br/>ios"]
     geraet["Gekoppeltes Gerät,<br/>Lagemonitor<br/>frontend"]
   end
 
@@ -53,12 +55,16 @@ flowchart LR
     fach["Fachebenen-Quellen<br/>NINA, DWD, LHP, BfS-ODL,<br/>Autobahn, UBA, MaStR, Overpass,<br/>Copernicus EMS"]
     geofabrik["Geofabrik<br/>(OSM-Extrakt)"]
     push["Push-Dienste<br/>Google, Mozilla, Apple, Microsoft"]
+    relais["push-relais<br/>(betreibt das Projekt)"]
+    apns["APNs (Apple)"]
     clamd["clamd (ClamAV)"]
     gh["GitHub Releases"]
   end
 
   browser -- "HTTP(S), REST + SSE" --> hub
   huelle -- "Webview lädt Server-Adresse" --> hub
+  ios -- "Webview lädt Server-Adresse,<br/>GET /api/shell" --> hub
+  ios -. "Verbindung des Systems,<br/>Zustellung der Pushes" .-> apns
   geraet -- "HTTP(S), REST + SSE" --> hub
   maschine -- "HTTP(S) /api/v1,<br/>Authorization: Machine" --> hub
   absender -- "HTTPS /api/v1/einwurf,<br/>Schlüssel im Pfad, nur schreibend" --> hub
@@ -79,6 +85,8 @@ flowchart LR
   hub --> fach
   hub -- "KRITIS-Extrakt" --> geofabrik
   hub -- "Web Push (RFC 8291)" --> push
+  hub -- "iOS-Push: POST /v1/senden,<br/>Nutzlast für das Gerät verschlüsselt" --> relais
+  relais -- "HTTP/2, Anbieter-Token aus dem .p8" --> apns
   hub -- "Webhook: HTTPS POST,<br/>signiert in Lifeline-Signature" --> maschine
   hub -- "INSTREAM (TCP oder Unix-Socket)" --> clamd
 ```
@@ -100,6 +108,7 @@ diese nur unter `/api/v1/`.
 | TLS am Server (optional) | Gerät → Server | rustls; eigenes Zertifikat oder selbstsigniertes per `rcgen` | `src/tls/`, `--tls`; [`docs/betrieb-tls.md`](../betrieb-tls.md) |
 | Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto`; für den Einwurf zählt `X-Forwarded-Proto` nur von einem Proxy aus `--trusted-proxies`, und der Proxy protokolliert unter `/api/v1/einwurf/` nichts | `--trusted-proxies` in `src/config.rs`, `is_tls_nachgewiesen` in `src/extract.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md), [`docs/betrieb-tls.md`](../betrieb-tls.md) |
 | Desktop-Hülle | Hülle → Server | Webview lädt die https-Adresse; Anmeldung im Systembrowser über `POST /api/auth/app-code` | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md) |
+| iOS-Hülle | Hülle → Server | Webview lädt die https-Adresse; nativ nur `GET /api/shell` und beim Entfernen eines Servers `POST /api/ios-push/unregister` | [`ios/AGENTS.md`](../../ios/AGENTS.md) |
 | Update der Desktop-Hülle | Hülle → GitHub | HTTPS, `latest.json` am Release (stabil) bzw. Tag `desktop-alpha` | `src-tauri/tauri.conf.json` (`plugins.updater`), `src-tauri/src/update.rs` |
 | OIDC-Anmeldung | Server → IdP (Discovery, Token); Browser → IdP (Redirect) | OpenID Connect über HTTPS, ohne Redirect-Folgen, Antwort gedeckelt | `src/auth/oidc/`, `LIFELINE_OIDC_*` in `src/config.rs`; [`docs/betrieb-oidc.md`](../betrieb-oidc.md) |
 | Online-Kartenquellen | Server → Anbieter (Proxy, Vorgabe an) oder Browser → Anbieter (Proxy pro Quelle abgeschaltet) | HTTPS, Style-JSON, TileJSON, Tiles, Sprites, Glyphs | `src/karte/proxy.rs`, `src/karte/tile_cache.rs`, `src/karte/registry/`, `src/routes/karte.rs`; Vorschläge `default_online_styles` in `src/config.rs` |
@@ -114,6 +123,7 @@ diese nur unter `/api/v1/`.
 | Fachebenen | Server → NINA, DWD, LHP, BfS-ODL, Autobahn, UBA, MaStR, Overpass, Copernicus EMS | HTTPS, JSON/GeoJSON/WFS; normalisiert zu GeoJSON | `src/karte/quellen.rs`, `src/karte/copernicus.rs`; Tabelle der Quellen in [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
 | KRITIS-Extrakt | Server → Geofabrik | HTTPS, `HEAD` und Download einer `.osm.pbf` | `src/karte/kritis/scheduler.rs`; `--kritis-extrakt-url` in `src/config.rs` |
 | Web Push | Server → Push-Dienst | HTTPS, verschlüsselt nach RFC 8291; nur bekannte Dienste (`PUSH_DIENSTE`) | `src/web_push/`; [`docs/betrieb/web-push.md`](../betrieb/web-push.md) |
+| iOS-Push | Server → Push-Relais → APNs | HTTPS, JSON: `POST /v1/server` (Selbstanmeldung beim ersten Versand), `POST /v1/senden` mit `Authorization: Bearer <server_id>.<geheimnis>`, höchstens 100 Nachrichten je Aufruf; die Nutzlast ist AES-256-GCM mit dem Schlüssel des Geräts. Das Relais spricht APNs über HTTP/2 mit einem Anbieter-Token (ES256) | `src/ios_push/`, `push-relais/src/api.rs`, `push-relais/src/apns.rs`; [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md) |
 | Virenscan der Uploads | Server → clamd | ClamAV `INSTREAM` über TCP oder `unix:`-Socket; ohne Adresse kein Scan | `clamd_verbinden` in `src/anhang/mod.rs`; [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Backend — ClamAV-Upload-Scan“ |
 | Sicherung | Server → lokales Verzeichnis | Datei, optional mit `age` verschlüsselt | `src/backup/`; [`docs/betrieb/backup-restore.md`](../betrieb/backup-restore.md) |
 

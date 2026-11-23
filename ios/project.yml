@@ -5,6 +5,11 @@
 # (Version aus [workspace.package]); ohne die Datei bricht XcodeGen ab. Die XcodeGen-Version ist
 # in scripts/ios/xcodegen-installieren.sh gepinnt, den Ablauf in der CI fährt
 # scripts/ios/simulator-pruefung.sh (`.github/workflows/ios-pruefung.yml`).
+#
+# Push über APNs (Entwurf „iOS-Alarme über APNs“): die App trägt Push, Time Sensitive, die App
+# Group und den gemeinsamen Schlüsselbund (App/LifelineHub.entitlements); die Notification Service
+# Extension `Benachrichtigungsdienst` entschlüsselt die Nutzlast und teilt App Group und
+# Schlüsselbund. Code für beide liegt in Gemeinsam/. Signiert wird beides automatisch.
 name: LifelineHub
 
 options:
@@ -38,8 +43,11 @@ targets:
         excludes:
           - "Huelle/**"
           - "Info.plist"
+          - "LifelineHub.entitlements"
           - "PrivacyInfo.xcprivacy"
           - "Version.xcconfig"
+      # Schlüsselbund, Entschlüsseln und App Group, gemeinsam mit der Extension.
+      - path: Gemeinsam
       # Das Init-Skript ist reines JS (Vitest führt es aus, frontend/src/test/huelle.ts); die
       # App liest es als Ressource und spielt es als WKUserScript ein.
       - path: App/Huelle/huelle.js
@@ -53,6 +61,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: LifelineKern
+      # Wird als App-Erweiterung eingebettet (PlugIns/Benachrichtigungsdienst.appex).
+      - target: Benachrichtigungsdienst
     configFiles:
       Debug: App/Version.xcconfig
       Release: App/Version.xcconfig
@@ -62,6 +72,7 @@ targets:
         PRODUCT_NAME: LifelineHub
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: App/LifelineHub.entitlements
     info:
       path: App/Info.plist
       properties:
@@ -70,6 +81,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LifelineVersion: $(LIFELINE_VERSION)
+        # Gruppe des gemeinsamen Schlüsselbunds (Gemeinsam/Schluesselbund.swift).
+        LifelineSchluesselbundGruppe: $(AppIdentifierPrefix)dev.rubeen.lifeline.ios.gemeinsam
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         NSCameraUsageDescription: Die Kamera liest den QR-Code mit der Adresse des Einsatzservers.
@@ -92,6 +105,47 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+
+  # Notification Service Extension: öffnet die verschlüsselte Nutzlast, bevor iOS die Meldung zeigt.
+  Benachrichtigungsdienst:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: Benachrichtigungsdienst
+        excludes:
+          - "Info.plist"
+          - "Benachrichtigungsdienst.entitlements"
+          - "PrivacyInfo.xcprivacy"
+      - path: Gemeinsam
+      # Liest die Zahl der Server aus der App Group: eigenes Privacy-Manifest im Bündel.
+      - path: Benachrichtigungsdienst/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: LifelineKern
+    # Dieselbe Version wie die App; App Store Connect lehnt eine abweichende ab.
+    configFiles:
+      Debug: App/Version.xcconfig
+      Release: App/Version.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios.benachrichtigung
+        PRODUCT_NAME: Benachrichtigungsdienst
+        GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: Benachrichtigungsdienst/Benachrichtigungsdienst.entitlements
+        # Wie in Xcodes Vorlage: nur eingebettet in die App, sonst wird das Archiv „generisch“
+        # und lässt sich nicht zu App Store Connect hochladen (TN3110).
+        SKIP_INSTALL: "YES"
+    info:
+      path: Benachrichtigungsdienst/Info.plist
+      properties:
+        CFBundleDisplayName: Lifeline
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LifelineSchluesselbundGruppe: $(AppIdentifierPrefix)dev.rubeen.lifeline.ios.gemeinsam
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).Dienst
 
   # Unit-Tests im Simulator gegen die gebaute App (Info.plist, Ressourcen).
   LifelineHubTests:

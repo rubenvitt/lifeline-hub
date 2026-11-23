@@ -10,7 +10,10 @@
 // `window.__LIFELINE_REPLY__(id, fehler, wert)` (`fehler` `null` erfüllt, sonst Ablehnung). Die
 // Hülle nimmt Nachrichten nur aus dem Hauptframe und nur von der Origin des aktiven Servers an.
 // Befehle (Wire-Namen englisch, danach fest): `sign_in_with_browser`, `show_notification`
-// `{ title, body }`, `set_app_badge` `{ count }`, `print`, `haptics` `{ kind }` (ohne Antwort).
+// `{ title, body }`, `set_app_badge` `{ count }`, `print`, `haptics` `{ kind }` (ohne Antwort), `push_register` (Antwort
+// `{ registration_id, token, environment, key }`, Fehler `denied` oder `unavailable`),
+// `push_unregister`, `push_state` (Antwort `{ permission: granted|denied|undetermined,
+// registration_id? }`).
 //
 // Ohne Message-Handler `lifeline` (Browser, Desktop-Hülle) tut das Skript nichts.
 (() => {
@@ -74,6 +77,11 @@
       frage('show_notification', { title: titel, body: text ?? null }),
     setAppBadge: (count) => frage('set_app_badge', { count }),
     haptics,
+    // Push über APNs (Entwurf „iOS-Alarme über APNs“): die Oberfläche meldet sich damit am Server an.
+    push: true,
+    pushRegister: () => frage('push_register', {}),
+    pushUnregister: () => frage('push_unregister', {}),
+    pushState: () => frage('push_state', {}),
   });
 
   // `window.print()` tut im WKWebView einer App nichts; die Hülle druckt über

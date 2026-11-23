@@ -67,16 +67,29 @@ impl FromRequestParts<AppState> for EinsatzKontext {
             .and_then(|s| s.parse().ok())
             .ok_or(AppError::NotFound)?;
 
-        let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-        // Ein Gerät ist nie Mitglied: seine Rolle kommt aus der Ansicht (design.md D5). Den
-        // Einsatz hat `CurrentUser` schon gegen die Kopplung geprüft (sonst 404).
+        // Den Einsatz eines Geräts hat `CurrentUser` schon gegen die Kopplung geprüft (sonst 404).
         let geraet = parts.extensions.get::<GeraetKontext>().cloned();
+        Self::load(&state.pool, einsatz_id, benutzer, geraet).await
+    }
+}
+
+impl EinsatzKontext {
+    /// Baut den Kontext wie der Extractor, ohne Anfrage: Einsatz laden, Rolle bestimmen,
+    /// Org-Floor. Für Wege, die für einen bestimmten Benutzer prüfen, was eine Route ihm
+    /// antworten würde (iOS-Push, LLH-2040: Absender und Wortlaut nur mit Leserecht).
+    pub async fn load(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        benutzer: Benutzer,
+        geraet: Option<GeraetKontext>,
+    ) -> Result<Self, AppError> {
+        let einsatz = einsatz_repo::laden(pool, einsatz_id).await?;
+        // Ein Gerät ist nie Mitglied: seine Rolle kommt aus der Ansicht (design.md D5).
         let rolle = match &geraet {
             Some(g) => Some(g.ansicht.rolle()),
-            None => einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?,
+            None => einsatz_repo::rolle_von(pool, einsatz_id, benutzer.id).await?,
         };
         berechtigung::fordere_org_zugehoerigkeit(&benutzer, einsatz.org_id, rolle)?;
-
         Ok(EinsatzKontext {
             einsatz,
             rolle,
@@ -84,9 +97,7 @@ impl FromRequestParts<AppState> for EinsatzKontext {
             geraet,
         })
     }
-}
 
-impl EinsatzKontext {
     /// Lese-Gate inkl. DSGVO-Zeit-Policy (Nachlauffrist/Aufbewahrungsfrist/Tombstone).
     pub fn fordere_lesezugriff(&self) -> Result<(), AppError> {
         berechtigung::fordere_lesezugriff(&self.benutzer, &self.einsatz, self.rolle)

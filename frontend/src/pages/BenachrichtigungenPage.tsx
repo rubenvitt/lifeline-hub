@@ -1,6 +1,7 @@
 import { Button, Switch, Typography, theme } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import AdminPage from '../components/AdminPage';
+import KopierbarerText from '../components/KopierbarerText';
 import { Paneel, PaneelZeile, PaneelZustand, Stapel, Textstufe } from '../components/instrument';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import {
@@ -14,14 +15,9 @@ import {
   showTestMeldung,
 } from '../alarm/desktopAlarm';
 import { useBenachrichtigungsEinstellungen } from '../alarm/useBenachrichtigungsEinstellungen';
-import {
-  ladePushStand,
-  pushAusschalten,
-  pushEinschalten,
-  pushInhaltSetzen,
-  type PushHub,
-  type PushZustand,
-} from '../alarm/webPush';
+import { pushKanal } from '../alarm/pushKanal';
+import { huellePush } from '../huelle/faehigkeiten';
+import type { PushHub, PushZustand } from '../alarm/webPush';
 import { useAuthOptional } from '../auth/AuthContext';
 
 const ALARM_ARTEN = ALLE_ARTEN.filter((a) => BENACHRICHTIGUNG_ARTEN[a].stufe === 'alarm');
@@ -114,41 +110,67 @@ function SchalterZeile({
 }
 
 /**
- * Web Push für diesen Browser (LLH-1223, design.md D8). Fehlt, wo es kein Push gibt (Browser,
- * Hülle, Server ohne Schalter). Erlaubnis, iOS und was der Schalter bewirkt, erklärt die
+ * Push für dieses Gerät (LLH-1223, design.md D8): Web Push im Browser, APNs in der iOS-App
+ * (`pushKanal`). Fehlt, wo es kein Push gibt (Browser, Desktop-Hülle, Server ohne Schalter). Erlaubnis, iOS und was der Schalter bewirkt, erklärt die
  * Anwenderdoku.
  */
 function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   const benutzerId = useAuthOptional()?.benutzer?.id ?? null;
   const [zustand, setZustand] = useState<PushZustand | null>(null);
   const [hub, setHub] = useState<PushHub | null>(null);
+  const [hinweis, setHinweis] = useState<string | null>(null);
   const [inhalt, setInhalt] = useState(false);
   const [laeuft, setLaeuft] = useState<'push' | 'inhalt' | null>(null);
   const [fehler, setFehler] = useState<'push' | 'inhalt' | null>(null);
 
   useEffect(() => {
     let aktiv = true;
-    ladePushStand().then(
-      (s) => {
-        if (!aktiv) return;
-        setZustand(s.zustand);
-        setHub(s.hub ?? null);
-        setInhalt(s.inhalt);
-      },
-      () => aktiv && setZustand('fehlt'),
-    );
+    pushKanal()
+      .ladeStand()
+      .then(
+        (s) => {
+          if (!aktiv) return;
+          setZustand(s.zustand);
+          setHub(s.hub ?? null);
+          setHinweis(s.hinweis ?? null);
+          setInhalt(s.inhalt);
+        },
+        () => aktiv && setZustand('fehlt'),
+      );
     return () => {
       aktiv = false;
     };
   }, []);
 
-  if (zustand == null || zustand === 'fehlt' || benutzerId == null) return null;
-  if (zustand === 'ueber_hub' && hub != null) {
+  if (zustand === 'fehlt' && hinweis != null) {
     return (
       <Paneel titel="Dieses Gerät">
         <PaneelZeile style={zeile}>
-          <Typography.Text>{pushUeberHub(hub.name)}</Typography.Text>
-          <Typography.Link href={`${hub.adresse}/benachrichtigungen`}>{ZUM_HUB}</Typography.Link>
+          <Typography.Text>{hinweis}</Typography.Text>
+        </PaneelZeile>
+      </Paneel>
+    );
+  }
+  if (zustand == null || zustand === 'fehlt' || benutzerId == null) return null;
+  if (zustand === 'ueber_hub' && hub != null) {
+    // In der iOS-App (`hinweis`) führt kein Link zum Hub: er kommt als eigener Server in die App,
+    // dafür steht seine Adresse zum Kopieren da.
+    return (
+      <Paneel titel="Dieses Gerät">
+        <PaneelZeile style={zeile}>
+          {hinweis != null ? (
+            <>
+              <Typography.Text>{hinweis}</Typography.Text>
+              <KopierbarerText text={hub.adresse} bezeichnung="Adresse des Hubs" />
+            </>
+          ) : (
+            <>
+              <Typography.Text>{pushUeberHub(hub.name)}</Typography.Text>
+              <Typography.Link href={`${hub.adresse}/benachrichtigungen`}>
+                {ZUM_HUB}
+              </Typography.Link>
+            </>
+          )}
         </PaneelZeile>
       </Paneel>
     );
@@ -157,7 +179,7 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   const setzePush = (an: boolean) => {
     setLaeuft('push');
     setFehler(null);
-    (an ? pushEinschalten(benutzerId) : pushAusschalten(benutzerId))
+    (an ? pushKanal().einschalten(benutzerId) : pushKanal().ausschalten(benutzerId))
       .then(
         (z) => {
           setZustand(z);
@@ -171,7 +193,8 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   const setzeInhalt = (an: boolean) => {
     setLaeuft('inhalt');
     setFehler(null);
-    pushInhaltSetzen(benutzerId, an)
+    pushKanal()
+      .inhaltSetzen(benutzerId, an)
       .then(setInhalt, () => setFehler('inhalt'))
       .finally(() => setLaeuft(null));
   };
@@ -182,7 +205,13 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
         feldId="benachrichtigung-push"
         name={PUSH_SCHALTER}
         fehler={fehler === 'push'}
-        marke={blockiert ? 'Vom Browser blockiert' : undefined}
+        marke={
+          blockiert
+            ? huellePush() != null
+              ? 'In den iOS-Einstellungen verweigert'
+              : 'Vom Browser blockiert'
+            : undefined
+        }
         an={zustand === 'an'}
         laeuft={laeuft === 'push'}
         gesperrt={laeuft != null || blockiert}

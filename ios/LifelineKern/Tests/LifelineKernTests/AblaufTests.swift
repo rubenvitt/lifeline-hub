@@ -297,6 +297,127 @@ final class AblaufTests: XCTestCase {
         XCTAssertEqual(Ablauf.wiederholIntervall, .seconds(5))
     }
 
+    // MARK: Tippen auf eine Meldung (LLH-2012)
+
+    func testTippenAufAktivenServerLaedtDenPfad() {
+        let schritt = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: "/einsaetze/7"))
+        XCTAssertEqual(schritt.seite, .web(elw, vertrag: 1))
+        XCTAssertEqual(schritt.effects, [.ladePfad(elw, "/einsaetze/7")])
+    }
+
+    func testTippenAufAnderenServerWechseltSichtbarUndLaedtDanachDenPfad() {
+        let tipp = step(.web(elw, vertrag: 1), .meldungAngetippt(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.seite, .pruefung(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.effects, [.check(lager)])
+        let ergebnis = step(
+            tipp.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: lager.id))
+        XCTAssertEqual(ergebnis.seite, .web(lager, vertrag: 2))
+        XCTAssertEqual(
+            ergebnis.effects,
+            [.markVerbunden(lager.id, vertrag: 2), .ladePfad(lager, "/einsaetze/7"), .vorwaermen(lager, info)])
+    }
+
+    func testTippenOhnePfadOeffnetDieStartseiteDesServers() {
+        let schritt = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: nil))
+        XCTAssertEqual(schritt.effects, [.ladePfad(elw, "/")])
+    }
+
+    func testTippenImOnboardingOderAufEinerStatusseitePrueftErstDenServer() {
+        for vorher: Ablauf.Seite in [.onboarding, .status(elw, .nichtErreichbar), .pruefung(elw)] {
+            let schritt = step(vorher, .meldungAngetippt(elw, pfad: "/lage"))
+            XCTAssertEqual(schritt.seite, .pruefung(elw, pfad: "/lage"))
+            XCTAssertEqual(schritt.effects, [.check(elw)])
+        }
+    }
+
+    func testUnbekannteKennungAendertNichts() {
+        for vorher: Ablauf.Seite in [.onboarding, .web(elw, vertrag: 1), .pruefung(lager)] {
+            let schritt = step(vorher, .meldungAngetippt(nil, pfad: "/einsaetze/7"))
+            XCTAssertEqual(schritt.seite, vorher)
+            XCTAssertEqual(schritt.effects, [])
+        }
+    }
+
+    func testFremderPfadOeffnetDieStartseite() throws {
+        let faelle = try GemeinsameFaelle.load("deeplink.json", as: LinkregelnTests.PushPfadDatei.self)
+            .push_pfad
+        for fall in faelle {
+            let aktiv = step(.web(elw, vertrag: 1), .meldungAngetippt(elw, pfad: fall.pfad))
+            XCTAssertEqual(aktiv.effects, [.ladePfad(elw, fall.erwartet)], fall.beschreibung)
+            let anderer = step(.web(elw, vertrag: 1), .meldungAngetippt(lager, pfad: fall.pfad))
+            XCTAssertEqual(
+                anderer.seite, .pruefung(lager, pfad: fall.erwartet), fall.beschreibung)
+        }
+    }
+
+    func testEinFehlschlagenderServerVerwirftDenGemerktenPfad() {
+        let schritt = step(
+            .pruefung(lager, pfad: "/lage"),
+            .ergebnis(.nichtErreichbar(.nichtErreichbar), healthVersion: nil, fuer: lager.id))
+        XCTAssertEqual(schritt.seite, .status(lager, .nichtErreichbar))
+        XCTAssertEqual(step(schritt.seite, .zurOberflaeche).seite, .pruefung(lager))
+    }
+
+    func testEinWechselVerwirftDenGemerktenPfad() {
+        let schritt = step(.pruefung(lager, pfad: "/lage"), .wechseln(elw))
+        XCTAssertEqual(schritt.seite, .pruefung(elw))
+    }
+
+    // MARK: Tippen auf eine Meldung ohne Server (LLH-2012 mit LLH-1980)
+
+    /// Die gespeicherte Oberfläche hat keinen Server, der den Pfad liefern könnte; die Meldung kam
+    /// eben über ihn. Wie auf jeder Seite ohne Server-Oberfläche: erst prüfen, den Pfad merken.
+    func testTippenAufDerGespeichertenOberflaechePrueftErstDenServer() {
+        let seite = Ablauf.Seite.ohneServer(elw, version: info.version)
+        let tipp = step(seite, .meldungAngetippt(elw, pfad: "/lage"), vorrat: info.version)
+        XCTAssertEqual(tipp.seite, .pruefung(elw, pfad: "/lage"))
+        XCTAssertEqual(tipp.effects, [.check(elw)])
+    }
+
+    /// Auch bei gleicher Version lädt die App den Pfad: der Tipp will eine andere Seite, das
+    /// Weiterarbeiten ohne Neuladen gilt nur für die Rückkehr des Servers ohne Tipp.
+    func testNachDemTippAufDerGespeichertenOberflaecheLaedtDieAppDenPfad() {
+        let tipp = step(.ohneServer(elw, version: info.version), .meldungAngetippt(elw, pfad: "/lage"))
+        let ergebnis = step(
+            tipp.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id), vorrat: info.version)
+        XCTAssertEqual(ergebnis.seite, .web(elw, vertrag: 2))
+        XCTAssertEqual(
+            ergebnis.effects, [.markVerbunden(elw.id, vertrag: 2), .ladePfad(elw, "/lage"), .vorwaermen(elw, info)])
+    }
+
+    func testTippAufAnderenServerVonDerGespeichertenOberflaecheWechseltSichtbar() {
+        let tipp = step(.ohneServer(elw, version: "1.0"), .meldungAngetippt(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.seite, .pruefung(lager, pfad: "/einsaetze/7"))
+        XCTAssertEqual(tipp.effects, [.check(lager)])
+    }
+
+    func testUnbekannteKennungLaesstDieGespeicherteOberflaecheStehen() {
+        let seite = Ablauf.Seite.ohneServer(elw, version: "1.0")
+        let schritt = step(seite, .meldungAngetippt(nil, pfad: "/lage"), vorrat: "1.0")
+        XCTAssertEqual(schritt.seite, seite)
+        XCTAssertEqual(schritt.effects, [])
+    }
+
+    /// Antwortet der Server nach dem Tipp nicht, startet die gespeicherte Oberfläche ohne den
+    /// Pfad, wie die Status-Seite ihn verwirft.
+    func testOhneServerNachDemTippStartetDieGespeicherteOberflaecheOhnePfad() {
+        let schritt = step(.pruefung(elw, pfad: "/lage"), nichtErreichbar(elw), vorrat: "1.0")
+        XCTAssertEqual(schritt.seite, .ohneServer(elw, version: "1.0"))
+        XCTAssertEqual(schritt.effects, [.loadVorrat(elw), .scheduleRetry])
+        let zurueck = step(
+            schritt.seite, .ergebnis(.vertraeglich(info), healthVersion: nil, fuer: elw.id), vorrat: "1.0")
+        XCTAssertFalse(zurueck.effects.contains { if case .ladePfad = $0 { true } else { false } })
+    }
+
+    /// Ein verspätetes „nicht hochgefahren“ der verlassenen gespeicherten Oberfläche nimmt der
+    /// Prüfung den Pfad nicht.
+    func testGescheiterterVorratNachDemTippBehaeltDenPfad() {
+        let seite = Ablauf.Seite.pruefung(elw, pfad: "/lage")
+        let schritt = step(seite, .vorratGescheitert(fuer: elw.id), vorrat: "1.0")
+        XCTAssertEqual(schritt.seite, seite)
+        XCTAssertEqual(schritt.effects, [])
+    }
+
     // MARK: Start ohne Server (LLH-1980)
 
     func nichtErreichbar(_ e: ServerEintrag) -> Ablauf.Event {

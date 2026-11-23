@@ -84,7 +84,9 @@ trotzdem, denn die Pflicht gilt für jedes Medium mit Einsatzdaten. Die Klartext
 liegt neben der Datenbank und zählt zum Ort „Datenbank“.
 
 > Die automatischen Sicherungen sind wie jeder Export session-bereinigt: sie enthalten
-> keine Anmelde-Tokens.
+> keine Anmelde-Tokens und nichts von iOS-Push (keine Geräteanmeldungen, keinen Zugang zum
+> Push-Relais). Nach dem Einspielen meldet sich der Server beim nächsten Versand neu am Relais
+> an; die Geräte melden sich nach dem nächsten Login in der App wieder an.
 
 ## Verschlüsselte Sicherungen (LFH-1002)
 

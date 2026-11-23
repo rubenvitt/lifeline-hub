@@ -457,7 +457,8 @@ pub async fn logout(
         let (benutzer_id, anmeldeweg) =
             session::herkunft_zu_token(&state.pool, cookie.value()).await;
 
-        let beendet = session::loeschen(&state.pool, cookie.value()).await?;
+        // Die iOS-Anmeldung dieser Sitzung geht mit (LLH-2040), in derselben Transaktion.
+        let beendet = session::abmelden(&state.pool, cookie.value()).await?;
         state.live.melde_sitzung_ende(beendet);
 
         tracing::info!(benutzer_id = ?benutzer_id, peer_ip = ?peer_ip, "Abmeldung");

@@ -49,7 +49,7 @@ import {
 } from '../offline/geraetRaeumung';
 import { merkeGeraet } from '../geraet/geraetMarke';
 import { confirmGeraetKonto } from '../offline/fruehereKopplung';
-import { pushAbgleichen } from '../alarm/webPush';
+import { pushKanal } from '../alarm/pushKanal';
 import {
   GATEWAY_NICHT_ERREICHBAR,
   istVerbindungsfehler,
@@ -174,7 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Browser gewählt, meldet die neue es wieder an. Wirft nie, fragt nie nach der Erlaubnis. Ein
   // Neuladen derselben Sitzung findet das Abo am Server vor und meldet nicht erneut an (LLH-1839).
   useEffect(() => {
-    if (benutzerId != null && !istGeraet) void pushAbgleichen(benutzerId, { nurBeiBedarf: true });
+    if (benutzerId != null && !istGeraet)
+      void pushKanal().abgleichen(benutzerId, { nurBeiBedarf: true });
   }, [benutzerId, istGeraet]);
   // Refs für die Prüfung, die aus Fremd-Ereignissen läuft und nicht an einen Render gebunden
   // sein darf: sie muss den Benutzer von JETZT vergleichen, nicht den ihres Closures.
@@ -319,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Laufende Abrufe nicht abbrechen: die an der Sperre wartenden wiederholen gerade, ein
       // Abbruch schickte jeden zweimal.
       void queryClient.invalidateQueries(undefined, { cancelRefetch: false });
-      void pushAbgleichen(b.id, { nurBeiBedarf: true });
+      void pushKanal().abgleichen(b.id, { nurBeiBedarf: true });
       meldeAuthWechsel({ art: 'angemeldet' });
       return true;
     },

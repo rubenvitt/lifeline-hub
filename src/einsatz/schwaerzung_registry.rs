@@ -4145,10 +4145,15 @@ mod tests {
     /// werden. Je KANTE, nicht je Tabelle; der Grund ist Pflicht.
     ///
     /// GUARD 5 sieht keine Verweise ohne deklarierten FK (polymorphe `objekt_typ`/`objekt_id`) und
-    /// keine `_fts`-Tabellen. Die Liste ist leer, weil der Bestand keine solche Kante hat; ein
-    /// Eintrag ohne Querkante gilt selbst als Verstoß
+    /// keine `_fts`-Tabellen. Ein Eintrag ohne Querkante gilt selbst als Verstoß
     /// (`guard5_allowlist_hat_keine_toten_eintraege`).
-    const FREMDKANTEN_ALLOWLIST: &[(&str, &str, &str)] = &[];
+    const FREMDKANTEN_ALLOWLIST: &[(&str, &str, &str)] = &[(
+        "ios_push_anmeldung",
+        "session_token_hash",
+        "Die Anmeldung hängt an Konto und Gerät, nicht am Einsatz; der Sitzungsbezug ist nur \
+         der Weg zum Abmelden und fällt mit der Sitzung auf NULL (ON DELETE SET NULL). Ein \
+         Gerätekonto bekommt nie eine Anmeldung, im Einsatz-Scope liegt keine Zeile.",
+    )];
 
     /// Eine FK-Kante aus einer Tabelle außerhalb von S auf eine Tabelle in S.
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
