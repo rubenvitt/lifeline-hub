@@ -74,7 +74,7 @@ pub async fn queue_nachtraege(
 
 /// Führer: Was an einer Mitgliedschaft nach der Grenze geschieht, ist eine bewusste Wahl, die kein
 /// Nachtrag mehr überstimmt (Design D4). Die Grenze ist der Stand, ab dem diese Instanz `mitarbeit`
-/// kennt: für eine Kopplung von vor dem Aufrüsten setzt sie die Migration 0363 auf das Aufrüsten,
+/// kennt: für eine Kopplung von vor dem Aufrüsten setzt sie die Migration 0364 auf das Aufrüsten,
 /// sonst setzt sie der erste Wechsel der Fähigkeit hier. Ein späterer Wechsel verschiebt sie nicht:
 /// Eine Wahl zwischen Aufrüsten und erstem Melden bliebe sonst überstimmbar. Der Stand ist ein
 /// globaler Zähler (`einsatz_aenderung.stand`, AUTOINCREMENT): Jede spätere Änderung liegt darüber.
