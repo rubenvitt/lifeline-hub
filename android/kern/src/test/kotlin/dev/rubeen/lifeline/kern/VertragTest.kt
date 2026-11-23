@@ -6,137 +6,106 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Vertragsprüfung gegen `GET /api/shell`: die App lädt nur einen verträglichen Server, und ein
- * Server ohne Vertrag gilt als zu alt.
+ * Server ohne Vertrag gilt als zu alt. Bewertung und Weiterleitungsregel prüfen die gemeinsamen
+ * Fälle (`vertrag.json`, LLH-2062); hier steht nur, was allein die mobilen Hüllen kennen:
+ * Zertifikatsfehler, Abbruch durch die App, `/api/health`, fehlende URIs.
  */
 class VertragTest {
-    private fun shell(vertrag: Int, version: String = "1.0.0-alpha.300") =
-        ShellAbruf.Antwort(200, """{"version":"$version","shell_contract":$vertrag}""", "application/json")
+    @Serializable
+    private class Datei(val bekannt: List<Int>, val bewerte: List<BewerteFall>, val weiterleitung: List<WeiterleitungFall>)
 
-    private fun antwort(status: Int, body: String = "", typ: String? = "text/html") = ShellAbruf.Antwort(status, body, typ)
+    @Serializable
+    private class BewerteFall(
+        val beschreibung: String,
+        val abruf: Abruf,
+        @SerialName("letzter_vertrag") val letzterVertrag: Int? = null,
+        val bekannt: List<Int>? = null,
+        val ergebnis: String,
+        @SerialName("server_version") val serverVersion: String? = null,
+        @SerialName("shell_contract") val shellContract: Int? = null,
+    )
 
-    @Test
-    fun `ShellInfo liest die Wire-Felder und ignoriert neue`() {
-        val json = """{"version":"1.0.0-alpha.300","shell_contract":1,"assets":["a.js"]}"""
-        val info = Json { ignoreUnknownKeys = true }.decodeFromString(ShellInfo.serializer(), json)
-        assertEquals(ShellInfo("1.0.0-alpha.300", 1), info)
+    /** Eine Antwort (`status`, `content_type`, `koerper`) oder `fehler`: keine Antwort. */
+    @Serializable
+    private class Abruf(
+        val status: Int? = null,
+        @SerialName("content_type") val contentType: String? = null,
+        val koerper: String? = null,
+        val fehler: Boolean = false,
+    ) {
+        fun shellAbruf(): ShellAbruf =
+            if (fehler) {
+                ShellAbruf.Fehler(Netzfehler.VERBINDUNG)
+            } else {
+                ShellAbruf.Antwort(requireNotNull(status), requireNotNull(koerper), contentType)
+            }
     }
 
-    @Test
-    fun `die App kennt genau den ersten Vertrag`() {
-        assertEquals(listOf(1), LifelineKern.bekannteVertraege)
-    }
+    @Serializable
+    private class WeiterleitungFall(val beschreibung: String, val von: String, val nach: String, val folgt: Boolean)
 
-    @Test
-    fun `ein bekannter Vertrag ist verträglich`() {
-        assertEquals(
-            Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0-alpha.300", 1)),
-            Vertragspruefung.evaluate(shell(1), null),
+    /**
+     * Das Ergebnis in der Form der Fälle. Die App trägt bei „nicht verträglich“ den ganzen
+     * [ShellInfo] des Servers; die Fälle nennen davon die Version (wie die anderen Hüllen).
+     */
+    private data class Erwartung(val ergebnis: String, val serverVersion: String?, val shellContract: Int?) {
+        constructor(fall: BewerteFall) : this(fall.ergebnis, fall.serverVersion, fall.shellContract)
+
+        constructor(ist: Vertragsergebnis) : this(
+            when (ist.fehlerklasse) {
+                null -> "vertraeglich"
+                else -> ist.fehlerklasse.toString().lowercase()
+            },
+            when (ist) {
+                is Vertragsergebnis.Vertraeglich -> ist.info.version
+                is Vertragsergebnis.NichtVertraeglich -> ist.server?.version
+                is Vertragsergebnis.NichtErreichbar -> null
+            },
+            (ist as? Vertragsergebnis.Vertraeglich)?.info?.shellContract,
         )
     }
 
-    @Test
-    fun `ein größerer Vertrag heißt App aktualisieren`() {
-        assertEquals(
-            Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, ShellInfo("2.0.0", 2)),
-            Vertragspruefung.evaluate(shell(2, "2.0.0"), 1),
-        )
-        assertEquals(Fehlerklasse.ZU_NEU, Vertragspruefung.evaluate(shell(2), 1).fehlerklasse)
-    }
+    private fun datei() = GemeinsameFaelle.load("vertrag.json", Datei.serializer())
 
     @Test
-    fun `ein kleinerer Vertrag heißt Server zu alt`() {
-        assertEquals(Fehlerklasse.ZU_ALT, Vertragspruefung.evaluate(shell(1), null, listOf(2, 3)).fehlerklasse)
-    }
-
-    @Test
-    fun `ohne Endpunkt ist der Server zu alt`() {
-        assertEquals(
-            Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_ALT, null),
-            Vertragspruefung.evaluate(antwort(404, typ = "text/plain"), 1),
-        )
-        // JSON ohne lesbaren Vertrag nennt keinen Vertrag.
-        for (typ in listOf("application/json", "application/json; charset=utf-8", "Application/JSON")) {
-            assertEquals(
-                Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_ALT, null),
-                Vertragspruefung.evaluate(antwort(200, """{"status":"ok"}""", typ), 1),
-                typ,
-            )
+    fun `jeder gemeinsame Fall von bewerte gilt`() {
+        val datei = datei()
+        assertTrue(datei.bewerte.size >= 20)
+        for (fall in datei.bewerte) {
+            val ist = Vertragspruefung.evaluate(fall.abruf.shellAbruf(), fall.letzterVertrag, fall.bekannt ?: datei.bekannt)
+            assertEquals(Erwartung(fall), Erwartung(ist), fall.beschreibung)
         }
     }
 
     @Test
-    fun `der Vertrag gilt auch mit Zeichensatz im ContentType`() {
-        val abruf = antwort(200, """{"version":"1.0.0","shell_contract":1}""", "application/json; charset=utf-8")
-        assertEquals(Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0", 1)), Vertragspruefung.evaluate(abruf, null))
-    }
-
-    /** Ein Captive Portal antwortet mit 200 und HTML: das ist nicht der Server. */
-    @Test
-    fun `eine 200 ohne JSON ist nicht der Server`() {
-        val portal = "<!doctype html><title>WLAN-Anmeldung</title>"
-        for (typ in listOf("text/html", "text/html; charset=utf-8", "text/plain", null)) {
-            val abruf = antwort(200, portal, typ)
+    fun `jeder gemeinsame Fall von weiterleitung gilt`() {
+        val datei = datei()
+        assertTrue(datei.weiterleitung.size >= 5)
+        for (fall in datei.weiterleitung) {
             assertEquals(
-                Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-                Vertragspruefung.evaluate(abruf, 1),
-                "$typ",
-            )
-            assertEquals(
-                Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-                Vertragspruefung.evaluate(abruf, null),
-                "$typ",
-            )
-            assertEquals(
-                Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, null),
-                Vertragspruefung.evaluate(abruf, 2),
-                "$typ",
-            )
-        }
-        assertEquals(
-            Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-            Vertragspruefung.evaluate(antwort(200, """{"version":"9","shell_contract":1}""", "text/html"), null),
-        )
-    }
-
-    @Test
-    fun `eine Weiterleitung ist wie ohne Verbindung`() {
-        for (status in listOf(301, 302, 303, 307, 308)) {
-            assertEquals(
-                Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-                Vertragspruefung.evaluate(antwort(status), 1),
-                "$status",
+                fall.folgt,
+                Vertragspruefung.followsRedirect(URI.create(fall.von), URI.create(fall.nach)),
+                fall.beschreibung,
             )
         }
     }
 
+    /** Die Fälle setzen voraus, dass die App genau die Verträge der Datei kennt. */
     @Test
-    fun `nur Weiterleitungen auf derselben Origin werden verfolgt`() {
+    fun `die App kennt die Verträge der gemeinsamen Fälle`() {
+        assertEquals(datei().bekannt, LifelineKern.bekannteVertraege)
+    }
+
+    @Test
+    fun `ohne URI wird keiner Weiterleitung gefolgt`() {
         val shell = URI.create("https://elw.local:8443/api/shell")
-        assertTrue(Vertragspruefung.followsRedirect(shell, URI.create("https://ELW.local:8443/api/shell/")))
-        for (ziel in listOf(
-            "https://portal.example/login",
-            "https://elw.local/api/shell",
-            "http://elw.local:8443/api/shell",
-            "https://elw.local:8444/api/shell",
-        )) {
-            assertFalse(Vertragspruefung.followsRedirect(shell, URI.create(ziel)), ziel)
-        }
         assertFalse(Vertragspruefung.followsRedirect(null, shell))
         assertFalse(Vertragspruefung.followsRedirect(shell, null))
-    }
-
-    @Test
-    fun `JSON erkennt den Medientyp`() {
-        for (typ in listOf("application/json", " application/json ; charset=utf-8", "APPLICATION/JSON")) {
-            assertTrue(ShellAbruf.isJson(typ), typ)
-        }
-        for (typ in listOf("text/html", "application/jsonp", "text/json-ish", "", null)) {
-            assertFalse(ShellAbruf.isJson(typ), typ ?: "null")
-        }
     }
 
     @Test
@@ -144,19 +113,6 @@ class VertragTest {
         assertEquals("1.0.0-alpha.12", healthVersion("""{"status":"degraded","version":"1.0.0-alpha.12","db":false}"""))
         assertNull(healthVersion("kein json"))
         assertNull(healthVersion("""{"status":"ok"}"""))
-    }
-
-    /** Ohne Netz gilt der zuletzt bestätigte Vertrag: „nicht erreichbar“, nicht „nicht verträglich“. */
-    @Test
-    fun `ohne Netz gilt der zuletzt bestätigte Vertrag`() {
-        val fehler = ShellAbruf.Fehler(Netzfehler.VERBINDUNG)
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), Vertragspruefung.evaluate(fehler, 1))
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), Vertragspruefung.evaluate(fehler, null))
-        assertEquals(Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, null), Vertragspruefung.evaluate(fehler, 2))
-        assertEquals(
-            Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-            Vertragspruefung.evaluate(antwort(502), 1),
-        )
     }
 
     @Test
@@ -168,16 +124,15 @@ class VertragTest {
         assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 2))
     }
 
+    /** Ein Abbruch durch die App gilt wie jeder Verbindungsfehler, samt gemerktem Vertrag. */
     @Test
-    fun `ein abgebrochener Abruf ist kein Fehler der Seite`() {
-        val ergebnis = Vertragspruefung.evaluate(ShellAbruf.Fehler(Netzfehler.ABGEBROCHEN), 1)
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), ergebnis)
-    }
-
-    @Test
-    fun `die Richtung eines unbekannten Vertrags`() {
-        assertNull(Vertragspruefung.richtung(1, listOf(1)))
-        assertEquals(Fehlerklasse.ZU_NEU, Vertragspruefung.richtung(2, listOf(1)))
-        assertEquals(Fehlerklasse.ZU_ALT, Vertragspruefung.richtung(0, listOf(1)))
+    fun `ein abgebrochener Abruf gilt wie ohne Verbindung`() {
+        for (letzter in listOf(null, 1, 2)) {
+            assertEquals(
+                Vertragspruefung.evaluate(ShellAbruf.Fehler(Netzfehler.VERBINDUNG), letzter),
+                Vertragspruefung.evaluate(ShellAbruf.Fehler(Netzfehler.ABGEBROCHEN), letzter),
+                "$letzter",
+            )
+        }
     }
 }
