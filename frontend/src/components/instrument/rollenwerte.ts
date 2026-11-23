@@ -62,7 +62,6 @@ export function schriftStil(stufe: Schriftstufenname) {
     familie: keyof typeof schrift;
     sperrung?: string;
     versal?: boolean;
-    ziffern?: 'tabellarisch';
   } = schriftskala[stufe];
   return {
     fontFamily: schrift[s.familie],
@@ -70,10 +69,7 @@ export function schriftStil(stufe: Schriftstufenname) {
     fontWeight: s.gewicht,
     ...(s.sperrung ? { letterSpacing: s.sperrung } : {}),
     ...(s.versal ? { textTransform: 'uppercase' as const } : {}),
-    // Gleich breite Ziffern in Mono und in `meta` (Archivo kennt `tnum`, LLH-2046).
-    ...(s.familie === 'zahl' || s.ziffern === 'tabellarisch'
-      ? { fontVariantNumeric: 'tabular-nums' as const }
-      : {}),
+    ...(s.familie === 'zahl' ? { fontVariantNumeric: 'tabular-nums' as const } : {}),
   };
 }
 
@@ -83,7 +79,7 @@ export type Monostufe = {
 }[Schriftstufenname];
 
 /**
- * Mono-Text in einer Stufe der `schriftskala` (`monoFein` 11 · `monoKlein` 12 ·
+ * Mono-Text in einer Stufe der `schriftskala` (`meta` 11 · `monoKlein` 12 ·
  * `mono` 13 · `monoGross` 14 · `datenwert*`; LLH-1972). Die Stufe liefert Größe und, ohne
  * `gewicht`, ihr Gewicht — ihre Sperrung NICHT: wer sie will, setzt sie selbst.
  *

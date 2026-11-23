@@ -154,7 +154,7 @@ function ArtenAuswahl({
             return (
               <Checkbox key={a} value={a} disabled={grund != null} data-lfh={`webhook-art-${a}`}>
                 {ART_TEXT[a]}{' '}
-                <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{a}</span>
+                <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{a}</span>
                 {grund && <span style={{ color: rollen.gedaempft }}>{` · ${grund}`}</span>}
               </Checkbox>
             );

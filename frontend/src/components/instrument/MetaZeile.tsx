@@ -13,8 +13,8 @@ import Textstufe, { type Textton } from './Textstufe';
  * MetaZeile — Angaben zu einem Datensatz in einer Zeile (Spec `schriftstufen`, „Metazeile in
  * einer Form", LLH-1810): Teile in `textKlein`/`schwach`, dazwischen „·", den der Vorleser nicht
  * hört. Ein leerer Teil fällt samt Trenner weg, damit kein „· ·" stehen bleibt. Zahl, Zeit,
- * Kennzeichen und Nummer stehen mit `mono` in der Stufe `monoFein` (Zahlenfamilie, gleich breite
- * Ziffern; LLH-2046, vorher `meta`). Reicht die Breite nicht, bricht die Zeile zwischen den Teilen um.
+ * Kennzeichen und Nummer stehen mit `mono` in der Stufe `meta` (Zahlenfamilie, gleich breite
+ * Ziffern). Reicht die Breite nicht, bricht die Zeile zwischen den Teilen um.
  *
  * Steht eine Zeit in einem Wortteil („bis 14:32“), trägt `MetaZeile.Zahl` sie in Mono.
  *
@@ -24,7 +24,7 @@ import Textstufe, { type Textton } from './Textstufe';
 
 interface TeilProps {
   children?: ReactNode;
-  /** Zahl, Zeit, Kennzeichen, Nummer: Stufe `monoFein` in der Zahlenfamilie. */
+  /** Zahl, Zeit, Kennzeichen, Nummer: Stufe `meta` in der Zahlenfamilie. */
   mono?: boolean;
   /** Eigener Ton, etwa `alarm` für „nicht erreichbar“; Vorgabe `schwach`. */
   ton?: Textton;
@@ -32,16 +32,16 @@ interface TeilProps {
 
 function Teil({ children, mono = false, ton = 'schwach' }: TeilProps) {
   return (
-    <Textstufe stufe={mono ? 'monoFein' : 'textKlein'} ton={ton}>
+    <Textstufe stufe={mono ? 'meta' : 'textKlein'} ton={ton}>
       {children}
     </Textstufe>
   );
 }
 
-/** Eine Zahl, Zeit oder Nummer inmitten eines Wortteils („bis 14:32“): Stufe `monoFein`. */
+/** Eine Zahl, Zeit oder Nummer inmitten eines Wortteils („bis 14:32“): Stufe `meta`. */
 function Zahl({ children }: { children: ReactNode }) {
   return (
-    <Textstufe stufe="monoFein" ton="schwach">
+    <Textstufe stufe="meta" ton="schwach">
       {children}
     </Textstufe>
   );

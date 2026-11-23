@@ -55,11 +55,11 @@ export default function CopernicusZusatz({
         >
           {aktivierungen.map((a) => (
             <li key={a.emsr}>
-              <span style={monoStil('monoFein')}>{a.emsr}</span>
+              <span style={monoStil('meta')}>{a.emsr}</span>
               {a.aufnahme && (
                 <>
                   {' · Aufnahme '}
-                  <span style={monoStil('monoFein')}>{zeitKurz(a.aufnahme)}</span>
+                  <span style={monoStil('meta')}>{zeitKurz(a.aufnahme)}</span>
                 </>
               )}
               {a.unvollstaendig && (

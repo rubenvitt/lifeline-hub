@@ -95,7 +95,7 @@ import {
   Sammelbanner,
   WarnstufenHinweis,
   AlarmZeile,
-  schriftStil,
+  monoStil,
   useRollen,
 } from '../../components/instrument';
 import KachelGrenze from '../../components/KachelGrenze';
@@ -447,7 +447,7 @@ export default function LageDashboardPage() {
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: token.padding,
-                ...schriftStil('meta'),
+                ...monoStil('meta'),
                 color: rollen.schwach,
               }}
             >

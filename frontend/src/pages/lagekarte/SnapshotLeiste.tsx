@@ -17,7 +17,7 @@ import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
 import { Select } from '../../components/Select';
-import { monoStil } from '../../components/instrument/rollenwerte';
+import { schriftStil } from '../../components/instrument/rollenwerte';
 import Feld from '../../components/instrument/Feld';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
@@ -157,7 +157,7 @@ export function standBeschriftung(
 
 /**
  * Eine Option der Auswahl „Stand“: Hauptzeile, darunter sekundär die Erfassungszeit (LFH-1057).
- * Die Zeit läuft in `monoFein` (Mono, `tabular-nums`) wie jede Zeit neben Text; „Live“ und ein Stand
+ * Die Zeit läuft in `meta` (Mono, `tabular-nums`) wie jede Zeit neben Text; „Live“ und ein Stand
  * ohne Bezeichnung bleiben einzeilig.
  */
 function StandOption({
@@ -177,7 +177,7 @@ function StandOption({
       </span>
       <span
         data-lfh="stand-zeit"
-        style={{ ...monoStil('monoFein'), color: token.colorTextSecondary }}
+        style={{ ...schriftStil('meta'), color: token.colorTextSecondary }}
       >
         {zeit}
       </span>

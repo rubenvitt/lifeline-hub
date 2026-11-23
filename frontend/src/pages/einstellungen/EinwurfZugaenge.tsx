@@ -506,7 +506,7 @@ export default function EinwurfZugaenge() {
               {EINWURF_ZWECKE.map((s) => (
                 <Radio key={s} value={s}>
                   {SCOPE_TEXT[s]}{' '}
-                  <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{s}</span>
+                  <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
                 </Radio>
               ))}
             </Stapel>

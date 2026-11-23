@@ -40,7 +40,7 @@ export function Marke({ text, titel }: { text: string; titel: string }) {
       data-lfh="kraeftebaum-marke"
       title={titel}
       style={{
-        ...schriftStil('meta'),
+        ...monoStil('meta'),
         display: 'inline-flex',
         justifyContent: 'center',
         minWidth: 24,
@@ -193,12 +193,12 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
           }}
         >
           <Augenbraue>{z.bezeichnung}</Augenbraue>
-          {/* Zahl samt Zählwort: ein gemischter Knoten, also Textschrift (`meta`, LLH-2046). */}
-          <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>· {anzahl}</span>
+          {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
+          <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (
             <span
               data-lfh="kraeftebaum-ausfall"
-              style={{ ...schriftStil('meta'), color: rollen.alarmText }}
+              style={{ ...monoStil('meta'), color: rollen.alarmText }}
             >
               · {ausfall}
             </span>
@@ -210,7 +210,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         // Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
         // sonst als „Mtl“ über „.“ brechen (LFH-1007).
-        <span style={{ ...schriftStil('meta'), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
+        <span style={{ ...monoStil('meta'), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
         <>{z.bezeichnung}</>,
       );
   }

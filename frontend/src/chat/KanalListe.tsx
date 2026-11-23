@@ -139,7 +139,7 @@ export default function KanalListe({
                         data-lfh="kanal-ungelesen"
                         // `bedienText`, nicht `bedien`: die aktive Zeile trägt `flaeche3`, darauf
                         // hielt `bedien` am Tag nur 6,71 : 1 (LFH-879, Boden 7 : 1).
-                        style={{ ...monoStil('monoFein', 500), color: rollen.bedienText }}
+                        style={{ ...monoStil('meta', 500), color: rollen.bedienText }}
                       >
                         {k.ungelesen_anzahl}
                         <span style={NUR_VORLESER}> ungelesen</span>
@@ -148,7 +148,7 @@ export default function KanalListe({
                     {k.letzte_nachricht_at && (
                       <span
                         title="Letzte Nachricht"
-                        style={{ ...monoStil('monoFein'), color: rollen.schwach }}
+                        style={{ ...monoStil('meta'), color: rollen.schwach }}
                       >
                         {zeitKurz(k.letzte_nachricht_at)}
                       </span>

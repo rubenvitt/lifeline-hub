@@ -21,7 +21,6 @@ import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
   monoStil,
-  schriftStil,
   Paneel,
   PaneelZustand,
   Stapel,
@@ -739,7 +738,7 @@ export default function FahrzeugeBesatzung({
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
               <Augenbraue>Ohne Fahrzeug</Augenbraue>
-              <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>

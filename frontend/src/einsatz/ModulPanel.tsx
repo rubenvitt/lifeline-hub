@@ -25,7 +25,7 @@ import { bringIntoView } from '../components/bringIntoView';
 import { abonniereRahmenOben } from '../components/rahmenOben';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { handleLinkKlick } from '../routing/linkModifier';
-import { monoStil, Textstufe } from '../components/instrument';
+import { schriftStil, Textstufe } from '../components/instrument';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -343,7 +343,7 @@ export function ModulListe({
                 title={modulZaehler.beschreibung}
                 style={{
                   flexShrink: 0,
-                  ...monoStil('monoFein'),
+                  ...schriftStil('meta'),
                   color: aktiv ? farben.text2 : farben.schwach,
                 }}
               >

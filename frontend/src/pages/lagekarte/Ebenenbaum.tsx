@@ -88,7 +88,7 @@ function EbenenZeilenKnopf({
         )}
       </span>
       {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
-      <span style={{ ...monoStil('monoFein'), color: rollen.text2 }}>{zeile.anzahl}</span>
+      <span style={{ ...monoStil('meta'), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
   );
 }

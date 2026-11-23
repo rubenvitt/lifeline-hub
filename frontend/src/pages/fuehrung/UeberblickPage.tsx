@@ -1158,10 +1158,8 @@ function abschnittGliederung(
         <span style={{ ...schriftStil('text'), fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
-        {leitung && (
-          <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{leitung}</span>
-        )}
-        <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+        {leitung && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{leitung}</span>}
+        <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
           {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
               nur die direkt zugeordneten. */}
           {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
@@ -1201,7 +1199,7 @@ function abschnittGliederung(
           <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
-              <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>
+              <span style={{ ...monoStil('meta'), color: rollen.schwach }}>
                 {' '}
                 · +{weitere.length} weitere offen
               </span>
@@ -1209,7 +1207,7 @@ function abschnittGliederung(
           </span>
         ) : null}
         {unterzeile && (
-          <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{unterzeile}</span>
+          <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{unterzeile}</span>
         )}
         {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
             der Zeit im Linknamen ihre Bedeutung. */}
@@ -1220,7 +1218,7 @@ function abschnittGliederung(
           >
             {rueck ? (
               <>
-                <span style={{ ...schriftStil('meta'), color: rollen.schwach, flex: '0 0 auto' }}>
+                <span style={{ ...monoStil('meta'), color: rollen.schwach, flex: '0 0 auto' }}>
                   <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
                 </span>
                 {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
@@ -1258,7 +1256,7 @@ function abschnittGliederung(
             `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
         <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />
         {verteilung.ohne > 0 && (
-          <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>
+          <span style={{ ...monoStil('meta'), color: rollen.schwach }}>
             +{verteilung.ohne} ohne Status
           </span>
         )}

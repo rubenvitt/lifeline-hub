@@ -78,7 +78,6 @@ describe('MetaZeile (Spec `schriftstufen`, „Metazeile in einer Form")', () => 
     );
     const zeit = screen.getByText('14:32');
     expect(zeit).toHaveStyle({ fontSize: '11px' });
-    expect(zeit.style.fontFamily).toContain('JetBrains Mono');
     expect(zeit.style.fontVariantNumeric).toBe('tabular-nums');
   });
 
@@ -104,8 +103,6 @@ describe('MetaZeile (Spec `schriftstufen`, „Metazeile in einer Form")', () => 
     });
     const nummer = screen.getByText('0412');
     expect(nummer).toHaveStyle({ fontSize: '11px' });
-    // `monoFein` (LLH-2046): die Zahl bleibt Mono, seit `meta` in der Textschrift steht.
-    expect(nummer.style.fontFamily).toContain('JetBrains Mono');
     expect(nummer.style.fontVariantNumeric).toBe('tabular-nums');
   });
 

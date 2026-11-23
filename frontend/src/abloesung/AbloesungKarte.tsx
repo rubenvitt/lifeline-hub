@@ -8,7 +8,7 @@ import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { monoStil, schriftStil, Stapel, Textstufe, useRollen } from '../components/instrument';
+import { monoStil, Stapel, Textstufe, useRollen } from '../components/instrument';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -238,7 +238,7 @@ export default function AbloesungKarte({
         <span style={{ ...monoStil('mono', 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={spalte.zeit} rolle="kurz" />
         </span>
-        <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{spalte.wort}</span>
+        <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
         <Stapel abstand="xs">

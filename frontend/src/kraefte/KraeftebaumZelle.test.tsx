@@ -162,13 +162,11 @@ describe('KraeftebaumZelle', () => {
     expect(screen.getByText('Material')).toBeInTheDocument();
     expect(screen.getByText('· 2 Posten')).toBeInTheDocument();
     expect(screen.getByText('· 1 Ausfall')).toBeInTheDocument();
-    // Zahl mit Wort steht in der Textschrift mit gleich breiten Ziffern (`meta`, LLH-2046):
-    // Mono trägt nur reine Zahl, Zeit, Kennung und Funkrufname.
-    const text = document.createElement('span');
-    text.style.fontFamily = schrift.text;
-    for (const t of ['· 2 Posten', '· 1 Ausfall']) {
-      expect(screen.getByText(t).style.fontFamily, t).toBe(text.style.fontFamily);
-      expect(screen.getByText(t).style.fontVariantNumeric, t).toBe('tabular-nums');
+    // Zahlen immer Mono: Anzahl und Ausfall in der Zahlenschrift.
+    const mono = document.createElement('span');
+    mono.style.fontFamily = schrift.zahl;
+    for (const text of ['· 2 Posten', '· 1 Ausfall']) {
+      expect(screen.getByText(text).style.fontFamily, text).toBe(mono.style.fontFamily);
     }
   });
 });

@@ -180,7 +180,6 @@ const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
   augenbraue: '--lfh-typo-augenbraue',
   railEtikett: '--lfh-typo-rail-etikett',
   meta: '--lfh-typo-meta',
-  monoFein: '--lfh-typo-mono-fein',
   monoKlein: '--lfh-typo-mono-klein',
   mono: '--lfh-typo-mono',
   monoGross: '--lfh-typo-mono-gross',
@@ -461,30 +460,18 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
     ]);
   });
 
-  it('pinnt die Mono-Stufen 11 bis 14 (LLH-1972, Boden LLH-2044, monoFein LLH-2046)', () => {
+  it('pinnt die Mono-Stufen 11 bis 14 (LLH-1972, Boden LLH-2044)', () => {
     expect('metaKlein' in schriftskala).toBe(false);
     expect(
-      [
-        schriftskala.monoFein,
-        schriftskala.monoKlein,
-        schriftskala.mono,
-        schriftskala.monoGross,
-      ].map((s) => [s.groesse, s.gewicht, s.familie]),
+      [schriftskala.meta, schriftskala.monoKlein, schriftskala.mono, schriftskala.monoGross].map(
+        (s) => [s.groesse, s.gewicht, s.familie],
+      ),
     ).toEqual([
       [11, 400, 'zahl'],
       [12, 400, 'zahl'],
       [13, 400, 'zahl'],
       [14, 400, 'zahl'],
     ]);
-  });
-
-  it('meta steht in der Textschrift mit gleich breiten Ziffern (LLH-2046)', () => {
-    expect(schriftskala.meta).toEqual({
-      groesse: 11,
-      gewicht: 400,
-      familie: 'text',
-      ziffern: 'tabellarisch',
-    });
   });
 
   it('keine Stufe liegt unter dem Schriftboden von 11 px (LLH-2044)', () => {

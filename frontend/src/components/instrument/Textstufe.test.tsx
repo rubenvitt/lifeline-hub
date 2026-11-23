@@ -27,16 +27,9 @@ describe('Textstufe (Spec `schriftstufen`)', () => {
   });
 
   it('gibt der Zahlenfamilie gleich breite Ziffern', () => {
-    renderMitProviders(<Textstufe stufe="monoFein">14:32</Textstufe>);
+    renderMitProviders(<Textstufe stufe="meta">14:32</Textstufe>);
     const el = screen.getByText('14:32');
     expect(el.style.fontFamily).toContain('LFH JetBrains Mono');
-    expect(el.style.fontVariantNumeric).toBe('tabular-nums');
-  });
-
-  it('setzt meta in die Textschrift, mit gleich breiten Ziffern (LLH-2046)', () => {
-    renderMitProviders(<Textstufe stufe="meta">seit 14:32</Textstufe>);
-    const el = screen.getByText('seit 14:32');
-    expect(el.style.fontFamily).not.toContain('JetBrains Mono');
     expect(el.style.fontVariantNumeric).toBe('tabular-nums');
   });
 

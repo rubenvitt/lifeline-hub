@@ -52,7 +52,7 @@ export default function FachebeneStand({
           <span aria-hidden="true">⧖ </span>veraltet ·{' '}
         </>
       )}
-      {praefix} <span style={monoStil('monoFein')}>{zeit}</span>
+      {praefix} <span style={monoStil('meta')}>{zeit}</span>
     </span>
   );
 }

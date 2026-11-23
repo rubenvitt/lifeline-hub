@@ -4,7 +4,7 @@ import type { BefehlKopf } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import { AuswahlZiel, type AuswahlZielProps } from '../components/ListeDetail';
-import { Textstufe, schriftStil, useRollen } from '../components/instrument';
+import { Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { befehlSchemaLabel } from './befehlTexte';
 import { Quittungsstand } from './EmpfaengerQuittung';
@@ -43,7 +43,7 @@ function BefehlListenKarte({
       hervorgehoben={hervorgehoben}
       zeit={
         <>
-          <span style={{ display: 'block', ...schriftStil('meta'), color: rollen.schwach }}>
+          <span style={{ display: 'block', ...monoStil('meta'), color: rollen.schwach }}>
             Stand
           </span>
           <span>
@@ -65,7 +65,7 @@ function BefehlListenKarte({
       <Flex
         gap={token.marginSM}
         wrap
-        style={{ marginTop: token.marginXS, ...schriftStil('meta'), color: rollen.gedaempft }}
+        style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}
       >
         <span>{b.ersteller_name}</span>
         {b.status === 'freigegeben' && b.freigegeben_at && (

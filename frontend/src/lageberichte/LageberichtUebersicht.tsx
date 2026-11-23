@@ -19,7 +19,6 @@ import {
   Stapel,
   Textstufe,
   monoStil,
-  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
@@ -28,7 +27,7 @@ import { abschnittsFuellstand, kernAbschnitt, textAuszug, type Uebersicht } from
 
 /**
  * Die drei Paneele der Lageberichte-Übersicht (LLH-1064) in der Paneelsprache des Lagebild-Dashboards
- * (`pages/lage-dashboard/LagePaneele.tsx`): Augenbraue-Kopf mit Meta und Sprung „… ↗“.
+ * (`pages/lage-dashboard/LagePaneele.tsx`): Augenbraue-Kopf mit Mono-Meta und Sprung „… ↗“.
  *
  * - **Aktueller Lagevortrag**: die jüngste Freigabe; ohne Freigabe entfällt das Paneel.
  * - **In Arbeit**: die Entwürfe mit „zuletzt gespeichert“ und Füllstand.
@@ -209,7 +208,7 @@ function InArbeitPaneel({
                 >
                   {b.titel}
                 </KennungsLink>
-                <div style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+                <div style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                   {`${vorlageLabel(b.vorlage)} · v${b.version} · `}
                   <ZeitAnzeige wert={b.zeitstand} />
                   {` · ${b.ersteller_name}`}
@@ -220,7 +219,7 @@ function InArbeitPaneel({
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     columnGap: token.marginSM,
-                    ...schriftStil('meta'),
+                    ...monoStil('meta'),
                     color: rollen.text2,
                   }}
                 >
@@ -285,7 +284,7 @@ function VerlaufPaneel({
             <span style={{ flex: '1 1 12em', minWidth: 0 }}>
               <KennungsLink to={lageberichtDetailPfad(einsatzId, b.id)}>{b.titel}</KennungsLink>
             </span>
-            <span style={{ ...monoStil('monoFein'), color: rollen.gedaempft }}>v{b.version}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>v{b.version}</span>
           </li>
         ))}
       </ol>

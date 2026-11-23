@@ -13,7 +13,7 @@ import {
 import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { Status, Textstufe, schriftStil, useRollen } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { ERINNERUNG_FAELLIG } from './erinnerungZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -62,11 +62,11 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.
-    return <span style={schriftStil('meta')}>{text}</span>;
+    return <span style={monoStil('meta')}>{text}</span>;
   }
   // Verweis als Link mit ↗-Zeichen, kein farbiges Etikett.
   return (
-    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={schriftStil('meta')}>
+    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil('meta')}>
       {text}
     </KennungsLink>
   );

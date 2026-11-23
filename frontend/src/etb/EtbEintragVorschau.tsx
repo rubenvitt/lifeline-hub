@@ -8,7 +8,7 @@ import { etbNummerAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
-import { Datenfeld, Datenraster, Stapel, schriftStil, useRollen } from '../components/instrument';
+import { Datenfeld, Datenraster, Stapel, monoStil, useRollen } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
@@ -111,8 +111,7 @@ function EintragInhalt({
             <span
               data-lfh="typwort"
               style={{
-                ...schriftStil('meta'),
-                fontWeight: 500,
+                ...monoStil('meta', 500),
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: farbe.wort,

@@ -3,17 +3,17 @@ import type { EtbTyp } from '../../api/types';
 import { etbTypFarbe } from '../../theme/statusFarben';
 import { schriftskala, type EtbTypFarbe, type Farbrollen } from '../../theme/tokens';
 import { useViewport } from '../useViewport';
-import { monoStil, schriftStil, useRollen } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 
 /**
  * Zeitachsen-Eintrag — die Zeile des Einsatztagebuchs und jedes anderen zeitlich gelesenen
  * Stroms (Meldungen, Entscheidungen, Anordnungen).
  *
- * Aufbau von links: Zeit Mono 13/500 (+ Nr. Mono 11 `schwach`) · 2-px-KANTE in Typfarbe ·
- * TYPWORT Meta 11 Versalien, Sperrung .1em, in Wortfarbe, daneben Meta 11 · Text 13/1.5 ·
- * optionale Hinweiszeile 11 · rechts Verfasser / Weg in Meta 11 (Textschrift, LLH-2046) · Aktionen.
+ * Aufbau von links: Zeit Mono 13/500 (+ Nr. Mono 10 `schwach`) · 2-px-KANTE in Typfarbe ·
+ * TYPWORT Mono 10 Versalien, Sperrung .1em, in Wortfarbe, daneben Meta Mono 10 · Text 13/1.5 ·
+ * optionale Hinweiszeile 11 · rechts Verfasser Mono 11 / Weg Mono 10 · Aktionen.
  *
- * DICHTE (LFH-958, {@link zeitachsenAufbau}): in `kompakt` stehen Verfasser und Weg als Meta
+ * DICHTE (LFH-958, {@link zeitachsenAufbau}): in `kompakt` stehen Verfasser und Weg als Mono-Meta
  * in der Kopfzeile neben dem Typwort, das Zeilenmenü (`menue`) an ihrem Ende; die Spalte rechts
  * trägt dann nur noch Text-Aktionen (`aktionen`). So ist ein einzeiliger Eintrag im Fükw eine
  * Zeile hoch statt drei. In `komfortabel` und `handschuh` bleibt die Spalte.
@@ -85,7 +85,7 @@ interface ZeitachseneintragProps extends Hueller {
   farben?: EtbTypFarbe;
   /** Das Typwort — Pflicht, zweiter Kanal („ANORDNUNG" oder „Anordnung", Versalien per CSS). */
   typwort: string;
-  /** Meta neben dem Typwort („berichtigt Nr. 388", „S2 Lage"). */
+  /** Mono-Meta neben dem Typwort („berichtigt Nr. 388", „S2 Lage"). */
   meta?: ReactNode;
   /** Der Eintragstext. */
   children: ReactNode;
@@ -141,7 +141,7 @@ export default function Zeitachseneintrag({
   const metaImKopf = einzeilig && (verfasser == null || typeof verfasser === 'string');
   const menueImKopf = einzeilig && menue != null;
   const trenner = (
-    <span aria-hidden="true" style={{ ...schriftStil('meta'), color: rollen.schwach }}>
+    <span aria-hidden="true" style={{ ...monoStil('meta'), color: rollen.schwach }}>
       ·
     </span>
   );
@@ -175,7 +175,7 @@ export default function Zeitachseneintrag({
         <span data-lfh="zeitachse-zeit" style={{ ...monoStil('mono', 500), color: rollen.text }}>
           {zeit}
         </span>
-        {nr != null && <span style={{ ...monoStil('monoFein'), color: rollen.schwach }}>{nr}</span>}
+        {nr != null && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{nr}</span>}
       </div>
       <span
         aria-hidden="true"
@@ -204,8 +204,7 @@ export default function Zeitachseneintrag({
           <span
             data-lfh="typwort"
             style={{
-              ...schriftStil('meta'),
-              fontWeight: 500,
+              ...monoStil('meta', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -214,7 +213,7 @@ export default function Zeitachseneintrag({
             {typwort}
           </span>
           {meta != null && (
-            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{meta}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
           {metaImKopf && verfasser != null && (
             <>
@@ -225,7 +224,7 @@ export default function Zeitachseneintrag({
                 data-lfh="verfasser"
                 title={typeof verfasser === 'string' ? verfasser : undefined}
                 style={{
-                  ...schriftStil('meta'),
+                  ...monoStil('meta'),
                   color: rollen.gedaempft,
                   maxWidth: '24ch',
                   whiteSpace: 'nowrap',
@@ -240,7 +239,7 @@ export default function Zeitachseneintrag({
           {metaImKopf && weg != null && (
             <>
               {trenner}
-              <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{weg}</span>
+              <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{weg}</span>
             </>
           )}
           {menueImKopf && (
@@ -289,12 +288,12 @@ export default function Zeitachseneintrag({
         >
           {!metaImKopf && verfasser != null && (
             // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") drückte die Spalte den
-            // Meldungstext bei 1200 px unter die halbe Sicht. `ch` misst in der Schrift DIESES
+            // Meldungstext bei 1200 px unter die halbe Sicht. `ch` misst in der Mono-Schrift DIESES
             // Elements; ein längerer Verfasser bricht um.
             <span
               data-lfh="verfasser"
               style={{
-                ...schriftStil('meta'),
+                ...monoStil('meta'),
                 color: rollen.gedaempft,
                 maxWidth: '15ch',
                 overflowWrap: 'anywhere',
@@ -304,7 +303,7 @@ export default function Zeitachseneintrag({
             </span>
           )}
           {!metaImKopf && weg != null && (
-            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{weg}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{weg}</span>
           )}
           {aktionen}
           {!menueImKopf && menue}

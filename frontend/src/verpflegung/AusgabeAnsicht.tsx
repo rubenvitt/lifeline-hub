@@ -552,7 +552,7 @@ export default function AusgabeAnsicht() {
                 <Augenbraue style={{ ...einzeilig, display: 'block' }}>{titel}</Augenbraue>
                 <div style={{ ...einzeilig, ...monoStil(15, 500), color: farbe }}>
                   {wert}
-                  <span style={{ ...schriftStil('meta'), color: rollen.text2 }}> EP</span>
+                  <span style={{ ...monoStil('meta'), color: rollen.text2 }}> EP</span>
                 </div>
               </div>
             ))}

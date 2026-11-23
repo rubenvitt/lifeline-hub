@@ -118,7 +118,6 @@ import {
   StatusZelle,
   Textstufe,
   monoStil,
-  schriftStil,
   useRollen,
   Knopfreihe,
 } from '../components/instrument';
@@ -139,7 +138,7 @@ import { Marke } from '../components/instrument/Marke';
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
  *
- * Aufbau: Seitenkopf (Titel · Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
+ * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
  * Einheiten nach FMS-Status und Personal nach Status, „keine Rückmeldung"; LLH-1140) → Werkzeugzeile außerhalb des
  * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Spalten, Lagebericht, Druck) → Raster als
  * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
@@ -468,7 +467,7 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...schriftStil('meta'), fontWeight: 400 }}>
+          <span data-lfh="status-legende" style={{ ...monoStil('meta'), fontWeight: 400 }}>
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -518,7 +517,7 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
     <span
       data-lfh="meldebild-besatzung"
       style={{
-        ...schriftStil('meta'),
+        ...monoStil('meta'),
         display: 'flex',
         flexDirection: 'column',
         color: rollen.gedaempft,
@@ -581,7 +580,7 @@ function StatusSpalte({
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"
-            style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
+            style={{ ...monoStil('meta'), color: rollen.gedaempft }}
           >
             {verteilung}
           </span>
@@ -777,7 +776,7 @@ function RueckmeldungZelle({
       data-lfh="meldebild-rueckmeldung"
       data-zustand={anzeige.zustand}
       data-rolle={rolle}
-      style={{ ...monoStil('monoFein'), color: farbe, whiteSpace: 'nowrap' }}
+      style={{ ...monoStil('meta'), color: farbe, whiteSpace: 'nowrap' }}
     >
       {zeit ?? '—'}
     </span>

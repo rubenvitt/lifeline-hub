@@ -4,7 +4,14 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Knopfreihe, Status, Textstufe, schriftStil, useRollen } from '../components/instrument';
+import {
+  Knopfreihe,
+  Status,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -60,9 +67,7 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
   const { rollen } = useRollen();
   return (
     <>
-      <span style={{ display: 'block', ...schriftStil('meta'), color: rollen.schwach }}>
-        erteilt
-      </span>
+      <span style={{ display: 'block', ...monoStil('meta'), color: rollen.schwach }}>erteilt</span>
       <span>
         <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>
@@ -124,7 +129,7 @@ export function AuftragKopf({
           </Text>
         )}
         {a.frist_at && (
-          <Text type="secondary" style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+          <Text type="secondary" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
             Frist {zeitpunkt(a.frist_at)}
           </Text>
         )}

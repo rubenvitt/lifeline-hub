@@ -1,6 +1,6 @@
 import { Button, Typography } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { monoStil, schriftStil, Stapel, Textstufe, useRollen } from '../components/instrument';
+import { monoStil, Stapel, Textstufe, useRollen } from '../components/instrument';
 import type { OhneSchicht } from './ohneSchicht';
 
 const { Text } = Typography;
@@ -63,7 +63,7 @@ export default function OhneSchichtKarte({
         </span>
         {/* So breit wie „eingetroffen“: sonst stünde die Spalte je nach Wort verschieden breit,
             und die Namen der Zeilen fluchteten nicht. */}
-        <span style={{ ...schriftStil('meta'), color: rollen.schwach, minWidth: '12ch' }}>
+        <span style={{ ...monoStil('meta'), color: rollen.schwach, minWidth: '12ch' }}>
           {eingetroffen ? 'eingetroffen' : 'alarmiert'}
         </span>
       </div>

@@ -333,7 +333,7 @@ export default function FmsTableau({
                     >
                       {ef.funkrufname}
                     </span>
-                    <span style={{ ...schriftStil('meta'), ...gedaempft, flex: '0 0 auto' }}>
+                    <span style={{ ...monoStil('meta'), ...gedaempft, flex: '0 0 auto' }}>
                       seit {seit}
                     </span>
                   </div>

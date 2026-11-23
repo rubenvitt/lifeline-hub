@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../components/FunkUndTelefon';
-import { Datenfeld, Datenraster, schriftStil, useRollen } from '../components/instrument';
+import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { einheitStatusAnzeige } from './meldebildRaster';
@@ -59,7 +59,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
                   farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
                 />
                 {status.verteilung && (
-                  <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+                  <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                     {status.verteilung}
                   </span>
                 )}

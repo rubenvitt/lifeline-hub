@@ -468,9 +468,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         value={text ?? anzeige}
         prefix={
           z.zonenHinweis ? (
-            <span style={{ ...monoStil('monoFein'), color: rollen.gedaempft }}>
-              {z.zonenHinweis}
-            </span>
+            <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{z.zonenHinweis}</span>
           ) : undefined
         }
         suffix={suffix}
