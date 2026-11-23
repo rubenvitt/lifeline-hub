@@ -190,10 +190,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!(
-            "/api/einsaetze/{}/units/{}/vehicles/{ef}",
-            w.e, w.einheit
-        ),
+        &format!("/api/einsaetze/{}/units/{}/vehicles/{ef}", w.e, w.einheit),
         &w.admin,
         None,
     )
@@ -1015,10 +1012,7 @@ async fn zuruecknehmen(w: &Welt, schicht: i64) {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!(
-            "/api/einsaetze/{}/reliefs/{schicht}/execution/undo",
-            w.e
-        ),
+        &format!("/api/einsaetze/{}/reliefs/{schicht}/execution/undo", w.e),
         &w.admin,
         None,
     )

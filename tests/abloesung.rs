@@ -1355,14 +1355,7 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["folgeschichten"], serde_json::json!([]));
@@ -1439,7 +1432,11 @@ async fn vollzug_uebergabe_ohne_wirkung_braucht_keine_freigabe_einheiten() {
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{j:?}");
-        schichten.push(format!("{}/{}/execution", pfad(e), j["id"].as_i64().unwrap()));
+        schichten.push(format!(
+            "{}/{}/execution",
+            pfad(e),
+            j["id"].as_i64().unwrap()
+        ));
     }
 
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
@@ -1701,14 +1698,7 @@ async fn besatzungswechsel_ueber_die_route() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["art"], "einheit");
@@ -1840,14 +1830,7 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["verbleib"], "ruhe");
@@ -1941,14 +1924,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     ids.sort_unstable();
     assert_eq!(ids, vec![Some(pid), Some(qid)], "Vollzug");
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     let mut ids = gemeldet(&mut rx);
     ids.sort_unstable();

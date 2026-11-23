@@ -2006,8 +2006,7 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
     let a = fahrzeug_disponieren(&app, &admin, einsatz, "83-1").await;
     let b = fahrzeug_disponieren(&app, &admin, einsatz, "83-2").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
-    let pfad =
-        |ef: i64, q: &str| format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}{q}");
+    let pfad = |ef: i64, q: &str| format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}{q}");
     let fahrzeug_von = || async {
         let (_, personal) = anfrage(
             &app,

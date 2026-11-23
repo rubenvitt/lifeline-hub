@@ -5045,9 +5045,8 @@ async fn austragen_zuruecknehmen() {
         .await
         .unwrap();
     let aus = belegen(&app, &cookie, eid, sportplatz, "einheit", hlf, "austritt").await;
-    let pfad = |br: i64, id: &serde_json::Value| {
-        format!("{}/occupancy/{id}/undo", br_pfad(eid, br))
-    };
+    let pfad =
+        |br: i64, id: &serde_json::Value| format!("{}/occupancy/{id}/undo", br_pfad(eid, br));
 
     let (s, v) = anfrage_json(&app, "POST", &pfad(sportplatz, &aus["id"]), &cookie, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");

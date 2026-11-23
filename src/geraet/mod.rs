@@ -432,39 +432,24 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/staging-areas"),
     ("GET", "/api/einsaetze/{id}/staging-areas/{bid}"),
-    (
-        "GET",
-        "/api/einsaetze/{id}/staging-areas/{bid}/history",
-    ),
+    ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/history"),
     // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte außer Art und
     // Rufnamen (LLH-1387 design.md D1/D2); die Nachforderungsliste bleibt gesperrt.
-    (
-        "GET",
-        "/api/einsaetze/{id}/staging-areas/{bid}/expected",
-    ),
+    ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/expected"),
     // Einheiten-Vorlagen als Treffer zum eigenen Raum, nur Namen und Funkrufnamen (LLH-1300
     // design.md D2); der Stammdaten-Katalog bleibt gesperrt.
     (
         "GET",
         "/api/einsaetze/{id}/staging-areas/{bid}/master-data-matches",
     ),
-    (
-        "POST",
-        "/api/einsaetze/{id}/staging-areas/{bid}/occupancy",
-    ),
+    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/occupancy"),
     // Rücknahme eines Austritts, wie das Austragen selbst (LLH-1924, design.md D3).
     (
         "POST",
         "/api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
     ),
-    (
-        "POST",
-        "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
-    ),
-    (
-        "POST",
-        "/api/einsaetze/{id}/staging-areas/{bid}/status",
-    ),
+    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/arrival"),
+    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/status"),
     ("GET", "/api/einsaetze/{id}/units"),
     ("GET", "/api/einsaetze/{id}/units/timeline"),
     ("GET", "/api/einsaetze/{id}/vehicles"),
@@ -580,10 +565,7 @@ const EINHEIT: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/units"),
     ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
     // Den eigenen Wechsel zurücknehmen (LLH-1986).
-    (
-        "POST",
-        "/api/einsaetze/{id}/units/{eid}/status/undo",
-    ),
+    ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
     ("GET", "/api/einsaetze/{id}/auftraege"),
     ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
     (
@@ -825,31 +807,16 @@ mod tests {
         assert!(b.rolle().darf_schreiben());
         for (m, p) in [
             ("GET", "/api/einsaetze/{id}/staging-areas/{bid}"),
-            (
-                "GET",
-                "/api/einsaetze/{id}/staging-areas/{bid}/history",
-            ),
-            (
-                "POST",
-                "/api/einsaetze/{id}/staging-areas/{bid}/occupancy",
-            ),
-            (
-                "POST",
-                "/api/einsaetze/{id}/staging-areas/{bid}/status",
-            ),
-            (
-                "POST",
-                "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
-            ),
+            ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/history"),
+            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/occupancy"),
+            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/status"),
+            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/arrival"),
             ("GET", "/api/einsaetze/{id}/units"),
             ("GET", "/api/einsaetze/{id}/units/timeline"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
             // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte
             // (LLH-1387 design.md D1).
-            (
-                "GET",
-                "/api/einsaetze/{id}/staging-areas/{bid}/expected",
-            ),
+            ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/expected"),
             // Stamm-Treffer zum eigenen Raum (LLH-1300 design.md D2).
             (
                 "GET",
@@ -885,10 +852,7 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/units/from-resource-request"),
             // Ebenso der Storno einer Fehlübernahme (LLH-1388 D5).
-            (
-                "POST",
-                "/api/einsaetze/{id}/units/{eid}/cancel-takeover",
-            ),
+            ("POST", "/api/einsaetze/{id}/units/{eid}/cancel-takeover"),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }
@@ -1016,10 +980,7 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/units"),
             ("PATCH", "/api/einsaetze/{id}/units/{eid}"),
             ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
-            (
-                "POST",
-                "/api/einsaetze/{id}/units/{eid}/status/undo",
-            ),
+            ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
             ("POST", "/api/einsaetze/{id}/auftraege"),
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
             // Aufheben und Berichtigen gehören der Führung (LLH-1098).
@@ -1055,10 +1016,7 @@ mod tests {
             ("GET", "/api/fahrzeug-status"),
             ("GET", "/api/einsaetze/{id}/units"),
             ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
-            (
-                "POST",
-                "/api/einsaetze/{id}/units/{eid}/status/undo",
-            ),
+            ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
             ("GET", "/api/einsaetze/{id}/auftraege"),
             ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
             (

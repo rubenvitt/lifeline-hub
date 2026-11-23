@@ -2850,8 +2850,7 @@ async fn personal_zuruecknehmen_als_fuehrer() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let pfad =
-        |ep: i64, q: &str| format!("/api/einsaetze/{einsatz}/units/{a}/personnel/{ep}{q}");
+    let pfad = |ep: i64, q: &str| format!("/api/einsaetze/{einsatz}/units/{a}/personnel/{ep}{q}");
     let fuehrer = || async {
         let (_, l) = anfrage(
             &app,

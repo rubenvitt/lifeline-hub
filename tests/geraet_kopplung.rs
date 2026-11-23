@@ -4771,7 +4771,10 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
 
     // Das Gerät ruft nicht ab und nimmt nicht zurück.
     let vorher = anzahl().await;
-    for pfad in [format!("{raum}/dispatch"), format!("{raum}/dispatch/withdraw")] {
+    for pfad in [
+        format!("{raum}/dispatch"),
+        format!("{raum}/dispatch/withdraw"),
+    ] {
         let (s, v) = anfrage_json(
             &app,
             "POST",

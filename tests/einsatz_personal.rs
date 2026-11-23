@@ -1378,11 +1378,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     );
     for (methode, pfad, body) in [
         ("PUT", format!("units/{einheit}/personnel/{anna}"), None),
-        (
-            "PUT",
-            format!("vehicles/{fahrzeug}/crew/{anna}"),
-            None,
-        ),
+        ("PUT", format!("vehicles/{fahrzeug}/crew/{anna}"), None),
         ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
         ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
         ("POST", "abschnitte".to_string(), Some(leiter)),

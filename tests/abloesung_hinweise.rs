@@ -792,10 +792,7 @@ impl Welt {
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{br}");
-        let pfad = self.pfad(&format!(
-            "staging-areas/{}",
-            br["id"].as_i64().unwrap()
-        ));
+        let pfad = self.pfad(&format!("staging-areas/{}", br["id"].as_i64().unwrap()));
         let (s, _) = anfrage_json(
             &self.app,
             "POST",

@@ -537,14 +537,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     assert_eq!(im_b2["im_einsatz"], true, "{im_b2}");
 
     // Die Rücknahme legt die Besatzung zurück; Ben und Cem bleiben im Einsatz, ohne Einheit.
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/undo"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     let mut zurueck = vec![anna, dana];
     zurueck.sort_unstable();
