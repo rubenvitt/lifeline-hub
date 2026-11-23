@@ -178,7 +178,12 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   im Einsatz ausgeblendet sind (wirksame Sichtbarkeit, keine Rollenschranke), liest der Server
   nicht; er nennt sie in `alarm.ausgeblendet`, und `alarmAusMonitor` meldet sie als `gesperrt`,
   damit Monitor und Überblick dasselbe zeigen (LLH-1964, Zuordnung in `AlarmQuelle`). Nur der
-  Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Eine
+  Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Dasselbe gilt
+  für die Kacheln (LLH-2072): ist ihr Modul ausgeblendet, fehlt die Kachel ganz, ohne „—“ und
+  ohne 0 (Betroffene bzw. Hilfeleistungen ← `personen`, Meldungen ← `meldungen`, Kräfte ←
+  `personal` oder `einheiten` wie `kraefteZustand` im Lagebild, Belegung samt Zusatz „an UHS“
+  und UHS-Marken ← `unfallhilfsstellen`; „Ablauf“ nie). Der Server liest sie nicht und nennt sie
+  in `ausgeblendet` (`LagemonitorKachel`, `verdichte_ohne`), nur im Handler `lagebild`. Eine
   Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
   (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse
   bleiben ihm fern. Steigt diese Zahl
