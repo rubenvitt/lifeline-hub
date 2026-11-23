@@ -135,6 +135,21 @@ HTMLCanvasElement.prototype.getContext = function getContext() {
   }
 }
 
+// Ein schließendes antd-Menü nimmt keinen Fokus (LLH-2023). Der späte `autoFocus` eines Dropdowns
+// (`raf(focusMenu, 3)`) feuert auch, wenn das Menü schon wieder schließt, und zog den Fokus aus dem
+// danach geöffneten Dialog: Getipptes ging verloren (LLH-1390, `test/menue.ts`). Im Browser holt die
+// Fokusfalle des Dialogs ihn zurück; in jsdom läuft die Schließbewegung nie zu Ende, das Portal
+// bleibt mit `pointer-events: none` stehen (so erkennt es auch `offenesMenue`). Wächter:
+// ./schliessendesMenue.test.ts.
+{
+  const echtesFocus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function focus(this: HTMLElement, optionen?: FocusOptions) {
+    const portal = this.closest<HTMLElement>('.ant-dropdown');
+    if (portal?.style.pointerEvents === 'none') return;
+    echtesFocus.call(this, optionen);
+  };
+}
+
 // antds Breakpoint-Beobachter braucht `matchMedia`. Der Stub in ./viewport ist
 // BREITENBEWUSST (min-/max-width gegen eine steuerbare Breite, Default 1024 px).
 installiereMatchMedia();
