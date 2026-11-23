@@ -40,11 +40,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/nwt8vtesp5k9mozact6fp1tc (LLH-1964)
 **Interfaces:**
 - Produces: `pub fn ausgeblendete_module_aus(overrides: &HashMap<String, EinsatzModulOverride>, org_defaults: &HashMap<String, OrgModulVorgabe>) -> HashSet<&'static str>` (rein, über `MODUL_KEYS`) und `pub async fn ausgeblendete_module(pool: &SqlitePool, einsatz_id: i64, org_id: i64) -> Result<HashSet<&'static str>, AppError>`.
 
-- [ ] **Step 1: Failing test** `ausgeblendet_folgt_der_wirksamen_sichtbarkeit` im `mod tests`: Overrides `material: sichtbar=Some(false)`, `auftraege: sichtbar=Some(true)`; Org-Vorgaben `auftraege: sichtbar=Some(false)`, `erinnerungen: sichtbar=Some(false)`, `einsatzdaten: sichtbar=Some(false)`, `personen: benoetigte_rolle=Some("admin")`. Erwartet: Menge == `{"material", "erinnerungen"}`.
-- [ ] **Step 2:** `cargo test --lib ausgeblendet_folgt_der_wirksamen_sichtbarkeit` → FAIL (Funktion fehlt).
-- [ ] **Step 3:** Implementieren. Die reine Funktion wertet `modul_freigabe(...).sichtbar` nicht über einen Benutzer aus, sondern direkt `ist_ausblendbar(key) && !effektiv_sichtbar(override.sichtbar, vorgabe.sichtbar)` — genau die erste Hälfte von `modul_freigabe`; `modul_freigabe` ruft für `sichtbar` künftig dieselbe kleine Hilfsfunktion `fn ist_ausgeblendet(overrides, org_defaults, key) -> bool`, damit die Regel nur einmal steht. Die async-Fassung lädt über `lade_modul_regeln`.
-- [ ] **Step 4:** Test → PASS; `cargo test --lib einsatz::berechtigung` grün.
-- [ ] **Step 5:** Commit `feat: ausgeblendete Module eines Einsatzes bestimmen (LLH-1964)`.
+- [x] **Step 1: Failing test** `ausgeblendet_folgt_der_wirksamen_sichtbarkeit` im `mod tests`: Overrides `material: sichtbar=Some(false)`, `auftraege: sichtbar=Some(true)`; Org-Vorgaben `auftraege: sichtbar=Some(false)`, `erinnerungen: sichtbar=Some(false)`, `einsatzdaten: sichtbar=Some(false)`, `personen: benoetigte_rolle=Some("admin")`. Erwartet: Menge == `{"material", "erinnerungen"}`.
+- [x] **Step 2:** `cargo test --lib ausgeblendet_folgt_der_wirksamen_sichtbarkeit` → FAIL (Funktion fehlt).
+- [x] **Step 3:** Implementieren. Die reine Funktion wertet `modul_freigabe(...).sichtbar` nicht über einen Benutzer aus, sondern direkt `ist_ausblendbar(key) && !effektiv_sichtbar(override.sichtbar, vorgabe.sichtbar)` — genau die erste Hälfte von `modul_freigabe`; `modul_freigabe` ruft für `sichtbar` künftig dieselbe kleine Hilfsfunktion `fn ist_ausgeblendet(overrides, org_defaults, key) -> bool`, damit die Regel nur einmal steht. Die async-Fassung lädt über `lade_modul_regeln`.
+- [x] **Step 4:** Test → PASS; `cargo test --lib einsatz::berechtigung` grün.
+- [x] **Step 5:** Commit `feat: ausgeblendete Module eines Einsatzes bestimmen (LLH-1964)`.
 
 ### Task 2: Ausfall-Lader ohne ausgeblendete Mittel-Listen
 
@@ -54,11 +54,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/nwt8vtesp5k9mozact6fp1tc (LLH-1964)
 **Interfaces:**
 - Produces: `#[derive(Debug, Clone, Copy)] pub struct AusfallListen { pub personal: bool, pub fahrzeuge: bool, pub material: bool }` mit `AusfallListen::ALLE` (alle `true`); Signatur `load_einheiten_mit_ausfall(pool, einsatz_id, listen: AusfallListen)`. Eine Liste mit `false` wird nicht abgefragt und geht leer ein.
 
-- [ ] **Step 1: Failing test** `lader_liest_ausgeblendete_listen_nicht`: Einheit „Logistiktrupp“ mit defekter Trage direkt an der Einheit (`einheit_id`), Einheit „Sanitätszug“ mit krankem Personal. `listen = { material: false, ..ALLE }` → `["Sanitätszug"]`; `{ personal: false, ..ALLE }` → `["Logistiktrupp"]`; `ALLE` → `["Logistiktrupp", "Sanitätszug"]` (Folge nach `sortier`, Logistiktrupp zuerst anlegen mit kleinerem `sortier`). Fahrzeug-Fall: Fahrzeug mit Status `nicht_verfuegbar` an „Sanitätszug“, `fahrzeuge: false` → zählt nicht; seine Beladung zählt dann ebenfalls nicht (kein bekanntes Fahrzeug).
-- [ ] **Step 2:** `cargo test --lib ausfall::tests` → FAIL (Signatur).
-- [ ] **Step 3:** Signatur erweitern, je Liste die Abfrage nur bei `true`; bestehenden Test auf `AusfallListen::ALLE` umstellen.
-- [ ] **Step 4:** `cargo test --lib ausfall::tests` → PASS.
-- [ ] **Step 5:** Commit `feat: Ausfall-Lader liest ausgeblendete Listen nicht (LLH-1964)`.
+- [x] **Step 1: Failing test** `lader_liest_ausgeblendete_listen_nicht`: Einheit „Logistiktrupp“ mit defekter Trage direkt an der Einheit (`einheit_id`), Einheit „Sanitätszug“ mit krankem Personal. `listen = { material: false, ..ALLE }` → `["Sanitätszug"]`; `{ personal: false, ..ALLE }` → `["Logistiktrupp"]`; `ALLE` → `["Logistiktrupp", "Sanitätszug"]` (Folge nach `sortier`, Logistiktrupp zuerst anlegen mit kleinerem `sortier`). Fahrzeug-Fall: Fahrzeug mit Status `nicht_verfuegbar` an „Sanitätszug“, `fahrzeuge: false` → zählt nicht; seine Beladung zählt dann ebenfalls nicht (kein bekanntes Fahrzeug).
+- [x] **Step 2:** `cargo test --lib ausfall::tests` → FAIL (Signatur).
+- [x] **Step 3:** Signatur erweitern, je Liste die Abfrage nur bei `true`; bestehenden Test auf `AusfallListen::ALLE` umstellen.
+- [x] **Step 4:** `cargo test --lib ausfall::tests` → PASS.
+- [x] **Step 5:** Commit `feat: Ausfall-Lader liest ausgeblendete Listen nicht (LLH-1964)`.
 
 ### Task 3: Block `alarm` lässt ausgeblendete Quellen weg
 
@@ -71,14 +71,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/nwt8vtesp5k9mozact6fp1tc (LLH-1964)
 - Consumes: `ausgeblendete_module` (Task 1), `AusfallListen` (Task 2).
 - Produces: `#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)] #[serde(rename_all = "snake_case")] pub enum AlarmQuelle { Meldungen, Auftraege, Erinnerungen, Nachforderungen, Vermisst, Kritisch, Rueckmeldung, Ausfall }`; Feld `pub ausgeblendet: Vec<AlarmQuelle>` an `LagemonitorAlarm` (immer serialisiert, Folge der Enum-Varianten). TS: `LagemonitorAlarm['ausgeblendet']`.
 
-- [ ] **Step 1: Failing tests** in `tests/geraet_kopplung.rs`, Override per `PUT {basis}/modul-overrides/{modul}` mit `{"sichtbar":false,"benoetigte_rolle":null}` als Admin:
+- [x] **Step 1: Failing tests** in `tests/geraet_kopplung.rs`, Override per `PUT {basis}/modul-overrides/{modul}` mit `{"sichtbar":false,"benoetigte_rolle":null}` als Admin:
   - `lagemonitor_alarm_laesst_ausgeblendetes_material_weg`: Aufbau wie `lagemonitor_alarm_nennt_ausfall_ohne_personennamen`, dazu defekter Materialposten am Sanitätszug (`INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, status, einheit_id) VALUES (?, 'Trage', 'geraet', 1, 'defekt', ?)`); vor dem Ausblenden `ausfall == ["Sanitätszug","Logistiktrupp"]`, nach `material` aus `ausfall == ["Logistiktrupp"]`, `ausgeblendet == []`.
   - `lagemonitor_alarm_nennt_ausgeblendete_quellen`: überfälliger Auftrag (wie im bestehenden Test), Sofortmeldung, kritischer Abschnitt, Einheit mit krankem Personal; dann `auftraege`, `meldungen`, `einheiten`, `einsatzabschnitte`, `personen` aus. Erwartet: `ausgeblendet == ["meldungen","auftraege","vermisst","kritisch","rueckmeldung","ausfall"]`, `auftraege_ueberfaellig == 0`, `sofort_offen == 0`, kein Feld `sofort_aelteste_at`, `abschnitte_kritisch == []`, `ausfall == []`, und `sofortmeldungen_offen == 1` (Kachel behält ihre Zählung).
   - Ruhige Lage im bestehenden Test: erwartetes JSON um `"ausgeblendet": []` ergänzen.
-- [ ] **Step 2:** `cargo test --test geraet_kopplung lagemonitor_alarm` → FAIL.
-- [ ] **Step 3:** In `fn alarm` einmal `ausgeblendete_module(pool, einsatz_id, org_id)` laden; je Quelle nur lesen, wenn sichtbar, sonst Default (0, `None`, `Vec::new()`) und Quelle in `ausgeblendet`. `ausfall` mit `AusfallListen { personal: !aus("personal"), fahrzeuge: !aus("fahrzeuge"), material: !aus("material") }`. In `fn lagebild` `anzeige.sofortmeldungen_offen = alarm.sofort_offen` nur, wenn `Meldungen` nicht in `alarm.ausgeblendet`. Doku-Kommentar an `fn alarm` (prüft keine Rechte, aber die Sichtbarkeit) mit Verweis auf `frontend/src/geraet/AGENTS.md`, Lagemonitor.
-- [ ] **Step 4:** `cargo test --test geraet_kopplung lagemonitor` → PASS; `./scripts/check-typ-codegen.sh` → grün, generierte Dateien geändert.
-- [ ] **Step 5:** Commit `fix: Lagemonitor-Alarm lässt ausgeblendete Module weg (LLH-1964)` inkl. generierter Dateien.
+- [x] **Step 2:** `cargo test --test geraet_kopplung lagemonitor_alarm` → FAIL.
+- [x] **Step 3:** In `fn alarm` einmal `ausgeblendete_module(pool, einsatz_id, org_id)` laden; je Quelle nur lesen, wenn sichtbar, sonst Default (0, `None`, `Vec::new()`) und Quelle in `ausgeblendet`. `ausfall` mit `AusfallListen { personal: !aus("personal"), fahrzeuge: !aus("fahrzeuge"), material: !aus("material") }`. In `fn lagebild` `anzeige.sofortmeldungen_offen = alarm.sofort_offen` nur, wenn `Meldungen` nicht in `alarm.ausgeblendet`. Doku-Kommentar an `fn alarm` (prüft keine Rechte, aber die Sichtbarkeit) mit Verweis auf `frontend/src/geraet/AGENTS.md`, Lagemonitor.
+- [x] **Step 4:** `cargo test --test geraet_kopplung lagemonitor` → PASS; `./scripts/check-typ-codegen.sh` → grün, generierte Dateien geändert.
+- [x] **Step 5:** Commit `fix: Lagemonitor-Alarm lässt ausgeblendete Module weg (LLH-1964)` inkl. generierter Dateien.
 
 ### Task 4: Monitor meldet ausgeblendete Quellen als gesperrt
 
@@ -89,19 +89,19 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/nwt8vtesp5k9mozact6fp1tc (LLH-1964)
 - Consumes: `LagemonitorAlarm.ausgeblendet?: AlarmQuelle[]` (generiert in Task 3; optional lesen, älterer Server).
 - Produces: unveränderte Signatur `alarmAusMonitor(lage, fehler?)`.
 
-- [ ] **Step 1: Failing tests** in `alarmAusMonitor.test.ts`:
+- [x] **Step 1: Failing tests** in `alarmAusMonitor.test.ts`:
   - `ausgeblendete Quellen sind gesperrt, nicht unvollständig (LLH-1964)`: Antwort mit `ausgeblendet: ['auftraege','vermisst','ausfall']`, `betroffene.vermisst: 2` → `quellen.auftraege`, `quellen.vermisst`, `quellen.ausfall` sind `{ zustand: 'gesperrt' }`; `wasBrennt(quellen, JETZT)` enthält keinen Hinweis „Stand unvollständig“ (Feld wie im bestehenden Test geprüft) und keinen Eintrag der Arten `auftrag`, `vermisst`, `ausfall`.
   - `ohne Feld ausgeblendet wie bisher`: bestehender Monitor-Fall ohne `ausgeblendet` ergibt dieselbe Zeile wie vorher (der bestehende Gleichheitstest deckt das; `ausgeblendet` dort nicht setzen).
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/lage/alarmAusMonitor.test.ts` → FAIL.
-- [ ] **Step 3:** In `alarmAusMonitor` eine Menge aus `a.ausgeblendet ?? []` bilden und jede Quelle darin als `{ zustand: 'gesperrt' }` liefern; Kopfkommentar um den Verweis auf die Regel ergänzen.
-- [ ] **Step 4:** Vitest → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit -p .` und `lint` auf die Datei grün.
-- [ ] **Step 5:** Commit `fix: Monitor meldet ausgeblendete Alarmquellen als gesperrt (LLH-1964)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/lage/alarmAusMonitor.test.ts` → FAIL.
+- [x] **Step 3:** In `alarmAusMonitor` eine Menge aus `a.ausgeblendet ?? []` bilden und jede Quelle darin als `{ zustand: 'gesperrt' }` liefern; Kopfkommentar um den Verweis auf die Regel ergänzen.
+- [x] **Step 4:** Vitest → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit -p .` und `lint` auf die Datei grün.
+- [x] **Step 5:** Commit `fix: Monitor meldet ausgeblendete Alarmquellen als gesperrt (LLH-1964)`.
 
 ### Task 5: Regel festhalten, Gate
 
 **Files:**
 - Modify: `frontend/src/geraet/AGENTS.md` (Absatz Lagemonitor, Satz zur Alarmzeile)
 
-- [ ] **Step 1:** Nach „… nie Meldungs-, Auftrags- oder Erinnerungstexte;“ einfügen: Quellen aus Modulen, die im Einsatz ausgeblendet sind (wirksame Sichtbarkeit, keine Rollenschranke), liest der Server nicht; er nennt sie in `alarm.ausgeblendet`, und `alarmAusMonitor` meldet sie als `gesperrt`, damit Monitor und Überblick dasselbe zeigen (LLH-1964, Zuordnung in `fn alarm`). Prettier über die Datei.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 3:** Commit `docs: Regel ausgeblendete Module in der Monitor-Alarmzeile (LLH-1964)`.
+- [x] **Step 1:** Nach „… nie Meldungs-, Auftrags- oder Erinnerungstexte;“ einfügen: Quellen aus Modulen, die im Einsatz ausgeblendet sind (wirksame Sichtbarkeit, keine Rollenschranke), liest der Server nicht; er nennt sie in `alarm.ausgeblendet`, und `alarmAusMonitor` meldet sie als `gesperrt`, damit Monitor und Überblick dasselbe zeigen (LLH-1964, Zuordnung in `fn alarm`). Prettier über die Datei.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] **Step 3:** Commit `docs: Regel ausgeblendete Module in der Monitor-Alarmzeile (LLH-1964)`.
