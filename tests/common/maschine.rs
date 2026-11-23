@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use tower::ServiceExt;
 
 /// Verwaltung der Anbindungen.
-pub const ANBINDUNGEN: &str = "/api/admin/anbindungen";
+pub const ANBINDUNGEN: &str = "/api/admin/integrations";
 
 /// Deterministischer Schlüssel eines Fremdsystems.
 pub fn schluessel(n: u8) -> SigningKey {
@@ -55,7 +55,7 @@ pub async fn senden(
     (status, headers, bytes)
 }
 
-/// Legt eine Anbindung an (`POST /api/admin/anbindungen`).
+/// Legt eine Anbindung an (`POST /api/admin/integrations`).
 pub async fn anbindung_anlegen(
     app: &axum::Router,
     admin: &str,

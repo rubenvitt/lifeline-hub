@@ -30,6 +30,18 @@ final class InfoPlistTests: XCTestCase {
         }
     }
 
+    /// Standort nur „When in Use“ (LLH-2071): kein Always, kein Hintergrund, kein Nachfragen nach
+    /// dem genauen Standort.
+    func testDerStandortIstBegruendetUndNurImVordergrund() {
+        XCTAssertEqual(
+            info["NSLocationWhenInUseUsageDescription"] as? String,
+            "Lifeline zeigt deinen Standort auf der Lagekarte und übernimmt ihn auf Wunsch in "
+                + "Ortsfelder. Er bleibt auf dem Gerät, bis du ihn selbst speicherst.")
+        XCTAssertNil(info["NSLocationAlwaysAndWhenInUseUsageDescription"])
+        XCTAssertNil(info["NSLocationTemporaryUsageDescriptionDictionary"])
+        XCTAssertFalse((info["UIBackgroundModes"] as? [String] ?? []).contains("location"))
+    }
+
     func testDieAppKennzeichnetSichAlsLifelineIos() {
         XCTAssertEqual(Bundle.main.bundleIdentifier, "dev.rubeen.lifeline.ios")
     }
@@ -54,7 +66,8 @@ final class InfoPlistTests: XCTestCase {
     }
 
     /// App Store: Required-Reason-APIs stehen mit Grund im Privacy-Manifest; die Hülle verfolgt
-    /// niemanden und erhebt selbst keine Daten.
+    /// niemanden. Erhoben gilt nur der genaue Standort (LLH-2071): Ortsfeld und „Mein Standort“
+    /// schicken ihn auf Knopfdruck an den Server, verknüpft mit dem Konto, für die App-Funktion.
     func testDasPrivacyManifestLiegtImBuendel() throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"))
         let daten = try Data(contentsOf: url)
@@ -62,7 +75,16 @@ final class InfoPlistTests: XCTestCase {
             PropertyListSerialization.propertyList(from: daten, format: nil) as? [String: Any])
         XCTAssertEqual(manifest["NSPrivacyTracking"] as? Bool, false)
         XCTAssertEqual((manifest["NSPrivacyTrackingDomains"] as? [String])?.count, 0)
-        XCTAssertEqual((manifest["NSPrivacyCollectedDataTypes"] as? [Any])?.count, 0)
+        let erhoben = manifest["NSPrivacyCollectedDataTypes"] as? [[String: Any]] ?? []
+        XCTAssertEqual(erhoben.count, 1)
+        XCTAssertEqual(
+            erhoben.first?["NSPrivacyCollectedDataType"] as? String,
+            "NSPrivacyCollectedDataTypePreciseLocation")
+        XCTAssertEqual(erhoben.first?["NSPrivacyCollectedDataTypeLinked"] as? Bool, true)
+        XCTAssertEqual(erhoben.first?["NSPrivacyCollectedDataTypeTracking"] as? Bool, false)
+        XCTAssertEqual(
+            erhoben.first?["NSPrivacyCollectedDataTypePurposes"] as? [String],
+            ["NSPrivacyCollectedDataTypePurposeAppFunctionality"])
         let apis = manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]] ?? []
         let gruende = Dictionary(
             uniqueKeysWithValues: apis.compactMap { eintrag -> (String, [String])? in
@@ -78,6 +100,12 @@ final class InfoPlistTests: XCTestCase {
         let skript = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(skript.contains("__LIFELINE_HUELLE__"))
         XCTAssertTrue(skript.contains("__LIFELINE_VERSION__"))
+    }
+
+    func testDieUnterframeSperreLiegtAlsRessourceInDerApp() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "unterframe-standort", withExtension: "js"))
+        let skript = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(skript.contains("window.top === window"))
     }
 
     // MARK: Push über APNs (Entwurf „iOS-Alarme über APNs“)

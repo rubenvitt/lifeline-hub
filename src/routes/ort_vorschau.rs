@@ -1,4 +1,4 @@
-//! GET /api/einsaetze/:id/ort-vorschau?lat=&lon=&exclude=typ:id
+//! GET /api/einsaetze/:id/place-preview?lat=&lon=&exclude=typ:id
 //!
 //! Liefert `{peilung, ortsname}` für die Koordinaten-Plausibilitätsprüfung.
 //! Die Peilung (nächster verorteter Marker) wird bedingungslos berechnet; `ortsname`

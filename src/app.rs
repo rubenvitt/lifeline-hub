@@ -307,20 +307,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Verlauf und „alle gelesen“ eines Einsatzes (LLH-1143, design.md D3/D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen",
+            "/api/einsaetze/{id}/notifications",
             get(routes::benachrichtigung::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen/gelesen",
+            "/api/einsaetze/{id}/notifications/read",
             post(routes::benachrichtigung::gelesen),
         )
         // Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben",
+            "/api/einsaetze/{id}/notification-defaults",
             get(routes::benachrichtigung::vorgaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben/{art}",
+            "/api/einsaetze/{id}/notification-defaults/{art}",
             put(routes::benachrichtigung::vorgabe_setzen),
         )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
@@ -344,23 +344,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route(
-            "/api/einsaetze/mitglied-auswahl",
+            "/api/einsaetze/member-selection",
             get(routes::einsatz::mitglied_auswahl_anlage),
         )
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
         .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
-            "/api/einsaetze/{id}/abschliessen",
+            "/api/einsaetze/{id}/close",
             post(routes::einsatz::abschliessen),
         )
         // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
         .route(
-            "/api/einsaetze/{id}/wiedereroeffnen",
+            "/api/einsaetze/{id}/reopen",
             post(routes::einsatz::wiedereroeffnen),
         )
         // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
         .route(
-            "/api/einsaetze/{id}/abschluss/pruefung",
+            "/api/einsaetze/{id}/closure/check",
             get(routes::einsatz::abschluss_pruefung),
         )
         .route(
@@ -370,7 +370,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
         .route(
-            "/api/einsaetze/{id}/praesenz",
+            "/api/einsaetze/{id}/presence",
             put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
         )
         .route(
@@ -380,11 +380,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.
         .route(
-            "/api/einsaetze/{id}/programmpunkte",
+            "/api/einsaetze/{id}/agenda-items",
             get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/programmpunkte/{pid}",
+            "/api/einsaetze/{id}/agenda-items/{pid}",
             patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
         )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
@@ -394,23 +394,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist",
+            "/api/einsaetze/{id}/retention-period",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/nachbereitung",
+            "/api/einsaetze/{id}/follow-up",
             put(routes::einsatz::nachbereitung_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}",
+            "/api/einsaetze/{id}/retention-period/{kategorie}",
             put(routes::einsatz::kategorie_frist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrung-kategorien",
+            "/api/einsaetze/{id}/retention-categories",
             get(routes::einsatz::kategorien_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/einstellungen",
+            "/api/einsaetze/{id}/settings",
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
@@ -422,19 +422,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::unterkunft_richtwerte::einsatz_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides",
+            "/api/einsaetze/{id}/module-overrides",
             get(routes::einsatz::modul_overrides_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-freigaben",
+            "/api/einsaetze/{id}/module-access",
             get(routes::einsatz::modul_freigaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-vorgaben",
+            "/api/einsaetze/{id}/module-defaults",
             get(routes::einsatz::load_modul_vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides/{modul_key}",
+            "/api/einsaetze/{id}/module-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
         .route(
@@ -464,7 +464,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
-            "/api/einsaetze/{id}/modul-zaehler",
+            "/api/einsaetze/{id}/module-counts",
             get(routes::modul_zaehler::liste),
         )
         // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
@@ -1038,12 +1038,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::meldung::lage_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/ort-vorschau",
+            "/api/einsaetze/{id}/place-preview",
             get(routes::ort_vorschau::vorschau),
         )
         // Ortssuche des Ortsfelds (LFH-1175): Recht der Einsatzdaten, kein Modul.
         .route(
-            "/api/einsaetze/{id}/ort-suche",
+            "/api/einsaetze/{id}/place-search",
             get(routes::ort_suche::im_einsatz),
         )
         .route(
@@ -1293,7 +1293,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::export),
         )
         .route(
-            "/api/einsaetze/{id}/einsatzakte/anlagen.zip",
+            "/api/einsaetze/{id}/case-file/attachments.zip",
             get(routes::einsatzakte::anlagen_zip),
         )
         .route(
@@ -1581,11 +1581,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(
-            "/api/einsaetze/{id}/anbindungen",
+            "/api/einsaetze/{id}/integrations",
             get(routes::einsatz_anbindungen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/anbindungen/{zid}/freigabe",
+            "/api/einsaetze/{id}/integrations/{zid}/grant",
             put(routes::einsatz_anbindungen::freigeben)
                 .delete(routes::einsatz_anbindungen::freigabe_beenden),
         )
@@ -1971,67 +1971,67 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
         // Wiederherstellen und Löschersuchen (Antrag, Rücknahme; die Suche ist POST, liest aber
         // nur). Guard in tests/aufbewahrung.rs.
-        .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
+        .route("/api/retention", get(routes::aufbewahrung::uebersicht))
         .route(
-            "/api/aufbewahrung/einsaetze/{id}",
+            "/api/retention/incidents/{id}",
             get(routes::aufbewahrung::akte),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/etb",
+            "/api/retention/incidents/{id}/etb",
             get(routes::aufbewahrung::etb),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/wiederherstellen",
+            "/api/retention/incidents/{id}/restore",
             post(routes::aufbewahrung::wiederherstellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege",
+            "/api/retention/incidents/{id}/redaction-requests",
             get(routes::aufbewahrung::antraege).post(routes::aufbewahrung::antrag_stellen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen",
+            "/api/retention/incidents/{id}/redaction-requests/{aid}/undo",
             post(routes::aufbewahrung::antrag_zuruecknehmen),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/personensuche",
+            "/api/retention/incidents/{id}/person-search",
             post(routes::aufbewahrung::personensuche),
         )
         .route(
-            "/api/aufbewahrung/einsaetze/{id}/archiv",
+            "/api/retention/incidents/{id}/archive",
             get(routes::aufbewahrung::archiv_herunterladen).route_layer(download_grenze()),
         )
         // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der
         // Fremdsysteme selbst liegt unter `/api/v1/` (`public_api`).
         .route(
-            "/api/admin/anbindungen",
+            "/api/admin/integrations",
             get(routes::anbindungen::liste).post(routes::anbindungen::anlegen),
         )
         .route(
-            "/api/admin/anbindungen/{id}",
+            "/api/admin/integrations/{id}",
             get(routes::anbindungen::laden).patch(routes::anbindungen::aendern),
         )
         .route(
-            "/api/admin/anbindungen/{id}/code",
+            "/api/admin/integrations/{id}/code",
             post(routes::anbindungen::code),
         )
         .route(
-            "/api/admin/anbindungen/{id}/widerrufen",
+            "/api/admin/integrations/{id}/revoke",
             post(routes::anbindungen::widerrufen),
         )
         // LLH-1656: Webhook einer Anbindung. Zugestellt wird im Hintergrund
         // (`public_api::webhook::lauf`).
         .route(
-            "/api/admin/anbindungen/{id}/webhook",
+            "/api/admin/integrations/{id}/webhook",
             post(routes::anbindungen_webhook::create)
                 .patch(routes::anbindungen_webhook::update)
                 .delete(routes::anbindungen_webhook::delete),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",
+            "/api/admin/integrations/{id}/webhook/resume",
             post(routes::anbindungen_webhook::wieder_aufnehmen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/test",
+            "/api/admin/integrations/{id}/webhook/test",
             post(routes::anbindungen_webhook::test),
         )
         .route(
@@ -2039,7 +2039,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::anbindungen_webhook::zertifikat_abrufen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/versuche",
+            "/api/admin/integrations/{id}/webhook/attempts",
             get(routes::anbindungen_webhook::versuche),
         )
         // LLH-2017: Adapter verwalten (ADR-0077). Abgerufen wird im Hintergrund (`adapter::lauf`).
@@ -2054,37 +2054,34 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::adapter::delete),
         )
         .route(
-            "/api/admin/adapter/{id}/geheimnisse/{name}",
+            "/api/admin/adapter/{id}/secrets/{name}",
             put(routes::adapter::set_geheimnis).delete(routes::adapter::delete_geheimnis),
         )
         .route(
-            "/api/admin/adapter/{id}/pruefen",
+            "/api/admin/adapter/{id}/check",
             post(routes::adapter::check),
         )
+        .route("/api/admin/adapter/{id}/pause", post(routes::adapter::halt))
         .route(
-            "/api/admin/adapter/{id}/anhalten",
-            post(routes::adapter::halt),
-        )
-        .route(
-            "/api/admin/adapter/{id}/fortsetzen",
+            "/api/admin/adapter/{id}/resume",
             post(routes::adapter::resume),
         )
         .route(
-            "/api/admin/adapter/{id}/versuche",
+            "/api/admin/adapter/{id}/attempts",
             get(routes::adapter::list_versuche),
         )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(
-            "/api/admin/einwurf-zugaenge",
+            "/api/admin/intake-credentials",
             get(routes::einwurf_zugaenge::liste).post(routes::einwurf_zugaenge::anlegen),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/schluessel",
+            "/api/admin/intake-credentials/{id}/key",
             post(routes::einwurf_zugaenge::schluessel_wechseln),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/widerrufen",
+            "/api/admin/intake-credentials/{id}/revoke",
             post(routes::einwurf_zugaenge::widerrufen),
         )
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
@@ -2099,7 +2096,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // 256 MiB und die gemeinsame Upload-Grenze; dem Zeitbudget entzogen
         // (`zulassung::OHNE_ZULASSUNGSGRENZE`).
         .route(
-            "/api/admin/archiv/einspielen",
+            "/api/admin/archive/import",
             post(routes::archiv_einspielen::einspielen)
                 .layer(DefaultBodyLimit::max(ARCHIV_BLOCK_BODY_MAX))
                 .route_layer(upload_grenze.clone())
@@ -2350,66 +2347,63 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
-            "/api/planungen",
+            "/api/plans",
             get(routes::planung::list).post(routes::planung::create),
         )
         .route(
-            "/api/planungen/{id}",
+            "/api/plans/{id}",
             get(routes::planung::load)
                 .patch(routes::planung::update)
                 .delete(routes::planung::delete),
         )
         .route(
-            "/api/planungen/{id}/posten",
+            "/api/plans/{id}/posts",
             post(routes::planung::create_posten),
         )
-        // `reihenfolge` ist ein festes Segment neben `{pid}`.
+        // `order` ist ein festes Segment neben `{pid}`.
         .route(
-            "/api/planungen/{id}/posten/reihenfolge",
+            "/api/plans/{id}/posts/order",
             put(routes::planung::reihenfolge),
         )
         .route(
-            "/api/planungen/{id}/posten/{pid}",
+            "/api/plans/{id}/posts/{pid}",
             patch(routes::planung::update_posten).delete(routes::planung::delete_posten),
         )
         .route(
-            "/api/planungen/{id}/bloecke",
+            "/api/plans/{id}/blocks",
             post(routes::planung::create_block),
         )
         .route(
-            "/api/planungen/{id}/bloecke/{bid}",
+            "/api/plans/{id}/blocks/{bid}",
             patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
+        .route("/api/plans/{id}/generate", post(routes::planung::erzeugen))
+        .route("/api/plans/{id}/export", get(routes::planung::export))
         .route(
-            "/api/planungen/{id}/erzeugen",
-            post(routes::planung::erzeugen),
-        )
-        .route("/api/planungen/{id}/export", get(routes::planung::export))
-        .route(
-            "/api/planungen/{id}/helfer",
+            "/api/plans/{id}/helpers",
             post(routes::planung::create_helfer),
         )
         .route(
-            "/api/planungen/{id}/helfer/{hid}",
+            "/api/plans/{id}/helpers/{hid}",
             patch(routes::planung::update_helfer).delete(routes::planung::delete_helfer),
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
-            "/api/planungen/{id}/programmpunkte",
+            "/api/plans/{id}/agenda-items",
             post(routes::planung::create_programmpunkt),
         )
         .route(
-            "/api/planungen/{id}/programmpunkte/{pid}",
+            "/api/plans/{id}/agenda-items/{pid}",
             patch(routes::planung::update_programmpunkt)
                 .delete(routes::planung::delete_programmpunkt),
         )
-        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
+        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `preview` schreibt nichts.
         .route(
-            "/api/planungen/{id}/uebernahme/vorschau",
+            "/api/plans/{id}/transfer/preview",
             post(routes::planung::uebernahme_vorschau),
         )
         .route(
-            "/api/planungen/{id}/uebernahme",
+            "/api/plans/{id}/transfer",
             post(routes::planung::uebernehmen),
         )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
@@ -2719,126 +2713,123 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     };
 
     let router = router
-        .route("/api/karte/config", get(routes::karte::config))
-        .route(
-            "/api/karte/fachebenen/{quelle}",
-            get(routes::karte::fachebenen),
-        )
+        .route("/api/map/config", get(routes::karte::config))
+        .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
-            "/api/karte/offline/tiles/{z}/{x}/{y}",
+            "/api/map/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
         // Eingebettete Welt-Übersicht: der statische „welt“-Pfad steht vor der `{karte_id}`-Route.
         .route(
-            "/api/karte/offline/welt/tiles/{z}/{x}/{y}",
+            "/api/map/offline/world/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_welt_tiles),
         )
         // Region-adressierter Tile-Endpoint: je sichtbarer Region eine eigene Vector-Source.
         .route(
-            "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}",
+            "/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles_region),
         )
         // Eingebettete Offline-Glyphs/Sprite (rust-embed).
         .route(
-            "/api/karte/offline/fonts/{fontstack}/{datei}",
+            "/api/map/offline/fonts/{fontstack}/{datei}",
             get(routes::karte::offline_fonts),
         )
         .route(
-            "/api/karte/offline/sprites/{datei}",
+            "/api/map/offline/sprites/{datei}",
             get(routes::karte::offline_sprite),
         )
         // Style-/Tile-Proxy: verbirgt Upstream-Key und -URL, nur mit Sitzung (LFH-1072), damit
         // Fremde das Anbieter-Kontingent nicht verbrauchen.
         .route(
-            "/api/karte/proxy/{id}/style.json",
+            "/api/map/proxy/{id}/style.json",
             get(routes::karte::proxy_style),
         )
         .route(
-            "/api/karte/proxy/{id}/raster/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/raster/{z}/{x}/{y}",
             get(routes::karte::proxy_raster),
         )
         .route(
-            "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
             get(routes::karte::proxy_tile),
         )
         .route(
-            "/api/karte/proxy/{id}/tilejson/{slot}",
+            "/api/map/proxy/{id}/tilejson/{slot}",
             get(routes::karte::proxy_tilejson),
         )
         .route(
-            "/api/karte/proxy/{id}/sprite/{rest}",
+            "/api/map/proxy/{id}/sprite/{rest}",
             get(routes::karte::proxy_sprite),
         )
         .route(
-            "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+            "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
             get(routes::karte::proxy_glyphs),
         )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             get(routes::karte::online_liste).post(routes::karte::online_anlegen),
         )
         .route(
-            "/api/karte/online-quellen/katalog",
+            "/api/map/online-sources/catalog",
             get(routes::karte::online_katalog),
         )
         .route(
-            "/api/karte/online-quellen/{id}",
+            "/api/map/online-sources/{id}",
             patch(routes::karte::online_aktualisieren).delete(routes::karte::online_loeschen),
         )
         .route(
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             get(routes::karte::offline_liste).post(routes::karte::offline_registrieren),
         )
         // Statische Segmente (katalog/download) vor /{id} — matchit priorisiert statisch.
         .route(
-            "/api/karte/offline-karten/katalog",
+            "/api/map/offline-maps/catalog",
             get(routes::karte::offline_katalog),
         )
         .route(
-            "/api/karte/offline-karten/vorhandene",
+            "/api/map/offline-maps/existing",
             get(routes::karte::offline_vorhandene),
         )
         .route(
-            "/api/karte/offline-karten/download",
+            "/api/map/offline-maps/download",
             post(routes::karte::offline_download),
         )
         .route(
-            "/api/karte/offline-karten/bauen",
+            "/api/map/offline-maps/build",
             post(routes::karte::offline_bauen),
         )
         .route(
-            "/api/karte/offline-karten/baubare-regionen",
+            "/api/map/offline-maps/buildable-regions",
             get(routes::karte::offline_baubare_regionen),
         )
         .route(
-            "/api/karte/offline-karten/bau-status",
+            "/api/map/offline-maps/build-status",
             get(routes::karte::offline_bau_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung",
+            "/api/map/offline-maps/auto-update",
             get(routes::karte::offline_aktualisierung_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung/einstellung",
+            "/api/map/offline-maps/auto-update/settings",
             put(routes::karte::offline_aktualisierung_einstellen),
         )
         .route(
-            "/api/karte/offline-karten/{id}/jetzt-aktualisieren",
+            "/api/map/offline-maps/{id}/update-now",
             post(routes::karte::offline_jetzt_aktualisieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/aktivieren",
+            "/api/map/offline-maps/{id}/activate",
             post(routes::karte::offline_aktivieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/abbrechen",
+            "/api/map/offline-maps/{id}/cancel",
             post(routes::karte::offline_abbrechen),
         )
         .route(
-            "/api/karte/offline-karten/{id}",
+            "/api/map/offline-maps/{id}",
             delete(routes::karte::offline_loeschen),
         );
 

@@ -38,7 +38,7 @@ function region(
   return {
     karte_id,
     name: `R${karte_id}`,
-    tiles_url: `/api/karte/offline/${karte_id}/tiles/{z}/{x}/{y}?v=abc`,
+    tiles_url: `/api/map/offline/${karte_id}/tiles/{z}/{x}/{y}?v=abc`,
     attribution: ODBL,
     format,
     maxzoom,
@@ -48,7 +48,7 @@ function region(
 const beides: KarteServerConfig = {
   online_styles: [vektorView],
   offline_verfuegbar: true,
-  offline_tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}?v=abc',
+  offline_tiles_url: '/api/map/offline/1/tiles/{z}/{x}/{y}?v=abc',
   offline_attribution: ODBL,
   offline_regionen: [region(1)],
   karten_bau_verfuegbar: false,
@@ -56,7 +56,7 @@ const beides: KarteServerConfig = {
 const nurOffline: KarteServerConfig = {
   online_styles: [],
   offline_verfuegbar: true,
-  offline_tiles_url: '/api/karte/offline/5/tiles/{z}/{x}/{y}?v=abc',
+  offline_tiles_url: '/api/map/offline/5/tiles/{z}/{x}/{y}?v=abc',
   offline_attribution: ODBL,
   offline_regionen: [region(5)],
   karten_bau_verfuegbar: false,
@@ -84,8 +84,8 @@ describe('basemapStil', () => {
   it('absolutiereProxyAnfrage: root-relative Proxy-URL → absolut, andere unangetastet (LFH-182)', () => {
     const o = window.location.origin;
     // MapLibre ruft transformRequest mit substituierter Tile-URL (keine {z}-Platzhalter mehr).
-    expect(absolutiereProxyAnfrage('/api/karte/proxy/1/tile/5/6/34/22')).toEqual({
-      url: `${o}/api/karte/proxy/1/tile/5/6/34/22`,
+    expect(absolutiereProxyAnfrage('/api/map/proxy/1/tile/5/6/34/22')).toEqual({
+      url: `${o}/api/map/proxy/1/tile/5/6/34/22`,
     });
     expect(absolutiereProxyAnfrage('https://x/y')).toEqual({ url: 'https://x/y' });
     expect(absolutiereProxyAnfrage('//host/x')).toEqual({ url: '//host/x' });
@@ -94,26 +94,26 @@ describe('basemapStil', () => {
   it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
     const proxyView: OnlineStyle = {
       name: 'P',
-      url: '/api/karte/proxy/1/style.json',
+      url: '/api/map/proxy/1/style.json',
       typ: 'vektor',
       attribution: null,
     };
     expect(baueOnlineStyle(proxyView)).toBe(
-      new URL('/api/karte/proxy/1/style.json', window.location.origin).href,
+      new URL('/api/map/proxy/1/style.json', window.location.origin).href,
     );
   });
 
   it('baueOnlineStyle: relatives Raster-Proxy-Template bleibt relatives tiles[0] (LFH-182)', () => {
     const proxyRaster: OnlineStyle = {
       name: 'P',
-      url: '/api/karte/proxy/1/raster/{z}/{x}/{y}',
+      url: '/api/map/proxy/1/raster/{z}/{x}/{y}',
       typ: 'raster',
       attribution: null,
     };
     const s = baueOnlineStyle(proxyRaster) as {
       sources: Record<string, { tiles: string[] }>;
     };
-    expect(s.sources.raster.tiles).toEqual(['/api/karte/proxy/1/raster/{z}/{x}/{y}']);
+    expect(s.sources.raster.tiles).toEqual(['/api/map/proxy/1/raster/{z}/{x}/{y}']);
   });
 
   it('baueOnlineStyle: Raster verpackt das Template in einen Raster-Style', () => {
@@ -158,7 +158,7 @@ describe('basemapStil', () => {
       sources: Record<string, { type: string; tiles: string[] }>;
     };
     expect(raster.sources.raster.type).toBe('raster');
-    expect(raster.sources.raster.tiles).toEqual(['/api/karte/offline/5/tiles/{z}/{x}/{y}?v=abc']);
+    expect(raster.sources.raster.tiles).toEqual(['/api/map/offline/5/tiles/{z}/{x}/{y}?v=abc']);
   });
 
   it('offline-Modus: mehrere Regionen → je eine Vector-Source basemap-{id} (LFH-188)', () => {
@@ -169,8 +169,8 @@ describe('basemapStil', () => {
     };
     expect(s.sources['basemap-5'].type).toBe('vector');
     expect(s.sources['basemap-8'].type).toBe('vector');
-    expect(s.sources['basemap-5'].tiles[0]).toContain('/api/karte/offline/5/tiles/');
-    expect(s.sources['basemap-8'].tiles[0]).toContain('/api/karte/offline/8/tiles/');
+    expect(s.sources['basemap-5'].tiles[0]).toContain('/api/map/offline/5/tiles/');
+    expect(s.sources['basemap-8'].tiles[0]).toContain('/api/map/offline/8/tiles/');
     // Beide Regionen tragen die suffixierten Orts-Labels; Layer-IDs bleiben eindeutig.
     const ids = s.layers.map((l) => l.id);
     expect(ids).toContain('orte-5');
@@ -185,7 +185,7 @@ describe('basemapStil', () => {
       online_styles: [],
       offline_verfuegbar: true,
       offline_regionen: [],
-      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: ODBL,
       karten_bau_verfuegbar: false,
     };
@@ -194,7 +194,7 @@ describe('basemapStil', () => {
     };
     // Kompat: eine Region mit karte_id 0 aus offline_tiles_url.
     expect(s.sources['basemap-0'].type).toBe('vector');
-    expect(s.sources['basemap-0'].tiles[0]).toBe('/api/karte/offline/tiles/{z}/{x}/{y}?v=abc');
+    expect(s.sources['basemap-0'].tiles[0]).toBe('/api/map/offline/tiles/{z}/{x}/{y}?v=abc');
   });
 
   it('grundlageTheme: helle Online-Karte bleibt nachts hell, eine dunkel markierte auch am Tag dunkel (LLH-1486)', () => {
@@ -279,16 +279,16 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
     }>;
   };
   it('nutzt lokale Glyphs/Sprite (offline)', () => {
-    expect(style.glyphs).toBe('/api/karte/offline/fonts/{fontstack}/{range}.pbf');
+    expect(style.glyphs).toBe('/api/map/offline/fonts/{fontstack}/{range}.pbf');
     // Absolut (LFH-781): MapLibre parst die Sprite-URL mit `new URL(url)` ohne Basis, eine
     // root-relative scheitert mit „Invalid sprite URL … must be absolute", und das Sprite fehlt.
-    expect(style.sprite).toBe(`${window.location.origin}/api/karte/offline/sprites/basemap`);
+    expect(style.sprite).toBe(`${window.location.origin}/api/map/offline/sprites/basemap`);
     expect(() => new URL(style.sprite)).not.toThrow();
   });
   it('bindet je Region eine region-adressierte Vektor-Source basemap-{id}', () => {
     const src = style.sources['basemap-7'];
     expect(src.type).toBe('vector');
-    expect(src.tiles[0]).toContain('/api/karte/offline/7/tiles/{z}/{x}/{y}');
+    expect(src.tiles[0]).toContain('/api/map/offline/7/tiles/{z}/{x}/{y}');
   });
   it('genau ein gemeinsamer Hintergrund-Layer (nicht je Region)', () => {
     const bg = style.layers.filter((l) => l.type === 'background');
@@ -354,7 +354,7 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
       {
         karte_id: 0,
         name: 'Welt-Übersicht',
-        tiles_url: '/api/karte/offline/welt/tiles/{z}/{x}/{y}?v=w',
+        tiles_url: '/api/map/offline/world/tiles/{z}/{x}/{y}?v=w',
         attribution: 'ODbL',
         format: 'vektor',
         maxzoom: 6,

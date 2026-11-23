@@ -110,6 +110,15 @@ export function huellePlatform(): string | null {
   return typeof platform === 'string' ? platform : null;
 }
 
+/**
+ * Läuft die Oberfläche in einer App-Hülle (iOS oder Android, LLH-2071)? Dort gibt die Person
+ * Rechte wie den Standort in den Einstellungen des Geräts frei, nicht im Browser.
+ */
+export function huelleIstApp(): boolean {
+  const platform = huellePlatform();
+  return platform === 'ios' || platform === 'android';
+}
+
 /** Volle Version der Hülle; `null`, wo keine Hülle eine nennt (Browser, Desktop-Hülle vor LLH-1982). */
 export function huelleVersion(): string | null {
   const version = window.__LIFELINE_HUELLE__?.version;

@@ -140,7 +140,7 @@ describe('Druckkopf', () => {
       org_defaults: { org_id: 1 },
     });
     server.use(
-      http.get('/api/einsaetze/1/einstellungen', () =>
+      http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
     );
@@ -176,7 +176,7 @@ describe('Druckkopf', () => {
       org_defaults: { org_id: 1 },
     });
     server.use(
-      http.get('/api/einsaetze/1/einstellungen', () =>
+      http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
     );

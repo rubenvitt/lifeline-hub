@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 mod common;
 use common::*;
 
-const PFAD: &str = "/api/planungen";
+const PFAD: &str = "/api/plans";
 
 const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
@@ -68,7 +68,7 @@ async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (
     let (s, v) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         body.clone(),
     )
     .await;
@@ -79,7 +79,7 @@ async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (
     };
     let mut body = body;
     body["stand"] = json!(stand);
-    post(app, cookie, &format!("{PFAD}/{p}/uebernahme"), body).await
+    post(app, cookie, &format!("{PFAD}/{p}/transfer"), body).await
 }
 
 async fn einsatz_anzahl(app: &axum::Router, cookie: &str) -> usize {
@@ -120,7 +120,7 @@ async fn kleine_planung(app: &axum::Router, cookie: &str, name: &str) -> (i64, i
     let (s, helfer) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/helfer"),
+        &format!("{PFAD}/{p}/helpers"),
         json!({"name": "Nora Exempel", "telefon": "0170 1234567", "organisation": "Helferkreis"}),
     )
     .await;
@@ -129,7 +129,7 @@ async fn kleine_planung(app: &axum::Router, cookie: &str, name: &str) -> (i64, i
     let (s, plan) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "Streife 2", "art": "einheit", "soll_anzahl": 2}),
     )
     .await;
@@ -138,7 +138,7 @@ async fn kleine_planung(app: &axum::Router, cookie: &str, name: &str) -> (i64, i
     let (s, plan) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/bloecke"),
+        &format!("{PFAD}/{p}/blocks"),
         json!({"posten_id": posten, "von": "2027-03-13 14:00:00", "bis": "2027-03-13 17:00:00",
                "personen": [{"art": "stamm", "personal_id": mia},
                             {"art": "helfer", "helfer_id": nora}]}),
@@ -167,7 +167,7 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": {"art": "neu"}}),
     )
     .await;
@@ -288,32 +288,32 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/posten"),
+            format!("{PFAD}/{p}/posts"),
             json!({"bezeichnung": "Neu", "art": "einheit"}),
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/posten/{posten}"),
+            format!("{PFAD}/{p}/posts/{posten}"),
             json!({"bezeichnung": "Umbenannt"}),
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/bloecke/{}", block["id"]),
+            format!("{PFAD}/{p}/blocks/{}", block["id"]),
             json!({"version": block["version"], "notiz": "x"}),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/helfer"),
+            format!("{PFAD}/{p}/helpers"),
             json!({"name": "Spät Dazu"}),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/uebernahme/vorschau"),
+            format!("{PFAD}/{p}/transfer/preview"),
             json!({"ziel": {"art": "neu"}}),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/uebernahme"),
+            format!("{PFAD}/{p}/transfer"),
             json!({"ziel": {"art": "neu"}, "stand": 0}),
         ),
     ] {
@@ -340,7 +340,7 @@ async fn in_laufenden_einsatz_helfer_mit_herkunft_und_bestehende_einheit() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}}),
     )
     .await;
@@ -501,7 +501,7 @@ async fn ziel_und_rechte() {
     let (app, pool) = setup_mit_pool().await;
     let admin = admin(&app).await;
     let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
-    let vorschau = format!("{PFAD}/{p}/uebernahme/vorschau");
+    let vorschau = format!("{PFAD}/{p}/transfer/preview");
 
     // Ohne Recht zu planen 403, vor dem Ziel.
     benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
@@ -547,7 +547,7 @@ async fn ziel_und_rechte() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -596,7 +596,7 @@ async fn entscheidung_neu_statt_bestehender_einheit() {
     let (_, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": ziel}),
     )
     .await;
@@ -646,7 +646,7 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
     let (s, plan) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "Trupp", "art": "einheit", "einheit_vorlage_id": vorlage}),
     )
     .await;
@@ -659,7 +659,7 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
         let (s, v) = post(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/bloecke"),
+            &format!("{PFAD}/{p}/blocks"),
             json!({"posten_id": posten, "von": von, "bis": bis, "soll_anzahl": soll}),
         )
         .await;
@@ -708,7 +708,7 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
         json!({"bezeichnung": "Reserve", "art": "einheit"}),
         json!({"bezeichnung": "UHS Bühne", "art": "uhs", "uhs_typ": "behandlungsplatz"}),
     ] {
-        let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/posten"), body).await;
+        let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/posts"), body).await;
         assert_eq!(s, StatusCode::CREATED, "{v}");
     }
 
@@ -727,7 +727,7 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         ziel.clone(),
     )
     .await;
@@ -777,7 +777,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, plan) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "Boot 1", "art": "einheit"}),
     )
     .await;
@@ -786,7 +786,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/bloecke"),
+        &format!("{PFAD}/{p}/blocks"),
         json!({"posten_id": posten, "von": "2027-03-13 10:00:00", "bis": "2027-03-13 12:00:00",
                "soll_anzahl": 2, "quali_soll": [{"qualifikation_id": q, "anzahl": 1}]}),
     )
@@ -806,7 +806,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": {"art": "neu"}}),
     )
     .await;
@@ -833,7 +833,7 @@ async fn stand(app: &axum::Router, cookie: &str, p: i64) -> i64 {
     let (s, v) = post(
         app,
         cookie,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         json!({"ziel": {"art": "neu"}}),
     )
     .await;
@@ -850,7 +850,7 @@ async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() 
     let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
     let einsaetze = einsatz_anzahl(&app, &admin).await;
     let ziel = json!({"art": "neu"});
-    let uebernahme = format!("{PFAD}/{p}/uebernahme");
+    let uebernahme = format!("{PFAD}/{p}/transfer");
 
     let alt = stand(&app, &admin, p).await;
 
@@ -864,7 +864,7 @@ async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() 
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{PFAD}/{p}/bloecke/{}", block["id"]),
+        &format!("{PFAD}/{p}/blocks/{}", block["id"]),
         &admin,
         Some(&json!({"version": block["version"], "bis": "2027-03-13 19:00:00"})),
     )
@@ -892,7 +892,7 @@ async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() 
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{PFAD}/{p}/posten/{posten}"),
+        &format!("{PFAD}/{p}/posts/{posten}"),
         &admin,
         Some(&json!({"bezeichnung": "Streife 3"})),
     )
@@ -949,27 +949,27 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/posten"),
+            format!("{PFAD}/{p}/posts"),
             Some(json!({"bezeichnung": "Reserve", "art": "einheit", "schichtlaenge_minuten": 120})),
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/posten/{streife}"),
+            format!("{PFAD}/{p}/posts/{streife}"),
             Some(json!({"abschnitt": "Nord"})),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/helfer"),
+            format!("{PFAD}/{p}/helpers"),
             Some(json!({"name": "Spät Dazu"})),
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/helfer/{helfer}"),
+            format!("{PFAD}/{p}/helpers/{helfer}"),
             Some(json!({"telefon": "0170 7654321"})),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/programmpunkte"),
+            format!("{PFAD}/{p}/agenda-items"),
             Some(json!({"bezeichnung": "Einlass", "zeitpunkt_at": "2027-03-13 17:00:00"})),
         ),
     ];
@@ -1003,32 +1003,28 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
     let schritte: Vec<(&str, String, Option<Value>)> = vec![
         (
             "PUT",
-            format!("{PFAD}/{p}/posten/reihenfolge"),
+            format!("{PFAD}/{p}/posts/order"),
             Some(json!({"posten_ids": [reserve, streife]})),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/bloecke"),
+            format!("{PFAD}/{p}/blocks"),
             Some(json!({"posten_id": reserve, "von": "2027-03-13 09:00:00",
                         "bis": "2027-03-13 11:00:00"})),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/erzeugen"),
+            format!("{PFAD}/{p}/generate"),
             Some(json!({"posten_id": reserve, "von": "2027-03-13 18:00:00",
                         "bis": "2027-03-13 22:00:00"})),
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/programmpunkte/{einlass}"),
+            format!("{PFAD}/{p}/agenda-items/{einlass}"),
             Some(json!({"bezeichnung": "Einlass Bühne"})),
         ),
-        (
-            "DELETE",
-            format!("{PFAD}/{p}/programmpunkte/{einlass}"),
-            None,
-        ),
-        ("DELETE", format!("{PFAD}/{p}/helfer/{spaet}"), None),
+        ("DELETE", format!("{PFAD}/{p}/agenda-items/{einlass}"), None),
+        ("DELETE", format!("{PFAD}/{p}/helpers/{spaet}"), None),
     ];
     for (methode, pfad, body) in schritte {
         let (s, v) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
@@ -1050,13 +1046,13 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
     let schritte: Vec<(&str, String, Option<Value>)> = vec![
         (
             "PATCH",
-            format!("{PFAD}/{p}/bloecke/{}", block["id"]),
+            format!("{PFAD}/{p}/blocks/{}", block["id"]),
             Some(json!({"version": block["version"], "notiz": "Funk prüfen"})),
         ),
         (
             "DELETE",
             format!(
-                "{PFAD}/{p}/bloecke/{}?version={}",
+                "{PFAD}/{p}/blocks/{}?version={}",
                 block["id"],
                 block["version"].as_i64().unwrap() + 1
             ),
@@ -1064,7 +1060,7 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
         ),
         (
             "DELETE",
-            format!("{PFAD}/{p}/posten/{reserve}?mit_bloecken=true"),
+            format!("{PFAD}/{p}/posts/{reserve}?mit_bloecken=true"),
             None,
         ),
     ];
@@ -1091,7 +1087,7 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
 
 /// Legt in der Planung `p` einen Posten (ohne Block) an.
 async fn posten_anlegen(app: &axum::Router, cookie: &str, p: i64, body: Value) {
-    let (s, v) = post(app, cookie, &format!("{PFAD}/{p}/posten"), body).await;
+    let (s, v) = post(app, cookie, &format!("{PFAD}/{p}/posts"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
 }
 
@@ -1142,7 +1138,7 @@ async fn laufender_einsatz_bekommt_fehlende_abschnitte_neuer_posten() {
     let (s, vorschau) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         ziel.clone(),
     )
     .await;
@@ -1221,7 +1217,7 @@ async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/einsatzabschnitte"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/einsatzabschnitte"),
         &admin,
         Some(&json!({"sichtbar": false})),
     )
@@ -1235,7 +1231,7 @@ async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
     let (s, vorschau) = post(
         &app,
         &kraft,
-        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        &format!("{PFAD}/{p}/transfer/preview"),
         ziel.clone(),
     )
     .await;

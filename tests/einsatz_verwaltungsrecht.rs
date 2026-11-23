@@ -72,7 +72,7 @@ async fn alle_schreibwege(
         ),
         (
             "PUT",
-            format!("{basis}/einstellungen"),
+            format!("{basis}/settings"),
             Some(json!({"auftrag_quittierung_frist_min": 45})),
         ),
         (
@@ -103,7 +103,7 @@ async fn alle_schreibwege(
 async fn stand(app: &axum::Router, cookie: &str, einsatz: i64) -> (Value, Value, Value) {
     let basis = format!("/api/einsaetze/{einsatz}");
     let (s1, kopf) = anfrage(app, "GET", &basis, cookie, None).await;
-    let (s2, einst) = anfrage(app, "GET", &format!("{basis}/einstellungen"), cookie, None).await;
+    let (s2, einst) = anfrage(app, "GET", &format!("{basis}/settings"), cookie, None).await;
     let (s3, fs) = anfrage(
         app,
         "GET",

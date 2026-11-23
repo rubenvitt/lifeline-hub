@@ -57,7 +57,7 @@ pub struct OnlineStyle {
     pub attribution: Option<String>,
     /// Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
     /// mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
-    /// nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+    /// nicht mit einem Klick zur Grundlage aller werden. In `/api/map/config` immer absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hinweis: Option<String>,
     /// Die Grundlage ist dunkel (LLH-1486): die Lagekarte rastert ihre taktischen Zeichen dann mit
@@ -67,7 +67,7 @@ pub struct OnlineStyle {
     pub dunkel: bool,
 }
 
-/// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/karte/online-quellen/katalog`), kein
+/// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/map/online-sources/catalog`), kein
 /// Seed — die DB-Registry startet leer. Die ersten fünf sind behördlich/kommerziell nutzbar.
 ///
 /// **Ausnahme „Satellit (Esri)“** (LFH-616): ein kostenloses, hochauflösendes Luftbild mit
@@ -141,7 +141,7 @@ pub use karten_katalog::{
     eintrag_ist_lieferbar, merge_offline_katalog, remote_eintrag_ist_gueltig, OfflineKatalogEintrag,
 };
 
-/// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
+/// Kuratierter Offline-Karten-Katalog (`GET /api/map/offline-maps/catalog`): Eigenbau
 /// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), vom `karten-service` des Projekts unter
 /// [`crate::karte::katalog::KARTEN_BASIS_URL`] veröffentlicht.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
@@ -712,6 +712,19 @@ pub struct Config {
         value_parser = proxy_netz_parsen
     )]
     pub trusted_proxies: Vec<IpNet>,
+
+    /// Bereiche eines CDN vor dem Reverse-Proxy (LLH-2080), z. B. die von Cloudflare; nur
+    /// zusammen mit `--trusted-proxies`. Ein Eintrag daraus in `X-Forwarded-For` wird höchstens
+    /// einmal übersprungen, der nächste ist der Client. Die CDN-Bereiche gehören hierher, nicht
+    /// in `--trusted-proxies`: dort übersprungen, wählte ein eigener Worker im CDN seine Adresse
+    /// frei.
+    #[arg(
+        long,
+        env = "LIFELINE_CDN_PROXIES",
+        value_delimiter = ',',
+        value_parser = proxy_netz_parsen
+    )]
+    pub cdn_proxies: Vec<IpNet>,
 }
 
 /// Ein Eintrag der Proxy-Liste: Netz in CIDR-Form oder einzelne Adresse (dann `/32` bzw.
@@ -916,6 +929,18 @@ impl Config {
         }
         crate::web_push::kontakt_pruefen(kontakt).map_err(anyhow::Error::msg)?;
         Ok(Some(kontakt.to_owned()))
+    }
+
+    /// Die CDN-Liste (`--cdn-proxies`, LLH-2080). Ohne `--trusted-proxies` bricht der Start ab:
+    /// ohne vertrauten Proxy wird `X-Forwarded-For` nie gelesen, die Liste wirkte still nicht.
+    pub fn cdn_proxies_checked(&self) -> anyhow::Result<&[IpNet]> {
+        if !self.cdn_proxies.is_empty() && self.trusted_proxies.is_empty() {
+            anyhow::bail!(
+                "--cdn-proxies (LIFELINE_CDN_PROXIES) verlangt --trusted-proxies \
+                 (LIFELINE_TRUSTED_PROXIES), die Adresse des Reverse-Proxys hinter dem CDN"
+            );
+        }
+        Ok(&self.cdn_proxies)
     }
 
     /// Die Relais-Adresse für iOS-Push, wenn `--ios-push` an ist; `None` ohne Schalter. Nur
@@ -1348,6 +1373,36 @@ mod tests {
             try_parse_mit_env("LIFELINE_LIZENZ_AKZEPTIERT", "ja", &["lifeline-hub"]).is_err(),
             "LIFELINE_LIZENZ_AKZEPTIERT=ja muss ein Parse-Fehler sein, kein stilles Nein"
         );
+    }
+
+    /// CDN-Liste (LLH-2080): leer ohne Angabe, sonst wie die Proxy-Liste; nur mit ihr.
+    #[test]
+    fn cdn_proxies_vorgabe_leer_und_als_liste_setzbar() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert!(c.cdn_proxies.is_empty());
+        assert!(c.cdn_proxies_checked().unwrap().is_empty());
+        let c = try_parse_mit_env(
+            "LIFELINE_CDN_PROXIES",
+            "173.245.48.0/20,2a06:98c0::/29",
+            &["lifeline-hub", "--trusted-proxies", "10.0.1.0/24"],
+        )
+        .unwrap();
+        let erwartet: Vec<IpNet> = vec![
+            "173.245.48.0/20".parse().unwrap(),
+            "2a06:98c0::/29".parse().unwrap(),
+        ];
+        assert_eq!(c.cdn_proxies_checked().unwrap(), erwartet.as_slice());
+        assert!(
+            try_parse_mit_env("LIFELINE_CDN_PROXIES", "cloudflare", &["lifeline-hub"]).is_err()
+        );
+    }
+
+    #[test]
+    fn cdn_ohne_trusted_proxies_bricht_ab() {
+        let c = try_parse_mit_env("LIFELINE_CDN_PROXIES", "173.245.48.0/20", &["lifeline-hub"])
+            .unwrap();
+        let fehler = c.cdn_proxies_checked().unwrap_err().to_string();
+        assert!(fehler.contains("LIFELINE_TRUSTED_PROXIES"), "{fehler}");
     }
 
     /// Ohne Angabe ist die Proxy-Liste leer: dann bleibt die Gegenstelle die Quell-IP (LFH-604).

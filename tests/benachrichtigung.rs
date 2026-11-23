@@ -116,7 +116,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/modul-overrides/{modul}", self.einsatz),
+            &format!("/api/einsaetze/{}/module-overrides/{modul}", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -992,7 +992,7 @@ impl Welt {
         anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/benachrichtigungen", self.einsatz),
+            &format!("/api/einsaetze/{}/notifications", self.einsatz),
             cookie,
             None,
         )
@@ -1003,7 +1003,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", self.einsatz),
+            &format!("/api/einsaetze/{}/notifications/read", self.einsatz),
             cookie,
             Some(body),
         )
@@ -1175,7 +1175,7 @@ async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
     let (s, _) = anfrage_mit_offline_queue_benutzer(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", w.einsatz),
+        &format!("/api/einsaetze/{}/notifications/read", w.einsatz),
         &anna,
         Some(&json!({ "bis_id": bis }).to_string()),
         w.bert,

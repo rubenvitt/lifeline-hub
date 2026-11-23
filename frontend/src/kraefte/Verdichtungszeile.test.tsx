@@ -211,7 +211,7 @@ describe('Verdichtungszeile — Kontrast der Statuszahlen (LFH-538)', () => {
 describe('Verdichtungszeile · Meldebild gesperrt (LFH-888)', () => {
   it('zeigt die Zahlen, aber keinen Link in ein gesperrtes Meldebild', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ kraefteuebersicht: { zugriff: false } })),
       ),
     );
@@ -224,7 +224,7 @@ describe('Verdichtungszeile · Meldebild gesperrt (LFH-888)', () => {
 describe('Verdichtungszeile · Nachbarmodul gesperrt (LLH-1462)', () => {
   const sperre = (modul: 'personal' | 'fahrzeuge') =>
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ [modul]: { zugriff: false } })),
       ),
     );

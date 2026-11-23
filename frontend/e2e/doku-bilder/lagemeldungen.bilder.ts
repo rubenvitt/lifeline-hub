@@ -91,7 +91,7 @@ test.describe(KAPITEL, () => {
     // Das Bild zeigt nur, was der Server selbst rechnet (die Peilung, sofern ein verorteter Bezug
     // in der Nähe ist): der Geocoder zeigt im Bildlauf auf Loopback (`e2e/geocoder-kern.ts`).
     await uhrAnhalten(page);
-    const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
+    const ortVorschau = page.waitForResponse((r) => r.url().includes('/place-preview'));
     await page.goto(`/einsaetze/${demo.id}/lagemeldungen`);
     // Dazu kommen die Übergabe aus dem Dialog-Test davor (dieselbe Datenbank) und die beiden
     // Lagemeldungen der Demo.

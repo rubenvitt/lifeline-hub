@@ -14,7 +14,7 @@ import { expect, test } from '@playwright/test';
 // Netzfrei: KRITIS kommt aus dem lokalen Bestand; ohne Bestand ist die Antwort ein stabiler
 // Offline-Umschlag, es läuft kein externer Abruf.
 
-const PFAD = '/api/karte/fachebenen/kritis?bbox=6.9,50.9,7.0,51.0';
+const PFAD = '/api/map/overlays/kritis?bbox=6.9,50.9,7.0,51.0';
 
 test('zweiter Abruf einer Fachebene ist 304 auf der Leitung und voll beim Aufrufer', async ({
   page,
@@ -33,7 +33,7 @@ test('zweiter Abruf einer Fachebene ist 304 auf der Leitung und voll beim Aufruf
   const antworten: Array<{ id: string; status: number }> = [];
   const kopfJe = new Map<string, string | null>();
   cdp.on('Network.requestWillBeSent', (e) => {
-    if (e.request.url.includes('/api/karte/fachebenen/kritis')) kritisIds.add(e.requestId);
+    if (e.request.url.includes('/api/map/overlays/kritis')) kritisIds.add(e.requestId);
   });
   cdp.on('Network.requestWillBeSentExtraInfo', (e) => {
     const h = Object.fromEntries(

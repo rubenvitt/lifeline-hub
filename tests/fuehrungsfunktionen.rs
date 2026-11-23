@@ -748,7 +748,7 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

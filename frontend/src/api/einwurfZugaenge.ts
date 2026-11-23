@@ -24,27 +24,27 @@ export interface EinwurfZugangEingabe {
 }
 
 export function loadEinwurfZugaenge(): Promise<EinwurfZugaengeListe> {
-  return apiGet<EinwurfZugaengeListe>('/api/admin/einwurf-zugaenge');
+  return apiGet<EinwurfZugaengeListe>('/api/admin/intake-credentials');
 }
 
 /** Legt einen Zugang an; der Schlüssel steht nur in dieser Antwort. */
 export function createEinwurfZugang(
   eingabe: EinwurfZugangEingabe,
 ): Promise<EinwurfZugangSchluessel> {
-  return apiSend<EinwurfZugangSchluessel>('/api/admin/einwurf-zugaenge', 'POST', eingabe);
+  return apiSend<EinwurfZugangSchluessel>('/api/admin/intake-credentials', 'POST', eingabe);
 }
 
 /** Neuer Schlüssel für den Zugang; der alte gilt ab sofort nicht mehr. */
 export function wechsleEinwurfSchluessel(id: string): Promise<EinwurfZugangSchluessel> {
   return apiSend<EinwurfZugangSchluessel>(
-    `/api/admin/einwurf-zugaenge/${encodeURIComponent(id)}/schluessel`,
+    `/api/admin/intake-credentials/${encodeURIComponent(id)}/key`,
     'POST',
   );
 }
 
 export function widerrufeEinwurfZugang(id: string): Promise<EinwurfZugangAnzeige> {
   return apiSend<EinwurfZugangAnzeige>(
-    `/api/admin/einwurf-zugaenge/${encodeURIComponent(id)}/widerrufen`,
+    `/api/admin/intake-credentials/${encodeURIComponent(id)}/revoke`,
     'POST',
   );
 }

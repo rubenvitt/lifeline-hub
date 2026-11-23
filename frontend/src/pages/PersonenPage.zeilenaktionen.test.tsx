@@ -536,7 +536,7 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
 
   it('gesperrte Lagekarte: Verorten steht gesperrt mit Grund', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     );

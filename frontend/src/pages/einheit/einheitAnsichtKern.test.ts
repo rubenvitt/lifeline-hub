@@ -51,7 +51,7 @@ describe('collectNachfahren', () => {
   });
 });
 
-/** Freigaben wie `GET …/modul-freigaben`: nur `zugriff` zählt, hier für die vier Module. */
+/** Freigaben wie `GET …/module-access`: nur `zugriff` zählt, hier für die vier Module. */
 function freigaben(gesperrt: string[] = []): ModulFreigaben {
   return Object.fromEntries(
     ['einheiten', 'personal', 'fahrzeuge', 'material'].map((key) => [

@@ -64,7 +64,7 @@ export type SperrRolle = 'beobachter' | 'fuehrungspersonal';
 export async function seedEinheitPersonalGesperrt(page: Page, rolle: SperrRolle) {
   const { pfad, namen } = await einheitMitZuordnungen(page);
   const einsatzId = pfad.split('/')[2];
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/personal`, {
+  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/module-overrides/personal`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   // Ein still gescheitertes Seeding mäße den freien Zweig — grün durch Nichtstun.

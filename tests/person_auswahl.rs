@@ -93,7 +93,7 @@ async fn auswahl_hinter_dem_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

@@ -346,7 +346,7 @@ describe('LageberichtDetailPage — Leere Abschnitte aus dem Lagebild füllen (L
       ([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)] as const,
     );
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
     );
     setupDetail({
       ...lagebericht7Abschnitte,
@@ -744,7 +744,7 @@ function zaehlePosts(
     QUELLEN.map(([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)]),
   );
   server.use(
-    http.get('/api/einsaetze/7/modul-freigaben', () => {
+    http.get('/api/einsaetze/7/module-access', () => {
       freigabenAbrufe.anzahl += 1;
       return HttpResponse.json(freigaben);
     }),
@@ -1112,7 +1112,7 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
     http.get('/api/einsaetze/7/lageberichte/:lbId', ({ params }) =>
       HttpResponse.json(berichte.find((b) => b.id === Number(params.lbId))),
     ),
-    http.get('/api/einsaetze/7/einstellungen', () =>
+    http.get('/api/einsaetze/7/settings', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );

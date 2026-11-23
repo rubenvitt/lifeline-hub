@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 23.11.2026 (Push-Relais hinter Cloudflare mit Proxy-Liste, LLH-2080; Push-Relais für iOS, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App, iOS-App oder Android-App darauf zu. Einen
@@ -92,7 +92,7 @@ kein Docker (Kopf von `compose.yml`).
 | `lifeline-hub` | `127.0.0.1:8080` (`--bind`, `LIFELINE_BIND`); im Abbild `0.0.0.0:8080`. `--tls` ändert den Port nicht | `src/config.rs`, `Dockerfile`, [`betrieb-tls.md`](../betrieb-tls.md) |
 | `lifeline-hub` Health | `GET /api/health`: 200 mit Version, 503 ohne Datenbank | `src/routes/health.rs` |
 | `karten-service` | `0.0.0.0:8088` (`KS_BIND`), `GET /healthz`, Bearer-Token `KS_TOKEN` | `karten-service/src/config.rs`, `karten-service/src/api.rs` |
-| `push-relais` | `0.0.0.0:8089` (`PUSH_RELAIS_BIND`), `GET /v1/status`; spricht selbst kein TLS, läuft hinter einem Proxy (`PUSH_RELAIS_HINTER_PROXY`) | `push-relais/src/config.rs`, `push-relais/Dockerfile`, [`push-relais.md`](../betrieb/push-relais.md) |
+| `push-relais` | `0.0.0.0:8089` (`PUSH_RELAIS_BIND`), `GET /v1/status`; spricht selbst kein TLS, läuft hinter einem Proxy (`PUSH_RELAIS_TRUSTED_PROXIES`, ein CDN davor in `PUSH_RELAIS_CDN_PROXIES`; für genau einen Proxy ohne CDN `PUSH_RELAIS_HINTER_PROXY`) | `push-relais/src/config.rs`, `push-relais/Dockerfile`, [`push-relais.md`](../betrieb/push-relais.md) |
 | Garage (nur Dev) | `3900` S3-API, `3902` unsignierter Lesepfad | `compose.yml` |
 
 Der Server begrenzt sich selbst: höchstens 1024 Verbindungen, Kopflesefrist 15 s, HTTP/1-Köpfe
@@ -128,7 +128,7 @@ verschlüsselten Datenträger; die Anwendung verschlüsselt nicht selbst und pr�
 | Betriebsart | Verhalten | Beleg |
 | --- | --- | --- |
 | eigenes TLS (`--tls`) | Zertifikat in der Reihenfolge eigenes Paar, Cache neben der DB, `mkcert`, selbst signiert (`rcgen`); `--bind` muss IP:Port sein; HTTP/2 per ALPN | `src/tls/mod.rs`, `src/main.rs`, [`betrieb-tls.md`](../betrieb-tls.md) |
-| hinter einem Reverse-Proxy | `X-Forwarded-Proto: https` setzt `Secure` je Anfrage; `--trusted-proxies` legt fest, wem `X-Forwarded-For` geglaubt wird | `SichererTransport` (`src/auth/session.rs`), `extract::init_vertraute_proxys` (`src/main.rs`) |
+| hinter einem Reverse-Proxy | `X-Forwarded-Proto: https` setzt `Secure` je Anfrage; `--trusted-proxies` legt fest, wem `X-Forwarded-For` geglaubt wird, `--cdn-proxies` die Bereiche eines CDN davor, von denen einer einmal übersprungen wird (LLH-2080) | `SichererTransport` (`src/auth/session.rs`), `extract::init_vertraute_proxys`, `extract::init_cdn_proxys` (`src/main.rs`) |
 | Einwurf (`/api/v1/intake/`) | nur über TLS: `--tls`, oder `X-Forwarded-Proto: https` von einer Gegenstelle aus `--trusted-proxies`; sonst `403 tls_required`. `--einwurf-allow-http` hebt das für ein Netz auf, das selbst verschlüsselt | `is_tls_nachgewiesen` (`src/extract.rs`), `check_einwurf` (`src/public_api/einwurf/routen.rs`), `RouterOptionen` (`src/app.rs`), [`betrieb-tls.md`](../betrieb-tls.md) |
 | Klartext-HTTP | funktioniert, aber ohne Service Worker, PWA, Passkey, Eigenposition und Einwurf | [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 

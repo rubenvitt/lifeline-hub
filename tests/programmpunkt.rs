@@ -1,5 +1,5 @@
 //! Programmpunkte der Veranstaltung (LLH-1570, Spec `ablaufplan`): `GET`/`POST
-//! /api/einsaetze/{id}/programmpunkte`, `PATCH`/`DELETE …/{pid}` und das Feld `programm` des
+//! /api/einsaetze/{id}/agenda-items`, `PATCH`/`DELETE …/{pid}` und das Feld `programm` des
 //! Lagemonitors. Herleitung: `/mnt/project-files/llh-1570/design.md` (D1–D4).
 
 use axum::body::Body;
@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/programmpunkte")
+    format!("/api/einsaetze/{einsatz}/agenda-items")
 }
 
 /// Wire-Zeit (UTC, `YYYY-MM-DD HH:MM:SS`) relativ zu jetzt.
@@ -279,7 +279,7 @@ async fn abgeschlossener_einsatz_liest_und_ist_409_beim_schreiben() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

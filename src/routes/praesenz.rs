@@ -17,7 +17,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
 
-/// PUT `…/praesenz` (Einsatzkopf, Führungsstelle).
+/// PUT `…/presence` (Einsatzkopf, Führungsstelle).
 #[derive(Debug, Deserialize)]
 pub struct PraesenzEinsatzBody {
     pub objekt: PraesenzObjekt,
@@ -38,7 +38,7 @@ pub struct PraesenzFeldBody {
 pub type PraesenzEinsatzEndeBody = PraesenzEinsatzBody;
 pub type PraesenzFeldEndeBody = PraesenzFeldBody;
 
-/// PUT /api/einsaetze/{id}/praesenz — beginnt oder verlängert die Präsenz eines Fensters an
+/// PUT /api/einsaetze/{id}/presence — beginnt oder verlängert die Präsenz eines Fensters an
 /// Angaben von Einsatzkopf oder Führungsstelle. 204.
 pub async fn einsatz_melden(
     State(state): State<AppState>,
@@ -65,7 +65,7 @@ pub async fn einsatz_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/praesenz — idempotent, 204; Body wie beim PUT.
+/// DELETE /api/einsaetze/{id}/presence — idempotent, 204; Body wie beim PUT.
 pub async fn einsatz_beenden(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,

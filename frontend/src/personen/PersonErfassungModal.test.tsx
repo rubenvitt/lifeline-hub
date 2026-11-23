@@ -74,10 +74,10 @@ beforeEach(() => {
         { id: 5, name: 'RTW 1' },
       ]),
     ),
-    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+    http.get('/api/einsaetze/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/:eid/ort-suche', ({ request }) => {
+    http.get('/api/einsaetze/:eid/place-search', ({ request }) => {
       suchen.push(new URL(request.url).searchParams.get('q') ?? '');
       return HttpResponse.json({
         zustand: 'ok',

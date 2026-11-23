@@ -65,28 +65,28 @@ export function deleteAdapter(id: string): Promise<void> {
  * als `variables` fest (`components/Geheimfeld.tsx`).
  */
 export function setGeheimnis(id: string, platz: string, wert: string): Promise<void> {
-  return apiSend<void>(`${pfad(id)}/geheimnisse/${encodeURIComponent(platz)}`, 'PUT', { wert });
+  return apiSend<void>(`${pfad(id)}/secrets/${encodeURIComponent(platz)}`, 'PUT', { wert });
 }
 
 export function deleteGeheimnis(id: string, platz: string): Promise<void> {
-  return apiSend<void>(`${pfad(id)}/geheimnisse/${encodeURIComponent(platz)}`, 'DELETE');
+  return apiSend<void>(`${pfad(id)}/secrets/${encodeURIComponent(platz)}`, 'DELETE');
 }
 
 /** „Verbindung prüfen“: ruft einmal ab, übernimmt nichts, ändert den Zustand nicht. */
 export function checkAdapter(id: string): Promise<AdapterPruefErgebnis> {
-  return apiSend<AdapterPruefErgebnis>(`${pfad(id)}/pruefen`, 'POST');
+  return apiSend<AdapterPruefErgebnis>(`${pfad(id)}/check`, 'POST');
 }
 
 export function haltAdapter(id: string): Promise<AdapterAnzeige> {
-  return apiSend<AdapterAnzeige>(`${pfad(id)}/anhalten`, 'POST');
+  return apiSend<AdapterAnzeige>(`${pfad(id)}/pause`, 'POST');
 }
 
 export function resumeAdapter(id: string): Promise<AdapterAnzeige> {
-  return apiSend<AdapterAnzeige>(`${pfad(id)}/fortsetzen`, 'POST');
+  return apiSend<AdapterAnzeige>(`${pfad(id)}/resume`, 'POST');
 }
 
 export function loadAdapterVersuche(id: string): Promise<AdapterVersuchAnzeige[]> {
-  return apiGet<AdapterVersuchAnzeige[]>(`${pfad(id)}/versuche`);
+  return apiGet<AdapterVersuchAnzeige[]>(`${pfad(id)}/attempts`);
 }
 
 /** Klartext der Fehlercodes. Exhaustiv: ein neuer Code im Backend bricht hier den Typecheck. */
