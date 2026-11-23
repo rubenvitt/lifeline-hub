@@ -380,4 +380,4 @@ wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/map/offline/tiles/{
 **mit Beschriftung** (`name_de`-Label-Layer über die lokal eingebetteten Glyphs/Sprite). Die
 exakte visuelle Stil-Feinjustage (colorful/graybeard/„amtlich"-getunt) ist eine spätere
 Entscheidung an Live-Demos. Der frühere Protomaps-PMTiles-Pfad (Online-Protomaps + statischer
-`/api/map/tiles.pmtiles`-Serve) ist entfernt (LFH-196).
+`/api/karte/tiles.pmtiles`-Serve) ist entfernt (LFH-196).
