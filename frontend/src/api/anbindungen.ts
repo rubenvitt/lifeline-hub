@@ -190,10 +190,15 @@ export function holeZertifikat(
   url: string,
   lanErlaubt: boolean,
 ): Promise<WebhookZertifikat> {
-  return apiSend<WebhookZertifikat>(`${webhookPfad(id)}/zertifikat-abrufen`, 'POST', {
-    url,
-    lan_erlaubt: lanErlaubt,
-  });
+  // Neue Routen sind englisch (ADR-0085); die übrigen Webhook-Routen stehen noch im Bestand.
+  return apiSend<WebhookZertifikat>(
+    `/api/admin/integrations/${encodeURIComponent(id)}/webhook/fetch-certificate`,
+    'POST',
+    {
+      url,
+      lan_erlaubt: lanErlaubt,
+    },
+  );
 }
 
 /** Normalform eines Fingerabdrucks wie im Server: ohne `:`, Leerzeichen und `-`, klein. */
