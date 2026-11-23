@@ -1,5 +1,6 @@
 import { expect, request, type FullConfig } from '@playwright/test';
 import { ADMIN, ADMIN_PW } from './rollen-kern';
+import { GEOCODER_LOOPBACK, setGeocoderUrl } from './geocoder-kern';
 
 /**
  * Standard-Rufname des Admins (LFH-894). Ohne ihn fragte jede ETB-Erfassung zuerst nach dem
@@ -28,6 +29,9 @@ export default async function globaleVorbereitung(config: FullConfig) {
     expect(gesetzt.ok(), `Standard-Rufname: ${gesetzt.status()} ${await gesetzt.text()}`).toBe(
       true,
     );
+    // Kein Drittdienst (LLH-2063): ohne eigene URL fragte die Ort-Vorschau den öffentlichen
+    // Nominatim, und ob ein Ortsname käme, hinge am Netz des Laufs (`e2e/geocoder-kern.ts`).
+    await setGeocoderUrl(api, GEOCODER_LOOPBACK);
   } finally {
     await api.dispose();
   }

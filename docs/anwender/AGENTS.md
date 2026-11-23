@@ -87,7 +87,9 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
   (`e2e/doku-bilder/kontexte.ts`: Fükw 1440×900 als Vorgabe, Tablet 1280×800, Handy 390×844,
   Lagemonitor 1920×1080; Handy und Handschuh nur, wo das Kapitel den Kontext behandelt). Die Uhr
   hält `uhrAnhalten` vor dem ersten `goto` an. Gewartet wird auf Inhaltsanker, nie auf
-  `networkidle`.
+  `networkidle`. Kein Drittdienst: die Vorbereitung lenkt den Geocoder der Organisation auf
+  Loopback (`e2e/geocoder-kern.ts`, LLH-2063), die Ort-Vorschau zeigt also nie einen Ortsnamen
+  aus dem Netz; einen Ortsnamen im Bild liefert der Adressindex oder `page.route`.
 - **Ausschnitt statt Seite:** fotografiert wird das Element, um das es geht (Maske, Liste,
   Dialog); ganze Seiten nur für den Überblick eines Moduls. **PNG, höchstens 300 KB**
   (`fotografiere` und der Wächter prüfen das). Kein WebP, kein `sharp`.
