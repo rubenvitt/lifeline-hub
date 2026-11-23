@@ -425,7 +425,7 @@ async fn archiv_einspielen_verfuegbar(i: &Instanz) -> bool {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        "/api/admin/archiv/einspielen",
+        "/api/admin/archive/import",
         &i.admin,
         None,
     )

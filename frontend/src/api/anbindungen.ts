@@ -28,12 +28,12 @@ export interface AnbindungEingabe {
 }
 
 export function ladeAnbindungen(): Promise<AnbindungenListe> {
-  return apiGet<AnbindungenListe>('/api/admin/anbindungen');
+  return apiGet<AnbindungenListe>('/api/admin/integrations');
 }
 
 /** Legt einen Zugang an; der Einmal-Code steht nur in dieser Antwort. */
 export function legeAnbindungAn(eingabe: AnbindungEingabe): Promise<AnbindungCode> {
-  return apiSend<AnbindungCode>('/api/admin/anbindungen', 'POST', eingabe);
+  return apiSend<AnbindungCode>('/api/admin/integrations', 'POST', eingabe);
 }
 
 /**
@@ -49,16 +49,16 @@ export interface AnbindungPatch {
 }
 
 export function aendereAnbindung(id: string, aenderung: AnbindungPatch): Promise<AnbindungAnzeige> {
-  return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}`, 'PATCH', aenderung);
+  return apiSend<AnbindungAnzeige>(`/api/admin/integrations/${id}`, 'PATCH', aenderung);
 }
 
 /** Neuer Einmal-Code (Schlüsselwechsel); ein früherer offener Code verfällt. */
 export function stelleAnbindungsCodeAus(id: string): Promise<AnbindungCode> {
-  return apiSend<AnbindungCode>(`/api/admin/anbindungen/${id}/code`, 'POST');
+  return apiSend<AnbindungCode>(`/api/admin/integrations/${id}/code`, 'POST');
 }
 
 export function widerrufeAnbindung(id: string): Promise<AnbindungAnzeige> {
-  return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}/widerrufen`, 'POST');
+  return apiSend<AnbindungAnzeige>(`/api/admin/integrations/${id}/revoke`, 'POST');
 }
 
 /**
@@ -159,7 +159,7 @@ export interface WebhookPatch {
   basis_geaendert_at?: string;
 }
 
-const webhookPfad = (id: string) => `/api/admin/anbindungen/${encodeURIComponent(id)}/webhook`;
+const webhookPfad = (id: string) => `/api/admin/integrations/${encodeURIComponent(id)}/webhook`;
 
 export function createWebhook(id: string, eingabe: WebhookEingabe): Promise<WebhookAnzeige> {
   return apiSend<WebhookAnzeige>(webhookPfad(id), 'POST', eingabe);
@@ -174,7 +174,7 @@ export function deleteWebhook(id: string): Promise<void> {
 }
 
 export function nimmWebhookWiederAuf(id: string): Promise<WebhookAnzeige> {
-  return apiSend<WebhookAnzeige>(`${webhookPfad(id)}/wieder-aufnehmen`, 'POST');
+  return apiSend<WebhookAnzeige>(`${webhookPfad(id)}/resume`, 'POST');
 }
 
 export function sendTestereignis(id: string): Promise<WebhookTestErgebnis> {
@@ -216,7 +216,7 @@ export function fingerabdruckGruppen(hex: string): string {
 }
 
 export function loadWebhookVersuche(id: string): Promise<WebhookVersuch[]> {
-  return apiGet<WebhookVersuch[]>(`${webhookPfad(id)}/versuche`);
+  return apiGet<WebhookVersuch[]>(`${webhookPfad(id)}/attempts`);
 }
 
 /**

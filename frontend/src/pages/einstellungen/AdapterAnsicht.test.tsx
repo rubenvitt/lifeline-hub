@@ -38,7 +38,7 @@ function stelleBereit(start: AdapterAnzeige, extra: Partial<AdapterListe> = {}) 
   };
   server.use(
     http.get('/api/admin/adapter', () => HttpResponse.json(liste())),
-    http.get('/api/admin/adapter/a1/versuche', () =>
+    http.get('/api/admin/adapter/a1/attempts', () =>
       HttpResponse.json([
         {
           at: '2026-11-22 08:51:12',
@@ -68,24 +68,24 @@ function stelleBereit(start: AdapterAnzeige, extra: Partial<AdapterListe> = {}) 
       };
       return HttpResponse.json(stand);
     }),
-    http.put('/api/admin/adapter/a1/geheimnisse/:platz', async ({ request, params }) => {
+    http.put('/api/admin/adapter/a1/secrets/:platz', async ({ request, params }) => {
       await merke('PUT', request, `geheimnis/${String(params.platz)}`);
       return new HttpResponse(null, { status: 204 });
     }),
-    http.delete('/api/admin/adapter/a1/geheimnisse/:platz', async ({ request, params }) => {
+    http.delete('/api/admin/adapter/a1/secrets/:platz', async ({ request, params }) => {
       await merke('DELETE', request, `geheimnis/${String(params.platz)}`);
       return new HttpResponse(null, { status: 204 });
     }),
-    http.post('/api/admin/adapter/a1/pruefen', async ({ request }) => {
+    http.post('/api/admin/adapter/a1/check', async ({ request }) => {
       await merke('POST', request, 'pruefen');
       return HttpResponse.json({ erfolg: true, dauer_ms: 412, anzahl: 4 });
     }),
-    http.post('/api/admin/adapter/a1/anhalten', async ({ request }) => {
+    http.post('/api/admin/adapter/a1/pause', async ({ request }) => {
       await merke('POST', request, 'anhalten');
       stand = { ...stand, zustand: 'aus', angehalten_at: '2026-11-22 09:00:00' };
       return HttpResponse.json(stand);
     }),
-    http.post('/api/admin/adapter/a1/fortsetzen', async ({ request }) => {
+    http.post('/api/admin/adapter/a1/resume', async ({ request }) => {
       await merke('POST', request, 'fortsetzen');
       stand = { ...stand, zustand: 'ok', angehalten_at: undefined };
       return HttpResponse.json(stand);

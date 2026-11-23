@@ -8,7 +8,7 @@ import { apiGet, apiUploadMitFortschritt, type UploadFortschritt } from './clien
  * unbrauchbarer Aufruf, bevor der Block hochgeladen ist.
  */
 
-const PFAD = '/api/admin/archiv/einspielen';
+const PFAD = '/api/admin/archive/import';
 
 /**
  * Das Zeitlimit umfasst Upload UND Einspielen: 256 MiB über eine langsame Leitung plus

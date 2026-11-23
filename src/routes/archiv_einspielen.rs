@@ -3,8 +3,8 @@
 //!
 //! | Methode | Pfad | Zweck |
 //! |---|---|---|
-//! | GET  | `/api/admin/archiv/einspielen` | Steht das Einspielen hier zur Verfügung? |
-//! | POST | `/api/admin/archiv/einspielen` | Schlüssel und Block hochladen, einspielen |
+//! | GET  | `/api/admin/archive/import` | Steht das Einspielen hier zur Verfügung? |
+//! | POST | `/api/admin/archive/import` | Schlüssel und Block hochladen, einspielen |
 //!
 //! Beide nur für den System-Admin; eingespielt wird immer in seine Org, und deren Name muss im
 //! Archiv derselbe sein. Nicht im Archiv-Namensraum `/api/aufbewahrung`: der bleibt lesend (Spec
@@ -42,7 +42,7 @@ pub const PASSPHRASE_MAX: usize = 1024;
 const ZU_GROSS: &str = "Der Archivblock ist größer als 256 MiB. Einen so großen Block spielt der \
                         Betrieb mit dem Befehl `lifeline-hub archiv einspielen` ein.";
 
-/// Antwort von `GET /api/admin/archiv/einspielen`.
+/// Antwort von `GET /api/admin/archive/import`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ArchivEinspielenVerfuegbarkeit {
     /// `false` an einer Instanz, bei der sich eine andere meldet (Hub): dort gehört kein privater
@@ -50,7 +50,7 @@ pub struct ArchivEinspielenVerfuegbarkeit {
     pub verfuegbar: bool,
 }
 
-/// Was eingespielt wurde (`POST /api/admin/archiv/einspielen`).
+/// Was eingespielt wurde (`POST /api/admin/archive/import`).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ArchivEingespieltAnzeige {
     pub einsatz_id: i64,
@@ -81,7 +81,7 @@ async fn fordere_keinen_hub(state: &AppState) -> Result<(), AppError> {
     Ok(())
 }
 
-/// GET /api/admin/archiv/einspielen — ob die Verwaltung hier einspielen kann.
+/// GET /api/admin/archive/import — ob die Verwaltung hier einspielen kann.
 pub async fn verfuegbarkeit(
     State(state): State<AppState>,
     AdminUser(_): AdminUser,
@@ -129,7 +129,7 @@ fn passphrase_aus(roh: &SecretBox<Vec<u8>>) -> Result<SecretString, AppError> {
     Ok(SecretString::from(genau))
 }
 
-/// POST /api/admin/archiv/einspielen — Multipart mit `schluessel` (Text) oder `schluessel_datei`
+/// POST /api/admin/archive/import — Multipart mit `schluessel` (Text) oder `schluessel_datei`
 /// (Datei), optional `passphrase`, und zuletzt `block` (design.md D4). Der Schlüssel kommt vor
 /// dem Block, damit ein unbrauchbarer Aufruf endet, bevor 256 MiB auf die Platte gehen.
 pub async fn einspielen(

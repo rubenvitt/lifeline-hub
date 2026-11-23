@@ -6,6 +6,8 @@ admin	-
 animals	Tiere
 api	-
 app-code	-
+archive	Archiv
+attempts	Versuche
 audit	-
 auth	-
 backup	-
@@ -16,6 +18,7 @@ care	Betreuung
 case-file	Einsatzakte
 catering	Verpflegung
 chat	-
+check	prüfen
 code	-
 codes	-
 command	Führung
@@ -49,9 +52,11 @@ incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
+intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 ios-push	-
 jwks.json	-
+key	Schlüssel
 lan	-
 live	-
 login	-
@@ -70,6 +75,7 @@ orders	Befehle
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+pause	anhalten
 personnel	Personal
 persons	Personen
 plan	-
@@ -90,8 +96,11 @@ reports	Meldungen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
+resume	fortsetzen
 retention	Aufbewahrung
+revoke	widerrufen
 seats	Plätze
+secrets	Geheimnisse
 sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen

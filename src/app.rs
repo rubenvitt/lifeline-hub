@@ -2003,35 +2003,35 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der
         // Fremdsysteme selbst liegt unter `/api/v1/` (`public_api`).
         .route(
-            "/api/admin/anbindungen",
+            "/api/admin/integrations",
             get(routes::anbindungen::liste).post(routes::anbindungen::anlegen),
         )
         .route(
-            "/api/admin/anbindungen/{id}",
+            "/api/admin/integrations/{id}",
             get(routes::anbindungen::laden).patch(routes::anbindungen::aendern),
         )
         .route(
-            "/api/admin/anbindungen/{id}/code",
+            "/api/admin/integrations/{id}/code",
             post(routes::anbindungen::code),
         )
         .route(
-            "/api/admin/anbindungen/{id}/widerrufen",
+            "/api/admin/integrations/{id}/revoke",
             post(routes::anbindungen::widerrufen),
         )
         // LLH-1656: Webhook einer Anbindung. Zugestellt wird im Hintergrund
         // (`public_api::webhook::lauf`).
         .route(
-            "/api/admin/anbindungen/{id}/webhook",
+            "/api/admin/integrations/{id}/webhook",
             post(routes::anbindungen_webhook::create)
                 .patch(routes::anbindungen_webhook::update)
                 .delete(routes::anbindungen_webhook::delete),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",
+            "/api/admin/integrations/{id}/webhook/resume",
             post(routes::anbindungen_webhook::wieder_aufnehmen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/test",
+            "/api/admin/integrations/{id}/webhook/test",
             post(routes::anbindungen_webhook::test),
         )
         .route(
@@ -2039,7 +2039,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::anbindungen_webhook::zertifikat_abrufen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/versuche",
+            "/api/admin/integrations/{id}/webhook/attempts",
             get(routes::anbindungen_webhook::versuche),
         )
         // LLH-2017: Adapter verwalten (ADR-0077). Abgerufen wird im Hintergrund (`adapter::lauf`).
@@ -2054,37 +2054,37 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::adapter::delete),
         )
         .route(
-            "/api/admin/adapter/{id}/geheimnisse/{name}",
+            "/api/admin/adapter/{id}/secrets/{name}",
             put(routes::adapter::set_geheimnis).delete(routes::adapter::delete_geheimnis),
         )
         .route(
-            "/api/admin/adapter/{id}/pruefen",
+            "/api/admin/adapter/{id}/check",
             post(routes::adapter::check),
         )
         .route(
-            "/api/admin/adapter/{id}/anhalten",
+            "/api/admin/adapter/{id}/pause",
             post(routes::adapter::halt),
         )
         .route(
-            "/api/admin/adapter/{id}/fortsetzen",
+            "/api/admin/adapter/{id}/resume",
             post(routes::adapter::resume),
         )
         .route(
-            "/api/admin/adapter/{id}/versuche",
+            "/api/admin/adapter/{id}/attempts",
             get(routes::adapter::list_versuche),
         )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(
-            "/api/admin/einwurf-zugaenge",
+            "/api/admin/intake-credentials",
             get(routes::einwurf_zugaenge::liste).post(routes::einwurf_zugaenge::anlegen),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/schluessel",
+            "/api/admin/intake-credentials/{id}/key",
             post(routes::einwurf_zugaenge::schluessel_wechseln),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/widerrufen",
+            "/api/admin/intake-credentials/{id}/revoke",
             post(routes::einwurf_zugaenge::widerrufen),
         )
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
@@ -2099,7 +2099,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // 256 MiB und die gemeinsame Upload-Grenze; dem Zeitbudget entzogen
         // (`zulassung::OHNE_ZULASSUNGSGRENZE`).
         .route(
-            "/api/admin/archiv/einspielen",
+            "/api/admin/archive/import",
             post(routes::archiv_einspielen::einspielen)
                 .layer(DefaultBodyLimit::max(ARCHIV_BLOCK_BODY_MAX))
                 .route_layer(upload_grenze.clone())

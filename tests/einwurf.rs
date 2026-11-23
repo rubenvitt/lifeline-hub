@@ -1,5 +1,5 @@
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
-//! Verwaltung unter `/api/admin/einwurf-zugaenge` und die Einwurf-Routen unter
+//! Verwaltung unter `/api/admin/intake-credentials` und die Einwurf-Routen unter
 //! `/api/v1/einwurf/{schluessel}/…`, durch den ganzen Router.
 //!
 //! Der Zähler für Maschinen und die Drossel gelten prozessweit; jeder Test, der sie berührt,
@@ -20,7 +20,7 @@ use common::{
     setup_mit_pool,
 };
 
-const LISTE: &str = "/api/admin/einwurf-zugaenge";
+const LISTE: &str = "/api/admin/intake-credentials";
 
 /// Der Router der meisten Tests: Einwürfe auch ohne TLS, weil `oneshot` keine Verbindung hat.
 /// Die TLS-Pflicht selbst prüfen eigene Tests mit den Vorgabe-Optionen.
@@ -317,7 +317,7 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
@@ -356,7 +356,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
         StatusCode::NO_CONTENT
     );
 
-    let widerrufen = format!("{LISTE}/{id}/widerrufen");
+    let widerrufen = format!("{LISTE}/{id}/revoke");
     let (s, v) = anfrage_json(&app, "POST", &widerrufen, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(v["widerrufen_at"].is_string());
@@ -373,7 +373,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
@@ -414,7 +414,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
@@ -429,7 +429,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{zweiter}/widerrufen"),
+        &format!("{LISTE}/{zweiter}/revoke"),
         &admin,
         None,
     )
@@ -464,7 +464,7 @@ async fn direktkopplung_vor_ort_sperrt_keine_einwuerfe() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
@@ -927,7 +927,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
+        &format!("{LISTE}/{id}/revoke"),
         &admin,
         None,
     )
@@ -968,7 +968,7 @@ async fn abgeloeste_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     let (_, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
@@ -1017,7 +1017,7 @@ async fn abgelaufener_zugang_bekommt_keinen_neuen_schluessel() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{id}/schluessel"),
+        &format!("{LISTE}/{id}/key"),
         &admin,
         None,
     )
