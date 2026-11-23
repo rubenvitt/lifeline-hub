@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 
@@ -182,7 +183,7 @@ for (const { dichte, hoehe, abstand } of [
     await expect(kaestchen).toHaveCount(3);
     // Erst nach dem Einblenden messen: im Zoom ist der Dialog noch skaliert (ab 0,2), und
     // `getBoundingClientRect` misst die verkleinerten Kästchen.
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await eingeblendet(page.getByRole('dialog'));
     const boxen = await kaestchen.evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect();

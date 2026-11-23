@@ -2,7 +2,7 @@ use super::{BerichtigungVerweis, EinheitVerweis, EtbEintragAnzeige, Folgeauftrag
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Eingabedaten für einen neuen ETB-Eintrag. Alle Werte sind bereits
 /// validiert und normalisiert (Zeitformat, Pflichtfelder) — das ist Aufgabe
@@ -429,6 +429,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     load_einheiten(pool, std::slice::from_mut(&mut eintrag)).await?;
+    meldung_in_lage_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -568,6 +569,57 @@ async fn berichtigungen_nachladen(
                 .berichtigt_durch
                 .push(BerichtigungVerweis { id, lfd_nr });
         }
+    }
+    Ok(())
+}
+
+/// Welche der Einträge `ids` zu einer Meldung in der Lage gehören (LLH-2008): der Eintrag selbst
+/// oder ein Glied seiner Kette `berichtigt_eintrag_id` hängt an einer Meldung desselben Einsatzes,
+/// die lagerelevant oder eine Lagemeldung ist. Gelesen wird nur `etb_eintrag.meldung_id`
+/// (Primärschlüssel der Meldung): `meldung::repo::verlinke_tx` setzt beide Richtungen zugleich,
+/// und auf `meldung.etb_meldung_id` liegt kein Index (ein OR über beide las je Glied alle
+/// Meldungen des Einsatzes, LLH-2008: 500 Einträge bei 10.000 Meldungen über 800 ms). `CROSS JOIN`
+/// hält die Reihenfolge Kette → Eintrag → Meldung, jeder Schritt über den Primärschlüssel; ohne
+/// las SQLite je nach Statistik `etb_eintrag` ganz. Eine Abfrage für alle; die IN-Liste ist durch
+/// [`MAX_LIMIT`] begrenzt.
+pub async fn meldung_in_lage(pool: &SqlitePool, ids: &[i64]) -> Result<HashSet<i64>, AppError> {
+    if ids.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "WITH RECURSIVE kette(start, id, einsatz_id) AS ( \
+           SELECT e.id, e.id, e.einsatz_id FROM etb_eintrag e WHERE e.id IN (",
+    );
+    let mut liste = qb.separated(", ");
+    for &id in ids {
+        liste.push_bind(id);
+    }
+    qb.push(
+        ") UNION \
+           SELECT k.start, e.berichtigt_eintrag_id, k.einsatz_id FROM kette k \
+           JOIN etb_eintrag e ON e.id = k.id AND e.einsatz_id = k.einsatz_id \
+           WHERE e.berichtigt_eintrag_id IS NOT NULL \
+         ) \
+         SELECT DISTINCT k.start FROM kette k \
+         CROSS JOIN etb_eintrag e ON e.id = k.id \
+         CROSS JOIN meldung m ON m.id = e.meldung_id AND m.einsatz_id = k.einsatz_id \
+          AND (m.lagerelevant = 1 OR m.meldungsart = ",
+    );
+    qb.push_bind(crate::meldung::ART_LAGEMELDUNG);
+    qb.push(")");
+    let treffer: Vec<i64> = qb.build_query_scalar().fetch_all(pool).await?;
+    Ok(treffer.into_iter().collect())
+}
+
+/// Füllt `meldung_in_lage` (LLH-2008) für alle übergebenen Einträge mit EINER Abfrage nach.
+async fn meldung_in_lage_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = eintraege.iter().map(|e| e.id).collect();
+    let in_lage = meldung_in_lage(pool, &ids).await?;
+    for e in eintraege.iter_mut() {
+        e.meldung_in_lage = in_lage.contains(&e.id);
     }
     Ok(())
 }
@@ -868,6 +920,7 @@ pub async fn abfrage(
     anhaenge_nachladen(pool, &mut eintraege).await?;
     berichtigungen_nachladen(pool, &mut eintraege).await?;
     load_einheiten(pool, &mut eintraege).await?;
+    meldung_in_lage_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 

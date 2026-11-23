@@ -1597,6 +1597,86 @@ async fn schluessel_einer_widerrufenen_zuordnung_gelten_nicht_mehr() {
     assert!(gueltige_fremde(&uebersicht(&elw).await).is_empty());
 }
 
+// ── Höchstens `ORGS_MAX` Orgs je Meldung (LLH-2019) ──────────────────────────────────────────
+
+/// Legt an `i` `anzahl` Orgs ab `ab` an und bindet jede an die einzige Kopplung, aktiv oder als
+/// ungemeldeten Widerruf.
+async fn zuordnungen_auffuellen(i: &Instanz, ab: i64, anzahl: i64, widerrufen: bool) {
+    let k: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung")
+        .fetch_one(&i.pool)
+        .await
+        .unwrap();
+    for org in ab..ab + anzahl {
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (?, ?)")
+            .bind(org)
+            .bind(format!("Füll-Org {org}"))
+            .execute(&i.pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name, bestaetigt_at, widerrufen_at) \
+             VALUES (?, ?, ?, 'Füll-Org', datetime('now'), CASE WHEN ? THEN datetime('now') END)",
+        )
+        .bind(k)
+        .bind(org)
+        .bind(format!("fuell/{org}"))
+        .bind(widerrufen)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+    }
+}
+
+/// Die erreichte Seite nimmt keine Zuordnung über `ORGS_MAX` an: Die Gegenstelle bekommt eine
+/// klare Abweisung, und der Code bleibt gültig, bis wieder Platz ist.
+#[tokio::test]
+async fn koppeln_ueber_orgs_max_wird_klar_abgewiesen_und_verbraucht_den_code_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    let max = lifeline_hub::instanz::melden::ORGS_MAX as i64;
+    zuordnungen_auffuellen(&hub, 1000, max - 1, false).await;
+    let elw_i = identitaet_von(&elw).await;
+    let c = code_org_y(&hub).await;
+    let s = koppeln_roh(&hub, &c, &elw_i.kennung, &elw_i, ("elw/9", "Org ELW Y")).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET widerrufen_at = datetime('now') WHERE org_id = 1000",
+    )
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    let s = koppeln_roh(&hub, &c, &elw_i.kennung, &elw_i, ("elw/9", "Org ELW Y")).await;
+    assert_eq!(s, StatusCode::OK, "derselbe Code gilt noch");
+}
+
+/// Mehr offene Widerrufe, als eine Meldung tragen darf, gehen in Portionen: Jede Meldung kommt
+/// an, und nur die gesendeten Widerrufe gelten als gemeldet.
+#[tokio::test]
+async fn offene_widerrufe_ueber_orgs_max_gehen_in_portionen() {
+    let (hub, elw) = gekoppelt().await;
+    let max = lifeline_hub::instanz::melden::ORGS_MAX as i64;
+    zuordnungen_auffuellen(&elw, 1000, max + 10, true).await;
+    let offen = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM instanz_kopplung_org \
+             WHERE widerrufen_at IS NOT NULL AND widerruf_gemeldet_at IS NULL",
+        )
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap()
+    };
+    elw_meldet(&elw).await;
+    let fehler: Option<String> = sqlx::query_scalar("SELECT letzter_fehler FROM instanz_kopplung")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(fehler, None);
+    assert_eq!(offen().await, 10);
+    elw_meldet(&elw).await;
+    assert_eq!(offen().await, 0);
+    assert_eq!(uebersicht(&hub).await["kopplungen"][0]["zustand"], "aktiv");
+}
+
 // ── Zurückgespielter Hub (LLH-1853) ──────────────────────────────────────────────────────────
 
 /// Zustand und Fingerabdruck eines vom Hub übernommenen Schlüssels am ELW.

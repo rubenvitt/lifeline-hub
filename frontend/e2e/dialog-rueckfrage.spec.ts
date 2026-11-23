@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { einsatzPerApi } from './einsatz-kern';
 
@@ -38,7 +39,7 @@ test('Vermisst melden: Klick neben den Dialog schließt nicht, Escape fragt, „
   await expect(rueckfrage).toContainText('Die Eingaben in „Vermisst melden“ gehen verloren.');
   await expect(rueckfrage.getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused();
   // Bild der Änderung erst nach der Einblende-Animation.
-  await expect(rueckfrage).not.toHaveClass(/ant-zoom-appear|ant-zoom-enter/);
+  await eingeblendet(rueckfrage);
   await page.screenshot({ path: info.outputPath('rueckfrage.png') });
 
   await rueckfrage.getByRole('button', { name: 'Weiter bearbeiten' }).click();
@@ -58,9 +59,9 @@ test('Vermisst melden: Klick neben den Dialog schließt nicht, Escape fragt, „
 async function enterFuehrtZurueck(page: Page, feld: Locator, text: string) {
   for (const runde of [1, 2]) {
     await page.keyboard.press('Escape');
-    const rueckfrage = page.getByRole('dialog', { name: 'Eingaben verwerfen?' });
-    await expect(rueckfrage, `Runde ${runde}`).toBeVisible();
-    await expect(rueckfrage).not.toHaveClass(/ant-zoom-appear|ant-zoom-enter/);
+    const rueckfrage = await eingeblendet(
+      page.getByRole('dialog', { name: 'Eingaben verwerfen?' }),
+    );
     await expect(
       rueckfrage.getByRole('button', { name: 'Weiter bearbeiten' }),
       `Runde ${runde}`,
@@ -81,8 +82,7 @@ test('Erfassungshülle „Auftrag erteilen“: Enter in der Rückfrage führt zu
   const id = await einsatzPerApi(page, `Rückfrage Fokus ${Date.now()}`);
   await page.goto(`/einsaetze/${id}/auftraege`);
   await page.getByRole('button', { name: 'Auftrag erteilen' }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Auftrag erteilen' });
-  await expect(dialog).toBeVisible();
+  const dialog = await dialogSteht(page, 'Auftrag erteilen');
   const was = dialog.getByLabel('Auftrag / Was');
   await was.click();
   await page.keyboard.type('Hydrant H12 freilegen');
@@ -110,8 +110,7 @@ test('„Vollzug melden“ (useVerwerfenSchutz): Enter in der Rückfrage führt 
   await detail.getByRole('button', { name: 'Empfang für EA Nord quittieren' }).click();
   await page.getByRole('button', { name: 'Empfang quittieren' }).click();
   await detail.getByRole('button', { name: 'Vollzug melden' }).click();
-  const vollzug = page.getByRole('dialog', { name: 'Vollzug melden' });
-  await expect(vollzug).toBeVisible();
+  const vollzug = await dialogSteht(page, 'Vollzug melden');
   const meldung = vollzug.getByPlaceholder('Rückmeldung zur Erledigung');
   await meldung.click();
   await page.keyboard.type('Hydrant frei');

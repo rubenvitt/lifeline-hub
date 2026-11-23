@@ -373,8 +373,8 @@ const alsZustand = (z: string): string | null => (z.trim() === '' ? null : z);
 export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
-  // Ohne Verbindung gesperrt mit Grund, im Kopf wie in der Liste (LLH-1103, design.md D8): die
-  // Mutation pausierte sonst und überschriebe nach der Rückkehr still einen ungesehenen Wert.
+  // Ohne Verbindung gesperrt mit Grund, im Kopf wie in der Liste (LLH-1103, design.md D8). Bis
+  // LLH-1950 pausierte die Mutation sonst und überschrieb nach der Rückkehr still einen Wert.
   // `useOhneVerbindung`, nie `navigator.onLine` allein (WLAN ohne Server).
   const ohneVerbindung = useOhneVerbindung();
   const konflikt = useFeldKonflikt();
@@ -458,8 +458,8 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
 
 function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienung }) {
   const { rollen } = useRollen();
-  // Nicht bearbeitbar: eine pausierte Änderung überschriebe nach der Rückkehr des Netzes einen
-  // Wert, den niemand gesehen hat (LFH-1095).
+  // Nicht bearbeitbar: der Wert ist nicht geladen, eine Änderung überschriebe einen Wert, den
+  // niemand gesehen hat (LFH-1095).
   if (nichtGeladen(p, 'zustand')) return <NichtGeladenZelle />;
   // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {

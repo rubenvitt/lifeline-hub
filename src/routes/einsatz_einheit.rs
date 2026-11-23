@@ -5,7 +5,8 @@ use crate::app::AppState;
 use crate::benachrichtigung::{BenachrichtigungBezugTyp, Bezug};
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{
-    aus_nachforderung, aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX, FUNKRUFNAME_MAX,
+    aus_nachforderung, aus_vorlage, mitglied_repo, EinheitAnzeige, EinheitStatusAntwort,
+    BEMERKUNG_MAX, FUNKRUFNAME_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -24,6 +25,7 @@ use crate::routes::support::{
     pruefe_koordinate,
 };
 use crate::staerke::Staerke;
+use crate::status_ruecknahme::HandStatusRuecknahmeBeleg;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -1598,7 +1600,7 @@ pub async fn status_setzen(
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
-) -> Result<Json<EinheitAnzeige>, AppError> {
+) -> Result<Json<EinheitStatusAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let status_id = body
         .status_id
@@ -1620,18 +1622,32 @@ pub async fn status_setzen(
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (beruehrt, wieder_verfuegbar, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (beruehrt, wieder_verfuegbar, etb_id, beleg) = crate::write_retry!(&state.pool, |conn| {
         let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
         let mut wieder_verfuegbar = false;
         let mut etb_id = None;
-        if let Some(w) =
-            einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
+        let mut beleg = None;
+        if let Some(w) = einheit_repo::setze_hand_status_tx(
+            conn,
+            einsatz_id,
+            eid,
+            status_id,
+            Some(ctx.benutzer.id),
+            &jetzt,
+        )
+        .await?
         {
+            // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel.
+            beleg = w.zuruecknehmbar.then(|| HandStatusRuecknahmeBeleg {
+                vorher_status_id: w.vorher_id,
+                status_id,
+                gesetzt_at: jetzt.clone(),
+            });
             wieder_verfuegbar =
                 StatusKategorie::wird_wieder_verfuegbar(w.vorher_kategorie, w.nachher_kategorie);
             // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
             if let Some(sid) = status_id {
-                if let Some((_, _, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
+                if let Some((_, ereignis, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,
@@ -1641,6 +1657,7 @@ pub async fn status_setzen(
                 )
                 .await?
                 {
+                    einheit_repo::merke_status_ereignis_tx(conn, einsatz_id, eid, ereignis).await?;
                     beruehrt = b;
                 }
             }
@@ -1660,7 +1677,7 @@ pub async fn status_setzen(
                 .await?,
             );
         }
-        Ok((beruehrt, wieder_verfuegbar, etb_id))
+        Ok((beruehrt, wieder_verfuegbar, etb_id, beleg))
     })?;
     super::etb_verteilen(&state, einsatz_id, etb_id);
     sse_einheit(&state, einsatz_id, eid);
@@ -1684,6 +1701,82 @@ pub async fn status_setzen(
         )
         .await;
     }
+    Ok(Json(EinheitStatusAntwort {
+        einheit: einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
+        status_ruecknahme: beleg,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen — „Rückgängig“ nach einem
+/// Wechsel des Handstatus, auch nach dem Löschen (LLH-1986, Regel
+/// `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines Statuswechsels“). Body ist der
+/// Beleg aus der Antwort des PUT. Ein Einheitengerät nimmt nur den Wechsel der eigenen Einheit
+/// zurück (fremde 404); stellt das „kein Status“ her, ist das erlaubt, denn es macht den eigenen
+/// Fehlgriff ungeschehen. Status inzwischen anders → 409 `veraltet`; andere Person, abgelaufene
+/// Frist, inzwischen führende Fahrzeuge oder eine Zeitachse, die das Streichen nicht trägt → 409
+/// mit Grund. Ein ETB-Eintrag, Live-Meldungen wie beim Setzen, keine Benachrichtigung.
+pub async fn status_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
+    JsonBody(beleg): JsonBody<HandStatusRuecknahmeBeleg>,
+) -> Result<Json<EinheitAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
+        b.fordere_einheit(eid)?;
+    }
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (beruehrt, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let (name, neu_label): (String, Option<String>) = sqlx::query_as(
+            "SELECT e.name, s.label FROM einsatz_einheit e \
+             LEFT JOIN fahrzeug_status s ON s.id = e.status_id \
+             WHERE e.id = ? AND e.einsatz_id = ?",
+        )
+        .bind(eid)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        let beruehrt = einheit_repo::status_zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            eid,
+            ctx.benutzer.id,
+            &jetzt,
+            &beleg,
+        )
+        .await?;
+        let alt_label: Option<String> = sqlx::query_scalar(
+            "SELECT s.label FROM einsatz_einheit e \
+             LEFT JOIN fahrzeug_status s ON s.id = e.status_id \
+             WHERE e.id = ? AND e.einsatz_id = ?",
+        )
+        .bind(eid)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::einheit::etb_text_statuswechsel_zurueckgenommen(
+                &name,
+                alt_label.as_deref(),
+                neu_label.as_deref(),
+            ),
+        )
+        .await?;
+        Ok((beruehrt, etb_id))
+    })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
+    sse_einheit(&state, einsatz_id, eid);
+    for ep_id in &beruehrt.personen {
+        sse_personal(&state, einsatz_id, *ep_id);
+    }
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
     Ok(Json(
         einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
     ))

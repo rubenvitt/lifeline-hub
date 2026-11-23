@@ -45,8 +45,27 @@ const RANG: Record<EinsatzRolle, number> = {
   beobachter: 3,
 };
 
-/** Eine gewählte, noch nicht bestätigte Herabstufung der eigenen Rolle (LFH-966). */
-type Herabstufung = { benutzerId: number; rolle: EinsatzRolle };
+/**
+ * Rollen, die eine Führungsfunktion tragen (LLH-2064; Regel in `src/AGENTS.md`, Benachrichtigungen):
+ * Mitarbeit und Beobachter tragen keine, der Server lehnt sie ab (422).
+ */
+const FUEHRUNG: ReadonlySet<EinsatzRolle> = new Set(['einsatzleitung', 'fuehrungspersonal']);
+
+/**
+ * Ein gewählter, noch nicht bestätigter Rollenwechsel: die eigene Herabstufung (LFH-966) und/oder
+ * das Ende einer Führungsfunktion (LLH-2064). `funktion` trägt deren Anzeige, `name` die Person.
+ */
+type Herabstufung = {
+  benutzerId: number;
+  rolle: EinsatzRolle;
+  eigene: boolean;
+  funktion?: string;
+  name: string;
+};
+
+/** Die Anzeige einer Rolle in Texten, etwa „Mitarbeit“. */
+const rollenLabel = (rolle: EinsatzRolle) =>
+  EINSATZ_ROLLE_OPTIONEN.find((r) => r.value === rolle)?.label ?? rolle;
 
 interface Props {
   einsatzId: number;
@@ -92,7 +111,10 @@ function FuehrungsstelleModal({
   fehler: Error | null;
 }) {
   const [form] = Form.useForm<StellenWerte>();
-  const funktionen = useFunktionsVorschlaege(mitglied.einsatzId);
+  const alleFunktionen = useFunktionsVorschlaege(mitglied.einsatzId);
+  // Außerhalb der Führung nur Freitext (LLH-2064): der Katalog fehlt in der Auswahl.
+  const fuehrt = FUEHRUNG.has(mitglied.einsatz_rolle);
+  const funktionen = fuehrt ? alleFunktionen : { ...alleFunktionen, katalog: [] };
   const bisher = stellenWert(mitglied);
   // Der gespeicherte Wert trägt seine Anzeige selbst — auch bevor der Katalog geladen ist.
   const zusatz = bisher
@@ -117,13 +139,17 @@ function FuehrungsstelleModal({
         getValueFromEvent={letzterWert}
         // Vorrangregel (Spec `fuehrungsfunktionen`): nur der erste Vorschlag der Rufname-Abfrage,
         // kein vorbelegter Eintrag (LFH-894). Kein „Leer lassen …“ (LFH-1078).
-        extra="Führungsfunktion im Einsatz und erster Vorschlag für den ETB-Rufnamen"
+        extra={
+          fuehrt
+            ? 'Führungsfunktion im Einsatz und erster Vorschlag für den ETB-Rufnamen'
+            : 'Mitarbeit und Beobachter tragen keine Führungsfunktion. Die Angabe ist nur der erste Vorschlag für den ETB-Rufnamen.'
+        }
       >
         <EinWertAuswahl
           vorschlaege={funktionen}
           zusatz={zusatz}
           aria-label="Führungsstelle"
-          placeholder="Funktion (z. B. S2) oder Freitext"
+          placeholder={fuehrt ? 'Funktion (z. B. S2) oder Freitext' : 'Freitext, z. B. Funk ELW 2'}
           disabled={laeuft}
         />
       </Feld>
@@ -265,8 +291,20 @@ export default function MitgliederAbschnitt({
    * LFH-1118). Kein Rückfragebedarf beim Hochstufen oder in fremden Zeilen.
    */
   const rolleWaehlen = (m: MitgliedAnzeige, rolle: EinsatzRolle) => {
-    const eigeneHerabstufung = m.benutzer_id === ich?.id && RANG[rolle] > RANG[m.einsatz_rolle];
-    if (eigeneHerabstufung) setHerabstufung({ benutzerId: m.benutzer_id, rolle });
+    const eigene = m.benutzer_id === ich?.id && RANG[rolle] > RANG[m.einsatz_rolle];
+    // Verlässt ein Mitglied mit Funktion die Führung, wird sie zur Bezeichnung (LLH-2064): vorher
+    // fragen, in EINER Bestätigung mit der eigenen Herabstufung.
+    const funktionEndet = m.fuehrungsfunktion != null && !FUEHRUNG.has(rolle);
+    if (eigene || funktionEndet)
+      setHerabstufung({
+        benutzerId: m.benutzer_id,
+        rolle,
+        eigene,
+        funktion: funktionEndet
+          ? (m.fuehrungsstelle_anzeige ?? m.fuehrungsfunktion ?? undefined)
+          : undefined,
+        name: m.anzeigename,
+      });
     else rolleSetzen({ benutzerId: m.benutzer_id, rolle });
   };
   // Der Server lässt Mitglieder schon weg; der Filter deckt den Moment bis zum Neuladen.
@@ -532,17 +570,22 @@ export default function MitgliederAbschnitt({
       {herabstufung !== null && (
         <Modal
           open
-          title="Eigene Rolle herabstufen?"
-          okText="Rolle herabstufen"
+          title={herabstufung.eigene ? 'Eigene Rolle herabstufen?' : 'Führungsfunktion beenden?'}
+          okText={herabstufung.eigene ? 'Rolle herabstufen' : 'Rolle ändern'}
           cancelText="Abbrechen"
           okButtonProps={{ danger: true }}
           onOk={() => {
-            rolleSetzen(herabstufung);
+            rolleSetzen({ benutzerId: herabstufung.benutzerId, rolle: herabstufung.rolle });
             setHerabstufung(null);
           }}
           onCancel={() => setHerabstufung(null)}
         >
-          {`Mit „${EINSATZ_ROLLE_OPTIONEN.find((r) => r.value === herabstufung.rolle)?.label}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}
+          {herabstufung.eigene && (
+            <p>{`Mit „${rollenLabel(herabstufung.rolle)}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}</p>
+          )}
+          {herabstufung.funktion && (
+            <p>{`Mit „${rollenLabel(herabstufung.rolle)}“ endet die Führungsfunktion „${herabstufung.funktion}“ von ${herabstufung.name}. Die Angabe bleibt als Bezeichnung stehen; Hinweise an die Funktion erreichen ${herabstufung.name} nicht mehr.`}</p>
+          )}
         </Modal>
       )}
     </Paneel>

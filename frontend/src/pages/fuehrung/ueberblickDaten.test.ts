@@ -834,6 +834,23 @@ describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1
     expect(abschnittGruende(logistik, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
   });
 
+  it('Person an unbekannter Einheit: „Ohne Abschnitt“ zählt Stärke und Ausfall wie das Meldebild (LLH-1916)', () => {
+    // Zwischenstand nach dem Auflösen: Einheit 99 steht nicht mehr in der Liste, die Person
+    // trägt ihre `einheit_id` noch.
+    const zeilen = abschnittZeilen({
+      abschnitte,
+      einheiten,
+      personal: [...personalListe, personal(8, 99, 'mannschaft', 'nicht_verfuegbar')],
+      fahrzeuge: [],
+      material: [],
+      auftraege: [],
+    });
+    const ohne = zeilen.find((z) => z.abschnittId == null)!;
+    expect(ohne).toBeDefined();
+    expect(ohne.staerke.gesamt).toBe(1);
+    expect(abschnittGruende(ohne, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
+  });
+
   it('ohne geladene Rückmeldungen kein Rückmeldungsgrund — nie ein erfundenes „keine“', () => {
     const z = zeileMit();
     expect(abschnittGruende(z, JETZT).some((g) => g.art.startsWith('rueckmeldung'))).toBe(false);

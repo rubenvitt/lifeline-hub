@@ -1194,6 +1194,18 @@ pub async fn mitglied_setzen(
     } else {
         None
     };
+    // Eine Führungsfunktion trägt nur die Führung (LLH-2064, Entwurf D2; `src/AGENTS.md`,
+    // Benachrichtigungen). Freitext bleibt jeder Rolle; ein Rollenwechsel ohne Angabe macht die
+    // bestehende Funktion im Repo zur Bezeichnung.
+    if !neue_rolle.gehoert_zur_fuehrung()
+        && fuehrungsstelle
+            .as_ref()
+            .is_some_and(|a| a.funktion.is_some())
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Mitarbeit und Beobachter tragen keine Führungsfunktion".into(),
+        ));
+    }
 
     // Ziel-Benutzer muss existieren, zur Organisation DIESES Einsatzes gehören und aktiv
     // sein. Der Org-Bezug gehört schon hierher (F05/LFH-232): der eigentliche Guard sitzt

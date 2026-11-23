@@ -92,6 +92,31 @@ describe('alarmAusMonitor (LLH-1743, D5)', () => {
     expect(wasBrennt(alarmAusMonitor(lage), JETZT).stand).toBe('vollstaendig');
   });
 
+  it('ausgeblendete Quellen sind gesperrt, nicht unvollständig (LLH-1964)', () => {
+    const lage = {
+      betroffene: { vermisst: 2 },
+      alarm: {
+        sofort_offen: 1,
+        dringend_offen: 0,
+        bestaetigung_ueberfaellig: 0,
+        auftraege_ueberfaellig: 0,
+        erinnerungen_faellig: 0,
+        nachforderungen_ueberfaellig: 0,
+        rueckmeldung_ueberfaellig: [],
+        abschnitte_kritisch: [],
+        ausfall: [],
+        ausgeblendet: ['auftraege', 'vermisst', 'ausfall'],
+      },
+    } as unknown as LagemonitorAnzeige;
+    const quellen = alarmAusMonitor(lage);
+    expect(quellen.auftraege).toEqual({ zustand: 'gesperrt' });
+    expect(quellen.vermisst).toEqual({ zustand: 'gesperrt' });
+    expect(quellen.ausfall).toEqual({ zustand: 'gesperrt' });
+    const w = wasBrennt(quellen, JETZT);
+    expect(w.stand).toBe('vollstaendig');
+    expect(w.eintraege.map((e) => e.art)).toEqual(['sofort']);
+  });
+
   it('ohne Antwort lädt die Zeile', () => {
     expect(wasBrennt(alarmAusMonitor(undefined), JETZT).stand).toBe('laedt');
   });

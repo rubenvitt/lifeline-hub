@@ -1,9 +1,9 @@
 # Datenraster mit DatenfeldEingabe und FeldFehler
 
-Datenraster — die Detail-Optik statt antds `Descriptions`: je Feld eine Augenbraue über dem
+Datenraster — die Detail-Optik statt antds `Descriptions`: je Feld ein Feldetikett über dem
 Wert, 2–4 Spalten im Fugenraster, Kennungen/Zahlen/Zeiten in Mono.
 
-SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>` — die
+SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Feldetikett) und `<dd>` — die
 zulässige Gruppierung nach HTML, Vorleser hören Begriff und Wert als Paar.
 
 BEARBEITEN AN ORT UND STELLE: im Edit-Modus einer Detailseite steht statt `Datenfeld` eine
