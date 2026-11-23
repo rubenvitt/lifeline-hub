@@ -461,7 +461,7 @@ const PIN_GRUPPEN =
 function abrufBereit(antwort: Record<string, unknown>) {
   const abrufe: unknown[] = [];
   server.use(
-    http.post('/api/admin/anbindungen/a/webhook/zertifikat-abrufen', async ({ request }) => {
+    http.post('/api/admin/integrations/a/webhook/fetch-certificate', async ({ request }) => {
       abrufe.push(await request.json());
       return HttpResponse.json(antwort);
     }),

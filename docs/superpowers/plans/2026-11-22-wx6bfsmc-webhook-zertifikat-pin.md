@@ -180,7 +180,7 @@ Tests), React + antd + TanStack Query, Vitest.
   - `WebhookAenderung.zertifikat_pin` tri-state via
     `#[serde(default, deserialize_with = "support::deserialize_optional_field")]`
   - `WebhookAnzeige.zertifikat_pin?: string` (für jeden, der die Anbindung sieht)
-  - `POST /api/admin/anbindungen/{id}/webhook/zertifikat-abrufen`, Body
+  - `POST /api/admin/integrations/{id}/webhook/fetch-certificate`, Body
     `WebhookZertifikatAbruf { url: String, lan_erlaubt: bool }`, Antwort
     `WebhookZertifikat { fingerabdruck?: String, fehler_art?: WebhookFehler }` (200).
 - Regeln:

@@ -582,7 +582,7 @@ pub struct WebhookZertifikat {
     pub fehler_art: Option<WebhookFehler>,
 }
 
-/// POST /api/admin/anbindungen/{id}/webhook/zertifikat-abrufen — liest den Fingerabdruck des
+/// POST /api/admin/integrations/{id}/webhook/fetch-certificate — liest den Fingerabdruck des
 /// Zertifikats, das ein Ziel zeigt (LLH-1872, D4). Es geht nie eine HTTP-Anfrage hinaus; die URL
 /// besteht vorher den Zielschutz (400). Gespeichert wird nichts; ein Webhook muss noch nicht
 /// existieren. Admin-Spur `maschinenzugang_webhook_zertifikat_abgerufen`, weil der Abruf jedes
