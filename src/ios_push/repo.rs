@@ -1,4 +1,4 @@
-//! Speicher von iOS-Push (`migrations/0366_ios_push.sql`).
+//! Speicher von iOS-Push (`migrations/0368_ios_push.sql`).
 
 use super::krypto::{b64_lesen, nachweis};
 use super::SPERRE_GILT_STUNDEN;
