@@ -226,7 +226,7 @@ describe('AuftragDetail (Spec `auftraege-befehle`)', () => {
     it('ohne Lagekarten-Freigabe steht der Ausschnitt, aber kein Sprung', async () => {
       let abgefragt = false;
       server.use(
-        http.get('/api/einsaetze/5/modul-freigaben', () => {
+        http.get('/api/einsaetze/5/module-access', () => {
           abgefragt = true;
           return HttpResponse.json(
             freigabenFixture({ lagekarte: { zugriff: false, sichtbar: false } }),

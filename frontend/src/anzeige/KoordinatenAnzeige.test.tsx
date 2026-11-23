@@ -19,7 +19,7 @@ describe('KoordinatenAnzeige', () => {
 
   it('zeigt mit einsatzId Koordinate + Ort-Zeile', async () => {
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({
           peilung: { distanz_m: 1200, richtung: 'NO', bezug_label: 'Einsatzort' },
           ortsname: 'Hauptstr. 5, Musterstadt',

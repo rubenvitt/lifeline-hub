@@ -32,7 +32,7 @@ async fn einsatz_abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
     let (s, _) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         cookie,
         None,
     )

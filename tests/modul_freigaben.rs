@@ -1,4 +1,4 @@
-//! Modulfreigaben je Benutzer (LFH-669): `GET /api/einsaetze/{id}/modul-freigaben`.
+//! Modulfreigaben je Benutzer (LFH-669): `GET /api/einsaetze/{id}/module-access`.
 //!
 //! Die tragende Zusicherung ist der **Gleichlauf**: `zugriff` sagt für jedes Modul genau das,
 //! was der Listen-Endpunkt desselben Moduls demselben Benutzer antwortet. Die Tests prüfen
@@ -14,7 +14,7 @@ use common::{
 };
 
 fn uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/modul-freigaben")
+    format!("/api/einsaetze/{einsatz}/module-access")
 }
 
 async fn freigaben(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -53,7 +53,7 @@ async fn modul_override(app: &axum::Router, admin: &str, einsatz: i64, modul: &s
     let (status, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(body),
     )
@@ -374,7 +374,7 @@ async fn org_ausblendung_wirkt_auf_laufenden_einsatz_ohne_eigenen_wert() {
     let (status, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &format!("/api/einsaetze/{einsatz}/module-counts"),
         &erika,
         None,
     )

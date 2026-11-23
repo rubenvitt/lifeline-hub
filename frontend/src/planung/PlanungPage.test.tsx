@@ -251,7 +251,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup(planung(), planungPfad(5, 'ablauf'));
     server.use(
-      http.post('/api/plans/5/program-items', async ({ request }) => {
+      http.post('/api/plans/5/agenda-items', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(
           { id: 32, bezeichnung: 'Einlass', zeitpunkt_at: '2027-06-12 16:00:00' },
@@ -279,7 +279,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let geloescht = false;
     setup(planung(), planungPfad(5, 'ablauf'));
     server.use(
-      http.delete('/api/plans/5/program-items/31', () => {
+      http.delete('/api/plans/5/agenda-items/31', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),

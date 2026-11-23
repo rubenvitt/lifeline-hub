@@ -157,7 +157,7 @@ describe('useDrucken / DruckKnopf', () => {
   it('druckt über den Knopf ohne Logo die frische Druckzeit, nicht die vom Seitenaufbau', async () => {
     server.use(
       http.get('/api/organisation', () => HttpResponse.json(ORG)),
-      http.get('/api/einsaetze/1/einstellungen', () =>
+      http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
     );

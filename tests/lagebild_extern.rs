@@ -476,7 +476,7 @@ async fn widerruf_ablauf_und_abschluss_beenden_den_link() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

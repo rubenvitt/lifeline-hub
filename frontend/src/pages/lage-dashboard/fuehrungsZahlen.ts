@@ -4,7 +4,7 @@ import type { ModulZaehler } from '../../api/types';
 /**
  * Die Handlungsmengen des Führungsstands — Aufträge, Meldungen, Nachforderungen und (LLH-1145)
  * Erinnerungen und Lagemeldungen — aus dem Modulzähler des
- * Servers (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`).
+ * Servers (`GET …/module-counts`, `src/einsatz/zaehler.rs`).
  *
  * **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard, Führungsüberblick und die Vorbereitung der
  * Lagebesprechung zählen diese Mengen NICHT über die Listen. Dieselbe Zahl steht so im

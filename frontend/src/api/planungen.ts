@@ -128,7 +128,7 @@ export function createPlanungProgrammpunkt(
   id: number,
   daten: ProgrammpunktEingabe,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`${basis(id)}/program-items`, 'POST', daten);
+  return apiSend<Programmpunkt>(`${basis(id)}/agenda-items`, 'POST', daten);
 }
 
 export function updatePlanungProgrammpunkt(
@@ -136,11 +136,11 @@ export function updatePlanungProgrammpunkt(
   punktId: number,
   daten: Partial<ProgrammpunktEingabe>,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`${basis(id)}/program-items/${punktId}`, 'PATCH', daten);
+  return apiSend<Programmpunkt>(`${basis(id)}/agenda-items/${punktId}`, 'PATCH', daten);
 }
 
 export function deletePlanungProgrammpunkt(id: number, punktId: number): Promise<void> {
-  return apiSend<void>(`${basis(id)}/program-items/${punktId}`, 'DELETE');
+  return apiSend<void>(`${basis(id)}/agenda-items/${punktId}`, 'DELETE');
 }
 
 /**

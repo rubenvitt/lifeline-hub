@@ -59,13 +59,13 @@ function setup(
 ) {
   const pruefung = opts.pruefung ?? offen;
   server.use(
-    http.get('/api/einsaetze/7/abschluss/pruefung', () => {
+    http.get('/api/einsaetze/7/closure/check', () => {
       if (pruefung === 'haengt') return new Promise<never>(() => {});
       if (pruefung === 'fehler')
         return HttpResponse.json({ error: 'Datenbank nicht erreichbar' }, { status: 500 });
       return HttpResponse.json(pruefung);
     }),
-    http.get('/api/einsaetze/7/modul-freigaben', () =>
+    http.get('/api/einsaetze/7/module-access', () =>
       HttpResponse.json(opts.freigaben ?? freigabenFixture()),
     ),
   );
@@ -266,7 +266,7 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     let aufrufe = 0;
     setup({ pruefung: nichtsOffen });
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () => {
+      http.post('/api/einsaetze/7/close', () => {
         aufrufe += 1;
         return HttpResponse.json({ id: 7, status: 'abgeschlossen' });
       }),
@@ -287,7 +287,7 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     let aufrufe = 0;
     setup({ pruefung: nichtsOffen });
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () => {
+      http.post('/api/einsaetze/7/close', () => {
         aufrufe += 1;
         return HttpResponse.json({ id: 7, status: 'abgeschlossen' });
       }),
@@ -313,7 +313,7 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     let aufrufe = 0;
     const { onSchliessen } = setup();
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () => {
+      http.post('/api/einsaetze/7/close', () => {
         aufrufe += 1;
         return HttpResponse.json({ id: 7, status: 'abgeschlossen' });
       }),
@@ -330,7 +330,7 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
   it('zeigt eine Ablehnung im Dialog, ohne Toast, und lässt ihn offen', async () => {
     const { onSchliessen } = setup({ pruefung: nichtsOffen });
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', () =>
+      http.post('/api/einsaetze/7/close', () =>
         HttpResponse.json({ error: 'Einsatz ist bereits abgeschlossen' }, { status: 409 }),
       ),
     );

@@ -547,7 +547,7 @@ async fn ziel_und_rechte() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -969,7 +969,7 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/program-items"),
+            format!("{PFAD}/{p}/agenda-items"),
             Some(json!({"bezeichnung": "Einlass", "zeitpunkt_at": "2027-03-13 17:00:00"})),
         ),
     ];
@@ -1020,12 +1020,12 @@ async fn jeder_schreibweg_erhoeht_den_stand() {
         ),
         (
             "PATCH",
-            format!("{PFAD}/{p}/program-items/{einlass}"),
+            format!("{PFAD}/{p}/agenda-items/{einlass}"),
             Some(json!({"bezeichnung": "Einlass Bühne"})),
         ),
         (
             "DELETE",
-            format!("{PFAD}/{p}/program-items/{einlass}"),
+            format!("{PFAD}/{p}/agenda-items/{einlass}"),
             None,
         ),
         ("DELETE", format!("{PFAD}/{p}/helpers/{spaet}"), None),
@@ -1221,7 +1221,7 @@ async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/einsatzabschnitte"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/einsatzabschnitte"),
         &admin,
         Some(&json!({"sichtbar": false})),
     )

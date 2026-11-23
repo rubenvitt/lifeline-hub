@@ -451,7 +451,7 @@ async fn abschliessen_und_nachbereitung_vorbei(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &i.admin,
         None,
     )

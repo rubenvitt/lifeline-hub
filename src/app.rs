@@ -307,20 +307,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Verlauf und „alle gelesen“ eines Einsatzes (LLH-1143, design.md D3/D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen",
+            "/api/einsaetze/{id}/notifications",
             get(routes::benachrichtigung::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigungen/gelesen",
+            "/api/einsaetze/{id}/notifications/read",
             post(routes::benachrichtigung::gelesen),
         )
         // Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4).
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben",
+            "/api/einsaetze/{id}/notification-defaults",
             get(routes::benachrichtigung::vorgaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/benachrichtigung-vorgaben/{art}",
+            "/api/einsaetze/{id}/notification-defaults/{art}",
             put(routes::benachrichtigung::vorgabe_setzen),
         )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
@@ -344,23 +344,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route(
-            "/api/einsaetze/mitglied-auswahl",
+            "/api/einsaetze/member-selection",
             get(routes::einsatz::mitglied_auswahl_anlage),
         )
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
         .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
-            "/api/einsaetze/{id}/abschliessen",
+            "/api/einsaetze/{id}/close",
             post(routes::einsatz::abschliessen),
         )
         // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
         .route(
-            "/api/einsaetze/{id}/wiedereroeffnen",
+            "/api/einsaetze/{id}/reopen",
             post(routes::einsatz::wiedereroeffnen),
         )
         // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
         .route(
-            "/api/einsaetze/{id}/abschluss/pruefung",
+            "/api/einsaetze/{id}/closure/check",
             get(routes::einsatz::abschluss_pruefung),
         )
         .route(
@@ -370,7 +370,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
         .route(
-            "/api/einsaetze/{id}/praesenz",
+            "/api/einsaetze/{id}/presence",
             put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
         )
         .route(
@@ -380,11 +380,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.
         .route(
-            "/api/einsaetze/{id}/programmpunkte",
+            "/api/einsaetze/{id}/agenda-items",
             get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/programmpunkte/{pid}",
+            "/api/einsaetze/{id}/agenda-items/{pid}",
             patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
         )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
@@ -394,23 +394,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist",
+            "/api/einsaetze/{id}/retention-period",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/nachbereitung",
+            "/api/einsaetze/{id}/follow-up",
             put(routes::einsatz::nachbereitung_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}",
+            "/api/einsaetze/{id}/retention-period/{kategorie}",
             put(routes::einsatz::kategorie_frist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/aufbewahrung-kategorien",
+            "/api/einsaetze/{id}/retention-categories",
             get(routes::einsatz::kategorien_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/einstellungen",
+            "/api/einsaetze/{id}/settings",
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
@@ -422,19 +422,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::unterkunft_richtwerte::einsatz_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides",
+            "/api/einsaetze/{id}/module-overrides",
             get(routes::einsatz::modul_overrides_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-freigaben",
+            "/api/einsaetze/{id}/module-access",
             get(routes::einsatz::modul_freigaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/modul-vorgaben",
+            "/api/einsaetze/{id}/module-defaults",
             get(routes::einsatz::load_modul_vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/modul-overrides/{modul_key}",
+            "/api/einsaetze/{id}/module-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
         .route(
@@ -464,7 +464,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
-            "/api/einsaetze/{id}/modul-zaehler",
+            "/api/einsaetze/{id}/module-counts",
             get(routes::modul_zaehler::liste),
         )
         // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
@@ -1038,12 +1038,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::meldung::lage_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/ort-vorschau",
+            "/api/einsaetze/{id}/place-preview",
             get(routes::ort_vorschau::vorschau),
         )
         // Ortssuche des Ortsfelds (LFH-1175): Recht der Einsatzdaten, kein Modul.
         .route(
-            "/api/einsaetze/{id}/ort-suche",
+            "/api/einsaetze/{id}/place-search",
             get(routes::ort_suche::im_einsatz),
         )
         .route(
@@ -1293,7 +1293,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::export),
         )
         .route(
-            "/api/einsaetze/{id}/einsatzakte/anlagen.zip",
+            "/api/einsaetze/{id}/case-file/attachments.zip",
             get(routes::einsatzakte::anlagen_zip),
         )
         .route(
@@ -1581,11 +1581,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(
-            "/api/einsaetze/{id}/anbindungen",
+            "/api/einsaetze/{id}/integrations",
             get(routes::einsatz_anbindungen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/anbindungen/{zid}/freigabe",
+            "/api/einsaetze/{id}/integrations/{zid}/grant",
             put(routes::einsatz_anbindungen::freigeben)
                 .delete(routes::einsatz_anbindungen::freigabe_beenden),
         )
@@ -2389,11 +2389,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
-            "/api/plans/{id}/program-items",
+            "/api/plans/{id}/agenda-items",
             post(routes::planung::create_programmpunkt),
         )
         .route(
-            "/api/plans/{id}/program-items/{pid}",
+            "/api/plans/{id}/agenda-items/{pid}",
             patch(routes::planung::update_programmpunkt)
                 .delete(routes::planung::delete_programmpunkt),
         )

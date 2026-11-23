@@ -160,7 +160,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     [langeBezeichnung('Zugabe'), 200],
     ['Ende', 240],
   ] as const) {
-    await anlegen(page, `/api/einsaetze/${e}/programmpunkte`, {
+    await anlegen(page, `/api/einsaetze/${e}/agenda-items`, {
       bezeichnung,
       zeitpunkt_at: wireAb(minuten),
     });

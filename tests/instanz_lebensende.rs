@@ -39,7 +39,7 @@ async fn abschliessen(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &i.admin,
         None,
     )
@@ -130,7 +130,7 @@ async fn nach_der_nachbereitung_verwahrt_der_hub_und_der_elw_raeumt_ab() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "PUT",
-        &format!("/api/einsaetze/{h}/nachbereitung"),
+        &format!("/api/einsaetze/{h}/follow-up"),
         &hub.admin,
         Some(&json!({ "nachbereitung_bis": null })),
     )

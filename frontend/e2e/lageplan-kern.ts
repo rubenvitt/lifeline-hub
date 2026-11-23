@@ -133,7 +133,7 @@ export async function einsatzMitLage(page: Page, bezeichnung: string): Promise<s
   await a.patch(`abschnitte/${abschnitt}/flaeche`, {
     flaeche_geojson: JSON.stringify(rechteck(0.002, 0.001, 0.003)),
   });
-  await a.put('modul-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
+  await a.put('module-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });
   return einsatzId;
 }
 

@@ -676,7 +676,7 @@ pub async fn delete_helfer(
 // Programmpunkte (LLH-1583)
 // ---------------------------------------------------------------------------------------------
 
-/// POST /api/plans/{id}/program-items (201, der Programmpunkt). Grenzen wie am Einsatz:
+/// POST /api/plans/{id}/agenda-items (201, der Programmpunkt). Grenzen wie am Einsatz:
 /// Bezeichnung Pflicht und höchstens 100 Zeichen, Zeitpunkt im Jahresbereich (400), höchstens 50
 /// je Planung (422).
 pub async fn create_programmpunkt(
@@ -703,7 +703,7 @@ pub async fn create_programmpunkt(
     Ok((StatusCode::CREATED, Json(p)))
 }
 
-/// PATCH /api/plans/{id}/program-items/{pid} — Bezeichnung und/oder Zeitpunkt.
+/// PATCH /api/plans/{id}/agenda-items/{pid} — Bezeichnung und/oder Zeitpunkt.
 pub async fn update_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -733,7 +733,7 @@ pub async fn update_programmpunkt(
     Ok(Json(p))
 }
 
-/// DELETE /api/plans/{id}/program-items/{pid} (204).
+/// DELETE /api/plans/{id}/agenda-items/{pid} (204).
 pub async fn delete_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,

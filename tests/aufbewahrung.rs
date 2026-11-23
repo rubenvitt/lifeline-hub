@@ -26,7 +26,7 @@ async fn abgeschlossen(app: &axum::Router, admin: &str) -> i64 {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         admin,
         None,
     )
@@ -96,7 +96,7 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -232,7 +232,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -242,7 +242,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        &format!("/api/einsaetze/{id}/retention-period"),
         &admin,
         Some(&format!(
             r#"{{"retention_bis":"{}","bestaetigt":true}}"#,
@@ -397,7 +397,7 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -1073,7 +1073,7 @@ async fn frist_put(app: &axum::Router, cookie: &str, id: i64, frist: &str) -> (S
     anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        &format!("/api/einsaetze/{id}/retention-period"),
         cookie,
         Some(&format!(
             r#"{{"retention_bis":"{frist}","bestaetigt":true}}"#
@@ -1280,7 +1280,7 @@ async fn wieder_oeffnen(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/wiedereroeffnen"),
+        &format!("/api/einsaetze/{id}/reopen"),
         cookie,
         Some(r#"{"grund":"Falscher Einsatz abgeschlossen"}"#),
     )
@@ -1293,7 +1293,7 @@ async fn abschluss_post(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         cookie,
         None,
     )
@@ -1420,7 +1420,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        &format!("/api/einsaetze/{id}/retention-period"),
         &admin,
         Some(&serde_json::json!({ "retention_bis": frist })),
     )
@@ -1430,7 +1430,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/aufbewahrungsfrist/personenauskunft"),
+        &format!("/api/einsaetze/{id}/retention-period/personenauskunft"),
         &admin,
         Some(&serde_json::json!({ "retention_bis": kategorie_frist })),
     )
@@ -1442,7 +1442,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/nachbereitung"),
+        &format!("/api/einsaetze/{id}/follow-up"),
         &admin,
         Some(&serde_json::json!({ "nachbereitung_bis": nachbereitung })),
     )

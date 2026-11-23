@@ -25,7 +25,7 @@ import {
  * Aufbewahrungsfrist am Einsatz anzeigen und ändern.
  *
  * Die Frist gehört NICHT zu den eingefrorenen Einstellungen: sie wird auch nach dem Abschluss
- * über `PUT …/aufbewahrungsfrist` gesetzt. Deshalb steht das Paneel ÜBER und AUSSERHALB des
+ * über `PUT …/retention-period` gesetzt. Deshalb steht das Paneel ÜBER und AUSSERHALB des
  * Vollersatz-`<Form>` der Einstellungen.
  *
  * **Umkehrbarkeit entscheidet die Rückfrage:** Verlängern und Aufheben fragen nicht. Aufheben
