@@ -91,6 +91,28 @@
         "pfad": "/einsaetze/1",
         "einsatz_id": 1
       }
+    },
+    {
+      "beschreibung": "ohne Einsatz: Störung einer Anbindung (LLH-2077)",
+      "klartext": {
+        "v": 1,
+        "s": "Kreis Nord",
+        "b": 11,
+        "stufe": "hinweis",
+        "titel": "Anbindung gestört",
+        "detail": "Leitstelle Nord · Zugang abgelehnt (401)",
+        "pfad": "/admin/einstellungen/anbindungen?adapter=a1"
+      },
+      "server_anzahl": 1,
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "erwartet": {
+        "titel": "Anbindung gestört",
+        "untertitel": null,
+        "text": "Leitstelle Nord · Zugang abgelehnt (401)",
+        "thread": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07-org",
+        "pfad": "/admin/einstellungen/anbindungen?adapter=a1",
+        "einsatz_id": null
+      }
     }
   ],
   "zweck": "Gemeinsamer Fall des Klartexts der iOS-Push-Nutzlast: Rust serialisiert `klartext` (src/ios_push/inhalt.rs, Test klartext_passt_zu_den_gemeinsamen_faellen), Swift baut daraus die Meldung (PushNutzlast.meldung) und erwartet `erwartet`."

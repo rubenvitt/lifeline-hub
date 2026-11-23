@@ -25,7 +25,7 @@ describe('ArchivPaneel (LLH-1494)', () => {
     // Block 2 ist seit dem Laden der Akte abgelaufen: der Server liefert Block 3.
     server.use(
       http.get(
-        '/api/aufbewahrung/einsaetze/7/archiv',
+        '/api/retention/incidents/7/archive',
         () =>
           new HttpResponse(new Uint8Array([1, 2, 3]), {
             status: 200,
@@ -52,7 +52,7 @@ describe('ArchivPaneel (LLH-1494)', () => {
   it('nimmt ohne Namen in der Antwort den Block der Akte', async () => {
     server.use(
       http.get(
-        '/api/aufbewahrung/einsaetze/7/archiv',
+        '/api/retention/incidents/7/archive',
         () => new HttpResponse(new Uint8Array([1, 2, 3]), { status: 200 }),
       ),
     );
@@ -68,7 +68,7 @@ describe('ArchivPaneel (LLH-1494)', () => {
 
   it('nennt eine Ablehnung am Paneel', async () => {
     server.use(
-      http.get('/api/aufbewahrung/einsaetze/7/archiv', () =>
+      http.get('/api/retention/incidents/7/archive', () =>
         HttpResponse.json({ error: 'Kein Archiv.' }, { status: 404 }),
       ),
     );

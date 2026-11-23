@@ -7,6 +7,7 @@ use axum::{
 use http_body_util::BodyExt;
 use push_relais::{
     api::{router, RelaisState},
+    client_ip::ClientIpSource,
     speicher::{self, Pruefung},
 };
 use serde_json::{json, Value};
@@ -83,7 +84,7 @@ async fn aufbau(basis: &str, limit: u32) -> (Router, SqlitePool, String) {
     let app = router(RelaisState::neu(
         pool.clone(),
         10,
-        false,
+        ClientIpSource::Peer,
         gemeinsam::apns_client(basis),
         limit,
     ));
@@ -203,7 +204,7 @@ async fn sandbox_geht_an_die_sandbox_basis() {
     let app = router(RelaisState::neu(
         pool,
         10,
-        false,
+        ClientIpSource::Peer,
         push_relais::apns::ApnsClient::neu(&cfg).unwrap(),
         600,
     ));
@@ -454,8 +455,14 @@ async fn gesamtfrist_beendet_den_aufruf_mit_fehlern() {
     let zugang = speicher::registrieren(&pool, None, "1").await.unwrap();
     let bearer = format!("Bearer {}.{}", zugang.server_id, zugang.geheimnis);
     let app = router(
-        RelaisState::neu(pool, 10, false, gemeinsam::apns_client(&d.basis), 600)
-            .mit_gesamtfrist(std::time::Duration::from_secs(1)),
+        RelaisState::neu(
+            pool,
+            10,
+            ClientIpSource::Peer,
+            gemeinsam::apns_client(&d.basis),
+            600,
+        )
+        .mit_gesamtfrist(std::time::Duration::from_secs(1)),
     );
     let start = std::time::Instant::now();
     let a = tokio::time::timeout(

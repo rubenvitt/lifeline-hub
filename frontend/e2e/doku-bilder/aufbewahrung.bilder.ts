@@ -44,12 +44,12 @@ async function abgeschlosseneEinsaetze(page: Page): Promise<Record<string, Einsa
       if (bezeichnung === MIT_FRIST) {
         const frist = new Date(Date.now() + 180 * 24 * 3600 * 1000);
         frist.setUTCHours(22, 0, 0, 0);
-        await fuelle(page, 'put', `/api/einsaetze/${einsatz.id}/aufbewahrungsfrist`, {
+        await fuelle(page, 'put', `/api/einsaetze/${einsatz.id}/retention-period`, {
           retention_bis: frist.toISOString(),
           bestaetigt: true,
         });
       }
-      await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/abschliessen`);
+      await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/close`);
     }
     ergebnis[bezeichnung] = einsatz;
   }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { huelleIstApp } from '../../huelle/faehigkeiten';
 
 /**
  * Eigenposition auf der Lagekarte. Der Standort bleibt auf dem Gerät: kein Request, kein
@@ -25,8 +26,15 @@ export const EIGENPOSITION_SPERRGRUND: Record<
   fehlt: 'Dieses Gerät oder dieser Browser liefert keinen Standort.',
 };
 
-export const MELDUNG_VERWEIGERT =
-  'Standortzugriff verweigert – im Browser für diese Seite freigeben, dann erneut einschalten.';
+/**
+ * Meldung bei verweigertem Standort: im Browser die Freigabe für die Seite, in der iOS- und der
+ * Android-App die Einstellungen des Geräts (LLH-2071). Beim Aufruf gelesen.
+ */
+export function meldungVerweigert(): string {
+  return huelleIstApp()
+    ? 'Standortzugriff verweigert – in den Einstellungen des Geräts für Lifeline freigeben, dann erneut einschalten.'
+    : 'Standortzugriff verweigert – im Browser für diese Seite freigeben, dann erneut einschalten.';
+}
 export const MELDUNG_KEIN_STANDORT = 'Kein Standort ermittelbar.';
 
 /**
@@ -84,7 +92,7 @@ export function useEigenposition({
         }
       },
       (e) => {
-        if (e.code === e.PERMISSION_DENIED) aus(MELDUNG_VERWEIGERT);
+        if (e.code === e.PERMISSION_DENIED) aus(meldungVerweigert());
         else if (!hatFix) aus(MELDUNG_KEIN_STANDORT);
       },
       // Endliche Frist, sonst wartete ein Gerät ohne Ortung stumm. 15 s tragen einen GPS-Kaltstart

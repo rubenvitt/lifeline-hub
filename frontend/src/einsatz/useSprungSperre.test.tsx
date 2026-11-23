@@ -23,7 +23,7 @@ describe('useSprungSperre (LFH-888)', () => {
   it('sperrt nach der Antwort des Servers, vorher nicht; zwei Aufrufer teilen einen Abruf', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () => {
+      http.get('/api/einsaetze/7/module-access', () => {
         abrufe += 1;
         return HttpResponse.json(freigabenFixture({ etb: { zugriff: false } }));
       }),
@@ -43,7 +43,7 @@ describe('useSprungSperre (LFH-888)', () => {
   it('eine verbogene Einsatz-ID fragt nichts ab und sperrt nichts (LFH-438)', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/:id/modul-freigaben', () => {
+      http.get('/api/einsaetze/:id/module-access', () => {
         abrufe += 1;
         return HttpResponse.json(freigabenFixture());
       }),

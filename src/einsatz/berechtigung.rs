@@ -247,7 +247,7 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 }
 
 /// Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
-/// `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+/// `GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter
 /// [`fordere_modul_zugriff`] und [`erlaubte_module`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ModulFreigabe {

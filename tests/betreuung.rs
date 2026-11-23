@@ -1065,7 +1065,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -1820,7 +1820,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_bezirks() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

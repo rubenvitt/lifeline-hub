@@ -37,7 +37,7 @@ function setup(antwort?: () => Response) {
   server.use(
     meHandler(admin),
     http.get('/api/einsaetze', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/mitglied-auswahl', () => {
+    http.get('/api/einsaetze/member-selection', () => {
       stand.auswahlAbrufe += 1;
       return HttpResponse.json(AUSWAHL);
     }),

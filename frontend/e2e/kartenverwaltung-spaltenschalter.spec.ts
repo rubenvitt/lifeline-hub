@@ -42,7 +42,7 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
   // Eine Zeile legt der Spec selbst an — ohne Zeile wäre „bleibt eine Tabelle" nur ein Kopf.
   // INAKTIV und am Ende wieder gelöscht: Online-Quellen gelten instanzweit, und eine aktive
   // Quelle mit unerreichbarer URL brach jede spätere Lagekarte im selben Shard.
-  const antwort = await page.request.post('/api/karte/online-quellen', {
+  const antwort = await page.request.post('/api/map/online-sources', {
     data: {
       name: `E2E Spalten ${Date.now()}`,
       url: `https://e2e.example/${Date.now()}/{z}/{x}/{y}.png`,
@@ -75,7 +75,7 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
       page.getByRole('button', { name: 'Spalten · 1 ausgeblendet — Online-Quellen' }),
     ).toBeVisible();
   } finally {
-    await page.request.delete(`/api/karte/online-quellen/${quelleId}`);
+    await page.request.delete(`/api/map/online-sources/${quelleId}`);
   }
 });
 

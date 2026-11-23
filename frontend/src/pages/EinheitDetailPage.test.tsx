@@ -507,7 +507,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     const { handler } = mitAufgeloesten([aufgeloest]);
     server.use(
       handler,
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(
           freigabenFixture({ personal: { zugriff: false }, fahrzeuge: { zugriff: false } }),
         ),
@@ -963,7 +963,7 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
 
   it('Modul Einheiten gesperrt: auch mit Schreibrecht keine Stifte und kein Auflösen (D6)', async () => {
     zeige(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -985,7 +985,7 @@ describe('EinheitDetailPage · Listen nur mit Freigabe (D5)', () => {
         return HttpResponse.json([]);
       });
     zeige(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(
           freigabenFixture(Object.fromEntries(gesperrt.map((k) => [k, { zugriff: false }]))),
         ),
@@ -1464,7 +1464,7 @@ describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075
   it('ohne Freigabe Fahrzeuge kein „Abweisen“', async () => {
     zeige(
       offen(),
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -1544,7 +1544,7 @@ describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
   it('ohne Freigabe Nachforderungen kein Paneel', async () => {
     zeige(
       aus(4),
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );

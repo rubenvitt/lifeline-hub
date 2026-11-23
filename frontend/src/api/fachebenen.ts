@@ -14,7 +14,7 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 /** Rust: `FachebeneAntwort`. `stand` ist ABSENT statt present-null. */
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
-/** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
+/** Pfad-Parameter von `/api/map/overlays/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
 export type FachebeneQuelle =
   | 'dwd'
   | 'pegelonline'
@@ -131,5 +131,5 @@ export function ladeFachebene(
   if (bbox) teile.push(`bbox=${encodeURIComponent(bbox)}`);
   if (archiv) teile.push('archiv=1');
   const q = teile.length ? `?${teile.join('&')}` : '';
-  return apiGet<FachebeneAntwort>(`/api/karte/fachebenen/${quelle}${q}`);
+  return apiGet<FachebeneAntwort>(`/api/map/overlays/${quelle}${q}`);
 }

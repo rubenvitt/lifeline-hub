@@ -1,6 +1,6 @@
 //! Vorgabe je Funktion am Einsatz (LLH-1421, Entwurf `/mnt/project-files/llh-1421/design.md`,
 //! D2–D4; Spec `benachrichtigungen`, „Vorgabe je Funktion am Einsatz“): Lesen und Setzen über
-//! `…/benachrichtigung-vorgaben`, Rechte und Statuscodes, das Live-Ereignis und die Wirkung auf
+//! `…/notification-defaults`, Rechte und Statuscodes, das Live-Ereignis und die Wirkung auf
 //! die Empfänger eines Auftrags (lauter gewinnt).
 
 use axum::http::StatusCode;
@@ -70,7 +70,7 @@ impl Welt {
     }
 
     fn pfad(&self) -> String {
-        format!("/api/einsaetze/{}/benachrichtigung-vorgaben", self.einsatz)
+        format!("/api/einsaetze/{}/notification-defaults", self.einsatz)
     }
 
     async fn funktion_setzen(&self, benutzer_id: i64, funktion: &str) {
@@ -289,7 +289,7 @@ async fn statuscodes_und_rechte() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/abschliessen", w.einsatz),
+        &format!("/api/einsaetze/{}/close", w.einsatz),
         &w.admin,
         None,
     )
@@ -323,7 +323,7 @@ async fn still_fuer_s2_und_lauter_gewinnt() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/benachrichtigungen", w.einsatz),
+        &format!("/api/einsaetze/{}/notifications", w.einsatz),
         &bert,
         None,
     )

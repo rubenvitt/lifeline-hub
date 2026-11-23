@@ -1513,7 +1513,7 @@ pub async fn soft_delete_einsatz(
 /// Transaktion. Gewinnt eine parallele Schwärzung, findet das UPDATE keine Zeile. Bei 0
 /// Zeilen wird neu gelesen und eingeordnet: geschwärzt oder Karenz abgelaufen → 409
 /// (endgültiger Lebenszyklus-Zustand, kein Rückweg), nicht vorgemerkt → 422 (die Frist
-/// ändert man dort über `PUT …/aufbewahrungsfrist`), aktiv → 409, unbekannt → 404.
+/// ändert man dort über `PUT …/retention-period`), aktiv → 409, unbekannt → 404.
 /// Keine Ablehnung schreibt. Liefert die Kennung des ETB-Eintrags für das `etb`-Ereignis
 /// (LFH-858).
 pub async fn wiederherstellen(

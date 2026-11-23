@@ -800,7 +800,7 @@ describe('TierePage', () => {
   it('Fundort als Ortsfeld: eine getippte Koordinate geht als Paar mit und wird gemerkt (LLH-1114)', async () => {
     const rumpfe: Record<string, unknown>[] = [];
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
       http.post('/api/einsaetze/1/tiere', async ({ request }) => {

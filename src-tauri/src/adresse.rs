@@ -6,6 +6,11 @@
 //!
 //! Ports, die der Webview sperrt, lehnt sie ebenfalls ab (LLH-1987): WebKit lädt dorthin nichts
 //! und meldet keinen Ladefehler, das Fenster bliebe leer.
+//!
+//! Einen Hostnamen mit Umlauten (IDN) speichert `Url::parse` in Punycode (URL-Standard, UTS 46
+//! nicht-transitional), so wie der Webview die Origin meldet (LLH-2070). Die mobilen Hüllen
+//! (`URLComponents.encodedHost` in iOS, `Idna.kt` in Android) prüfen dasselbe gegen die
+//! gemeinsamen Fälle.
 
 use std::fmt;
 

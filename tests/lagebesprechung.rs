@@ -43,7 +43,7 @@ async fn ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: &str) 
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -528,7 +528,7 @@ async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -595,7 +595,7 @@ async fn abschluss_auf_abgeschlossenem_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -673,7 +673,7 @@ async fn abschluss_ohne_termin_rollt_bei_inaktivem_einsatz_ebenfalls_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -851,7 +851,7 @@ async fn termin_beobachter_403_und_abgeschlossener_einsatz_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -877,7 +877,7 @@ async fn termin_rollt_bei_inaktivem_einsatz_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

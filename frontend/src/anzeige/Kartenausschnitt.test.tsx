@@ -90,7 +90,7 @@ beforeEach(() => {
   karte.spruenge.length = 0;
   karte.nadeln.length = 0;
   server.use(
-    http.get('/api/karte/config', () =>
+    http.get('/api/map/config', () =>
       HttpResponse.json({
         online_styles: [],
         offline_verfuegbar: false,

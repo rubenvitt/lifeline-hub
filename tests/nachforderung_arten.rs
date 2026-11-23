@@ -93,7 +93,7 @@ async fn ohne_zugriff_auf_das_modul_im_anderen_einsatz_zaehlt_er_nicht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{a}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{a}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":null,"benoetigte_rolle":"fuehrungskraft"}"#),
     )

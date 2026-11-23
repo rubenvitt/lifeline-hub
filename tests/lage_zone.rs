@@ -1510,7 +1510,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/betreuung"),
+        &format!("/api/einsaetze/{e}/module-overrides/betreuung"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
     )
@@ -1523,7 +1523,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/evakuierung"),
+        &format!("/api/einsaetze/{e}/module-overrides/evakuierung"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
     )

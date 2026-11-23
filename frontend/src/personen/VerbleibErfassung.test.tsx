@@ -48,7 +48,7 @@ beforeEach(() => {
       { status: 201 },
     );
   server.use(
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/betreuung', () => {
       betreuungAbrufe += 1;
       return HttpResponse.json({ stellen: [NORD, SUED] });

@@ -12,7 +12,7 @@ import { anmeldenPerApi } from './anmelde-kern';
 // `transformRequest` → fetch IM WORKER → Parsen". Genau diese Kette brach schon einmal
 // (root-relative Proxy-URLs ohne Dokument-Base im Tile-Worker, LFH-182).
 //
-// DIE QUELLE STELLT DER TEST SELBST: `page.route` beantwortet `/api/karte/config` mit einem
+// DIE QUELLE STELLT DER TEST SELBST: `page.route` beantwortet `/api/map/config` mit einem
 // Online-VEKTOR-View, dessen Style-JSON und die Kacheln (33 Bytes Protobuf, `KACHEL_HEX`,
 // gebaut in `kartenFixture.ts`).
 // `page.route` greift auch für die Anfragen des maplibre-Workers. VEKTOR, weil maplibre
@@ -31,11 +31,11 @@ import { anmeldenPerApi } from './anmelde-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-/** Root-relative Kachel-Vorlage wie sie das Backend liefert (`/api/karte/proxy/…`). */
-const KACHEL_VORLAGE = '/api/karte/proxy/9/tile/{z}/{x}/{y}.pbf';
-const STIL_PFAD = '/api/karte/proxy/9/style.json';
+/** Root-relative Kachel-Vorlage wie sie das Backend liefert (`/api/map/proxy/…`). */
+const KACHEL_VORLAGE = '/api/map/proxy/9/tile/{z}/{x}/{y}.pbf';
+const STIL_PFAD = '/api/map/proxy/9/style.json';
 /** Präfix der substituierten Kachel-URLs — ohne Platzhalter, so wie MapLibre sie anfragt. */
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 /** Name des Layers IM Kachel-Körper; muss zum `source-layer` des Fixture-Styles passen. */
 const KACHEL_LAYER = 'strassen';
 

@@ -125,6 +125,10 @@ interface SpiderHaken extends MapHaken {
     properties: Record<string, unknown> | null;
     geometry: { type: string; coordinates: [number, number] };
   }[];
+  queryRenderedFeatures(punkt: [number, number]): {
+    source: string;
+    properties: Record<string, unknown> | null;
+  }[];
 }
 
 // In `handschuh` legt der Cluster-Donut eine 72-px-Hülle (Radius 36) um den Ring; die
@@ -212,7 +216,28 @@ test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öff
   // (30 px) innerhalb der Hülle (36) UND innerhalb des gezeichneten Blattkreises (Kante 13).
   expect(d).toBeGreaterThan(36);
   expect(d - 30).toBeLessThan(13);
-  await page.mouse.click(mitte.x + (dx / d) * 30, mitte.y + (dy / d) * 30);
+  const tipp = { x: mitte.x + (dx / d) * 30, y: mitte.y + (dy / d) * 30 };
+  // Getroffen wird, was die Karte GEZEICHNET hat (`map.on('click', layer, …)` fragt die
+  // gezeichneten Merkmale ab). `querySourceFeatures` oben kennt die Blätter schon, sobald die
+  // Quelle sie hat; das Bild dazu kommt einen Rahmen später. In der CI (alpha 8115b5ae) lag der
+  // Tipp 2 ms nach der Quelle und vor dem Bild: ein leerer Kartenklick, der den Spider schloss.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          ({ x, y, schluessel }) => {
+            const k = (window as unknown as { __lfhKarte: SpiderHaken }).__lfhKarte;
+            const r = k.getCanvas().getBoundingClientRect();
+            return k
+              .queryRenderedFeatures([x - r.left, y - r.top])
+              .some((f) => f.source === 'spider-leaves' && f.properties?.schluessel === schluessel);
+          },
+          { ...tipp, schluessel: `person-${blatt.id}` },
+        ),
+      { message: 'Blatt am Tipp-Punkt gezeichnet' },
+    )
+    .toBe(true);
+  await page.mouse.click(tipp.x, tipp.y);
   await expect(page).toHaveURL(new RegExp(`/personen/${blatt.id}$`));
   expect(ids).toContain(blatt.id);
 });

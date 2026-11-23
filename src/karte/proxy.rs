@@ -22,12 +22,12 @@ wire_enum! {
     }
 }
 
-/// Client-URL, die `/api/karte/config` für eine proxied Quelle ausgibt (statt der Upstream-URL).
+/// Client-URL, die `/api/map/config` für eine proxied Quelle ausgibt (statt der Upstream-URL).
 /// Vektor → Style-JSON-Endpunkt; Raster → XYZ-Tile-Template, das MapLibre clientseitig füllt.
 pub fn proxy_config_url(id: i64, typ: &OnlineStyleTyp) -> String {
     match typ {
-        OnlineStyleTyp::Vektor => format!("/api/karte/proxy/{id}/style.json"),
-        OnlineStyleTyp::Raster => format!("/api/karte/proxy/{id}/raster/{{z}}/{{x}}/{{y}}"),
+        OnlineStyleTyp::Vektor => format!("/api/map/proxy/{id}/style.json"),
+        OnlineStyleTyp::Raster => format!("/api/map/proxy/{id}/raster/{{z}}/{{x}}/{{y}}"),
     }
 }
 
@@ -36,11 +36,11 @@ pub fn proxy_config_url(id: i64, typ: &OnlineStyleTyp) -> String {
 /// `.json`/`.png`/`@2x` an).
 pub fn proxy_url(id: i64, art: SlotArt, slot: i64) -> String {
     match art {
-        SlotArt::Template => format!("/api/karte/proxy/{id}/tile/{slot}/{{z}}/{{x}}/{{y}}"),
-        SlotArt::Tilejson => format!("/api/karte/proxy/{id}/tilejson/{slot}"),
-        SlotArt::Sprite => format!("/api/karte/proxy/{id}/sprite/{slot}"),
-        SlotArt::Glyphs => format!("/api/karte/proxy/{id}/glyphs/{slot}/{{fontstack}}/{{range}}"),
-        SlotArt::Static => format!("/api/karte/proxy/{id}/asset/{slot}"),
+        SlotArt::Template => format!("/api/map/proxy/{id}/tile/{slot}/{{z}}/{{x}}/{{y}}"),
+        SlotArt::Tilejson => format!("/api/map/proxy/{id}/tilejson/{slot}"),
+        SlotArt::Sprite => format!("/api/map/proxy/{id}/sprite/{slot}"),
+        SlotArt::Glyphs => format!("/api/map/proxy/{id}/glyphs/{slot}/{{fontstack}}/{{range}}"),
+        SlotArt::Static => format!("/api/map/proxy/{id}/asset/{slot}"),
     }
 }
 
@@ -944,11 +944,11 @@ mod tests {
     fn proxy_config_url_je_typ() {
         assert_eq!(
             proxy_config_url(7, &OnlineStyleTyp::Vektor),
-            "/api/karte/proxy/7/style.json"
+            "/api/map/proxy/7/style.json"
         );
         assert_eq!(
             proxy_config_url(7, &OnlineStyleTyp::Raster),
-            "/api/karte/proxy/7/raster/{z}/{x}/{y}"
+            "/api/map/proxy/7/raster/{z}/{x}/{y}"
         );
     }
 
@@ -956,24 +956,21 @@ mod tests {
     fn proxy_url_fuenf_formen() {
         assert_eq!(
             proxy_url(3, SlotArt::Template, 9),
-            "/api/karte/proxy/3/tile/9/{z}/{x}/{y}"
+            "/api/map/proxy/3/tile/9/{z}/{x}/{y}"
         );
         assert_eq!(
             proxy_url(3, SlotArt::Tilejson, 9),
-            "/api/karte/proxy/3/tilejson/9"
+            "/api/map/proxy/3/tilejson/9"
         );
         assert_eq!(
             proxy_url(3, SlotArt::Sprite, 9),
-            "/api/karte/proxy/3/sprite/9"
+            "/api/map/proxy/3/sprite/9"
         );
         assert_eq!(
             proxy_url(3, SlotArt::Glyphs, 9),
-            "/api/karte/proxy/3/glyphs/9/{fontstack}/{range}"
+            "/api/map/proxy/3/glyphs/9/{fontstack}/{range}"
         );
-        assert_eq!(
-            proxy_url(3, SlotArt::Static, 9),
-            "/api/karte/proxy/3/asset/9"
-        );
+        assert_eq!(proxy_url(3, SlotArt::Static, 9), "/api/map/proxy/3/asset/9");
     }
 
     #[test]
@@ -1125,7 +1122,7 @@ mod rewrite_tests {
     fn fake_mint(log: &mut Vec<(String, SlotArt)>) -> impl FnMut(&str, SlotArt) -> String + '_ {
         move |u, a| {
             log.push((u.to_string(), a));
-            format!("/api/karte/proxy/1/{}/{}", a.as_str(), log.len())
+            format!("/api/map/proxy/1/{}/{}", a.as_str(), log.len())
         }
     }
 
@@ -1575,7 +1572,7 @@ mod service_tests {
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         let tj = v["sources"]["v"]["url"].as_str().unwrap();
         assert!(
-            tj.starts_with(&format!("/api/karte/proxy/{qid}/tilejson/")),
+            tj.starts_with(&format!("/api/map/proxy/{qid}/tilejson/")),
             "tilejson-Proxy-URL: {tj}"
         );
         let slot: i64 = tj.rsplit('/').next().unwrap().parse().unwrap();
@@ -2192,7 +2189,7 @@ mod service_tests {
         assert!(!s.contains("GEHEIMTOKEN12345"), "key-frei: {s}");
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         assert_eq!(v["scheme"].as_str(), Some("xyz"), "tms→xyz");
-        // Der Tile-Slot trägt {-y} (Server-Flip). Pfad: /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
+        // Der Tile-Slot trägt {-y} (Server-Flip). Pfad: /api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}
         let tile = v["tiles"][0].as_str().unwrap();
         let slot: i64 = tile.split('/').nth(6).unwrap().parse().unwrap();
         let upstream = repo::slot_aufloesen(&pool, qid, slot, "template")
