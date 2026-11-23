@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Farbrollen } from '../../theme/tokens';
-import { monoStil, useRollen } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 import '../../theme/sprache.css';
 
 /**
@@ -8,7 +8,7 @@ import '../../theme/sprache.css';
  *
  * Rahmen `bedien` 1 px, Grund `flaeche2`, Höhe ≥ 40; links eine Präfix-Zelle Mono 14 in `bedien`
  * mit Trennlinie (`/anordnung`, `/person`), in der Mitte das Feld des Aufrufers, rechts ein
- * Mono-Hinweis 11 (etwa ein Zeichenzähler), darunter optional eine Hinweiszeile Mono 11.
+ * Hinweis in `meta` (etwa ein Zeichenzähler), darunter optional eine Hinweiszeile in `meta`.
  *
  * WAS SIE NICHT IST: kein Formular. Die Erfassungs-Norm (LFH-332/B4) bleibt beim Konsumenten,
  * der seine Felder in `ErfassungsFormular` oder `SchnellAnlegen` hält. Ein `<form>` HIER wäre
@@ -66,7 +66,7 @@ export function zellenStile(
       ? { flex: '1 1 100%', minWidth: 0, display: 'flex', alignItems: 'center' }
       : { flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center' },
     hinweis: {
-      ...monoStil('meta'),
+      ...schriftStil('meta'),
       display: 'flex',
       alignItems: 'center',
       flex: '0 0 auto',
@@ -82,7 +82,7 @@ interface SchnellerfassungszeileProps {
   praefix?: ReactNode;
   /** Das Eingabefeld (bzw. mehrere) des Konsumenten. */
   children: ReactNode;
-  /** Mono-Hinweis rechts in der Zeile (etwa ein Zeichenzähler; der Tastaturvertrag steht am Knopf). */
+  /** Hinweis rechts in der Zeile (etwa ein Zeichenzähler; der Tastaturvertrag steht am Knopf). */
   hinweis?: ReactNode;
   /** Hinweiszeile darunter (Zeichenzähler, „Werte behalten", „Zuletzt: …"). */
   hinweiszeile?: ReactNode;
@@ -173,7 +173,7 @@ export default function Schnellerfassungszeile({
       {hinweiszeile != null && (
         <div
           style={{
-            ...monoStil('meta'),
+            ...schriftStil('meta'),
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',

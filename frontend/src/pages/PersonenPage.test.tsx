@@ -1759,7 +1759,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
 
   it('?ansicht=karte öffnet die Kartenansicht und lässt den Parameter stehen', async () => {
     server.use(
-      http.get('/api/karte/config', () => HttpResponse.json({})),
+      http.get('/api/map/config', () => HttpResponse.json({})),
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
     );
     renderMitSuche('/einsaetze/1/personen?ansicht=karte');
@@ -1957,7 +1957,7 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
-      http.get('/api/karte/config', () => HttpResponse.json({})),
+      http.get('/api/map/config', () => HttpResponse.json({})),
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
     );
     return renderMitProviders(

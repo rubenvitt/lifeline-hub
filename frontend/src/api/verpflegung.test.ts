@@ -93,7 +93,7 @@ describe('api/verpflegung — Pfade und Methoden der sechs Endpunkte', () => {
     await nimmAusgabeZurueck(7, 31);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
       ['POST', `${B}/time-slots/5/distributions`],
-      ['POST', `${B}/distributions/31/retract`],
+      ['POST', `${B}/distributions/31/undo`],
     ]);
     expect(a[0].body).toEqual({
       menge: 60,

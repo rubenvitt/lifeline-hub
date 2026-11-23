@@ -229,7 +229,7 @@ export function nimmUhsAustrittZurueck(
   belegungId: number,
 ): Promise<UhsBelegungRuecknahme> {
   return apiSend<UhsBelegungRuecknahme>(
-    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy/${belegungId}/retract`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy/${belegungId}/undo`,
     'POST',
   );
 }

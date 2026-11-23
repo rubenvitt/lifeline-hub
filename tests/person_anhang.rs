@@ -241,7 +241,7 @@ async fn override_personen(app: &axum::Router, admin: &str, einsatz: i64, body: 
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
         admin,
         Some(body),
     )
@@ -443,7 +443,7 @@ async fn abgeschlossener_einsatz_schreibt_409_liest_weiter() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

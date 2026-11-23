@@ -57,7 +57,7 @@ beforeEach(() => {
   anzahlAdressen = [];
   freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/modul-freigaben', () => {
+    http.get('/api/einsaetze/:id/module-access', () => {
       zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
@@ -188,7 +188,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
    */
   it('fragt keine Liste ab, wenn der Abruf der Freigaben scheitert', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/modul-freigaben', () => {
+      http.get('/api/einsaetze/:id/module-access', () => {
         zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
         return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
       }),
@@ -211,7 +211,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
      */
     const reihenfolge: string[] = [];
     server.use(
-      http.get('/api/einsaetze/:id/modul-freigaben', async () => {
+      http.get('/api/einsaetze/:id/module-access', async () => {
         // Verzögert, damit „danach“ nicht bloß die schnellere Leitung ist.
         await new Promise((r) => setTimeout(r, 20));
         reihenfolge.push('modul-freigaben');

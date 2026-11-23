@@ -85,7 +85,7 @@ export function loadBetreuungsstelleStand(
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 export function storniereStelle(einsatzId: number, stelleId: number): Promise<Betreuungsstelle> {
-  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/positions/${stelleId}/cancel`, 'POST', {});
+  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/positions/${stelleId}/annul`, 'POST', {});
 }
 
 /** An eine geschlossene Stelle ist 422 — außer für den Replay einer schon gespeicherten Meldung. */
@@ -105,5 +105,5 @@ export function meldeBelegung(
 
 /** Rückweg einer Belegungsmeldung; `meldungId` ist `StelleMeldung.meldung_id`. */
 export function nimmBelegungZurueck(einsatzId: number, meldungId: number): Promise<StelleMeldung> {
-  return apiSend<StelleMeldung>(`${basis(einsatzId)}/occupancies/${meldungId}/retract`, 'POST', {});
+  return apiSend<StelleMeldung>(`${basis(einsatzId)}/occupancies/${meldungId}/undo`, 'POST', {});
 }

@@ -86,20 +86,20 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/organisation"),
     ("GET", "/api/organisation/logo"),
     ("GET", "/api/fahrzeug-status"),
-    ("GET", "/api/karte/config"),
-    ("GET", "/api/karte/offline/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/welt/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/fonts/{fontstack}/{datei}"),
-    ("GET", "/api/karte/offline/sprites/{datei}"),
-    ("GET", "/api/karte/proxy/{id}/style.json"),
-    ("GET", "/api/karte/proxy/{id}/raster/{z}/{x}/{y}"),
-    ("GET", "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}"),
-    ("GET", "/api/karte/proxy/{id}/tilejson/{slot}"),
-    ("GET", "/api/karte/proxy/{id}/sprite/{rest}"),
+    ("GET", "/api/map/config"),
+    ("GET", "/api/map/offline/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/world/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/fonts/{fontstack}/{datei}"),
+    ("GET", "/api/map/offline/sprites/{datei}"),
+    ("GET", "/api/map/proxy/{id}/style.json"),
+    ("GET", "/api/map/proxy/{id}/raster/{z}/{x}/{y}"),
+    ("GET", "/api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}"),
+    ("GET", "/api/map/proxy/{id}/tilejson/{slot}"),
+    ("GET", "/api/map/proxy/{id}/sprite/{rest}"),
     (
         "GET",
-        "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+        "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
     ),
 ];
 
@@ -108,8 +108,8 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
 /// [`Funktionsansicht::lese_module`] zu.
 pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}"),
-    ("GET", "/api/einsaetze/{id}/modul-freigaben"),
-    ("GET", "/api/einsaetze/{id}/modul-zaehler"),
+    ("GET", "/api/einsaetze/{id}/module-access"),
+    ("GET", "/api/einsaetze/{id}/module-counts"),
     ("GET", "/api/einsaetze/{id}/live"),
     // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
     ("GET", "/api/einsaetze/{id}/antraege"),
@@ -282,7 +282,7 @@ const UHS_TABLET: &[(&str, &str)] = &[
     // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/retract",
+        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
     ),
     ("GET", "/api/einsaetze/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
@@ -352,7 +352,7 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/retract",
+        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
     ),
     ("GET", "/api/einsaetze/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
@@ -497,7 +497,7 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
     ),
-    ("POST", "/api/einsaetze/{id}/care/occupancies/{mid}/retract"),
+    ("POST", "/api/einsaetze/{id}/care/occupancies/{mid}/undo"),
     ("GET", "/api/einsaetze/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
     ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
@@ -563,7 +563,7 @@ const VERPFLEGUNG: &[(&str, &str)] = &[
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/catering/distributions/{aid}/retract",
+        "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
     ),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
@@ -944,7 +944,7 @@ mod tests {
             ),
             (
                 "POST",
-                "/api/einsaetze/{id}/catering/distributions/{aid}/retract",
+                "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
             ),
             ("GET", "/api/einsaetze/{id}/meldungen"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
@@ -1129,7 +1129,7 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/care/occupancy"),
             ("POST", "/api/einsaetze/{id}/care/positions"),
             ("PATCH", "/api/einsaetze/{id}/care/positions/{sid}"),
-            ("POST", "/api/einsaetze/{id}/care/positions/{sid}/cancel"),
+            ("POST", "/api/einsaetze/{id}/care/positions/{sid}/annul"),
             // Bezirke sind das eigene Modul Evakuierung (LLH-1034); die Stelle sieht keins davon.
             ("GET", "/api/einsaetze/{id}/evacuation"),
             ("POST", "/api/einsaetze/{id}/evacuation/districts"),
@@ -1146,7 +1146,7 @@ mod tests {
             // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
             (
                 "POST",
-                "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/retract",
+                "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
             ),
             ("GET", "/api/einsaetze/{id}/uhs"),
             ("GET", "/api/einsaetze/{id}/persons/export"),

@@ -34,11 +34,12 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerIp {
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let vertraut = vertraute_proxys();
+        let cdn = cdn_proxys();
         Ok(PeerIp(
             parts
                 .extensions
                 .get::<ConnectInfo<SocketAddr>>()
-                .map(|ConnectInfo(adresse)| client_ip(adresse.ip(), &parts.headers, vertraut)),
+                .map(|ConnectInfo(adresse)| client_ip(adresse.ip(), &parts.headers, vertraut, cdn)),
         ))
     }
 }
@@ -57,6 +58,20 @@ pub fn init_vertraute_proxys(netze: Vec<IpNet>) {
 /// gesetzt hat.
 pub fn vertraute_proxys() -> &'static [IpNet] {
     VERTRAUTE_PROXYS.get().map(Vec::as_slice).unwrap_or(&[])
+}
+
+/// Bereiche eines CDN vor dem Proxy (`--cdn-proxies`, LLH-2080); prozessweit wie
+/// [`VERTRAUTE_PROXYS`].
+static CDN_PROXYS: OnceLock<Vec<IpNet>> = OnceLock::new();
+
+/// Setzt die CDN-Liste einmal beim Serverstart. Weitere Aufrufe bleiben wirkungslos.
+pub fn init_cdn_proxys(netze: Vec<IpNet>) {
+    let _ = CDN_PROXYS.set(netze);
+}
+
+/// Die CDN-Liste, wie [`init_cdn_proxys`] sie gesetzt hat; leer, solange niemand eine gesetzt hat.
+pub fn cdn_proxys() -> &'static [IpNet] {
+    CDN_PROXYS.get().map(Vec::as_slice).unwrap_or(&[])
 }
 
 /// TCP-Gegenstelle der Anfrage, ohne Blick auf `X-Forwarded-For`; `None`, wenn sie unbekannt ist
@@ -114,14 +129,26 @@ const X_FORWARDED_PROTO: &str = "x-forwarded-proto";
 /// selbst geschrieben und zählt nicht. Ein unlesbarer Eintrag beendet die Suche bei der letzten
 /// bekannten Stufe; besteht die Kette nur aus Vertrauenswürdigem, gilt deren linkester Eintrag.
 ///
+/// **CDN vor dem Proxy (LLH-2080):** Einträge aus `cdn` gelten nicht als vertraut, sondern
+/// der erste davon wird **einmal** übersprungen; danach ist der nächste Eintrag der Client, auch
+/// wenn er in einer der Listen liegt. Ein eigener Worker im CDN, der `X-Forwarded-For` selbst
+/// setzt, zählt so mit seiner eigenen Adresse. Vertraute Einträge werden nur vor dem CDN
+/// übersprungen. Zwilling: `push-relais/src/client_ip.rs` — beide gleich halten.
+///
 /// Mit Liste zählen IPv4-gemappte IPv6-Adressen (`::ffff:a.b.c.d`, Dual-Stack-Socket) als IPv4,
 /// damit eine IPv4-Liste auch dort greift und die Sperre je Client nur einen Schlüssel kennt.
 /// Ohne Liste kommt die Gegenstelle unverändert zurück, wie vor LFH-604.
-pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet]) -> IpAddr {
+pub fn client_ip(
+    gegenstelle: IpAddr,
+    headers: &HeaderMap,
+    vertraut: &[IpNet],
+    cdn: &[IpNet],
+) -> IpAddr {
     if vertraut.is_empty() {
         return gegenstelle;
     }
-    let ist_vertraut = |ip: &IpAddr| vertraut.iter().any(|netz| netz.contains(ip));
+    let liegt_in = |netze: &[IpNet], ip: &IpAddr| netze.iter().any(|netz| netz.contains(ip));
+    let ist_vertraut = |ip: &IpAddr| liegt_in(vertraut, ip);
     let mut stufe = gegenstelle.to_canonical();
     if !ist_vertraut(&stufe) {
         return stufe;
@@ -134,6 +161,7 @@ pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet]) -
         .iter()
         .flat_map(|zeile| zeile.as_bytes().split(|b| *b == b','))
         .collect();
+    let mut cdn_gesehen = false;
     for eintrag in eintraege.into_iter().rev() {
         let Some(ip) = std::str::from_utf8(eintrag)
             .ok()
@@ -142,9 +170,17 @@ pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet]) -
             return stufe;
         };
         stufe = ip.to_canonical();
-        if !ist_vertraut(&stufe) {
+        if cdn_gesehen {
             return stufe;
         }
+        if ist_vertraut(&stufe) {
+            continue;
+        }
+        if liegt_in(cdn, &stufe) {
+            cdn_gesehen = true;
+            continue;
+        }
+        return stufe;
     }
     stufe
 }
@@ -386,6 +422,57 @@ mod tests {
         assert_eq!(json["error"], "Anfrage ist zu groß.");
     }
 
+    // ── CDN vor dem Proxy (LLH-2080) ──
+
+    /// Ein Eintrag aus der CDN-Liste wird einmal übersprungen, dann folgt der Client.
+    #[test]
+    fn cdn_wird_einmal_uebersprungen() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["198.51.100.9, 203.0.113.50, 173.245.48.10"]),
+            &netze(&["10.9.0.0/16"]),
+            &netze(&["173.245.48.0/20", "2a06:98c0::/29"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    /// Ein eigener Worker im CDN setzt `X-Forwarded-For` selbst und schickt aus einem
+    /// CDN-Bereich: gezählt wird der Worker, nie der frei gewählte Eintrag links davon.
+    #[test]
+    fn worker_zaehlt_selbst() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["198.51.100.66, 2a06:98c0:3600::103, 173.245.48.10"]),
+            &netze(&["10.9.0.0/16"]),
+            &netze(&["173.245.48.0/20", "2a06:98c0::/29"]),
+        );
+        assert_eq!(ergebnis, ip("2a06:98c0:3600::103"));
+    }
+
+    /// Ein Proxy-Eintrag links vom CDN hat der Client geschrieben und zählt selbst.
+    #[test]
+    fn proxy_links_vom_cdn_zaehlt_selbst() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["198.51.100.66, 10.9.0.7, 173.245.48.10"]),
+            &netze(&["10.9.0.0/16"]),
+            &netze(&["173.245.48.0/20"]),
+        );
+        assert_eq!(ergebnis, ip("10.9.0.7"));
+    }
+
+    /// Eine Gegenstelle aus dem CDN ist kein vertrauter Proxy: der Header zählt nicht.
+    #[test]
+    fn gegenstelle_im_cdn_zaehlt_selbst() {
+        let ergebnis = client_ip(
+            ip("173.245.48.10"),
+            &xff(&["203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+            &netze(&["173.245.48.0/20"]),
+        );
+        assert_eq!(ergebnis, ip("173.245.48.10"));
+    }
+
     // ── Client-IP hinter vertrauenswürdigen Proxys (LFH-604) ──
 
     fn ip(s: &str) -> IpAddr {
@@ -406,7 +493,7 @@ mod tests {
 
     #[test]
     fn ohne_proxy_liste_gilt_die_gegenstelle() {
-        let ergebnis = client_ip(ip("10.9.0.2"), &xff(&["203.0.113.50"]), &[]);
+        let ergebnis = client_ip(ip("10.9.0.2"), &xff(&["203.0.113.50"]), &[], &[]);
         assert_eq!(
             ergebnis,
             ip("10.9.0.2"),
@@ -420,6 +507,7 @@ mod tests {
             ip("192.0.2.66"),
             &xff(&["203.0.113.50"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("192.0.2.66"));
     }
@@ -430,13 +518,19 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["203.0.113.50"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
 
     #[test]
     fn vertrauenswuerdige_gegenstelle_ohne_header_bleibt_die_gegenstelle() {
-        let ergebnis = client_ip(ip("10.9.0.2"), &HeaderMap::new(), &netze(&["10.9.0.0/16"]));
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &HeaderMap::new(),
+            &netze(&["10.9.0.0/16"]),
+            &[],
+        );
         assert_eq!(ergebnis, ip("10.9.0.2"));
     }
 
@@ -448,6 +542,7 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["1.1.1.1, 198.51.100.9, 203.0.113.50"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
@@ -458,6 +553,7 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["198.51.100.9, 203.0.113.50, 172.20.0.4"]),
             &netze(&["10.9.0.0/16", "172.20.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
@@ -468,6 +564,7 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["198.51.100.9", "203.0.113.50"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
@@ -480,6 +577,7 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["10.9.0.7, 10.9.0.5"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("10.9.0.7"));
     }
@@ -492,6 +590,7 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["203.0.113.50, unbekannt, 10.9.0.5"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("10.9.0.5"));
     }
@@ -505,13 +604,13 @@ mod tests {
             "x-forwarded-for",
             HeaderValue::from_bytes(b"\xff, 203.0.113.50").unwrap(),
         );
-        let ergebnis = client_ip(ip("10.9.0.2"), &headers, &netze(&["10.9.0.0/16"]));
+        let ergebnis = client_ip(ip("10.9.0.2"), &headers, &netze(&["10.9.0.0/16"]), &[]);
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
 
     #[test]
     fn ohne_proxy_liste_bleibt_eine_gemappte_gegenstelle_unveraendert() {
-        let ergebnis = client_ip(ip("::ffff:192.0.2.9"), &HeaderMap::new(), &[]);
+        let ergebnis = client_ip(ip("::ffff:192.0.2.9"), &HeaderMap::new(), &[], &[]);
         assert_eq!(ergebnis, ip("::ffff:192.0.2.9"));
     }
 
@@ -521,12 +620,14 @@ mod tests {
             ip("10.9.0.2"),
             &xff(&["203.0.113.50:51234"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
         let ergebnis = client_ip(
             ip("10.9.0.2"),
             &xff(&["[2001:db8::5]:51234"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("2001:db8::5"));
     }
@@ -539,6 +640,7 @@ mod tests {
             ip("::ffff:10.9.0.2"),
             &xff(&["::ffff:203.0.113.50"]),
             &netze(&["10.9.0.0/16"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("203.0.113.50"));
     }
@@ -549,6 +651,7 @@ mod tests {
             ip("fd00::2"),
             &xff(&["2001:db8::7"]),
             &netze(&["fd00::/64"]),
+            &[],
         );
         assert_eq!(ergebnis, ip("2001:db8::7"));
     }

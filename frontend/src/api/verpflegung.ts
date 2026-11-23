@@ -97,7 +97,7 @@ export function nimmAusgabeZurueck(
   ausgabeId: number,
 ): Promise<VerpflegungAusgabeErgebnis> {
   return apiSend<VerpflegungAusgabeErgebnis>(
-    `${basis(einsatzId)}/distributions/${ausgabeId}/retract`,
+    `${basis(einsatzId)}/distributions/${ausgabeId}/undo`,
     'POST',
     {},
   );

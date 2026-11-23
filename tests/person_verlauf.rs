@@ -118,7 +118,7 @@ async fn sichtung_replay_nach_abschluss_gelingt_neue_ist_409() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

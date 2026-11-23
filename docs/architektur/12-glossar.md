@@ -9,7 +9,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 `frontend/src/einsatz/modulRegistry.ts`. Die Begriffe rund um Meldungen stehen in der Tabelle
 „Begriffe“ von [`docs/design/2026-10-21-meldungsmodell/README.md`](../design/2026-10-21-meldungsmodell/README.md).
 Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
-`scripts/api-routen-woerter.tsv` ([ADR-0093](entscheidungen/ADR-0093-api-routen-sind-englisch-bestand-darf-umbenannt-werden.md)).
+`scripts/api-routen-woerter.tsv` ([ADR-0095](entscheidungen/ADR-0095-api-routen-sind-englisch-bestand-darf-umbenannt-werden.md)).
 
 ## 12.1 Fachbegriffe
 
@@ -70,7 +70,7 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Adapter, Adapterart | Eine Anbindung, die Lifeline Hub selbst im Hintergrund abruft (Divera, HiOrg, Postfach …), mit Einstellungen, Geheimnissen und Zustand (wartet, ok, gestört, braucht Eingriff, aus). Die Art legt Plätze für Geheimnisse, Felder und Abruf fest. Anders als ein Zugang (signiert oder Einwurf) geht die Verbindung von Lifeline Hub aus. | `src/adapter/`, [ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md) |
 | ADR | Architekturentscheidung als Datei mit prüfbaren Regeln. | [`docs/architektur/AGENTS.md`](AGENTS.md), [Architekturentscheidungen](09-architekturentscheidungen.md) |
 | Antrag (am Spiegel) | Erfassung an einem Spiegel, die als Antrag zum Führer geht; Zustand `ausstehend`, `zugestellt`, `uebernommen` oder `abgelehnt`. Beantragbar ist nur, was ohne Netz vormerkbar ist (`BEANTRAGBAR`). | `src/instanz/spiegel/antrag.rs`, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md) |
-| Archiv (Aufbewahrung) | Nur lesender, dem System-Admin vorbehaltener Zugang zu gesperrten Einsätzen unter `/api/aufbewahrung`. | `src/aufbewahrung/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Aufbewahrung“ |
+| Archiv (Aufbewahrung) | Nur lesender, dem System-Admin vorbehaltener Zugang zu gesperrten Einsätzen unter `/api/retention`. | `src/aufbewahrung/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Aufbewahrung“ |
 | Bruchstelle | Grenze, bis zu der die neue führende Instanz einen Einsatz kennt: bei einer Notübernahme die letzte erfolgreiche Meldung davor, bei Übergabe und Abgabe per Code die Abgabe, nach einem Widerruf der Zeitpunkt, zu dem diese Instanz von ihm erfährt. Was die abgelöste Instanz danach schrieb, kennt die neue nicht; die abgelöste nimmt es aus dem Einsatz und hebt es auf. | Spec [`instanz-fuehrung`](../../openspec/specs/instanz-fuehrung/spec.md), `einsatz_bruchstelle` in `migrations/0321_fuehrung_auf_spiegel.sql`, `src/instanz/spiegel/fuehrung.rs` |
 | CAS | Vergleich mit dem Stand beim Öffnen vor dem Schreiben (`basis_geaendert_at`, `erwartet`); Verstoß ist 409. | [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Statuscode-Konvention“ |
 | Change | Abgeschlossene OpenSpec-Änderung im eingefrorenen Archiv `openspec/changes/archive/`; seit LLH-1967 entstehen keine neuen, sondern Design-Doc und Plan unter `docs/superpowers/`. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“ |

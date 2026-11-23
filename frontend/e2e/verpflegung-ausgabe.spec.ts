@@ -251,7 +251,7 @@ for (const { breite, hoehe, dichte } of [
 
     // Die Ausgabe ist schon anderswo zurückgenommen: „Rückgängig“ wird abgelehnt.
     const [ausgabe] = (await zeitfenster(page, e)).ausgaben;
-    await anlegen(page, `/api/einsaetze/${e}/catering/distributions/${ausgabe.id}/retract`, {});
+    await anlegen(page, `/api/einsaetze/${e}/catering/distributions/${ausgabe.id}/undo`, {});
     await page.getByRole('button', { name: 'Rückgängig' }).click();
     await expect(page.locator('[data-lfh="ausgabe-ablehnung"]')).toContainText(
       'Nicht zurückgenommen',

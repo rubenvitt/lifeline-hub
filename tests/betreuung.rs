@@ -169,7 +169,7 @@ async fn durchstich_bezirk_stand_fortschreibung_ruecknahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/progress/{m2_id}/retract", pfad_evak(e)),
+        &format!("{}/progress/{m2_id}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -258,7 +258,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/occupancies/{mid}/retract", pfad(e)),
+        &format!("{}/occupancies/{mid}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -278,7 +278,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, st) = anfrage(
         &app,
         "POST",
-        &format!("{}/positions/{sid}/cancel", pfad(e)),
+        &format!("{}/positions/{sid}/annul", pfad(e)),
         &admin,
         None,
     )
@@ -724,8 +724,8 @@ async fn statuscodes_404_409_422() {
             "POST",
             format!("{}/districts/999999/progress", pfad_evak(e)),
         ),
-        ("POST", format!("{}/progress/999999/retract", pfad_evak(e))),
-        ("POST", format!("{}/occupancies/999999/retract", pfad(e))),
+        ("POST", format!("{}/progress/999999/undo", pfad_evak(e))),
+        ("POST", format!("{}/occupancies/999999/undo", pfad(e))),
     ] {
         let (s, _) = anfrage(
             &app,
@@ -742,7 +742,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/districts/{fremder_bezirk}/cancel", pfad_evak(e)),
+        &format!("{}/districts/{fremder_bezirk}/annul", pfad_evak(e)),
         &admin,
         None,
     )
@@ -821,7 +821,7 @@ async fn statuscodes_404_409_422() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{st:?}");
 
     // 422: dieselbe Belegungsmeldung zweimal zurücknehmen (LFH-682)
-    let belegung_ruecknahme = format!("{}/occupancies/{belegung_40}/retract", pfad(e));
+    let belegung_ruecknahme = format!("{}/occupancies/{belegung_40}/undo", pfad(e));
     let (s, _) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, j) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
@@ -848,14 +848,14 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     let mid = m["meldung_id"].as_i64().unwrap();
-    let ruecknahme = format!("{}/progress/{mid}/retract", pfad_evak(e));
+    let ruecknahme = format!("{}/progress/{mid}/undo", pfad_evak(e));
     let (s, _) = anfrage(&app, "POST", &ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     // 409: storniert — ändern, melden, erneut stornieren
-    let stornieren = format!("{}/districts/{bid}/cancel", pfad_evak(e));
+    let stornieren = format!("{}/districts/{bid}/annul", pfad_evak(e));
     let (s, _) = anfrage(&app, "POST", &stornieren, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &stornieren, &admin, None).await;
@@ -879,7 +879,7 @@ async fn statuscodes_404_409_422() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
     // 409: stornierte Stelle — erneut stornieren, ändern, belegen, Belegung zurücknehmen
-    let stelle_stornieren = format!("{}/positions/{sid}/cancel", pfad(e));
+    let stelle_stornieren = format!("{}/positions/{sid}/annul", pfad(e));
     let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
@@ -905,7 +905,7 @@ async fn statuscodes_404_409_422() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/occupancies/{belegung_12}/retract", pfad(e)),
+        &format!("{}/occupancies/{belegung_12}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -1062,7 +1062,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -1663,7 +1663,7 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/progress/{mid}/retract", pfad_evak(e)),
+        &format!("{}/progress/{mid}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -1693,7 +1693,7 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     let (s, b) = anfrage(
         &app,
         "POST",
-        &format!("{}/districts/{zweiter}/cancel", pfad_evak(e)),
+        &format!("{}/districts/{zweiter}/annul", pfad_evak(e)),
         &admin,
         None,
     )
@@ -1817,7 +1817,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_bezirks() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -1948,7 +1948,7 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/districts/{bid}/cancel", pfad_evak(e)),
+        &format!("{}/districts/{bid}/annul", pfad_evak(e)),
         &admin,
         Some("{}"),
     )
@@ -2051,7 +2051,7 @@ async fn verlauf_liefert_die_reihen_mit_ruecknahme_und_draht_form() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/progress/{m212}/retract", pfad_evak(e)),
+        &format!("{}/progress/{m212}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -2141,7 +2141,7 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/districts/{bid}/cancel", pfad_evak(e)),
+        &format!("{}/districts/{bid}/annul", pfad_evak(e)),
         &admin,
         None,
     )

@@ -203,7 +203,7 @@ async fn override_tiere(app: &axum::Router, admin: &str, einsatz: i64, body: &st
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/tiere"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/tiere"),
         admin,
         Some(body),
     )
@@ -215,7 +215,7 @@ async fn einsatz_abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         admin,
         None,
     )

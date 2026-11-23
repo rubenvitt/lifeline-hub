@@ -1,27 +1,41 @@
-# Glossar der API-Routen (ADR-0093): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0095): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accesses	Zugriffe
 accommodation	Unterkunft
 accommodation-guidelines	Unterkunft-Richtwerte
+activate	aktivieren
 adapter	-
 admin	-
+agenda-items	Programmpunkte
 animals	Tiere
+annul	stornieren
 api	-
 app-code	-
+archive	Archiv
 attachments	Anhänge
+attachments.zip	Anlagen
+attempts	Versuche
 audit	-
 auth	-
+auto-update	automatische Aktualisierung
 availability	Verfügbarkeit
 available	verfügbar
 backup	-
 briefings	Lagebesprechungen
+build	bauen
+build-status	Baustatus
+buildable-regions	baubare Regionen
 bulk	-
 callback	-
-cancel	stornieren
+cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
+catalog	Katalog
 catering	Verpflegung
 chat	-
+check	prüfen
+close	abschließen
+closure	Abschluss
 code	-
 codes	-
 command	Führung
@@ -48,16 +62,19 @@ enroll	-
 etb	ETB
 evacuation	Evakuierung
 events	-
+existing	vorhandene
 export	-
 fetch-certificate	Zertifikat abrufen
 file	Datei
 finish	-
+follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 from-attachment	aus Anhang
 from-template	aus Vorlage
 gauges	Pegel
 glyphs	-
+grant	Freigabe
 hazard-areas	Gefahrengebiete
 health	-
 household	Haushalt
@@ -69,10 +86,12 @@ info-line	Infotelefon
 injuries	Verletzungen
 instance	Instanz
 intake	Einwurf
+intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 interventions	Maßnahmen
 ios-push	-
 jwks.json	-
+key	Schlüssel
 lan	-
 list-accesses	Listenzugriffe
 live	-
@@ -86,23 +105,39 @@ matches	Abgleich
 material	Material
 matrix	-
 me	-
+member-selection	Mitglied-Auswahl
 mirror	Spiegel
+module-access	Modulfreigaben
+module-counts	Modulzähler
+module-defaults	Modulvorgaben
+module-overrides	Modul-Overrides
 notes	Notizen
+notification-defaults	Benachrichtigungsvorgaben
+notifications	Benachrichtigungen
 occupancies	Belegungen
 occupancy	Belegung
+offline	-
+offline-maps	Offline-Karten
 oidc	-
+online-sources	Online-Quellen
 openapi.json	-
 orders	Befehle
+overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+pause	anhalten
+person-search	Personensuche
 personnel	Personal
 persons	Personen
+place-preview	Ortsvorschau
+place-search	Ortssuche
 plan	-
 plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+presence	Präsenz
 print	Druck
 progress	Stände
 providers	-
@@ -110,24 +145,32 @@ proxy	-
 raster	-
 read	gelesen
 reason	Anlass
+redaction-requests	Schwärzungsanträge
 redeem	einlösen
 register	-
 registration	-
 registrations	Registrierungen
 release-notes	Versionsstand
 reliefs	Ablösungen
+reopen	wiedereröffnen
 reports	Meldungen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
+restore	wiederherstellen
+resume	fortsetzen
 retention	Aufbewahrung
-retract	zurücknehmen
+retention-categories	Aufbewahrungskategorien
+retention-period	Aufbewahrungsfrist
+revoke	widerrufen
 row	Zeile
 seats	Plätze
+secrets	Geheimnisse
 sectors	Einsatzabschnitte
 selection	Auswahl
 sessions	Sitzungen
 set	festlegen
+settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
 situation	Lage
@@ -156,9 +199,11 @@ transport-means	Transportmittel
 triage	Sichtung
 uhs	UHS
 uhs-occupancy	UHS-Belegung
+undo	zurücknehmen
 unit	Einheit
 units	Einheiten
 unregister	-
+update-now	jetzt aktualisieren
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge
@@ -168,3 +213,4 @@ webauthn	-
 webhook	-
 whereabouts	Verbleib
 whereabouts-details	Verbleib-Angaben
+world	Welt

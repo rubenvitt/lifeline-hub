@@ -379,7 +379,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
             let (s, _) = anfrage(
                 &app,
                 "PUT",
-                &format!("/api/einsaetze/{e}/modul-overrides/{modul}"),
+                &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
                 &admin,
                 Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
             )
@@ -407,7 +407,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

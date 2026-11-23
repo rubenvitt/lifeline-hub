@@ -73,7 +73,7 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1', () =>
       HttpResponse.json(einsatz(a.rolle, a.status ?? 'aktiv', a.spiegel ?? null)),
     ),
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/1/geraete', () => {
@@ -85,7 +85,7 @@ function stelleBereit(a: Aufbau = {}) {
       });
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
-    http.get('/api/einsaetze/1/anbindungen', () => HttpResponse.json(a.anbindungen ?? [])),
+    http.get('/api/einsaetze/1/integrations', () => HttpResponse.json(a.anbindungen ?? [])),
     http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/care', () =>
       HttpResponse.json({
@@ -513,7 +513,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit();
       let kaputt = true;
       server.use(
-        http.get('/api/einsaetze/1/anbindungen', () =>
+        http.get('/api/einsaetze/1/integrations', () =>
           kaputt
             ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
             : HttpResponse.json([anbindung(1)]),
@@ -544,7 +544,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1)] });
       let aufrufe = 0;
       server.use(
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () => {
           aufrufe += 1;
           return HttpResponse.json([anbindung(1, { freigegeben: true })]);
         }),
@@ -588,11 +588,11 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1)] });
       const methoden: string[] = [];
       server.use(
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+        http.put('/api/einsaetze/1/integrations/z-1/grant', ({ request }) => {
           methoden.push(request.method);
           return HttpResponse.json([anbindung(1, { freigegeben: true })]);
         }),
-        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+        http.delete('/api/einsaetze/1/integrations/z-1/grant', ({ request }) => {
           methoden.push(request.method);
           return HttpResponse.json([anbindung(1)]);
         }),
@@ -622,7 +622,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
     it('nennt einen Fehler beim Umschalten', async () => {
       stelleBereit({ anbindungen: [anbindung(1)] });
       server.use(
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () =>
           HttpResponse.json(
             { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
             { status: 409 },
@@ -641,10 +641,10 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1), anbindung(2)] });
       let widerrufen = false;
       server.use(
-        http.get('/api/einsaetze/1/anbindungen', () =>
+        http.get('/api/einsaetze/1/integrations', () =>
           HttpResponse.json(widerrufen ? [anbindung(2)] : [anbindung(1), anbindung(2)]),
         ),
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () => {
           // Der Admin hat die Anbindung inzwischen widerrufen.
           widerrufen = true;
           return HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
@@ -669,10 +669,10 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1)] });
       let widerrufen = false;
       server.use(
-        http.get('/api/einsaetze/1/anbindungen', () =>
+        http.get('/api/einsaetze/1/integrations', () =>
           HttpResponse.json(widerrufen ? [] : [anbindung(1)]),
         ),
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () => {
           widerrufen = true;
           return HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
         }),
@@ -699,7 +699,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       let abrufe = 0;
       let alterAbrufAntwortet: (() => void) | undefined;
       server.use(
-        http.get('/api/einsaetze/1/anbindungen', async () => {
+        http.get('/api/einsaetze/1/integrations', async () => {
           abrufe += 1;
           // Der zweite Abruf liest vor dem Umschalten und antwortet erst danach.
           if (abrufe === 2) {
@@ -709,7 +709,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
           }
           return HttpResponse.json([anbindung(1)]);
         }),
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () =>
           HttpResponse.json([anbindung(1, { freigegeben: true })]),
         ),
       );
@@ -730,7 +730,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1, { freigegeben: true, ruht: true })] });
       let beendet = false;
       server.use(
-        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+        http.delete('/api/einsaetze/1/integrations/z-1/grant', () => {
           beendet = true;
           return HttpResponse.json([]);
         }),
@@ -754,12 +754,12 @@ describe('EinsatzGeraete (LFH-892)', () => {
       stelleBereit({ anbindungen: [anbindung(1)] });
       let kaputt = false;
       server.use(
-        http.get('/api/einsaetze/1/anbindungen', () =>
+        http.get('/api/einsaetze/1/integrations', () =>
           kaputt
             ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
             : HttpResponse.json([anbindung(1)]),
         ),
-        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+        http.put('/api/einsaetze/1/integrations/z-1/grant', () => {
           kaputt = true;
           return HttpResponse.json({ error: 'Konflikt' }, { status: 409 });
         }),

@@ -218,7 +218,7 @@ async fn override_uhs(app: &axum::Router, admin: &str, einsatz: i64, body: &str)
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/unfallhilfsstellen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/unfallhilfsstellen"),
         admin,
         Some(body),
     )
@@ -230,7 +230,7 @@ async fn einsatz_abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         admin,
         None,
     )

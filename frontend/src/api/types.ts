@@ -298,7 +298,7 @@ export type ModulOverrides = Record<string, ModulOverride>;
 /** Effektive Freigabe eines Moduls für den angemeldeten Benutzer (LFH-669). */
 export type ModulFreigabe = S['ModulFreigabe'];
 
-/** Antwort von `GET /api/einsaetze/{id}/modul-freigaben`: ein Eintrag je Modul-Key der Registry.
+/** Antwort von `GET /api/einsaetze/{id}/module-access`: ein Eintrag je Modul-Key der Registry.
  *  Die Map selbst ist kein Backend-Schema, FE-lokal. */
 export type ModulFreigaben = Record<string, ModulFreigabe>;
 
@@ -1976,7 +1976,7 @@ export type ZugangsAngaben = S['ZugangsAngaben'];
 // ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
 /** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sieben Werte, `retention::zustand`). */
 export type AufbewahrungZustand = S['AufbewahrungZustand'];
-/** Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). */
+/** Zeile der Aufbewahrungsübersicht (`GET /api/retention`). */
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
 /** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
 export type ArchivAkte = S['ArchivAkteAnzeige'];
@@ -1992,21 +1992,21 @@ export type ArchivSchaden = S['ArchivSchadenAnzeige'];
 /** ETB-Eintrag der Archivakte im Wortlaut, ohne Anhänge und Rückverweise. */
 export type ArchivEtbEintrag = S['ArchivEtbEintragAnzeige'];
 
-/** Body von `POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen`. Kein Backend-Schema,
+/** Body von `POST /api/retention/incidents/{id}/restore`. Kein Backend-Schema,
  *  FE-lokal. `retention_bis` ist PFLICHT: ein Zeitpunkt in der Zukunft (UTC,
  *  `YYYY-MM-DD HH:mm:ss`) oder `null` für unbegrenzt. */
 export interface WiederherstellenBody {
   retention_bis: string | null;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist`. `null` hebt die Frist auf; eine
+/** Body von `PUT /api/einsaetze/{id}/retention-period`. `null` hebt die Frist auf; eine
  *  Verkürzung braucht `bestaetigt: true`, sonst 409. Kein Backend-Schema, FE-lokal. */
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/nachbereitung` (LLH-1494). `null` hebt die Frist auf.
+/** Body von `PUT /api/einsaetze/{id}/follow-up` (LLH-1494). `null` hebt die Frist auf.
  *  Kein Backend-Schema, FE-lokal. */
 export interface NachbereitungSetzenBody {
   nachbereitung_bis: string | null;
@@ -2024,7 +2024,7 @@ export type Schwaerzungsantrag = S['SchwaerzungsantragAnzeige'];
 /** Treffer der pseudonymen Personensuche — ohne Name oder Kontakt. */
 export type PersonTreffer = S['PersonTrefferAnzeige'];
 
-/** Body von `POST …/schwaerzungsantraege`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
+/** Body von `POST …/redaction-requests`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
  *  Einsatz und ist bei einer Person Pflicht; `bestaetigung` ist die eingetippte Kennung. */
 export interface NeuerSchwaerzungsantrag {
   /** Eine Person per `id` oder per `kennung` (`R-042`, am archivierten Einsatz, LLH-1712). */
@@ -2041,7 +2041,7 @@ export type KategorieVorgabe = S['KategorieVorgabe'];
 /** Aufbewahrung einer Kategorie am Einsatz bzw. in der Archivakte (Frist, Zustand, Rechtsgrundlage). */
 export type KategorieAufbewahrung = S['KategorieAufbewahrungAnzeige'];
 
-/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`. `null` hebt die Frist auf
+/** Body von `PUT /api/einsaetze/{id}/retention-period/{kategorie}`. `null` hebt die Frist auf
  *  (die Kategorie folgt der Einsatz-Frist); eine Verkürzung braucht `bestaetigt: true`, sonst 409;
  *  die erste Frist einer Kategorie braucht eine Rechtsgrundlage, sonst 422. Kein Backend-Schema,
  *  FE-lokal. */

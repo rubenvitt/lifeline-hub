@@ -22,7 +22,7 @@ use utoipa::ToSchema;
 /// unverändert. Bestehende Felder werden nie umbenannt, entfernt oder umgedeutet.
 ///
 /// Verlauf: 1 mit LLH-1978; 2 mit LLH-1979, weil der Login-Pfad der Hüllen von
-/// `/api/auth/app-code/einloesen` zu `/api/auth/app-code/redeem` wurde (ADR-0093).
+/// `/api/auth/app-code/einloesen` zu `/api/auth/app-code/redeem` wurde (ADR-0095).
 pub const SHELL_CONTRACT: u32 = 2;
 
 /// Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`).

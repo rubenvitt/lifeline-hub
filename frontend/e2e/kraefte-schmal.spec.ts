@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { eingeblendet } from './dialog-kern';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
 /**
@@ -132,28 +132,47 @@ async function keinQuerlauf(
     .toBeLessThanOrEqual(SUBPIXEL);
 }
 
-test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über, auch die Personenansicht nicht', async ({
-  page,
-}) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Kraefte schmal ${Date.now()}`);
+/**
+ * Je Route ein Test (LLH-2081): als ein Test lud der Admin-Fall fünf ganze Seiten, ruhig 14 s,
+ * unter Last (4 Worker) über dem Testlimit; der Beobachter-Fall mit sechs Seiten und
+ * Rollenwechsel brauchte `test.slow()`. Jetzt meldet jeder Test an, legt Einsatz und Bestand über
+ * die API an (der Fall prüft den Dialog nicht, `e2e/AGENTS.md`) und lädt genau eine Seite.
+ */
+async function routenEinsatz(page: Page, name: string) {
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `${name} ${Date.now()}`);
   const kraftId = await seedeAlles(page, einsatzId);
+  return { einsatzId, kraftId };
+}
 
-  await page.setViewportSize(HANDSCHIRM);
+/** Die Personenansicht (LLH-1060) braucht die ID der Kraft; der Platzhalter steht für sie. */
+const PERSONENANSICHT = 'personal/:kraftId';
 
-  // Je Route ein Wortlaut, der erst MIT den Daten erscheint — siehe `keinQuerlauf`.
-  const routen: [string, string][] = [
-    ['fahrzeuge', FUNKRUFNAME],
-    ['personal', KRAFT],
-    ['material', MATERIAL],
-    ['einheiten', '1. Zug'],
-    // Die Personenansicht (LLH-1060): ihr Kopf trägt Funktion, Träger und Einsatzdauer.
-    [`personal/${kraftId}`, 'Freiwillige Feuerwehr Musterstadt-Nordwest'],
-  ];
-  for (const [modul, wortlaut] of routen) {
-    await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut);
-  }
-});
+function routenPfad(einsatzId: string, modul: string, kraftId: number) {
+  return `/einsaetze/${einsatzId}/${modul.replace(':kraftId', String(kraftId))}`;
+}
+
+/** Je Route ein Wortlaut, der erst MIT den Daten erscheint — siehe `keinQuerlauf`. */
+const ADMIN_ROUTEN = [
+  { titel: 'Fahrzeuge', modul: 'fahrzeuge', wortlaut: FUNKRUFNAME },
+  { titel: 'Personal', modul: 'personal', wortlaut: KRAFT },
+  { titel: 'Material', modul: 'material', wortlaut: MATERIAL },
+  { titel: 'Einheiten', modul: 'einheiten', wortlaut: '1. Zug' },
+  // Ihr Kopf trägt Funktion, Träger und Einsatzdauer.
+  {
+    titel: 'Personenansicht',
+    modul: PERSONENANSICHT,
+    wortlaut: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+  },
+] as const;
+
+for (const { titel, modul, wortlaut } of ADMIN_ROUTEN) {
+  test(`bei 390 px läuft die Kräfte-Route ${titel} nicht waagerecht über`, async ({ page }) => {
+    const { einsatzId, kraftId } = await routenEinsatz(page, `Kraefte schmal ${titel}`);
+    await page.setViewportSize(HANDSCHIRM);
+    await keinQuerlauf(page, routenPfad(einsatzId, modul, kraftId), wortlaut);
+  });
+}
 
 /**
  * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser, die
@@ -167,147 +186,164 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über, auch die
  * Karte): erst dessen Sichtbarkeit belegt, dass der Slot überhaupt gerendert hat — sonst wäre
  * `toHaveCount(0)` auch bei einem Tippfehler im Namen grün.
  */
-test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)', async ({ page }) => {
-  // Zusätzliche Anmeldung und eine Route mehr als der Admin-Geschwister.
-  test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Kraefte schmal lesend ${Date.now()}`);
-  const kraftId = await seedeAlles(page, einsatzId);
-  await wechsleZuRolle(page, 'beobachter', einsatzId);
+const BEOBACHTER_ROUTEN: {
+  titel: string;
+  modul: string;
+  wortlaut: string;
+  vorbedingung: (page: Page) => Promise<void>;
+}[] = [
+  {
+    titel: 'Fahrzeuge',
+    modul: 'fahrzeuge',
+    wortlaut: FUNKRUFNAME,
+    vorbedingung: async (page) => {
+      const karte = page.locator('[data-lfh="datensicht-karte"]');
+      await expect(karte, 'Vorbedingung: genau eine Fahrzeugkarte').toHaveCount(1);
+      // Bei 390 px steht die Ansicht hinter „Filter“ (LLH-1786); der Knopf bleibt ohne Schreibrecht.
+      await expect(
+        page.locator('[data-lfh="seitenkopf"]').getByRole('button', { name: /^Filter/ }),
+        'Vorbedingung: der Filterknopf mit der Ansicht bleibt auch ohne Schreibrecht',
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: `Status von ${FUNKRUFNAME} ändern` }),
+        'Vorbedingung: ohne Schreibrecht kein Statusauslöser (FahrzeugePage `statusBedienung`)',
+      ).toHaveCount(0);
+      await expect(
+        karte.getByRole('combobox'),
+        'Vorbedingung: die Karte trägt keine Besatzungs-Auswahl',
+      ).toHaveCount(0);
+      await expect(
+        karte.getByRole('button', { name: `Details zu ${FUNKRUFNAME}` }),
+        'Vorbedingung: der lesende Aufklapper der Besatzung steht (LFH-697)',
+      ).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Fahrzeuge disponieren' })).toHaveCount(0);
+    },
+  },
+  {
+    titel: 'Personal',
+    modul: 'personal',
+    wortlaut: KRAFT,
+    vorbedingung: async (page) => {
+      const karte = page.locator('[data-lfh="datensicht-karte"]');
+      await expect(karte, 'Vorbedingung: genau eine Personalkarte').toHaveCount(1);
+      await expect(
+        page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
+        'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
+      ).toHaveCount(0);
+      // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser und die Inline-Angaben
+      // der Einteilung. Seit LLH-1060 gibt es keinen Aufklapper der Zeitachse mehr; der Name
+      // führt in die Personenansicht, in jeder Rolle.
+      await expect(
+        karte.getByRole('button'),
+        'Vorbedingung: die Personalkarte trägt ohne Schreibrecht keinen Knopf',
+      ).toHaveCount(0);
+      await expect(
+        karte.getByRole('link', { name: KRAFT }),
+        'Vorbedingung: der Name führt in die Personenansicht',
+      ).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);
+    },
+  },
+  {
+    // Die Personenansicht (LLH-1060) im Nur-Lese-Zweig: Hinweis statt Bedienung.
+    titel: 'Personenansicht',
+    modul: PERSONENANSICHT,
+    wortlaut: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+    vorbedingung: async (page) => {
+      const hauptteil = page.getByRole('main');
+      await expect(
+        hauptteil.getByText(/^Nur Ansicht/).first(),
+        'Vorbedingung: der Hinweis „Nur Ansicht“ steht',
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: `${KRAFT} entlassen` }),
+        'Vorbedingung: ohne Schreibrecht kein „Entlassen“',
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Stornieren' }),
+        'Vorbedingung: ohne Schreibrecht kein „Stornieren“',
+      ).toHaveCount(0);
+      await expect(
+        hauptteil.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
+        'Vorbedingung: keine Angabe ist bearbeitbar',
+      ).toHaveCount(0);
+    },
+  },
+  {
+    titel: 'Material',
+    modul: 'material',
+    wortlaut: MATERIAL,
+    vorbedingung: async (page) => {
+      const karte = page.locator('[data-lfh="datensicht-karte"]');
+      await expect(karte, 'Vorbedingung: genau eine Materialkarte').toHaveCount(1);
+      await expect(
+        page.getByRole('button', { name: `Status von ${MATERIAL} ändern` }),
+        'Vorbedingung: ohne Schreibrecht kein Statusauslöser (MaterialPage `statusBedienung`)',
+      ).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Material disponieren' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Ad-hoc-Material' })).toHaveCount(0);
+      // Nur Ansicht: die Menge steht als Zahl, nicht als Feld.
+      await expect(page.getByRole('spinbutton')).toHaveCount(0);
+    },
+  },
+  {
+    titel: 'Einheiten',
+    modul: 'einheiten',
+    wortlaut: '1. Zug',
+    vorbedingung: async (page) => {
+      await expect(
+        page.getByRole('main').getByRole('button', { name: 'Einheit bilden', exact: true }),
+        'Vorbedingung: ohne Schreibrecht kein „Einheit bilden"',
+      ).toHaveCount(0);
+    },
+  },
+  {
+    titel: 'Meldebild',
+    modul: 'kraefteuebersicht',
+    wortlaut: '1. Zug',
+    vorbedingung: async (page) => {
+      // Drucken ist ein Nebenweg des Kopfs (LLH-1786), bei 390 px hinter „Weitere“.
+      await expect(
+        page.getByRole('button', { name: 'Weitere Aktionen zum Meldebild' }),
+        'Vorbedingung: der Auslöser der Nebenwege steht — Drucken bleibt erreichbar',
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+        'Vorbedingung: ohne Schreibrecht kein „In Lagebericht übernehmen"',
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Einheit', exact: true }),
+        'Vorbedingung: ohne Schreibrecht keine Primäraktion „Einheit"',
+      ).toHaveCount(0);
+    },
+  },
+];
 
-  await page.setViewportSize(HANDSCHIRM);
-  const karte = page.locator('[data-lfh="datensicht-karte"]');
-  const hauptteil = page.getByRole('main');
-
-  const routen: [string, string, () => Promise<void>][] = [
-    [
-      'fahrzeuge',
-      FUNKRUFNAME,
-      async () => {
-        await expect(karte, 'Vorbedingung: genau eine Fahrzeugkarte').toHaveCount(1);
-        // Bei 390 px steht die Ansicht hinter „Filter“ (LLH-1786); der Knopf bleibt ohne Schreibrecht.
-        await expect(
-          page.locator('[data-lfh="seitenkopf"]').getByRole('button', { name: /^Filter/ }),
-          'Vorbedingung: der Filterknopf mit der Ansicht bleibt auch ohne Schreibrecht',
-        ).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: `Status von ${FUNKRUFNAME} ändern` }),
-          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (FahrzeugePage `statusBedienung`)',
-        ).toHaveCount(0);
-        await expect(
-          karte.getByRole('combobox'),
-          'Vorbedingung: die Karte trägt keine Besatzungs-Auswahl',
-        ).toHaveCount(0);
-        await expect(
-          karte.getByRole('button', { name: `Details zu ${FUNKRUFNAME}` }),
-          'Vorbedingung: der lesende Aufklapper der Besatzung steht (LFH-697)',
-        ).toHaveCount(1);
-        await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Fahrzeuge disponieren' })).toHaveCount(0);
-      },
-    ],
-    [
-      'personal',
-      KRAFT,
-      async () => {
-        await expect(karte, 'Vorbedingung: genau eine Personalkarte').toHaveCount(1);
-        await expect(
-          page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
-          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
-        ).toHaveCount(0);
-        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser und die Inline-Angaben
-        // der Einteilung. Seit LLH-1060 gibt es keinen Aufklapper der Zeitachse mehr; der Name
-        // führt in die Personenansicht, in jeder Rolle.
-        await expect(
-          karte.getByRole('button'),
-          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht keinen Knopf',
-        ).toHaveCount(0);
-        await expect(
-          karte.getByRole('link', { name: KRAFT }),
-          'Vorbedingung: der Name führt in die Personenansicht',
-        ).toHaveCount(1);
-        await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);
-      },
-    ],
-    [
-      // Die Personenansicht (LLH-1060) im Nur-Lese-Zweig: Hinweis statt Bedienung.
-      `personal/${kraftId}`,
-      'Freiwillige Feuerwehr Musterstadt-Nordwest',
-      async () => {
-        await expect(
-          hauptteil.getByText(/^Nur Ansicht/).first(),
-          'Vorbedingung: der Hinweis „Nur Ansicht“ steht',
-        ).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: `${KRAFT} entlassen` }),
-          'Vorbedingung: ohne Schreibrecht kein „Entlassen“',
-        ).toHaveCount(0);
-        await expect(
-          page.getByRole('button', { name: 'Stornieren' }),
-          'Vorbedingung: ohne Schreibrecht kein „Stornieren“',
-        ).toHaveCount(0);
-        await expect(
-          hauptteil.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
-          'Vorbedingung: keine Angabe ist bearbeitbar',
-        ).toHaveCount(0);
-      },
-    ],
-    [
-      'material',
-      MATERIAL,
-      async () => {
-        await expect(karte, 'Vorbedingung: genau eine Materialkarte').toHaveCount(1);
-        await expect(
-          page.getByRole('button', { name: `Status von ${MATERIAL} ändern` }),
-          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (MaterialPage `statusBedienung`)',
-        ).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Material disponieren' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Ad-hoc-Material' })).toHaveCount(0);
-        // Nur Ansicht: die Menge steht als Zahl, nicht als Feld.
-        await expect(page.getByRole('spinbutton')).toHaveCount(0);
-      },
-    ],
-    [
-      'einheiten',
-      '1. Zug',
-      async () => {
-        await expect(
-          hauptteil.getByRole('button', { name: 'Einheit bilden', exact: true }),
-          'Vorbedingung: ohne Schreibrecht kein „Einheit bilden"',
-        ).toHaveCount(0);
-      },
-    ],
-    [
-      'kraefteuebersicht',
-      '1. Zug',
-      async () => {
-        // Drucken ist ein Nebenweg des Kopfs (LLH-1786), bei 390 px hinter „Weitere“.
-        await expect(
-          page.getByRole('button', { name: 'Weitere Aktionen zum Meldebild' }),
-          'Vorbedingung: der Auslöser der Nebenwege steht — Drucken bleibt erreichbar',
-        ).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
-          'Vorbedingung: ohne Schreibrecht kein „In Lagebericht übernehmen"',
-        ).toHaveCount(0);
-        await expect(
-          page.getByRole('button', { name: 'Einheit', exact: true }),
-          'Vorbedingung: ohne Schreibrecht keine Primäraktion „Einheit"',
-        ).toHaveCount(0);
-      },
-    ],
-  ];
-  for (const [modul, wortlaut, vorbedingung] of routen) {
-    await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut, vorbedingung);
-  }
-});
+for (const { titel, modul, wortlaut, vorbedingung } of BEOBACHTER_ROUTEN) {
+  test(`bei 390 px läuft die Kräfte-Route ${titel} nicht waagerecht über (Beobachter)`, async ({
+    page,
+  }) => {
+    const { einsatzId, kraftId } = await routenEinsatz(page, `Kraefte schmal lesend ${titel}`);
+    await wechsleZuRolle(page, 'beobachter', einsatzId);
+    await page.setViewportSize(HANDSCHIRM);
+    await keinQuerlauf(page, routenPfad(einsatzId, modul, kraftId), wortlaut, () =>
+      vorbedingung(page),
+    );
+  });
+}
 
 /**
  * LFH-983: Der Seitenkopf der drei Kräfte-Seiten ÖFFNET nur. Kein Auswahl- und kein Mengenfeld im
  * Kopf, kein englischer Stufentext von rc-input-number im DOM, auf allen vier Schirmen. Am Desktop
  * steht der Kopf einzeilig: alle Knöpfe auf einer Höhe, der Titel so hoch wie bei Personal.
  * Der Beobachter-Zweig steht im Test darüber (kein Disponier-Knopf).
+ *
+ * Je Schirm ein Test (LLH-2069): als ein Test lud der Fall 19 ganze Seiten, ruhig 51 s, unter Last
+ * (4 Worker) über dem Testlimit, an wechselnden späten Stellen. Der Einsatz kommt über die API,
+ * weil der Fall den Dialog nicht prüft; Material steht zuletzt, damit seine Dialoge ohne zweites
+ * `goto` auf der schon geladenen Seite laufen.
  */
 const SCHIRME = [
   { width: 390, height: 844 },
@@ -316,21 +352,27 @@ const SCHIRME = [
   { width: 1440, height: 900 },
 ] as const;
 
-test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche Namen', async ({
-  page,
-}) => {
-  test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Kopf oeffnet ${Date.now()}`);
+/** Meldet an, legt Einsatz und Bestand über die API an; liefert die Einsatz-ID. */
+async function kopfEinsatz(page: Page, schirm: { width: number; height: number }) {
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `Kopf oeffnet ${schirm.width} ${Date.now()}`);
   await seedeAlles(page, einsatzId);
-  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+  await page.setViewportSize(schirm);
+  return einsatzId;
+}
 
-  for (const schirm of SCHIRME) {
-    await page.setViewportSize(schirm);
+for (const schirm of SCHIRME) {
+  test(`@${schirm.width}: der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche Namen`, async ({
+    page,
+  }) => {
+    const einsatzId = await kopfEinsatz(page, schirm);
+    const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+
+    // Material zuletzt: die Dialoge unten laufen auf dieser Seite weiter.
     for (const [modul, wortlaut, knopf] of [
-      ['material', MATERIAL, 'Material disponieren'],
       ['personal', KRAFT, 'Personal disponieren'],
       ['fahrzeuge', FUNKRUFNAME, 'Fahrzeuge disponieren'],
+      ['material', MATERIAL, 'Material disponieren'],
     ] as const) {
       await page.goto(`/einsaetze/${einsatzId}/${modul}`);
       await expect(page.getByText(wortlaut).first()).toBeVisible();
@@ -350,26 +392,30 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
 
     // Material: die Menge ist in Zeile und Karte ein Wert ohne Feld (LLH-1093 D9); „Ausgeben“
     // öffnet einen Dialog mit benanntem Feld (LLH-1225 D5), der Disponier-Dialog sein Feld „Menge".
-    await page.goto(`/einsaetze/${einsatzId}/material`);
+    // Geklickt wird erst in den stehenden Dialog (`e2e/AGENTS.md`, „Erst klicken, wenn der Dialog
+    // steht“).
     await page.getByRole('button', { name: `${MATERIAL} ausgeben` }).click();
-    const ausgabe = page.getByRole('dialog', { name: `${MATERIAL} ausgeben` });
+    const ausgabe = await dialogSteht(page, `${MATERIAL} ausgeben`);
     await expect(ausgabe.getByRole('spinbutton', { name: 'Menge ausgeben' })).toBeVisible();
     await ausgabe.getByRole('button', { name: 'Abbrechen' }).click();
     await expect(ausgabe).toBeHidden();
-    await page.getByRole('button', { name: 'Material disponieren' }).click();
-    const dialog = page.getByRole('dialog');
+    await kopf.getByRole('button', { name: 'Material disponieren' }).click();
+    const dialog = await dialogSteht(page, 'Material disponieren');
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();
     expect(await page.content(), `Stufentexte @${schirm.width}`).not.toMatch(
       /Increase Value|Decrease Value/,
     );
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
     await expect(dialog).toBeHidden();
-  }
+  });
+}
 
-  // Desktop: einzeilig. Alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Fahrzeugen:
-  // beide Köpfe tragen eine Segmentleiste (Ansicht bzw. Gruppierung, LLH-1225 D4), die mit dem
+test('am Desktop steht der Kopf der Kräfte-Seiten einzeilig', async ({ page }) => {
+  // Einzeilig: alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Fahrzeugen: beide
+  // Köpfe tragen eine Segmentleiste (Ansicht bzw. Gruppierung, LLH-1225 D4), die mit dem
   // Zielabstand höher steht als ein Knopf; Personal hat keine.
-  await page.setViewportSize({ width: 1440, height: 900 });
+  const einsatzId = await kopfEinsatz(page, { width: 1440, height: 900 });
+  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
   const titelOben = async (modul: string, wortlaut: string) => {
     await page.goto(`/einsaetze/${einsatzId}/${modul}`);
     await expect(page.getByText(wortlaut).first()).toBeVisible();

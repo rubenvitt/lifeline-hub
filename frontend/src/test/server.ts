@@ -45,13 +45,10 @@ export const server = setupServer(
    * Verlauf der Eingänge eines Einsatzes (LLH-1143) — leer als Default. Der Knopf „Eingänge“ im
    * Einsatz-Rahmen fragt ihn beim Mount ab; Tests mit Einträgen überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:id/benachrichtigungen', () =>
+  http.get('/api/einsaetze/:id/notifications', () =>
     HttpResponse.json({ eintraege: [], ungelesen: 0 }),
   ),
-  http.post(
-    '/api/einsaetze/:id/benachrichtigungen/gelesen',
-    () => new HttpResponse(null, { status: 204 }),
-  ),
+  http.post('/api/einsaetze/:id/notifications/read', () => new HttpResponse(null, { status: 204 })),
   /**
    * Eigene Führungsstelle (LFH-849/LFH-1181) — nicht erfasst als Default, der echte Zustand eines
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
@@ -64,7 +61,7 @@ export const server = setupServer(
    * Programmpunkte der Veranstaltung (LLH-1570) — keine als Default. Überblick und Einsatzdaten
    * lesen sie mit; Tests mit Ablauf überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:id/programmpunkte', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:id/agenda-items', () => HttpResponse.json([])),
   /**
    * Katalog-Sprechgruppen mit gleichnamiger Einsatz-Sprechgruppe (LLH-1645) — keine als Default.
    * Der Sprechgruppen-Tab fragt sie für Admins mit ab; Tests mit Paaren überschreiben.
@@ -104,7 +101,7 @@ export const server = setupServer(
    * Modulzähler des Navigationsrahmens — `{}` als Default („kein gezähltes Modul erlaubt", ein
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  http.get('/api/einsaetze/:einsatzId/module-counts', () => HttpResponse.json({})),
   // Herkunft der Stammdaten (LLH-1493): ohne Kopplung keine Quelle, nichts gesperrt. Jeder
   // Stammdaten-Reiter fragt sie ab; ein Test mit Hub-Zeilen überschreibt per `server.use`.
   http.get('/api/instanz/stammdaten/herkunft', () =>
@@ -130,7 +127,7 @@ export const server = setupServer(
    * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das
    * Frist-Paneel fragt sie ab; Tests der Kategorien überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/aufbewahrung-kategorien', () =>
+  http.get('/api/einsaetze/:einsatzId/retention-categories', () =>
     HttpResponse.json([
       { kategorie: 'behandlung' },
       { kategorie: 'personenauskunft' },
@@ -142,9 +139,7 @@ export const server = setupServer(
    * Einsatzes ohne Overrides und ohne Org-Vorgaben. Rahmen und jede Seite, die Daten eines
    * fremden Moduls lädt, fragen sie ab; Tests mit Sperren überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
-    HttpResponse.json(freigabenFixture()),
-  ),
+  http.get('/api/einsaetze/:einsatzId/module-access', () => HttpResponse.json(freigabenFixture())),
   /**
    * Gefahrengebiete — leere Liste als Default (LFH-397). Der Rahmen fragt sie für die
    * Warnsperre des Helligkeitsreglers beim Mount ab (`einsatz/useAktiveWarnung.ts`); `[]`
@@ -230,7 +225,7 @@ export const server = setupServer(
    * Anzeigezone ab und fällt ohne Leserecht auf die Org-Zone zurück; Tests mit Einstellungen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/einstellungen', () =>
+  http.get('/api/einsaetze/:einsatzId/settings', () =>
     HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
   ),
   /**
@@ -244,7 +239,7 @@ export const server = setupServer(
    * Archiv einspielen (LLH-1711): verfügbar als Default, wie an einer Installation ohne Kopplung,
    * bei der sich eine andere meldet. Tests des Hubs überschreiben per `server.use()`.
    */
-  http.get('/api/admin/archiv/einspielen', () => HttpResponse.json({ verfuegbar: true })),
+  http.get('/api/admin/archive/import', () => HttpResponse.json({ verfuegbar: true })),
   /**
    * Datenträgerprüfung (LFH-1100): alles verschlüsselt als Default, damit die Verwaltung keine
    * Warnleiste zeigt. Tests der Warnung überschreiben per `server.use()`.

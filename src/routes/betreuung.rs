@@ -479,7 +479,7 @@ pub async fn stelle_aendern(
     ))
 }
 
-/// POST /api/einsaetze/{id}/care/positions/{sid}/cancel
+/// POST /api/einsaetze/{id}/care/positions/{sid}/annul
 pub async fn stelle_stornieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,
@@ -558,7 +558,7 @@ pub async fn belegung_melden(
     ))
 }
 
-/// POST /api/einsaetze/{id}/care/occupancies/{mid}/retract
+/// POST /api/einsaetze/{id}/care/occupancies/{mid}/undo
 pub async fn belegung_zuruecknehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,

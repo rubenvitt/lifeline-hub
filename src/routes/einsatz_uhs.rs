@@ -697,7 +697,7 @@ pub async fn belegung(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/retract — den
+/// POST /api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo — den
 /// Austritt einer Person aus einer UHS zurücknehmen (LLH-1924, Spec `personen-detail`, „Austritt
 /// aus der UHS zurücknehmen“, design.md D3). Rechte und Stellenbindung wie der Austritt: ein
 /// UHS-Gerät nur für die eigene UHS. Pseudonymer ETB-Eintrag, Live für UHS und Person.

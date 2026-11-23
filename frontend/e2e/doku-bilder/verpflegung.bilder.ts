@@ -152,7 +152,7 @@ test.describe(KAPITEL, () => {
         `${basis}/time-slots/${mittag.id}/distributions`,
         { menge: 5, verpflegungsstelle_id: turnhalle, zeitpunkt_at: um(jetzt, -15) },
       );
-      await fuelle(api, 'post', `${basis}/distributions/${falsch.ausgabe_id}/retract`);
+      await fuelle(api, 'post', `${basis}/distributions/${falsch.ausgabe_id}/undo`);
 
       await fuelle(api, 'post', `${basis}/time-slots`, {
         bezeichnung: 'Abendessen',

@@ -509,7 +509,7 @@ async fn abgeschlossener_einsatz_ist_readonly() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -575,7 +575,7 @@ async fn person_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -2370,7 +2370,7 @@ async fn druck_ohne_modulzugriff_ist_403_ohne_audit() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -2665,7 +2665,7 @@ async fn listenzugriffe_im_abgeschlossenen_einsatz() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -3444,7 +3444,7 @@ async fn zeile_ohne_modulzugriff_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -3520,7 +3520,7 @@ async fn stand_ohne_modulzugriff_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

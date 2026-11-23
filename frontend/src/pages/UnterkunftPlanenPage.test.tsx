@@ -72,7 +72,7 @@ function stelleBereit(a: Aufbau = {}) {
         org_id: 1,
       }),
     ),
-    http.get('/api/einsaetze/1/modul-freigaben', () =>
+    http.get('/api/einsaetze/1/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
     http.get('/api/einsaetze/1/care', () =>

@@ -455,7 +455,7 @@ async fn einsatz_freigeben(app: &axum::Router, admin: &str, einsatz: i64, cred: 
         app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         admin,
@@ -602,7 +602,7 @@ async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             nur_rechner.zugang_id
         ),
         &admin,
@@ -655,7 +655,7 @@ async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

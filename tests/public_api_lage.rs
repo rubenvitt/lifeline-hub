@@ -304,7 +304,7 @@ async fn ohne_scope_403_mit_bearer_401_und_ein_abgeschlossener_einsatz_ist_null(
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

@@ -78,7 +78,7 @@ async fn stelle_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, sid: 
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/cancel"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -90,7 +90,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

@@ -242,7 +242,7 @@ async fn durchstich_anlegen_ausgabe_ruecknahme_loeschen() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/distributions/{aid}/retract", pfad(e)),
+        &format!("{}/distributions/{aid}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -537,7 +537,7 @@ async fn statuscodes_422() {
     let aid = a["ausgabe_id"].as_i64().unwrap();
     let (s, _) = anfrage(&app, "DELETE", &patch, &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let zurueck = format!("{}/distributions/{aid}/retract", pfad(e));
+    let zurueck = format!("{}/distributions/{aid}/undo", pfad(e));
     let (s, _) = anfrage(&app, "POST", &zurueck, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &zurueck, &admin, None).await;
@@ -586,7 +586,7 @@ async fn statuscodes_404_fremder_einsatz() {
         ),
         (
             "POST",
-            format!("{}/distributions/{fremd_aid}/retract", pfad(e)),
+            format!("{}/distributions/{fremd_aid}/undo", pfad(e)),
             None,
         ),
         (
@@ -732,7 +732,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/verpflegung"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/verpflegung"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -786,7 +786,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -1039,7 +1039,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -2325,7 +2325,7 @@ async fn modul_override(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -2782,7 +2782,7 @@ async fn betreuungsstelle_stornieren(app: &axum::Router, cookie: &str, einsatz: 
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/cancel"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -3683,7 +3683,7 @@ async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

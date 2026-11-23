@@ -1,6 +1,6 @@
 import { Button, Flex, Popconfirm, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
-import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
+import { Status, Textstufe, schriftStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
@@ -26,7 +26,7 @@ export function Quittungsstand({ anzahl, quittiert }: { anzahl: number; quittier
   return (
     <Text
       type="secondary"
-      style={{ ...monoStil('meta'), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
+      style={{ ...schriftStil('meta'), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
     >
       {anzahl} Empfänger · {quittiert}/{anzahl} quittiert
     </Text>

@@ -551,7 +551,7 @@ describe('ChatPage', () => {
 
   it('sperrt „Zu ETB" nach den Freigaben des Servers (LFH-904)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     );
@@ -569,7 +569,7 @@ describe('ChatPage', () => {
 
   it('sperrt „Zu Auftrag" nach den Freigaben des Servers (LFH-904)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } })),
       ),
     );

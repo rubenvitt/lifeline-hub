@@ -216,7 +216,7 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
 
     it('ohne Zugriff auf das Modul Betreuung entfällt der Link, der Text bleibt', async () => {
       server.use(
-        http.get('/api/einsaetze/1/modul-freigaben', () =>
+        http.get('/api/einsaetze/1/module-access', () =>
           HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
         ),
       );
@@ -1610,7 +1610,7 @@ describe('Patientenkopf — Versorgt von (LLH-1567)', () => {
 
   it('nennt die Meldung ohne Freigabe der Meldungen nur als Text', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
       ),
     );

@@ -1098,7 +1098,7 @@ describe('TiereDetailPage — stehende Leiste (LLH-1101)', () => {
 
 describe('TiereDetailPage — Verortung (LLH-1123)', () => {
   const verortet: Tier = { ...tierBasis, antreff_lat: 51.5, antreff_lon: 8.25 };
-  const ortVorschau = http.get('/api/einsaetze/:id/ort-vorschau', () =>
+  const ortVorschau = http.get('/api/einsaetze/:id/place-preview', () =>
     HttpResponse.json({ peilung: null, ortsname: null }),
   );
 

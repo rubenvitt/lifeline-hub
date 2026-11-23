@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
+import { beendeHuelle, starteAndroidHuelle } from '../../test/huelle';
 import {
   eigenpositionVerfuegbarkeit,
   EIGENPOSITION_SPERRGRUND,
+  meldungVerweigert,
   useEigenposition,
 } from './useEigenposition';
 
@@ -140,6 +142,27 @@ describe('useEigenposition (LFH-712)', () => {
     stub.scheitere(1);
     expect(result.current.an).toBe(false);
     expect(onFehler).toHaveBeenCalledWith(expect.stringMatching(/freigeben/));
+  });
+
+  it('verweigerte Berechtigung in der App: Hinweis auf die Einstellungen des Geräts (LLH-2071)', () => {
+    starteAndroidHuelle({ bruecke: { postMessage: vi.fn() } });
+    try {
+      const onFehler = vi.fn();
+      const { result } = renderHook(() => useEigenposition({ onFehler, onErsterFix: vi.fn() }));
+      act(() => result.current.umschalten());
+      stub.scheitere(1);
+      expect(onFehler).toHaveBeenCalledWith(
+        'Standortzugriff verweigert – in den Einstellungen des Geräts für Lifeline freigeben, dann erneut einschalten.',
+      );
+    } finally {
+      beendeHuelle();
+    }
+  });
+
+  it('meldungVerweigert nennt im Browser die Freigabe im Browser', () => {
+    expect(meldungVerweigert()).toBe(
+      'Standortzugriff verweigert – im Browser für diese Seite freigeben, dann erneut einschalten.',
+    );
   });
 
   it('kein Standort vor dem ersten Fix: aus und Meldung', () => {

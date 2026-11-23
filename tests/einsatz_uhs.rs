@@ -1270,7 +1270,7 @@ async fn austragen_zuruecknehmen() {
         v
     };
     let aus = austragen().await;
-    let pfad = |id: &serde_json::Value| format!("{belegung}/{id}/retract");
+    let pfad = |id: &serde_json::Value| format!("{belegung}/{id}/undo");
 
     let (s, v) = anfrage_json(&app, "POST", &pfad(&aus["id"]), &cookie, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");

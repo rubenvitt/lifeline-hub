@@ -113,9 +113,9 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
       ['POST', `${E}/districts`],
       ['PATCH', `${E}/districts/3`],
-      ['POST', `${E}/districts/3/cancel`],
+      ['POST', `${E}/districts/3/annul`],
       ['POST', `${E}/districts/3/progress`],
-      ['POST', `${E}/progress/11/retract`],
+      ['POST', `${E}/progress/11/undo`],
     ]);
     expect(a[0].body).toEqual({
       bezeichnung: 'Uferstraße 12–40',
@@ -139,9 +139,9 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
       ['POST', `${B}/positions`],
       ['PATCH', `${B}/positions/4`],
-      ['POST', `${B}/positions/4/cancel`],
+      ['POST', `${B}/positions/4/annul`],
       ['POST', `${B}/positions/4/occupancies`],
-      ['POST', `${B}/occupancies/21/retract`],
+      ['POST', `${B}/occupancies/21/undo`],
     ]);
     expect(a[3].body).toEqual({ belegt: 89, zeitpunkt_at: '2026-09-23 12:00:00' });
   });

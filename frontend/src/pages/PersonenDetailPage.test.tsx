@@ -287,7 +287,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       await screen.findByRole('heading', { name: /R-001/ });
       // Die Modulfreigaben (Sprung-Sperre „Auf Lagekarte verorten", LFH-888) zählen nicht: sie
       // liegen in der App schon im Cache des Einsatzrahmens; nur dieser nackte Test lädt sie.
-      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+      expect(pfade.filter((p) => !p.endsWith('/module-access'))).toEqual([
         '/api/einsaetze/1',
         '/api/einsaetze/1/persons/10',
       ]);
@@ -310,7 +310,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       } as PersonDetail);
       await screen.findByRole('heading', { name: /R-001/ });
       expect(within(kopf()).getByText(/^Turnhalle · Wartebereich · seit/)).toBeInTheDocument();
-      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+      expect(pfade.filter((p) => !p.endsWith('/module-access'))).toEqual([
         '/api/einsaetze/1',
         '/api/einsaetze/1/persons/10',
       ]);
@@ -1458,7 +1458,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
     const zurueck: string[] = [];
     render(einsatzAktiv, belegt, [
       http.post('/api/einsaetze/1/persons/10/uhs-occupancy', () => belegungsAntwort('austritt', 5)),
-      http.post('/api/einsaetze/1/persons/10/uhs-occupancy/:bid/retract', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy/:bid/undo', ({ params }) => {
         zurueck.push(String(params.bid));
         return HttpResponse.json(
           { error: 'Die Person ist inzwischen weiter gebucht' },
@@ -1482,7 +1482,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
   it('kehrt die Person nur in den Wartebereich zurück, sagt der Hinweis das (LLH-1924)', async () => {
     render(einsatzAktiv, belegt, [
       http.post('/api/einsaetze/1/persons/10/uhs-occupancy', () => belegungsAntwort('austritt', 5)),
-      http.post('/api/einsaetze/1/persons/10/uhs-occupancy/:bid/retract', () =>
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy/:bid/undo', () =>
         HttpResponse.json(
           {
             ereignis: {
@@ -1830,7 +1830,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
 
   it('gesperrte Lagekarte: „Auf Lagekarte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
     render(einsatzAktiv, mitKoordinate, [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     ]);
@@ -1943,7 +1943,9 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
         herkunft_adresse: 'Hauptstraße 12, Musterstadt',
         erwartet: { herkunft_adresse: null },
       });
-      expect(anfragen.filter((u) => /ort-suche|ort-vorschau/.test(u))).toEqual([]);
+      expect(
+        anfragen.filter((u) => /ort-suche|ort-vorschau|place-search|place-preview/.test(u)),
+      ).toEqual([]);
     } finally {
       server.events.removeListener('request:start', merken);
     }

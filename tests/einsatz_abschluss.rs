@@ -20,7 +20,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode,
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         cookie,
         None,
     )
@@ -123,7 +123,7 @@ async fn pruefung(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode, Val
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{id}/abschluss/pruefung"),
+        &format!("/api/einsaetze/{id}/closure/check"),
         cookie,
         None,
     )
@@ -206,7 +206,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -323,7 +323,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
         let (s, v) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{e}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
             &admin,
             Some(regel),
         )
@@ -402,7 +402,7 @@ async fn wiedereroeffnen(
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/wiedereroeffnen"),
+        &format!("/api/einsaetze/{id}/reopen"),
         cookie,
         body.as_ref(),
     )

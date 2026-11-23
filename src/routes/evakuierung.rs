@@ -223,7 +223,7 @@ pub async fn bezirk_aendern(
     ))
 }
 
-/// POST /api/einsaetze/{id}/evacuation/districts/{bid}/cancel — Fehlanlage; liefert den
+/// POST /api/einsaetze/{id}/evacuation/districts/{bid}/annul — Fehlanlage; liefert den
 /// Bezirk mit gesetztem `storniert_at`.
 pub async fn bezirk_stornieren(
     State(state): State<AppState>,
@@ -323,7 +323,7 @@ async fn bezirk_meldung(
     })
 }
 
-/// POST /api/einsaetze/{id}/evacuation/progress/{sid}/retract
+/// POST /api/einsaetze/{id}/evacuation/progress/{sid}/undo
 pub async fn stand_zuruecknehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Evakuierung>,

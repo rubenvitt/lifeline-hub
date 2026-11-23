@@ -37,7 +37,7 @@ describe('useZumEtbEintrag (LFH-888)', () => {
 
   it('gesperrtes ETB: gesperrter Knopf, „Keine Berechtigung" sichtbar, kein Link', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     );

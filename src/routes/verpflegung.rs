@@ -586,7 +586,7 @@ async fn antwort(
     ))
 }
 
-/// POST /api/einsaetze/{id}/catering/distributions/{aid}/retract — endgültig, ohne
+/// POST /api/einsaetze/{id}/catering/distributions/{aid}/undo — endgültig, ohne
 /// ETB-Eintrag; 422 beim zweiten Mal.
 pub async fn ausgabe_zuruecknehmen(
     State(state): State<AppState>,

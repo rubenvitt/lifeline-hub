@@ -4956,7 +4956,7 @@ let kritisBuendelOrt: [number, number] | null = null;
 
 async function fachebenenBeantworten(page: Page) {
   for (const [i, { key, titel, props }] of FACHEBENEN_PROBE.entries()) {
-    await page.route(`**/api/karte/fachebenen/${key}**`, (route) => {
+    await page.route(`**/api/map/overlays/${key}**`, (route) => {
       const punkt = (ll: [number, number], p: Record<string, unknown>) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: ll },
@@ -5502,7 +5502,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   const seitenFrei = await freigegebeneDokumenteSaeen(page, frei);
   const [berichtGesperrt] = await freigegebeneDokumenteSaeen(page, gesperrt);
   // Modulsperre per Override (`e2e/AGENTS.md`, LFH-820): das ETB nur für Admins.
-  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/modul-overrides/etb`, {
+  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/module-overrides/etb`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();

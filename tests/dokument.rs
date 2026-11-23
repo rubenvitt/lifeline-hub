@@ -516,7 +516,7 @@ async fn abgeschlossener_einsatz_ablegen_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -798,7 +798,7 @@ async fn aendern_braucht_schreibrecht_und_aktiven_einsatz() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -977,7 +977,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1032,7 +1032,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
             &app,
             "PUT",
             &format!(
-                "/api/einsaetze/{einsatz}/modul-overrides/{}",
+                "/api/einsaetze/{einsatz}/module-overrides/{}",
                 art.modul_key()
             ),
             &admin,
@@ -1097,7 +1097,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

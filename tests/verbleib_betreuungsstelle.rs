@@ -84,7 +84,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -239,7 +239,7 @@ async fn stornierte_stelle_ist_409_geschlossene_ist_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/positions/{storniert}/cancel", betreuung(e)),
+        &format!("{}/positions/{storniert}/annul", betreuung(e)),
         &admin,
         None,
     )
@@ -562,7 +562,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/positions/{andere}/cancel", betreuung(e)),
+        &format!("{}/positions/{andere}/annul", betreuung(e)),
         &admin,
         Some("{}"),
     )

@@ -88,7 +88,7 @@ test('Einsatzakte: jedes Kapitel auf neuer Seite mit Druckkopf, ZIP abrufbar', a
   }
   await page.emulateMedia({ media: null });
 
-  const zip = await page.request.get(`/api/einsaetze/${einsatzId}/einsatzakte/anlagen.zip`);
+  const zip = await page.request.get(`/api/einsaetze/${einsatzId}/case-file/attachments.zip`);
   expect(zip.status()).toBe(200);
   expect(zip.headers()['content-type']).toBe('application/zip');
   // Lokaler Kopf einer ZIP-Datei: „PK\x03\x04“.

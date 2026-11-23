@@ -49,7 +49,7 @@ async fn freigeben(l: &Lage, einsatz: i64, cred: &Credentials) {
         &l.app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &l.admin,
@@ -75,7 +75,7 @@ async fn abschliessen(l: &Lage, einsatz: i64) {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &l.admin,
         None,
     )
@@ -340,7 +340,7 @@ async fn einsaetze_lesen_macht_freigebbar_ereignisse_abrufen_allein_nicht() {
     let (s, v) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anbindungen"),
+        &format!("/api/einsaetze/{einsatz}/integrations"),
         &l.admin,
         None,
     )
@@ -363,7 +363,7 @@ async fn einsaetze_lesen_macht_freigebbar_ereignisse_abrufen_allein_nicht() {
         &l.app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             nur_events.zugang_id
         ),
         &l.admin,

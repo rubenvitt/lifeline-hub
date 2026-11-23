@@ -85,7 +85,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Seite `geraet/GeraetRegistrierlisteDruckPage.tsx`); die Druckansicht einer Person bleibt draußen.
 - **Eigene Hülle** (`geraet/GeraeteLayout.tsx`): keine Modulleiste, kein Benutzermenü, keine
   Sprungpalette (`CommandPaletteProvider` öffnet bei `geraet` nicht), kein Org-Strom (`/api/live`
-  steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403), kein Ton
+  steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/settings`, 403), kein Ton
   und keine Benachrichtigung: beide Hüllen öffnen den Einsatzstrom mit `stumm` (Spec
   `benachrichtigungen`, „Gekoppelte Geräte bleiben still“; Nachweis `geraet/GeraetAbschnitt.test.tsx`,
   `geraet/LagemonitorPage.test.tsx`; einzige Ausnahme die Vibration des Einheitengeräts,
@@ -168,7 +168,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Karte ohne Zonenmarken (`zonenBeschriften={false}`); eine überbelegte UHS (`istUeberbelegt`: mehr Belegte
   als Plätze) steht in Kachel und Kartenmarke in der Alarmrolle. Die nächsten drei
   Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
-  `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
+  `/agenda-items` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
   Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Die Alarmzeile
   (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“) liest den Block `alarm` derselben
   Antwort: Zahlen aus den Zählfunktionen des Modulzählers, überfällige Rückmeldungen nur mit dem

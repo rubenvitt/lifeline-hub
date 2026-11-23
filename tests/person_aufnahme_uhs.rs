@@ -235,7 +235,7 @@ async fn aufnahme_braucht_uhs_modulzugriff_auch_beim_replay() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/unfallhilfsstellen"),
+        &format!("/api/einsaetze/{e}/module-overrides/unfallhilfsstellen"),
         &admin,
         Some(r#"{"sichtbar":false}"#),
     )

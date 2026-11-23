@@ -102,7 +102,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(einsatzFixture({ id: 7, bezeichnung: 'Hochwasser', ...a.einsatz })),
     ),
-    http.get('/api/einsaetze/7/modul-freigaben', () =>
+    http.get('/api/einsaetze/7/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
     http.get('/api/einsaetze/7/personal', ({ request }) =>

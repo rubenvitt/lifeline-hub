@@ -265,7 +265,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   // Storno löst die Fläche; sie bleibt als nicht zugeordnete Bezirksfläche stehen. Nach dem
   // Neuladen verbindet der Strom neu, das Storno darf ihm nicht zuvorkommen.
   await liveOffen(page);
-  await senden(andere, 'post', `${basis}/evacuation/districts/${bid}/cancel`);
+  await senden(andere, 'post', `${basis}/evacuation/districts/${bid}/annul`);
   await expect.poll(() => zonenLabel(page), { timeout: 30_000 }).toEqual(['Evakuierungsbezirk']);
   await andere.context().close();
 });
@@ -301,7 +301,7 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
   // Seit LLH-1034 zwei Module: die Stellen hängen an `betreuung`, Name und Räumung der Fläche an
   // `evakuierung`.
   for (const modul of ['betreuung', 'evakuierung'])
-    await senden(page, 'put', `${basis}/modul-overrides/${modul}`, {
+    await senden(page, 'put', `${basis}/module-overrides/${modul}`, {
       sichtbar: true,
       benoetigte_rolle: 'fuehrungskraft',
     });

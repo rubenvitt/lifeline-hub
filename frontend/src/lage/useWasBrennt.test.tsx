@@ -55,8 +55,8 @@ const rueckmeldung = (faellig: string) => ({
 
 function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] } = {}) {
   server.use(
-    http.get(`${BASIS}/modul-freigaben`, () => HttpResponse.json(freigabenFixture())),
-    http.get(`${BASIS}/modul-zaehler`, () => HttpResponse.json(zaehler)),
+    http.get(`${BASIS}/module-access`, () => HttpResponse.json(freigabenFixture())),
+    http.get(`${BASIS}/module-counts`, () => HttpResponse.json(zaehler)),
     http.get(`${BASIS}/persons`, () => HttpResponse.json(over.personen ?? [])),
     http.get(`${BASIS}/abschnitte`, () =>
       HttpResponse.json([
@@ -129,7 +129,7 @@ describe('useWasBrennt (LLH-1743)', () => {
   it('ohne Modul Meldungen: keine Rückmeldung, kein unvollständiger Stand', async () => {
     handler();
     server.use(
-      http.get(`${BASIS}/modul-freigaben`, () =>
+      http.get(`${BASIS}/module-access`, () =>
         HttpResponse.json(freigabenFixture({ meldungen: { sichtbar: true, zugriff: false } })),
       ),
     );
@@ -141,7 +141,7 @@ describe('useWasBrennt (LLH-1743)', () => {
   it('gesperrtes Material: Ausfall aus Personal und Fahrzeugen bleibt, wie im Meldebild (Review)', async () => {
     handler();
     server.use(
-      http.get(`${BASIS}/modul-freigaben`, () =>
+      http.get(`${BASIS}/module-access`, () =>
         HttpResponse.json(freigabenFixture({ material: { sichtbar: true, zugriff: false } })),
       ),
       http.get(`${BASIS}/einheiten`, () =>
@@ -185,7 +185,7 @@ describe('useWasBrennt (LLH-1743)', () => {
   it('gesperrte Einheiten: kein Ausfall, kein unvollständiger Stand', async () => {
     handler();
     server.use(
-      http.get(`${BASIS}/modul-freigaben`, () =>
+      http.get(`${BASIS}/module-access`, () =>
         HttpResponse.json(freigabenFixture({ einheiten: { sichtbar: true, zugriff: false } })),
       ),
     );
@@ -200,7 +200,7 @@ describe('useWasBrennt (LLH-1743)', () => {
       handler();
       let abrufe = 0;
       server.use(
-        http.get(`${BASIS}/modul-zaehler`, () => {
+        http.get(`${BASIS}/module-counts`, () => {
           abrufe += 1;
           return HttpResponse.json({
             ...zaehler,

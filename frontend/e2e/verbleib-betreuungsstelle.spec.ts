@@ -156,7 +156,7 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
     org_rolle: 'keine',
   });
   await senden(page, 'put', `${basis}/mitglieder/${bid}`, { einsatz_rolle: 'fuehrungspersonal' });
-  await senden(page, 'put', `${basis}/modul-overrides/betreuung`, {
+  await senden(page, 'put', `${basis}/module-overrides/betreuung`, {
     sichtbar: false,
     benoetigte_rolle: null,
   });

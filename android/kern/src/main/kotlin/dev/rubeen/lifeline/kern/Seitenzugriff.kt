@@ -21,6 +21,16 @@ object Seitenzugriff {
     }
 
     /**
+     * Bekommt die Seite den Standort (`navigator.geolocation`, LLH-2071)? Nur die Origin des
+     * aktiven Servers (dieselbe Regel wie [Bruecke.accepts]); der WebView nennt nur die Origin des
+     * fragenden Frames, also bekommt ein Unterframe derselben Origin ihn auch, ein fremdes nie.
+     * Hat die App selbst das Recht noch nicht, fragt sie danach, bevor sie freigibt. Der WebView
+     * merkt sich die Freigabe nie (`retain` immer `false`).
+     */
+    fun standort(origin: SeitenOrigin?, aktiverServer: ServerAdresse?): Boolean =
+        Bruecke.accepts(isMainFrame = true, origin, aktiverServer)
+
+    /**
      * MIME-Typen für den Systemdialog aus dem `accept` der Seite (`FileChooserParams.acceptTypes`):
      * Typen wie `image/png` bleiben, Endungen wie `.pdf` übersetzt [mimeFuerEndung] (die App fragt
      * `MimeTypeMap`). Leer heißt: keine Einschränkung, auch wenn eine Endung unbekannt ist. Lieber

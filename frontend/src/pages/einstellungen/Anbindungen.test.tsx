@@ -47,7 +47,7 @@ const zugang = (id: string, extra: Record<string, unknown> = {}) => ({
  */
 function einwurfLeer() {
   server.use(
-    http.get('/api/admin/einwurf-zugaenge', () =>
+    http.get('/api/admin/intake-credentials', () =>
       HttpResponse.json({ zugaenge: [], gesperrt_grund: null, transport: 'tls' }),
     ),
   );
@@ -80,14 +80,14 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
     return z;
   };
   server.use(
-    http.get('/api/admin/anbindungen', () =>
+    http.get('/api/admin/integrations', () =>
       HttpResponse.json({
         zugaenge: stand,
         gesperrt_grund: gesperrt,
         instanz_fingerabdruck: 'ABCD',
       }),
     ),
-    http.post('/api/admin/anbindungen', async ({ request }) => {
+    http.post('/api/admin/integrations', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'anlegen', body });
       return HttpResponse.json(
@@ -99,7 +99,7 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
         { status: 201 },
       );
     }),
-    http.post('/api/admin/anbindungen/a/widerrufen', () => {
+    http.post('/api/admin/integrations/a/revoke', () => {
       aufrufe.push({ pfad: 'widerrufen', body: null });
       return HttpResponse.json(
         merke(
@@ -111,7 +111,7 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
         ),
       );
     }),
-    http.patch('/api/admin/anbindungen/a', async ({ request }) => {
+    http.patch('/api/admin/integrations/a', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'aendern', body });
       if (konflikt.offen && body.basis_geaendert_at !== undefined) {
@@ -128,7 +128,7 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
         ),
       );
     }),
-    http.post('/api/admin/anbindungen/a/code', () => {
+    http.post('/api/admin/integrations/a/code', () => {
       aufrufe.push({ pfad: 'code', body: null });
       return HttpResponse.json(
         { zugang: zugang('a'), code: 'ZZZZ-YYYY-XXXX-WWWW', laeuft_ab_at: '2026-11-12 09:15:00' },
@@ -255,7 +255,7 @@ describe('Anbindungen (LLH-1652)', () => {
     let fehlschlag = false;
     stelleBereit();
     server.use(
-      http.get('/api/admin/anbindungen', () =>
+      http.get('/api/admin/integrations', () =>
         fehlschlag
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
           : HttpResponse.json({
@@ -278,7 +278,7 @@ describe('Anbindungen (LLH-1652)', () => {
   it('ohne Liste kein Anlegen, dafür „Erneut abrufen“', async () => {
     einwurfLeer();
     server.use(
-      http.get('/api/admin/anbindungen', () =>
+      http.get('/api/admin/integrations', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -438,7 +438,7 @@ describe('Anbindung · Ansicht (LLH-1652)', () => {
     });
     let fertigWiderrufen = false;
     server.use(
-      http.get('/api/admin/anbindungen', () =>
+      http.get('/api/admin/integrations', () =>
         HttpResponse.json({
           zugaenge: [fertigWiderrufen ? widerrufenerZugang : zugang('a')],
           gesperrt_grund: null,
@@ -446,7 +446,7 @@ describe('Anbindung · Ansicht (LLH-1652)', () => {
         }),
       ),
       http.post(
-        '/api/admin/anbindungen/a/widerrufen',
+        '/api/admin/integrations/a/revoke',
         () =>
           new Promise<Response>((fertig) => {
             loslassen = () => {

@@ -291,7 +291,7 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
           erfasst_von: 1,
         }),
       ),
-      http.post('/api/einsaetze/1/persons/7/uhs-occupancy/:bid/retract', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy/:bid/undo', ({ params }) => {
         zurueck.push(String(params.bid));
         return HttpResponse.json(
           { error: 'Das Austragen liegt mehr als 10 Minuten zurück' },

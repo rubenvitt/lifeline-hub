@@ -18,7 +18,7 @@ import { useAktiveWarnung } from './useAktiveWarnung';
 import { useModulZaehler } from './useModulZaehler';
 
 const GEBIETE = '/api/einsaetze/7/gefahrengebiete';
-const ZAEHLER = '/api/einsaetze/7/modul-zaehler';
+const ZAEHLER = '/api/einsaetze/7/module-counts';
 const WETTER = '/api/einsaetze/7/wetter';
 
 const STUNDE = 60 * 60_000;

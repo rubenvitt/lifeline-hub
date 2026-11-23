@@ -3,7 +3,7 @@ import { useId, type CSSProperties, type ReactNode } from 'react';
 import {
   Stapel,
   augenbraueStil,
-  monoStil,
+  schriftStil,
   paneelKopfStil,
   useRollen,
 } from '../../components/instrument';
@@ -50,7 +50,7 @@ export function klappKopfStil(token: {
 
 interface AbschnittProps {
   titel: string;
-  /** Mono-Meta rechts im Kopf (Zähler). */
+  /** Meta rechts im Kopf (Zähler, auch „2 an“). */
   meta?: ReactNode;
   /** Zeichen rechts im Kopf (z. B. ein Icon). */
   zeichen?: ReactNode;
@@ -75,7 +75,7 @@ export function LeistenAbschnitt({ titel, meta, zeichen, kennung, children }: Ab
         </h2>
         <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
           {meta != null && (
-            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
+            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
           {zeichen != null && (
             <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
@@ -140,7 +140,7 @@ export function KlappPaneel({
               als Flex-Kind ohne Breite unsichtbar. */}{' '}
         <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
           {meta != null && (
-            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
+            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
             {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}

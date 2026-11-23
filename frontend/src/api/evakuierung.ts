@@ -50,11 +50,7 @@ export function aendereBezirk(
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 export function storniereBezirk(einsatzId: number, bezirkId: number): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(
-    `${basis(einsatzId)}/districts/${bezirkId}/cancel`,
-    'POST',
-    {},
-  );
+  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/districts/${bezirkId}/annul`, 'POST', {});
 }
 
 /**
@@ -78,5 +74,5 @@ export function meldeStand(
 
 /** Rückweg einer Standmeldung; `standId` ist `BezirkMeldung.meldung_id`. Zweimal → 422. */
 export function nimmStandZurueck(einsatzId: number, standId: number): Promise<BezirkMeldung> {
-  return apiSend<BezirkMeldung>(`${basis(einsatzId)}/progress/${standId}/retract`, 'POST', {});
+  return apiSend<BezirkMeldung>(`${basis(einsatzId)}/progress/${standId}/undo`, 'POST', {});
 }

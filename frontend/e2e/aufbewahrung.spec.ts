@@ -84,10 +84,10 @@ async function abgeschlossen(page: Page, name: string, frist?: string): Promise<
   const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
   expect(r.ok(), await r.text()).toBeTruthy();
   const e = (await r.json()) as { id: number; einsatznummer_intern: string };
-  const z = await page.request.post(`/api/einsaetze/${e.id}/abschliessen`);
+  const z = await page.request.post(`/api/einsaetze/${e.id}/close`);
   expect(z.ok(), await z.text()).toBeTruthy();
   if (frist) {
-    const f = await page.request.put(`/api/einsaetze/${e.id}/aufbewahrungsfrist`, {
+    const f = await page.request.put(`/api/einsaetze/${e.id}/retention-period`, {
       data: { retention_bis: frist, bestaetigt: true },
     });
     expect(f.ok(), await f.text()).toBeTruthy();
@@ -181,7 +181,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
       data: { name: 'Yilmaz', vorname: 'Ayse' },
     });
     expect(p.ok(), await p.text()).toBeTruthy();
-    const z = await page.request.post(`/api/einsaetze/${e.id}/abschliessen`);
+    const z = await page.request.post(`/api/einsaetze/${e.id}/close`);
     expect(z.ok(), await z.text()).toBeTruthy();
 
     await page.goto(`/admin/aufbewahrung/${e.id}`);

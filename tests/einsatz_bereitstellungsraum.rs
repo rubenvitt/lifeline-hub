@@ -1361,7 +1361,7 @@ async fn verlauf_modul_ausgeblendet_403() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{eid}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(&json!({"sichtbar": false, "benoetigte_rolle": null})),
     )
@@ -2373,7 +2373,7 @@ async fn eintreffen_raum_und_rechte() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
         )
@@ -2394,7 +2394,7 @@ async fn eintreffen_raum_und_rechte() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": null})),
         )
@@ -2419,7 +2419,7 @@ async fn eintreffen_raum_und_rechte() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{eid}/module-overrides/einheiten"),
         &admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2676,7 +2676,7 @@ async fn uebernehmen_bezuege_und_zustaende() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{eid}/module-overrides/einheiten"),
         &cookie,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2747,7 +2747,7 @@ async fn abweisen_loest_auf_und_entlaesst() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/fahrzeuge"),
+        &format!("/api/einsaetze/{eid}/module-overrides/fahrzeuge"),
         &cookie,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2946,7 +2946,7 @@ async fn modul_sperren(app: &axum::Router, admin: &str, eid: i64, modul: &str, g
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
         admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": rolle})),
     )
@@ -4721,7 +4721,7 @@ async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
         )

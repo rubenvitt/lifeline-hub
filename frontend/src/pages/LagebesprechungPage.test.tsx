@@ -137,7 +137,7 @@ function rendere({
       termine.push(body);
       return HttpResponse.json({ ...stand, naechste_lagebesprechung_at: body.naechste_at });
     }),
-    http.get('/api/einsaetze/1/modul-freigaben', () => {
+    http.get('/api/einsaetze/1/module-access', () => {
       if (freigaben === 'haengt') return new Promise<Response>(() => {});
       if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
       return HttpResponse.json(freigaben);
@@ -167,7 +167,7 @@ function rendere({
         return HttpResponse.json([]);
       }),
     ),
-    http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
+    http.get('/api/einsaetze/1/module-counts', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );
   const seite = (
     <Routes>
@@ -584,7 +584,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     let offen = 3;
     const { client } = rendere({});
     server.use(
-      http.get('/api/einsaetze/1/modul-zaehler', () =>
+      http.get('/api/einsaetze/1/module-counts', () =>
         HttpResponse.json({ ...ZAEHLER, meldungen: { ...ZAEHLER.meldungen, offen } }),
       ),
     );

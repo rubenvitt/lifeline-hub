@@ -9,14 +9,14 @@ export interface ProgrammpunktEingabe {
 
 /** Alle Programmpunkte des Einsatzes nach Zeitpunkt, auch verstrichene. */
 export function ladeProgrammpunkte(einsatzId: number): Promise<Programmpunkt[]> {
-  return apiGet<Programmpunkt[]>(`/api/einsaetze/${einsatzId}/programmpunkte`);
+  return apiGet<Programmpunkt[]>(`/api/einsaetze/${einsatzId}/agenda-items`);
 }
 
 export function legeProgrammpunktAn(
   einsatzId: number,
   daten: ProgrammpunktEingabe,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`/api/einsaetze/${einsatzId}/programmpunkte`, 'POST', daten);
+  return apiSend<Programmpunkt>(`/api/einsaetze/${einsatzId}/agenda-items`, 'POST', daten);
 }
 
 /**
@@ -31,12 +31,12 @@ export function aendereProgrammpunkt(
   erwartet?: Partial<ProgrammpunktEingabe>,
 ): Promise<Programmpunkt> {
   return apiSend<Programmpunkt>(
-    `/api/einsaetze/${einsatzId}/programmpunkte/${id}`,
+    `/api/einsaetze/${einsatzId}/agenda-items/${id}`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );
 }
 
 export function loescheProgrammpunkt(einsatzId: number, id: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/programmpunkte/${id}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/agenda-items/${id}`, 'DELETE');
 }

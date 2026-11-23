@@ -54,6 +54,14 @@ class BrueckeTest {
         assertTrue(Bruecke.accepts(true, origin("https", "lager.example", 443), zweiter))
     }
 
+    /** LLH-2070: der WebView meldet einen Host mit Umlaut als Punycode; die Brücke bleibt nicht stumm. */
+    @Test
+    fun `ein Server mit Umlaut im Host passt zur Punycode-Origin des WebViews`() {
+        val lueneburg = ServerAdresse.parse("https://einsatz-lüneburg.de/")
+        assertTrue(Bruecke.accepts(true, SeitenOrigin.parse("https://xn--einsatz-lneburg-7vb.de"), lueneburg))
+        assertEquals("https://xn--einsatz-lneburg-7vb.de", Bruecke.allowedOriginRule(lueneburg))
+    }
+
     @Test
     fun `Großschreibung im Host zählt nicht`() {
         assertTrue(Bruecke.accepts(true, origin("HTTPS", "ELW.local", 8443), elw))

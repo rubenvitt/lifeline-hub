@@ -9,7 +9,7 @@ import { BLOECKE, STANDARDUMFANG, type BlockSchluessel } from './auswahl';
  * Die Weiche fällt VOR dem Abruf: ein im Einsatz ausgeblendetes Modul ist „nicht genutzt“ und
  * sperrt den Druck nicht, ein Modul ohne Zugriff sperrt ihn. Am Server sähen beide gleich aus
  * (403), deshalb unterscheidet sie der Client über die Modulfreigaben, die der Server je Benutzer
- * ausrechnet (`GET …/modul-freigaben`, LFH-669: Override, Rolle UND Org-Vorgabe). Unbekannt gibt
+ * ausrechnet (`GET …/module-access`, LFH-669: Override, Rolle UND Org-Vorgabe). Unbekannt gibt
  * nichts frei (Spec `modul-freigabe`). Der Server bleibt Türsteher: ein 403 trotz `abrufen`
  * (Aufbewahrungsfrist) wertet der Abruf als „kein Zugriff“, nie als leeren Bestand.
  *

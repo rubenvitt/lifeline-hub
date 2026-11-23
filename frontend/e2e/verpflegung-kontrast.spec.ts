@@ -127,7 +127,7 @@ for (const modus of ['light', 'dark'] as const) {
       `${basis}/time-slots/${fruehstueck.id}/distributions`,
       { menge: 25, zeitpunkt_at: zeit(-30), ort: 'Deichweg' },
     );
-    await post(page, `${basis}/distributions/${falsch.ausgabe_id}/retract`);
+    await post(page, `${basis}/distributions/${falsch.ausgabe_id}/undo`);
     // Stellen: zwei aktive (eine danach aufgelöst), eine geplante.
     const stelle = async (bezeichnung: string, art: string, status?: string) => {
       const { id } = await post(page, `${basis}/positions`, { bezeichnung, art });

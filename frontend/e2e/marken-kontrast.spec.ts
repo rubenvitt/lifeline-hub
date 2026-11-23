@@ -110,7 +110,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     // Status einer Online-Quelle. Inaktiv angelegt und wieder gelöscht: eine aktive Quelle mit
     // unerreichbarer URL bräche jede spätere Lagekarte im selben Shard.
-    const quelle = await post(page, '/api/karte/online-quellen', {
+    const quelle = await post(page, '/api/map/online-sources', {
       name: `E2E 1022 ${modus} ${Date.now()}`,
       url: `https://e2e.example/${Date.now()}/{z}/{x}/{y}.png`,
       typ: 'raster',
@@ -130,7 +130,7 @@ for (const modus of ['light', 'dark'] as const) {
       await page.mouse.move(1, 1);
       await pruefe(inaktiv, TEXT[modus], `${modus}: Online-Quelle „inaktiv“`);
     } finally {
-      await page.request.delete(`/api/karte/online-quellen/${quelle.id}`);
+      await page.request.delete(`/api/map/online-sources/${quelle.id}`);
     }
   });
 }

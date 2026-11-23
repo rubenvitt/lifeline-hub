@@ -126,9 +126,8 @@ overrides:
   # GHSA-c83g-rgw3-j3cx (high): unbegrenztes Cache-Wachstum ohne Eviction (OOM), sowie
   # ein zweiter Fund derselben Version (Crash/Prototype-Write über eine untrusted
   # `browserslist-stats.json`). Beide gepatcht ab 4.28.7, der Lockfile stand auf 4.28.4.
-  # Ketten: eslint-plugin-react-hooks → @babel/core → @babel/helper-compilation-targets →
-  # browserslist, dazu vite-plugin-pwa → workbox-build → @babel/core bzw.
-  # @babel/preset-env (gemeldet über 100 Pfade, alle über @babel).
+  # Kette: vite-plugin-pwa → workbox-build → @babel/core bzw. @babel/preset-env →
+  # @babel/helper-compilation-targets → browserslist (viele Pfade, alle über @babel).
   # Reines Build-Zeit-Tooling — browserslist beantwortet beim Bundeln die Zielbrowser-
   # Frage und liegt nicht im ausgelieferten Bündel. Wir rufen es nirgends selbst; kein
   # Direktabhängiger führt es, ein Bump ohne Override gibt es also nicht.
@@ -150,27 +149,14 @@ overrides:
   brace-expansion@>=2.0.0 <2.1.6: ^2.1.6
 
   # GHSA-rgw5-rvv9-x895 (high): dieselbe DoS-Lücke in der 5.x-Linie.
-  # Ketten: @eslint/js → eslint → @eslint/config-array → minimatch sowie vite-plugin-pwa →
-  # workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9 ist ein
-  # Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh geprüft.
+  # Kette: vite-plugin-pwa → workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9
+  # ist ein Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh
+  # geprüft.
   #
   # NACHGEZOGEN 2026-09-30: dieselben beiden Funde wie in der 2.x-Linie oben, hier
   # GHSA-6j4f-fj2g-mc7p (betrifft < 5.0.10) und GHSA-qhr7-859c-m2p7 (betrifft < 5.0.11).
   # Schwelle und Ziel stehen jetzt bei 5.0.11.
   brace-expansion@>=5.0.0 <5.0.11: ^5.0.11
-
-  # GHSA-mrhx-c7xc-m3w5 (high): Speichererschöpfung beim Validieren übergroßer Collections
-  # mit Größen-Constraints (betrifft < 4.6.6). Fund 2026-10-24, alpha ohne eigenes Zutun rot.
-  # Kette: eslint-plugin-react-hooks → zod sowie eslint-plugin-react-hooks →
-  # zod-validation-error → zod. Reines Lint-Zeit-Tooling (der im Plugin eingebettete React
-  # Compiler prüft damit seine Konfigurations- und Typ-Schemata); das Frontend selbst
-  # importiert zod nicht, kein Laufzeit-Code im Bündel. eslint-plugin-react-hooks 7.1.1 ist
-  # die neueste Version und fordert `zod ^3.25.0 || ^4.0.0`, zod-validation-error dasselbe
-  # als Peer: beide lassen den Fix zu, keiner erzwingt ihn, das Lockfile löste 4.4.3. Der
-  # Override hebt innerhalb dieser Range (Same-Major-Minor, kein Major); verifiziert durch
-  # `pnpm lint` und check-all.sh. Entfällt, sobald eslint-plugin-react-hooks selbst
-  # `zod >=4.6.6` fordert.
-  zod@>=4.0.0 <4.6.6: ^4.6.6
 
   # GHSA-2v37-7h3g-55p8 (high): custom-Generatoren von nanoid loopen unbegrenzt bei size 0.
   # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,

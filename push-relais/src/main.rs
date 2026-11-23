@@ -18,12 +18,13 @@ async fn main() -> anyhow::Result<()> {
     let pool = speicher::oeffnen(&cfg.datenbank).await?;
     match cfg.command.clone().unwrap_or(Command::Serve) {
         Command::Serve => {
+            let client_ip = cfg.client_ip_source()?;
             let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
             let apns = ApnsClient::neu(&cfg)?;
             let state = RelaisState::neu(
                 pool,
                 cfg.registrierungen_stunde,
-                cfg.hinter_proxy,
+                client_ip,
                 apns,
                 cfg.limit_minute,
             );

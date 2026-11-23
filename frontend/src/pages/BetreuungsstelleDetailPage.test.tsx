@@ -366,7 +366,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
   /** Standort über das Ortsfeld (LLH-1121, design.md D3/D6). */
   it('Bearbeiten: ein gewählter Standort verortet die Stelle, Text und Paar gehen hinaus', async () => {
     server.use(
-      http.get('/api/einsaetze/1/ort-suche', () =>
+      http.get('/api/einsaetze/1/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [
@@ -379,7 +379,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
           ],
         }),
       ),
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
     );
@@ -405,7 +405,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
 
   it('Bearbeiten: eine Textkorrektur am verorteten Standort behält den Punkt', async () => {
     server.use(
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
     );

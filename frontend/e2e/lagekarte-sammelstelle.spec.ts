@@ -186,7 +186,7 @@ test('Sammelstelle: ohne Modul Evakuierung keine Ebene und kein Marker', async (
   await oeffneEbenenGruppe(page, 'betroffene');
   await expect(page.locator('[data-ebene="sammelstelle"]')).toHaveCount(1, { timeout: 30_000 });
 
-  await senden(page, 'put', `${basis}/modul-overrides/evakuierung`, {
+  await senden(page, 'put', `${basis}/module-overrides/evakuierung`, {
     sichtbar: false,
     benoetigte_rolle: null,
   });

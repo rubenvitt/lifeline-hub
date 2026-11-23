@@ -244,7 +244,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('Abbrechen der Rückfrage sendet nichts', async () => {
     liefere('/districts/5/progress', STAENDE);
-    const ids = faengeRuecknahme('/progress/:id/retract', () => HttpResponse.json({}));
+    const ids = faengeRuecknahme('/progress/:id/undo', () => HttpResponse.json({}));
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     await screen.findByText('480 evakuiert (gezählt)');
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 300 von/ }));
@@ -257,7 +257,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('Bestätigen sendet genau EINE Rücknahme an die gewählte Meldung, die Rückfrage nennt „aktuell“', async () => {
     liefere('/districts/5/progress', STAENDE);
-    const ids = faengeRuecknahme('/progress/:id/retract', () =>
+    const ids = faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ meldung_id: 3, bezirk: {} }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -276,7 +276,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('eine Belegungsmeldung geht an die Rücknahme-Route der Belegungen', async () => {
     liefere('/positions/9/occupancies', BELEGUNGEN);
-    const ids = faengeRuecknahme('/occupancies/:id/retract', () =>
+    const ids = faengeRuecknahme('/occupancies/:id/undo', () =>
       HttpResponse.json({ meldung_id: 8, stelle: {} }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
@@ -291,7 +291,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('ein Fehler bleibt IM offenen Dialog und erscheint nicht als Toast', async () => {
     liefere('/districts/5/progress', STAENDE);
-    faengeRuecknahme('/progress/:id/retract', () =>
+    faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ error: 'Die Standmeldung ist bereits zurückgenommen' }, { status: 422 }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -312,7 +312,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('ein alter Grund wandert nicht in eine neue Rückfrage', async () => {
     liefere('/districts/5/progress', STAENDE);
-    faengeRuecknahme('/progress/:id/retract', () =>
+    faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ error: 'Alter Grund' }, { status: 422 }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -335,7 +335,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     let antworte: (r: Response) => void = () => {};
     server.use(
       http.post(
-        `${E}/progress/:id/retract`,
+        `${E}/progress/:id/undo`,
         () => new Promise<Response>((fertig) => (antworte = fertig)),
       ),
     );
@@ -356,9 +356,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
 
   it('nach der Rücknahme liegt der Fokus im Verlauf, nicht auf <body>', async () => {
     liefere('/districts/5/progress', STAENDE);
-    faengeRuecknahme('/progress/:id/retract', () =>
-      HttpResponse.json({ meldung_id: 4, bezirk: {} }),
-    );
+    faengeRuecknahme('/progress/:id/undo', () => HttpResponse.json({ meldung_id: 4, bezirk: {} }));
     const { container } = renderMitProviders(
       <MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />,
     );

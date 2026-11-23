@@ -529,7 +529,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("{basis}/modul-zaehler"),
+        &format!("{basis}/module-counts"),
         &geraet,
         None,
     )
@@ -1235,7 +1235,7 @@ async fn kein_koppeln_am_abgeschlossenen_einsatz() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1495,7 +1495,7 @@ async fn einsatzabschluss_beendet_jede_kopplung() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1654,10 +1654,10 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
     for (methode, uri) in [
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
         ("GET", format!("/api/einsaetze/{einsatz}/geraete")),
-        ("GET", format!("/api/einsaetze/{einsatz}/modul-vorgaben")),
+        ("GET", format!("/api/einsaetze/{einsatz}/module-defaults")),
         ("GET", "/api/einsaetze".to_string()),
         ("GET", "/api/benutzer".to_string()),
-        ("POST", format!("/api/einsaetze/{einsatz}/abschliessen")),
+        ("POST", format!("/api/einsaetze/{einsatz}/close")),
         ("GET", "/api/live".to_string()),
     ] {
         let (s, _) = anfrage(&app, methode, &uri, &geraet, None).await;
@@ -1769,13 +1769,13 @@ async fn geraet_erreicht_den_kachel_proxy() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            "/api/karte/proxy/999/raster/64/0/0",
+            "/api/map/proxy/999/raster/64/0/0",
             geraet,
             None,
         )
         .await;
         assert_eq!(s, StatusCode::NO_CONTENT);
-        let (s, _) = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", geraet, None).await;
+        let (s, _) = anfrage(&app, "GET", "/api/map/proxy/999/style.json", geraet, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
     }
 }
@@ -1791,7 +1791,7 @@ async fn modulfreigaben_des_geraets_folgen_der_ansicht() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &format!("/api/einsaetze/{einsatz}/module-access"),
         &geraet,
         None,
     )
@@ -1825,7 +1825,7 @@ async fn modulfreigabe_sperrt_zusaetzlich() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
         &admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
     )
@@ -1835,7 +1835,7 @@ async fn modulfreigabe_sperrt_zusaetzlich() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &format!("/api/einsaetze/{einsatz}/module-access"),
         &geraet,
         None,
     )
@@ -1874,7 +1874,7 @@ async fn einsatzfuehrung_sperrt_das_geraet() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
         &admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "einsatzfuehrung"})),
     )
@@ -1893,7 +1893,7 @@ async fn einsatzfuehrung_sperrt_das_geraet() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &format!("/api/einsaetze/{einsatz}/module-access"),
         &geraet,
         None,
     )
@@ -2252,7 +2252,7 @@ async fn tablet_kennt_nur_die_eigene_uhs() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &format!("/api/einsaetze/{einsatz}/module-counts"),
         &geraet,
         None,
     )
@@ -4163,7 +4163,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &format!("/api/einsaetze/{einsatz}/module-counts"),
         &geraet,
         None,
     )
@@ -4235,7 +4235,7 @@ async fn br_geraet_liest_nur_das_material_des_eigenen_raums() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &format!("/api/einsaetze/{einsatz}/module-access"),
         &geraet,
         None,
     )
@@ -5641,7 +5641,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/care/occupancies/{meldung}/retract"),
+            &format!("/api/einsaetze/{einsatz}/care/occupancies/{meldung}/undo"),
             &geraet,
             None,
         )
@@ -5668,7 +5668,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/care/positions/{nord}/cancel"),
+            format!("/api/einsaetze/{einsatz}/care/positions/{nord}/annul"),
             None,
         ),
     ] {
@@ -5680,7 +5680,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &format!("/api/einsaetze/{einsatz}/module-counts"),
         &geraet,
         None,
     )
@@ -6252,8 +6252,8 @@ async fn wiederoeffnen_mit_kopplung_an_verpflegungsstelle_meldet_sich_live() {
         let admin = admin.clone();
         async move {
             for (pfad, body) in [
-                ("abschliessen", None),
-                ("wiedereroeffnen", Some(json!({ "grund": "Versehen" }))),
+                ("close", None),
+                ("reopen", Some(json!({ "grund": "Versehen" }))),
             ] {
                 let (s, v) = anfrage_json(
                     &app,
@@ -6532,7 +6532,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/distributions/{zurueck}/retract"),
+        &format!("{basis}/distributions/{zurueck}/undo"),
         &admin,
         None,
     )
@@ -6681,7 +6681,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("{basis}/distributions/{}/retract", a["id"]),
+            &format!("{basis}/distributions/{}/undo", a["id"]),
             &geraet,
             None,
         )
@@ -6691,7 +6691,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/distributions/{eigene}/retract"),
+        &format!("{basis}/distributions/{eigene}/undo"),
         &geraet,
         None,
     )
@@ -6824,7 +6824,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/distributions/{ausgabe}/retract"),
+        &format!("{basis}/distributions/{ausgabe}/undo"),
         &geraet,
         None,
     )
@@ -7045,14 +7045,14 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
     }
 
-    let (s, v) = anfrage(&app, "GET", &format!("{e}/modul-freigaben"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{e}/module-access"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["verpflegung"]["zugriff"], true, "{v}");
     assert_eq!(v["meldungen"]["zugriff"], true, "{v}");
     assert_eq!(v["nachforderungen"]["zugriff"], false, "{v}");
     assert_eq!(v["personal"]["zugriff"], false, "{v}");
 
-    let (s, v) = anfrage(&app, "GET", &format!("{e}/modul-zaehler"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{e}/module-counts"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(
         v["meldungen"].is_null(),
@@ -7802,7 +7802,7 @@ async fn einheitengeraet_sieht_nur_die_eigene_einheit() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("{basis}/modul-zaehler"),
+        &format!("{basis}/module-counts"),
         &geraet,
         None,
     )
@@ -9013,7 +9013,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     // Der überfällige Auftrag legt selbst eine Erinnerung an die Quittierfrist an; sie zählt am
     // Auftrag, nicht als Erinnerung (LLH-1908). Es bleibt die selbst angelegte „Frau Notiz
     // anrufen“. Die Zahl ist die des Modulzählers.
-    let (_, z) = anfrage(&app, "GET", &format!("{basis}/modul-zaehler"), &admin, None).await;
+    let (_, z) = anfrage(&app, "GET", &format!("{basis}/module-counts"), &admin, None).await;
     assert_eq!(
         a["erinnerungen_faellig"], z["erinnerungen"]["faellig"],
         "{z}"
@@ -9098,7 +9098,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -9354,7 +9354,7 @@ async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{belegung}/{aus}/retract"),
+        &format!("{belegung}/{aus}/undo"),
         &geraet,
         None,
     )
@@ -9376,7 +9376,7 @@ async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{belegung}/{aus}/retract"),
+        &format!("{belegung}/{aus}/undo"),
         &geraet,
         None,
     )
@@ -9500,7 +9500,7 @@ async fn geraet_darf_keine_praesenz_melden() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/praesenz"),
+        &format!("/api/einsaetze/{eid}/presence"),
         &geraet,
         Some(r#"{"objekt":"einsatz","felder":["stichwort"],"fenster":"t"}"#),
     )

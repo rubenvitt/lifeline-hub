@@ -20,7 +20,7 @@ beforeEach(() => {
   gesendet = [];
   antwort = () => HttpResponse.json({ zustand: 'frist_laeuft' });
   server.use(
-    http.post('/api/aufbewahrung/einsaetze/7/wiederherstellen', async ({ request }) => {
+    http.post('/api/retention/incidents/7/restore', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return antwort();
     }),
