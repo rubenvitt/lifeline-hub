@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0085). Der Wächter irrt in beide
+# Selbsttest für scripts/check-api-routen.sh (LLH-1979, ADR-0093). Der Wächter irrt in beide
 # Richtungen still: ließe er eine deutsche Route durch, wüchse der Bestand wieder, den die
 # Pakete von LLH-1979 abbauen; schlüge er auf Testcode oder eine englische Route an, würde er
 # abgeschaltet.
@@ -151,6 +151,15 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+# Pakete unter `/api/einsaetze/{id}/` übersetzen erst die Segmente nach `{id}`, das Präfix zuletzt
+# (LLH-2057): der umbenannte Pfad bleibt bis dahin im Bestand, aber nur mit `einsaetze` als
+# einzigem deutschen Segment.
+fall "neue Bestandszeile, einziges deutsches Segment einsaetze" gruen \
+  "route_dazu '/api/einsaetze/{id}/health' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/health' > scripts/api-routen-bestand.txt" \
+  "OK"
+fall "neue Bestandszeile mit einsaetze und einem weiteren deutschen Segment" rot \
+  "route_dazu '/api/einsaetze/{id}/neu-deutsch' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/neu-deutsch' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/neu-deutsch" "origin/alpha"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0085, Wurzel-`AGENTS.md`,
+# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0093, Wurzel-`AGENTS.md`,
 # „Bezeichner-Sprache“). Herleitung:
 # `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
 #
@@ -17,7 +17,9 @@
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
 #   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
-#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
+#     der Bestand wächst nicht, außer um Pfade, deren einziges Segment außerhalb des Glossars
+#     `einsaetze` ist (die Pakete unter `/api/einsaetze/{id}/`, bis das Präfix-Paket LLH-2061 es
+#     umstellt; ADR-0093). Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
@@ -134,7 +136,7 @@ ohne_bestand="$(comm -23 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '
 if [ -n "$ohne_bestand" ]; then
   while IFS="$(printf '\t')" read -r pfad seg; do
     melde "$pfad: Segment '$seg' steht nicht im Glossar (scripts/api-routen-woerter.tsv)." \
-      "Englisch benennen und den Begriff eintragen (ADR-0085)."
+      "Englisch benennen und den Begriff eintragen (ADR-0093)."
   done <<< "$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NR == FNR { neu[$0] = 1; next } ($1 in neu)' \
     <(printf '%s\n' "$ohne_bestand") -)"
 fi
@@ -152,10 +154,20 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
+    # Ausnahme bis zum Präfix-Paket (LLH-2061): Ein Paket unter `/api/einsaetze/{id}/` übersetzt
+    # erst die Segmente nach `{id}`; der umbenannte Pfad darf neu im Bestand stehen, wenn
+    # `einsaetze` sein einziges Segment außerhalb des Glossars ist (LLH-2057).
+    if [ -n "$neu_zeilen" ]; then
+      neu_zeilen="$(printf '%s\n' "$unbekannt" | awk -F'\t' '
+        NR == FNR { neu[$0] = 1; next }
+        ($1 in neu) && $2 != "einsaetze" { print $1 }
+      ' <(printf '%s\n' "$neu_zeilen") - | sort -u)"
+      # Eine neue Zeile, die gar nicht registriert ist, meldet schon Prüfpunkt 2 als veraltet.
+    fi
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0085). Die Route englisch benennen."
+          "(ADR-0093). Die Route englisch benennen."
       done <<< "$neu_zeilen"
     fi
   fi
@@ -164,7 +176,7 @@ else
 fi
 
 if [ "$fehler" -gt 0 ]; then
-  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0085)." >&2
+  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0093)." >&2
   exit 1
 fi
 echo "OK: $(registrierte_pfade | wc -l | tr -d ' ') API-Routen geprüft, $(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ') im deutschen Bestand."

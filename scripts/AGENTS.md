@@ -207,9 +207,10 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   der macOS-Build nach dem Release (LFH-1050)
   (`openspec/changes/archive/2026-10-05-lfh-1053-schreibweisen-waechter/design.md`).
 - **API-Routen englisch** (LLH-1979, Schritt 14, `scripts/check-api-routen.sh`, Regel in der
-  Wurzel-`AGENTS.md`, „Bezeichner-Sprache“, und ADR-0085): jedes Segment einer registrierten Route
+  Wurzel-`AGENTS.md`, „Bezeichner-Sprache“, und ADR-0093): jedes Segment einer registrierten Route
   steht im Glossar `scripts/api-routen-woerter.tsv`; deutsche Pfade nur aus
-  `scripts/api-routen-bestand.txt`, der gegenüber der Merge-Base mit `origin/alpha` nicht wächst
+  `scripts/api-routen-bestand.txt`, der gegenüber der Merge-Base mit `origin/alpha` nur um Pfade
+  wächst, die allein noch das Präfix `einsaetze` tragen
   (im Bündel `schnell` fehlt der Ref; durchgesetzt in `migrationen.yml`, Schritt „Bestand der
   deutschen API-Routen“, ohne eigenen Status). Nach einem
   Umbenennungspaket: `scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt`.

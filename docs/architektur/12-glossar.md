@@ -9,7 +9,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 `frontend/src/einsatz/modulRegistry.ts`. Die Begriffe rund um Meldungen stehen in der Tabelle
 „Begriffe“ von [`docs/design/2026-10-21-meldungsmodell/README.md`](../design/2026-10-21-meldungsmodell/README.md).
 Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
-`scripts/api-routen-woerter.tsv` ([ADR-0085](entscheidungen/ADR-0085-api-routen-sind-englisch-nach-glossar.md)).
+`scripts/api-routen-woerter.tsv` ([ADR-0093](entscheidungen/ADR-0093-api-routen-englisch-bestand-waechst-nur-um-den-praefix.md)).
 
 ## 12.1 Fachbegriffe
 
