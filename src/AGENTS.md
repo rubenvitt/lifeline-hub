@@ -247,7 +247,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
   `frontend/src/api/adapter.ts`.
 - **Störung melden** (LLH-2026,
-  [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   nur der Lauf meldet, über den Merker `adapter.gemeldet` (`repo::mark_gemeldet` in seiner
   Transaktion, `zustand::meldung_nach_fehlschlag` entscheidet: Eingriff sofort, gestört ab 30
   Minuten, gesperrter Speicher nie). Ein Admin-Schreibweg, der einen Stopp aufhebt oder setzt
@@ -849,7 +849,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Client per `GET`.
 - **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
   Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
-- **Zwei Orte** (LLH-2026, ADR-0084): eine Zeile hängt an einem Einsatz oder an einem Adapter
+- **Zwei Orte** (LLH-2026, ADR-0086): eine Zeile hängt an einem Einsatz oder an einem Adapter
   (`Ort`, `benachrichtigung.adapter_id`, CHECK genau einer). Am Adapter gilt nur
   `Adressat::OrgAdmins` (aktive System-Admins seiner Org); Empfänger, Leserecht (`darf_lesen`) und
   Text stehen nur in `benachrichtigung::adapter`, Erledigen für alle nur über
