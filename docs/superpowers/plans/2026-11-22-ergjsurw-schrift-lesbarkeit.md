@@ -227,3 +227,88 @@ Köpfe (Bereichskopf, Paneel, Kennzahl) und bleiben unberührt.
   Lagekarten-Inspector misst (Grep nach `datenfeld`, `einsatzdaten`, `auswahl-`) → grün.
 - [x] **Step 6: Bilder** vorher/nachher (Einsatzdaten-Datenraster, Bearbeiten-Modus,
   Lagekarten-Inspector), Commit, Push, PR gegen `alpha` mit Label `voll`.
+
+---
+
+## Teil 3 — LLH-2044 Boden 11 px, Seitentitel 16 px
+
+Zunder: https://zunder.rubeen.dev/#/aufgabe/ebue3pipo8ja2tetp3xc5w0d
+
+Stand `alpha` a09dc207. Unter 11 px liegen drei Stufen (`augenbraue` 10, `railEtikett` 9,
+`metaKlein` 10, rund 31 Aufrufer) und acht Schuld-Literale. Davon sind fünf Nicht-Ziele und bleiben:
+`fernmeldewesen/skizze/SkizzenElemente.tsx` (7, 9: Fernmeldeskizze),
+`pages/lagekarte/LageplanDruck.tsx` (9: Druck), `pages/lagekarte/clusterDonut.ts` (10: Cluster) und
+`pages/lagekarte/Sichtungslegende.tsx` (8: Kurzzeichen im Kreis, Abbild des Kartenmarkers). Drei
+rasten ein: `lagekarte.css` (Maßstab 10 → `--lfh-typo-meta-*`), `wetter/Verlaufslinie.tsx`
+(Prognose-Beschriftung 9 → `monoStil('meta')`), `lagekarte/KartenDetailCard.tsx` (Kachel 9 →
+`monoStil('meta')`, Kachel 38 px).
+
+Nächste ADR-Nummer: ADR-0085 (höchste auf `alpha` 0084).
+
+**Review Focus (Teil 3):**
+1. Ein Rail-Etikett („ERFASSUNG“) läuft bei 11 px über die 64-px-Rail → `e2e/rail-etikett.spec.ts`
+   misst `scrollWidth` und Kasten in jeder Dichte (Task 8).
+2. Der Seitentitel 16 px bricht den 44-px-Seitenkopf in `kompakt` oder schiebt Werkzeuge in einen
+   Umbruch → `einsatztauglichkeit-layout`, `seitenkopf-werkzeuganteil`, `kraefte-seitenkopf`,
+   `kopfzeile-schmal` (Task 12).
+3. Augenbraue 11 px bricht Kennzahl-Titel oder Paneelköpfe in zwei Zeilen → Risiko-Specs
+   `kennzahl*`, `gate1-ueberlauf`, `leisten-flaeche`, Handy-Specs (Task 12).
+4. Ein Aufrufer von `metaKlein` bleibt übrig (CSS-Variable `--lfh-typo-meta-klein-*`) → Typecheck
+   und `rollen.guard` (bekannte Variablen) fangen beides (Task 7).
+
+### Task 7: Skala-Werte, Boden-Wächter, `metaKlein` entfällt
+
+**Files:** `theme/tokens.ts`, `theme/rollen.css`, `theme/rollen.guard.test.ts`,
+`components/instrument/rollenwerte.ts`, `components/instrument/Augenbraue.test.tsx`, alle
+`metaKlein`-Aufrufer (→ `'meta'`).
+
+**Interfaces:** `schriftskala.augenbraue = { groesse: 11, gewicht: 600, familie: 'text', sperrung:
+'0.08em', versal: true }`, `railEtikett = { groesse: 11, gewicht: 500, familie: 'text', sperrung:
+'0.04em', versal: true }`, `seitentitel.groesse = 16`, `metaKlein` entfällt (Typ `Schriftstufenname`
+ohne sie). Export `export const SCHRIFT_BODEN = 11;` in `theme/tokens.ts`.
+
+- [ ] **Step 1: Tests** in `rollen.guard.test.ts`: `it('keine Stufe unter dem Schriftboden 11 px (LLH-2044)')`
+  über alle Werte der `schriftskala` (`groesse >= SCHRIFT_BODEN`, `SCHRIFT_BODEN === 11`); Pins
+  auf die neuen Werte (Augenbraue, Seitentitel 16, Mono-Stufen 11 bis 14 ohne `metaKlein`,
+  `railEtikett`); `--lfh-typo-meta-klein` aus der Liste der bekannten Variablen. Augenbraue-Test:
+  `fontSize: '11px'`.
+- [ ] **Step 2: rot sehen** — `vitest run src/theme/rollen.guard.test.ts src/components/instrument/Augenbraue.test.tsx` → FAIL.
+- [ ] **Step 3: umsetzen** (Werte, CSS-Spiegel, Doku-Kommentare an Skala, `monoStil`, IconRail,
+  EinsatzSeite), alle `metaKlein`-Aufrufer auf `meta`.
+- [ ] **Step 4: grün sehen** — dieselben Läufe, `vitest run src/theme src/components`, Typecheck → PASS.
+- [ ] **Step 5: Commit** `feat(frontend): Schriftboden 11 px, Seitentitel 16 px, metaKlein entfällt (LLH-2044)`.
+
+### Task 8: Rail 64 px
+
+- [ ] **Step 1:** `Kopfleiste.test.tsx` erwartet `railBreite` 64 / 64 / 73; `IconRail.test.tsx`
+  Kommentare/Mock auf 64. Rot sehen.
+- [ ] **Step 2:** `RAIL_BREITE = 64` in `components/Kopfleiste.tsx`; Kommentare in `rail-etikett.spec.ts`
+  (11 px, .04em, 64 px) nachziehen. Grün sehen, dann `e2e/rail-etikett.spec.ts` (alle Dichten) → PASS.
+- [ ] **Step 3: Commit** `feat(frontend): Rail 64 px für das 11-px-Etikett (LLH-2044)`.
+
+### Task 9: Schuld unter 11 px einrasten
+
+- [ ] **Step 1:** Schuld senken (`lagekarte.css`, `Verlaufslinie.tsx`, `KartenDetailCard.tsx` je 1 → Eintrag fällt);
+  Ratsche läuft rot (mehr Funde als Schuld).
+- [ ] **Step 2:** die drei Stellen auf Stufen; Ratsche und betroffene Tests grün.
+- [ ] **Step 3: Commit** `refactor(frontend): Schriftgrößen unter 11 px auf Stufen (LLH-2044)`.
+
+### Task 10: ADR-0085, Regel
+
+- [ ] ADR-0085 „Text hat einen Boden von 11 px“ ersetzt ADR-0071: übernimmt deren Regeln (Mono-Stufen
+  jetzt `meta` 11 bis `monoGross` 14), neu „MUST NOT: eine Stufe der `schriftskala` unter 11 px“,
+  Prüfung mit den Pins von ADR-0071 plus `SCHRIFT_BODEN = 11`; ADR-0071 `status: ersetzt`,
+  `ersetzt_durch: ADR-0085`. `frontend/AGENTS.md`, „`schriftskala`“: Boden, Werte, Verweis.
+  `scripts/check-all.sh --nur schnell` bzw. `scripts/check-architektur.sh` → grün. Commit.
+
+### Task 11: Design System, Anwender-Bilder
+
+- [ ] Design System neu erzeugen. Anwender-Bilder: Augenbraue, Rail und Seitentitel stehen auf
+  fast jeder Ansicht; alle Kapitel neu, committet werden die Bilder, die sich gegenüber einem
+  `alpha`-Lauf in derselben Umgebung über das Rauschen hinaus ändern. Commit.
+
+### Task 12: Gate, Risiko-e2e, PR
+
+- [ ] Gate grün; Risiko-Specs aus dem Entwurf („Für jeden Teil gleich“) plus
+  `rail-etikett`, `einsatztauglichkeit-layout`, `seitenkopf-werkzeuganteil`, `kraefte-seitenkopf`,
+  `kennzahl*`, `hellmodus-kontrast` → grün oder Platz schaffen. Bilder vorher/nachher, PR `voll`.
