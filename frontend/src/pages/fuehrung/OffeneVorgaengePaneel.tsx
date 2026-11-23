@@ -196,13 +196,13 @@ export default function OffeneVorgaengePaneel({
       <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
         {haupt}
       </Textstufe>
-      {unter && <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{unter}</span>}
+      {unter && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{unter}</span>}
     </Stapel>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span
       data-lfh="vorgang-wort"
-      style={{ ...monoStil('metaKlein'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
+      style={{ ...monoStil('meta'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
     >
       {w}
     </span>

@@ -3,8 +3,8 @@ import type { Farbrollen } from '../../theme/tokens';
 import { schriftStil, useRollen } from './rollenwerte';
 
 /**
- * Augenbraue — die Metadaten-Stimme des Neuentwurfs: 10 px, 600, Versalien, Sperrung
- * .14em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt Köpfe: Paneele,
+ * Augenbraue — die Metadaten-Stimme des Neuentwurfs: 11 px (Boden, LLH-2044), 600, Versalien, Sperrung
+ * .08em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt Köpfe: Paneele,
  * Kennzahlen, Tabellenspalten, Gruppen und Abschnitte. Ein Feld benennt sie nicht, das tut das
  * `Feldetikett` (LLH-2045); deshalb kennt sie `als="dt"` nicht.
  *
