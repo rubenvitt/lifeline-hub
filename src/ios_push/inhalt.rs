@@ -59,17 +59,22 @@ pub async fn klartext(
     ereignis: &BenachrichtigungEreignis,
     mit_inhalt: bool,
 ) -> Result<Klartext, AppError> {
+    // Ohne Einsatz (Störung einer Anbindung, LLH-2026) gibt es keinen Klartext: `e` ist Pflicht
+    // auf dem Wire. `benachrichtigung::ausliefern` reicht solche Ereignisse gar nicht erst her.
+    let einsatz_id = ereignis.einsatz_id.ok_or_else(|| {
+        AppError::Internal("iOS-Push ohne Einsatz hat keinen Klartext".to_owned())
+    })?;
     let (titel, detail, pfad) = match anzeige(pool, benutzer, ereignis).await? {
         Some(a) => (a.titel, a.detail, a.pfad),
         // Wie der Service Worker ohne Antwort: Titel der Stufe, Sprung in den Einsatz.
         None => (
             rueckfall_titel(ereignis.stufe).to_owned(),
             None,
-            format!("/einsaetze/{}", ereignis.einsatz_id),
+            format!("/einsaetze/{einsatz_id}"),
         ),
     };
     let (absender, wortlaut) = if mit_inhalt && hat_inhalt(ereignis.art, ereignis.bezug_typ) {
-        meldung_inhalt(pool, benutzer, ereignis.einsatz_id, ereignis.bezug_id)
+        meldung_inhalt(pool, benutzer, einsatz_id, ereignis.bezug_id)
             .await
             .unwrap_or_default()
     } else {
@@ -78,7 +83,7 @@ pub async fn klartext(
     Ok(Klartext {
         v: VERSION,
         s: crate::instanz::name().to_owned(),
-        e: ereignis.einsatz_id,
+        e: einsatz_id,
         b: ereignis.benachrichtigung_id,
         stufe: ereignis.stufe,
         titel,
@@ -112,12 +117,15 @@ async fn anzeige(
     else {
         return Ok(None);
     };
-    let recht = match Leserecht::laden(pool, zeile.einsatz_id).await {
+    let Some(einsatz_id) = zeile.einsatz_id else {
+        return Ok(None);
+    };
+    let recht = match Leserecht::laden(pool, einsatz_id).await {
         Ok(r) => r,
         Err(AppError::NotFound) => return Ok(None),
         Err(e) => return Err(e),
     };
-    crate::routes::benachrichtigung::anzeige(pool, &recht, benutzer, zeile).await
+    crate::routes::benachrichtigung::anzeige(pool, &recht, benutzer, einsatz_id, zeile).await
 }
 
 /// Ob der Service Worker zu dieser Art und diesem Bezug die Meldung holt (`inhaltTitelWort` in
