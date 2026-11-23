@@ -126,7 +126,8 @@ ohne das Modul Personen, „Meldungen“ ohne Meldungen, „Kräfte“ ohne Pers
 Unfallhilfsstellen. Die übrigen Kacheln nehmen den Platz; „Ablauf“ bleibt. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
 hervorgehoben. Er schreibt
 nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
-keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
+keine verortete UHS (ist das Modul Unfallhilfsstellen ausgeblendet, zählen seine UHS nicht) und
+keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
 Kann der Browser des Monitors keine Karte zeichnen (Voraussetzung wie bei der
 [Lagekarte](lagekarte.md)), steht in der Kartenkachel „Karte auf diesem Gerät nicht darstellbar“;
 alle übrigen Kacheln und die Statusleiste laufen weiter.
