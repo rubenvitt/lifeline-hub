@@ -63,25 +63,33 @@ export function zeigeRueckgaengig(
   });
 }
 
+/** Statusarten mit Quittung und Rückweg (LLH-1781 Fahrzeug, LLH-1986 die übrigen). */
+export type StatusArt = 'fahrzeug' | 'personal' | 'material' | 'einheit';
+
 /**
- * Quittung nach einem Statuswechsel eines Fahrzeugs (LLH-1781, Spec `fahrzeugstatus-quittung`,
- * Change `eon26eat-status-und-bedienung`, D10): „85-1: S2 → S3 · Rückgängig“. Eigener Schlüssel
- * je Fahrzeug: zwei schnelle Wechsel an zwei Fahrzeugen überschreiben sich nicht, ein zweiter
- * Wechsel am selben Fahrzeug ersetzt den ersten. antds `message` nimmt keinen Fokus, die Hand
- * bleibt also an der Zeile oder Kachel.
+ * Quittung nach einem Statuswechsel (LLH-1781, LLH-1986; Regel `kraefte/AGENTS.md`, „Quittung und
+ * Rücknahme eines Statuswechsels“): „85-1: S2 → S3 · Rückgängig“. Eigener Schlüssel je Art und
+ * Kraft: zwei schnelle Wechsel an zwei Kräften überschreiben sich nicht, auch nicht bei gleicher
+ * ID verschiedener Arten; ein zweiter Wechsel an derselben ersetzt den ersten. antds `message`
+ * nimmt keinen Fokus, die Hand bleibt also an der Zeile oder Kachel.
  */
 export function zeigeStatusQuittung(
   api: MessageInstance,
-  q: { efId: number; rufname: string; vorher: string; neu: string },
+  q: { art: StatusArt; id: number; name: string; vorher: string; neu: string },
   aufRueckgaengig: () => void,
 ) {
-  zeigeRueckgaengig(api, statusQuittungText(q), aufRueckgaengig, statusQuittungSchluessel(q.efId));
+  zeigeRueckgaengig(
+    api,
+    statusQuittungText(q),
+    aufRueckgaengig,
+    statusQuittungSchluessel(q.art, q.id),
+  );
 }
 
-export function statusQuittungText(q: { rufname: string; vorher: string; neu: string }): string {
-  return `${q.rufname}: ${q.vorher} → ${q.neu}`;
+export function statusQuittungText(q: { name: string; vorher: string; neu: string }): string {
+  return `${q.name}: ${q.vorher} → ${q.neu}`;
 }
 
-export function statusQuittungSchluessel(efId: number): string {
-  return `lfh-status-quittung-${efId}`;
+export function statusQuittungSchluessel(art: StatusArt, id: number): string {
+  return `lfh-status-quittung-${art}-${id}`;
 }

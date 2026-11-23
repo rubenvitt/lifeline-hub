@@ -579,6 +579,11 @@ const VERPFLEGUNG: &[(&str, &str)] = &[
 const EINHEIT: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/einheiten"),
     ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+    // Den eigenen Wechsel zurücknehmen (LLH-1986).
+    (
+        "POST",
+        "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+    ),
     ("GET", "/api/einsaetze/{id}/auftraege"),
     ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
     (
@@ -1011,6 +1016,10 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/einheiten"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
             ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+            ),
             ("POST", "/api/einsaetze/{id}/auftraege"),
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
             // Aufheben und Berichtigen gehören der Führung (LLH-1098).
@@ -1046,6 +1055,10 @@ mod tests {
             ("GET", "/api/fahrzeug-status"),
             ("GET", "/api/einsaetze/{id}/einheiten"),
             ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+            ),
             ("GET", "/api/einsaetze/{id}/auftraege"),
             ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
             (

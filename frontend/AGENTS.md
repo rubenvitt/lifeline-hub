@@ -1371,10 +1371,9 @@ anwendbar), „nicht geprüft" ist keins.
 - **Statusmenü und Quittung bei Fahrzeugen** (LLH-1781, Spec `fahrzeugstatus-quittung`):
   `StatusWahl` mit `titel` = Rufname als Menükopf; das Menü misst beim Öffnen den Platz
   (`menueLage`), öffnet zur größeren Seite, begrenzt die Höhe und steht im Handschuh-Betrieb
-  in zwei Spalten, wenn eine nicht passt, in drei, wenn auch zwei nicht passen. Nach jedem Wechsel des Fahrzeug-FMS die Quittung
-  „85-1: S2 → S3 · Rückgängig“ (`kraefte/useFahrzeugStatusQuittung.ts`, Schlüssel je Fahrzeug)
-  mit dem Beleg aus der PATCH-Antwort an `…/status/zuruecknehmen`. Personal-, Material- und
-  Einheitsstatus haben noch keinen Rückweg.
+  in zwei Spalten, wenn eine nicht passt, in drei, wenn auch zwei nicht passen. Quittung und
+  Rückweg nach jedem Statuswechsel, auch bei Personal, Material und Einheit: `kraefte/AGENTS.md`,
+  „Quittung und Rücknahme eines Statuswechsels“.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
   Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss. Am Ort (LLH-1133,

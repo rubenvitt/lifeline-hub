@@ -47,7 +47,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `Wurzel::Einheit`): `einheiten` = nur die eigene, `abschnitte` leer, deshalb sieht das Gerät
   nur Aufträge mit der Einheit selbst als Empfänger, nie die ihres Abschnitts (F4). Handstatus
   nur der eigenen Einheit (`fordere_einheit`, fremde 404), Löschen 403, mit Fahrzeug 422 wie
-  überall (F8). Meldungsabsender fest die eigene Einheit; nur dieses Gerät darf einen Ort an jede
+  überall (F8). Den eigenen Wechsel nimmt das Gerät mit der Quittung zurück (LLH-1986, Regel
+  `kraefte/AGENTS.md`, „Quittung und Rücknahme eines Statuswechsels“), auch wenn das „kein
+  Status“ herstellt: es macht den Fehlgriff ungeschehen und entscheidet nichts Neues. Meldungsabsender fest die eigene Einheit; nur dieses Gerät darf einen Ort an jede
   Art Meldung hängen (F9, `routes/meldung.rs`), die Karte zeigt ihn als Kartensprung
   (`MeldungKarte`). Kein `zonen`, keine `abschnitte`, keine `befehle`: Startseite ist
   `GeraetAuftraegePage` (ohne Abschnitte und Befehle), dazu `GeraetStatusPage` (Flächen aus dem
