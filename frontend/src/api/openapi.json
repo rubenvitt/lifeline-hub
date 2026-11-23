@@ -12854,7 +12854,7 @@
       },
       "LageGesehenAnzeige": {
         "type": "object",
-        "description": "Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.",
+        "description": "Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.",
         "required": [
           "gesehen"
         ],
@@ -24735,7 +24735,7 @@
       },
       "WetterAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/wetter`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/weather`.",
         "required": [
           "warnungen",
           "vorhersage",

@@ -200,7 +200,7 @@ async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/abschnitte", l.einsatz),
+        &format!("/api/einsaetze/{}/sectors", l.einsatz),
         &l.admin,
         Some(&json!({"name": "EA Deich"})),
     )

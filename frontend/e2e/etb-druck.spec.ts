@@ -442,7 +442,7 @@ test('ETB-Druck einer Übung: „ÜBUNG“ im Druckkopf, in Chromium auf jeder S
 async function gefahrengebiet(page: Page, einsatzId: string, i: number) {
   const x = 10 + i / 200;
   const antwort = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',

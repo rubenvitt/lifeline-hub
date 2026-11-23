@@ -145,7 +145,7 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
     data: { einsatzleiter: { art: 'extern', name: 'KBM Weber' } },
   });
   expect(leiter.ok(), await leiter.text()).toBeTruthy();
-  await post(page, `${basis}/abschnitte`, { name: 'EA Nord' });
+  await post(page, `${basis}/sectors`, { name: 'EA Nord' });
   await post(page, `${basis}/einheiten`, { name: 'Florian Nord 1' });
 
   // Erst mit dem Abo des Stroms schreiben (`e2e/AGENTS.md`, Live-Strom).

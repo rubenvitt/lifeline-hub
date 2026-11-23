@@ -287,7 +287,7 @@ pub struct LagemonitorAnzeige {
     pub alarm: Option<LagemonitorAlarm>,
 }
 
-/// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
+/// GET /api/einsaetze/{id}/situation-monitor — nur für einen gekoppelten Lagemonitor; eine Person und
 /// jede andere Ansicht bekommen 403 (die Zahlen umgingen sonst das Modul `personen`).
 pub async fn lagebild(
     State(state): State<AppState>,

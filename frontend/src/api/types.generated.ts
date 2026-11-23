@@ -5128,7 +5128,7 @@ export interface components {
             objekt_id: number;
             objekt_typ: string;
         };
-        /** @description Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden. */
+        /** @description Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden. */
         LageGesehenAnzeige: {
             /** Format: int64 */
             gesehen: number;
@@ -9802,7 +9802,7 @@ export interface components {
             daten?: components["schemas"]["WetterAktuell"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/weather`. */
         WetterAnzeige: {
             aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;

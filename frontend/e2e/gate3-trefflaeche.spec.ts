@@ -1750,7 +1750,7 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const abschnitt = await post('abschnitte', { name: 'Abschnitt Nord' });
+  const abschnitt = await post('sectors', { name: 'Abschnitt Nord' });
   const einheit = await post('einheiten', { name: '1. Zug', abschnitt_id: abschnitt });
   const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname: 'Florian 1/42-1' } });
   const zuordnung = await page.request.put(
@@ -1978,7 +1978,7 @@ async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
     { data: { mittel: 'festnetz', wert: '0421 112' } },
   );
   expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
-  const abschnitt = await page.request.post(`${basis}/abschnitte`, {
+  const abschnitt = await page.request.post(`${basis}/sectors`, {
     data: { name: 'Abschnitt Nord', verbindungen: [{ mittel: 'mobil', wert: '0170 1' }] },
   });
   expect(abschnitt.ok(), `Seeding Abschnitt: ${await abschnitt.text()}`).toBeTruthy();
@@ -2308,8 +2308,8 @@ async function organigrammSaeen(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const nord = await post('abschnitte', { name: 'Abschnitt Nord' });
-  const deich = await post('abschnitte', {
+  const nord = await post('sectors', { name: 'Abschnitt Nord' });
+  const deich = await post('sectors', {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: nord,
   });
@@ -2428,7 +2428,7 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
     const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
@@ -2486,7 +2486,7 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
     const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
@@ -4610,7 +4610,7 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrun
     expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
   }
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    await anlegen(page, einsatzId, 'lage-snapshots', { bezeichnung }, `Stand ${bezeichnung}`);
+    await anlegen(page, einsatzId, 'situation-snapshots', { bezeichnung }, `Stand ${bezeichnung}`);
   }
 
   const gemessen: string[] = [];
@@ -5163,7 +5163,7 @@ async function gefahrengebieteSaeen(page: Page, einsatzId: string, gebiete: read
     await anlegen(
       page,
       einsatzId,
-      'zonen',
+      'zones',
       {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',

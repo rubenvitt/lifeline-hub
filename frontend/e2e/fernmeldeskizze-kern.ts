@@ -152,7 +152,7 @@ export async function seedeGrund(
   ].entries()) {
     ea.push(
       (
-        await a.post('abschnitte', {
+        await a.post('sectors', {
           name,
           kurzbezeichnung: `EA ${i + 1}`,
           sprechgruppe_ids: i === 1 ? [bnBos, f314] : [bnBos],

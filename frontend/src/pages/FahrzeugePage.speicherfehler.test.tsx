@@ -89,7 +89,7 @@ function render({
     ),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(pool)),
   );

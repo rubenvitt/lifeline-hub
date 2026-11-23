@@ -217,7 +217,7 @@ function zuordnungsPfad(einsatzId: number, ziel: ZuordnungsZiel, sprechgruppeId:
   const sg = `sprechgruppen/${sprechgruppeId}`;
   switch (ziel.art) {
     case 'abschnitt':
-      return `${e}/abschnitte/${ziel.id}/${sg}`;
+      return `${e}/sectors/${ziel.id}/talk-groups/${sprechgruppeId}`;
     case 'einheit':
       return `${e}/einheiten/${ziel.id}/${sg}`;
     case 'fuehrungsstelle':

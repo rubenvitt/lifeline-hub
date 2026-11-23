@@ -295,7 +295,7 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       http.get('/api/einsaetze/:id/nachforderungen', () =>
         HttpResponse.json([{ id: 3, anzahl: 2, art: 'RTW', bezeichnung: 'Transport aus der UHS' }]),
       ),
-      http.get('/api/einsaetze/:id/zonen', () =>
+      http.get('/api/einsaetze/:id/zones', () =>
         HttpResponse.json([{ id: 2, gefahrengebiet_id: 9, label: 'Gasaustritt Halle 3' }]),
       ),
     );

@@ -161,7 +161,7 @@ export function reaktiviereDisposition(einsatzId: number, epId: number): Promise
 
 /** L‑2: Lädt die Führungskräfte-Marker für die Lagekarte. */
 export function listeFuehrungskraefte(einsatzId: number): Promise<FuehrungskraftKarte[]> {
-  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/karte/fuehrungskraefte`);
+  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/map/commanders`);
 }
 
 /**

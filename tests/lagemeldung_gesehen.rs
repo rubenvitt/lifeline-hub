@@ -51,14 +51,14 @@ fn einzeln(e: i64, mid: i64) -> String {
 
 /// Pfad des Sammelwegs.
 fn sammel(e: i64) -> String {
-    format!("/api/einsaetze/{e}/lage/gesehen")
+    format!("/api/einsaetze/{e}/situation/seen")
 }
 
 async fn liste(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage/meldungen"),
+        &format!("/api/einsaetze/{e}/situation/reports"),
         cookie,
         None,
     )
@@ -258,11 +258,11 @@ async fn alte_pfade_der_kenntnisnahme_sind_404() {
     let mid = uebergeben(&app, &admin, e, "Brücke gesperrt").await;
     for (pfad, body) in [
         (
-            format!("/api/einsaetze/{e}/lage/meldungen/{mid}/gesehen"),
+            format!("/api/einsaetze/{e}/situation/reports/{mid}/gesehen"),
             "{}".to_string(),
         ),
         (
-            format!("/api/einsaetze/{e}/lage/meldungen/gesehen"),
+            format!("/api/einsaetze/{e}/situation/reports/gesehen"),
             json!({ "bis_id": mid }).to_string(),
         ),
     ] {

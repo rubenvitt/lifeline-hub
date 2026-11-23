@@ -9,7 +9,7 @@ mod common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, system_etb_anzahl};
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abschnitte")
+    format!("/api/einsaetze/{einsatz}/sectors")
 }
 
 async fn anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> Value {

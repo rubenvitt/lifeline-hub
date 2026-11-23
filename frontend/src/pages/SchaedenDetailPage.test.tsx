@@ -105,10 +105,10 @@ function render(
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(schaden)),
+    http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(schaden)),
     http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([einePerson])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden/10/anhaenge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages/10/attachments', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
@@ -182,7 +182,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('Einsatzleitung kann bearbeiten und speichern (ohne Geschädigt → alle vier null)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden());
       }),
@@ -200,7 +200,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
 
   // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
-  it.each(['/schaeden/10', ''] as const)(
+  it.each(['/damages/10', ''] as const)(
     'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = render(einsatzAktiv, basisSchaden());
@@ -230,7 +230,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-300/F10)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden());
       }),
@@ -250,8 +250,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     let stand: Record<string, unknown> = basisSchaden();
     let body: Record<string, unknown> | null = null;
     const { client } = render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden());
       }),
@@ -277,7 +277,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-300/F10)', async () => {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         // Erster Save (mit Baseline) → 409; der Overwrite (ohne Baseline) → Erfolg.
         if (koerper.length === 1) {
@@ -301,7 +301,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     // umgehen kann. Ohne den `!v.overwrite`-Zweig wäre „Überschreiben" ein toter Knopf.
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(
           { error: 'Stornierter Schaden kann nicht geändert werden' },
@@ -330,7 +330,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('Edit: Geschädigt-Combobox auf betroffene Person → geschaedigt_person_id', async () => {
     let body: Record<string, unknown> = {};
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden());
       }),
@@ -354,7 +354,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     });
     let body: Record<string, unknown> = {};
     const { container } = render(einsatzAktiv, mitGeschaedigt, [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(mitGeschaedigt);
       }),
@@ -382,7 +382,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('Stornieren fragt über einen Dialog zurück, ruft DELETE und navigiert zur Liste', async () => {
     let geloescht = false;
     render(einsatzAktiv, basisSchaden(), [
-      http.delete('/api/einsaetze/1/schaeden/10', () => {
+      http.delete('/api/einsaetze/1/damages/10', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -463,7 +463,7 @@ describe('SchaedenDetailPage — Gefahr und Schadensgrad (LLH-1115)', () => {
     let body: Record<string, unknown> | null = null;
     const s = basisSchaden({ gefahrenart: 'brand', schadensgrad: 'angeschlagen' });
     render(einsatzAktiv, s, [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(s);
       }),
@@ -482,7 +482,7 @@ describe('SchaedenDetailPage — Gefahr und Schadensgrad (LLH-1115)', () => {
     let body: Record<string, unknown> | null = null;
     const s = basisSchaden({ gefahrenart: 'brand' });
     render(einsatzAktiv, s, [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(s);
       }),
@@ -607,7 +607,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
   it('Übergeben-Modal erzwingt einen Adressaten und schickt ihn', async () => {
     let body: { uebergeben_an?: string } = {};
     render(einsatzAktiv, basisSchaden(), [
-      http.post('/api/einsaetze/1/schaeden/10/uebergeben', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages/10/hand-over', async ({ request }) => {
         body = (await request.json()) as { uebergeben_an?: string };
         return HttpResponse.json(
           basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }),
@@ -627,7 +627,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
   it('Abschließen-Modal erzwingt einen Grund und schickt ihn', async () => {
     let body: { abschluss_grund?: string } = {};
     render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }), [
-      http.post('/api/einsaetze/1/schaeden/10/abschliessen', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages/10/close', async ({ request }) => {
         body = (await request.json()) as { abschluss_grund?: string };
         return HttpResponse.json(
           basisSchaden({ status: 'abgeschlossen', abschluss_grund: body.abschluss_grund }),
@@ -681,7 +681,7 @@ describe('SchaedenDetailPage — Robustheit', () => {
 
   it('zeigt bei 404 „Diesen Schaden gibt es nicht (mehr)“ mit dem Weg zu den Schäden', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () =>
+      http.get('/api/einsaetze/1/damages/10', () =>
         HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     ]);
@@ -694,7 +694,7 @@ describe('SchaedenDetailPage — Robustheit', () => {
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () =>
+      http.get('/api/einsaetze/1/damages/10', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -724,7 +724,7 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
   it('Übergeben: Fokus im Feld, Enter sendet ab', async () => {
     let body: { uebergeben_an?: string } = {};
     render(einsatzAktiv, basisSchaden(), [
-      http.post('/api/einsaetze/1/schaeden/10/uebergeben', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages/10/hand-over', async ({ request }) => {
         body = (await request.json()) as { uebergeben_an?: string };
         return HttpResponse.json(
           basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }),
@@ -751,7 +751,7 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
   it('zeigt eine ältere, zu lange Beschreibung als Überlänge und speichert sie nicht', async () => {
     let gepatcht = false;
     render(einsatzAktiv, basisSchaden({ beschreibung: 'b'.repeat(8_001) }), [
-      http.patch('/api/einsaetze/1/schaeden/10', () => {
+      http.patch('/api/einsaetze/1/damages/10', () => {
         gepatcht = true;
         return HttpResponse.json(basisSchaden());
       }),
@@ -766,7 +766,7 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
   it('ein Ort über 500 Zeichen steht ganz und sperrt mit der Grenze am Feld', async () => {
     let gepatcht = false;
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', () => {
+      http.patch('/api/einsaetze/1/damages/10', () => {
         gepatcht = true;
         return HttpResponse.json(basisSchaden());
       }),
@@ -840,7 +840,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: der Grund steht am Formular, das nächste Speichern räumt ihn', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Ort zu lang')),
+      http.patch('/api/einsaetze/1/damages/10', erstAblehnenDannWarten('Ort zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereBeschreibung();
@@ -858,7 +858,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', abgelehnt('Ort zu lang')),
+      http.patch('/api/einsaetze/1/damages/10', abgelehnt('Ort zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereBeschreibung();
@@ -874,7 +874,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   it('Bearbeiten: der Sperrkonflikt bleibt beim Konfliktdialog, ein 409 danach am Formular', async () => {
     render(einsatzAktiv, basisSchaden(), [
       http.patch(
-        '/api/einsaetze/1/schaeden/10',
+        '/api/einsaetze/1/damages/10',
         abgelehnt('Stornierter Schaden kann nicht geändert werden', 409),
       ),
     ]);
@@ -894,7 +894,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   it('Übergeben: der Grund steht im Dialog, das nächste Absenden räumt ihn', async () => {
     render(einsatzAktiv, basisSchaden(), [
       http.post(
-        '/api/einsaetze/1/schaeden/10/uebergeben',
+        '/api/einsaetze/1/damages/10/hand-over',
         erstAblehnenDannWarten('Schaden ist bereits übergeben'),
       ),
     ]);
@@ -918,7 +918,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   it('Übergeben: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
     render(einsatzAktiv, basisSchaden(), [
       http.post(
-        '/api/einsaetze/1/schaeden/10/uebergeben',
+        '/api/einsaetze/1/damages/10/hand-over',
         abgelehnt('Schaden ist bereits übergeben'),
       ),
     ]);
@@ -940,10 +940,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Abschließen: der Grund steht im Dialog, kein Toast', async () => {
     render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }), [
-      http.post(
-        '/api/einsaetze/1/schaeden/10/abschliessen',
-        abgelehnt('Schaden ist storniert', 409),
-      ),
+      http.post('/api/einsaetze/1/damages/10/close', abgelehnt('Schaden ist storniert', 409)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
@@ -961,7 +958,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Stornieren: der Grund steht in der Rückfrage, das nächste Bestätigen räumt ihn', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.delete('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Schaden ist verknüpft')),
+      http.delete('/api/einsaetze/1/damages/10', erstAblehnenDannWarten('Schaden ist verknüpft')),
     ]);
     const dialog = await storniere();
 
@@ -978,7 +975,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Stornieren: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.delete('/api/einsaetze/1/schaeden/10', abgelehnt('Schaden ist verknüpft')),
+      http.delete('/api/einsaetze/1/damages/10', abgelehnt('Schaden ist verknüpft')),
     ]);
     const dialog = await storniere();
     await within(dialog).findByRole('alert');
@@ -1002,12 +999,12 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
-      http.get('/api/einsaetze/1/schaeden/11', () =>
+      http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(basisSchaden())),
+      http.get('/api/einsaetze/1/damages/11', () =>
         HttpResponse.json(basisSchaden({ id: 11, registrier_nr: 2 })),
       ),
-      http.get('/api/einsaetze/1/schaeden/:sid/anhaenge', () => HttpResponse.json([])),
-      http.delete('/api/einsaetze/1/schaeden/10', abgelehnt('Schaden ist verknüpft')),
+      http.get('/api/einsaetze/1/damages/:sid/attachments', () => HttpResponse.json([])),
+      http.delete('/api/einsaetze/1/damages/10', abgelehnt('Schaden ist verknüpft')),
     );
     renderMitProviders(
       <>
@@ -1046,11 +1043,11 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
-      http.get('/api/einsaetze/1/schaeden/11', () =>
+      http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(basisSchaden())),
+      http.get('/api/einsaetze/1/damages/11', () =>
         HttpResponse.json(basisSchaden({ id: 11, registrier_nr: 2 })),
       ),
-      http.get('/api/einsaetze/1/schaeden/:sid/anhaenge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages/:sid/attachments', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -1083,7 +1080,7 @@ describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
   function mitPatch() {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(basisSchaden());
       }),
@@ -1232,7 +1229,7 @@ describe('SchaedenDetailPage — Schadensort über die Ortssuche (LLH-1121)', ()
           ],
         }),
       ),
-      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/damages/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(schaden);
       }),
@@ -1286,7 +1283,7 @@ describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
   it('wird er während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
     let stand: Record<string, unknown> = basisSchaden();
     const { client } = render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+      http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(stand)),
     ]);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
@@ -1308,7 +1305,7 @@ describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
   it('eine unberührte Bearbeitung schließt beim Storno', async () => {
     let stand: Record<string, unknown> = basisSchaden();
     const { client } = render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+      http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(stand)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await screen.findByRole('textbox', { name: 'Beschreibung' });

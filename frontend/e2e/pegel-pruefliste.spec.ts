@@ -101,7 +101,7 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
  * Pegelliste. Der PUT wartet nicht auf die Quelle.
  */
 async function legePegelFest(page: Page, einsatzId: string) {
-  const r = await page.request.put(`/api/einsaetze/${einsatzId}/pegel`, {
+  const r = await page.request.put(`/api/einsaetze/${einsatzId}/gauges`, {
     data: { stationen: [{ station_uuid: UUID[0], name: 'HANN. MÜNDEN', gewaesser: 'WESER' }] },
   });
   expect(r.ok(), `Pegel festlegen: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -109,7 +109,7 @@ async function legePegelFest(page: Page, einsatzId: string) {
 
 /** Stellt die Pegel-Abfrage und die Stationsliste auf Literale. */
 async function stellePegel(page: Page, einsatzId: string, liste: unknown[]) {
-  await page.route(`**/api/einsaetze/${einsatzId}/pegel`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: liste }) : route.continue(),
   );
   await page.route('**/api/karte/fachebenen/pegelonline', (route) =>
@@ -893,7 +893,7 @@ for (const [route, text] of [
       await page.setViewportSize({ width: breite, height: 844 });
       await page.unrouteAll({ behavior: 'ignoreErrors' });
       const pegel = await zurueckhalten(page, [
-        [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
+        [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
       // Das Lagebild trägt das Band „Lage in Zahlen“, der Überblick seit LLH-1748 keins. Dort
@@ -936,7 +936,7 @@ test('Einstellungssektion Pegel: das Nachladen von Liste und Stationen trägt �
     await page.setViewportSize({ width: breite, height: 844 });
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const antworten = await zurueckhalten(page, [
-      [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
+      [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(10)],
       ['**/api/karte/fachebenen/pegelonline', STATIONEN],
     ]);
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);

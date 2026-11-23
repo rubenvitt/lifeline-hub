@@ -34,11 +34,11 @@ function liefere(
 ) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/gefahrengebiete', () => {
+    http.get('/api/einsaetze/5/hazard-areas', () => {
       abrufe += 1;
       return HttpResponse.json(gebiete);
     }),
-    http.get('/api/einsaetze/5/gefahrengebiete/3/matrix', matrixAntwort),
+    http.get('/api/einsaetze/5/hazard-areas/3/matrix', matrixAntwort),
   );
   return () => abrufe;
 }

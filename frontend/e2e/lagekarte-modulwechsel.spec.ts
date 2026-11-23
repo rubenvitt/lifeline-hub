@@ -122,7 +122,7 @@ test.describe('Lagekarte: Modulwechsel mit laufendem Werkzeug (LFH-943)', () => 
     const seitenFehler = fehlerSammeln(page);
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page);
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
       data: { name: 'EA Modulwechsel' },
     });
     expect(angelegt.ok(), `Abschnitt: ${angelegt.status()}`).toBe(true);

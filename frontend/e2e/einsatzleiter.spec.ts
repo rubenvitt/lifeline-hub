@@ -40,7 +40,7 @@ test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im 
   const kopf = page.getByRole('group', { name: 'Einsatzleitung' });
   await expect(kopf).toHaveText(/BI Krause \(extern\)/);
 
-  await post(page, einsatzId, 'abschnitte', { name: 'EA Nord' });
+  await post(page, einsatzId, 'sectors', { name: 'EA Nord' });
   // Die Führungsstelle antwortet erst, wenn der Zeiger über dem Organigramm ruht: die Schleuse
   // (LFH-867) hält die Knoten, lässt den ladenden Kopf aber zu Daten werden (LLH-1166).
   let antworten = () => {};

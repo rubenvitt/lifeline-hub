@@ -25,17 +25,17 @@ export const PEGEL_MAX = 5;
 export const PEGEL_ABRUF_MS = 5 * 60_000;
 
 export function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
-  return apiGet<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`);
+  return apiGet<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/gauges`);
 }
 
 /** Ersetzt die Liste vollständig; die Reihenfolge ist die des Arrays (erster = Leitpegel). */
 export function setzePegel(einsatzId: number, stationen: PegelEingabe[]): Promise<PegelAnzeige[]> {
-  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'PUT', { stationen });
+  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/gauges`, 'PUT', { stationen });
 }
 
 /** Hängt eine Station hinten an; eine schon festgelegte bleibt unverändert (200, idempotent). */
 export function fuegePegelHinzu(einsatzId: number, station: PegelEingabe): Promise<PegelAnzeige[]> {
-  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'POST', station);
+  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/gauges`, 'POST', station);
 }
 
 /** Erwarteter Höchststand: Wert in cm, Zeitpunkt ISO-8601 (`toISOString()`). */
@@ -51,7 +51,7 @@ export function setzePrognose(
   prognose: PrognoseEingabe,
 ): Promise<PegelAnzeige[]> {
   return apiSend<PegelAnzeige[]>(
-    `/api/einsaetze/${einsatzId}/pegel/${pegelId}/prognose`,
+    `/api/einsaetze/${einsatzId}/gauges/${pegelId}/forecast`,
     'PUT',
     prognose,
   );
@@ -59,7 +59,10 @@ export function setzePrognose(
 
 /** Löscht die Prognose eines Pegels (idempotent); Antwort: die ganze Liste. */
 export function loeschePrognose(einsatzId: number, pegelId: number): Promise<PegelAnzeige[]> {
-  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel/${pegelId}/prognose`, 'DELETE');
+  return apiSend<PegelAnzeige[]>(
+    `/api/einsaetze/${einsatzId}/gauges/${pegelId}/forecast`,
+    'DELETE',
+  );
 }
 
 /**
@@ -70,7 +73,7 @@ export function ladeVorhersage(
   einsatzId: number,
   pegelId: number,
 ): Promise<PegelVorhersageAntwort> {
-  return apiGet<PegelVorhersageAntwort>(`/api/einsaetze/${einsatzId}/pegel/${pegelId}/vorhersage`);
+  return apiGet<PegelVorhersageAntwort>(`/api/einsaetze/${einsatzId}/gauges/${pegelId}/prediction`);
 }
 
 /**
@@ -169,7 +172,7 @@ export function pegelSchreibScope(einsatzId: number) {
  * Reihe aber nur die Modulseite braucht.
  */
 function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
-  return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/pegel/verlauf`);
+  return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/gauges/history`);
 }
 
 /**

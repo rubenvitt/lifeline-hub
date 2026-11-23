@@ -24,7 +24,7 @@ use crate::schaden::repo as schaden_repo;
 use super::einsatz_schaden::sse_anhang;
 use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
 
-/// GET /api/einsaetze/{id}/schaeden/{sid}/anhaenge — lebende Anhänge, neueste zuerst.
+/// GET /api/einsaetze/{id}/damages/{sid}/attachments — lebende Anhänge, neueste zuerst.
 /// Ein stornierter Schaden bleibt lesbar; ein Schaden eines anderen Einsatzes ist 404.
 pub async fn liste(
     State(state): State<AppState>,
@@ -36,7 +36,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/schaeden/{sid}/anhaenge — eine Datei ablegen (Multipart, Feld
+/// POST /api/einsaetze/{id}/damages/{sid}/attachments — eine Datei ablegen (Multipart, Feld
 /// `datei`). Reihenfolge (design.md D4): Gate (403/409) → Schaden im Einsatz (404) →
 /// storniert (409) → Datei lesen (400) → Typ, Größe, Scan (400/422/503) → EINE Transaktion
 /// aus Anhang, Linker und ETB-Nachweis (Storno dort erneut geprüft). Der Scan läuft vor der
@@ -77,7 +77,7 @@ pub async fn ablegen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei — Download (ETag/304). Der
+/// GET /api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file — Download (ETag/304). Der
 /// Linker-Lookup IST die Zugriffsprüfung: fremder Einsatz, anderer Schaden, unbekannt oder
 /// entfernt → 404.
 pub async fn datei(
@@ -102,7 +102,7 @@ pub async fn datei(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// DELETE /api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid} — Soft-Delete mit
+/// DELETE /api/einsaetze/{id}/damages/{sid}/attachments/{aid} — Soft-Delete mit
 /// ETB-Nachweis. Die Datei bleibt bis zur Schwärzung gespeichert.
 pub async fn entfernen(
     State(state): State<AppState>,

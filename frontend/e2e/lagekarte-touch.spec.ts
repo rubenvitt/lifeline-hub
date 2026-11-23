@@ -105,7 +105,9 @@ async function einsatzMitLage(page: Page): Promise<number> {
   await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
   // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur der Knopf „Stand sichern“
   // (LLH-1936), und die Tests mit ausgeklappter Zeitachse hätten kein Band.
-  await post(page, `/api/einsaetze/${einsatzId}/lage-snapshots`, { bezeichnung: 'Stand vor Ort' });
+  await post(page, `/api/einsaetze/${einsatzId}/situation-snapshots`, {
+    bezeichnung: 'Stand vor Ort',
+  });
   return einsatzId;
 }
 
@@ -621,7 +623,7 @@ for (const viewport of [
         .poll(
           async () => {
             const zonen = (await (
-              await page.request.get(`/api/einsaetze/${einsatzId}/zonen`)
+              await page.request.get(`/api/einsaetze/${einsatzId}/zones`)
             ).json()) as { typ: string; geometrie_typ: string }[];
             return zonen.filter((z) => z.typ === 'gefahrengebiet' && z.geometrie_typ === 'Polygon')
               .length;
@@ -908,7 +910,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
       }));
       for (const f of faelle) {
         const antwort = await page.request.post(
-          `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`,
+          `/api/einsaetze/${einsatzId}/map/background-images`,
           {
             multipart: {
               datei: { name: 'plan.png', mimeType: 'image/png', buffer: PNG },
@@ -1033,7 +1035,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
     });
     await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
     // Eine Zone um das Zeichen: ein Tipp aufs Zeichen gehört dem Marker, nicht der Zone.
-    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',
@@ -1159,12 +1161,12 @@ async function einsatzFuerModi(page: Page): Promise<Modussaat> {
   const reserve: Record<string, number> = {};
   for (const name of RESERVE)
     reserve[name] = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name });
-  const schadenId = await post(page, `/api/einsaetze/${einsatzId}/schaeden`, {
+  const schadenId = await post(page, `/api/einsaetze/${einsatzId}/damages`, {
     typ: 'sachschaden',
     ausmass: 'gering',
     ort: 'Fingerprobe Keller',
   });
-  const bild = await page.request.post(`/api/einsaetze/${einsatzId}/karte/hintergrundbilder`, {
+  const bild = await page.request.post(`/api/einsaetze/${einsatzId}/map/background-images`, {
     multipart: {
       datei: { name: 'plan.png', mimeType: 'image/png', buffer: PNG },
       ecken: JSON.stringify(BILD_ECKEN),
@@ -1370,7 +1372,7 @@ for (const viewport of [
           async () =>
             (
               (await (
-                await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+                await page.request.get(`/api/einsaetze/${saat.einsatzId}/free-symbols`)
               ).json()) as unknown[]
             ).length,
           { message: 'Freies Zeichen ist gespeichert' },
@@ -1481,7 +1483,7 @@ for (const viewport of [
 
 async function bildEcken(page: Page, saat: Modussaat): Promise<string> {
   const bilder = (await (
-    await page.request.get(`/api/einsaetze/${saat.einsatzId}/karte/hintergrundbilder`)
+    await page.request.get(`/api/einsaetze/${saat.einsatzId}/map/background-images`)
   ).json()) as { id: number; ecken_json: string }[];
   return bilder.find((b) => b.id === saat.bildId)?.ecken_json ?? '';
 }
@@ -1545,7 +1547,7 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     });
     await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
     // Zone um das Zeichen, Abschnitt über ihrer Westhälfte samt Zeichen.
-    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
       data: {
         typ: 'absperrbereich',
         geometrie_typ: 'Polygon',
@@ -1554,11 +1556,11 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
       },
     });
     expect(zone.ok(), await zone.text()).toBeTruthy();
-    const abschnittId = await post(page, `/api/einsaetze/${einsatzId}/abschnitte`, {
+    const abschnittId = await post(page, `/api/einsaetze/${einsatzId}/sectors`, {
       name: 'Deichwache Probe',
     });
     const flaeche = await page.request.patch(
-      `/api/einsaetze/${einsatzId}/abschnitte/${abschnittId}/flaeche`,
+      `/api/einsaetze/${einsatzId}/sectors/${abschnittId}/area`,
       {
         data: {
           flaeche_geojson: JSON.stringify(
@@ -1813,7 +1815,7 @@ async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
     lng + 0.004,
     lat - 0.003,
   ];
-  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
     data: {
       typ: 'absperrbereich',
       geometrie_typ: 'Polygon',
@@ -2034,7 +2036,7 @@ for (const { viewport, dichte } of [
       await expect
         .poll(
           async () =>
-            (await (await page.request.get(`/api/einsaetze/${saat.einsatzId}/zonen`)).json()) as {
+            (await (await page.request.get(`/api/einsaetze/${saat.einsatzId}/zones`)).json()) as {
               typ: string;
               kreis_radius_m?: number;
               kreis_mitte_lat?: number;
@@ -2111,7 +2113,7 @@ for (const { viewport, dichte } of [
         .poll(
           async () =>
             (await (
-              await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+              await page.request.get(`/api/einsaetze/${saat.einsatzId}/free-symbols`)
             ).json()) as { zeichen_spec: string | null; lat: number; lon: number }[],
           { message: 'Zeichen ist an der Druckstelle gespeichert' },
         )
@@ -2171,7 +2173,7 @@ for (const { viewport, dichte } of [
       expect(
         (
           (await (
-            await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+            await page.request.get(`/api/einsaetze/${saat.einsatzId}/free-symbols`)
           ).json()) as unknown[]
         ).length,
       ).toBe(1);

@@ -133,7 +133,7 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
     await post(page, `${basis}/erinnerungen`, { titel, faellig_at: inMin(min) });
   }
   // Einheiten mit und ohne Abschnitt (LLH-1481): zwei Zeilen der Gliederung.
-  const abschnittId = await post(page, `${basis}/abschnitte`, {
+  const abschnittId = await post(page, `${basis}/sectors`, {
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
   });
@@ -158,7 +158,7 @@ const LISTEN = ['meldungen', 'nachforderungen'];
 const MARKEN = ['auftraege', 'erinnerungen', 'abloesungen'];
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ (`abschnittZeilen`), ohne Unterpfade. */
-const GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+const GLIEDERUNG = ['sectors', 'einheiten', 'personal', 'fahrzeuge', 'material'];
 
 /** Zeilen der Gliederung nach dem Säen: „EA Nord“ und „Ohne Abschnitt“. */
 const GLIEDERUNG_ZEILEN = 2;

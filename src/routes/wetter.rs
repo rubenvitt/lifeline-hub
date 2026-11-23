@@ -1,4 +1,4 @@
-//! Route des Wetters am Einsatzort (LFH-633): `GET /api/einsaetze/{id}/wetter`.
+//! Route des Wetters am Einsatzort (LFH-633): `GET /api/einsaetze/{id}/weather`.
 //!
 //! Gate `EinsatzLesezugriff<WetterPegel>`: ist das Modul ausgeblendet oder gesperrt → 403. Die
 //! Pegel-Routen bleiben modul-los.
@@ -17,7 +17,7 @@ use crate::einsatz::modul::WetterPegel;
 use crate::error::AppError;
 use crate::wetter::{abruf, WetterAnzeige};
 
-/// GET /api/einsaetze/{id}/wetter — Warnungen der Warnzelle des Einsatzorts und Vorhersage der
+/// GET /api/einsaetze/{id}/weather — Warnungen der Warnzelle des Einsatzorts und Vorhersage der
 /// nächsten 24 Stunden. Cache im Nachschlage-Cache mit Rückfall auf den operativen Pool (wie
 /// `routes::pegel`).
 pub async fn anzeige(

@@ -5607,7 +5607,7 @@ const ZEICHEN: &str =
 async fn zeichen_anlegen(i: &Instanz, einsatz: i64, label: &str) -> i64 {
     let (s, v) = post(
         i,
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": ZEICHEN, "label": label}),
     )
     .await;
@@ -5619,7 +5619,7 @@ async fn zeichen_loeschen(i: &Instanz, einsatz: i64, zeichen: i64) {
     let (s, v) = common::anfrage_json(
         &i.app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zeichen}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zeichen}"),
         &i.admin,
         None,
     )
@@ -5863,7 +5863,7 @@ async fn merker_bleibt_bis_der_juengste_stand_der_zeile_quittiert_ist() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "PATCH",
-        &format!("/api/einsaetze/{h}/freie-zeichen/{n}"),
+        &format!("/api/einsaetze/{h}/free-symbols/{n}"),
         &hub.admin,
         Some(&json!({"label": "N geändert"})),
     )
@@ -6043,7 +6043,7 @@ async fn veraltete_herkunft_aendert_keine_zeile_eines_anderen_einsatzes() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/freie-zeichen/{z}"),
+        &format!("/api/einsaetze/{e}/free-symbols/{z}"),
         &elw.admin,
         Some(&json!({"label": "Z geändert"})),
     )

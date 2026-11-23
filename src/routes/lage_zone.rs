@@ -70,7 +70,7 @@ async fn pruefe_bezirk_zuordnung(
     Ok(())
 }
 
-/// GET /api/einsaetze/{id}/zonen — Liste aller Zonen. Nur Lesezugriff.
+/// GET /api/einsaetze/{id}/zones — Liste aller Zonen. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
@@ -146,7 +146,7 @@ fn validiere_neu(body: &ZoneBody) -> Result<(&'static str, String), AppError> {
     Ok((klasse, geometrie.clone()))
 }
 
-/// POST /api/einsaetze/{id}/zonen — anlegen. Schreibrecht + aktiv. ETB „eingerichtet".
+/// POST /api/einsaetze/{id}/zones — anlegen. Schreibrecht + aktiv. ETB „eingerichtet".
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -280,7 +280,7 @@ fn pruefe_neue_geometrie(geometrie: &str, gespeichert: &str) -> Result<(), AppEr
     lage_zone::pruefe_geometrie_struktur(&v, "geometrie")
 }
 
-/// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz, dazu Radius und Mitte einer
+/// PATCH /api/einsaetze/{id}/zones/{zid} — label/typ/farbe/notiz, dazu Radius und Mitte einer
 /// Kreiszone (LLH-1043, LLH-1344) oder eine neue Geometrie. ETB „geändert" NUR wenn effektiver
 /// typ, label oder die Geometrie sich unterscheidet; eine Kreisänderung schreibt EINE Zeile
 /// „Radius alt → neu · Mitte um … versetzt“.
@@ -527,7 +527,7 @@ pub async fn aktualisieren(
     Ok(Json(z))
 }
 
-/// DELETE /api/einsaetze/{id}/zonen/{zid} — aufheben (Hard-Delete). ETB „aufgehoben".
+/// DELETE /api/einsaetze/{id}/zones/{zid} — aufheben (Hard-Delete). ETB „aufgehoben".
 pub async fn aufloesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,

@@ -86,7 +86,7 @@ function stelleBereit(a: Aufbau = {}) {
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
     http.get('/api/einsaetze/1/anbindungen', () => HttpResponse.json(a.anbindungen ?? [])),
-    http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/situation-picture-shares', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
         stellen: [

@@ -1192,7 +1192,7 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/7/gefahrengebiete', () =>
+      http.get('/api/einsaetze/7/hazard-areas', () =>
         HttpResponse.json([
           { id: 1, einsatz_id: 7, hoechste_warnstufe: stufe, label: 'Deich', zonen_ids: [] },
         ]),
@@ -1234,7 +1234,7 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     const um = (ms: number) => new Date(Date.now() + ms).toISOString();
     mitWarnstufe(
       'keine',
-      http.get('/api/einsaetze/7/wetter', () =>
+      http.get('/api/einsaetze/7/weather', () =>
         HttpResponse.json({
           warnungen: {
             zustand: 'ok',

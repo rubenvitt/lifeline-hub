@@ -322,7 +322,7 @@ fn csv_feld(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// CSV der Schäden wie `GET …/schaeden/export`, in der übergebenen Reihenfolge; geteilt mit
+/// CSV der Schäden wie `GET …/damages/export`, in der übergebenen Reihenfolge; geteilt mit
 /// dem ZIP der Einsatzakte (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6).
 pub fn schaeden_csv(schaeden: &[SchadenAnzeige]) -> String {
     let mut csv = String::from(
@@ -352,7 +352,7 @@ pub fn schaeden_csv(schaeden: &[SchadenAnzeige]) -> String {
     csv
 }
 
-/// GET /api/einsaetze/{id}/schaeden/export — CSV aller nicht stornierten Schäden, älteste Nummer
+/// GET /api/einsaetze/{id}/damages/export — CSV aller nicht stornierten Schäden, älteste Nummer
 /// zuerst (LLH-1115). Aufzählungen in Worten wie die Oberfläche; Gefahr und Schadensgrad leer,
 /// wenn nicht angegeben. Ohne Geschädigte: die Liste ist eine Lageübersicht, kein Register
 /// betroffener Personen. Gleiches Gate wie die Liste, nicht auditiert.

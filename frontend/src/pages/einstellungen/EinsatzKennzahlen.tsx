@@ -33,7 +33,7 @@ function umgeschaltet(
  * Herleitung `/mnt/project-files/llh-1021/llh-1371/design.md` D3, D8.
  *
  * Gelesen wird die Wahl aus `EinsatzAnzeige.lagekennzahlen`, geschrieben über
- * `PUT …/lagekennzahl-wahl` (Vollersatz der Wahl). Speicherweg sofort wie die Pegel-Sektion,
+ * `PUT …/situation-metric-selection` (Vollersatz der Wahl). Speicherweg sofort wie die Pegel-Sektion,
  * keine Speicherleiste: ein Schalter hat keinen Entwurf. Danach wird der Einsatz neu abgerufen,
  * damit das Dashboard den neuen Zuschnitt ohne Banner zeigt. Rechte wie der Pegel
  * (`darfImEinsatzSchreiben`, Server `EinsatzSchreibzugriff`).

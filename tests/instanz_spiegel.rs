@@ -38,7 +38,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/schaeden"),
+        &format!("/api/einsaetze/{e}/damages"),
         &i.admin,
         Some(&json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 1" })),
     )
@@ -55,12 +55,12 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{e}/schaeden"),
+            format!("/api/einsaetze/{e}/damages"),
             json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 2" }),
         ),
         (
             "PATCH",
-            format!("/api/einsaetze/{e}/schaeden/{schaden}"),
+            format!("/api/einsaetze/{e}/damages/{schaden}"),
             json!({ "ort": "Hauptstr. 3" }),
         ),
     ] {

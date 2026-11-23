@@ -74,7 +74,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/personen', 'personen'),
     json('/personen/verbleib-angaben', 'personenVerbleibAngaben'),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/schaeden', 'schaeden'),
+    json('/damages', 'schaeden'),
     json('/evakuierung', 'evakuierung'),
     json('/betreuung', 'betreuung'),
     json('/verpflegung', 'verpflegung'),
@@ -237,7 +237,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('ein 403 trotz Freigabe: kein Zugriff, kein Drucken', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/schaeden`, () =>
+      http.get(`/api/einsaetze/${E}/damages`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );

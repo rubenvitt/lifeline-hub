@@ -32,7 +32,7 @@ vi.mock('../pages/lagekarte/Kartenflaeche', () => ({
 beforeEach(() => {
   server.use(
     http.get('/api/karte/config', () => HttpResponse.json({})),
-    http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
   );
 });
 

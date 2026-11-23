@@ -66,7 +66,7 @@ function setup(antraege: unknown[]) {
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/benutzer-einstellungen', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },

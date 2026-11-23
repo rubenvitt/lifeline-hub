@@ -155,7 +155,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
     http.get('/api/einsaetze/1/personen/transportmittel', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
@@ -392,14 +392,14 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
 
   it('Bezug zu einem Schaden: Grund im Dialog, kein Toast', async () => {
     render(detail, [
-      http.get('/api/einsaetze/1/schaeden/auswahl', () =>
+      http.get('/api/einsaetze/1/damages/options', () =>
         HttpResponse.json(
           [freierSchaden].map((s) =>
             alsSchadenAuswahl(s as Parameters<typeof alsSchadenAuswahl>[0]),
           ),
         ),
       ),
-      http.patch('/api/einsaetze/1/schaeden/51', () => abgelehnt('Schaden abgeschlossen')),
+      http.patch('/api/einsaetze/1/damages/51', () => abgelehnt('Schaden abgeschlossen')),
     ]);
     await klappeBezuegeAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
@@ -765,12 +765,12 @@ describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', (
   it('Schaden lösen: der Grund steht an der Zeile, das nächste Lösen räumt ihn', async () => {
     let zweiter = false;
     render(detail, [
-      http.get('/api/einsaetze/1/schaeden', ({ request }) =>
+      http.get('/api/einsaetze/1/damages', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('geschaedigt_person_id') ? [schaden] : [],
         ),
       ),
-      http.patch('/api/einsaetze/1/schaeden/50', async () => {
+      http.patch('/api/einsaetze/1/damages/50', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Schaden abgeschlossen');
@@ -842,7 +842,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
       http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
       http.get('/api/einsaetze/1/personen/11', () => HttpResponse.json(zweite)),
       http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.get('/api/einsaetze/1/personen/:pid/audit', () => HttpResponse.json([])),
     );

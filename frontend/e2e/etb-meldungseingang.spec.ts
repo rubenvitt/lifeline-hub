@@ -19,7 +19,7 @@ async function einsatzPerApi(page: Page, bezeichnung: string): Promise<number> {
 }
 
 async function lagemeldungenText(page: Page, einsatzId: number): Promise<string> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/situation/reports`);
   expect(antwort.ok(), `Lagemeldungen: ${antwort.status()}`).toBe(true);
   return antwort.text();
 }
