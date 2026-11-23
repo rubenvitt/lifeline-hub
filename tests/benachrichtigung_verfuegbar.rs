@@ -165,7 +165,7 @@ async fn fahrzeug_einsatzbereit_erreicht_el_und_s3() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{id}"),
+        &format!("/api/notifications/{id}"),
         &w.cookie("simon").await,
         None,
     )

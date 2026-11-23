@@ -45,7 +45,7 @@ Dienstes, auch Backup-, Purge- und DB-Fehler.
   letzten Zeile) und `seit_s`. Ebbt die Last ab, steht der Rest der Zählung erst in der Zeile
   des nächsten Ereignisses.
 - **Absturz im Browser:** fängt die Oberfläche einen Fehler beim Zeichnen einer Seite, meldet sie
-  ihn an `POST /api/client-fehler` (`src/routes/client_fehler.rs`). Im Log steht höchstens eine
+  ihn an `POST /api/client-errors` (`src/routes/client_fehler.rs`). Im Log steht höchstens eine
   WARN-Zeile je Minute („Absturz im Client gemeldet“) mit Routenmuster ohne Kennungen, Version,
   Meldung, Stack-Anfang, `anzahl` und `seit_s`; Benutzer und Organisation stehen nicht darin.
 - **503 ist kein ERROR mehr:** der `TraceLayer` schreibt einen 503 als WARN-Sammelzeile; jeder
@@ -128,7 +128,7 @@ Aktion; ein Schreibfehler hält sie nicht auf. **Aufbewahrung:** 365 Tage
 Beide Spuren liest der System-Admin unter **Verwaltung → Zugangsprotokoll** (LFH-1097), ohne
 Datenbankzugriff: Reiter „Zugangsänderungen“ (Admin-Spur) und „Anmeldungen“ (Anmeldespur), Filter
 nach Zeitraum, Konto und Ereignis bzw. Aktion, neueste zuerst. Dahinter stehen
-`GET /api/zugangsprotokoll/zugangsaenderungen` und `GET /api/zugangsprotokoll/anmeldungen`
+`GET /api/access-log/access-changes` und `GET /api/access-log/logins`
 (Parameter `von`, `bis`, `konto`, `aktion` bzw. `ereignis`, `vor_id`, `limit`). Andere Rollen
 bekommen `403`. Der Kontofilter vergleicht ohne Groß-/Kleinschreibung und trifft in der Admin-Spur
 die handelnde Person und das Zielkonto. Zeilen der Anmeldespur ohne Namen (Abmeldung) zeigen den

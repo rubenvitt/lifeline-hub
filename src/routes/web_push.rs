@@ -1,9 +1,9 @@
 //! HTTP-Routen von Web Push (LLH-1223, design.md D3/D5; Spec `web-push`).
 //!
 //! GET    /api/web-push      — öffentlicher Schlüssel und ob diese Sitzung ein Abo hat
-//! PUT    /api/web-push/abo  — Abo dieses Browsers für diese Sitzung anmelden, samt der Wahl
+//! PUT    /api/web-push/subscription  — Abo dieses Browsers für diese Sitzung anmelden, samt der Wahl
 //!                             „Mit Absender und Wortlaut“ und der stummen Arten des Geräts (204)
-//! DELETE /api/web-push/abo  — Abo dieser Sitzung abmelden (idempotent, 204)
+//! DELETE /api/web-push/subscription  — Abo dieser Sitzung abmelden (idempotent, 204)
 //!
 //! Ohne `--web-push` antworten alle drei 404 wie ein unbekannter Pfad. Das Abo hängt an der
 //! Sitzung aus dem Cookie; Gerätesitzungen erreichen die Routen nicht (keine Routenliste, 403).
@@ -118,7 +118,7 @@ pub async fn stand(
     }))
 }
 
-/// PUT /api/web-push/abo — 400, wenn Endpunkt oder Schlüssel für sich nicht taugen (keine URL,
+/// PUT /api/web-push/subscription — 400, wenn Endpunkt oder Schlüssel für sich nicht taugen (keine URL,
 /// kein bekannter Push-Dienst, kein P-256-Punkt, mehr stumme Arten als es Arten gibt); dasselbe
 /// Browserprofil hängt sein Abo an diese Sitzung um.
 pub async fn anmelden(
@@ -179,7 +179,7 @@ pub async fn anmelden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/web-push/abo
+/// DELETE /api/web-push/subscription
 pub async fn abmelden(
     State(state): State<AppState>,
     CurrentUser(_benutzer): CurrentUser,

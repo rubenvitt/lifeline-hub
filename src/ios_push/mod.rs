@@ -4,7 +4,7 @@
 //! - Versand nur aus `benachrichtigung::ausliefern`, neben Web Push und mit denselben Filtern:
 //!   Stilles nie, Konten, denen der Hub iOS-Push gibt, nie, eine auf dem Gerät stumme
 //!   Hinweis-Art nie, ein Alarm immer ([`IosPush::versenden`]).
-//! - Die Nutzlast trägt Titel, Detail und Pfad wie `GET /api/benachrichtigungen/{id}`, Absender
+//! - Die Nutzlast trägt Titel, Detail und Pfad wie `GET /api/notifications/{id}`, Absender
 //!   und Wortlaut nur mit Wahl und Leserecht ([`inhalt`]); verschlüsselt mit dem Schlüssel des
 //!   Geräts ([`krypto`]), sodass Relais und Apple nichts davon lesen.
 //! - Kein Token, kein Schlüssel und keine Nutzlast in einem Log.

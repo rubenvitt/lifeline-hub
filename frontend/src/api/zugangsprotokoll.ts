@@ -7,7 +7,7 @@ import { apiGet, mitParametern } from './client';
  * neueste Zeile zuerst und blättern über `vor_id` (kleinste `id` der letzten Seite).
  */
 
-const BASIS = '/api/zugangsprotokoll';
+const BASIS = '/api/access-log';
 
 /** Seitengröße; gleich der Vorgabe des Servers (`auth::spur::STANDARD_LIMIT`). */
 export const ZUGANGSPROTOKOLL_SEITE = 100;
@@ -27,13 +27,13 @@ export interface AenderungsFilter extends SpurFilter {
   aktion?: AdminAktion;
 }
 
-/** `GET /api/zugangsprotokoll/anmeldungen` — eine Seite der Anmeldespur. */
+/** `GET /api/access-log/logins` — eine Seite der Anmeldespur. */
 export function ladeAnmeldungen(
   filter: AnmeldeFilter,
   vorId: number | undefined,
 ): Promise<AnmeldeEintrag[]> {
   return apiGet<AnmeldeEintrag[]>(
-    mitParametern(`${BASIS}/anmeldungen`, {
+    mitParametern(`${BASIS}/logins`, {
       ...filter,
       vor_id: vorId,
       limit: ZUGANGSPROTOKOLL_SEITE,
@@ -41,13 +41,13 @@ export function ladeAnmeldungen(
   );
 }
 
-/** `GET /api/zugangsprotokoll/zugangsaenderungen` — eine Seite der Admin-Spur. */
+/** `GET /api/access-log/access-changes` — eine Seite der Admin-Spur. */
 export function ladeZugangsaenderungen(
   filter: AenderungsFilter,
   vorId: number | undefined,
 ): Promise<Zugangsaenderung[]> {
   return apiGet<Zugangsaenderung[]>(
-    mitParametern(`${BASIS}/zugangsaenderungen`, {
+    mitParametern(`${BASIS}/access-changes`, {
       ...filter,
       vor_id: vorId,
       limit: ZUGANGSPROTOKOLL_SEITE,

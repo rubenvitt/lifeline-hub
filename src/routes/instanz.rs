@@ -1104,7 +1104,7 @@ pub async fn bruchstelle_verwerfen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/antraege/abgelehnt — die eigenen abgelehnten Anträge an Einsätzen, die kein Spiegel
+/// GET /api/requests/rejected — die eigenen abgelehnten Anträge an Einsätzen, die kein Spiegel
 /// mehr sind (LLH-1648, nach der Verwahrung am Hub). Einsatzübergreifend und ohne Einsatz-Lese-Gate:
 /// nach der Schonfrist liest die Person den Einsatz nicht mehr, ihren Antrag aber schon.
 pub async fn antraege_abgelehnt(
@@ -1116,7 +1116,7 @@ pub async fn antraege_abgelehnt(
     ))
 }
 
-/// DELETE /api/antraege/abgelehnt/{antrag_id} — verwirft einen davon (204; fremd oder am Spiegel
+/// DELETE /api/requests/rejected/{antrag_id} — verwirft einen davon (204; fremd oder am Spiegel
 /// 404).
 pub async fn antrag_abgelehnt_verwerfen(
     State(state): State<AppState>,

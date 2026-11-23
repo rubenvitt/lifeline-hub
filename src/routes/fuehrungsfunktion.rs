@@ -1,7 +1,7 @@
 //! Katalog der Führungsfunktionen (LFH-549).
 //!
 //! GET /api/fuehrungsfunktionen — wirksamer Katalog der eigenen Org, jeder Angemeldete.
-//! PUT /api/org-fuehrungsfunktionen/{funktion} — Label/S7-Schalter setzen, nur system_rolle=admin.
+//! PUT /api/org-command-roles/{funktion} — Label/S7-Schalter setzen, nur system_rolle=admin.
 //!
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
@@ -35,7 +35,7 @@ pub struct FunktionSetzen {
     aktiv: Option<bool>,
 }
 
-/// PUT /api/org-fuehrungsfunktionen/{funktion} — liefert den neuen wirksamen Katalog.
+/// PUT /api/org-command-roles/{funktion} — liefert den neuen wirksamen Katalog.
 pub async fn setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

@@ -33,7 +33,7 @@ function verzoegerteOrganisation() {
     freigeben = fertig;
   });
   server.use(
-    http.get('/api/organisation', async () => {
+    http.get('/api/organization', async () => {
       await tor;
       return HttpResponse.json(ORG);
     }),
@@ -58,7 +58,7 @@ describe('useDrucken / DruckKnopf', () => {
   });
 
   it('druckt sofort, wenn die Organisation schon geladen ist — je Klick genau einmal', async () => {
-    server.use(http.get('/api/organisation', () => HttpResponse.json(ORG)));
+    server.use(http.get('/api/organization', () => HttpResponse.json(ORG)));
     renderMitProviders(<DruckKnopf />);
     const knopf = screen.getByRole('button', { name: 'Drucken / als PDF' });
     await waitFor(() => expect(knopf).toBeEnabled());
@@ -71,7 +71,7 @@ describe('useDrucken / DruckKnopf', () => {
   it('ohne Organisation (Hilfe, LFH-1096): druckt sofort und fragt den Server nicht', async () => {
     let abgefragt = false;
     server.use(
-      http.get('/api/organisation', () => {
+      http.get('/api/organization', () => {
         abgefragt = true;
         return HttpResponse.json({}, { status: 401 });
       }),
@@ -83,7 +83,7 @@ describe('useDrucken / DruckKnopf', () => {
   });
 
   it('führt einen Vorbereitungsschritt VOR dem Druck aus (Meldebild klappt auf)', async () => {
-    server.use(http.get('/api/organisation', () => HttpResponse.json(ORG)));
+    server.use(http.get('/api/organization', () => HttpResponse.json(ORG)));
     const reihenfolge: string[] = [];
     drucke.mockImplementation(() => reihenfolge.push('print'));
     renderMitProviders(<DruckKnopf vorbereiten={() => reihenfolge.push('vorbereiten')} />);
@@ -93,7 +93,7 @@ describe('useDrucken / DruckKnopf', () => {
 
   it('sperrt den Knopf bei Fehler, bietet Wiederholen an und druckt nicht nachträglich', async () => {
     server.use(
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 }),
       ),
     );
@@ -102,7 +102,7 @@ describe('useDrucken / DruckKnopf', () => {
     expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeDisabled();
     expect(screen.getByText(/Organisation nicht geladen/)).toBeInTheDocument();
 
-    server.use(http.get('/api/organisation', () => HttpResponse.json(ORG)));
+    server.use(http.get('/api/organization', () => HttpResponse.json(ORG)));
     await userEvent.click(wiederholen);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled(),
@@ -119,7 +119,7 @@ describe('useDrucken / DruckKnopf', () => {
   it('bleibt druckbar, wenn nur ein Refetch der Organisation scheitert und die Daten da sind', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/organisation', () => {
+      http.get('/api/organization', () => {
         abrufe += 1;
         return HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
       }),
@@ -140,7 +140,7 @@ describe('useDrucken / DruckKnopf', () => {
   });
 
   it('bleibt gesperrt, solange der Aufrufer sperrt (ETB: noch nicht vollständig geladen)', async () => {
-    server.use(http.get('/api/organisation', () => HttpResponse.json(ORG)));
+    server.use(http.get('/api/organization', () => HttpResponse.json(ORG)));
     renderMitProviders(<DruckKnopf gesperrt />);
     await new Promise((fertig) => setTimeout(fertig, 20));
     expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeDisabled();
@@ -156,7 +156,7 @@ describe('useDrucken / DruckKnopf', () => {
    */
   it('druckt über den Knopf ohne Logo die frische Druckzeit, nicht die vom Seitenaufbau', async () => {
     server.use(
-      http.get('/api/organisation', () => HttpResponse.json(ORG)),
+      http.get('/api/organization', () => HttpResponse.json(ORG)),
       http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
@@ -212,7 +212,7 @@ describe('useDrucken / DruckKnopf', () => {
         configurable: true,
         value: decode,
       });
-      server.use(http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)));
+      server.use(http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)));
     });
 
     afterEach(() => {

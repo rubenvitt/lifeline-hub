@@ -141,7 +141,7 @@ async function pushZeigen(d) {
   let inhalt;
   try {
     [text, inhalt] = await Promise.all([
-      holeJson(`/api/benachrichtigungen/${d.benachrichtigung_id}`, abbruch.signal),
+      holeJson(`/api/notifications/${d.benachrichtigung_id}`, abbruch.signal),
       pushInhalt(d, abbruch.signal),
     ]);
   } finally {

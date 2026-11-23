@@ -23,7 +23,7 @@ export default async function globaleVorbereitung(config: FullConfig) {
       data: { benutzername: ADMIN, passwort: ADMIN_PW },
     });
     expect(login.ok(), `Admin-Anmeldung: ${login.status()} ${await login.text()}`).toBe(true);
-    const gesetzt = await api.put('/api/benutzer-einstellungen/etb_standard_rufname', {
+    const gesetzt = await api.put('/api/user-settings/etb_standard_rufname', {
       data: { wert: JSON.stringify(E2E_STANDARD_RUFNAME) },
     });
     expect(gesetzt.ok(), `Standard-Rufname: ${gesetzt.status()} ${await gesetzt.text()}`).toBe(

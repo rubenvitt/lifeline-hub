@@ -111,7 +111,7 @@ export default defineConfig({
   webServer: [
     {
       name: 'Backend',
-      // `--demo-daten` schaltet `/api/demo-daten` frei (src/AGENTS.md, Demo-Daten);
+      // `--demo-daten` schaltet `/api/demo-data` frei (src/AGENTS.md, Demo-Daten);
       // `--kritis-extrakt false` wie im e2e-Lauf (kein Deutschland-Extrakt je Lauf).
       command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password ${ADMIN_PW} --kritis-extrakt false --demo-daten --lizenz-akzeptiert`,
       url: `${backendUrl}/api/health`,

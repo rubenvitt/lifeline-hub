@@ -1366,14 +1366,7 @@ async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
         uebersicht(&hub).await["kopplungen"][0]["ohne_gueltigen_schluessel"],
         false
     );
-    let (s, v) = common::anfrage(
-        &hub.app,
-        "POST",
-        "/api/benutzer/1/deaktivieren",
-        &zweit,
-        None,
-    )
-    .await;
+    let (s, v) = common::anfrage(&hub.app, "POST", "/api/users/1/deactivate", &zweit, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let zustand: String =
         sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE credential_id = 'a'")
@@ -1430,7 +1423,7 @@ async fn herabstufen_des_letzten_schluesselhalters_gelingt() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "PATCH",
-        "/api/benutzer/1",
+        "/api/users/1",
         &zweit,
         Some(&json!({"system_rolle": "keiner"})),
     )
@@ -1481,7 +1474,7 @@ async fn deaktivieren_widerruft_die_schluessel_des_kontos() {
     let (s, _) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/benutzer/{id}/deaktivieren"),
+        &format!("/api/users/{id}/deactivate"),
         &hub.admin,
         None,
     )

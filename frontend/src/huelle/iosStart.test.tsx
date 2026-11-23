@@ -23,7 +23,7 @@ import { antworteIosHuelle, beendeHuelle, starteIosHuelle } from '../test/huelle
 /**
  * Start in der iOS-Hülle (Change t39ltxxi, design.md Fakt 1): im WKWebView einer App gibt es keinen
  * Service Worker. Registrierung, Alarm und Web Push bleiben dann still — kein Wurf, keine
- * unbehandelte Zurückweisung, kein Bericht an `/api/client-fehler`.
+ * unbehandelte Zurückweisung, kein Bericht an `/api/client-errors`.
  */
 
 const admin = adminFixture();

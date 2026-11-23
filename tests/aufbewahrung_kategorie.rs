@@ -17,7 +17,7 @@ async fn org_vorgabe(app: &axum::Router, admin: &str, liste: Value) {
     let (status, body) = anfrage_json(
         app,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         admin,
         Some(&json!({ "aufbewahrung_kategorien": liste })),
     )

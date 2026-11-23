@@ -25,7 +25,7 @@ export default function EinheitZeichen({
   tz: TzEinheit | null;
   /** Kantenlänge des Rahmens in px; das Zeichen darin ist 4 px kleiner. */
   groesse?: number;
-  /** Organisations-Vorgabe aus `/api/organisation`; eine eigene Organisation geht vor. */
+  /** Organisations-Vorgabe aus `/api/organization`; eine eigene Organisation geht vor. */
   orgDefault?: string | null;
 }) {
   const { rollen } = useRollen();

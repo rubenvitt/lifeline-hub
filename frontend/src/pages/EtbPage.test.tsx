@@ -170,7 +170,7 @@ function setupMSW() {
     // Auftrags-Ziele für das ETB→Auftrag-Formular.
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     // Standard-Rufname gesetzt (LFH-894): ohne ihn sperrte die Von/An-Pflicht jedes Absenden.
-    http.get('/api/benutzer-einstellungen', () =>
+    http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },
       }),
@@ -368,8 +368,8 @@ describe('EtbPage', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }),
       ),
-      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
-      http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+      http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
+      http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
         gespeichert = ((await request.json()) as { wert: string }).wert;
         return HttpResponse.json({
           eintraege: { [String(params.schluessel)]: gespeichert },

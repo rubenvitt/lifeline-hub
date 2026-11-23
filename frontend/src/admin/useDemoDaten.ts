@@ -9,7 +9,7 @@ import { istAdmin } from '../einsatz/schreibrecht';
 /**
  * Stand der Demo-Daten für die Oberfläche.
  *
- * EINE Quelle für Verwaltungsmenü, Sektion und Einsatzliste: `GET /api/demo-daten`. 404 heißt
+ * EINE Quelle für Verwaltungsmenü, Sektion und Einsatzliste: `GET /api/demo-data`. 404 heißt
  * „nicht freigeschaltet“ (ohne `--demo-daten` sind die Routen nicht registriert), 200 liefert
  * den Status.
  *

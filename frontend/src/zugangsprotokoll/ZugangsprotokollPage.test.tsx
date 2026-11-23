@@ -74,13 +74,13 @@ function zeige(
   const gesehen = { anmeldungen: [] as URLSearchParams[], aenderungen: [] as URLSearchParams[] };
   server.use(
     meHandler(me),
-    http.get('/api/benutzer', () => HttpResponse.json([ME_ADMIN])),
-    http.get('/api/zugangsprotokoll/zugangsaenderungen', ({ request }) => {
+    http.get('/api/users', () => HttpResponse.json([ME_ADMIN])),
+    http.get('/api/access-log/access-changes', ({ request }) => {
       const p = new URL(request.url).searchParams;
       gesehen.aenderungen.push(p);
       return HttpResponse.json(p.get('vor_id') ? [] : aenderungen);
     }),
-    http.get('/api/zugangsprotokoll/anmeldungen', ({ request }) => {
+    http.get('/api/access-log/logins', ({ request }) => {
       gesehen.anmeldungen.push(new URL(request.url).searchParams);
       return HttpResponse.json(ANMELDUNGEN);
     }),
@@ -268,7 +268,7 @@ describe('ZugangsprotokollPage', () => {
     let freigeben: () => void = () => {};
     const gesehen = zeige();
     server.use(
-      http.get('/api/zugangsprotokoll/zugangsaenderungen', async ({ request }) => {
+      http.get('/api/access-log/access-changes', async ({ request }) => {
         const p = new URL(request.url).searchParams;
         gesehen.aenderungen.push(p);
         if (p.get('konto') !== 'kurt') return HttpResponse.json(AENDERUNGEN);

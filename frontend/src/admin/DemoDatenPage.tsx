@@ -28,7 +28,7 @@ import { invalidiereNachDemoVorgang, useDemoDatenStatus } from './useDemoDaten';
  * Verwaltungssektion „Demo-Daten“.
  *
  * ── Wer sie sieht ─────────────────────────────────────────────────────────────────────
- * Nur der System-Admin, und nur bei 200 von `GET /api/demo-daten`. Die Seite schützt sich
+ * Nur der System-Admin, und nur bei 200 von `GET /api/demo-data`. Die Seite schützt sich
  * selbst (wie `BenutzerPage`): das `AdminLayout` lässt auch Führungskräfte herein.
  *
  * ── Bedienung ─────────────────────────────────────────────────────────────────────────
