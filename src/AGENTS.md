@@ -244,7 +244,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   idempotent in den Vertrag der Art.
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
   vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
-- **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/geheimnisse/{platz}`; gelesen und
+- **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
   Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
   Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
@@ -345,7 +345,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
-- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/einsatzakte/anlagen.zip`,
+- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/case-file/attachments.zip`,
   `routes/einsatzakte.rs`, `einsatzakte/`): liest die Bytes über `support::anhang_fuer_akte`,
   immer bereinigt; unbereinigbar, am Spiegel noch nicht geholt oder entfernt steht als „nicht
   enthalten“ im `inhalt.csv` statt das ZIP zu kippen. Gate: jedes Modul aus `AKTE_MODULE` lesbar
@@ -760,7 +760,7 @@ Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitgli
 - **Die anlegende Person ist immer Einsatzleitung** und steht nicht in der Liste (sonst 400).
 - **Dieselbe Menge wie unter „Zugriff“:** aufnehmbar ist, was `einsatz::repo::auswahl_sql` liefert
   (aktiv, eigene Org, ohne Geräte-, Stellvertreter- und Archivkonten). Die Auswahl beim Anlegen
-  (`GET /api/einsaetze/mitglied-auswahl`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
+  (`GET /api/einsaetze/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
   Eine fremde oder unbekannte Person nennt die Meldung nur mit Kennung.
 - **Jede aufgenommene Person bekommt nach dem Commit den Hinweis `einsatz_aufnahme`** wie bei
   `mitglied_setzen`; die anlegende Person nicht.
@@ -883,8 +883,8 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   stellt (EL als Einsatzleiter der Führungsstelle ∪ Funktion der Mitgliedschaft, leer = `ohne`);
   lauter gewinnt. Ohne Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
   `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
-  Verlauf `GET …/einsaetze/{id}/benachrichtigungen` (≤ 200, `ungelesen` = unquittierte Eingänge
-  nach der Rechteprüfung), „alle gelesen“ `POST …/benachrichtigungen/gelesen` nur über
+  Verlauf `GET …/einsaetze/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
+  nach der Rechteprüfung), „alle gelesen“ `POST …/notifications/read` nur über
   `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines
   je Zeile.
 - **Für alle erledigt nur über `benachrichtigung::erledigen`** (LLH-1062): ist der Anlass selbst
@@ -940,11 +940,12 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `IosPush::versenden`, Stilles nie, Konten in `UeberHub::ios_push` nie; die auf dem Gerät stumme
   Art filtert `ios_push::soll_senden` je Anmeldung, ein Alarm geht immer. Ohne `--ios-push` ist
   `LiveHub::ios_push()` `None`, und die Routen antworten 404. Ereignisse ohne Einsatz (Störung
-  einer Anbindung, LLH-2026) gehen nicht per iOS-Push, weil der Klartext `e` verlangt; Web Push
-  und Live bleiben (Folgeaufgabe LLH-2077).
+  einer Anbindung, LLH-2026) gehen mit (LLH-2077): im Klartext fehlt dann `e`, die App gruppiert
+  sie im Thread `<kennung>-org`.
 - **Klartext aus derselben Stelle wie `GET /api/notifications/{id}`**
   (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
-  Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`. Absender und Wortlaut nur mit
+  Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`, ohne Einsatz
+  `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
   mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
@@ -1111,12 +1112,12 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 
 Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md`.
 - **Totalsperre bleibt** (`einsatz::berechtigung::darf_lesen`, auch für den System-Admin); das
-  Archiv liest nur `/api/aufbewahrung` (`routes/aufbewahrung.rs`), Guard
+  Archiv liest nur `/api/retention` (`routes/aufbewahrung.rs`), Guard
   `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) — neue Routen dort
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.
 - Archivzugriff nur für den System-Admin der eigenen Org (`fordere_archivzugriff`: fremd 403,
-  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` schneidet gleich (LFH-753): Admin nur
+  unbekannt 404, aktiv 409). `PUT …/retention-period` schneidet gleich (LFH-753): Admin nur
   der Einsatz-Org, sonst Einsatzleitung (auch org-fremd); der Client spiegelt das über
   `BenutzerAnzeige.org_id`. Nach Fristablauf hat die Einsatzleitung bewusst keinen **UI**-Weg;
   der PUT bleibt ihr bis zur Vormerkung (≤ 10 min) offen, danach nur das Wiederherstellen des

@@ -104,7 +104,7 @@ Tabelle kommt als Kurzfassung in die Beschreibung des v1-Dokuments.
 - **Keine Verwaltung über die API:** Benutzer, Rollen, Anmeldewege, Zugänge und Aufbewahrung
   bleiben Sache der Oberfläche.
 - **Kein Lesen abgeschlossener oder archivierter Einsätze.** Das Archiv liest nur
-  `/api/aufbewahrung` mit Sitzung.
+  `/api/retention` mit Sitzung.
 
 ## Anmeldung für Maschinen (D1, D2)
 

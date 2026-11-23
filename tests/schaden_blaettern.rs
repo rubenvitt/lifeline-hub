@@ -439,7 +439,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/schaeden"),
+        &format!("/api/einsaetze/{e}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

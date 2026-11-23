@@ -237,7 +237,7 @@ async fn abgeschlossener_einsatz_nimmt_keine_wahl_an() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

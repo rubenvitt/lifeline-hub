@@ -155,7 +155,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &self.pfad(&format!("modul-overrides/{modul}")),
+            &self.pfad(&format!("module-overrides/{modul}")),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )

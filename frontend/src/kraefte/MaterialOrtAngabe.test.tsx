@@ -215,7 +215,7 @@ describe('Einheiten der Ort-Auswahl nach Abschnittsrang (LLH-1277)', () => {
   function routen(freigaben: ModulFreigaben) {
     const abschnittAbrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+      http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(geladeneEinheiten)),
       http.get('/api/einsaetze/1/abschnitte', ({ request }) => {
         abschnittAbrufe.push(request.url);

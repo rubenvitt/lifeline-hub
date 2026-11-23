@@ -370,7 +370,7 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

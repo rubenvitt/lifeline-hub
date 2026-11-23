@@ -35,7 +35,7 @@ async function oeffnenMitStrom(page: Page, pfad: string, einsatzId: number) {
 }
 
 async function ungeleseneAmServer(page: Page, einsatzId: number): Promise<number> {
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/benachrichtigungen`);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/notifications`);
   expect(r.ok(), `GET Verlauf: ${r.status()}`).toBe(true);
   return ((await r.json()) as { ungelesen: number }).ungelesen;
 }
@@ -102,7 +102,7 @@ test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesend
     expect(await ungeleseneAmServer(page, einsatzId)).toBe(2);
 
     const gelesen = page.waitForResponse((r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`),
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/notifications/read`),
     );
     await page.context().setOffline(false);
     expect((await gelesen).status()).toBe(204);

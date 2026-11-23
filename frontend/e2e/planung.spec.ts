@@ -248,7 +248,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
     punkte.map((p) => [p.bezeichnung, p.zeitpunkt_at]);
   const geplant = await (await page.request.get(`/api/planungen/${planungId}`)).json();
   const programm = await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/programmpunkte`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/agenda-items`)
   ).json();
   expect(paar(geplant.programmpunkte)).toHaveLength(1);
   expect(paar(geplant.programmpunkte)[0][1]).toMatch(/^2027-06-12 2\d:30:00$/);

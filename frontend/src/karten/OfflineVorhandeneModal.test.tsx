@@ -27,8 +27,8 @@ function Harness() {
 /** Die Bremer Datei lehnt der Server ab, die Hamburger nimmt er an. */
 function mock(gesendet: { pfad: string; name: string }[] = []) {
   server.use(
-    http.get('/api/karte/offline-karten/vorhandene', () => HttpResponse.json(DATEIEN)),
-    http.post('/api/karte/offline-karten', async ({ request }) => {
+    http.get('/api/map/offline-maps/existing', () => HttpResponse.json(DATEIEN)),
+    http.post('/api/map/offline-maps', async ({ request }) => {
       const body = (await request.json()) as { pfad: string; name: string };
       gesendet.push(body);
       if (body.pfad.includes('bremen')) {
@@ -110,8 +110,8 @@ describe('OfflineVorhandeneModal', () => {
     let gibFrei: () => void = () => {};
     const freigabe = new Promise<void>((r) => (gibFrei = r));
     server.use(
-      http.get('/api/karte/offline-karten/vorhandene', () => HttpResponse.json(DATEIEN)),
-      http.post('/api/karte/offline-karten', async () => {
+      http.get('/api/map/offline-maps/existing', () => HttpResponse.json(DATEIEN)),
+      http.post('/api/map/offline-maps', async () => {
         await freigabe;
         return HttpResponse.json({ error: 'Name schon vergeben' }, { status: 409 });
       }),

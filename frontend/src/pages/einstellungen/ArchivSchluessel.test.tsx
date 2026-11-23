@@ -46,7 +46,7 @@ function stelleBereit(liste: unknown[] = [schluessel(1)]) {
         { status: 201 },
       );
     }),
-    http.post('/api/org-archive-keys/:id/verify', async ({ request, params }) => {
+    http.post('/api/org-archive-keys/:id/check', async ({ request, params }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: `pruefen ${String(params.id)}`, body });
       lauf += 1;

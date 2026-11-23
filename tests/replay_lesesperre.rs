@@ -36,7 +36,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, e: i64) {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         cookie,
         None,
     )

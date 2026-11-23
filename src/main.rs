@@ -549,6 +549,19 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
     lifeline_hub::extract::init_vertraute_proxys(config.trusted_proxies.clone());
+    let cdn = config.cdn_proxies_checked()?;
+    if !cdn.is_empty() {
+        let liste = cdn
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        tracing::warn!(
+            "CDN vor dem Proxy: --cdn-proxies (LIFELINE_CDN_PROXIES) = {liste} — ein Eintrag \
+             daraus in X-Forwarded-For wird einmal übersprungen (LLH-2080)."
+        );
+    }
+    lifeline_hub::extract::init_cdn_proxys(cdn.to_vec());
 
     // Einwurf ohne TLS (ADR-0023): der Schalter nimmt Schlüssel und Alarmtext im Klartext an und
     // steht deshalb im Log. Unter `--tls` kommt ohnehin nichts unverschlüsselt an.

@@ -1,6 +1,6 @@
 //! Nachbereitungsfrist über die HTTP-Routen (LLH-1494, Spec `aufbewahrung`, design.md D1).
 //!
-//! Org-Vorgabe → Abschluss setzt `nachbereitung_bis` mit ETB-Eintrag; `PUT …/nachbereitung` mit
+//! Org-Vorgabe → Abschluss setzt `nachbereitung_bis` mit ETB-Eintrag; `PUT …/follow-up` mit
 //! den Rechten des Frist-PUT, 422 am aktiven und 409 am übergebenen Einsatz. Die Fachlogik pinnen die
 //! Repo-Tests in `src/einsatz/nachbereitung.rs`.
 
@@ -16,7 +16,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (status, body) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         cookie,
         None,
     )
@@ -34,7 +34,7 @@ async fn nachbereitung(
     anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{id}/nachbereitung"),
+        &format!("/api/einsaetze/{id}/follow-up"),
         cookie,
         Some(&body),
     )

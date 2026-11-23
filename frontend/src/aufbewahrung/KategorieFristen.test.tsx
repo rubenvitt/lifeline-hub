@@ -31,14 +31,14 @@ function liste(eintraege: Partial<Record<string, Partial<KategorieAufbewahrung>>
 
 function mitListe(eintraege: Partial<Record<string, Partial<KategorieAufbewahrung>>>) {
   server.use(
-    http.get('/api/einsaetze/1/aufbewahrung-kategorien', () => HttpResponse.json(liste(eintraege))),
+    http.get('/api/einsaetze/1/retention-categories', () => HttpResponse.json(liste(eintraege))),
   );
 }
 
 beforeEach(() => {
   gesendet = [];
   server.use(
-    http.put('/api/einsaetze/1/aufbewahrungsfrist/:kategorie', async ({ request, params }) => {
+    http.put('/api/einsaetze/1/retention-period/:kategorie', async ({ request, params }) => {
       gesendet.push({
         kategorie: String(params.kategorie),
         body: (await request.json()) as Record<string, unknown>,
@@ -121,7 +121,7 @@ describe('KategorieFristen', () => {
     zeige(ME_ADMIN, 'abgeschlossen');
     // Antwort des Servers: die Kategorie läuft wieder mit der neuen Frist.
     server.use(
-      http.put('/api/einsaetze/1/aufbewahrungsfrist/:kategorie', async ({ request, params }) => {
+      http.put('/api/einsaetze/1/retention-period/:kategorie', async ({ request, params }) => {
         gesendet.push({
           kategorie: String(params.kategorie),
           body: (await request.json()) as Record<string, unknown>,

@@ -1,5 +1,5 @@
 //! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0035,
-//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/anbindungen`, ein Einsatz je Zugang,
+//! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/integrations`, ein Einsatz je Zugang,
 //! Ende der Freigabe, Anzeige an der Anbindung und das Verhalten an einem Spiegel.
 
 use axum::http::StatusCode;
@@ -17,7 +17,7 @@ use common::{
 const IP: &str = "198.51.100.7";
 
 fn liste_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/anbindungen")
+    format!("/api/einsaetze/{einsatz}/integrations")
 }
 
 async fn liste(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -35,7 +35,7 @@ async fn freigeben(
     anfrage(
         app,
         "PUT",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
@@ -51,7 +51,7 @@ async fn beenden(
     anfrage(
         app,
         "DELETE",
-        &format!("{}/{zugang}/freigabe", liste_pfad(einsatz)),
+        &format!("{}/{zugang}/grant", liste_pfad(einsatz)),
         cookie,
         None,
     )
@@ -270,7 +270,7 @@ async fn ein_zugang_liest_hoechstens_einen_einsatz_und_abschluss_beendet_die_fre
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{zweiter}/abschliessen"),
+        &format!("/api/einsaetze/{zweiter}/close"),
         &admin,
         None,
     )
@@ -442,7 +442,7 @@ async fn widerruf_und_entzug_des_rechts_beenden_die_freigabe() {
     );
 
     // Widerruf: 401 für das Fremdsystem, Freigabe weg, ETB und Admin-Spur nennen es.
-    let (s, w) = anfrage(&app, "POST", &format!("{pfad}/widerrufen"), &admin, None).await;
+    let (s, w) = anfrage(&app, "POST", &format!("{pfad}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{w}");
     assert!(w.get("einsatz_id").is_none());
     assert!(
@@ -471,7 +471,7 @@ async fn widerruf_und_entzug_des_rechts_beenden_die_freigabe() {
         .unwrap()
         .is_empty());
     // Ein zweiter Widerruf schreibt keinen zweiten ETB-Eintrag.
-    anfrage(&app, "POST", &format!("{pfad}/widerrufen"), &admin, None).await;
+    anfrage(&app, "POST", &format!("{pfad}/revoke"), &admin, None).await;
     let etb = system_etb_inhalte(&app, &admin, einsatz).await;
     assert_eq!(zaehle(&etb, "Anbindung „FüKW Anzeige“ widerrufen von"), 1);
 }
@@ -783,7 +783,7 @@ async fn am_spiegel_gilt_die_freigabe_hier_und_das_etb_geht_als_antrag_an_den_fu
     let (status, w) = anfrage(
         &hub.app,
         "POST",
-        &format!("{ANBINDUNGEN}/{}/widerrufen", zweiter.zugang_id),
+        &format!("{ANBINDUNGEN}/{}/revoke", zweiter.zugang_id),
         &hub.admin,
         None,
     )

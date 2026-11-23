@@ -96,7 +96,7 @@ impl Umgebung {
         let (s, v) = anfrage_json(
             &self.app,
             "PUT",
-            &format!("{LISTE}/{id}/geheimnisse/token"),
+            &format!("{LISTE}/{id}/secrets/token"),
             &self.admin,
             Some(&json!({ "wert": wert })),
         )
@@ -229,7 +229,7 @@ async fn voruebergehender_fehler_wartet_und_erholt_sich() {
     let (_, versuche) = anfrage_json(
         &u.app,
         "GET",
-        &format!("{LISTE}/{id}/versuche"),
+        &format!("{LISTE}/{id}/attempts"),
         &u.admin,
         None,
     )
@@ -280,7 +280,7 @@ async fn von_admin_angehalten_bleibt_aus_auch_nach_neuem_geheimnis() {
     anfrage_json(
         &u.app,
         "POST",
-        &format!("{LISTE}/{id}/anhalten"),
+        &format!("{LISTE}/{id}/pause"),
         &u.admin,
         None,
     )
@@ -462,7 +462,7 @@ async fn aenderung_waehrend_des_abrufs_gewinnt() {
     let (_, versuche) = anfrage_json(
         &u.app,
         "GET",
-        &format!("{LISTE}/{id}/versuche"),
+        &format!("{LISTE}/{id}/attempts"),
         &u.admin,
         None,
     )
@@ -507,7 +507,7 @@ async fn start_mit_schluessel_nimmt_wegen_des_speichers_angehaltene_wieder_auf()
     anfrage_json(
         &u.app,
         "POST",
-        &format!("{LISTE}/{id}/anhalten"),
+        &format!("{LISTE}/{id}/pause"),
         &u.admin,
         None,
     )
@@ -801,7 +801,7 @@ async fn fortsetzen_erledigt_ohne_entwarnung() {
     let u = umgebung().await;
     let id = eingriff_gemeldet(&u).await;
     assert_eq!(
-        post(&u, &format!("{LISTE}/{id}/fortsetzen")).await,
+        post(&u, &format!("{LISTE}/{id}/resume")).await,
         StatusCode::OK
     );
     assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
@@ -843,7 +843,7 @@ async fn anhalten_durch_admin_erledigt_stoerung() {
     let u = umgebung().await;
     let (id, _) = stoerung_gemeldet(&u).await;
     assert_eq!(
-        post(&u, &format!("{LISTE}/{id}/anhalten")).await,
+        post(&u, &format!("{LISTE}/{id}/pause")).await,
         StatusCode::OK
     );
     assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_gestoert")]);

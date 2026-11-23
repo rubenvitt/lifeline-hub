@@ -1,6 +1,6 @@
 //! Fristen je Datenkategorie über die HTTP-Routen (LFH-749, Spec `aufbewahrung-kategorien`).
 //!
-//! `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`: Rechte und je Antwort ein Fall,
+//! `PUT /api/einsaetze/{id}/retention-period/{kategorie}`: Rechte und je Antwort ein Fall,
 //! jeder Fehlerfall ohne Änderung an Kategorie-Zeile und ETB. Die Fachlogik (Karenz,
 //! Wiederherstellen, Zustand) pinnen die Repo-Tests in `src/einsatz/aufbewahrung_kategorie.rs`.
 
@@ -29,7 +29,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, id: i64) {
     let (status, body) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         cookie,
         None,
     )
@@ -47,7 +47,7 @@ async fn kategorie_frist(
     anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}"),
+        &format!("/api/einsaetze/{id}/retention-period/{kategorie}"),
         cookie,
         Some(&body),
     )
@@ -236,7 +236,7 @@ async fn kategorien_lesen(app: &axum::Router, cookie: &str, id: i64) -> (StatusC
     anfrage_json(
         app,
         "GET",
-        &format!("/api/einsaetze/{id}/aufbewahrung-kategorien"),
+        &format!("/api/einsaetze/{id}/retention-categories"),
         cookie,
         None,
     )
@@ -330,7 +330,7 @@ async fn gemischte_zustaende_am_einsatz_und_in_der_akte() {
     let (status, akte) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )

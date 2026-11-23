@@ -80,7 +80,7 @@ test.describe(KAPITEL, () => {
   test('Reiter „Module“ mit ausgeblendetem und beschränktem Modul', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const pfad = (modul: string) => `/api/einsaetze/${demo.id}/modul-overrides/${modul}`;
+    const pfad = (modul: string) => `/api/einsaetze/${demo.id}/module-overrides/${modul}`;
     const orgPfad = '/api/org-module-settings/lage-dashboard';
     // Nur für die Aufnahme: zwei Module im Einsatz verändert und eines von der Organisation
     // ausgeblendet (LLH-1179), danach zurückgesetzt. Andere Kapitel brauchen den Demo-Einsatz

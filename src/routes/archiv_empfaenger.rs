@@ -5,7 +5,7 @@
 //! |---|---|---|
 //! | GET    | `/api/org-archive-keys` | Liste |
 //! | POST   | `/api/org-archive-keys` | Eintragen; liefert die Schlüsselprobe |
-//! | POST   | `/api/org-archive-keys/{id}/verify` | Code der Probe eingeben |
+//! | POST   | `/api/org-archive-keys/{id}/check` | Code der Probe eingeben |
 //! | DELETE | `/api/org-archive-keys/{id}` | Entfernen |
 
 use crate::app::AppState;
@@ -77,7 +77,7 @@ pub struct Probe {
     pub code: String,
 }
 
-/// POST /api/org-archive-keys/{id}/verify — Code der Probe; richtig: der Schlüssel gilt.
+/// POST /api/org-archive-keys/{id}/check — Code der Probe; richtig: der Schlüssel gilt.
 pub async fn pruefen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,

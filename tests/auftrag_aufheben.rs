@@ -257,7 +257,7 @@ async fn beobachter_403_abgeschlossener_einsatz_409_fremder_einsatz_404() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -274,7 +274,7 @@ async fn aufheben_schreibt_auch_ohne_auto_etb() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einstellungen"),
+        &format!("/api/einsaetze/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -385,7 +385,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/modul-zaehler"),
+        &format!("/api/einsaetze/{e}/module-counts"),
         &admin,
         None,
     )

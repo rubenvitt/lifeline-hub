@@ -20,7 +20,7 @@ export function trageArchivSchluesselEin(
 }
 
 export function pruefeArchivSchluessel(id: number, code: string): Promise<ArchivEmpfaengerAnzeige> {
-  return apiSend<ArchivEmpfaengerAnzeige>(`${BASIS}/${id}/verify`, 'POST', { code });
+  return apiSend<ArchivEmpfaengerAnzeige>(`${BASIS}/${id}/check`, 'POST', { code });
 }
 
 export function entferneArchivSchluessel(id: number): Promise<void> {

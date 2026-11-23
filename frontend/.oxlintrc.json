@@ -95,8 +95,9 @@
     "typescript/prefer-as-const": "error",
     "typescript/prefer-namespace-keyword": "error",
     "typescript/triple-slash-reference": "error",
-    "react/rules-of-hooks": "error",
-    "react/exhaustive-deps": "warn"
+    // Schreibweise `react-hooks/…` wie in den Direktiven und der oxlint-Meldung (frontend/AGENTS.md).
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn"
   },
   "overrides": [
     {

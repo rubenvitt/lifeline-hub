@@ -14,6 +14,12 @@ public enum Brueckenbefehl: Equatable, Sendable {
     case pushRegister(id: Int)
     case pushUnregister(id: Int)
     case pushState(id: Int)
+    /// Standort einmal (LLH-2071); `timeout` zählt erst ab der Freigabe.
+    case locationCurrent(id: Int, highAccuracy: Bool, timeout: Duration?)
+    /// Startet eine Beobachtung mit dem Schlüssel `id`; Positionen gehen über `locationScript`.
+    case locationWatch(id: Int, highAccuracy: Bool, timeout: Duration?)
+    /// Beendet die Beobachtung `watch`, ohne Antwort.
+    case locationClear(watch: Int)
     /// Unbekannter Befehl oder fehlerhafte Felder; die Seite bekommt eine Ablehnung.
     case ungueltig(id: Int, grund: String)
 }
@@ -24,6 +30,8 @@ public enum Antwortwert: Equatable, Sendable {
     case bool(Bool)
     /// JSON-Objekt aus Textwerten (`push_register`, `push_state`).
     case objekt([String: String])
+    /// Eine Position (`location_current`).
+    case position(Standortposition)
 }
 
 /// Antwort an die Seite: `window.__LIFELINE_REPLY__(id, fehler, wert)`.
@@ -49,6 +57,8 @@ extension Bruecke {
             return nil
         }
         if cmd == "haptics" { return .haptics(kind: nachricht["kind"] as? String ?? "") }
+        // Ohne Antwort und ohne `id`: nur die Beobachtung, die endet.
+        if cmd == "location_clear" { return ganzzahl(nachricht["watch"]).map { .locationClear(watch: $0) } }
         guard let id = ganzzahl(nachricht["id"]) else { return nil }
         switch cmd {
         case "show_notification":
@@ -71,6 +81,14 @@ extension Bruecke {
             return .pushUnregister(id: id)
         case "push_state":
             return .pushState(id: id)
+        case "location_current", "location_watch":
+            let genau = nachricht["high_accuracy"] as? Bool ?? false
+            guard let frist = frist(nachricht["timeout"]) else {
+                return .ungueltig(id: id, grund: "Die Frist muss eine Zahl ab 0 sein.")
+            }
+            return cmd == "location_current"
+                ? .locationCurrent(id: id, highAccuracy: genau, timeout: frist.wert)
+                : .locationWatch(id: id, highAccuracy: genau, timeout: frist.wert)
         default:
             return .ungueltig(id: id, grund: "Unbekannter Befehl der Hülle: \(cmd)")
         }
@@ -85,8 +103,45 @@ extension Bruecke {
         case .null: wert = "null"
         case .bool(let b): wert = b ? "true" : "false"
         case .objekt(let felder): wert = jsObjekt(felder)
+        case .position(let position): wert = jsPosition(position)
         }
         return "window.__LIFELINE_REPLY__?.(\(antwort.id), \(fehler), \(wert));"
+    }
+
+    /// Meldet einer laufenden Beobachtung eine Position oder einen Fehler (LLH-2071). Ist die Seite
+    /// inzwischen eine andere, fehlt `__LIFELINE_LOCATION__`, und der Aufruf tut nichts.
+    public static func locationScript(id: Int, fehler: Standortfehler?, position: Standortposition?)
+        -> String
+    {
+        let text = fehler.map { jsString($0.rawValue) } ?? "null"
+        let wert = position.map(jsPosition) ?? "null"
+        return "window.__LIFELINE_LOCATION__?.(\(id), \(text), \(wert));"
+    }
+
+    /// Position als JS-Objekt mit sortierten Schlüsseln; was das Gerät nicht weiß, ist `null`.
+    private static func jsPosition(_ p: Standortposition) -> String {
+        func zahl(_ wert: Double?) -> String {
+            guard let wert, wert.isFinite else { return "null" }
+            return "\(wert)"
+        }
+        let felder: [(String, String)] = [
+            ("accuracy", zahl(p.accuracy)), ("altitude", zahl(p.altitude)),
+            ("altitude_accuracy", zahl(p.altitudeAccuracy)), ("heading", zahl(p.heading)),
+            ("latitude", zahl(p.latitude)), ("longitude", zahl(p.longitude)),
+            ("speed", zahl(p.speed)), ("timestamp", "\(p.timestamp)"),
+        ]
+        return "{" + felder.map { "\"\($0.0)\":\($0.1)" }.joined(separator: ",") + "}"
+    }
+
+    /// Frist in ms aus JS: fehlt sie oder ist sie `null`, gibt es keine (`wert` `nil`); `nil`
+    /// insgesamt heißt ungültig (Text, negativ, nicht endlich).
+    private static func frist(_ roh: Any?) -> (wert: Duration?, Void)? {
+        if roh == nil || roh is NSNull { return (nil, ()) }
+        if roh is String || roh is Bool { return nil }
+        guard let ms = (roh as? Double) ?? (roh as? Int).map(Double.init), ms.isFinite, ms >= 0 else {
+            return nil
+        }
+        return (.milliseconds(Int64(ms.rounded(.up))), ())
     }
 
     /// JSON-Objekt mit sortierten Schlüsseln, gültig als JS-Literal (wie `jsString`).
@@ -176,6 +231,12 @@ public protocol Huellendienste: AnyObject, Sendable {
     /// Berechtigung und Kennung des aktiven Servers, sobald die App eine angelegt hat (auch wenn
     /// ihr Schlüssel fehlt: nur mit ihr meldet die Seite am Server ab); fragt nie.
     func pushState() async -> (Meldungsfreigabe, kennung: String?)
+    /// Freigabe des Standorts (`CLAuthorizationStatus`, Ortungsdienst des Geräts); fragt nie.
+    func loadStandortfreigabe() async -> Standortfreigabe
+    /// Fragt die Person („When in Use“); `true`, wenn sie den Standort erlaubt.
+    func requestStandortfreigabe() async -> Bool
+    /// Eine Position; die Freigabe ist erteilt, die Frist zählt ab jetzt. Wirft `Standortfehler`.
+    func currentPosition(highAccuracy: Bool, timeout: Duration?) async throws -> Standortposition
 }
 
 /// Führt einen angenommenen Befehl aus (Spec `ios-huelle`, „Haptik nur auf Wunsch der Seite und
@@ -247,8 +308,29 @@ public enum Brueckenausfuehrung {
                 if let kennung { felder["registration_id"] = kennung }
                 return .objekt(felder)
             }
+        case .locationCurrent(let id, let genau, let frist):
+            return await antwort(id) {
+                try await isStandortErlaubt(dienste)
+                // Erst nach der Freigabe: die Frist zählt die Wartezeit auf die Person nicht mit.
+                return .position(try await dienste.currentPosition(highAccuracy: genau, timeout: frist))
+            }
+        case .locationWatch, .locationClear:
+            // Beobachtungen führt die App über `Standortbeobachtung`; sie antworten nicht hier.
+            return nil
         case .ungueltig(let id, let grund):
             return Brueckenantwort(id: id, fehler: grund, wert: .null)
+        }
+    }
+
+    /// Darf die Hülle den Standort holen (LLH-2071)? Wer noch nie gefragt wurde, wird jetzt
+    /// gefragt; sonst wirft sie `denied` oder, ohne Ortungsdienst des Geräts, `unavailable`.
+    public static func isStandortErlaubt(_ dienste: Huellendienste) async throws {
+        switch await dienste.loadStandortfreigabe() {
+        case .erlaubt: return
+        case .verweigert: throw Standortfehler.denied
+        case .aus: throw Standortfehler.unavailable
+        case .offen:
+            guard await dienste.requestStandortfreigabe() else { throw Standortfehler.denied }
         }
     }
 

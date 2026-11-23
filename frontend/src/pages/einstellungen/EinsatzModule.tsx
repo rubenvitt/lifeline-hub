@@ -45,7 +45,7 @@ const RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
  * `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`): der Schalter zeigt den wirksamen Wert —
  * eigener Wert des Einsatzes, sonst die Freigabe des Servers (dort ist die Org-Vorgabe schon
  * aufgelöst), sonst die Org-Vorgabe, sonst sichtbar. Die Herkunft zeigen die Vorgaben am Einsatz
- * (`…/modul-vorgaben`, LLH-1183), die auch eine Einsatzleitung ohne Org-Rolle lesen darf.
+ * (`…/module-defaults`, LLH-1183), die auch eine Einsatzleitung ohne Org-Rolle lesen darf.
  * Umlegen setzt einen eigenen Wert; „Vorgabe übernehmen“ nimmt ihn zurück (`sichtbar: null`). Ein
  * Rollenwechsel schickt den eigenen Wert mit, nie den wirksamen — sonst würde eine geerbte
  * Ausblendung nebenbei festgeschrieben.

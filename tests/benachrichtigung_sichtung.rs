@@ -68,7 +68,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/personen", w.einsatz),
+        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )

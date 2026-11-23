@@ -52,7 +52,7 @@ async fn schluessel_eintragen(app: &axum::Router, admin: &str) -> age::x25519::I
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/org-archive-keys/{id}/verify"),
+        &format!("/api/org-archive-keys/{id}/check"),
         admin,
         Some(&json!({ "code": code.trim() })),
     )
@@ -149,7 +149,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -170,7 +170,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, akte) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )
@@ -186,7 +186,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
 
     let (s, bytes, name) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &admin,
     )
     .await;
@@ -226,7 +226,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let fremd = login_cookie(&app, "fremdadmin", "fremdpw12").await;
     let (s, _, _) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &fremd,
     )
     .await;

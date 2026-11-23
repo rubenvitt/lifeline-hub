@@ -60,7 +60,7 @@ import {
  *   Beide stehen immer, auch solange die Prüfung lädt oder gescheitert ist: sie sind Pflichtsätze,
  *   kein Ergebnis der Prüfung (der Abschluss lässt Kräfte unverändert, Entscheidung 17.11.2026).
  * - **Bestätigung:** der rote Knopf ist gesperrt, bis Nummer oder Bezeichnung eingetippt sind
- *   ({@link matchesEinsatzkennung}). Geprüft wird nur hier; `POST …/abschliessen` bleibt ohne
+ *   ({@link matchesEinsatzkennung}). Geprüft wird nur hier; `POST …/close` bleibt ohne
  *   Bestätigung im Body (D2), ein Fehlgriff lässt sich binnen 24 Stunden zurücknehmen.
  * - **Ohne Netz gesperrt, nie vorgemerkt:** der Knopf fragt `useOhneVerbindung`, die Mutation
  *   läuft mit `networkMode: 'always'` ({@link SOFORT_ODER_NIE}). Sonst hielte TanStack sie an,

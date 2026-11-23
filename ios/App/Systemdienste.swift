@@ -14,15 +14,29 @@ final class Systemdienste: Huellendienste {
     private let pushablage: Pushablage?
     /// Der Server, dessen Seite gerade die Brücke ruft.
     private let aktiverServer: @MainActor () -> UUID?
+    /// Standort der Oberfläche (LLH-2071); dieselbe Instanz führt `Brueckenempfang` für
+    /// Beobachtungen.
+    private let standort: Standortdienst
 
     init(
         webView: @escaping @MainActor () -> WKWebView?, anmelder: Anmelder, pushablage: Pushablage?,
-        aktiverServer: @escaping @MainActor () -> UUID?
+        standort: Standortdienst, aktiverServer: @escaping @MainActor () -> UUID?
     ) {
         self.webView = webView
         self.anmelder = anmelder
         self.pushablage = pushablage
+        self.standort = standort
         self.aktiverServer = aktiverServer
+    }
+
+    // MARK: Standort (LLH-2071)
+
+    func loadStandortfreigabe() async -> Standortfreigabe { await standort.freigabe() }
+
+    func requestStandortfreigabe() async -> Bool { await standort.requestFreigabe() }
+
+    func currentPosition(highAccuracy: Bool, timeout: Duration?) async throws -> Standortposition {
+        try await standort.einmal(highAccuracy: highAccuracy, timeout: timeout)
     }
 
     var isHaptikEnabled: Bool {

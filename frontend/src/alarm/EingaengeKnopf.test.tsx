@@ -51,7 +51,7 @@ function eintrag(id: number, teil: Partial<BenachrichtigungAnzeige> = {}): Benac
 function serverMit(verlauf: { eintraege: BenachrichtigungAnzeige[]; ungelesen: number }) {
   const zaehler = { abrufe: 0, quittiert: [] as number[], gelesen: [] as number[] };
   server.use(
-    http.get('/api/einsaetze/:id/benachrichtigungen', () => {
+    http.get('/api/einsaetze/:id/notifications', () => {
       zaehler.abrufe++;
       return HttpResponse.json(verlauf);
     }),
@@ -59,7 +59,7 @@ function serverMit(verlauf: { eintraege: BenachrichtigungAnzeige[]; ungelesen: n
       zaehler.quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
-    http.post('/api/einsaetze/:id/benachrichtigungen/gelesen', async ({ request }) => {
+    http.post('/api/einsaetze/:id/notifications/read', async ({ request }) => {
       zaehler.gelesen.push(((await request.json()) as { bis_id: number }).bis_id);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -637,9 +637,7 @@ describe('Eingänge ohne Netz (LLH-1422)', () => {
       daten: { bis_id: 9 },
     });
     serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
-    server.use(
-      http.post('/api/einsaetze/:id/benachrichtigungen/gelesen', () => HttpResponse.error()),
-    );
+    server.use(http.post('/api/einsaetze/:id/notifications/read', () => HttpResponse.error()));
     rendern();
     await screen.findByTestId('angemeldet');
     act(() => {
