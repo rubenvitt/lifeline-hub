@@ -7536,7 +7536,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
 
-    for aktion in ["uebernehmen", "abweisen"] {
+    for aktion in ["take-over", "reject"] {
         let (s, _) = anfrage_json(
             &app,
             "POST",
@@ -8063,7 +8063,7 @@ async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/status/zuruecknehmen", l.zug_nord),
+        &format!("{basis}/{}/status/undo", l.zug_nord),
         &geraet,
         Some(&beleg),
     )
@@ -8073,7 +8073,7 @@ async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/status/zuruecknehmen", l.zug_ost),
+        &format!("{basis}/{}/status/undo", l.zug_ost),
         &geraet,
         Some(&beleg),
     )

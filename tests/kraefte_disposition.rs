@@ -80,7 +80,7 @@ async fn sammel(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/{art}/sammel"),
+        &format!("/api/einsaetze/{einsatz}/{art}/bulk"),
         cookie,
         Some(body),
     )
@@ -158,7 +158,7 @@ async fn neun_personen_in_einheit_und_fahrzeug_mit_einem_etb_eintrag() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(
             r#"{{"personal_ids":{},"einheit_id":{staffel},"fahrzeug_id":{fz}}}"#,
             ids(&pids)
@@ -223,7 +223,7 @@ async fn eine_person_ausser_dienst_lehnt_mit_grund_ab_und_legt_nichts_an() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":{}}}"#, ids(&pids)),
     )
     .await;
@@ -249,7 +249,7 @@ async fn schon_disponierte_unbekannte_und_entlassene_personen_nennen_ihren_grund
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":{}}}"#, ids(&[dabei, entlassen])),
     )
     .await;
@@ -269,7 +269,7 @@ async fn schon_disponierte_unbekannte_und_entlassene_personen_nennen_ihren_grund
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(
             r#"{{"personal_ids":{}}}"#,
             ids(&[frei, dabei, 987654, entlassen])
@@ -307,7 +307,7 @@ async fn fahrzeug_einer_anderen_einheit_ist_422() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a}],"einheit_id":{staffel},"fahrzeug_id":{fz}}}"#),
     )
     .await;
@@ -326,20 +326,20 @@ async fn einundfuenfzig_kraefte_sind_400_und_dubletten_zaehlen_einmal() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":{}}}"#, ids(&zu_viel)),
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
     assert!(personal(&app, &admin, einsatz).await.is_empty());
-    let (s, json) = sammel(&app, &admin, einsatz, "fahrzeuge", r#"{"fahrzeug_ids":[]}"#).await;
+    let (s, json) = sammel(&app, &admin, einsatz, "vehicles", r#"{"fahrzeug_ids":[]}"#).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
 
     let (s, json) = sammel(
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a},{a}]}}"#),
     )
     .await;
@@ -385,7 +385,7 @@ async fn ziel_in_gesperrtem_modul_ist_403_und_legt_nichts_an() {
         &app,
         &frieda,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a}],"einheit_id":{staffel}}}"#),
     )
     .await;
@@ -394,7 +394,7 @@ async fn ziel_in_gesperrtem_modul_ist_403_und_legt_nichts_an() {
         &app,
         &frieda,
         einsatz,
-        "fahrzeuge",
+        "vehicles",
         &format!(r#"{{"fahrzeug_ids":[{f2}],"einheit_id":{staffel}}}"#),
     )
     .await;
@@ -405,7 +405,7 @@ async fn ziel_in_gesperrtem_modul_ist_403_und_legt_nichts_an() {
         &app,
         &frieda,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a}],"fahrzeug_id":{fz}}}"#),
     )
     .await;
@@ -418,7 +418,7 @@ async fn ziel_in_gesperrtem_modul_ist_403_und_legt_nichts_an() {
         &app,
         &frieda,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a}]}}"#),
     )
     .await;
@@ -438,7 +438,7 @@ async fn zwei_fahrzeuge_in_eine_einheit() {
         &app,
         &admin,
         einsatz,
-        "fahrzeuge",
+        "vehicles",
         &format!(r#"{{"fahrzeug_ids":[{f1},{f2}],"einheit_id":{zug}}}"#),
     )
     .await;
@@ -464,7 +464,7 @@ async fn zwei_fahrzeuge_in_eine_einheit() {
         &app,
         &admin,
         einsatz,
-        "fahrzeuge",
+        "vehicles",
         &format!(r#"{{"fahrzeug_ids":[{f3},{f1}]}}"#),
     )
     .await;
@@ -510,7 +510,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a},{b}],"einheit_id":{staffel},"fahrzeug_id":{fz}}}"#),
     )
     .await;
@@ -535,7 +535,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
         &app,
         &admin,
         einsatz,
-        "fahrzeuge",
+        "vehicles",
         &format!(r#"{{"fahrzeug_ids":[{f2}],"einheit_id":{staffel}}}"#),
     )
     .await;
@@ -555,7 +555,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
         &app,
         &admin,
         einsatz,
-        "personal",
+        "personnel",
         &format!(r#"{{"personal_ids":[{a}]}}"#),
     )
     .await;
@@ -573,7 +573,7 @@ async fn beobachter_disponiert_nicht_gesammelt() {
     rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let body = format!(r#"{{"personal_ids":[{a}]}}"#);
-    let (s, _) = sammel(&app, &erika, einsatz, "personal", &body).await;
+    let (s, _) = sammel(&app, &erika, einsatz, "personnel", &body).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     assert!(personal(&app, &admin, einsatz).await.is_empty());
 }

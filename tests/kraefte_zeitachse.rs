@@ -618,7 +618,7 @@ async fn grenzwerte(w: &Welt, cookie: &str, modul: &str) -> (StatusCode, Value) 
     anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/{modul}/zeitachse/grenzwerte", w.e),
+        &format!("/api/einsaetze/{}/{modul}/timeline/limits", w.e),
         cookie,
         None,
     )
@@ -669,19 +669,19 @@ async fn grenzwerte_lesen_ohne_modul_abloesung() {
     assert_eq!(s, StatusCode::OK);
     modul_sichtbar(&w, "abloesung", false).await;
 
-    let (s, g) = grenzwerte(&w, &bea, "einheiten").await;
+    let (s, g) = grenzwerte(&w, &bea, "units").await;
     assert_eq!(s, StatusCode::OK, "{g:?}");
     assert_eq!(g["max_dienst_minuten"], 360);
     assert_eq!(g["max_dienst_eigen"], true);
     assert_eq!(g["min_ruhe_minuten"], 480);
 
     modul_sichtbar(&w, "personal", false).await;
-    let (s, _) = grenzwerte(&w, &bea, "personal").await;
+    let (s, _) = grenzwerte(&w, &bea, "personnel").await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _) = grenzwerte(&w, &bea, "einheiten").await;
+    let (s, _) = grenzwerte(&w, &bea, "units").await;
     assert_eq!(s, StatusCode::OK);
     modul_sichtbar(&w, "einheiten", false).await;
-    let (s, _) = grenzwerte(&w, &bea, "einheiten").await;
+    let (s, _) = grenzwerte(&w, &bea, "units").await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 

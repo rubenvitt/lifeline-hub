@@ -312,10 +312,20 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     let helena_id = common::benutzer_anlegen(&app, &admin, "helena", "keine").await;
     common::rolle_setzen(&app, &admin, e, helena_id, "einsatzleitung").await;
     let lena = login_cookie(&app, "helena", "helenapw1").await;
-    for (modul, regel) in [
-        ("meldungen", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
-        ("einheiten", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    // Modul-Key und Pfad gehen auseinander, seit die Routen englisch werden (ADR-0085).
+    for (modul, pfad, regel) in [
         (
+            "meldungen",
+            "meldungen",
+            r#"{"sichtbar":false,"benoetigte_rolle":null}"#,
+        ),
+        (
+            "einheiten",
+            "units",
+            r#"{"sichtbar":false,"benoetigte_rolle":null}"#,
+        ),
+        (
+            "auftraege",
             "auftraege",
             r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#,
         ),
@@ -332,7 +342,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/{modul}"),
+            &format!("/api/einsaetze/{e}/{pfad}"),
             &lena,
             None,
         )
