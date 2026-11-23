@@ -73,8 +73,10 @@ Telefon).
 - `repo::save_faehigkeiten` speichert den Wert aus jeder erfolgreichen Meldung mit; `None`
   löscht ihn. `KopplungZeile` und `KOPPLUNG_SPALTEN` führen die Spalte.
 - **Einsatz:** `EinsatzAnzeige.ios_push_hub_gesperrt: Vec<IosPushHubSperre>`, wobei
-  `IosPushHubSperre { hub_name, since }` neu ist (englische Wire-Felder). Leer ist `[]`, immer
-  vorhanden. Liste und Detail machen dieselbe Aussage, wie bei `meine_sachgebiete`. Die Menge der
+  `IosPushHubSperre { hub_name, since }` neu ist (englische Wire-Felder). Leer fehlt es
+  (`skip_serializing_if = "Vec::is_empty"`; als Pflichtfeld müssten elf Frontend-Fixtures es
+  nachtragen). Liste und Detail machen dieselbe Aussage, weil beide dieselbe Spalte lesen. Die
+  Menge der
   Kopplungen ist genau die von `spiegel::hinweis::ziele` (aktiv, meldet sich, nimmt Hinweise an,
   Org-Zuordnung nicht widerrufen, kein Spiegel-, Demo- oder abzuräumender Einsatz), dazu
   `gegenueber_ios_push = 1` und `gegenueber_ios_push_gesperrt_seit IS NOT NULL`. Am Spiegel (Hub
