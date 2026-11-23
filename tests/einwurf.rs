@@ -310,7 +310,7 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
     let (app, pool, admin) = setup().await;
     let (id, alt) = zugang(&app, &admin, "FE2", "alarmmeldungen:write").await;
     assert_eq!(
-        einwerfen(&app, &alt, "alarmmeldung?text=a").await.status,
+        einwerfen(&app, &alt, "alarm?text=a").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -330,11 +330,11 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
     assert!(v["zugang"]["schluessel_gewechselt_at"].is_string());
 
     assert_eq!(
-        einwerfen(&app, &alt, "alarmmeldung?text=b").await.status,
+        einwerfen(&app, &alt, "alarm?text=b").await.status,
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(
-        einwerfen(&app, &neu, "alarmmeldung?text=b").await.status,
+        einwerfen(&app, &neu, "alarm?text=b").await.status,
         StatusCode::NO_CONTENT
     );
 
@@ -350,7 +350,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     let (app, pool, admin) = setup().await;
     let (id, schluessel) = zugang(&app, &admin, "Divera", "alarmmeldungen:write").await;
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
+        einwerfen(&app, &schluessel, "alarm?text=a")
             .await
             .status,
         StatusCode::NO_CONTENT
@@ -362,7 +362,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     assert!(v["widerrufen_at"].is_string());
     assert_eq!(v["widerrufen_von_name"], "Administrator");
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=b").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=b").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     assert_eq!(antwort.code(), "unauthorized");
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 1, "nichts gespeichert");
@@ -421,7 +421,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 0);
 
@@ -445,7 +445,7 @@ async fn direktkopplung_vor_ort_sperrt_keine_einwuerfe() {
     let (id, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     org_koppeln(&pool, "vor_ort").await;
 
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::NO_CONTENT);
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 1);
 
@@ -482,7 +482,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
     let antwort = einwerfen(
         &app,
         &schluessel,
-        "alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung",
+        "alarm?ric=1234567&subric=a&text=B2%20Wohnung",
     )
     .await;
     assert_eq!(antwort.status, StatusCode::NO_CONTENT);
@@ -514,7 +514,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
     let wieder = einwerfen(
         &app,
         &schluessel,
-        "alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung",
+        "alarm?ric=1234567&subric=a&text=B2%20Wohnung",
     )
     .await;
     assert_eq!(wieder.status, StatusCode::NO_CONTENT);
@@ -640,7 +640,7 @@ async fn unbekannter_und_abgelaufener_schluessel_sind_401() {
 
     let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
     for falsch in [unbekannt.as_str(), "llh_ew_kurz", "irgendwas"] {
-        let antwort = einwerfen(&app, falsch, "alarmmeldung?text=a").await;
+        let antwort = einwerfen(&app, falsch, "alarm?text=a").await;
         assert_eq!(antwort.status, StatusCode::UNAUTHORIZED, "{falsch}");
         assert_eq!(antwort.code(), "unauthorized");
         assert!(
@@ -654,7 +654,7 @@ async fn unbekannter_und_abgelaufener_schluessel_sind_401() {
         .execute(&pool)
         .await
         .unwrap();
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &schluessel, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["zugaenge"][0]["is_abgelaufen"], true);
@@ -670,7 +670,7 @@ async fn ein_zugang_schreibt_nur_fuer_seinen_zweck() {
     let antwort = einwerfen(&app, &alarm, "position?id=a&lat=1&lon=2").await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "missing_scope");
-    let antwort = einwerfen(&app, &ortung, "alarmmeldung?text=a").await;
+    let antwort = einwerfen(&app, &ortung, "alarm?text=a").await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "missing_scope");
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 0);
@@ -681,7 +681,7 @@ async fn ein_zugang_schreibt_nur_fuer_seinen_zweck() {
 async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
-    einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    einwerfen(&app, &schluessel, "alarm?text=a").await;
 
     for pfad in [
         format!("/api/v1/intake/{schluessel}"),
@@ -824,7 +824,7 @@ async fn mit_eigenem_tls_wird_der_einwurf_angenommen() {
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["transport"], "tls");
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
+        einwerfen(&app, &schluessel, "alarm?text=a")
             .await
             .status,
         StatusCode::NO_CONTENT
@@ -846,7 +846,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
         let antwort = einwerfen(
             &app,
             &schluessel,
-            &format!("alarmmeldung?text={angenommen}"),
+            &format!("alarm?text={angenommen}"),
         )
         .await;
         if antwort.status == StatusCode::TOO_MANY_REQUESTS {
@@ -871,7 +871,7 @@ async fn der_31_einwurf_wird_gedrosselt() {
     );
     // Je Zugang getrennt.
     assert_eq!(
-        einwerfen(&app, &anderer, "alarmmeldung?text=a")
+        einwerfen(&app, &anderer, "alarm?text=a")
             .await
             .status,
         StatusCode::NO_CONTENT
@@ -912,7 +912,7 @@ async fn zehn_unbekannte_schluessel_sperren_die_quelle_nur_auf_den_maschinenwege
     assert!(!lifeline_hub::auth::rate_limit::ist_gesperrt(ip));
     // Eine andere Quelle ist nicht betroffen.
     assert_eq!(
-        einwerfen(&app, &schluessel, "alarmmeldung?text=a")
+        einwerfen(&app, &schluessel, "alarm?text=a")
             .await
             .status,
         StatusCode::NO_CONTENT
@@ -1061,7 +1061,7 @@ async fn tagesgrenze_der_ablage_ergibt_429() {
         .await
         .unwrap();
     for abfrage in ["text=zu-viel", "text=schon-da"] {
-        let antwort = einwerfen(&app, &schluessel, &format!("alarmmeldung?{abfrage}")).await;
+        let antwort = einwerfen(&app, &schluessel, &format!("alarm?{abfrage}")).await;
         assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS, "{abfrage}");
         assert_eq!(antwort.headers[header::RETRY_AFTER], "3600");
     }
@@ -1204,8 +1204,8 @@ async fn purge_lauf_loescht_die_ablage_nach_frist() {
     let (app, pool, admin) = setup().await;
     let (_, alarm) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     let (_, ortung) = zugang(&app, &admin, "OsmAnd", "positionen:write").await;
-    einwerfen(&app, &alarm, "alarmmeldung?text=alt").await;
-    einwerfen(&app, &alarm, "alarmmeldung?text=jung").await;
+    einwerfen(&app, &alarm, "alarm?text=alt").await;
+    einwerfen(&app, &alarm, "alarm?text=jung").await;
     einwerfen(&app, &ortung, "position?id=alt&lat=1&lon=2").await;
     einwerfen(&app, &ortung, "position?id=jung&lat=1&lon=2").await;
     sqlx::query(
