@@ -2853,7 +2853,7 @@ const UNTERKUNFT_GRUNDLAGE_KNOEPFE = 6;
 const UNTERKUNFT_ZAHLENFELDER = 6;
 
 async function unterkunftStelleSaeen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/care/positions`, {
     data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
   });
   expect(antwort.ok(), `Seeding Stelle: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -3546,7 +3546,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3724,7 +3724,7 @@ test('Ausgabeansicht: „+1“ ≥ 72 px in jeder Stufe und unten, übrige Zähl
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Zaehlen`);
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/zeitfenster`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/time-slots`, {
     data: {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3819,7 +3819,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen Lesend`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3921,7 +3921,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Stellen`);
-  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+  const basis = `/api/einsaetze/${einsatzId}/catering`;
   const senden = async (pfad: string, data: unknown, methode: 'post' | 'patch' = 'post') => {
     const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
     expect(
@@ -4005,7 +4005,7 @@ const personZeile = (page: Page, id: number) =>
   page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
 
 async function personAnlegen(page: Page, einsatzId: string, daten: object): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data: daten });
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data: daten });
   expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }

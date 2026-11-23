@@ -56,7 +56,7 @@ Handler (`JsonBody`, LFH-1074).
   `ohne_treffer` zu 409 `Veraltet` oder 404). Die Stärke-Position vergleicht den wirksamen Wert,
   der Material-Ort ist eine Gruppe aller vier Spalten. Kein Eintrag in `einsatz_feld_vermerk`.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
-  `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
+  `f8218h1i-personendaten-feldweise`): der PATCH `…/persons/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
   `person::repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an. Sichtung, Status, PAT oder
   ein anderes Feld lösen so keinen 409 aus; ein Altwert ohne Änderung desselben Felds und eine
@@ -304,13 +304,13 @@ Lese-Audit (wie Tiere insgesamt).
   `original_freigeben`; scheitert sie, geht nichts hinaus. Abgewiesene Anfragen, Liste und
   Ablegen protokollieren nichts. `anhang_id` dort **ohne FK** (sonst wäre die Tabelle für den
   Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
-  lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
+  lesbar. Einsicht `GET …/uhs/{uid}/attachments/accesses` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
 - **UHS-Plan (LFH-999)** (Spec `uhs-plan`, Herleitung
   `openspec/changes/archive/2026-10-05-lfh-999-uhs-plan-hintergrund/design.md`): der Plan unter
   dem Platz-Layout ist **kein Anhang**, sondern eigene, bereinigte Bytes in `uhs_plan` (einer je
-  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/bild`) schreibt
-  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/aus-anhang`) ist
+  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/image`) schreibt
+  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/from-attachment`) ist
   EIN protokollierter Abruf, vor dem Lesen der Bytes über `support::anhang_bereinigt_kopieren`.
   Keinen Verweis vom Plan auf einen Anhang einführen: das Audit verlöre seine Aussage.
 
@@ -419,7 +419,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
-- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`,
+- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/persons/selection`,
   `…/schaeden/auswahl`), nicht die Vollliste.
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.

@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn b(e: i64) -> String {
-    format!("/api/einsaetze/{e}/betreuung")
+    format!("/api/einsaetze/{e}/care")
 }
 
 async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (StatusCode, Value) {
@@ -360,7 +360,7 @@ async fn kostform_im_personen_patch() {
     let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{e}/personen/{tom}");
+    let pfad = format!("/api/einsaetze/{e}/persons/{tom}");
 
     let (s, p) = anfrage(
         &app,
@@ -457,7 +457,7 @@ async fn kostform_zaehlung_ist_live_auch_an_gezaehlter_stelle() {
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let anna = h["personen"][0]["id"].as_i64().unwrap();
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let person = |p: i64| format!("/api/einsaetze/{e}/personen/{p}");
+    let person = |p: i64| format!("/api/einsaetze/{e}/persons/{p}");
 
     let feed = live_oeffnen(&app, &admin, e).await;
     let (s, _) = anfrage(
@@ -523,7 +523,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &format!("/api/einsaetze/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -553,7 +553,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{neu}/verbleib"),
+        &format!("/api/einsaetze/{e}/persons/{neu}/whereabouts"),
         json!({"art": "notunterkunft", "betreuungsstelle_id": sid}),
     )
     .await;
@@ -815,7 +815,7 @@ async fn bezugsperson_wechseln_und_umhaengen() {
     let (_, p) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &format!("/api/einsaetze/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -982,7 +982,7 @@ async fn storno_der_bezugsperson_rueckt_im_selben_eintrag_nach() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{anna}"),
+        &format!("/api/einsaetze/{e}/persons/{anna}"),
         &admin,
         None,
     )

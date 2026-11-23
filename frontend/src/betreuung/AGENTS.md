@@ -7,7 +7,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
 
 - **Zwei Module** (LLH-1034, Spec `betreuung-evakuierung`): `evakuierung` (Räumungsbezirke,
   Stand evakuiert) und `betreuung` (Stellen, Belegung) sind getrennte Module mit eigenem Recht,
-  eigener Route (`…/evakuierung/bezirke/…` bzw. `…/betreuung/stellen/…`), eigenem Lese-Endpunkt,
+  eigener Route (`…/evacuation/districts/…` bzw. `…/care/positions/…`), eigenem Lese-Endpunkt,
   Live-Ereignis, Query-Prefix und Zähler. Fachcode und Tabellen bleiben gemeinsam in
   `src/betreuung/`. Die Lagekennzahl „Evakuiert“, die Bezirksflächen der Lagekarte und jeder
   `?bezirk=`-Sprung hängen an `evakuierung`; `…/betreuung?bezirk=` leitet um (`BetreuungPage`).
@@ -41,7 +41,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   keine Zone an. Ein Radius kommt erst mit dem Kreis der Lagekarte (LLH-1043).
 - **Detailseite der Betreuungsstelle** (LLH-1044, Spec `betreuung-evakuierung`,
   `pages/BetreuungsstelleDetailPage.tsx`, Route `betreuung/:stelleId`, Pfad nur über
-  `betreuungsstellePfad`): liest die Stelle aus `GET …/betreuung` (`einsatzKeys.betreuung`), es
+  `betreuungsstellePfad`): liest die Stelle aus `GET …/care` (`einsatzKeys.betreuung`), es
   gibt keinen Einzel-Endpunkt; unbekannt, fremd, storniert oder unlesbar →
   `betreuung/StelleNichtGefunden.tsx` (LLH-1827, auch „Unterkunft planen“; Adresse bleibt).
   `?stelle=` ist eine Altadresse und leitet in `BetreuungPage` um, vor jedem Abruf. Bearbeiten
@@ -120,7 +120,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Meldereihe. Die **Maske** ist kompakt ohne Einklappen (Ruben, 09.11.2026): Adresse und Kontakt
   einmal je Haushalt, je Person eine Zeile mit allen Feldern, sichtbare Beschriftungen,
   Tab-Folge Haushalt → Person, Kostform als Radiogruppe; das Feldbudget von „Betroffene
-  erfassen“ gilt hier nicht. Kostformen ohne Personenbezug liest `GET …/betreuung/kostformen`
+  erfassen“ gilt hier nicht. Kostformen ohne Personenbezug liest `GET …/care/diets`
   (nur Modul Betreuung); daraus belegt die Verpflegung die Sonderkost beim Anlegen eines
   Zeitfensters vor (`useBedarfsvorschlag`, Stand jetzt, nie als 0 ohne Registrierte).
   **Haushalte umbauen** (LLH-1615, Change `lm62ud0b-haushalt-umbauen`): `PUT
@@ -141,7 +141,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   „Ohne Meldung“ zählt nur Stellen in Betrieb (dieselbe Menge wie die Kopfzahl, LFH-679),
   Kapazität und Frei nur nicht geschlossene Stellen. **„in Betreuung“ ist eine Wahrheit:** Band,
   Detailseite und Verpflegung lesen dieselbe Belegung — die Verpflegung über die Kopfzahl
-  `…/betreuung/belegung`, die an `juengste_meldung!` hängt wie der Zeiger der Übersicht. Keine
+  `…/care/occupancy`, die an `juengste_meldung!` hängt wie der Zeiger der Übersicht. Keine
   zweite Summe im Backend, keine Summe im Blockkopf von `StellenBlock`. Ohne Stelle stehen statt
   Band und Tabelle `SeitenLeer` mit „Betreuungsstelle anlegen“ (ohne Schreibrecht gesperrt mit
   Grund).
@@ -150,7 +150,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (`person_verbleib.betreuungsstelle_id`, Cache
   `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`), den Namen belegt der Client vor; der Server kopiert
   keinen Stellennamen (Ziel, Kurzform, ETB). Prüfkette 422 → 403 (vor jedem Lesen) → 404 → 409.
-  „davon namentlich n" rechnet `…/betreuung`, nicht `repo::stellen`; ohne Personenrecht fehlt
+  „davon namentlich n" rechnet `…/care`, nicht `repo::stellen`; ohne Personenrecht fehlt
   es. Live über `EINSATZ_STREAM_EVENTS.person → betreuung`. `betreuungsstelle` ist kein Leaf
   (Rebuild braucht den FK-Schalter).
 - **Meldeverlauf** (LFH-676, `openspec/changes/archive/2026-09-29-lfh-676-betreuung-meldeverlauf/design.md`):
@@ -180,7 +180,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Gerätekopplung, sonst 409 „Gerät gekoppelt“ und „Stornieren“ gesperrt mit Grund, LLH-1048), Zuordnung zum Zeitfenster
   n:m (`stelle_ids`), **Soll nur am Zeitfenster**, Ist je Stelle (`je_stelle`) nur vom Server
   (`deckung::rechne`), der Client rechnet nichts nach; keine eigene Leseroute, `stellen[]` kommt
-  mit `GET …/verpflegung` (`einsatzKeys.verpflegung`).
+  mit `GET …/catering` (`einsatzKeys.verpflegung`).
   Oberfläche (LLH-1040 Teil II, design.md D13): dritte Ansicht „Stellen“ in derselben
   Segmentleiste (`verpflegung/StellenListe.tsx`, Maske `StelleDialog.tsx`, Kern
   `stellenKern.ts`); schmal tragen „vergangen“ und „Stellen“ keine Zahl (390 px, Handschuh). Die
@@ -194,7 +194,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   beim alten Ziel ab („senden“); das Bündel trägt Stelle und Empfänger seines ersten Tipps.
   **Empfänger** (LLH-1055 D1–D4, `src/verpflegung/repo.rs`): Einheit (Abholung) oder Abschnitt
   (Zuführung), **höchstens einer** (beide 422), **nie Personen**; fremd oder unbekannt 404. Die
-  Empfängerliste (`empfaenger`) kommt nur als Projektion mit `GET …/verpflegung` (bewusste
+  Empfängerliste (`empfaenger`) kommt nur als Projektion mit `GET …/catering` (bewusste
   Ausnahme von LFH-634 D4): Name, Funkrufname, Gliederung, Abschnitt, Stärke aus
   `einheit::repo::load_staerken_je_einheit`, Eintreffen; die Feldmenge ist in
   `tests/verpflegung.rs` gepinnt, kein Führer, keine Erreichbarkeit, keine Mitglieder. Live:

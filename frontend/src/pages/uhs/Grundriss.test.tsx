@@ -163,12 +163,12 @@ function renderGrundriss(
   angemeldet = false,
 ) {
   server.use(
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+    http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
     // Die gemeinsame Verbleib-Maske (LLH-1332) liest Rettungsmittel und Betreuungsstellen.
-    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+    http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
-    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ stellen: [] })),
+    http.get('/api/einsaetze/1/care', () => HttpResponse.json({ stellen: [] })),
   );
   if (angemeldet) server.use(meHandler(benutzerFixture()));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -252,7 +252,7 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     let body: { art?: string } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', async ({ request }) => {
         body = (await request.json()) as { art?: string };
         return HttpResponse.json({
           id: 1,
@@ -278,7 +278,7 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     const zurueck: string[] = [];
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({
           id: 41,
           einsatz_id: 1,
@@ -291,7 +291,7 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
           erfasst_von: 1,
         }),
       ),
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung/:bid/zuruecknehmen', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy/:bid/retract', ({ params }) => {
         zurueck.push(String(params.bid));
         return HttpResponse.json(
           { error: 'Das Austragen liegt mehr als 10 Minuten zurück' },
@@ -333,7 +333,7 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
       status?: string | null;
     } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/7/whereabouts', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
           id: 1,
@@ -370,7 +370,7 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     let body: { art?: string; status?: string | null } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/7/whereabouts', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
           id: 1,
@@ -421,7 +421,7 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     server.use(
-      http.post('/api/einsaetze/1/personen/7/verbleib', () =>
+      http.post('/api/einsaetze/1/persons/7/whereabouts', () =>
         HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 500 }),
       ),
     );
@@ -468,7 +468,7 @@ describe('Grundriss – Verbleib ohne Netz (LLH-1138, design.md D8)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/7/whereabouts', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({}, { status: 201 });
       }),
@@ -553,7 +553,7 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
     const uhs = uhsDetail({ plaetze: [], status: 'geplant' });
     let body: { typ?: string; menge?: number } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
+      http.post('/api/einsaetze/1/uhs/1/seats/bulk', async ({ request }) => {
         body = (await request.json()) as { typ?: string; menge?: number };
         return HttpResponse.json([]);
       }),
@@ -572,7 +572,7 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
     const uhs = uhsDetail({ plaetze: [], status: 'geplant' });
     let body: { typ?: string; menge?: number } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
+      http.post('/api/einsaetze/1/uhs/1/seats/bulk', async ({ request }) => {
         body = (await request.json()) as { typ?: string; menge?: number };
         return HttpResponse.json([]);
       }),
@@ -649,7 +649,7 @@ describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
   it('„Übergabe quittieren“ aus „Unterwegs“ sendet die Übergabe (LLH-1332)', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(
-      http.post('/api/einsaetze/1/personen/9/verbleib', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/9/whereabouts', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 2, person_id: 9 }, { status: 201 });
       }),
@@ -746,7 +746,7 @@ describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
     });
     let body: { verfuegbarkeit?: string } | null = null;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async ({ request }) => {
+      http.post('/api/einsaetze/1/uhs/1/seats/10/availability', async ({ request }) => {
         body = (await request.json()) as { verfuegbarkeit?: string };
         return HttpResponse.json({});
       }),
@@ -810,7 +810,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   }
 
   function belegungRoute(personId: number, senke: { body: unknown }) {
-    return http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async ({ request }) => {
+    return http.post(`/api/einsaetze/1/persons/${personId}/uhs-occupancy`, async ({ request }) => {
       senke.body = await request.json();
       return HttpResponse.json({
         id: 1,
@@ -852,7 +852,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
       freigeben = resolve;
     });
     server.use(
-      http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
+      http.post('/api/einsaetze/1/persons/5/uhs-occupancy', async () => {
         await gate;
         return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
       }),
@@ -876,7 +876,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
       refetchFreigeben = resolve;
     });
     server.use(
-      http.get('/api/einsaetze/1/personen', async () => {
+      http.get('/api/einsaetze/1/persons', async () => {
         await refetchGate;
         return HttpResponse.json([{ ...p, name: 'Extern geändert' }, anderePerson]);
       }),
@@ -988,7 +988,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })],
     });
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})),
+      http.post('/api/einsaetze/1/uhs/1/seats/10/availability', () => HttpResponse.json({})),
     );
     renderGrundriss(uhs, [p]);
 
@@ -1006,7 +1006,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
     });
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})),
+      http.post('/api/einsaetze/1/uhs/1/seats/10/availability', () => HttpResponse.json({})),
     );
     renderGrundriss(uhs, [p]);
 
@@ -1155,7 +1155,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
 
   it('öffnet beim Klick auf eine Wartebereichs-Karte den Detail-Drawer', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: null });
-    server.use(http.get('/api/einsaetze/1/personen/7', () => HttpResponse.json(detail(p))));
+    server.use(http.get('/api/einsaetze/1/persons/7', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p]);
     await userEvent.click(await screen.findByText(/R-007/));
     expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
@@ -1165,7 +1165,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   it('öffnet den Detail-Drawer auch für eine belegte Platz-Person', async () => {
     const p = person({ id: 8, registrier_nr: 8, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
-    server.use(http.get('/api/einsaetze/1/personen/8', () => HttpResponse.json(detail(p))));
+    server.use(http.get('/api/einsaetze/1/persons/8', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhs, [p]);
     await userEvent.click(await screen.findByText(/R-008/));
     expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
@@ -1173,7 +1173,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
 
   it('öffnet den Detail-Drawer auch im schreibgeschützten Modus (nur ansehen)', async () => {
     const p = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: null });
-    server.use(http.get('/api/einsaetze/1/personen/9', () => HttpResponse.json(detail(p))));
+    server.use(http.get('/api/einsaetze/1/persons/9', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p], true);
     await userEvent.click(await screen.findByText(/R-009/));
     expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
@@ -1182,7 +1182,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
     const p = person({ id: 11, registrier_nr: 11, aktuelle_uhs_id: null });
     server.use(
-      http.get('/api/einsaetze/1/personen/11', () =>
+      http.get('/api/einsaetze/1/persons/11', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -1291,7 +1291,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   it('öffnet über „Person öffnen" den Detail-Drawer', async () => {
     const p = belegtePerson();
     server.use(
-      http.get('/api/einsaetze/1/personen/7', () =>
+      http.get('/api/einsaetze/1/persons/7', () =>
         HttpResponse.json({
           ...p,
           sichtungen: [],
@@ -1342,7 +1342,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     });
     let gesendet: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async ({ request }) => {
+      http.post('/api/einsaetze/1/uhs/1/seats/10/availability', async ({ request }) => {
         gesendet = await request.json();
         return HttpResponse.json({});
       }),
@@ -1469,7 +1469,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   it('öffnet ohne Schreibrecht beim belegten Platz direkt die Person, ohne Menü', async () => {
     const p = belegtePerson();
     server.use(
-      http.get('/api/einsaetze/1/personen/7', () =>
+      http.get('/api/einsaetze/1/persons/7', () =>
         HttpResponse.json({
           ...p,
           sichtungen: [],
@@ -1737,7 +1737,7 @@ describe('Grundriss – Aktionszeile mit Breitenboden (LFH-381/LFH-379)', () => 
       status: 'aktiv',
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
     });
-    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([p])));
+    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([p])));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
       <MemoryRouter>
@@ -1790,7 +1790,7 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
       freigeben = aufloesen;
     });
     server.use(
-      http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async () => {
+      http.post(`/api/einsaetze/1/persons/${personId}/uhs-occupancy`, async () => {
         await tor;
         return HttpResponse.json({
           id: 1,
@@ -1949,7 +1949,7 @@ describe('Grundriss – Plan als Hintergrund (LFH-999)', () => {
   function bildLiefern() {
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/1/uhs/1/plan/bild', ({ request }) => {
+      http.get('/api/einsaetze/1/uhs/1/plan/image', ({ request }) => {
         abrufe.push(request.url);
         return new HttpResponse(new Blob(['png']), { headers: { 'Content-Type': 'image/png' } });
       }),
@@ -2066,7 +2066,7 @@ describe('Grundriss – Knopf „Plan“ (LFH-999)', () => {
   const aktiv = () => uhsDetail({ status: 'aktiv', plaetze: [platz({})] });
   const planKnopf = () => screen.queryByRole('button', { name: 'Plan' });
   const anhaengeLeer = () =>
-    server.use(http.get('/api/einsaetze/1/uhs/1/anhaenge', () => HttpResponse.json([])));
+    server.use(http.get('/api/einsaetze/1/uhs/1/attachments', () => HttpResponse.json([])));
 
   it('fehlt ohne Bearbeiten-Modus und erscheint mit ihm', async () => {
     anhaengeLeer();
@@ -2143,7 +2143,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Zurückweisen: der Grund steht über der Fläche beim Platz, die Karte trägt die Marke', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
       ),
     );
@@ -2162,7 +2162,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('die Karte mit Grund trägt den Rand aus `colorError`, die Meldung nennt den Platz', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
       ),
     );
@@ -2187,7 +2187,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('der Grund eines Platzes, den es nicht mehr gibt, steht nicht über der Fläche', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
       ),
     );
@@ -2204,7 +2204,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
   it('Verfügbarkeit: zwei Plätze nebenläufig, die späte Ablehnung des ersten steht bei ihm', async () => {
     const erste = tor();
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/:pid/verfuegbarkeit', async ({ params }) => {
+      http.post('/api/einsaetze/1/uhs/1/seats/:pid/availability', async ({ params }) => {
         if (params.pid === '10') {
           await erste.offen;
           return HttpResponse.json({ error: 'Platz ist reserviert' }, { status: 409 });
@@ -2228,7 +2228,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
   it('Verfügbarkeit: die nächste Aktion am Platz räumt den Grund', async () => {
     let erster = true;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async () => {
+      http.post('/api/einsaetze/1/uhs/1/seats/10/availability', async () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Platz ist reserviert' }, { status: 409 });
@@ -2249,7 +2249,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Zurück in den Wartebereich: der Grund steht beim Platz, nicht in einem Dialog', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({ error: 'Wartebereich voll' }, { status: 409 }),
       ),
     );
@@ -2268,7 +2268,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Zurück in den Wartebereich: eine Ablehnung rollt die Person auf ihr Bett zurück', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/7/uhs-occupancy', () =>
         HttpResponse.json({ error: 'Wartebereich voll' }, { status: 409 }),
       ),
     );
@@ -2276,7 +2276,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     await waitFor(() => expect(karte('Bett 1')).toHaveTextContent('R-007'));
     // Nur das Zurückrollen bringt sie zurück: jeder spätere Abruf der Personen bleibt aus.
     server.use(
-      http.get('/api/einsaetze/1/personen', async () => {
+      http.get('/api/einsaetze/1/persons', async () => {
         await delay('infinite');
         return HttpResponse.json([]);
       }),
@@ -2293,7 +2293,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Ziehen in den Wartebereich: der Grund steht im Wartebereich, nicht über der Fläche', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/5/uhs-belegung', () =>
+      http.post('/api/einsaetze/1/persons/5/uhs-occupancy', () =>
         HttpResponse.json({ error: 'UHS nicht aktiv' }, { status: 409 }),
       ),
     );
@@ -2322,7 +2322,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
       Element.prototype.scrollIntoView = vorher;
     });
     server.use(
-      http.patch('/api/einsaetze/1/uhs/1/plaetze/10', () =>
+      http.patch('/api/einsaetze/1/uhs/1/seats/10', () =>
         HttpResponse.json({ error: 'Position belegt' }, { status: 409 }),
       ),
     );
@@ -2340,7 +2340,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Platz löschen: der Grund steht beim Platz, kein Toast', async () => {
     server.use(
-      http.delete('/api/einsaetze/1/uhs/1/plaetze/10', () =>
+      http.delete('/api/einsaetze/1/uhs/1/seats/10', () =>
         HttpResponse.json({ error: 'Platz ist belegt' }, { status: 409 }),
       ),
     );
@@ -2361,7 +2361,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     const zweiter = tor();
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
+      http.post('/api/einsaetze/1/persons/5/uhs-occupancy', async () => {
         versuche += 1;
         if (versuche > 1) await zweiter.offen;
         return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
@@ -2395,7 +2395,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Verbleib: der Grund steht im Dialog, Abbrechen und Öffnen zeigen ihn nicht', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/7/verbleib', () =>
+      http.post('/api/einsaetze/1/persons/7/whereabouts', () =>
         HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 409 }),
       ),
     );
@@ -2417,7 +2417,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
   it('Plätze anlegen: der Grund steht am Block, das nächste Anlegen räumt ihn, Abbrechen auch', async () => {
     let erster = true;
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async () => {
+      http.post('/api/einsaetze/1/uhs/1/seats/bulk', async () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Zu viele Plätze' }, { status: 422 });
@@ -2445,7 +2445,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Plätze anlegen: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     server.use(
-      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', () =>
+      http.post('/api/einsaetze/1/uhs/1/seats/bulk', () =>
         HttpResponse.json({ error: 'Zu viele Plätze' }, { status: 422 }),
       ),
     );
@@ -2724,7 +2724,7 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
       });
       const gesendet: number[] = [];
       server.use(
-        http.post('/api/einsaetze/1/personen/:pid/uhs-belegung', ({ params }) => {
+        http.post('/api/einsaetze/1/persons/:pid/uhs-occupancy', ({ params }) => {
           gesendet.push(Number(params.pid));
           return HttpResponse.json({ ...eintritt(Number(params.pid), 'x'), platz_id: 10 });
         }),
@@ -2754,7 +2754,7 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
       });
       const senke: { body: unknown } = { body: null };
       server.use(
-        http.post('/api/einsaetze/1/personen/2/uhs-belegung', async ({ request }) => {
+        http.post('/api/einsaetze/1/persons/2/uhs-occupancy', async ({ request }) => {
           senke.body = await request.json();
           return HttpResponse.json({ ...eintritt(2, 'x'), platz_id: 10, art: 'wechsel' });
         }),
@@ -2801,7 +2801,7 @@ describe('Grundriss – Kacheln wachsen mit der Fläche (LLH-1940)', () => {
 
   it('streckt den Plan im selben Maß, die Karte deckt dieselbe Stelle', async () => {
     server.use(
-      http.get('/api/einsaetze/1/uhs/1/plan/bild', () =>
+      http.get('/api/einsaetze/1/uhs/1/plan/image', () =>
         HttpResponse.json(null, { headers: { 'Content-Type': 'image/png' } }),
       ),
     );
@@ -2847,7 +2847,7 @@ describe('Grundriss – Kacheln wachsen mit der Fläche (LLH-1940)', () => {
   it('rechnet einen Zug auf das Raster zurück: 200 px bei Faktor 2 sind 100 Einheiten', async () => {
     const koerper: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/uhs/1/plaetze/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/uhs/1/seats/10', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json(platz({ id: 10, pos_x: 110 }));
       }),

@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/verpflegung")
+    format!("/api/einsaetze/{einsatz}/catering")
 }
 
 /// „Mittag“ am 24.09., 10:00–11:30 UTC (12:00–13:30 in Berlin), 180 Kräfte, 70 Betreute.
@@ -859,7 +859,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -950,7 +950,7 @@ async fn leerlauf_patch_publiziert_kein_ereignis() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1753,7 +1753,7 @@ async fn live_ereignis_bei_stellen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -2743,7 +2743,7 @@ async fn betreuungsstelle(
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        &format!("/api/einsaetze/{einsatz}/care/positions"),
         cookie,
         Some(&serde_json::json!({
             "bezeichnung": bezeichnung,
@@ -2770,7 +2770,7 @@ async fn betreuungsstelle_status(
     let (s, j) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}"),
         cookie,
         Some(&serde_json::json!({ "status": status })),
     )
@@ -2782,7 +2782,7 @@ async fn betreuungsstelle_stornieren(app: &axum::Router, cookie: &str, einsatz: 
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}/stornieren"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/cancel"),
         cookie,
         None,
     )
@@ -2987,7 +2987,7 @@ async fn betreuungsstellen_fuer_verpflegungsleser_ohne_modul_betreuung() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/care"),
         &frieda,
         None,
     )

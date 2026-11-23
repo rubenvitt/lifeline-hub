@@ -50,7 +50,7 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   const cy = before!.y + 14;
 
   // PATCH-Requests an /plaetze/:pid einsammeln — die Layout-Mutation darf genau einmal feuern.
-  const platzPatchRegex = /\/api\/einsaetze\/\d+\/uhs\/\d+\/plaetze\/\d+(\?.*)?$/;
+  const platzPatchRegex = /\/api\/einsaetze\/\d+\/uhs\/\d+\/seats\/\d+(\?.*)?$/;
   const patches: Request[] = [];
   page.on('request', (req) => {
     if (req.method() === 'PATCH' && platzPatchRegex.test(req.url())) patches.push(req);

@@ -658,7 +658,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{eid}/personen"))
+                .uri(format!("/api/einsaetze/{eid}/persons"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"name":"Muster","vorname":"Max"}"#))
@@ -937,7 +937,7 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;
@@ -1029,7 +1029,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Erste","vorname":"Person"}"#,
     )
     .await;
@@ -1048,7 +1048,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Zweite","vorname":"Person"}"#,
     )
     .await;
@@ -1270,7 +1270,7 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;

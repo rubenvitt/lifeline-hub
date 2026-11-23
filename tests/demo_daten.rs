@@ -360,7 +360,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, betreuung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/care"),
         &admin,
         None,
     )
@@ -370,7 +370,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, evakuierung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evakuierung"),
+        &format!("/api/einsaetze/{e}/evacuation"),
         &admin,
         None,
     )
@@ -1285,7 +1285,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/personen"),
+        format!("/api/einsaetze/{e}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#.into(),
     )
     .await;

@@ -26,7 +26,7 @@ interface Anfrage {
   body: unknown;
 }
 
-const B = '/api/einsaetze/7/verpflegung';
+const B = '/api/einsaetze/7/catering';
 
 /** Fängt jede Anfrage unter dem Modulpfad und antwortet mit `{ ok: true }` (DELETE: 204). */
 function faengeAnfragen(): Anfrage[] {
@@ -66,9 +66,9 @@ describe('api/verpflegung — Pfade und Methoden der sechs Endpunkte', () => {
     await aendereZeitfenster(7, 5, { bedarf_kraefte: 200 });
     await loescheZeitfenster(7, 5);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${B}/zeitfenster`],
-      ['PATCH', `${B}/zeitfenster/5`],
-      ['DELETE', `${B}/zeitfenster/5`],
+      ['POST', `${B}/time-slots`],
+      ['PATCH', `${B}/time-slots/5`],
+      ['DELETE', `${B}/time-slots/5`],
     ]);
     expect(a[0].body).toEqual({
       bezeichnung: 'Mittag',
@@ -92,8 +92,8 @@ describe('api/verpflegung — Pfade und Methoden der sechs Endpunkte', () => {
     });
     await nimmAusgabeZurueck(7, 31);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${B}/zeitfenster/5/ausgaben`],
-      ['POST', `${B}/ausgaben/31/zuruecknehmen`],
+      ['POST', `${B}/time-slots/5/distributions`],
+      ['POST', `${B}/distributions/31/retract`],
     ]);
     expect(a[0].body).toEqual({
       menge: 60,
@@ -118,10 +118,10 @@ describe('api/verpflegung — Verpflegungsstellen (LLH-1040)', () => {
     await setStelleStatus(7, 4, 'aktiv');
     await storniereStelle(7, 5);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${B}/stellen`],
-      ['PATCH', `${B}/stellen/4`],
-      ['POST', `${B}/stellen/4/status`],
-      ['DELETE', `${B}/stellen/5`],
+      ['POST', `${B}/positions`],
+      ['PATCH', `${B}/positions/4`],
+      ['POST', `${B}/positions/4/status`],
+      ['DELETE', `${B}/positions/5`],
     ]);
     expect(a[0].body).toEqual({
       bezeichnung: 'Feldküche BR Sportplatz',

@@ -309,7 +309,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('sperrt das Drucken, solange geladen wird', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/verpflegung`, async () => {
+      http.get(`/api/einsaetze/${E}/catering`, async () => {
         await delay(200);
         return HttpResponse.json({
           zeitfenster: [],

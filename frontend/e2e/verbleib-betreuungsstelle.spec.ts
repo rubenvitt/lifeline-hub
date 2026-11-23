@@ -69,16 +69,16 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
     bezeichnung: `E2E Weserlage ${LAUF}`,
   });
   const basis = `/api/einsaetze/${e}`;
-  const { id: sid } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
+  const { id: sid } = await senden(page, 'post', `${basis}/care/positions`, {
     bezeichnung: 'NU Turnhalle Nord',
     art: 'notunterkunft',
     kapazitaet_personen: 150,
   });
-  await senden(page, 'patch', `${basis}/betreuung/stellen/${sid}`, { status: 'in_betrieb' });
-  await senden(page, 'post', `${basis}/betreuung/stellen/${sid}/belegungen`, { belegt: 40 });
-  const { id: p } = await senden(page, 'post', `${basis}/personen`, {});
+  await senden(page, 'patch', `${basis}/care/positions/${sid}`, { status: 'in_betrieb' });
+  await senden(page, 'post', `${basis}/care/positions/${sid}/occupancies`, { belegt: 40 });
+  const { id: p } = await senden(page, 'post', `${basis}/persons`, {});
   // Gesichtet → der Patientenkopf bietet „Verbleib erfassen" an.
-  await senden(page, 'post', `${basis}/personen/${p}/sichtung`, { kategorie: 'sk3' });
+  await senden(page, 'post', `${basis}/persons/${p}/triage`, { kategorie: 'sk3' });
 
   // Zweite Sitzung auf der Betreuungsseite — vorher ohne namentliche Zahl.
   const zweite = await zweiteSitzung(browser, ADMIN, PW);
@@ -134,16 +134,16 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
     bezeichnung: `E2E Deichlage ${LAUF}`,
   });
   const basis = `/api/einsaetze/${e}`;
-  const { id: sid } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
+  const { id: sid } = await senden(page, 'post', `${basis}/care/positions`, {
     bezeichnung: 'NU Halle Ost',
     art: 'notunterkunft',
   });
-  const { id: p } = await senden(page, 'post', `${basis}/personen`, {});
-  await senden(page, 'post', `${basis}/personen/${p}/sichtung`, { kategorie: 'sk3' });
+  const { id: p } = await senden(page, 'post', `${basis}/persons`, {});
+  await senden(page, 'post', `${basis}/persons/${p}/triage`, { kategorie: 'sk3' });
   // Eine zweite Person, schon in der Stelle untergebracht (gesät vor der Sperre).
-  const { id: p2 } = await senden(page, 'post', `${basis}/personen`, {});
-  await senden(page, 'post', `${basis}/personen/${p2}/sichtung`, { kategorie: 'sk3' });
-  await senden(page, 'post', `${basis}/personen/${p2}/verbleib`, {
+  const { id: p2 } = await senden(page, 'post', `${basis}/persons`, {});
+  await senden(page, 'post', `${basis}/persons/${p2}/triage`, { kategorie: 'sk3' });
+  await senden(page, 'post', `${basis}/persons/${p2}/whereabouts`, {
     art: 'notunterkunft',
     ziel: 'NU Halle Ost',
     betreuungsstelle_id: sid,

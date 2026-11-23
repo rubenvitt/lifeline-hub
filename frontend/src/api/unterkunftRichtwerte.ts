@@ -26,7 +26,7 @@ export function setzeOrgUnterkunftRichtwert(
 
 /** Alle Ebenen im Einsatz. */
 export function ladeEinsatzUnterkunftRichtwerte(einsatzId: number): Promise<UnterkunftRichtwerte> {
-  return apiGet<UnterkunftRichtwerte>(`/api/einsaetze/${einsatzId}/unterkunft-richtwerte`);
+  return apiGet<UnterkunftRichtwerte>(`/api/einsaetze/${einsatzId}/accommodation-guidelines`);
 }
 
 /** Einsatz-Wert setzen, `null` = erbt (Verwaltungszugriff des Einsatzes). */
@@ -36,7 +36,7 @@ export function setzeEinsatzUnterkunftRichtwert(
   wert: number | null,
 ): Promise<UnterkunftRichtwerte> {
   return apiSend<UnterkunftRichtwerte>(
-    `/api/einsaetze/${einsatzId}/unterkunft-richtwerte/${encodeURIComponent(schluessel)}`,
+    `/api/einsaetze/${einsatzId}/accommodation-guidelines/${encodeURIComponent(schluessel)}`,
     'PUT',
     { wert },
   );

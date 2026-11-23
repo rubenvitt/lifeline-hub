@@ -66,7 +66,7 @@ async fn ablage_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/uhs/{besitzer}/anhaenge"))
+                .uri(format!("/api/einsaetze/{einsatz}/uhs/{besitzer}/attachments"))
                 .header(header::COOKIE, admin.as_str())
                 .header(
                     header::CONTENT_TYPE,

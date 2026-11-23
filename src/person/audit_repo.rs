@@ -11,10 +11,10 @@ use utoipa::ToSchema;
 pub enum ZugriffArt {
     Detail,
     Export,
-    /// LFH-727: Abruf der Personen-Druckansicht (`GET …/personen/druck`), ohne Person; LLH-1120:
-    /// Druckansicht einer Person (`GET …/personen/{pid}/druck`), mit Person.
+    /// LFH-727: Abruf der Personen-Druckansicht (`GET …/persons/print`), ohne Person; LLH-1120:
+    /// Druckansicht einer Person (`GET …/persons/{pid}/print`), mit Person.
     Druck,
-    /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/personen/{pid}/anhaenge/{aid}/datei`),
+    /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/persons/{pid}/attachments/{aid}/file`),
     /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
     Anhang,
     /// LLH-1616: Druck der Registrierliste einer Betreuungsstelle

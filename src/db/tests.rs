@@ -14999,3 +14999,57 @@ async fn migration_0366_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruest
             .unwrap();
     assert_eq!(grenze, Some(hoechster));
 }
+
+/// LLH-2055: Die Routen der Personen, Betreuung, Evakuierung und Verpflegung heißen englisch.
+/// Ein am Spiegel beantragter, noch nicht übernommener Antrag trägt das Routenmuster in
+/// `spiegel_antrag.pfad_vorlage`; die Migration schreibt es um, sonst lehnte der Führer ihn als
+/// „Unbekannte Art des Antrags“ ab. Fremde Muster bleiben.
+#[tokio::test]
+async fn migration_0369_schreibt_beantragte_pfade_auf_die_englischen_routen_um() {
+    use crate::instanz::spiegel::antrag::BEANTRAGBAR;
+
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 368).await;
+    let (einsatz, benutzer) = bild_grundlage(&pool).await;
+    let alt = [
+        "/api/einsaetze/{id}/personen",
+        "/api/einsaetze/{id}/personen/{pid}/sichtung",
+        "/api/einsaetze/{id}/personen/{pid}/verbleib",
+        "/api/einsaetze/{id}/personen/{pid}/notizen",
+        "/api/einsaetze/{id}/personen/{pid}/transport",
+        "/api/einsaetze/{id}/personen/{pid}/anlass",
+        "/api/einsaetze/{id}/personen/{pid}/massnahmen",
+        "/api/einsaetze/{id}/personen/{pid}/verletzungen",
+        "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
+        "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben",
+        "/api/einsaetze/{id}/etb",
+    ];
+    for pfad in alt {
+        sqlx::query(
+            "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, \
+             benutzer_id, erfasst_at) VALUES (?, 'x', 'POST', ?, '{}', ?, '2026-11-23 10:00:00')",
+        )
+        .bind(einsatz)
+        .bind(pfad)
+        .bind(benutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    migriere_bis(&pool, 369).await;
+    let neu: Vec<String> = sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(neu.len(), alt.len());
+    for (vorher, nachher) in alt.iter().zip(&neu) {
+        assert!(
+            BEANTRAGBAR.iter().any(|b| b.pfad == nachher.as_str()),
+            "{vorher} → {nachher} ist kein beantragbarer Pfad"
+        );
+    }
+    assert_eq!(neu[0], "/api/einsaetze/{id}/persons");
+    assert_eq!(neu[13], "/api/einsaetze/{id}/etb", "fremde Muster bleiben");
+}

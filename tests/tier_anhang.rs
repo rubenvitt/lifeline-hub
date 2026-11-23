@@ -1,5 +1,5 @@
 //! Integrationstests der Tier-Anhänge (LFH-758, Spec `tier-anhaenge`): je Spec-Szenario ein
-//! Test über die Routen `/api/einsaetze/{id}/tiere/{tid}/anhaenge…` — Ablegen, Allowlist und
+//! Test über die Routen `/api/einsaetze/{id}/animals/{tid}/attachments…` — Ablegen, Allowlist und
 //! Größe, Rechte über das Modul Tiere, Zugehörigkeit zu Einsatz und Tier, Lebenszyklus,
 //! Entfernen, Download mit ETag, pseudonyme ETB-Spur und Live-Verteilung.
 //!
@@ -18,7 +18,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, tier: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/tiere/{tier}/anhaenge")
+    format!("/api/einsaetze/{einsatz}/animals/{tier}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).
@@ -145,7 +145,7 @@ async fn tier_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/tiere"),
+        &format!("/api/einsaetze/{einsatz}/animals"),
         cookie,
         Some(r#"{"spezies":"hund","rufname":"Bello","halter_kontakt":"Müller, 0171 1234567"}"#),
     )
@@ -514,7 +514,7 @@ async fn storniertes_tier_ist_409_beim_schreiben_und_bleibt_lesbar() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/tiere/{tier}"),
+        &format!("/api/einsaetze/{einsatz}/animals/{tier}"),
         &admin,
         None,
     )
@@ -553,7 +553,7 @@ async fn vermisstes_und_abgeschlossenes_tier_nehmen_dateien_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/tiere/{t1}/status"),
+        &format!("/api/einsaetze/{einsatz}/animals/{t1}/status"),
         &admin,
         Some(r#"{"status":"vermisst"}"#),
     )
@@ -562,7 +562,7 @@ async fn vermisstes_und_abgeschlossenes_tier_nehmen_dateien_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/tiere/{t2}/status"),
+        &format!("/api/einsaetze/{einsatz}/animals/{t2}/status"),
         &admin,
         Some(r#"{"status":"abgeschlossen","abschluss_grund":"uebergabe_tierheim"}"#),
     )

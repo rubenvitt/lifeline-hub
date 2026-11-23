@@ -106,8 +106,8 @@ fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Opt
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/betreuung — nicht stornierte Stellen mit aktueller Meldung. Die eine
-/// Quelle für Modulseite und Modulzähler; die Bezirke liefert seit LLH-1034 `GET …/evakuierung`.
+/// GET /api/einsaetze/{id}/care — nicht stornierte Stellen mit aktueller Meldung. Die eine
+/// Quelle für Modulseite und Modulzähler; die Bezirke liefert seit LLH-1034 `GET …/evacuation`.
 ///
 /// LFH-674 (design.md D4): „davon namentlich“ je Stelle steht nur für Lesende, die zusätzlich
 /// das Modul Personen sehen dürfen — dieselbe Rangfolge-Auswertung wie der Modulzähler, nur
@@ -151,7 +151,7 @@ pub struct KopfzahlParams {
     zeitpunkt: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/betreuung/belegung?zeitpunkt= — Kopfzahl „in Betreuung“ zum
+/// GET /api/einsaetze/{id}/care/occupancy?zeitpunkt= — Kopfzahl „in Betreuung“ zum
 /// Stichtag (LFH-634). Ein Stichtag in der Zukunft ist erlaubt: er liefert den heutigen Stand.
 pub async fn kopfzahl(
     State(state): State<AppState>,
@@ -167,7 +167,7 @@ pub async fn kopfzahl(
     ))
 }
 
-/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen — die ganze Belegungsreihe der
+/// GET /api/einsaetze/{id}/care/positions/{sid}/occupancies — die ganze Belegungsreihe der
 /// Stelle (LFH-676), wie [`stand_verlauf`]; auch an einer geschlossenen Stelle.
 pub async fn belegung_verlauf(
     State(state): State<AppState>,
@@ -180,7 +180,7 @@ pub async fn belegung_verlauf(
     ))
 }
 
-/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/stand — Storno-Stand einer Stelle für ihre
+/// GET /api/einsaetze/{id}/care/positions/{sid}/state — Storno-Stand einer Stelle für ihre
 /// offene Detailseite (LLH-1832, Spec `storno-sperre`). Die Übersicht lässt stornierte Stellen
 /// weg; fällt eine gesehene Stelle heraus, fragt die Seite hier nach Wann und Wer. Unbekannt oder
 /// fremder Einsatz 404, Stellenbindung wie bei den übrigen Stellenrouten.
@@ -241,7 +241,7 @@ pub struct StelleAnlegen {
     belegungsart: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/betreuung/stellen
+/// POST /api/einsaetze/{id}/care/positions
 pub async fn stelle_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,
@@ -351,7 +351,7 @@ struct StelleErwartet {
     belegungsart: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id}/betreuung/stellen/{sid}
+/// PATCH /api/einsaetze/{id}/care/positions/{sid}
 pub async fn stelle_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,
@@ -479,7 +479,7 @@ pub async fn stelle_aendern(
     ))
 }
 
-/// POST /api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren
+/// POST /api/einsaetze/{id}/care/positions/{sid}/cancel
 pub async fn stelle_stornieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,
@@ -514,7 +514,7 @@ pub struct BelegungMelden {
     client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen
+/// POST /api/einsaetze/{id}/care/positions/{sid}/occupancies
 ///
 /// Idempotent wie [`stand_melden`]: ein Replay kommt auch an der inzwischen geschlossenen
 /// Stelle zurück; eine NEUE Meldung dort bleibt 422.
@@ -558,7 +558,7 @@ pub async fn belegung_melden(
     ))
 }
 
-/// POST /api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen
+/// POST /api/einsaetze/{id}/care/occupancies/{mid}/retract
 pub async fn belegung_zuruecknehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Betreuung>,

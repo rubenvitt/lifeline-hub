@@ -372,7 +372,7 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(body),
     )

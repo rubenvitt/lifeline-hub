@@ -27,13 +27,13 @@ test('alter Bezirkslink unter Betreuung führt auf die Detailseite des Bezirks',
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Evakuierungsmodul ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
-  await senden(page, `${basis}/bezirke`, {
+  const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+  await senden(page, `${basis}/districts`, {
     bezeichnung: 'Deichweg 1–9',
     plan_personen: 120,
     plan_erhebung: 'gezaehlt',
   });
-  const { id: bezirkId } = await senden(page, `${basis}/bezirke`, {
+  const { id: bezirkId } = await senden(page, `${basis}/districts`, {
     bezeichnung: 'Hafenviertel',
     plan_personen: 1210,
     plan_erhebung: 'geschaetzt',

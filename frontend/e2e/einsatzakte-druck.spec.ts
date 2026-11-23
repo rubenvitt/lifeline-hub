@@ -28,7 +28,7 @@ async function seede(page: Page): Promise<number> {
   });
   expect(neu.ok(), `Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+  const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
     data: { name: 'Aktenfeld', vorname: 'Agathe' },
   });
   expect(person.ok(), `Person: ${person.status()} ${await person.text()}`).toBeTruthy();

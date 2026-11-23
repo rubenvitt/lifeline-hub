@@ -1351,7 +1351,7 @@ export type BetreuungsstelleStatus = S['BetreuungsstelleStatus'];
 export type Evakuierungsbezirk = S['EvakuierungsbezirkAnzeige'];
 export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
 export type BetreuungUebersicht = S['BetreuungUebersicht'];
-/** Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): die Bezirke. */
+/** Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): die Bezirke. */
 export type EvakuierungUebersicht = S['EvakuierungUebersicht'];
 export type StelleNamentlich = S['StelleNamentlich'];
 export type BelegungKopfzahl = S['BelegungKopfzahl'];
@@ -1385,7 +1385,7 @@ export type RegistriertePerson = S['RegistriertePerson'];
 export type RegistrierListe = S['RegistrierListe'];
 /** Antwort auf „Abmelden“: die abgemeldeten Personen (übersprungene fehlen). */
 export type Abmeldung = S['AbmeldungAnzeige'];
-/** Kostformen der Registrierten ohne Personenbezug (`GET …/betreuung/kostformen`). */
+/** Kostformen der Registrierten ohne Personenbezug (`GET …/care/diets`). */
 export type KostformZaehlung = S['KostformZaehlung'];
 
 /** Kein Backend-Schema: eine Person im Body von `POST …/stellen/{sid}/registrierungen`. */
@@ -1405,7 +1405,7 @@ export interface RegistrierPersonEingabe {
 }
 
 /**
- * Kein Backend-Schema: Body von `POST …/betreuung/stellen/{sid}/registrierungen`. Ohne
+ * Kein Backend-Schema: Body von `POST …/care/positions/{sid}/registrations`. Ohne
  * `haushalt_id` entsteht ein neuer Haushalt (die erste Person ist die Bezugsperson), mit ihm
  * werden die Personen angehängt. Höchstens `REGISTRIERUNG_PERSONEN_MAX` Personen.
  */
@@ -1419,7 +1419,7 @@ export interface RegistrierungEingabe {
 }
 
 /**
- * Kein Backend-Schema: Body von `POST …/betreuung/stellen/{sid}/abmeldungen`. Genau eins von
+ * Kein Backend-Schema: Body von `POST …/care/positions/{sid}/departures`. Genau eins von
  * `haushalt_id` und `person_ids` (sonst 422); `ziel` geht nie ins ETB.
  */
 export interface AbmeldungEingabe {
@@ -1431,12 +1431,12 @@ export interface AbmeldungEingabe {
 }
 
 /**
- * Kein Backend-Schema: Body von `PUT …/betreuung/stellen/{sid}/personen/{pid}/haushalt`
+ * Kein Backend-Schema: Body von `PUT …/care/positions/{sid}/persons/{pid}/household`
  * (LLH-1615). Genau eins von `haushalt_id` und `neuer_haushalt: true` (sonst 422).
  */
 export type HaushaltZielEingabe = { haushalt_id: number } | { neuer_haushalt: true };
 
-/** Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke` (`BezirkAnlegen`), FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/evacuation/districts` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {
   bezeichnung: string;
   /** Ganzzahlig ≥ 1; fehlt oder kleiner → 400. */
@@ -1451,7 +1451,7 @@ export interface EvakuierungsbezirkEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/evakuierung/bezirke/{id}` (`BezirkAendern`).
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/evacuation/districts/{id}` (`BezirkAendern`).
  * DREIWERTIG bei `abschnitt_id`/`sammelstelle`/`notiz`: Schlüssel fehlt = unverändert · `null` =
  * lösen bzw. leeren. Ein PATCH ohne tatsächliche Änderung schreibt keinen ETB-Eintrag.
  */
@@ -1469,7 +1469,7 @@ export interface EvakuierungsbezirkPatch {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke/{id}/staende` (`StandMelden`).
+ * Kein Backend-Schema: Eingabe-Body von `POST …/evacuation/districts/{id}/progress` (`StandMelden`).
  * `evakuiert` ist eine ABSOLUTE Anzahl (≥ 0), kein Delta. Ohne `zeitpunkt_at` gilt „jetzt“, sonst
  * UTC `YYYY-MM-DD HH:mm:ss` über `alsBackendZeit`, höchstens 60 s in der Zukunft.
  */
@@ -1482,7 +1482,7 @@ export interface StandmeldungEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/stellen` (`StelleAnlegen`). Ohne
+ * Kein Backend-Schema: Eingabe-Body von `POST …/care/positions` (`StelleAnlegen`). Ohne
  * Kapazität gibt es keine Zahl freier Plätze.
  */
 export interface BetreuungsstelleEingabe {
@@ -1505,7 +1505,7 @@ export interface BetreuungsstelleEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/stellen/{id}` (`StelleAendern`).
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/care/positions/{id}` (`StelleAendern`).
  * DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`/`leitung`/
  * `kontaktweg`: Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität“ bzw.
  * leeren. `status: 'geschlossen'` bei
@@ -1529,7 +1529,7 @@ export interface BetreuungsstellePatch {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/stellen/{id}/belegungen`
+ * Kein Backend-Schema: Eingabe-Body von `POST …/care/positions/{id}/occupancies`
  * (`BelegungMelden`). Absolute Anzahl (≥ 0); Zeitpunkt wie bei {@link StandmeldungEingabe}.
  * Nicht `BelegungEingabe`, den Namen trägt die UHS-Belegung (`api/einsatzUhs.ts`).
  */
@@ -1541,7 +1541,7 @@ export interface BelegungsmeldungEingabe {
 }
 
 // ============================== LFH-634 Verpflegung ==============================
-/** Übersicht `GET …/verpflegung`: alle Zeitfenster nach Beginn, dazu die Verpflegungsstellen
+/** Übersicht `GET …/catering`: alle Zeitfenster nach Beginn, dazu die Verpflegungsstellen
  *  (LLH-1040, keine eigene Leseroute). */
 export type Verpflegung = S['VerpflegungAnzeige'];
 /** Zeitfenster samt Bedarf, ausgegebener Menge, Fehlmenge und Ausgaben. */
@@ -1564,7 +1564,7 @@ export type VerpflegungsstelleStatus = S['VerpflegungsstelleStatus'];
 /** Ausgegebene Menge an einer Stelle (`je_stelle` am Zeitfenster), nur das Ist; ohne
  *  `stelle_id` der Eintrag „ohne Stelle“. Der Client rechnet je Stelle nichts nach. */
 export type VerpflegungStelleIst = S['StelleIst'];
-/** Empfängerliste der Verpflegung (LLH-1055): Projektion in `GET …/verpflegung`, keine eigene
+/** Empfängerliste der Verpflegung (LLH-1055): Projektion in `GET …/catering`, keine eigene
  *  Leseroute und ohne Personenangaben — nie `GET …/einheiten` für die Verpflegung lesen. */
 export type VerpflegungEmpfaenger = S['VerpflegungEmpfaenger'];
 /** Eine Einheit als Empfänger: Gliederung, Abschnitt, Ist-Stärke (eigene und kumuliert) und
@@ -1576,7 +1576,7 @@ export type EmpfaengerAbschnitt = S['EmpfaengerAbschnitt'];
 export type EmpfaengerBetreuungsstelle = S['EmpfaengerBetreuungsstelle'];
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/stellen` (`StelleAnlegen`).
+ * Kein Backend-Schema: Eingabe-Body von `POST …/catering/positions` (`StelleAnlegen`).
  * Bezeichnung eindeutig unter den nicht stornierten Stellen (sonst 409); `lat` und `lon` nur
  * als Paar (sonst 422).
  */
@@ -1590,7 +1590,7 @@ export interface VerpflegungsstelleEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/verpflegung/stellen/{sid}` (`StelleAendern`).
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/catering/positions/{sid}` (`StelleAendern`).
  * Schlüssel fehlt = unverändert; `null` leert Standort, Koordinate und Abschnitt.
  */
 export interface VerpflegungsstellePatch {
@@ -1609,7 +1609,7 @@ export interface VerpflegungsstellePatch {
 export type SonderkostEingabe = Partial<Sonderkost>;
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster` (`ZeitfensterAnlegen`).
+ * Kein Backend-Schema: Eingabe-Body von `POST …/catering/time-slots` (`ZeitfensterAnlegen`).
  * Zeiten als UTC `YYYY-MM-DD HH:mm:ss` oder ISO mit Zone; `bis_at` muss nach `von_at` liegen
  * (sonst 422).
  */
@@ -1628,7 +1628,7 @@ export interface ZeitfensterEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/verpflegung/zeitfenster/{id}`
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/catering/time-slots/{id}`
  * (`ZeitfensterAendern`). Schlüssel fehlt = unverändert; nur `verpflegungsart` kennt `null`
  * (leeren). `stelle_ids` ersetzt die Zuordnung, `[]` leert sie. Wertgleichheit (bei den Stellen
  * auch in anderer Reihenfolge) schreibt weder ETB-Eintrag noch Ereignis.
@@ -1668,7 +1668,7 @@ export type VerpflegungVorlagePatch = Partial<
 };
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/aus-vorlage`
+ * Kein Backend-Schema: Eingabe-Body von `POST …/catering/time-slots/from-template`
  * (`TagAusVorlage`). Die Tagesgrenzen und jede Uhrzeit hat der Client in der Anzeigezone auf den
  * Tag gelegt (`anzeige/uhrzeit.ts`); ein Zeitfenster trägt die Felder des Einzelanlegens ohne
  * Stellen. Höchstens `VERPFLEGUNG_AUS_VORLAGE_MAX` Zeitfenster.
@@ -1680,7 +1680,7 @@ export interface TagAusVorlageEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
+ * Kein Backend-Schema: Eingabe-Body von `POST …/catering/time-slots/{id}/distributions`
  * (`AusgabeErfassen`). Ohne `zeitpunkt_at` gilt „jetzt“; `menge` > 0; die Sonderkost ist
  * Teilmenge der Menge (sonst 422). Eine fremde `nachforderung_id` ist 404.
  */

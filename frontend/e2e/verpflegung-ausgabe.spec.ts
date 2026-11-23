@@ -48,7 +48,7 @@ async function saeen(
     .id;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const zf = await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster`, {
+  const zf = await anlegen(page, `/api/einsaetze/${e}/catering/time-slots`, {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(minutenVon),
     bis_at: zeit(minutenBis),
@@ -60,7 +60,7 @@ async function saeen(
 }
 
 async function zeitfenster(page: Page, e: number): Promise<Zeitfenster> {
-  const r = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
+  const r = await page.request.get(`/api/einsaetze/${e}/catering`);
   return ((await r.json()) as { zeitfenster: Zeitfenster[] }).zeitfenster[0];
 }
 
@@ -70,7 +70,7 @@ function ausgabenZaehler(page: Page) {
   page.on('response', (r) => {
     if (
       r.request().method() === 'POST' &&
-      /\/verpflegung\/zeitfenster\/\d+\/ausgaben$/.test(r.url())
+      /\/catering\/time-slots\/\d+\/distributions$/.test(r.url())
     ) {
       status.push(r.status());
     }
@@ -251,7 +251,7 @@ for (const { breite, hoehe, dichte } of [
 
     // Die Ausgabe ist schon anderswo zurückgenommen: „Rückgängig“ wird abgelehnt.
     const [ausgabe] = (await zeitfenster(page, e)).ausgaben;
-    await anlegen(page, `/api/einsaetze/${e}/verpflegung/ausgaben/${ausgabe.id}/zuruecknehmen`, {});
+    await anlegen(page, `/api/einsaetze/${e}/catering/distributions/${ausgabe.id}/retract`, {});
     await page.getByRole('button', { name: 'Rückgängig' }).click();
     await expect(page.locator('[data-lfh="ausgabe-ablehnung"]')).toContainText(
       'Nicht zurückgenommen',
@@ -615,7 +615,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
       kraefte: 1830,
     });
     for (let n = 1; n <= 10; n += 1) {
-      await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+      await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
         menge: n,
       });
     }
@@ -653,7 +653,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
         }),
       );
     const vorher = await lagen();
-    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+    await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
       menge: 100,
       sonderkost: { ohne_schwein: 100 },
     });
@@ -666,7 +666,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     );
     // Ausgegeben über dem Soll (4 → 10/4) wächst um eine Stelle und bleibt im festen Platz
     // (Mutationsprobe: Platz nur nach den Stellen des Solls → rot).
-    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+    await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
       menge: 10,
       sonderkost: { vegetarisch: 10 },
     });

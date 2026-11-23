@@ -898,7 +898,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
 }
 
 fn evakuierung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evakuierung")
+    format!("/api/einsaetze/{einsatz}/evacuation")
 }
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {

@@ -28,7 +28,7 @@ interface PersonWire {
 }
 
 async function personen(page: Page, e: number): Promise<PersonWire[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${e}/personen`);
+  const antwort = await page.request.get(`/api/einsaetze/${e}/persons`);
   expect(antwort.ok()).toBeTruthy();
   return (await antwort.json()) as PersonWire[];
 }
@@ -50,7 +50,7 @@ test('LLH-1572: Liste — versorgt und entlassen in drei Griffen, ein ETB-Eintra
 
   const posts: string[] = [];
   page.on('request', (r) => {
-    if (r.method() === 'POST' && r.url().includes(`/api/einsaetze/${e}/personen`))
+    if (r.method() === 'POST' && r.url().includes(`/api/einsaetze/${e}/persons`))
       posts.push(r.url());
   });
 
@@ -69,7 +69,7 @@ test('LLH-1572: Liste — versorgt und entlassen in drei Griffen, ein ETB-Eintra
     aktuelle_sichtung: null,
     anlass: 'allergie',
   });
-  expect(posts.filter((u) => u.endsWith(`/api/einsaetze/${e}/personen`))).toHaveLength(1);
+  expect(posts.filter((u) => u.endsWith(`/api/einsaetze/${e}/persons`))).toHaveLength(1);
   const reg = `R-${String(p.registrier_nr).padStart(3, '0')}`;
   const zurPerson = (await etbTexte(page, e)).filter((t) => t.includes(reg));
   expect(zurPerson).toEqual([`Person ${reg} versorgt und entlassen`]);
@@ -124,7 +124,7 @@ test('LLH-1572: UHS-Tablet ohne Netz — vorgemerkt, mit Netz einmal angelegt un
       anlass: 'hitze_kaelte',
     });
     // Die vorgemerkte Maßnahme kommt mit dem Replay an.
-    const detail = await page.request.get(`/api/einsaetze/${e}/personen/${p.id}`);
+    const detail = await page.request.get(`/api/einsaetze/${e}/persons/${p.id}`);
     expect(detail.ok()).toBeTruthy();
     const { massnahmen } = (await detail.json()) as { massnahmen: { art: string }[] };
     expect(massnahmen.map((m) => m.art)).toEqual(['kuehlung']);

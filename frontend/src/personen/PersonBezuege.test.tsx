@@ -57,7 +57,7 @@ beforeEach(() => {
   patches = [];
   tierPatchAntwort = () => HttpResponse.json(tier({ halter_person_id: null }));
   server.use(
-    http.get('/api/einsaetze/1/tiere', ({ request }) => {
+    http.get('/api/einsaetze/1/animals', ({ request }) => {
       const halter = new URL(request.url).searchParams.get('halter_person_id');
       if (halter === '10') return HttpResponse.json(tiereDerPerson);
       return HttpResponse.json([
@@ -93,7 +93,7 @@ beforeEach(() => {
         },
       ]),
     ),
-    http.patch('/api/einsaetze/1/tiere/:id', async ({ request, params }) => {
+    http.patch('/api/einsaetze/1/animals/:id', async ({ request, params }) => {
       patches.push({ pfad: `tiere/${String(params.id)}`, body: (await request.json()) as never });
       return tierPatchAntwort();
     }),

@@ -88,7 +88,7 @@ function render(einsatzObj: object) {
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => [einSchaden]).handler,
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(

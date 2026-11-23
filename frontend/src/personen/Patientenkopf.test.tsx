@@ -119,10 +119,10 @@ let gesendet: { pfad: string; body: unknown }[];
 beforeEach(() => {
   gesendet = [];
   server.use(
-    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+    http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
-    http.post('/api/einsaetze/1/personen/10/:was', async ({ request, params }) => {
+    http.post('/api/einsaetze/1/persons/10/:was', async ({ request, params }) => {
       gesendet.push({ pfad: String(params.was), body: await request.json() });
       return HttpResponse.json({ id: 99 }, { status: 201 });
     }),
@@ -332,7 +332,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
 
   it('lässt eine Ablehnung im Paneel stehen, die Eingabe bleibt', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/sichtung', () =>
+      http.post('/api/einsaetze/1/persons/10/triage', () =>
         HttpResponse.json({ error: 'Person ist storniert' }, { status: 409 }),
       ),
     );
@@ -418,7 +418,7 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
       freigeben = r;
     });
     server.use(
-      http.post('/api/einsaetze/1/personen/10/sichtung', async () => {
+      http.post('/api/einsaetze/1/persons/10/triage', async () => {
         await freigabe;
         return antwort();
       }),
@@ -656,11 +656,11 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
   beforeEach(() => {
     gepatcht = [];
     server.use(
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
         gepatcht.push(await request.json());
         return HttpResponse.json({ ...basis });
       }),
-      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/10/interventions/:mid/void', ({ params }) => {
         gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
         return HttpResponse.json({ id: Number(params.mid) });
       }),
@@ -721,7 +721,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
 
   it('lässt eine Ablehnung des Transports im Paneel stehen, die übrigen bleiben bedienbar', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/transport', () =>
+      http.post('/api/einsaetze/1/persons/10/transport', () =>
         HttpResponse.json({ error: 'Person ist vermisst' }, { status: 422 }),
       ),
     );
@@ -792,7 +792,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
       freigeben = r;
     });
     server.use(
-      http.post('/api/einsaetze/1/personen/10/massnahmen', async () => {
+      http.post('/api/einsaetze/1/persons/10/interventions', async () => {
         await freigabe;
         return HttpResponse.json({ error: 'Person ist storniert' }, { status: 409 });
       }),
@@ -831,7 +831,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
           laeuft_ab_at: '2026-10-08 12:00:00',
         },
       }),
-      http.get('/api/einsaetze/1/personen/bestaetiger', () =>
+      http.get('/api/einsaetze/1/persons/confirmers', () =>
         HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]),
       ),
     );
@@ -961,7 +961,7 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
 
   it('lässt eine Ablehnung am Schema stehen, die übrigen Paneele bleiben bedienbar', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/verletzungen', () =>
+      http.post('/api/einsaetze/1/persons/10/injuries', () =>
         HttpResponse.json({ error: 'Person ist vermisst' }, { status: 422 }),
       ),
     );
@@ -977,7 +977,7 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
 
   it('hebt eine Verletzung am Sternchen auf', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/verletzungen/:vid/aufheben', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/10/injuries/:vid/void', ({ params }) => {
         gesendet.push({ pfad: `verletzungen/${String(params.vid)}/aufheben`, body: null });
         return HttpResponse.json({ id: Number(params.vid) });
       }),
@@ -1038,7 +1038,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
           laeuft_ab_at: '2026-10-08 12:00:00',
         },
       }),
-      http.get('/api/einsaetze/1/personen/bestaetiger', () =>
+      http.get('/api/einsaetze/1/persons/confirmers', () =>
         HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]),
       ),
     );
@@ -1350,7 +1350,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
 describe('Patientenkopf — Review PAT-Kern', () => {
   beforeEach(() => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', ({ params }) => {
+      http.post('/api/einsaetze/1/persons/10/interventions/:mid/void', ({ params }) => {
         gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
         return HttpResponse.json({ id: Number(params.mid) });
       }),
@@ -1362,7 +1362,7 @@ describe('Patientenkopf — Review PAT-Kern', () => {
 
   it('räumt den Grund eines gescheiterten Aufhebens beim neuen Öffnen des Paneels', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', () =>
+      http.post('/api/einsaetze/1/persons/10/interventions/:mid/void', () =>
         HttpResponse.json({ error: 'Maßnahme ist bereits aufgehoben' }, { status: 409 }),
       ),
     );
@@ -1468,7 +1468,7 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
   it('„Zustand / Verdacht“ zählt, sperrt über der Grenze und kürzt nicht', async () => {
     const patches: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
         patches.push(await request.json());
         return HttpResponse.json({ ...basis });
       }),
@@ -1521,7 +1521,7 @@ describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
   it('ein getippter Entwurf bleibt ohne Netz stehen und geht erst mit Netz hinaus', async () => {
     const patches: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
         patches.push(await request.json());
         return HttpResponse.json({ ...basis, zustand: 'Atemnot' });
       }),
@@ -1576,13 +1576,13 @@ describe('Patientenkopf — Versorgt von (LLH-1567)', () => {
   beforeEach(() => {
     gepatcht = [];
     server.use(
-      http.get('/api/einsaetze/1/personen/einheiten', () =>
+      http.get('/api/einsaetze/1/persons/units', () =>
         HttpResponse.json([
           { id: 4, name: 'Streife 2', abschnitt_id: 1, abschnitt_name: 'Bühne' },
           { id: 5, name: 'RTW 1' },
         ]),
       ),
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
         gepatcht.push(await request.json());
         return HttpResponse.json({ ...basis });
       }),
@@ -1825,7 +1825,7 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
   it('erfasst Einträge (als Antrag), ändert aber nichts: Zustand, PAT und Versorgt von gesperrt', async () => {
     server.use(
       meHandler(benutzerFixture({ id: 11 })),
-      http.post('/api/einsaetze/1/personen/10/notizen', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/10/notes', async ({ request }) => {
         gesendet.push({ pfad: 'notizen', body: await request.json() });
         return HttpResponse.json({ antrag: { id: 8, zustand: 'ausstehend' } }, { status: 202 });
       }),

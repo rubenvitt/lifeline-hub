@@ -1260,7 +1260,7 @@ async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
         cookie,
         Some(
             &json!({"bezeichnung": bezeichnung, "plan_personen": 640, "plan_erhebung": "geschaetzt"})
@@ -1296,7 +1296,7 @@ async fn flaechen(app: &axum::Router, cookie: &str, einsatz: i64, bezirk: i64) -
     let (_, u) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/evakuierung"),
+        &format!("/api/einsaetze/{einsatz}/evacuation"),
         cookie,
         None,
     )
@@ -1483,7 +1483,7 @@ async fn zuordnung_statuscodes_422_404_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evacuation/districts/{ufer}/cancel"),
         &admin,
         None,
     )
@@ -1532,7 +1532,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evakuierung"),
+        &format!("/api/einsaetze/{e}/evacuation"),
         &frieda,
         None,
     )
@@ -1587,7 +1587,7 @@ async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evacuation/districts/{ufer}/cancel"),
         &admin,
         None,
     )

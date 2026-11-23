@@ -15,7 +15,7 @@ import type {
  * als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über `alsBackendZeit`, zurück über
  * `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/evakuierung`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/evacuation`;
 
 /** Die eine Lesequelle: alle nicht stornierten Bezirke samt aktuellem Stand. */
 export function ladeEvakuierung(einsatzId: number): Promise<EvakuierungUebersicht> {
@@ -30,14 +30,14 @@ export function ladeStandVerlauf(
   einsatzId: number,
   bezirkId: number,
 ): Promise<StandVerlaufEintrag[]> {
-  return apiGet<StandVerlaufEintrag[]>(`${basis(einsatzId)}/bezirke/${bezirkId}/staende`);
+  return apiGet<StandVerlaufEintrag[]>(`${basis(einsatzId)}/districts/${bezirkId}/progress`);
 }
 
 export function legeBezirkAn(
   einsatzId: number,
   body: EvakuierungsbezirkEingabe,
 ): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/bezirke`, 'POST', body);
+  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/districts`, 'POST', body);
 }
 
 export function aendereBezirk(
@@ -45,13 +45,13 @@ export function aendereBezirk(
   bezirkId: number,
   body: EvakuierungsbezirkPatch,
 ): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/bezirke/${bezirkId}`, 'PATCH', body);
+  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/districts/${bezirkId}`, 'PATCH', body);
 }
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 export function storniereBezirk(einsatzId: number, bezirkId: number): Promise<Evakuierungsbezirk> {
   return apiSend<Evakuierungsbezirk>(
-    `${basis(einsatzId)}/bezirke/${bezirkId}/stornieren`,
+    `${basis(einsatzId)}/districts/${bezirkId}/cancel`,
     'POST',
     {},
   );
@@ -69,7 +69,7 @@ export function meldeStand(
   optionen?: ApiSendOptionen,
 ): Promise<BezirkMeldung> {
   return apiSend<BezirkMeldung>(
-    `${basis(einsatzId)}/bezirke/${bezirkId}/staende`,
+    `${basis(einsatzId)}/districts/${bezirkId}/progress`,
     'POST',
     body,
     optionen,
@@ -78,5 +78,5 @@ export function meldeStand(
 
 /** Rückweg einer Standmeldung; `standId` ist `BezirkMeldung.meldung_id`. Zweimal → 422. */
 export function nimmStandZurueck(einsatzId: number, standId: number): Promise<BezirkMeldung> {
-  return apiSend<BezirkMeldung>(`${basis(einsatzId)}/staende/${standId}/zuruecknehmen`, 'POST', {});
+  return apiSend<BezirkMeldung>(`${basis(einsatzId)}/progress/${standId}/retract`, 'POST', {});
 }

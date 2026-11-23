@@ -12,7 +12,7 @@ mod common;
 use common::*;
 
 fn betreuung(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/betreuung")
+    format!("/api/einsaetze/{einsatz}/care")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
@@ -34,7 +34,7 @@ async fn person(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some("{}"),
     )
@@ -53,7 +53,7 @@ async fn verbleib(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
         cookie,
         Some(body),
     )
@@ -64,7 +64,7 @@ async fn person_detail(app: &axum::Router, cookie: &str, einsatz: i64, person: i
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
         cookie,
         None,
     )
@@ -468,7 +468,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
-    let personen = format!("/api/einsaetze/{e}/personen");
+    let personen = format!("/api/einsaetze/{e}/persons");
     let hier = personen_ids(&app, &admin, &personen).await;
     assert_eq!(hier.len(), 2, "Vorbedingung: zwei Personen an der Stelle");
 
@@ -588,7 +588,7 @@ async fn filter_nach_stelle_ohne_personenrecht_ist_403() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen?betreuungsstelle_id={sid}"),
+        &format!("/api/einsaetze/{e}/persons?betreuungsstelle_id={sid}"),
         &bernd,
         None,
     )

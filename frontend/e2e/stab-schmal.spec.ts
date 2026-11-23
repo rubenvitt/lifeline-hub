@@ -40,13 +40,13 @@ async function einsatzAnlegen(page: Page, sichtungen: readonly string[] = LANG):
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   const einsatzId = String(((await antwort.json()) as { id: number }).id);
   for (const kategorie of sichtungen) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { antreff_ort: 'Sammelstelle Süd' },
     });
     expect(person.ok(), `Person: ${person.status()} ${await person.text()}`).toBe(true);
     const { id } = (await person.json()) as { id: number };
     const sichtung = await page.request.post(
-      `/api/einsaetze/${einsatzId}/personen/${id}/sichtung`,
+      `/api/einsaetze/${einsatzId}/persons/${id}/triage`,
       { data: { kategorie } },
     );
     expect(sichtung.ok(), `Sichtung ${kategorie}: ${sichtung.status()}`).toBe(true);

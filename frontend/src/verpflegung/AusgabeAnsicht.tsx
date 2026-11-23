@@ -175,7 +175,7 @@ function davon(b: Buendel): string {
  *
  * Empfänger (LLH-1055 Teil II, Entscheidung LLH-1024 F3): Am Platz `ausgabe-empfaenger` steht die
  * Wahl „ohne Empfänger“ (Vorgabe, das Zählen bleibt so schnell wie ohne), eine Einheit (Abholung)
- * oder ein Abschnitt (Zuführung), alles aus der Projektion `empfaenger` in `GET …/verpflegung`.
+ * oder ein Abschnitt (Zuführung), alles aus der Projektion `empfaenger` in `GET …/catering`.
  * Mit einer Einheit steht daneben die Taste „+n“: sie zählt die Ist-Stärke ihres Teilbaums in die
  * Sammlung, „−1“ und „Menge …“ (vorbelegt mit derselben Zahl) überschreiben. Gemerkt wird die Wahl
  * nirgends; sie gilt bis zum Wechsel des Zeitfensters. Ein Wechsel bucht das offene Bündel beim

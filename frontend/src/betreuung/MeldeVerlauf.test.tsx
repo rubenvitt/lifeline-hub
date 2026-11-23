@@ -29,9 +29,9 @@ vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   };
 });
 
-const B = '/api/einsaetze/7/betreuung';
+const B = '/api/einsaetze/7/care';
 /** Bezirke und Stände gehören seit LLH-1034 zum Modul Evakuierung. */
-const E = '/api/einsaetze/7/evakuierung';
+const E = '/api/einsaetze/7/evacuation';
 const basis = (pfad: string) => (/^\/(bezirke|staende)\//.test(pfad) ? E : B);
 
 const STAENDE: StandVerlaufEintrag[] = [
@@ -135,7 +135,7 @@ describe('MeldeVerlauf · Zustände', () => {
   });
 
   it('der Ladezustand steht in Worten da, nicht nur als Skelett', async () => {
-    server.use(http.get(`${E}/bezirke/5/staende`, () => new Promise<Response>(() => {})));
+    server.use(http.get(`${E}/districts/5/progress`, () => new Promise<Response>(() => {})));
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     expect(await screen.findByText('Verlauf wird geladen …')).toBeVisible();
   });
@@ -335,7 +335,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     let antworte: (r: Response) => void = () => {};
     server.use(
       http.post(
-        `${E}/staende/:id/zuruecknehmen`,
+        `${E}/progress/:id/retract`,
         () => new Promise<Response>((fertig) => (antworte = fertig)),
       ),
     );

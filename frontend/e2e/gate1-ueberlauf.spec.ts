@@ -445,7 +445,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Stand',
     );
     const antwort = await page.request.patch(
-      `/api/einsaetze/${einsatzId}/evakuierung/bezirke/${bezirk.id}`,
+      `/api/einsaetze/${einsatzId}/evacuation/districts/${bezirk.id}`,
       { data: { raeumung: 'laeuft' } },
     );
     expect(antwort.ok(), `Seeding Räumung: ${antwort.status()}`).toBeTruthy();
@@ -1001,7 +1001,7 @@ function gate1RoutenVersorgung(einsatzId: string): Gate1Route[] {
       // die erst nach dem Seeding feststeht; deshalb führt `vorbereiten` von der Modulseite hin.
       pfad: `/einsaetze/${einsatzId}/verpflegung`,
       vorbereiten: async (p: Page) => {
-        const r = await p.request.get(`/api/einsaetze/${einsatzId}/verpflegung`);
+        const r = await p.request.get(`/api/einsaetze/${einsatzId}/catering`);
         const [zf] = ((await r.json()) as { zeitfenster: { id: number }[] }).zeitfenster;
         await p.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
         await expect(p.locator('[data-lfh="zaehltasten"]')).toBeVisible();

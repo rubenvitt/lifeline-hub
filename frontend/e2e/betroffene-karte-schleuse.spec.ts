@@ -110,7 +110,7 @@ test('Karte: ein Live-Zugang neben dem Marker unter dem Zeiger verschmilzt nicht
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Schleuse ${Date.now()}`,
   });
-  const a = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+  const a = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
     name: 'Unter dem Zeiger',
     antreff_lat: 53.0,
     antreff_lon: 8.8,
@@ -124,7 +124,7 @@ test('Karte: ein Live-Zugang neben dem Marker unter dem Zeiger verschmilzt nicht
   await page.mouse.move(punkt.x, punkt.y);
   await expect(standzeile(page)).toHaveText('Live pausiert');
 
-  const b = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+  const b = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
     name: 'Zugang daneben',
     antreff_lat: 53.0001,
     antreff_lon: 8.8,
@@ -182,7 +182,7 @@ test('Karte: ein aufgefächertes Bündel bleibt bei einer Sichtungsänderung off
   const ids: number[] = [];
   for (const i of [0, 1]) {
     ids.push(
-      await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+      await post(page, `/api/einsaetze/${einsatzId}/persons`, {
         name: `Paar ${i}`,
         antreff_lat: 53.0 + i * 0.0001,
         antreff_lon: 8.8,
@@ -225,7 +225,7 @@ test('Karte: ein aufgefächertes Bündel bleibt bei einer Sichtungsänderung off
 
   // Die Maus bleibt, wo sie geklickt hat (im Bereich). Live: die Sichtung des ersten Blatts.
   const ziel = ids[0];
-  await post(page, `/api/einsaetze/${einsatzId}/personen/${ziel}/sichtung`, { kategorie: 'sk1' });
+  await post(page, `/api/einsaetze/${einsatzId}/persons/${ziel}/triage`, { kategorie: 'sk1' });
   await expect
     .poll(async () => (await blaetter()).find((b) => b.schluessel === `person-${ziel}`)?.kurz, {
       timeout: 15_000,
@@ -273,7 +273,7 @@ for (const breite of [
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Banner ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
       name: 'Da',
       antreff_lat: 53.0,
       antreff_lon: 8.8,
@@ -298,7 +298,7 @@ for (const breite of [
     const y0 = (await karte.boundingBox())!.y;
     const m = await page.evaluate(() => performance.now());
 
-    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
       name: 'Weit weg',
       antreff_lat: 53.05,
       antreff_lon: 8.9,
@@ -339,7 +339,7 @@ test.describe('Touch (LFH-668)', () => {
       bezeichnung: `E2E Touch ${Date.now()}`,
     });
     for (const i of [0, 1]) {
-      await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+      await post(page, `/api/einsaetze/${einsatzId}/persons`, {
         name: `Paar ${i}`,
         antreff_lat: 53.0 + i * 0.0001,
         antreff_lon: 8.8,
@@ -364,7 +364,7 @@ test.describe('Touch (LFH-668)', () => {
     await expect.poll(blaetter, { timeout: 10_000 }).toBe(2);
     // Das aufgefächerte Bündel hält (onSpiderOffen), ohne Zeiger.
     await expect(standzeile(page)).toHaveText('Live pausiert');
-    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
       name: 'Zugang',
       antreff_lat: 53.00015,
       antreff_lon: 8.8,

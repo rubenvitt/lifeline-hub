@@ -56,7 +56,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personen/{person}/verbleib", self.einsatz),
+            &format!("/api/einsaetze/{}/persons/{person}/whereabouts", self.einsatz),
             &self.admin,
             Some(&body.to_string()),
         )
@@ -67,7 +67,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/personen/{person}", self.einsatz),
+            &format!("/api/einsaetze/{}/persons/{person}", self.einsatz),
             &self.admin,
             None,
         )
@@ -303,7 +303,7 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personen/transportmittel", w.einsatz),
+        &format!("/api/einsaetze/{}/persons/transport-means", w.einsatz),
         &w.admin,
         None,
     )
@@ -433,7 +433,7 @@ async fn vermisste_person_bleibt_offen_trotz_verbleib() {
     assert_eq!(w.detail(p).await["versorgung"], "offen");
 }
 
-/// LLH-1575 (design.md D3): `GET …/personen/verbleib-angaben` liefert je Person die Angaben des
+/// LLH-1575 (design.md D3): `GET …/persons/whereabouts-details` liefert je Person die Angaben des
 /// jüngsten Verbleibs ohne Übergabe; Stornierte und Personen ohne Angabe fehlen. Am Modul
 /// Personen: wer es nicht lesen darf, bekommt 403.
 #[tokio::test]
@@ -484,7 +484,7 @@ async fn verbleib_angaben_fuer_den_bericht() {
     let (s, v) = w.verbleib(ohne, json!({ "art": "vor_ort" })).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
 
-    let pfad = format!("/api/einsaetze/{}/personen/verbleib-angaben", w.einsatz);
+    let pfad = format!("/api/einsaetze/{}/persons/whereabouts-details", w.einsatz);
     let (s, v) = anfrage(&w.app, "GET", &pfad, &w.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(

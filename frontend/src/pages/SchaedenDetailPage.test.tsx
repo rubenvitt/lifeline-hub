@@ -106,7 +106,7 @@ function render(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(schaden)),
-    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([einePerson])),
+    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([einePerson])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden/10/anhaenge', () => HttpResponse.json([])),
   );

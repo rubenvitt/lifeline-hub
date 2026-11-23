@@ -1881,7 +1881,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Muster","versorgende_einheit_id":{f1}}}"#
@@ -1894,7 +1894,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, q) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Ablöser","versorgende_einheit_id":{f2}}}"#

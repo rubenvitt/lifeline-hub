@@ -26,7 +26,7 @@ async fn auswahl_ohne_freitexte_und_ohne_stornierte() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{storniert}"),
+        &format!("/api/einsaetze/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -36,7 +36,7 @@ async fn auswahl_ohne_freitexte_und_ohne_stornierte() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/auswahl"),
+        &format!("/api/einsaetze/{e}/persons/selection"),
         &admin,
         None,
     )
@@ -87,7 +87,7 @@ async fn auswahl_hinter_dem_modulrecht() {
     let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
     rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
-    let auswahl = format!("/api/einsaetze/{e}/personen/auswahl");
+    let auswahl = format!("/api/einsaetze/{e}/persons/selection");
     let (s, _) = anfrage(&app, "GET", &auswahl, &gustav, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest er");
     let (s, v) = anfrage(
@@ -102,7 +102,7 @@ async fn auswahl_hinter_dem_modulrecht() {
     let (s_liste, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &gustav,
         None,
     )

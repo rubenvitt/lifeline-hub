@@ -40,7 +40,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -75,7 +75,7 @@ async fn doppelte_client_id_ergibt_eine_sichtung_und_einen_etb_eintrag() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, "{}").await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/sichtung");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/triage");
     let body = json!({ "kategorie": "sk2", "client_id": "sicht-1" });
     let (s1, v1) = post(&app, &admin, &pfad, body.clone()).await;
     assert_eq!(s1, StatusCode::CREATED, "{v1}");
@@ -106,7 +106,7 @@ async fn sichtung_replay_nach_abschluss_gelingt_neue_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, "{}").await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/sichtung");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/triage");
     let (s, erst) = post(
         &app,
         &admin,
@@ -162,7 +162,7 @@ async fn client_id_einer_anderen_person_ist_422() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
         body.clone(),
     )
     .await;
@@ -170,7 +170,7 @@ async fn client_id_einer_anderen_person_ist_422() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{q}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{q}/triage"),
         body,
     )
     .await;
@@ -191,7 +191,7 @@ async fn aeltere_sichtung_aendert_den_cache_nicht_und_meldet_nicht() {
     rolle_setzen(&app, &admin, e, anna, "fuehrungspersonal").await;
     let p = person_anlegen(&app, &admin, e, "{}").await;
     angelegt_vor(&pool, p, 30).await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/sichtung");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/triage");
 
     // 14:20 online SK II, danach kommt eine um 14:10 vorgemerkte SK I an.
     let (s, _) = post(&app, &admin, &pfad, json!({ "kategorie": "sk2" })).await;
@@ -262,7 +262,7 @@ async fn juengere_vorgemerkte_sichtung_wird_aktuell_ohne_nachtrag() {
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, "{}").await;
     angelegt_vor(&pool, p, 30).await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/sichtung");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/triage");
     let (s, _) = post(
         &app,
         &admin,
@@ -306,7 +306,7 @@ async fn sichtung_vor_dem_anlegen_wird_auf_das_anlegen_gekappt() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
         json!({ "kategorie": "sk2", "zeitpunkt_at": zeit(-3600) }),
     )
     .await;
@@ -323,7 +323,7 @@ async fn sichtung_weit_in_der_zukunft_ist_400_und_speichert_nichts() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
         json!({ "kategorie": "sk2", "zeitpunkt_at": zeit(600) }),
     )
     .await;
@@ -344,7 +344,7 @@ async fn sichtung_sendet_das_etb_live_ereignis() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
         json!({ "kategorie": "sk2" }),
     )
     .await;
@@ -382,7 +382,7 @@ async fn person_in_uhs(
     let (s, person) = post(
         app,
         cookie,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "uhs_id": u }),
     )
     .await;
@@ -404,7 +404,7 @@ async fn aelterer_verbleib_laesst_den_aktuellen_stehen_und_tritt_nicht_aus() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, _u, p) = person_in_uhs(&app, &pool, &admin).await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/whereabouts");
 
     let (s, _) = post(&app, &admin, &pfad, json!({ "art": "vor_ort" })).await;
     assert_eq!(s, StatusCode::CREATED);
@@ -466,7 +466,7 @@ async fn nachgereichter_verbleib_vor_der_wiederaufnahme_tritt_nicht_aus() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, u, p) = person_in_uhs(&app, &pool, &admin).await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/whereabouts");
 
     // 10:00 Transport (Austritt), 10:30 Wiederaufnahme, 10:15 vorgemerkte Entlassung kommt an.
     let (s, v) = post(
@@ -481,7 +481,7 @@ async fn nachgereichter_verbleib_vor_der_wiederaufnahme_tritt_nicht_aus() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/uhs-occupancy"),
         json!({ "art": "eintritt", "uhs_id": u }),
     )
     .await;
@@ -517,7 +517,7 @@ async fn verbleib_replay_ist_idempotent_samt_austritt() {
     let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, _u, p) = person_in_uhs(&app, &pool, &admin).await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/whereabouts");
     let body = json!({ "art": "transport", "zeitpunkt_at": zeit(-120), "client_id": "v-2" });
     let mut rx = live.abonniere(e);
     let (s1, v1) = post(&app, &admin, &pfad, body.clone()).await;
@@ -554,7 +554,7 @@ async fn verbleib_weit_in_der_zukunft_ist_400() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        &format!("/api/einsaetze/{e}/persons/{p}/whereabouts"),
         json!({ "art": "entlassung", "zeitpunkt_at": zeit(600) }),
     )
     .await;
@@ -575,7 +575,7 @@ async fn notiz_replay_steht_genau_einmal_im_verlauf() {
     let p = person_anlegen(&app, &admin, e, "{}").await;
     angelegt_vor(&pool, p, 30).await;
     let etb_vorher = system_etb(&app, &admin, e).await.len();
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}/notizen");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}/notes");
     let vorgemerkt = zeit(-300);
     let body =
         json!({ "text": "stabil, ansprechbar", "zeitpunkt_at": vorgemerkt, "client_id": "n-1" });
@@ -613,7 +613,7 @@ async fn notiz_weit_in_der_zukunft_ist_400() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/notizen"),
+        &format!("/api/einsaetze/{e}/persons/{p}/notes"),
         json!({ "text": "x", "zeitpunkt_at": zeit(600) }),
     )
     .await;
@@ -638,7 +638,7 @@ async fn pat_nummer_und_kontamination_einzeln_setzen_und_leeren() {
         r#"{"name":"Muster","zustand":"unterkühlt"}"#,
     )
     .await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}");
     let patch = |body: Value| {
         let app = app.clone();
         let admin = admin.clone();
@@ -695,7 +695,7 @@ async fn auswahl_traegt_die_pat_nummer() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         &admin,
         Some(r#"{"pat_nummer":"4711"}"#),
     )
@@ -704,7 +704,7 @@ async fn auswahl_traegt_die_pat_nummer() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/auswahl"),
+        &format!("/api/einsaetze/{e}/persons/selection"),
         &admin,
         None,
     )
@@ -722,7 +722,7 @@ async fn pat_nummer_ueber_der_grenze_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, "{}").await;
-    let pfad = format!("/api/einsaetze/{e}/personen/{p}");
+    let pfad = format!("/api/einsaetze/{e}/persons/{p}");
     let max = lifeline_hub::person::PAT_NUMMER_MAX;
     let (s, v) = anfrage(
         &app,
@@ -779,7 +779,7 @@ async fn vorgemerkte_aufnahme_traegt_ihre_erfassungszeit() {
         "zeitpunkt_at": vorgemerkt,
         "client_id": "aufnahme-1",
     });
-    let pfad = format!("/api/einsaetze/{e}/personen");
+    let pfad = format!("/api/einsaetze/{e}/persons");
     let (s, person) = post(&app, &admin, &pfad, body.clone()).await;
     assert_eq!(s, StatusCode::CREATED, "{person}");
     let p = person["id"].as_i64().unwrap();
@@ -841,7 +841,7 @@ async fn aufnahme_ohne_zeitpunkt_traegt_die_serverzeit() {
     let (s, person) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "sichtung": "sk3" }),
     )
     .await;
@@ -868,7 +868,7 @@ async fn aufnahme_vor_dem_einsatzbeginn_wird_auf_ihn_gekappt() {
     let (s, person) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "sichtung": "sk2", "zeitpunkt_at": zeit(-3600) }),
     )
     .await;
@@ -885,7 +885,7 @@ async fn aufnahme_weit_in_der_zukunft_ist_400_und_legt_nichts_an() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "sichtung": "sk2", "zeitpunkt_at": zeit(600) }),
     )
     .await;
@@ -909,7 +909,7 @@ async fn vorgemerkte_vermisstmeldung_gilt_ab_ihrer_erfassungszeit() {
     let (s, person) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "status": "vermisst", "zeitpunkt_at": vorgemerkt }),
     )
     .await;
@@ -956,7 +956,7 @@ async fn vorgemerkte_aufnahme_an_der_uhs_steht_ab_ihrer_erfassungszeit_im_eingan
     // Um 14:10 ohne Netz mit UHS aufgenommen, um 14:30 übertragen.
     let vorgemerkt = zeit(-1200);
     let body = json!({ "uhs_id": u, "zeitpunkt_at": vorgemerkt, "client_id": "uhs-1" });
-    let pfad = format!("/api/einsaetze/{e}/personen");
+    let pfad = format!("/api/einsaetze/{e}/persons");
     let (s, person) = post(&app, &admin, &pfad, body.clone()).await;
     assert_eq!(s, StatusCode::CREATED, "{person}");
     let p = person["id"].as_i64().unwrap();
@@ -1022,7 +1022,7 @@ async fn spaeter_vorgemerkter_verbleib_nimmt_die_vorgemerkte_uhs_aufnahme_heraus
     let (s, person) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({ "uhs_id": u, "zeitpunkt_at": zeit(-1200), "client_id": "uhs-2" }),
     )
     .await;
@@ -1032,7 +1032,7 @@ async fn spaeter_vorgemerkter_verbleib_nimmt_die_vorgemerkte_uhs_aufnahme_heraus
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        &format!("/api/einsaetze/{e}/persons/{p}/whereabouts"),
         json!({ "art": "transport", "ziel": "KH Mitte", "zeitpunkt_at": zeit(-600), "client_id": "v-uhs-2" }),
     )
     .await;

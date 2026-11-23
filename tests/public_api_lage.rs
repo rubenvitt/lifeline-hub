@@ -121,7 +121,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
         let person = post(
             &app,
             &admin,
-            &format!("{basis}/personen"),
+            &format!("{basis}/persons"),
             json!({"name": "Muster", "vorname": "Max", "uhs_id": uhs}),
         )
         .await["id"]
@@ -131,7 +131,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
             post(
                 &app,
                 &admin,
-                &format!("{basis}/personen/{person}/sichtung"),
+                &format!("{basis}/persons/{person}/triage"),
                 json!({"kategorie": "sk1"}),
             )
             .await;
@@ -140,7 +140,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     post(
         &app,
         &admin,
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"}),
     )
     .await;
@@ -618,7 +618,7 @@ async fn lage_traegt_keine_namen_freitexte_oder_personenkennungen() {
     post(
         &app,
         &admin,
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         json!({"name": "Beispiel", "vorname": "Erika", "uhs_id": uhs}),
     )
     .await;

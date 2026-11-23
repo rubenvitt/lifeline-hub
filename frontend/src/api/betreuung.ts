@@ -16,7 +16,7 @@ import type {
  * LLH-1034 das eigene Modul Evakuierung (`api/evakuierung.ts`). Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
  * `alsBackendZeit`, zurück über `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/betreuung`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/care`;
 
 /** Die eine Lesequelle: alle nicht stornierten Stellen samt aktueller Meldung. */
 export function ladeBetreuung(einsatzId: number): Promise<BetreuungUebersicht> {
@@ -33,7 +33,7 @@ export function ladeBelegungKopfzahl(
   zeitpunkt?: string,
 ): Promise<BelegungKopfzahl> {
   const query = zeitpunkt ? `?zeitpunkt=${encodeURIComponent(zeitpunkt)}` : '';
-  return apiGet<BelegungKopfzahl>(`${basis(einsatzId)}/belegung${query}`);
+  return apiGet<BelegungKopfzahl>(`${basis(einsatzId)}/occupancy${query}`);
 }
 
 /**
@@ -44,14 +44,14 @@ export function ladeBelegungVerlauf(
   einsatzId: number,
   stelleId: number,
 ): Promise<BelegungVerlaufEintrag[]> {
-  return apiGet<BelegungVerlaufEintrag[]>(`${basis(einsatzId)}/stellen/${stelleId}/belegungen`);
+  return apiGet<BelegungVerlaufEintrag[]>(`${basis(einsatzId)}/positions/${stelleId}/occupancies`);
 }
 
 export function legeStelleAn(
   einsatzId: number,
   body: BetreuungsstelleEingabe,
 ): Promise<Betreuungsstelle> {
-  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/stellen`, 'POST', body);
+  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/positions`, 'POST', body);
 }
 
 export function aendereStelle(
@@ -66,7 +66,7 @@ export function aendereStelle(
   erwartet?: Partial<Omit<BetreuungsstellePatch, 'status'>>,
 ): Promise<Betreuungsstelle> {
   return apiSend<Betreuungsstelle>(
-    `${basis(einsatzId)}/stellen/${stelleId}`,
+    `${basis(einsatzId)}/positions/${stelleId}`,
     'PATCH',
     erwartet ? { ...body, erwartet } : body,
   );
@@ -80,13 +80,13 @@ export function loadBetreuungsstelleStand(
   einsatzId: number,
   stelleId: number,
 ): Promise<StornoStand> {
-  return apiGet<StornoStand>(`${basis(einsatzId)}/stellen/${stelleId}/stand`);
+  return apiGet<StornoStand>(`${basis(einsatzId)}/positions/${stelleId}/state`);
 }
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 export function storniereStelle(einsatzId: number, stelleId: number): Promise<Betreuungsstelle> {
   return apiSend<Betreuungsstelle>(
-    `${basis(einsatzId)}/stellen/${stelleId}/stornieren`,
+    `${basis(einsatzId)}/positions/${stelleId}/cancel`,
     'POST',
     {},
   );
@@ -100,7 +100,7 @@ export function meldeBelegung(
   optionen?: ApiSendOptionen,
 ): Promise<StelleMeldung> {
   return apiSend<StelleMeldung>(
-    `${basis(einsatzId)}/stellen/${stelleId}/belegungen`,
+    `${basis(einsatzId)}/positions/${stelleId}/occupancies`,
     'POST',
     body,
     optionen,
@@ -110,7 +110,7 @@ export function meldeBelegung(
 /** Rückweg einer Belegungsmeldung; `meldungId` ist `StelleMeldung.meldung_id`. */
 export function nimmBelegungZurueck(einsatzId: number, meldungId: number): Promise<StelleMeldung> {
   return apiSend<StelleMeldung>(
-    `${basis(einsatzId)}/belegungen/${meldungId}/zuruecknehmen`,
+    `${basis(einsatzId)}/occupancies/${meldungId}/retract`,
     'POST',
     {},
   );

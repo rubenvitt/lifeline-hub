@@ -113,8 +113,8 @@ for (const breite of BREITEN) {
   }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Evakuierung');
-    const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
-    const bezirk = await senden<{ id: number }>(page, 'post', `${basis}/bezirke`, {
+    const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+    const bezirk = await senden<{ id: number }>(page, 'post', `${basis}/districts`, {
       bezeichnung: 'Uferstraße 12–40',
       plan_personen: 1850,
       plan_erhebung: 'geschaetzt',
@@ -130,7 +130,7 @@ for (const breite of BREITEN) {
     const paneele = page.locator('[data-lfh="lagebild-paneele"]');
     const vorher = { band: await hoehe(band(page)), paneele: (await paneele.boundingBox())!.y };
 
-    await senden(page, 'post', `${basis}/bezirke/${bezirk.id}/staende`, {
+    await senden(page, 'post', `${basis}/districts/${bezirk.id}/progress`, {
       evakuiert: 400,
       erhebung: 'geschaetzt',
     });

@@ -36,15 +36,15 @@ async function saeStelle(page: Page): Promise<string> {
   const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `Stellen schmal ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
-  const { id } = await senden(page, 'post', `${basis}/stellen`, {
+  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const { id } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',
     kapazitaet_personen: 150,
   });
-  await senden(page, 'patch', `${basis}/stellen/${id}`, { status: 'in_betrieb' });
+  await senden(page, 'patch', `${basis}/positions/${id}`, { status: 'in_betrieb' });
   // „fast voll“: das Auslastungswort macht die Belegungszelle so breit wie im Einsatz.
-  await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: 135 });
+  await senden(page, 'post', `${basis}/positions/${id}/occupancies`, { belegt: 135 });
   return String(einsatzId);
 }
 

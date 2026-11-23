@@ -24,7 +24,7 @@ afterEach(() => {
 const faelle = [
   {
     modul: 'Tier',
-    basis: '/api/einsaetze/7/tiere/3/anhaenge',
+    basis: '/api/einsaetze/7/animals/3/attachments',
     liste: listeTierAnhaenge,
     ablegen: legeTierAnhangAb,
     entfernen: entferneTierAnhang,
@@ -32,7 +32,7 @@ const faelle = [
   },
   {
     modul: 'UHS',
-    basis: '/api/einsaetze/7/uhs/3/anhaenge',
+    basis: '/api/einsaetze/7/uhs/3/attachments',
     liste: listeUhsAnhaenge,
     ablegen: legeUhsAnhangAb,
     entfernen: entferneUhsAnhang,
@@ -99,6 +99,6 @@ describe('UHS-Zugriffsprotokoll-API', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('[]', { status: 200 }));
     await ladeUhsAnhangZugriffe(7, 3);
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/uhs/3/anhaenge/zugriffe');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/uhs/3/attachments/accesses');
   });
 });

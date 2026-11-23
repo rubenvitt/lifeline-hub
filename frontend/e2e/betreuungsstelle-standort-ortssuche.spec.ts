@@ -91,7 +91,7 @@ test('Betreuungsstelle anlegen: gewählter Standort verortet, Marker auf der Lag
   await expect(dialog).toBeHidden();
 
   // Gespeichert sind Standort und Koordinate.
-  const uebersicht = (await (await page.request.get(`/api/einsaetze/${e}/betreuung`)).json()) as {
+  const uebersicht = (await (await page.request.get(`/api/einsaetze/${e}/care`)).json()) as {
     stellen: { id: number; bezeichnung: string; standort?: string; lat?: number; lon?: number }[];
   };
   const stelle = uebersicht.stellen.find((s) => s.bezeichnung === 'NU Sporthalle')!;

@@ -23,7 +23,7 @@ test.setTimeout(120_000);
 const SCHWARZ = 'rgb(0, 0, 0)';
 
 async function personSaeen(page: Page, einsatzId: string): Promise<number> {
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+  const r = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
     data: { name: 'Mustermann', status: 'betroffen', sichtung: 'sk2', geschlecht: 'weiblich' },
   });
   expect(r.ok(), `Person: ${r.status()} ${await r.text()}`).toBe(true);
@@ -33,12 +33,12 @@ async function personSaeen(page: Page, einsatzId: string): Promise<number> {
     { ansicht: 'vorn', region: 'unterarm_l', art: 'fraktur_verdacht', schwere: 'schwer' },
     { ansicht: 'hinten', region: 'ruecken', art: 'schmerz' },
   ]) {
-    const v = await page.request.post(`/api/einsaetze/${einsatzId}/personen/${pid}/verletzungen`, {
+    const v = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${pid}/injuries`, {
       data: verletzung,
     });
     expect(v.ok(), `Verletzung: ${v.status()} ${await v.text()}`).toBe(true);
   }
-  const m = await page.request.post(`/api/einsaetze/${einsatzId}/personen/${pid}/massnahmen`, {
+  const m = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${pid}/interventions`, {
     data: { art: 'blutstillung' },
   });
   expect(m.ok()).toBe(true);
@@ -129,7 +129,7 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
 
   // ── Das Öffnen steht als Druck an der Person (die Einsicht hat nur die Einsatzleitung).
   await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const audit = await page.request.get(`/api/einsaetze/${einsatzId}/personen/${pid}/audit`);
+  const audit = await page.request.get(`/api/einsaetze/${einsatzId}/persons/${pid}/audit`);
   expect(audit.ok()).toBe(true);
   const eintraege = (await audit.json()) as { art: string; person_id: number | null }[];
   expect(eintraege.filter((e) => e.art === 'druck' && e.person_id === pid)).toHaveLength(1);

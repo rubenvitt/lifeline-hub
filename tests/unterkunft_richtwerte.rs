@@ -18,7 +18,7 @@ fn org_put(schluessel: &str) -> String {
 }
 
 fn einsatz_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/unterkunft-richtwerte")
+    format!("/api/einsaetze/{einsatz}/accommodation-guidelines")
 }
 
 /// Der Eintrag eines Schlüssels aus der Antwort.

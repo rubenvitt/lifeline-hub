@@ -83,28 +83,28 @@ interface Uebersicht {
 
 /** Ergänzt die Demo-Lage einmal je Lauf (die Datenbank gilt für alle Tests eines Laufs). */
 async function lageErgaenzen(page: Page, einsatzId: number): Promise<void> {
-  const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
+  const basis = `/api/einsaetze/${einsatzId}/evacuation`;
   const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
   if (!lage.bezirke.some((b) => b.bezeichnung === 'Uferstraße 2–18')) {
-    const bezirk = await fuelle<{ id: number }>(page, 'post', `${basis}/bezirke`, {
+    const bezirk = await fuelle<{ id: number }>(page, 'post', `${basis}/districts`, {
       bezeichnung: 'Uferstraße 2–18',
       plan_personen: 64,
       plan_erhebung: 'gezaehlt',
       sammelstelle: 'Parkplatz Uferstraße',
     });
-    await fuelle(page, 'patch', `${basis}/bezirke/${bezirk.id}`, { raeumung: 'laeuft' });
+    await fuelle(page, 'patch', `${basis}/districts/${bezirk.id}`, { raeumung: 'laeuft' });
     // Eine frühere Meldung, damit die Detailseite eine Stufenlinie zeigt (LLH-1076).
     const frueher = new Date(Date.now() - 45 * 60_000).toISOString().slice(0, 19).replace('T', ' ');
-    await fuelle(page, 'post', `${basis}/bezirke/${bezirk.id}/staende`, {
+    await fuelle(page, 'post', `${basis}/districts/${bezirk.id}/progress`, {
       evakuiert: 30,
       erhebung: 'geschaetzt',
       zeitpunkt_at: frueher,
     });
-    await fuelle(page, 'post', `${basis}/bezirke/${bezirk.id}/staende`, {
+    await fuelle(page, 'post', `${basis}/districts/${bezirk.id}/progress`, {
       evakuiert: 64,
       erhebung: 'gezaehlt',
     });
-    await fuelle(page, 'patch', `${basis}/bezirke/${bezirk.id}`, { raeumung: 'geraeumt' });
+    await fuelle(page, 'patch', `${basis}/districts/${bezirk.id}`, { raeumung: 'geraeumt' });
   }
 }
 

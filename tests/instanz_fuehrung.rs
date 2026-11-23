@@ -4216,19 +4216,19 @@ async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
         }
     };
     let neu = schreibe(
-        format!("/api/einsaetze/{e}/personen"),
+        format!("/api/einsaetze/{e}/persons"),
         json!({"name": "Muster", "vorname": "Max", "sichtung": "sk2", "pat_nummer": "PAT-77",
                "client_id": "bruch-person-1"}),
     )
     .await;
     let p = neu["id"].as_i64().unwrap();
     schreibe(
-        format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        format!("/api/einsaetze/{e}/persons/{p}/triage"),
         json!({"kategorie": "sk1", "client_id": "bruch-sichtung-1"}),
     )
     .await;
     let m = schreibe(
-        format!("/api/einsaetze/{e}/personen/{p}/massnahmen"),
+        format!("/api/einsaetze/{e}/persons/{p}/interventions"),
         json!({"art": "blutstillung", "client_id": "bruch-massnahme-1"}),
     )
     .await;
@@ -4236,7 +4236,7 @@ async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
         &elw.app,
         "POST",
         &format!(
-            "/api/einsaetze/{e}/personen/{p}/massnahmen/{}/aufheben",
+            "/api/einsaetze/{e}/persons/{p}/interventions/{}/void",
             m["id"].as_i64().unwrap()
         ),
         &erika,
@@ -4245,7 +4245,7 @@ async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     schreibe(
-        format!("/api/einsaetze/{e}/personen/{bekannt}/sichtung"),
+        format!("/api/einsaetze/{e}/persons/{bekannt}/triage"),
         json!({"kategorie": "sk3", "client_id": "bruch-sichtung-bekannt"}),
     )
     .await;
@@ -4504,7 +4504,7 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     let (s, p) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &erika,
         Some(&json!({"name": "Muster", "meldung_id": m["id"], "client_id": "bruch-person-422"})),
     )
@@ -4567,7 +4567,7 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen/{person_lokal}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{person_lokal}/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "bruch-sichtung-422"})),
     )
@@ -5558,7 +5558,7 @@ async fn nach_widerspruch_bleibt_eine_vom_elw_stammende_zeile() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "PATCH",
-        &format!("/api/einsaetze/{h}/personen/{ph}"),
+        &format!("/api/einsaetze/{h}/persons/{ph}"),
         &hub.admin,
         Some(&json!({"name": "Am Hub geändert"})),
     )

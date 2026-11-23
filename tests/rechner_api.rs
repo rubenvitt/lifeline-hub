@@ -476,7 +476,7 @@ async fn einsatz_wert_setzen(
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/unterkunft-richtwerte/{schluessel}"),
+        &format!("/api/einsaetze/{einsatz}/accommodation-guidelines/{schluessel}"),
         admin,
         Some(&json!({ "wert": wert })),
     )

@@ -24,14 +24,14 @@ async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Sta
 }
 
 fn pfad(e: i64, p: i64) -> String {
-    format!("/api/einsaetze/{e}/personen/{p}/anlass")
+    format!("/api/einsaetze/{e}/persons/{p}/reason")
 }
 
 async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -73,7 +73,7 @@ async fn festgelegter_anlass_steht_in_liste_detail_und_verlauf() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         None,
     )
@@ -134,7 +134,7 @@ async fn anlass_geht_mit_der_anlage_und_nie_ins_etb() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&json!({"sichtung": "sk3", "anlass": "allergie", "client_id": "auf-1"}).to_string()),
     )
@@ -147,7 +147,7 @@ async fn anlass_geht_mit_der_anlage_und_nie_ins_etb() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&json!({"sichtung": "sk3", "anlass": "allergie", "client_id": "auf-1"}).to_string()),
     )
@@ -173,7 +173,7 @@ async fn anlass_geht_mit_der_anlage_und_nie_ins_etb() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/personen"),
+            &format!("/api/einsaetze/{e}/persons"),
             &admin,
             Some(&body.to_string()),
         )
@@ -251,7 +251,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{storniert}"),
+        &format!("/api/einsaetze/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -271,7 +271,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/personen/{p}/status"),
+            &format!("/api/einsaetze/{e}/persons/{p}/status"),
             &admin,
             Some(&json!({"status": status}).to_string()),
         )

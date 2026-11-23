@@ -276,7 +276,7 @@ async fn stufe_lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_namen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"})),
     )
@@ -376,7 +376,7 @@ async fn stufe_oeffentlich_zeigt_nur_gesamtzahlen_einsatzort_und_absperrungen() 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Muster", "status": "vermisst"})),
     )

@@ -94,12 +94,12 @@ test('Tier: aus der Detailseite verorten, Tierzeichen, ohne ETB, zurück zur Det
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: hund } = await senden(page, 'post', `${basis}/tiere`, {
+  const { id: hund } = await senden(page, 'post', `${basis}/animals`, {
     spezies: 'hund',
     rufname: 'Bello',
   });
   // Ein vermisstes Tier, schon beim Anlegen verortet: Achtung und das Wort „vermisst“.
-  const { id: katze } = await senden(page, 'post', `${basis}/tiere`, {
+  const { id: katze } = await senden(page, 'post', `${basis}/animals`, {
     spezies: 'katze',
     status: 'vermisst',
     antreff_lat: VERMISST_ORT[1],
@@ -160,7 +160,7 @@ test('Tier: ohne Modul Tiere keine Ebene und kein Marker', async ({ page }) => {
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: hund } = await senden(page, 'post', `${basis}/tiere`, {
+  const { id: hund } = await senden(page, 'post', `${basis}/animals`, {
     spezies: 'hund',
     antreff_lat: FUND_ORT[1],
     antreff_lon: FUND_ORT[0],

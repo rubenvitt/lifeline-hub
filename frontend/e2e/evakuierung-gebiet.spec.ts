@@ -88,7 +88,7 @@ test('Bezirk mit Fläche anlegen: zeichnen, zuordnen, zurück zum Bezirk', async
   await expect(page.getByText('Kein Gebiet auf der Lagekarte')).toHaveCount(0);
 
   // Der Server trägt die Zuordnung.
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evakuierung`);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evacuation`);
   const { bezirke } = (await r.json()) as { bezirke: { id: number; flaechen: number }[] };
   expect(bezirke.find((b) => b.id === bezirkId)).toMatchObject({ flaechen: 1 });
 
@@ -209,7 +209,7 @@ test('Bezirk mit Radius 500 m um den Einsatzort anlegen: Kreisfläche mit Zuordn
   });
   expect(zone.kreis_mitte_lat).toBeCloseTo(EINSATZORT.lat, 5);
   expect(zone.kreis_mitte_lon).toBeCloseTo(EINSATZORT.lon, 5);
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evakuierung`);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evacuation`);
   const { bezirke } = (await r.json()) as { bezirke: { id: number; flaechen: number }[] };
   expect(bezirke.find((b) => b.id === bezirkId)).toMatchObject({ flaechen: 1 });
 

@@ -14,12 +14,12 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/betreuung")
+    format!("/api/einsaetze/{einsatz}/care")
 }
 
 /// Bezirke und Stände sind seit LLH-1034 das eigene Modul Evakuierung.
 fn pfad_evak(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evakuierung")
+    format!("/api/einsaetze/{einsatz}/evacuation")
 }
 
 async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
@@ -50,7 +50,7 @@ async fn bezirk(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &st
     json["id"].as_i64().unwrap()
 }
 
-/// Die Bezirke aus `GET …/evakuierung` (LLH-1034).
+/// Die Bezirke aus `GET …/evacuation` (LLH-1034).
 async fn bezirke_von(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (s, u) = anfrage(app, "GET", &pfad_evak(einsatz), cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{u:?}");
@@ -1252,7 +1252,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )

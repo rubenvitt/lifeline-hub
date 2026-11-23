@@ -1769,12 +1769,12 @@ test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   const einsatzId = await einsatzAnlegen(page, `Körperschema ${Date.now()}`);
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+  const r = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
     data: { name: 'Treffer', status: 'betroffen', sichtung: 'sk3' },
   });
   expect(r.ok(), `Person: ${r.status()}`).toBe(true);
   const pid = ((await r.json()) as { id: number }).id;
-  const v = await page.request.post(`/api/einsaetze/${einsatzId}/personen/${pid}/verletzungen`, {
+  const v = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${pid}/injuries`, {
     data: { ansicht: 'vorn', region: 'thorax', art: 'prellung_schwellung' },
   });
   expect(v.ok(), `Verletzung: ${v.status()}`).toBe(true);

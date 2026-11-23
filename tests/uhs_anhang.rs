@@ -1,5 +1,5 @@
 //! Integrationstests der UHS-Anhänge (LFH-758, Spec `uhs-anhaenge`): je Spec-Szenario ein Test
-//! über die Routen `/api/einsaetze/{id}/uhs/{uid}/anhaenge…` — Ablegen, Allowlist und Größe,
+//! über die Routen `/api/einsaetze/{id}/uhs/{uid}/attachments…` — Ablegen, Allowlist und Größe,
 //! Rechte über das Modul Unfallhilfsstellen, Zugehörigkeit zu Einsatz und UHS, Lebenszyklus,
 //! Entfernen, Download mit ETag, pseudonyme ETB-Spur, Live-Verteilung und das Lese-Audit samt
 //! Einsicht für die Einsatzleitung.
@@ -19,7 +19,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, uhs: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge")
+    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).

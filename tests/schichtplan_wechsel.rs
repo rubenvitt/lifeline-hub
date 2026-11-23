@@ -53,7 +53,7 @@ async fn an_uhs(app: &axum::Router, cookie: &str, e: i64, uhs: i64, ep: i64) {
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{e}/uhs/{uhs}/kraefte/{ep}"),
+        &format!("/api/einsaetze/{e}/uhs/{uhs}/forces/{ep}"),
         cookie,
         None,
     )

@@ -21,7 +21,7 @@ herleitung:
   Abfrage setzt `refetchOnWindowFocus: false` und keinen Retry.
 - MUST: Was die offene Seite live wissen muss (Storno), liefert eine eigene Lese-Route ohne
   Protokoll, die nur diesen Stand trägt (`StornoStand` in `src/storno.rs`, Route
-  `…/personen/{pid}/stand`), mit denselben Schranken wie das Detail.
+  `…/persons/{pid}/state`), mit denselben Schranken wie das Detail.
 - MUST: Ihr Key ist live über das Ereignis des Objekts (`personStand` in
   `EINSATZ_STREAM_ZIELE.person` und `EINSATZ_STREAM_EVENTS.person`); beim Öffnen trägt das
   Detail den Stand schon, ein eigener Abruf folgt erst auf ein Ereignis.

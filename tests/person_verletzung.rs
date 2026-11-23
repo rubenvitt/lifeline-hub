@@ -26,7 +26,7 @@ async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Sta
 }
 
 fn pfad(e: i64, p: i64) -> String {
-    format!("/api/einsaetze/{e}/personen/{p}/verletzungen")
+    format!("/api/einsaetze/{e}/persons/{p}/injuries")
 }
 
 fn aufheben_pfad(e: i64, p: i64, v: &Value) -> String {
@@ -41,7 +41,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -205,7 +205,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{storniert}"),
+        &format!("/api/einsaetze/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -218,7 +218,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/personen/{p}/status"),
+            &format!("/api/einsaetze/{e}/persons/{p}/status"),
             &admin,
             Some(&json!({"status": status}).to_string()),
         )
@@ -472,7 +472,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, eigene) = post(
         &app,
         &tablet,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({}),
     )
     .await;
@@ -481,7 +481,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, fremde) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({"uhs_id": uhs[1]}),
     )
     .await;
@@ -519,7 +519,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/betreuung/stellen/{stelle}"),
+        &format!("/api/einsaetze/{e}/care/positions/{stelle}"),
         &admin,
         Some(&json!({"status": "in_betrieb"}).to_string()),
     )
@@ -535,7 +535,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, in_stelle) = post(
         &app,
         &betreuung,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({}),
     )
     .await;
@@ -591,7 +591,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
     let (s, person) = post(
         &app,
         &tablet,
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         json!({}),
     )
     .await;
@@ -616,7 +616,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, v) = post(
             &app,
             &tablet,
-            &format!("/api/einsaetze/{e}/personen/{p}/{unterpfad}"),
+            &format!("/api/einsaetze/{e}/persons/{p}/{unterpfad}"),
             body,
         )
         .await;

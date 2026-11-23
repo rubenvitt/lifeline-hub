@@ -1,5 +1,5 @@
 //! Integrationstests der Personen-Anhänge (LFH-757): je Spec-Szenario ein Test über die Routen
-//! `/api/einsaetze/{id}/personen/{pid}/anhaenge…` — Ablegen, Allowlist und Größe, Rechte über das
+//! `/api/einsaetze/{id}/persons/{pid}/attachments…` — Ablegen, Allowlist und Größe, Rechte über das
 //! Modul Personen, Zugehörigkeit zu Einsatz und Person, Lebenszyklus, Entfernen, Download mit
 //! ETag, **Lese-Audit je Download**, pseudonyme ETB-Spur und Live-Verteilung.
 //!
@@ -18,7 +18,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, person: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/personen/{person}/anhaenge")
+    format!("/api/einsaetze/{einsatz}/persons/{person}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).
@@ -157,7 +157,7 @@ async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &s
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(body),
     )
@@ -253,7 +253,7 @@ async fn stornieren(app: &axum::Router, admin: &str, einsatz: i64, person: i64) 
     let (s, _) = anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
         admin,
         None,
     )

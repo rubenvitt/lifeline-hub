@@ -38,10 +38,10 @@ function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/unterkunft-richtwerte', () =>
+    http.get('/api/einsaetze/1/accommodation-guidelines', () =>
       HttpResponse.json(richtwerteAntwort({ flaeche_je_person_m2: 5 }, einsatz)),
     ),
-    http.put('/api/einsaetze/1/unterkunft-richtwerte/:schluessel', async ({ request, params }) => {
+    http.put('/api/einsaetze/1/accommodation-guidelines/:schluessel', async ({ request, params }) => {
       const body = (await request.json()) as { wert: number | null };
       const schluessel = String(params.schluessel);
       puts.push({ schluessel, body });

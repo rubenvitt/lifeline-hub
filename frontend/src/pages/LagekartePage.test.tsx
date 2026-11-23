@@ -434,9 +434,9 @@ function basisHandler(
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
     // Ebene „Betroffene": der MSW-Default meldet jedes Modul frei (`test/server.ts`), die Query
     // läuft in jedem Test — ohne diese zwei Handler stünde „Betroffene" überall im Ausfallbanner.
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ stellen: [] })),
-    http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/care', () => HttpResponse.json({ stellen: [] })),
+    http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [] })),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
@@ -1482,7 +1482,7 @@ describe('LagekartePage', () => {
     };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_EB])),
-      http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [UFER] })),
+      http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
     expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
@@ -2678,7 +2678,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('Bestandsansicht ohne Schalterwert: keine Personen-Marker, obwohl eine Person verortet ist', async () => {
     // Die Vorgabe „aus" (LAYER_DEFAULT.person = false) schließt Personen aus.
     basisHandler([
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     // Warten, bis die übrigen Marker stehen — sonst wäre die Negativaussage trivial.
@@ -2705,7 +2705,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('mit Zugriff: die eingeschaltete Ebene zeichnet die Person — ohne Namen', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
@@ -2717,7 +2717,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('mit Zugriff und eingeschalteter Ebene: die Objektsuche führt die Person (LFH-716)', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     objekteVorn();
     renderSeite();
@@ -2729,7 +2729,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
     ]);
     objekteVorn();
     renderSeite();
@@ -2744,7 +2744,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
     ]);
     objekteVorn();
     renderSeite();
@@ -2763,7 +2763,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
       http.get('/api/einsaetze/1/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
-      http.get('/api/einsaetze/1/personen', () => {
+      http.get('/api/einsaetze/1/persons', () => {
         anfragen += 1;
         return HttpResponse.json([PERSON_VERORTET]);
       }),
@@ -2783,7 +2783,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
       http.patch('/api/einsaetze/1/karten-ansichten/1', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1, einsatz_id: 1, name: 'Standard', ist_standard: true });
@@ -2805,7 +2805,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
@@ -2828,7 +2828,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
 
   it('ohne eingeschaltete Ebene macht ein Ausfall der Personenliste die Suche nicht unvollständig', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
     const kopf = await screen.findByRole('button', { name: /^Schäden/, hidden: true });
@@ -2838,7 +2838,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
@@ -2852,7 +2852,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('ein Klick auf den Personen-Marker füllt „Ausgewählt" mit Registriernummer und Sichtung', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -2880,10 +2880,10 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     let verortet = false;
     basisHandler([
       ...extra,
-      http.get('/api/einsaetze/1/personen', () =>
+      http.get('/api/einsaetze/1/persons', () =>
         HttpResponse.json([verortet ? PERSON_VERORTET : PERSON_OHNE_ORT]),
       ),
-      http.patch('/api/einsaetze/1/personen/11', () => {
+      http.patch('/api/einsaetze/1/persons/11', () => {
         verortet = true;
         return HttpResponse.json(PERSON_VERORTET);
       }),
@@ -2956,12 +2956,12 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     localStorage.setItem('lfh:lagekarte:leiste-offen:ab-lg', '0');
     let verortet = false;
     basisHandler([
-      http.get('/api/einsaetze/1/personen', () =>
+      http.get('/api/einsaetze/1/persons', () =>
         verortet
           ? HttpResponse.json({ error: 'Netz weg' }, { status: 503 })
           : HttpResponse.json([PERSON_OHNE_ORT]),
       ),
-      http.patch('/api/einsaetze/1/personen/11', () => {
+      http.patch('/api/einsaetze/1/persons/11', () => {
         verortet = true;
         return HttpResponse.json(PERSON_VERORTET);
       }),
@@ -3520,7 +3520,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     angelegt_at: '',
   };
   const mitBezirken = (bezirke: unknown[] = [UFER]) =>
-    http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke }));
+    http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke }));
   const ort = () => screen.getByTestId('location-search');
   const geraeumt = () =>
     waitFor(() => {
@@ -3623,7 +3623,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('eine noch nicht gerenderte Räumung startet den Modus nicht neu', async () => {
     let flaechen = 0;
     basisHandler([
-      http.get('/api/einsaetze/1/evakuierung', () =>
+      http.get('/api/einsaetze/1/evacuation', () =>
         HttpResponse.json({ bezirke: [{ ...UFER, flaechen }] }),
       ),
       http.post('/api/einsaetze/1/zonen', () => {
@@ -3719,7 +3719,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
       freigeben = r;
     });
     basisHandler([
-      http.get('/api/einsaetze/1/evakuierung', async () => {
+      http.get('/api/einsaetze/1/evacuation', async () => {
         await listeDa;
         return HttpResponse.json({ bezirke: [UFER] });
       }),
@@ -4843,7 +4843,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
         http.get('/api/einsaetze/1/zonen', () =>
           HttpResponse.json([{ ...ZONE_EB, geaendert_at: String(runde) }]),
         ),
-        http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [UFER] })),
+        http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
       ],
       gewirkt: () => screen.findByLabelText('Gehört zu Evakuierungsbezirk'),
       aufheben: (user) => user.keyboard('{Escape}'),
@@ -4868,7 +4868,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?zeichnen=gefahrengebiet',
       // Die Bezirksliste lädt neu (der Fall aus PR #878).
       handler: () => [
-        http.get('/api/einsaetze/1/evakuierung', () =>
+        http.get('/api/einsaetze/1/evacuation', () =>
           HttpResponse.json({ bezirke: runde > 0 ? [UFER] : [] }),
         ),
       ],

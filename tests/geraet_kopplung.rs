@@ -555,7 +555,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     // Nicht gelistet: 403.
     for (m, p) in [
         ("GET", format!("{basis}/etb")),
-        ("GET", format!("{basis}/personen")),
+        ("GET", format!("{basis}/persons")),
         ("GET", format!("{basis}/uhs")),
         ("GET", format!("{basis}/personal")),
         ("PATCH", format!("{basis}/abschnitte/{}", l.nord)),
@@ -1884,7 +1884,7 @@ async fn einsatzfuehrung_sperrt_das_geraet() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         None,
     )
@@ -2105,7 +2105,7 @@ async fn person_in(app: &axum::Router, cookie: &str, einsatz: i64, uhs: Option<i
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(&body),
     )
@@ -2124,7 +2124,7 @@ async fn tablet_erfasst_leichten_fall_in_der_eigenen_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({
             "status": "betroffen",
@@ -2143,7 +2143,7 @@ async fn tablet_erfasst_leichten_fall_in_der_eigenen_uhs() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         None,
     )
@@ -2159,7 +2159,7 @@ async fn tablet_erfasst_leichten_fall_in_der_eigenen_uhs() {
     let (s, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
         &geraet,
         None,
     )
@@ -2179,7 +2179,7 @@ async fn tablet_bekommt_rettungsmittel_nur_aus_verbleiben_der_eigenen_uhs() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personen/{}/verbleib", p["id"]),
+            &format!("/api/einsaetze/{einsatz}/persons/{}/whereabouts", p["id"]),
             &admin,
             Some(&json!({ "art": "transport", "transport_durch": "fremd",
                           "transportmittel": rettungsmittel })),
@@ -2190,7 +2190,7 @@ async fn tablet_bekommt_rettungsmittel_nur_aus_verbleiben_der_eigenen_uhs() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/transportmittel"),
+        &format!("/api/einsaetze/{einsatz}/persons/transport-means"),
         &geraet,
         None,
     )
@@ -2273,7 +2273,7 @@ async fn tablet_setzt_verfuegbarkeit_aber_bearbeitet_den_grundriss_nicht() {
             let (s, v) = anfrage_json(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze"),
+                &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats"),
                 &admin,
                 Some(&json!({"typ": "bett", "bezeichnung": "B1"})),
             )
@@ -2288,7 +2288,7 @@ async fn tablet_setzt_verfuegbarkeit_aber_bearbeitet_den_grundriss_nicht() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/plaetze"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/seats"),
         &geraet,
         Some(&json!({"typ": "bett", "bezeichnung": "B2"})),
     )
@@ -2296,7 +2296,7 @@ async fn tablet_setzt_verfuegbarkeit_aber_bearbeitet_den_grundriss_nicht() {
     assert_eq!(s, StatusCode::FORBIDDEN, "Grundriss bearbeiten: {v}");
 
     let verfuegbarkeit = |uhs: i64, pid: i64| {
-        format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/{pid}/verfuegbarkeit")
+        format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{pid}/availability")
     };
     let (s, v) = anfrage_json(
         &app,
@@ -2336,7 +2336,7 @@ async fn aufnahme_am_tablet_steht_im_eingang_der_eigenen_uhs() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         None,
     )
@@ -2352,7 +2352,7 @@ async fn aufnahme_am_tablet_steht_im_eingang_der_eigenen_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/anlass"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/reason"),
         &geraet,
         Some(&json!({"anlass": "hitze_kaelte"})),
     )
@@ -2363,7 +2363,7 @@ async fn aufnahme_am_tablet_steht_im_eingang_der_eigenen_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"name": "Fremd", "uhs_id": sued})),
     )
@@ -2395,7 +2395,7 @@ async fn aufnahme_scheitert_ganz_wenn_der_eintritt_scheitert() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"name": "Muster"})),
     )
@@ -2422,10 +2422,10 @@ async fn tablet_oeffnet_keine_druckansicht_der_person() {
     let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let eigen = person_in(&app, &admin, einsatz, Some(nord)).await;
     let pid = eigen["id"].as_i64().unwrap();
-    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let basis = format!("/api/einsaetze/{einsatz}/persons/{pid}");
     let (s, v) = anfrage_json(&app, "GET", &basis, &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: das Detail liest es: {v}");
-    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/druck"), &geraet, None).await;
+    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/print"), &geraet, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
     let druck: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'druck'",
@@ -2448,7 +2448,7 @@ async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         None,
     )
@@ -2457,33 +2457,33 @@ async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
 
     for p in [&fremd, &ohne] {
         let pid = p["id"].as_i64().unwrap();
-        let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+        let basis = format!("/api/einsaetze/{einsatz}/persons/{pid}");
         for (methode, uri, body) in [
             ("GET", basis.clone(), None),
             ("PATCH", basis.clone(), Some(json!({"name": "X"}))),
             (
                 "POST",
-                format!("{basis}/sichtung"),
+                format!("{basis}/triage"),
                 Some(json!({"kategorie": "sk2"})),
             ),
             (
                 "POST",
-                format!("{basis}/verbleib"),
+                format!("{basis}/whereabouts"),
                 Some(json!({"art": "entlassung"})),
             ),
             (
                 "POST",
-                format!("{basis}/notizen"),
+                format!("{basis}/notes"),
                 Some(json!({"text": "x"})),
             ),
             (
                 "POST",
-                format!("{basis}/anlass"),
+                format!("{basis}/reason"),
                 Some(json!({"anlass": "intoxikation"})),
             ),
             (
                 "POST",
-                format!("{basis}/uhs-belegung"),
+                format!("{basis}/uhs-occupancy"),
                 Some(json!({"art": "austritt"})),
             ),
         ] {
@@ -2504,7 +2504,7 @@ async fn tablet_bucht_nicht_in_eine_fremde_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/uhs-occupancy"),
         &geraet,
         Some(&json!({"art": "wechsel", "uhs_id": sued})),
     )
@@ -2515,7 +2515,7 @@ async fn tablet_bucht_nicht_in_eine_fremde_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/uhs-occupancy"),
         &admin,
         Some(&json!({"art": "wechsel", "uhs_id": sued})),
     )
@@ -2524,7 +2524,7 @@ async fn tablet_bucht_nicht_in_eine_fremde_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/uhs-occupancy"),
         &geraet,
         Some(&json!({"art": "austritt"})),
     )
@@ -2543,7 +2543,7 @@ async fn tablet_traegt_den_verbleib_nach_dem_austritt_ein() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/uhs-occupancy"),
         &geraet,
         Some(&json!({"art": "austritt"})),
     )
@@ -2553,7 +2553,7 @@ async fn tablet_traegt_den_verbleib_nach_dem_austritt_ein() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/whereabouts"),
         &geraet,
         Some(&json!({"art": "transport", "ziel": "KH Mitte"})),
     )
@@ -2562,7 +2562,7 @@ async fn tablet_traegt_den_verbleib_nach_dem_austritt_ein() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
         &geraet,
         None,
     )
@@ -2593,7 +2593,7 @@ async fn laptop_bearbeitet_grundriss_und_stammdaten_der_eigenen_uhs() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let geraet = laptop(&app, &admin, einsatz, nord).await;
-    let plaetze = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze");
+    let plaetze = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats");
 
     // Platz anlegen: Laptop ja, Tablet nein, fremde UHS 404.
     let neu = json!({"typ": "bett", "bezeichnung": "B1"});
@@ -2685,7 +2685,7 @@ async fn laptop_wechselt_den_uhs_status_nicht() {
         ),
         (
             "GET",
-            format!("/api/einsaetze/{einsatz}/uhs/{nord}/anhaenge/zugriffe"),
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/attachments/accesses"),
             None,
         ),
     ];
@@ -2739,7 +2739,7 @@ async fn laptop_liest_material_und_anhaenge_der_eigenen_uhs() {
     let (_, v) = anfrage(&app, "GET", &detail, &tablet, None).await;
     assert_eq!(v["material"], json!([]), "Tablet liest kein Material");
 
-    let anhaenge = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge");
+    let anhaenge = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments");
     let (s, v) = anfrage(&app, "GET", &anhaenge(nord), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let (s, _) = anfrage(&app, "GET", &anhaenge(sued), &geraet, None).await;
@@ -2753,7 +2753,7 @@ async fn plan_bild_status(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i
     app.clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan/bild"))
+                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan/image"))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -2809,7 +2809,7 @@ async fn tablet_sieht_den_plan_laptop_setzt_ihn() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{plan}/aus-anhang"),
+        &format!("{plan}/from-attachment"),
         &tablet,
         Some(r#"{"anhang_id":1}"#),
     )
@@ -2994,7 +2994,7 @@ async fn lagemonitor_zaehlt_abgeschlossene_nicht_als_patienten() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personen"),
+            &format!("/api/einsaetze/{einsatz}/persons"),
             &admin,
             Some(&json!({ "sichtung": "sk2" })),
         )
@@ -3005,7 +3005,7 @@ async fn lagemonitor_zaehlt_abgeschlossene_nicht_als_patienten() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{}/verbleib", ids[0]),
+        &format!("/api/einsaetze/{einsatz}/persons/{}/whereabouts", ids[0]),
         &admin,
         Some(&json!({ "art": "transport", "transport_durch": "fremd",
                       "transportmittel": "RTW 3/83-2" })),
@@ -3042,7 +3042,7 @@ async fn lagemonitor_zaehlt_hilfeleistungen_nur_in_der_reihe_sanitaetsdienst() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Vermisstfrau", "status": "vermisst"})),
     )
@@ -3093,7 +3093,7 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"})),
     )
@@ -3187,11 +3187,11 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
 
     // Der Monitor liest keine Personen und keine UHS-Detailseite und schreibt nichts.
     for (m, pfad, body) in [
-        ("GET", format!("/api/einsaetze/{einsatz}/personen"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/persons"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/uhs/{nord}"), None),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/personen"),
+            format!("/api/einsaetze/{einsatz}/persons"),
             Some(json!({"name": "X"})),
         ),
         (
@@ -3281,7 +3281,7 @@ async fn bestaetigte_sichtung_nennt_geraet_stelle_und_person() {
     let (s, v, setzt_cookie) = post_roh(
         &app,
         &geraet,
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
     )
     .await;
@@ -3303,7 +3303,7 @@ async fn bestaetigte_sichtung_nennt_geraet_stelle_und_person() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
         &admin,
         None,
     )
@@ -3322,7 +3322,7 @@ async fn bestaetigter_verbleib_und_erst_sichtung() {
     let (s, p) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"sichtung": "sk1", "bestaetigt_personal_id": aerztin})),
     )
@@ -3333,7 +3333,7 @@ async fn bestaetigter_verbleib_und_erst_sichtung() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/whereabouts"),
         &geraet,
         Some(&json!({"art": "transport", "bestaetigt_personal_id": aerztin})),
     )
@@ -3357,7 +3357,7 @@ async fn bestaetigter_verbleib_und_erst_sichtung() {
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
         &admin,
         None,
     )
@@ -3369,7 +3369,7 @@ async fn bestaetigter_verbleib_und_erst_sichtung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"bestaetigt_personal_id": aerztin})),
     )
@@ -3389,7 +3389,7 @@ async fn sichtung_ohne_bestaetigung_bleibt_wie_bisher() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         &geraet,
         Some(&json!({"kategorie": "sk3"})),
     )
@@ -3426,7 +3426,7 @@ async fn bestaetigung_prueft_einsatz_und_sitzungsart() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         &geraet,
         Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": fremde_kraft})),
     )
@@ -3441,7 +3441,7 @@ async fn bestaetigung_prueft_einsatz_und_sitzungsart() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         &admin,
         Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": eigene_kraft})),
     )
@@ -3450,7 +3450,7 @@ async fn bestaetigung_prueft_einsatz_und_sitzungsart() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/whereabouts"),
         &admin,
         Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": eigene_kraft})),
     )
@@ -3475,7 +3475,7 @@ async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
     let (s, _, _) = post_roh(
         &app,
         &geraet,
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
     )
     .await;
@@ -3485,7 +3485,7 @@ async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
     for (methode, pfad) in [
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
         ("GET", format!("/api/einsaetze/{einsatz}/personal")),
-        ("GET", format!("/api/einsaetze/{einsatz}/personen/export")),
+        ("GET", format!("/api/einsaetze/{einsatz}/persons/export")),
         (
             "POST",
             format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
@@ -3526,7 +3526,7 @@ async fn entlassene_kraft_fehlt_in_der_auswahl_der_bestaetigenden() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
 
-    let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
+    let pfad = format!("/api/einsaetze/{einsatz}/persons/confirmers");
     let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let namen: Vec<&str> = v
@@ -3626,7 +3626,7 @@ async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         &geraet,
         Some(&json!({
             "kategorie": "sk2", "bestaetigt_personal_id": aerztin,
@@ -3641,7 +3641,7 @@ async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/whereabouts"),
         &geraet,
         Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": aerztin})),
     )
@@ -3673,7 +3673,7 @@ async fn replay_am_geraet_legt_jeden_eintrag_einmal_an() {
             .await
             .unwrap();
     }
-    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let basis = format!("/api/einsaetze/{einsatz}/persons/{pid}");
     let schritte = [
         (
             "sichtung",
@@ -3747,7 +3747,7 @@ async fn bestaetigung_nach_dem_einsatzende_der_kraft_ist_409() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}/triage"),
         &geraet,
         Some(&json!({
             "kategorie": "sk2", "bestaetigt_personal_id": aerztin, "zeitpunkt_at": zeit(-600)
@@ -3784,7 +3784,7 @@ async fn ohne_zeitachse_gilt_aktiv_jetzt() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung");
+    let pfad = format!("/api/einsaetze/{einsatz}/persons/{pid}/triage");
 
     let (s, v) = anfrage_json(
         &app,
@@ -3830,7 +3830,7 @@ async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
+    let pfad = format!("/api/einsaetze/{einsatz}/persons/confirmers");
 
     let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -4155,7 +4155,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
             Some(json!({"lat": 52.5, "lon": 13.4})),
         ),
         ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
-        ("GET", format!("/api/einsaetze/{einsatz}/personen"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/persons"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/abschnitte"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/uhs"), None),
     ] {
@@ -4931,7 +4931,7 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let geraet = laptop(&app, &admin, einsatz, nord).await;
-    let kraefte = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte");
+    let kraefte = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces");
     let frei = uhs_kraft(&app, &admin, einsatz, "Freie Kraft").await;
     let bei_sued = uhs_kraft(&app, &admin, einsatz, "Kraft Süd").await;
     let (s, _) = anfrage(
@@ -5212,7 +5212,7 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/{ep}"),
             &admin,
             None,
         )
@@ -5233,7 +5233,7 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ohne}"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/{ohne}"),
         &admin,
         None,
     )
@@ -5498,7 +5498,7 @@ async fn betreuungsstelle_anlegen(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        &format!("/api/einsaetze/{einsatz}/care/positions"),
         cookie,
         Some(&json!({"bezeichnung": bez, "art": "notunterkunft", "kapazitaet_personen": 80})),
     )
@@ -5508,7 +5508,7 @@ async fn betreuungsstelle_anlegen(
     let (s, v) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{stelle}"),
         cookie,
         Some(&json!({"status": "in_betrieb"})),
     )
@@ -5544,7 +5544,7 @@ async fn belegung_melden(
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/belegungen"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{stelle}/occupancies"),
         cookie,
         Some(&json!({"belegt": belegt})),
     )
@@ -5559,7 +5559,7 @@ async fn person_in_stelle(app: &axum::Router, admin: &str, einsatz: i64, stelle:
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
         admin,
         Some(&json!({"art": "notunterkunft", "betreuungsstelle_id": stelle})),
     )
@@ -5576,7 +5576,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
         &admin,
         Some(
             &json!({"bezeichnung": "Uferstraße", "plan_personen": 40, "plan_erhebung": "gezaehlt"}),
@@ -5588,7 +5588,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &format!("/api/einsaetze/{einsatz}/care"),
         &geraet,
         None,
     )
@@ -5606,7 +5606,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/evakuierung"),
+        &format!("/api/einsaetze/{einsatz}/evacuation"),
         &geraet,
         None,
     )
@@ -5627,7 +5627,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
         let (s, v) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/belegungen"),
+            &format!("/api/einsaetze/{einsatz}/care/positions/{stelle}/occupancies"),
             &geraet,
             None,
         )
@@ -5646,7 +5646,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/betreuung/belegungen/{meldung}/zuruecknehmen"),
+            &format!("/api/einsaetze/{einsatz}/care/occupancies/{meldung}/retract"),
             &geraet,
             None,
         )
@@ -5658,22 +5658,22 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     for (m, p, body) in [
         (
             "GET",
-            format!("/api/einsaetze/{einsatz}/betreuung/belegung"),
+            format!("/api/einsaetze/{einsatz}/care/occupancy"),
             None,
         ),
         (
             "PATCH",
-            format!("/api/einsaetze/{einsatz}/betreuung/stellen/{nord}"),
+            format!("/api/einsaetze/{einsatz}/care/positions/{nord}"),
             Some(json!({"status": "geschlossen"})),
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+            format!("/api/einsaetze/{einsatz}/care/positions"),
             Some(json!({"bezeichnung": "NU West", "art": "notunterkunft"})),
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/betreuung/stellen/{nord}/stornieren"),
+            format!("/api/einsaetze/{einsatz}/care/positions/{nord}/cancel"),
             None,
         ),
     ] {
@@ -5706,7 +5706,7 @@ async fn betreuungsstelle_druckt_nur_die_eigene_registrierliste() {
     let (einsatz, nord, sued, kopplung_id, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
     let person = person_in_stelle(&app, &admin, einsatz, nord).await;
     let pfad = |stelle: i64| {
-        format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/registrierungen/druck")
+        format!("/api/einsaetze/{einsatz}/care/positions/{stelle}/registrations/print")
     };
     let eintraege = || async {
         sqlx::query_as::<_, (Option<i64>, i64)>(
@@ -5772,7 +5772,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         None,
     )
@@ -5788,7 +5788,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{fremd}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{fremd}"),
         &geraet,
         None,
     )
@@ -5799,7 +5799,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &format!("/api/einsaetze/{einsatz}/care"),
         &geraet,
         None,
     )
@@ -5820,7 +5820,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personen"),
+            &format!("/api/einsaetze/{einsatz}/persons"),
             &geraet,
             Some(&body),
         )
@@ -5830,7 +5830,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"name": "C", "status": "vermisst"})),
     )
@@ -5845,7 +5845,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
         let (s, _) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personen/{aufgenommen}/{route}"),
+            &format!("/api/einsaetze/{einsatz}/persons/{aufgenommen}/{route}"),
             &geraet,
             Some(&body),
         )
@@ -5876,7 +5876,7 @@ async fn vorgemerkte_aufnahme_an_der_betreuungsstelle_traegt_ihre_erfassungszeit
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &geraet,
         Some(&json!({"name": "Muster", "zeitpunkt_at": vorgemerkt, "client_id": "nu-1"})),
     )
@@ -5887,7 +5887,7 @@ async fn vorgemerkte_aufnahme_an_der_betreuungsstelle_traegt_ihre_erfassungszeit
     let (s, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{p}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{p}"),
         &admin,
         None,
     )
@@ -5929,7 +5929,7 @@ async fn betreuungsstelle_bringt_in_keine_fremde_notunterkunft() {
             anfrage_json(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+                &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
                 &geraet,
                 Some(&body),
             )
@@ -5950,7 +5950,7 @@ async fn betreuungsstelle_bringt_in_keine_fremde_notunterkunft() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
         &geraet,
         None,
     )
@@ -5970,7 +5970,7 @@ async fn widerrufene_betreuungsstelle_verliert_jeden_zugriff() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &format!("/api/einsaetze/{einsatz}/care"),
         &geraet,
         None,
     )
@@ -6001,7 +6001,7 @@ async fn mittag(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster"),
+        &format!("/api/einsaetze/{einsatz}/catering/time-slots"),
         cookie,
         Some(&json!({
             "bezeichnung": "Mittag",
@@ -6038,7 +6038,7 @@ async fn verpflegungsstelle(
     bezeichnung: &str,
     status: &str,
 ) -> i64 {
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung/stellen");
+    let basis = format!("/api/einsaetze/{einsatz}/catering/positions");
     let (s, v) = anfrage_json(
         app,
         "POST",
@@ -6088,12 +6088,12 @@ async fn verpflegungsgeraet_an(
     (id, a.cookie.expect("Sitzungscookie"))
 }
 
-/// `geraet_gekoppelt` der Stelle `sid` in `GET …/verpflegung`, gelesen als `cookie`.
+/// `geraet_gekoppelt` der Stelle `sid` in `GET …/catering`, gelesen als `cookie`.
 async fn stelle_gekoppelt(app: &axum::Router, cookie: &str, einsatz: i64, sid: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/verpflegung"),
+        &format!("/api/einsaetze/{einsatz}/catering"),
         cookie,
         None,
     )
@@ -6143,7 +6143,7 @@ async fn stelle_mit_gekoppeltem_geraet_ist_nicht_stornierbar() {
         let (s, v) = anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{sid}"),
+            &format!("/api/einsaetze/{einsatz}/catering/positions/{sid}"),
             &admin,
             None,
         )
@@ -6163,7 +6163,7 @@ async fn stelle_mit_gekoppeltem_geraet_ist_nicht_stornierbar() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{kueche}"),
+        &format!("/api/einsaetze/{einsatz}/catering/positions/{kueche}"),
         &admin,
         None,
     )
@@ -6395,7 +6395,7 @@ async fn verpflegungsgeraet_bindet_wahlweise_an_eine_verpflegungsstelle() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{storniert}"),
+        &format!("/api/einsaetze/{einsatz}/catering/positions/{storniert}"),
         &admin,
         None,
     )
@@ -6465,7 +6465,7 @@ async fn zeitfenster_an(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster"),
+        &format!("/api/einsaetze/{einsatz}/catering/time-slots"),
         cookie,
         Some(&json!({
             "bezeichnung": bezeichnung,
@@ -6500,7 +6500,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let basis = format!("/api/einsaetze/{einsatz}/catering");
     let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "aktiv").await;
     let turnhalle = verpflegungsstelle(&app, &admin, einsatz, "Turnhalle", "aktiv").await;
     let z_kueche = zeitfenster_an(&app, &admin, einsatz, "Früh", 6, &[kueche]).await;
@@ -6512,7 +6512,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
 
     let buche = |cookie: String, zid: i64, body: Value| {
         let app = app.clone();
-        let pfad = format!("{basis}/zeitfenster/{zid}/ausgaben");
+        let pfad = format!("{basis}/time-slots/{zid}/distributions");
         async move { anfrage_json(&app, "POST", &pfad, &cookie, Some(&body)).await }
     };
     // Die Leitung bucht am Abend an beiden Stellen und ohne Stelle.
@@ -6537,7 +6537,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/ausgaben/{zurueck}/zuruecknehmen"),
+        &format!("{basis}/distributions/{zurueck}/retract"),
         &admin,
         None,
     )
@@ -6645,7 +6645,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{basis}/zeitfenster/{z_einsatzweit}"),
+        &format!("{basis}/time-slots/{z_einsatzweit}"),
         &admin,
         Some(&json!({"stelle_ids": [turnhalle]})),
     )
@@ -6686,7 +6686,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("{basis}/ausgaben/{}/zuruecknehmen", a["id"]),
+            &format!("{basis}/distributions/{}/retract", a["id"]),
             &geraet,
             None,
         )
@@ -6696,7 +6696,7 @@ async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/ausgaben/{eigene}/zuruecknehmen"),
+        &format!("{basis}/distributions/{eigene}/retract"),
         &geraet,
         None,
     )
@@ -6731,14 +6731,14 @@ async fn verpflegungsgeraet_an_aufgeloester_stelle() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let basis = format!("/api/einsaetze/{einsatz}/catering");
     let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "aktiv").await;
     let zf = zeitfenster_an(&app, &admin, einsatz, "Mittag", 12, &[kueche]).await;
     let (_, geraet) = verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/stellen/{kueche}/status"),
+        &format!("{basis}/positions/{kueche}/status"),
         &admin,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -6753,7 +6753,7 @@ async fn verpflegungsgeraet_an_aufgeloester_stelle() {
     assert_eq!(v["stellen"][0]["status"], "aufgeloest");
     assert_eq!(kennungen(&v["zeitfenster"], "id"), vec![zf]);
 
-    let pfad = format!("{basis}/zeitfenster/{zf}/ausgaben");
+    let pfad = format!("{basis}/time-slots/{zf}/distributions");
     let (s, v) = anfrage_json(&app, "POST", &pfad, &geraet, Some(&json!({"menge": 5}))).await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
     let (s, v) = anfrage_json(
@@ -6780,12 +6780,12 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zf = mittag(&app, &admin, einsatz).await;
     let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let basis = format!("/api/einsaetze/{einsatz}/catering");
 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &format!("{basis}/time-slots/{zf}/distributions"),
         &admin,
         Some(&json!({"menge": 100, "ort": "Küche"})),
     )
@@ -6795,7 +6795,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &format!("{basis}/time-slots/{zf}/distributions"),
         &geraet,
         Some(&json!({"menge": 40, "ort": "Deich"})),
     )
@@ -6829,7 +6829,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/ausgaben/{ausgabe}/zuruecknehmen"),
+        &format!("{basis}/distributions/{ausgabe}/retract"),
         &geraet,
         None,
     )
@@ -6858,7 +6858,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+            &format!("{basis}/time-slots/{zf}/distributions"),
             &geraet,
             Some(&json!({"menge": 5, "nachforderung_id": n})),
         )
@@ -6871,7 +6871,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     for (m, pfad, body) in [
         (
             "POST",
-            format!("{basis}/zeitfenster"),
+            format!("{basis}/time-slots"),
             Some(json!({
                 "bezeichnung": "Abend",
                 "von_at": "2026-10-08T18:00:00Z",
@@ -6882,14 +6882,14 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
         ),
         (
             "PATCH",
-            format!("{basis}/zeitfenster/{zf}"),
+            format!("{basis}/time-slots/{zf}"),
             Some(json!({"bedarf_kraefte": 1})),
         ),
-        ("DELETE", format!("{basis}/zeitfenster/{zf}"), None),
+        ("DELETE", format!("{basis}/time-slots/{zf}"), None),
         // Tag aus der Vorlage und Verpflegungsplan (LLH-1058 D12).
         (
             "POST",
-            format!("{basis}/zeitfenster/aus-vorlage"),
+            format!("{basis}/time-slots/from-template"),
             Some(json!({
                 "tag_von_at": "2026-10-07T22:00:00Z",
                 "tag_bis_at": "2026-10-08T22:00:00Z",
@@ -6916,7 +6916,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     assert_eq!(v["zeitfenster"][0]["bedarf"]["gesamt"], 250);
 }
 
-/// LLH-1040 D12: Das Verpflegungsgerät liest die Stellen mit `GET …/verpflegung` (ohne
+/// LLH-1040 D12: Das Verpflegungsgerät liest die Stellen mit `GET …/catering` (ohne
 /// Benutzerkennungen) und bucht an einer Stelle; Stellen planen und Zeitfenster zuordnen bleibt
 /// der Führung.
 #[tokio::test]
@@ -6925,11 +6925,11 @@ async fn verpflegungsgeraet_liest_stellen_und_bucht_an_stelle() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zf = mittag(&app, &admin, einsatz).await;
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let basis = format!("/api/einsaetze/{einsatz}/catering");
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/stellen"),
+        &format!("{basis}/positions"),
         &admin,
         Some(&json!({
             "bezeichnung": "Feldküche BR Sportplatz",
@@ -6943,7 +6943,7 @@ async fn verpflegungsgeraet_liest_stellen_und_bucht_an_stelle() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/stellen/{sid}/status"),
+        &format!("{basis}/positions/{sid}/status"),
         &admin,
         Some(&json!({"status": "aktiv"})),
     )
@@ -6969,7 +6969,7 @@ async fn verpflegungsgeraet_liest_stellen_und_bucht_an_stelle() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &format!("{basis}/time-slots/{zf}/distributions"),
         &geraet,
         Some(&json!({"menge": 40, "verpflegungsstelle_id": sid})),
     )
@@ -6981,23 +6981,23 @@ async fn verpflegungsgeraet_liest_stellen_und_bucht_an_stelle() {
     for (m, pfad, body) in [
         (
             "POST",
-            format!("{basis}/stellen"),
+            format!("{basis}/positions"),
             Some(json!({"bezeichnung": "Ausgabe Deich", "art": "zufuehrung"})),
         ),
         (
             "PATCH",
-            format!("{basis}/stellen/{sid}"),
+            format!("{basis}/positions/{sid}"),
             Some(json!({"bezeichnung": "Küche"})),
         ),
-        ("DELETE", format!("{basis}/stellen/{sid}"), None),
+        ("DELETE", format!("{basis}/positions/{sid}"), None),
         (
             "POST",
-            format!("{basis}/stellen/{sid}/status"),
+            format!("{basis}/positions/{sid}/status"),
             Some(json!({"status": "aufgeloest"})),
         ),
         (
             "PATCH",
-            format!("{basis}/zeitfenster/{zf}"),
+            format!("{basis}/time-slots/{zf}"),
             Some(json!({"stelle_ids": [sid]})),
         ),
     ] {
@@ -7028,7 +7028,7 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
 
     for (m, pfad, body) in [
         ("GET", format!("{e}/personal"), None),
-        ("GET", format!("{e}/betreuung"), None),
+        ("GET", format!("{e}/care"), None),
         ("GET", format!("{e}/nachforderungen"), None),
         (
             "POST",
@@ -7040,7 +7040,7 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
                 "adressat_kategorie": "leitstelle",
             })),
         ),
-        ("GET", format!("{e}/personen"), None),
+        ("GET", format!("{e}/persons"), None),
         ("GET", format!("{e}/etb"), None),
         ("GET", format!("{e}/uhs"), None),
         ("GET", format!("{e}/einheiten"), None),
@@ -7186,7 +7186,7 @@ async fn widerrufenes_verpflegungsgeraet_verliert_jeden_zugriff() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zf = mittag(&app, &admin, einsatz).await;
     let (id, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
-    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let basis = format!("/api/einsaetze/{einsatz}/catering");
     let (s, _) = anfrage(&app, "GET", &basis, &geraet, None).await;
     assert_eq!(s, StatusCode::OK);
 
@@ -7196,7 +7196,7 @@ async fn widerrufenes_verpflegungsgeraet_verliert_jeden_zugriff() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &format!("{basis}/time-slots/{zf}/distributions"),
         &geraet,
         Some(&json!({"menge": 5})),
     )
@@ -7291,7 +7291,7 @@ async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/verpflegung"),
+        &format!("/api/einsaetze/{einsatz}/catering"),
         &geraet,
         None,
     )
@@ -7343,7 +7343,7 @@ async fn verpflegungsgeraet_bucht_an_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster/{zf}/ausgaben"),
+        &format!("/api/einsaetze/{einsatz}/catering/time-slots/{zf}/distributions"),
         &geraet,
         Some(&json!({"menge": 9, "einheit_id": gruppe})),
     )
@@ -7622,7 +7622,7 @@ async fn pat_kern_am_geraet(weg: &str, body: Value) -> PatKernAmGeraet {
     let fremde = person_in(&app, &admin, einsatz, Some(sued)).await["id"]
         .as_i64()
         .unwrap();
-    let pfad = |p: i64| format!("/api/einsaetze/{einsatz}/personen/{p}/{weg}");
+    let pfad = |p: i64| format!("/api/einsaetze/{einsatz}/persons/{p}/{weg}");
 
     let mut bestaetigt = body.clone();
     bestaetigt["bestaetigt_personal_id"] = json!(aerztin);
@@ -7689,7 +7689,7 @@ async fn transport_am_uhs_geraet() {
     let (_, d) = anfrage(
         &lage.app,
         "GET",
-        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &format!("/api/einsaetze/{}/persons/{}", lage.einsatz, lage.person),
         &lage.admin,
         None,
     )
@@ -7706,7 +7706,7 @@ async fn massnahme_am_uhs_geraet() {
     let (_, d) = anfrage(
         &lage.app,
         "GET",
-        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &format!("/api/einsaetze/{}/persons/{}", lage.einsatz, lage.person),
         &lage.admin,
         None,
     )
@@ -7726,7 +7726,7 @@ async fn massnahme_am_uhs_geraet() {
 
     let aufheben = |p: i64, m: &Value| {
         format!(
-            "/api/einsaetze/{}/personen/{p}/massnahmen/{m}/aufheben",
+            "/api/einsaetze/{}/persons/{p}/interventions/{m}/void",
             lage.einsatz
         )
     };
@@ -7735,7 +7735,7 @@ async fn massnahme_am_uhs_geraet() {
         &lage.app,
         "POST",
         &format!(
-            "/api/einsaetze/{}/personen/{}/massnahmen",
+            "/api/einsaetze/{}/persons/{}/interventions",
             lage.einsatz, lage.fremde
         ),
         &lage.admin,
@@ -8380,7 +8380,7 @@ async fn einheitengeraet_erfasst_kontakt_und_sieht_nur_eigene_ohne_namen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+    let personen = format!("/api/einsaetze/{}/persons", l.einsatz);
 
     let (s, v) = anfrage_json(
         &app,
@@ -8437,7 +8437,7 @@ async fn einheitengeraet_erfasst_kontakt_und_sieht_nur_eigene_ohne_namen() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{personen}/{fremde}/verbleib"),
+        &format!("{personen}/{fremde}/whereabouts"),
         &geraet,
         Some(&json!({"art": "entlassung"})),
     )
@@ -8469,7 +8469,7 @@ async fn einheitengeraet_replay_ohne_personalien_und_nur_eigene() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+    let personen = format!("/api/einsaetze/{}/persons", l.einsatz);
 
     let eigener = kontakt(json!({"entlassen": true, "client_id": "kontakt-1"}));
     let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&eigener)).await;
@@ -8524,7 +8524,7 @@ async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
     let l = abschnittslage(&app, &admin).await;
     let uhs = uhs_anlegen(&app, &admin, l.einsatz, "UHS Bühne").await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+    let personen = format!("/api/einsaetze/{}/persons", l.einsatz);
 
     for extra in [
         json!({"name": "Meier"}),
@@ -8589,14 +8589,14 @@ async fn einheitengeraet_bringt_kontakt_zur_uhs() {
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
     let basis = format!("/api/einsaetze/{}", l.einsatz);
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/personen/uhs"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/persons/uhs"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v, json!([{"id": uhs, "bezeichnung": "UHS Bühne"}]));
 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&kontakt(json!({"uhs_id": geplant}))),
     )
@@ -8606,7 +8606,7 @@ async fn einheitengeraet_bringt_kontakt_zur_uhs() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&kontakt(json!({"uhs_id": uhs}))),
     )
@@ -8625,7 +8625,7 @@ async fn einheitengeraet_bringt_kontakt_zur_uhs() {
     )
     .await;
     let tablet = koppeln(&app, &code, None).await.cookie.expect("Cookie");
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/personen"), &tablet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/persons"), &tablet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(v.as_array().unwrap().iter().any(|p| p["id"] == pid), "{v}");
 
@@ -8657,7 +8657,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let (s, v) = anfrage_mit_offline_queue_benutzer(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&kontakt(json!({"rtw": true, "client_id": "k-1"})).to_string()),
         benutzer,
@@ -8673,7 +8673,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&kontakt(json!({"rtw": true}))),
     )
@@ -8683,7 +8683,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let (s, person) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&kontakt(json!({"rtw": true, "client_id": "rtw-0"}))),
     )
@@ -8698,7 +8698,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let (s, erste) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&erneut),
     )
@@ -8707,7 +8707,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let (s, zweite) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         &geraet,
         Some(&erneut),
     )
@@ -8771,7 +8771,7 @@ async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
     let (s, zeile) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{eigene}/zeile"),
+        &format!("/api/einsaetze/{einsatz}/persons/{eigene}/row"),
         &geraet,
         None,
     )
@@ -8783,7 +8783,7 @@ async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
     let (s, antwort) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{fremde}/zeile"),
+        &format!("/api/einsaetze/{einsatz}/persons/{fremde}/row"),
         &geraet,
         None,
     )
@@ -8809,7 +8809,7 @@ async fn tablet_ruft_stand_nur_fuer_personen_der_eigenen_uhs_ab() {
     let (s, stand) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{eigene}/stand"),
+        &format!("/api/einsaetze/{einsatz}/persons/{eigene}/state"),
         &geraet,
         None,
     )
@@ -8819,7 +8819,7 @@ async fn tablet_ruft_stand_nur_fuer_personen_der_eigenen_uhs_ab() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{fremde}/stand"),
+        &format!("/api/einsaetze/{einsatz}/persons/{fremde}/state"),
         &geraet,
         None,
     )
@@ -8835,7 +8835,7 @@ async fn einheitengeraet_ruft_zeile_ohne_personalien_ab() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+    let personen = format!("/api/einsaetze/{}/persons", l.einsatz);
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -8860,7 +8860,7 @@ async fn einheitengeraet_ruft_zeile_ohne_personalien_ab() {
     let (s, zeile) = anfrage(
         &app,
         "GET",
-        &format!("{personen}/{eigene}/zeile"),
+        &format!("{personen}/{eigene}/row"),
         &geraet,
         None,
     )
@@ -8872,7 +8872,7 @@ async fn einheitengeraet_ruft_zeile_ohne_personalien_ab() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{personen}/{fremde}/zeile"),
+        &format!("{personen}/{fremde}/row"),
         &geraet,
         None,
     )
@@ -9337,7 +9337,7 @@ async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
     let (einsatz, _nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let p = person_in(&app, &geraet, einsatz, None).await;
     let pid = p["id"].as_i64().unwrap();
-    let belegung = format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung");
+    let belegung = format!("/api/einsaetze/{einsatz}/persons/{pid}/uhs-occupancy");
     let austragen = |cookie: String| {
         let app = app.clone();
         let belegung = belegung.clone();
@@ -9435,14 +9435,14 @@ async fn laptop_rueckgaengig_nach_abziehen_nennt_die_andere_uhs() {
     let (s, k) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces"),
         &geraet,
         Some(&json!({"name": "Ben Sani"})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{k}");
     let kraft =
-        |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte/{}{q}", k["id"]);
+        |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces/{}{q}", k["id"]);
     let (s, _) = anfrage(&app, "DELETE", &kraft(nord, ""), &geraet, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage(&app, "PUT", &kraft(sued, ""), &admin, None).await;

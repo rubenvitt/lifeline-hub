@@ -323,7 +323,7 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
 
     stelleBereit(geraet({ ansicht: 'uhs-tablet', uhs_id: 2, stelle_id: 2, stelle: 'UHS Nord' }));
     server.use(
-      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/uhs/2', () => HttpResponse.json({ id: 2, plaetze: [] })),
     );
     const zweiter = renderApp('/geraet/7/auftraege');

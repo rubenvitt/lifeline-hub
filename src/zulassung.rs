@@ -113,7 +113,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
     ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/bild"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/image"),
     // ETB-Anhänge (LFH-117) und Erfassungs-Anhänge (Schaden LFH-21, Person LFH-757, Tier und UHS
     // LFH-758): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Über LTE dauert ein
     // 15-MiB-Gutachten länger als das Budget (LFH-938). Nur POST bzw. GET — Liste, DELETE und die
@@ -125,18 +125,18 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
     ),
-    ("POST", "/api/einsaetze/{id}/personen/{pid}/anhaenge"),
+    ("POST", "/api/einsaetze/{id}/persons/{pid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
+        "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/tiere/{tid}/anhaenge"),
+    ("POST", "/api/einsaetze/{id}/animals/{tid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
+        "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file"),
     // Bild-Anlagen an Lagebericht und Befehl (LFH-1028): dieselbe Kette wie die Anhänge. Nur POST
     // bzw. GET — Liste und DELETE bleiben geregelt.
     ("POST", "/api/einsaetze/{id}/lageberichte/{lid}/anlagen"),
@@ -151,8 +151,8 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-, Tier- und Schadenszahl der Lage.
-    ("GET", "/api/einsaetze/{id}/personen/export"),
-    ("GET", "/api/einsaetze/{id}/tiere/export"),
+    ("GET", "/api/einsaetze/{id}/persons/export"),
+    ("GET", "/api/einsaetze/{id}/animals/export"),
     ("GET", "/api/einsaetze/{id}/schaeden/export"),
     // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
     ("GET", "/api/aufbewahrung/einsaetze/{id}/archiv"),

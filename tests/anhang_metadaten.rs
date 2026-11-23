@@ -829,7 +829,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &admin,
         Some("{}"),
     )
@@ -839,7 +839,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     let foto = foto_mit_gps();
     let (s, v) = multipart_post(
         &app,
-        &format!("/api/einsaetze/{einsatz}/personen/{person}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}/attachments"),
         &admin,
         Some(("verletzung.jpg", &foto)),
         &[],
@@ -847,7 +847,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let pfad = format!(
-        "/api/einsaetze/{einsatz}/personen/{person}/anhaenge/{}/datei",
+        "/api/einsaetze/{einsatz}/persons/{person}/attachments/{}/file",
         v["id"]
     );
 

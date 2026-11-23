@@ -53,13 +53,13 @@ function server_mit(personen: Person[], druckStatus = 200) {
   const abrufe = { druck: 0, liste: 0 };
   server.use(
     http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/personen/druck', () => {
+    http.get('/api/einsaetze/7/persons/print', () => {
       abrufe.druck += 1;
       return druckStatus === 200
         ? HttpResponse.json(personen)
         : HttpResponse.json({ error: 'kaputt' }, { status: druckStatus });
     }),
-    http.get('/api/einsaetze/7/personen', () => {
+    http.get('/api/einsaetze/7/persons', () => {
       abrufe.liste += 1;
       return HttpResponse.json(personen);
     }),
@@ -116,7 +116,7 @@ describe('PersonenDruckPage', () => {
     // Offline pausierte TanStack den Abruf (networkMode „online“) und zeigte den Schnappschuss
     // des letzten Besuchs als druckbar — ohne neuen Protokolleintrag.
     server_mit([person(1)]);
-    server.use(http.get('/api/einsaetze/7/personen/druck', () => HttpResponse.error()));
+    server.use(http.get('/api/einsaetze/7/persons/print', () => HttpResponse.error()));
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.personenDruck(7), {
       personen: [person(8)],
@@ -135,7 +135,7 @@ describe('PersonenDruckPage', () => {
   it('zeigt den Protokoll-Hinweis schon beim Laden', async () => {
     server_mit([person(1)]);
     server.use(
-      http.get('/api/einsaetze/7/personen/druck', async () => {
+      http.get('/api/einsaetze/7/persons/print', async () => {
         await new Promise((r) => setTimeout(r, 200));
         return HttpResponse.json([person(1)]);
       }),

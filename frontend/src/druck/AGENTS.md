@@ -156,7 +156,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Seite mit `planung/PlanungDruckPage.tsx` über `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx`;
   Rahmen und Laden bleiben je Seite. Jedes Blatt ist ein `druck-kapitel` mit eigenem Druckkopf
   (`ebene={2}`). Nachweis `e2e/schichtplan-druck.spec.ts` (drei Engines, PDF in Chromium).
-- **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
+- **Personendruck nur über `GET …/persons/print`**: jeder Abruf schreibt einen `druck`-Eintrag in
   `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache;
   Optionen aus `druck/abfrageOptionen.ts` (`retry: false`, `refetchOnMount: 'always'`,
   `networkMode: 'always'` — offline scheitern statt den alten Stand druckbar zeigen), `gcTime: 0`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
@@ -165,7 +165,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `personDruckPfad`), Einstieg als Nebenweg „Druckansicht“ des Personendetails, auch ohne
   Schreibrecht, nie am Gerät (`geraetDarf('person-druck')` ist überall falsch, die Route steht in
   keiner Routenliste; einzige Ausnahme beim Personendruck ist die Registrierliste, unten).
-  Geladen nur über `GET …/personen/{pid}/druck`, das jeden Abruf als `druck`
+  Geladen nur über `GET …/persons/{pid}/print`, das jeden Abruf als `druck`
   mit `person_id` ins Zugriffsprotokoll schreibt; Optionen wie beim Listendruck
   (`DRUCK_ABFRAGE`, `gcTime: 0`), eigener nicht-live Key `personDruck`, „Neu laden“ holt neu.
   Eine unbekannte Person steht als solche da, ohne Druckknopf. Das Blatt
@@ -222,7 +222,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `hilfeleistungen` im Standardumfang nach der Bilanz, zählt mit den Funktionen aus
   `personen/personenBilanz.ts` (`anlassbild`, `kontakteJeStunde`, `istTransportiert`,
   `kontakteJeEinheit`), nie mit einem zweiten Zähler. Rettungsmittel und Angaben „gegen Rat“
-  liefert die eigene Quelle `personenVerbleibAngaben` (`GET …/personen/verbleib-angaben`,
+  liefert die eigene Quelle `personenVerbleibAngaben` (`GET …/persons/whereabouts-details`,
   jüngster Verbleib ohne Übergabe); die Kennung verlässt die Verdichtung nicht. Der Kurzbericht ist
   nur eine Voreinstellung der Auswahl (`KURZBERICHT` in `auswahl.ts`) mit eigenem Namen im Kopf,
   kein Dokument und kein Parameter. Die Anlage `materialverbrauch` liest aktives und
@@ -234,7 +234,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `AbschnittsText`/`LageberichtText`, `DokumentAnlagenBlaetter`), nie auf deren Seiten. Weiche
   `akteFreigabe` vor dem Abruf über `AKTE_MODULE` (gespiegelt in `src/einsatzakte/mod.rs`),
   `freigabeDesModuls` aus dem Bericht, alles oder nichts. Ein Abruf, nicht-live Key
-  `einsatzakteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0` (Betroffene über `…/personen/druck`). Befehle
+  `einsatzakteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0` (Betroffene über `…/persons/print`). Befehle
   und Lageberichte nur freigegeben, je Kette der Kopf (`kettenKoepfe`), wie das ZIP. Das ZIP ist
   ein Link mit `download`, kein Blob.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
