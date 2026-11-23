@@ -151,6 +151,12 @@ fall "Bestand mit englisch gewordenem Pfad" rot \
 fall "Bestand wächst gegenüber origin/alpha" rot \
   "route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/neu-deutsch" "origin/alpha"
+fall "Paket übersetzt Segmente unter dem deutschen Präfix (Zeile umbenannt)" gruen \
+  "route_dazu /api/einsaetze/{id}/personen && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/personen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/personen#/persons#' src/app.rs > x && mv x src/app.rs && glossar \"api${TAB}-\" \"auth${TAB}Anmeldung\" \"health${TAB}-\" \"login${TAB}-\" \"me${TAB}-\" \"persons${TAB}Personen\" \"v1${TAB}-\" && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/persons' > scripts/api-routen-bestand.txt" \
+  "OK"
+fall "Bestand tauscht eine Zeile gegen ein neues deutsches Wort" rot \
+  "route_dazu /api/einsaetze/{id}/personen && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/personen' > scripts/api-routen-bestand.txt && git commit -qam alt && git update-ref refs/remotes/origin/alpha HEAD && sed 's#/personen#/leute#' src/app.rs > x && mv x src/app.rs && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/leute' > scripts/api-routen-bestand.txt" \
+  "/api/einsaetze/{id}/leute" "leute"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

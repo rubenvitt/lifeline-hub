@@ -16,8 +16,11 @@
 #     `scripts/api-routen-bestand.txt` steht;
 #   - ein Bestandseintrag, der nicht mehr registriert ist oder nur noch Glossar-Segmente hat
 #     (veraltet: Zeile löschen; so schrumpft der Bestand mit jedem Paket);
-#   - ein Bestandseintrag, der an der Merge-Base mit der Basis (Vorgabe `origin/alpha`) fehlt:
-#     der Bestand wächst nicht. Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
+#   - ein Bestand mit mehr Zeilen als an der Merge-Base mit der Basis (Vorgabe `origin/alpha`),
+#     oder ein neuer Bestandseintrag mit einem deutschen Segment, das dort in keiner Zeile steht:
+#     der Bestand wächst nicht. Umbenannt darf eine Zeile werden, solange sie nur schon bekannte
+#     deutsche Segmente trägt (Pakete unter `/api/einsaetze/{id}/` vor dem Präfix, LLH-2055).
+#     Merge-Base statt Spitze, damit ein Paket, das auf der Basis schon
 #     Zeilen gestrichen hat, einen älteren Branch nicht rot macht. Ohne den Ref (flacher
 #     Checkout, so im Bündel `schnell` der CI) laut übersprungen; durchgesetzt wird der Vergleich
 #     im Workflow `migrationen.yml`, der die Basis holt. Trägt die Merge-Base die Datei noch
@@ -151,12 +154,28 @@ fi
 if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
   merge_base="$(git -C "$ROOT" merge-base HEAD "$BASIS")"
   if alt="$(git -C "$ROOT" show "$merge_base:$BESTAND_REL" 2> /dev/null)"; then
+    alt_zahl="$(printf '%s\n' "$alt" | awk 'NF' | sort -u | wc -l | tr -d ' ')"
+    neu_zahl="$(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ')"
+    if [ "$neu_zahl" -gt "$alt_zahl" ]; then
+      melde "der Bestand hat $neu_zahl Zeilen, an der Merge-Base mit $BASIS $alt_zahl; er darf nur" \
+        "schrumpfen (ADR-0085). Die neuen Routen englisch benennen."
+    fi
+    # Eine neue Zeile darf nur deutsche Segmente tragen, die der Bestand an der Merge-Base schon
+    # kennt: So übersetzt ein Paket unter `/api/einsaetze/{id}/` die Segmente nach `{id}`, bevor
+    # das Präfix an der Reihe ist (LLH-2055), aber kein Tausch bringt ein neues deutsches Wort.
     neu_zeilen="$(comm -13 <(printf '%s\n' "$alt" | awk 'NF' | sort -u) <(printf '%s\n' "$bestand" | awk 'NF'))"
     if [ -n "$neu_zeilen" ]; then
-      while IFS= read -r pfad; do
-        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
-          "(ADR-0085). Die Route englisch benennen."
-      done <<< "$neu_zeilen"
+      neue_woerter="$(printf '%s\n' "$unbekannt" | awk -F'\t' '
+        FILENAME == ARGV[1] { n = split($0, s, "/"); for (i = 1; i <= n; i++) alt[s[i]] = 1; next }
+        FILENAME == ARGV[2] { neu[$0] = 1; next }
+        ($1 in neu) && !($2 in alt) { print $1 "\t" $2 }
+      ' <(printf '%s\n' "$alt") <(printf '%s\n' "$neu_zeilen") -)"
+      if [ -n "$neue_woerter" ]; then
+        while IFS="$(printf '\t')" read -r pfad seg; do
+          melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base) mit dem Segment '$seg', das der" \
+            "Bestand dort nicht kennt; er darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+        done <<< "$neue_woerter"
+      fi
     fi
   fi
 else
