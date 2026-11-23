@@ -52,6 +52,7 @@ import {
   codeAusstellenSperre,
   codeVorOrtSperre,
   gefundenZeile,
+  iosPushGesperrtText,
   kopplungHinweise,
   kopplungZustandZeile,
   richtungText,
@@ -263,6 +264,16 @@ export default function InstanzkopplungSeite() {
               style={{ marginBlockEnd: token.marginMD }}
               title={sperre}
               data-lfh="instanz-sperre"
+            />
+          )}
+          {u.ios_push_relais_gesperrt_seit != null && (
+            <Alert
+              type="warning"
+              showIcon
+              role="status"
+              style={{ marginBlockEnd: token.marginMD }}
+              title={iosPushGesperrtText(zeit(u.ios_push_relais_gesperrt_seit))}
+              data-lfh="instanz-ios-push-gesperrt"
             />
           )}
           <SpeicherFehler fehler={codeAusstellen.error} titel="Kein Code ausgestellt" />

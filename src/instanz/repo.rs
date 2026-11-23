@@ -43,6 +43,8 @@ pub struct KopplungZeile {
     pub gegenueber_hinweise: bool,
     /// Meldende Seite: das Gegenüber bietet Web Push an.
     pub gegenueber_web_push: bool,
+    /// Meldende Seite: das Gegenüber bietet iOS-Push an (LLH-2040), aus seiner Meldeantwort.
+    pub gegenueber_ios_push: bool,
     /// Beide Seiten: das Gegenüber kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7).
     /// Ohne sie geht `mitarbeit` als `beobachter` hinaus.
     pub gegenueber_rolle_mitarbeit: bool,
@@ -71,7 +73,7 @@ const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, g
      gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
      naechste_meldung_at, angebahnt_at, erstellt_at, gegenueber_age_empfaenger, \
      gegenueber_datentraeger_verschluesselt, art, tls_zertifikat, tls_zertifikat_gemeldet, \
-     gegenueber_hinweise, gegenueber_web_push, gegenueber_rolle_mitarbeit";
+     gegenueber_hinweise, gegenueber_web_push, gegenueber_ios_push, gegenueber_rolle_mitarbeit";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -653,19 +655,22 @@ pub async fn mark_gesehen(
 }
 
 /// Meldende Seite: die Fähigkeiten des Gegenübers aus seiner Meldeantwort (LLH-1495, D4;
-/// `rolle_mitarbeit` LLH-1817, design.md D7).
+/// `rolle_mitarbeit` LLH-1817, design.md D7; `ios_push` LLH-2040).
 pub async fn save_faehigkeiten(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     hinweise: bool,
     web_push: bool,
+    ios_push: bool,
     rolle_mitarbeit: bool,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ? WHERE id = ?",
+        "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ?, \
+         gegenueber_ios_push = ? WHERE id = ?",
     )
     .bind(hinweise)
     .bind(web_push)
+    .bind(ios_push)
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;

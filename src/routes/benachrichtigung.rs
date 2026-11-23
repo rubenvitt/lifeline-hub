@@ -51,8 +51,9 @@ pub struct ListeParams {
 }
 
 /// Macht aus einer eigenen Zeile die Anzeige, wenn `benutzer` Einsatz und Bezugsmodul (noch)
-/// lesen darf; sonst `None`.
-async fn anzeige(
+/// lesen darf; sonst `None`. Auch der iOS-Push bildet Titel, Detail und Pfad hier
+/// (`ios_push::inhalt`), damit sie gleich `GET /api/benachrichtigungen/{id}` sind.
+pub(crate) async fn anzeige(
     pool: &SqlitePool,
     recht: &Leserecht,
     benutzer: &Benutzer,

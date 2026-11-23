@@ -45,7 +45,7 @@ final class OhneServerTests: XCTestCase {
         server = Testserver(routen: Self.routen())
         let port = try await server.start()
         var liste = Serverliste()
-        eintrag = liste.add(try ServerAdresse.parse("https://localhost:\(port)"))
+        eintrag = liste.add(try ServerAdresse.parse("https://\(Testserver.host):\(port)"))
         verzeichnis = FileManager.default.temporaryDirectory
             .appendingPathComponent("ohne-server-\(UUID().uuidString)")
         vorrat = Vorratsdienst(
@@ -156,21 +156,57 @@ final class OhneServerTests: XCTestCase {
         ShellInfo(version: version, shellContract: 1, assets: assets)
     }
 
-    private func webview() -> WKWebView {
+    private func webview(navigation: WKNavigationDelegate? = nil) -> WKWebView {
         let web = Webviewfabrik.make(
             fuer: eintrag, skript: "",
-            empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: nil)
+            empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: navigation)
         halter.append(web)
         return web
     }
 
-    /// Lädt die Oberfläche vom Testserver und wartet, bis sie steht.
+    /// Lädt die Oberfläche vom Testserver und wartet, bis sie steht. Scheitert das, nennt die
+    /// Meldung den Ladefehler des Webviews, was beim Server ankam und ob das System dem Zertifikat
+    /// vertraut: so ist aus dem Protokoll des Laufs zu sehen, ob Verbindung, TLS oder Test-CA fehlt.
     private func ladeOnline() async throws -> WKWebView {
-        let web = webview()
+        let beobachter = Ladebeobachter()
+        halter.append(beobachter)
+        let web = webview(navigation: beobachter)
         web.load(URLRequest(url: eintrag.adresse.url))
         let gestartet = await vorrat.isGestartet(web)
-        XCTAssertTrue(gestartet, "Oberfläche vom Testserver nicht geladen (Test-CA im Simulator?)")
+        if !gestartet {
+            let vertrauen = Testserver.vertrauensfehler() ?? "vertraut"
+            XCTFail(
+                "Oberfläche vom Testserver nicht geladen. Webview: \(beobachter.beschreibung); "
+                    + "\(server.bericht); Zertifikat: \(vertrauen)")
+        }
         while web.isLoading { try await Task.sleep(for: .milliseconds(100)) }
         return web
+    }
+}
+
+/// Hält den letzten Ladefehler des Webviews fest, nur für die Meldung roter Tests. Ohne eigene
+/// Antwort auf Anmeldeanfragen: die Zertifikatsprüfung bleibt die des Systems.
+@MainActor
+private final class Ladebeobachter: NSObject, WKNavigationDelegate {
+    private var fehler: Error?
+
+    var beschreibung: String {
+        guard let fehler else { return "kein Ladefehler" }
+        let ns = fehler as NSError
+        var text = "\(ns.domain) \(ns.code)"
+        if let darunter = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            text += ", darunter \(darunter.domain) \(darunter.code)"
+        }
+        return text
+    }
+
+    func webView(
+        _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error
+    ) {
+        fehler = error
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        fehler = error
     }
 }

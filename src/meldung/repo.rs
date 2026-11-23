@@ -38,6 +38,14 @@ macro_rules! ist_offen_sql {
     };
 }
 
+/// Die Meldung, auf die eine Erinnerung (`e`) zeigt, ist offen: dieselbe Regel wie
+/// [`ist_offen_sql`], ohne Platzhalter. Für `erinnerung::AM_BEZUG_GETRAGEN` (LLH-1908).
+pub(crate) const BEZUG_OFFEN_SQL: &str = concat!(
+    "EXISTS (SELECT 1 FROM meldung m WHERE m.id = e.bezug_id AND ",
+    ist_offen_sql!(),
+    ")"
+);
+
 /// Sofortmeldung: löst den Sofortalarm aus (Meldungsart oder Priorität). SQL-Gegenstück von
 /// [`super::ist_sofort`]; Zähler und Lagemonitor beziehen das Prädikat von hier (LLH-1743).
 macro_rules! ist_sofort_sql {

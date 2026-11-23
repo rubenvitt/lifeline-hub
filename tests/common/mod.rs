@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod maschine;
+pub mod relais;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

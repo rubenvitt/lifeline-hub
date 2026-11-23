@@ -23,7 +23,12 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   spieleAlarmTon: vi.fn(),
 }));
 
-type Stand = { zustand: string; inhalt: boolean; hub?: { name: string; adresse: string } };
+type Stand = {
+  zustand: string;
+  inhalt: boolean;
+  hub?: { name: string; adresse: string };
+  hinweis?: string;
+};
 const push = vi.hoisted(() => ({
   ladePushStand: vi.fn(async (): Promise<Stand> => ({ zustand: 'fehlt', inhalt: false })),
   pushEinschalten: vi.fn(async () => 'an'),
@@ -175,6 +180,17 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
     expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
   });
 
+  it('zeigt statt des Schalters den Hinweis, wenn das Relais den Server sperrt', async () => {
+    push.ladePushStand.mockResolvedValue({
+      zustand: 'fehlt',
+      inhalt: false,
+      hinweis: 'Der Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.',
+    });
+    zeige();
+    expect(await screen.findByText(/Der Push-Dienst nimmt diesen Server nicht an/)).toBeVisible();
+    expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
+  });
+
   it('am gekoppelten ELW: Hinweis mit Link zum Hub statt des Schalters (LLH-1495)', async () => {
     push.ladePushStand.mockResolvedValue({
       zustand: 'ueber_hub',
@@ -187,6 +203,25 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
       'href',
       'https://hub.example.org/benachrichtigungen',
     );
+    expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
+  });
+
+  it('am gekoppelten ELW in der iOS-App: Hinweis auf die App und Adresse statt Link', async () => {
+    push.ladePushStand.mockResolvedValue({
+      zustand: 'ueber_hub',
+      inhalt: false,
+      hub: { name: 'Hub Kreisverband', adresse: 'https://hub.example.org' },
+      hinweis: 'Push läuft über Hub Kreisverband: Hub in der App hinzufügen und dort einschalten.',
+    });
+    zeige();
+    expect(
+      await screen.findByText(
+        'Push läuft über Hub Kreisverband: Hub in der App hinzufügen und dort einschalten.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('https://hub.example.org')).toBeVisible();
+    expect(screen.queryByRole('link', { name: ZUM_HUB })).not.toBeInTheDocument();
+    expect(screen.queryByText(pushUeberHub('Hub Kreisverband'))).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
   });
 

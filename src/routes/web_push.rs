@@ -13,6 +13,7 @@ use crate::auth::session::{hash_token, CurrentUser, SESSION_COOKIE};
 use crate::benachrichtigung::BenachrichtigungArt;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::instanz::spiegel::hinweis::Kanal;
 use crate::web_push::krypto::{b64_lesen, browser_schluessel, AUTH_LAENGE};
 use crate::web_push::{endpunkt_pruefen, repo, WebPush};
 use axum::extract::State;
@@ -54,10 +55,15 @@ pub struct PushUeberHub {
     pub adresse: String,
 }
 
-async fn ueber_hub(state: &AppState, benutzer_id: i64) -> Result<Option<PushUeberHub>, AppError> {
+/// Der Hub, über den dieser Nutzer Push im Kanal `kanal` bekommt (LLH-2040: je Kanal getrennt).
+pub(crate) async fn ueber_hub(
+    state: &AppState,
+    benutzer_id: i64,
+    kanal: Kanal,
+) -> Result<Option<PushUeberHub>, AppError> {
     let mut conn = state.pool.acquire().await?;
     Ok(
-        crate::instanz::spiegel::hinweis::push_hub_fuer(&mut conn, benutzer_id)
+        crate::instanz::spiegel::hinweis::push_hub_fuer(&mut conn, benutzer_id, kanal)
             .await?
             .map(|(name, adresse)| PushUeberHub { name, adresse }),
     )
@@ -108,7 +114,7 @@ pub async fn stand(
         angemeldet,
         inhalt: wahl.inhalt,
         stumm: repo::stumm_bereinigt(&wahl.stumm),
-        ueber_hub: ueber_hub(&state, benutzer.id).await?,
+        ueber_hub: ueber_hub(&state, benutzer.id, Kanal::WebPush).await?,
     }))
 }
 
@@ -150,7 +156,7 @@ pub async fn anmelden(
         .collect();
     // Gekoppelter ELW (LLH-1495, design.md D7): ein Zustand, nicht das Feld, also 422. Bestehende
     // Abos bleiben und gelten nach dem Entkoppeln wieder.
-    if let Some(hub) = ueber_hub(&state, benutzer.id).await? {
+    if let Some(hub) = ueber_hub(&state, benutzer.id, Kanal::WebPush).await? {
         return Err(AppError::UnprocessableEntity(format!(
             "Push läuft über {}.",
             hub.name

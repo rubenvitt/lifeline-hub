@@ -31,6 +31,7 @@ pub mod vorgabe;
 mod tests;
 
 use crate::fuehrung::Fuehrungsfunktion;
+use crate::instanz::spiegel::hinweis::Kanal;
 use crate::live::{LiveEvent, LiveHub, Zustellung};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -558,7 +559,7 @@ async fn melden_mit_fehler(
             anlass,
             aufgeloest.org_id,
             &mit_stufe,
-            &HashSet::new(),
+            &UeberHub::default(),
         )
         .await?;
         return Ok(aufgeloest.benutzer_ids);
@@ -576,11 +577,15 @@ async fn melden_mit_fehler(
     };
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
     // Den Push übernimmt der Hub nur für Konten, die er kennt; den übrigen (Spontanhelfer,
-    // Mitglieder anderer Orgs) pusht diese Instanz selbst (Entscheidung 12.11.2026).
-    let ueber_hub = if vorgemerkt && crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele) {
-        konten_am_hub(pool, &ziele, &aufgeloest.benutzer_ids).await
+    // Mitglieder anderer Orgs) pusht diese Instanz selbst (Entscheidung 12.11.2026). Je Kanal
+    // getrennt (LLH-2040): kann der Hub einen Kanal nicht, pusht diese Instanz ihn selbst.
+    let ueber_hub = if vorgemerkt {
+        UeberHub {
+            web_push: konten_am_hub(pool, &ziele, Kanal::WebPush, &aufgeloest.benutzer_ids).await,
+            ios_push: konten_am_hub(pool, &ziele, Kanal::IosPush, &aufgeloest.benutzer_ids).await,
+        }
     } else {
-        HashSet::new()
+        UeberHub::default()
     };
     let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
     ausliefern(
@@ -614,16 +619,20 @@ async fn hub_ziele(
     }
 }
 
-/// Die Empfänger, an die der Hub pusht (LLH-1495, design.md D4); ein Fehler gilt als „keine“:
-/// dann pusht diese Instanz allen selbst.
+/// Die Empfänger, an die der Hub im Kanal `kanal` pusht (LLH-1495, design.md D4; je Kanal
+/// LLH-2040); ein Fehler gilt als „keine“: dann pusht diese Instanz allen selbst.
 async fn konten_am_hub(
     pool: &SqlitePool,
     ziele: &[crate::instanz::spiegel::hinweis::Ziel],
+    kanal: Kanal,
     benutzer_ids: &[i64],
 ) -> HashSet<i64> {
+    if !crate::instanz::spiegel::hinweis::pusht_ueber_hub(ziele, kanal) {
+        return HashSet::new();
+    }
     let konten = async {
         let mut conn = pool.acquire().await?;
-        crate::instanz::spiegel::hinweis::konten_am_hub(&mut conn, ziele, benutzer_ids).await
+        crate::instanz::spiegel::hinweis::konten_am_hub(&mut conn, ziele, kanal, benutzer_ids).await
     };
     konten.await.unwrap_or_else(|e| {
         tracing::warn!(fehler = %e, "Konten am Hub nicht lesbar, Push von hier");
@@ -663,16 +672,24 @@ fn mit_stufe(
         .collect()
 }
 
+/// Die Empfänger, denen der Hub pusht, je Kanal (LLH-1495, design.md D4; je Kanal LLH-2040).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UeberHub {
+    pub web_push: HashSet<i64>,
+    pub ios_push: HashSet<i64>,
+}
+
 /// Schreibt je aufgelöstem Empfänger eine Zeile mit seiner Stufe und stellt sie zu (Live, Web
-/// Push). Nur für Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
-/// An `ueber_hub` geht kein Push: ihnen pusht der Hub (LLH-1495, design.md D4).
+/// Push, iOS-Push). Nur für Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert
+/// hat. An die Konten in `ueber_hub` geht im jeweiligen Kanal kein Push: ihnen pusht der Hub
+/// (LLH-1495, design.md D4).
 async fn ausliefern(
     pool: &SqlitePool,
     live: &LiveHub,
     anlass: &Anlass,
     org_id: i64,
     mit_stufe: &[(i64, BenachrichtigungStufe)],
-    ueber_hub: &HashSet<i64>,
+    ueber_hub: &UeberHub,
 ) -> Result<(), crate::error::AppError> {
     if mit_stufe.is_empty() {
         return Ok(());
@@ -705,11 +722,34 @@ async fn ausliefern(
             ereignisse
                 .iter()
                 // Stilles erreicht kein Gerät (design.md D2): es ist schon gelesen.
-                .filter(|(b, e)| e.stufe != BenachrichtigungStufe::Still && !ueber_hub.contains(b))
+                .filter(|(b, e)| {
+                    e.stufe != BenachrichtigungStufe::Still && !ueber_hub.web_push.contains(b)
+                })
                 .map(|(benutzer_id, e)| crate::web_push::Sendung {
                     benutzer_id: *benutzer_id,
                     art: e.art,
                     nutzlast: serde_json::to_string(e).expect("Nutzlast serialisierbar"),
+                    alarm: e.stufe == BenachrichtigungStufe::Alarm,
+                })
+                .collect(),
+        );
+    }
+    // iOS-Push an die angemeldeten Geräte (LLH-2040), mit denselben Filtern, in einem eigenen
+    // Task; ohne `--ios-push` nichts. Den Text bildet der Versand je Empfänger. Eine Meldung ohne
+    // Einsatz (Störung einer Anbindung, LLH-2026) geht nicht per iOS-Push: der Klartext braucht
+    // den Einsatz (`ios_push::inhalt::Klartext::e`).
+    if let Some(ios_push) = live.ios_push() {
+        ios_push.versenden(
+            ereignisse
+                .iter()
+                .filter(|(b, e)| {
+                    e.stufe != BenachrichtigungStufe::Still
+                        && e.einsatz_id.is_some()
+                        && !ueber_hub.ios_push.contains(b)
+                })
+                .map(|(benutzer_id, e)| crate::ios_push::IosSendung {
+                    benutzer_id: *benutzer_id,
+                    ereignis: e.clone(),
                     alarm: e.stufe == BenachrichtigungStufe::Alarm,
                 })
                 .collect(),
@@ -905,7 +945,7 @@ async fn umadressieren_mit_fehler(
         &anlass,
         aufgeloest.org_id,
         &dazu,
-        &HashSet::new(),
+        &UeberHub::default(),
     )
     .await
 }

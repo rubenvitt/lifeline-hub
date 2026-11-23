@@ -34,6 +34,8 @@ final class AppModell {
     let testzustand: Testzustand?
 
     @ObservationIgnored private let ablage: Serverablage?
+    /// Anmeldungen am Push-Kanal (`push.json` neben der Serverliste); `nil` im Testzustand.
+    @ObservationIgnored private let pushablage: Pushablage?
     /// Start ohne Server (LLH-1980); `nil` im Testzustand.
     @ObservationIgnored private let vorrat: Vorratsdienst?
     @ObservationIgnored private var wiederholung: Task<Void, Never>?
@@ -41,6 +43,8 @@ final class AppModell {
     @ObservationIgnored private var gestartet = false
     @ObservationIgnored private var anmelder: Anmelder!
     @ObservationIgnored private var dienste: Systemdienste!
+    /// Kennungen, deren Abmeldung gerade läuft (`abmeldenAusstehende`): kein zweiter Aufruf.
+    @ObservationIgnored private var abmeldungenLaufend: Set<String> = []
     @ObservationIgnored private var empfang: Brueckenempfang!
     @ObservationIgnored private var navigation: Navigationsbegleiter!
     @ObservationIgnored private let protokoll = Logger(
@@ -54,20 +58,30 @@ final class AppModell {
         testzustand = Testzustand(argumente: argumente)
         if testzustand != nil {
             ablage = nil
+            pushablage = nil
             vorrat = nil
             liste = Self.beispielliste()
         } else {
             let verzeichnis = URL.applicationSupportDirectory.appendingPathComponent("Lifeline")
             let ablage = Serverablage(verzeichnis: verzeichnis)
             self.ablage = ablage
+            let pushablage = Pushablage(verzeichnis: verzeichnis)
+            self.pushablage = pushablage
             vorrat = Vorratsdienst(
                 ablage: Vorratsablage(verzeichnis: verzeichnis.appendingPathComponent("Oberflaechen")))
             liste = ablage.loadOrRecover()
+            // Eine unlesbare push.json legte Push sonst für immer still (`recoverIfUnreadable`).
+            if pushablage.recoverIfUnreadable() {
+                protokoll.error("Push-Anmeldungen unlesbar, beiseitegelegt")
+            }
+            meldeServerAnzahl()
         }
         anmelder = Anmelder(
             webView: { [weak self] in self?.webView },
             aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
-        dienste = Systemdienste(webView: { [weak self] in self?.webView }, anmelder: anmelder)
+        dienste = Systemdienste(
+            webView: { [weak self] in self?.webView }, anmelder: anmelder, pushablage: pushablage,
+            aktiverServer: { [weak self] in self?.liste.aktiv?.id })
         empfang = Brueckenempfang(
             dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
         navigation = Navigationsbegleiter(aktiverServer: { [weak self] in self?.liste.aktiv?.adresse }) {
@@ -92,6 +106,10 @@ final class AppModell {
             zeigeBeispielseite(testzustand)
         } else {
             send(.start(aktiv: liste.aktiv))
+            // Erst jetzt: ein Tippen auf eine Meldung beim Kaltstart wartete bis hierher und folgt
+            // dem Start, statt von ihm überschrieben zu werden.
+            Meldungsweg.verbinde(self)
+            abmeldenAusstehende()
         }
     }
 
@@ -128,12 +146,14 @@ final class AppModell {
             }
         case .load(let eintrag):
             closeWebView()
-            let webView = Webviewfabrik.make(
-                fuer: eintrag,
-                skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
-                empfang: empfang, navigation: navigation)
-            webView.load(URLRequest(url: eintrag.adresse.url))
-            self.webView = webView
+            makeWebView(fuer: eintrag).load(URLRequest(url: eintrag.adresse.url))
+        case .ladePfad(let eintrag, let pfad):
+            // Nach einem Wechsel ist der Webview weg (`send` schließt ihn auf jeder Seite ohne
+            // Webview, `Seite.zeigtWebview`); ein Pfad aus dem Kern ist schon abgesichert, der
+            // Rückgriff auf die Startadresse gilt nur, falls er sich nicht auflösen ließe.
+            let webView = self.webView ?? makeWebView(fuer: eintrag)
+            let ziel = URL(string: pfad, relativeTo: eintrag.adresse.url)?.absoluteURL
+            webView.load(URLRequest(url: ziel ?? eintrag.adresse.url))
         case .reload:
             guard let webView, let eintrag = seite.eintrag else { return }
             if webView.url != nil {
@@ -160,6 +180,17 @@ final class AppModell {
         }
     }
 
+    /// Baut den Webview mit dem Datenspeicher des Eintrags und merkt ihn als aktuellen.
+    @discardableResult
+    private func makeWebView(fuer eintrag: ServerEintrag) -> WKWebView {
+        let webView = Webviewfabrik.make(
+            fuer: eintrag,
+            skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
+            empfang: empfang, navigation: navigation)
+        self.webView = webView
+        return webView
+    }
+
     // MARK: Start ohne Server (LLH-1980)
 
     /// Neuer Webview mit dem Datenspeicher des Servers, gespeicherte Oberfläche laden, dann
@@ -167,11 +198,7 @@ final class AppModell {
     private func loadVorrat(_ eintrag: ServerEintrag) {
         guard let vorrat else { return }
         closeWebView()
-        let webView = Webviewfabrik.make(
-            fuer: eintrag,
-            skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
-            empfang: empfang, navigation: navigation)
-        self.webView = webView
+        let webView = makeWebView(fuer: eintrag)
         let geladen = vorrat.loadVorrat(eintrag, in: webView)
         Task {
             let gestartet = geladen ? await vorrat.isGestartet(webView) : false
@@ -215,6 +242,7 @@ final class AppModell {
         default: gemeldet = .inactive
         }
         guard rueckkehr.melde(gemeldet), testzustand == nil else { return }
+        abmeldenAusstehende()
         Task {
             let antwortet = (await webView?.isResponsive()) ?? false
             send(
@@ -294,10 +322,98 @@ final class AppModell {
 
     private func save() {
         guard let ablage else { return }
+        meldeServerAnzahl()
         do {
             try ablage.save(liste)
         } catch {
             protokoll.error("Serverliste nicht gespeichert: \(error.localizedDescription)")
+        }
+    }
+
+    /// Die Extension zeigt den Namen des Servers nur bei mehr als einem (`PushNutzlast.meldung`);
+    /// die Liste selbst sieht sie nicht.
+    private func meldeServerAnzahl() {
+        AppGroup.defaults?.set(liste.eintraege.count, forKey: AppGroup.serverAnzahl)
+    }
+
+    // MARK: Meldungen
+
+    /// Tipp auf eine Push-Meldung (`Meldungsweg`): die Kennung nennt den Server, `Ablauf`
+    /// entscheidet über Wechsel und Pfad. Ein anderer Server wird wie beim Wechsel in der Liste
+    /// aktiv, damit die Brücke seine Seite annimmt.
+    func meldungAngetippt(kennung: String, pfad: String?) {
+        guard testzustand == nil else { return }
+        let eintrag = server(zu: kennung).flatMap { id in
+            id == inEntfernung ? nil : liste.eintraege.first { $0.id == id }
+        }
+        if let eintrag {
+            zeigtServerliste = false
+            zeigtEinstellungen = false
+            wechselRueckfrage = nil
+            if liste.aktiv?.id != eintrag.id {
+                try? liste.activate(eintrag.id)
+                save()
+            }
+        }
+        send(.meldungAngetippt(eintrag, pfad: pfad))
+    }
+
+    /// Eine Push-Meldung des Servers, dessen Oberfläche gerade läuft, zeigt die App nicht: die
+    /// Oberfläche meldet sie selbst über den Live-Kanal (`Meldungsdelegat`).
+    func isAktiverServer(kennung: String) -> Bool {
+        guard case .web(let aktiv, _) = seite else { return false }
+        return server(zu: kennung) == aktiv.id
+    }
+
+    private func server(zu kennung: String) -> UUID? {
+        guard let pushablage, let anmeldungen = try? pushablage.load() else { return nil }
+        return anmeldungen.server(zu: kennung)
+    }
+
+    /// Entfernter Server: seine Kennungen kommen zu den ausstehenden Abmeldungen
+    /// (`PushAnmeldungen.entfernen(server:abmeldenBei:)`) und werden gleich einmal versucht.
+    private func meldePushAb(server id: UUID, adresse: ServerAdresse) {
+        guard let pushablage, var anmeldungen = try? pushablage.load() else { return }
+        guard !anmeldungen.entfernen(server: id, abmeldenBei: adresse).isEmpty else { return }
+        do {
+            try pushablage.save(anmeldungen)
+        } catch {
+            protokoll.error("Push-Anmeldungen nicht gespeichert: \(error.localizedDescription)")
+        }
+        abmeldenAusstehende()
+    }
+
+    /// Jede ausstehende Abmeldung einmal beim Server versuchen: nach dem Entfernen, beim Start
+    /// und bei jeder Rückkehr in den Vordergrund, nie in einer Schleife. Erst eine erledigte
+    /// (`AusstehendeAbmeldung.isErledigt`) löscht den Schlüssel; ohne Netz bleibt sie liegen,
+    /// sonst pushte der Server weiter und die Meldungen ließen sich nicht mehr abstellen. Ohne
+    /// Schlüssel gibt es keinen Nachweis, auch später nicht: dann ist sie erledigt.
+    private func abmeldenAusstehende() {
+        guard testzustand == nil, let pushablage, let offen = try? pushablage.load().ausstehend
+        else { return }
+        for abmeldung in offen where !abmeldungenLaufend.contains(abmeldung.kennung) {
+            abmeldungenLaufend.insert(abmeldung.kennung)
+            Task {
+                defer { abmeldungenLaufend.remove(abmeldung.kennung) }
+                var erledigt = true
+                if let schluessel = Schluesselbund.lesen(kennung: abmeldung.kennung) {
+                    let status = await Vertragsabruf.meldePushAb(
+                        abmeldung.adresse, kennung: abmeldung.kennung,
+                        nachweis: Entschluesseler.nachweis(
+                            kennung: abmeldung.kennung, schluessel: schluessel))
+                    erledigt = AusstehendeAbmeldung.isErledigt(status: status)
+                }
+                guard erledigt else { return }
+                Schluesselbund.loeschen(kennung: abmeldung.kennung)
+                guard var anmeldungen = try? pushablage.load() else { return }
+                anmeldungen.abgemeldet(kennung: abmeldung.kennung)
+                do {
+                    try pushablage.save(anmeldungen)
+                } catch {
+                    protokoll.error(
+                        "Push-Anmeldungen nicht gespeichert: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -422,7 +538,9 @@ extension AppModell: Entfernungsdienste {
     }
 
     func removeEintrag(_ id: UUID) throws(Serverliste.ListError) {
+        let adresse = liste.eintraege.first { $0.id == id }?.adresse
         try liste.remove(id)
         save()
+        if let adresse { meldePushAb(server: id, adresse: adresse) }
     }
 }

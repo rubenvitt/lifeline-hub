@@ -347,8 +347,23 @@ pub async fn alarm(
     } else {
         0
     };
+    // Bestätigungs- und Quittierfristen offener Meldungen und Aufträge zählen schon in
+    // `bestaetigung_ueberfaellig` und `auftraege_ueberfaellig` (LLH-1908, `src/AGENTS.md`,
+    // „Automatische Fristen stehen am Bezug“), aber nur, wenn deren Quelle sichtbar ist; sonst
+    // bleiben sie fällige Erinnerungen. Ablösungen zeigt die Alarmzeile nicht; ihre Fristen
+    // bleiben Erinnerungen.
     let erinnerungen_faellig = if sichtbar(AlarmQuelle::Erinnerungen) {
-        crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?
+        crate::erinnerung::repo::faellige_offene(
+            pool,
+            einsatz_id,
+            jetzt,
+            &crate::erinnerung::am_bezug_getragen(|m| match m {
+                "meldungen" => sichtbar(AlarmQuelle::Meldungen),
+                "auftraege" => sichtbar(AlarmQuelle::Auftraege),
+                _ => false,
+            }),
+        )
+        .await?
     } else {
         0
     };

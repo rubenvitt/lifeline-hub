@@ -271,10 +271,33 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     let faellig = anzahl(&liste, |e| {
         e["ist_faellig"] == json!(true) && e["status"] == "offen"
     });
-    // Drei: die eigene plus die Quittierfristen, die die beiden Aufträge mit abgelaufener Frist
-    // selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
+    // Drei in der Liste: die eigene plus die Quittierfristen, die die beiden Aufträge mit
+    // abgelaufener Frist selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
     assert_eq!(faellig, 3, "Erwartung aus der Liste: {liste:?}");
-    assert_eq!(v["erinnerungen"], json!({ "faellig": faellig }), "{v:?}");
+    // Der Zähler lässt die Fristen aus, die am offenen Auftrag stehen (`src/AGENTS.md`,
+    // „Automatische Fristen stehen am Bezug“, LLH-1908). Die des vollzogenen bleibt: ihn zeigt
+    // keine Liste offener Aufträge mehr, seine Quittung fehlt aber noch.
+    let auftraege = get(&app, &admin, &format!("{basis}/auftraege")).await;
+    let offene_auftraege: Vec<i64> = auftraege
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|a| ist_offen(a))
+        .map(|a| a["id"].as_i64().unwrap())
+        .collect();
+    let nicht_am_bezug = anzahl(&liste, |e| {
+        e["ist_faellig"] == json!(true)
+            && e["status"] == "offen"
+            && !(e["quelle"] == "auto_frist"
+                && e["bezug_typ"] == "auftrag"
+                && offene_auftraege.contains(&e["bezug_id"].as_i64().unwrap()))
+    });
+    assert_eq!(nicht_am_bezug, 2, "Erwartung aus der Liste: {liste:?}");
+    assert_eq!(
+        v["erinnerungen"],
+        json!({ "faellig": nicht_am_bezug }),
+        "{v:?}"
+    );
 }
 
 /// Delta-Spec `modul-zaehler`, „Sofort- und dringende Meldungen im Zähler“ und „Eingang der
@@ -382,6 +405,58 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
             .contains_key("sofort_aelteste_at"),
         "{v}"
     );
+}
+
+/// Automatische Fristen stehen am Bezug nur, solange er sie trägt (LLH-1908, `src/AGENTS.md`,
+/// „Automatische Fristen stehen am Bezug“): die Bestätigungsfrist einer erledigten Meldung und
+/// die einer Meldung in einem ausgeblendeten Modul zählen als fällige Erinnerung. Der Admin
+/// erreicht ein ausgeblendetes Modul noch, sieht es aber nicht; die Zahl folgt dem, was er sieht.
+#[tokio::test]
+async fn auto_frist_zaehlt_als_erinnerung_wenn_der_bezug_sie_nicht_traegt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let sofort = |inhalt: &str| {
+        json!({
+            "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+            "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00",
+            "prioritaet": "sofort", "bestaetigung_frist_min": 5
+        })
+        .to_string()
+    };
+    let erledigt = post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen"),
+        &sofort("Deich"),
+    )
+    .await;
+    post(&app, &admin, &format!("{basis}/meldungen"), &sofort("MANV")).await;
+    sqlx::query(
+        "UPDATE erinnerung SET faellig_at = '2000-01-01 00:00:00' WHERE quelle = 'auto_frist'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let faellig = |v: Value| v["erinnerungen"]["faellig"].clone();
+
+    // Beide offen, Modul sichtbar: beide Fristen stehen an ihrer Meldung.
+    assert_eq!(faellig(zaehler(&app, &admin, einsatz).await), json!(0));
+
+    // Erledigt, aber unbestätigt: keine Liste offener Meldungen zeigt sie mehr.
+    post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen/{}/status", erledigt["id"]),
+        r#"{"status":"erledigt"}"#,
+    )
+    .await;
+    assert_eq!(faellig(zaehler(&app, &admin, einsatz).await), json!(1));
+
+    // Modul ausgeblendet: auch die Frist der offenen Meldung zählt als Erinnerung.
+    modul_ausblenden(&app, &admin, einsatz, "meldungen").await;
+    assert_eq!(faellig(zaehler(&app, &admin, einsatz).await), json!(2));
 }
 
 /// Überfällige Bestätigungspflicht (LFH-397): die Quelle der Warnsperre am

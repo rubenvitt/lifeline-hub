@@ -29,6 +29,19 @@ declare global {
       readonly anmeldungImBrowser?: () => Promise<unknown>;
       readonly benachrichtigungZeigen?: (titel: string, text?: string) => Promise<unknown>;
       readonly setAppBadge?: (count: number) => Promise<unknown>;
+      /** Die iOS-Hülle kann Push über APNs (`push_register`, `push_unregister`, `push_state`). */
+      readonly push?: boolean;
+      readonly pushRegister?: () => Promise<{
+        registration_id: string;
+        token: string;
+        environment: string;
+        key: string;
+      }>;
+      readonly pushUnregister?: () => Promise<unknown>;
+      readonly pushState?: () => Promise<{
+        permission: 'granted' | 'denied' | 'undetermined';
+        registration_id?: string;
+      }>;
     };
   }
 }
@@ -126,4 +139,49 @@ export function huelleHaptics(kind: HapticsKind): void {
   } catch {
     // Ohne Haptik geht es weiter.
   }
+}
+
+/**
+ * Push über APNs in der iOS-Hülle (Entwurf „iOS-Alarme über APNs“). `register` fragt die
+ * Berechtigung, holt das Token und liefert Kennung (`registration_id`), Umgebung und den Schlüssel
+ * der Nutzlast; die Brücke lehnt mit `denied` (Berechtigung verweigert) oder `unavailable` ab.
+ * `state` fragt nie nach der Berechtigung und nennt die Kennung, sobald die App eine für diesen
+ * Server angelegt hat, auch wenn ihr Schlüssel fehlt. Token und Schlüssel gehören in kein Log.
+ */
+export type HuellePush = {
+  register(): Promise<{
+    registration_id: string;
+    token: string;
+    environment: 'sandbox' | 'production';
+    key: string;
+  }>;
+  unregister(): Promise<void>;
+  state(): Promise<{
+    permission: 'granted' | 'denied' | 'undetermined';
+    registration_id?: string;
+  }>;
+};
+
+/** Der Push der Hülle, wenn sie ihn kann (`push === true` und alle drei Funktionen); sonst `null`. */
+export function huellePush(): HuellePush | null {
+  const h = window.__LIFELINE_HUELLE__;
+  if (h?.push !== true) return null;
+  const { pushRegister, pushUnregister, pushState } = h;
+  if (
+    typeof pushRegister !== 'function' ||
+    typeof pushUnregister !== 'function' ||
+    typeof pushState !== 'function'
+  ) {
+    return null;
+  }
+  return {
+    register: async () => {
+      const r = await pushRegister();
+      return { ...r, environment: r.environment === 'production' ? 'production' : 'sandbox' };
+    },
+    unregister: async () => {
+      await pushUnregister();
+    },
+    state: () => pushState(),
+  };
 }

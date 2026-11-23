@@ -46,6 +46,7 @@ pub mod geraet;
 pub mod http_begrenzt;
 pub mod infotelefon;
 pub mod instanz;
+pub mod ios_push;
 pub mod karte;
 pub mod karte_hintergrundbild;
 pub mod karten_ansicht;

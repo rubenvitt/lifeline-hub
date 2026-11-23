@@ -14,8 +14,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Die Demo enthält zwei Meldungen der Art Lagemeldung; sie stehen ab der Anlage in der Lage. Der
  * Dialog-Test übernimmt eine weitere, verortete über die Oberfläche, der Zeitleisten-Test drei
- * weitere über `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Bei der verorteten blendet der Lauf
- * den Ortsnamen aus (externer Geocoder, nicht deterministisch); die Peilung bleibt.
+ * weitere über `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Die verortete zeigt
+ * keinen Ortsnamen, nur die Peilung: der Geocoder zeigt im Bildlauf auf Loopback (LLH-2063).
  */
 
 const KAPITEL = 'lagemeldungen';
@@ -88,13 +88,8 @@ test.describe(KAPITEL, () => {
     await fuelle(page, 'post', `/api/einsaetze/${demo.id}/meldungen/${offen[2].id}/lagerelevant`, {
       text: offen[2].inhalt,
     });
-    // Den Ortsnamen holt der Server bei einem externen Geocoder; das Bild zeigt nur, was er selbst
-    // rechnet (die Peilung, sofern ein verorteter Bezug in der Nähe ist).
-    await page.route(`**/api/einsaetze/${demo.id}/ort-vorschau*`, async (route) => {
-      const antwort = await route.fetch();
-      const json = (await antwort.json()) as Record<string, unknown>;
-      await route.fulfill({ response: antwort, json: { ...json, ortsname: null } });
-    });
+    // Das Bild zeigt nur, was der Server selbst rechnet (die Peilung, sofern ein verorteter Bezug
+    // in der Nähe ist): der Geocoder zeigt im Bildlauf auf Loopback (`e2e/geocoder-kern.ts`).
     await uhrAnhalten(page);
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/lagemeldungen`);

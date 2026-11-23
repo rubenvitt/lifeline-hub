@@ -1,0 +1,25 @@
+{
+  "faelle": [
+    {
+      "beschreibung": "ASCII, kurze Nutzlast",
+      "chiffrat": "fPSoOz51-9-yoN26MYXukNbcpYqHk7dTnOuBiRXZWF0SFnBEDBvZsC5KcNOrFSGV25mUT2eLAQ9saWxuiNa_",
+      "kennung": "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90",
+      "klartext": "{\"art\":\"alarm\",\"titel\":\"Alarm\",\"einsatz_id\":42}",
+      "nachweis": "zdZAYb8o7XuiAU_uOX1Sre0wHWc4OiI_C_i-3L_zOCA",
+      "nonce": "AgICAgICAgICAgIC",
+      "schluessel": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "umschlag": "eyJjIjoiZlBTb096NTEtOS15b04yNk1ZWHVrTmJjcFlxSGs3ZFRuT3VCaVJYWldGMFNGbkJFREJ2WnNDNUtjTk9yRlNHVjI1bVVUMmVMQVE5c2FXeHVpTmFfIiwiayI6IjBiN2U0ZTBhLTNjMWQtNGYyYS05YTU1LTFkMmY2YTdjOGU5MCIsIm4iOiJBZ0lDQWdJQ0FnSUNBZ0lDIn0"
+    },
+    {
+      "beschreibung": "Umlaute und Emoji",
+      "chiffrat": "9za1tsms88uQQ9BB1Vv-cOq9Ko5ig-CAMUFmHLgpPoBGCa7AaTt0pRqyu_fQhgGAOFid1HLJ0vUp5Il7hnj9xrP3lHGfTCcOsKsD--WixZyfSNHwLg5BZcCEodo19YxgCJZ1tCE1HzeffNIZ-aGpczlwN71TAv0dweNPwoat5MxIhfnWt9T9LofhwfE",
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "klartext": "{\"art\":\"hinweis\",\"titel\":\"Hochwasser Süd, Löschzug Äußere Gasse 🚒\",\"text\":\"Straße gesperrt – bitte umfahren 🚧\"}",
+      "nachweis": "yViemBh8Y6YUpYsMYvk4cWrxlkfng-cChp8IvnJqoSE",
+      "nonce": "EBAQEBAQEBAQEBAQ",
+      "schluessel": "paWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaU",
+      "umschlag": "eyJjIjoiOXphMXRzbXM4OHVRUTlCQjFWdi1jT3E5S281aWctQ0FNVUZtSExncFBvQkdDYTdBYVR0MHBScXl1X2ZRaGdHQU9GaWQxSExKMHZVcDVJbDdobmo5eHJQM2xIR2ZUQ2NPc0tzRC0tV2l4WnlmU05Id0xnNUJaY0NFb2RvMTlZeGdDSloxdENFMUh6ZWZmTklaLWFHcGN6bHdONzFUQXYwZHdlTlB3b2F0NU14SWhmbld0OVQ5TG9maHdmRSIsImsiOiI3YzlkMWE1Mi04ZTQ0LTRiMGYtYjNhNi01ZTJkOWM0ZjFhMDciLCJuIjoiRUJBUUVCQVFFQkFRRUJBUSJ9"
+    }
+  ],
+  "zweck": "Gemeinsamer Testvektor der iOS-Push-Nutzlast (Rust-Server und Swift-Kern): AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat gefolgt vom 16-Byte-Tag, umschlag = base64url des kompakten JSON {k,n,c}, nachweis = base64url(HMAC-SHA256(schluessel, \"abmelden:\" + kennung)). Alle Binärwerte base64url ohne Auffüllung."
+}

@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/huelle/faehigkeiten.ts, frontend/src/components/Erfassung.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/routing/useAdressWert.ts, frontend/src/components/RollWiederherstellung.tsx, frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/pages/MitgliederKlappteil.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx, frontend/src/components/SprungZumInhalt.tsx, frontend/src/components/Fehlergrenze.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/components/SeitenZustand.tsx, frontend/src/components/DeeplinkHinweis.tsx, frontend/src/api/clientFehler.ts, frontend/src/hilfe/HilfeSeitenleisteProvider.tsx, frontend/src/hilfe/HilfeSeitenleiste.tsx, frontend/src/hilfe/HilfeKnopf.tsx, frontend/src/hilfe/kontextKapitel.ts, frontend/src/hilfe/tastenkuerzel.ts, frontend/src/hilfe/WillkommenKarte.tsx, frontend/src/hilfe/rundgang/]
+quellen: [frontend/src/huelle/faehigkeiten.ts, frontend/src/components/Erfassung.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/routing/useAdressWert.ts, frontend/src/components/RollWiederherstellung.tsx, frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/pages/MitgliederKlappteil.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/routes/ios_push.rs, src/ios_push/, ios/App/AppModell.swift, ios/Benachrichtigungsdienst/Dienst.swift, ios/LifelineKern/Sources/LifelineKern/PushAnmeldungen.swift, src/auth/session.rs, frontend/src/instanz/InstanzkopplungSeite.tsx, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx, frontend/src/components/SprungZumInhalt.tsx, frontend/src/components/Fehlergrenze.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/components/SeitenZustand.tsx, frontend/src/components/DeeplinkHinweis.tsx, frontend/src/api/clientFehler.ts, frontend/src/hilfe/HilfeSeitenleisteProvider.tsx, frontend/src/hilfe/HilfeSeitenleiste.tsx, frontend/src/hilfe/HilfeKnopf.tsx, frontend/src/hilfe/kontextKapitel.ts, frontend/src/hilfe/tastenkuerzel.ts, frontend/src/hilfe/WillkommenKarte.tsx, frontend/src/hilfe/rundgang/]
 ---
 
 ## Überblick
@@ -289,7 +289,8 @@ der Tasche:
 
 1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen.
 2. Unter „Dieses Gerät“ den Schalter „Auch bei geschlossener App“ einschalten.
-3. Fragt der Browser, ob die Seite Benachrichtigungen zeigen darf, „Erlauben“ wählen.
+3. Fragt der Browser, ob die Seite Benachrichtigungen zeigen darf, oder in der iOS-App das
+   iPhone, ob „Lifeline“ Mitteilungen senden darf, „Erlauben“ wählen.
 
 Der Schalter gilt für diesen Browser auf diesem Gerät, nicht für die Person; auf jedem Gerät, das
 melden soll, einmal einschalten. Nach dem Abmelden kommen keine Meldungen mehr; meldet sich
@@ -303,19 +304,39 @@ weggewischt wird. Wer ein Gerät nur selbst in der Hand hat, kann den Schalter e
 nennt die Meldung wie in der App den Absender und den Anfang des Wortlauts. Auch dieser Schalter
 gilt nur für dieses Gerät und bleibt nach einer neuen Anmeldung erhalten.
 
+In der iOS-App gilt der Schalter für den Server, der gerade offen ist, auf diesem iPhone oder
+iPad. Wer mehrere Server in der App hat, schaltet ihn auf jedem ein, von dem Meldungen kommen
+sollen; die Meldung nennt dann den Server. Ein Tipp auf die Meldung öffnet ihren Server und dort
+die Meldung; war gerade ein anderer Server offen, wechselt die App dorthin. Anders als im Browser
+wirkt der Schalter auch nach dem Ablauf der Anmeldung weiter. Die Meldungen enden mit dem
+Ausschalten, dem Abmelden in der App, „Beenden“ dieser Anmeldung oder „Alle anderen beenden“ von
+einem anderen Gerät aus (Profil → „Anmeldungen“; so auch für ein verlorenes iPhone, selbst wenn
+seine Anmeldung dort nicht mehr steht) und dem Entfernen des Servers aus der Serverliste der App;
+ohne Netz holt die App die Abmeldung beim nächsten Start nach. Alarme kommen
+auch durch einen Fokus, sofern das in den iOS-Einstellungen für „Lifeline“ nicht abgeschaltet ist;
+bei stummgeschaltetem iPhone bleiben sie leise.
+
 Arbeitet die Instanz im Fahrzeug (ELW) mit einem Hub zusammen und stammt das eigene Konto vom
 Hub, kommen die Meldungen bei geschlossener App vom Hub. Statt des Schalters steht dann „Push
 läuft über ‹Name des Hubs›“ mit dem Link „Am Hub einschalten“: dort, an der Seite
-„Benachrichtigungen“ des Hubs, den Schalter wie oben einschalten. Das Gerät erhält dann Meldungen
+„Benachrichtigungen“ des Hubs, den Schalter wie oben einschalten. In der iOS-App steht
+stattdessen „Push läuft über ‹Name des Hubs›: Hub in der App hinzufügen und dort einschalten.“ mit der
+Adresse des Hubs zum Kopieren: den Hub als weiteren Server in die Serverliste aufnehmen und dort
+einschalten. Das Gerät erhält dann Meldungen
 zu den Einsätzen des ELW, solange es dort angemeldet ist. Wer nur am ELW ein Konto hat, etwa als
 Spontanhelfer, schaltet wie gewohnt am ELW ein.
 
 Fehlt der Schalter, bietet ihn dieses Gerät nicht: Der Betrieb hat die Zustellung nicht
-eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop- oder iOS-App, die ohnehin
-selbst melden. Ohne iOS-App erscheint er auf dem iPhone und iPad nur in der installierten Web-App
-(„Zum Home-Bildschirm“ in Safari), nicht im Browser-Tab. Steht „Vom Browser blockiert“ daneben, hat
-der Browser die Erlaubnis verweigert; sie lässt sich nur in den Einstellungen des Browsers für diese
-Seite wieder geben.
+eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop-App, die ohnehin selbst
+meldet. Auf dem iPhone und iPad erscheint er in der iOS-App und in der installierten Web-App („Zum
+Home-Bildschirm“ in Safari), nicht im Browser-Tab. Steht „Vom Browser blockiert“ daneben, hat der
+Browser die Erlaubnis verweigert; sie lässt sich nur in den Einstellungen des Browsers für diese
+Seite wieder geben. In der iOS-App steht dann „In den iOS-Einstellungen verweigert“; erlauben lässt
+es sich wieder unter Einstellungen → Mitteilungen → „Lifeline“. Steht statt des Schalters „Der
+Push-Dienst nimmt diesen Server nicht an. Bitte den Betreiber informieren.“, stellt der Dienst für
+die iOS-App von diesem Server nichts zu; die Verwaltung zeigt das auf der Seite „Instanzkopplung“.
+Gibt der Betreiber des Dienstes den Server wieder frei, kommen die Meldungen spätestens nach einem
+Tag wieder.
 
 ## Hintergrund
 

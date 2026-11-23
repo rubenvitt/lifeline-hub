@@ -39,9 +39,9 @@ ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
   `android/app/src/main/assets/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest
   führt das Skript aus (`frontend/src/test/huelle.ts`, `frontend/src/huelle/androidHuelle.test.ts`),
   eine Änderung zieht die Tests dort mit.
-- **Gemeinsame Fälle:** Adressprüfung, Deeplink und Linkregeln prüft der Kern gegen
-  `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in die
-  JSON, nie nur in einen Kotlin-Test.
+- **Gemeinsame Fälle:** Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung prüft der Kern
+  gegen `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in
+  die JSON, nie nur in einen Kotlin-Test.
 - **Bildschirmbilder:** jede native Seite hat einen `Testzustand` im Kern (Intent-Extra
   `lifeline.testzustand`, nur in Debug-Bauten ausgewertet, `Testzustand.fromStart`; die App
   fragt dann kein Netz und speichert nichts) und ein Bild in

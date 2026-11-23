@@ -577,6 +577,23 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_WEB_PUSH_KONTAKT")]
     pub web_push_kontakt: Option<String>,
 
+    /// iOS-Push über das Relais (APNs, Spec `ios-apns-alarme`). **Vorgabe AUS.** Mit dem
+    /// Schalter meldet sich der Server beim ersten Versand am Relais an und schickt ihm
+    /// verschlüsselte Nutzlasten für iOS-Geräte; das Relais reicht sie an Apple weiter und
+    /// kann sie nicht lesen. Ohne Schalter keine ausgehende Verbindung. Die Umgebungsvariable
+    /// nimmt nur `true`/`false`.
+    #[arg(long, env = "LIFELINE_IOS_PUSH", default_value_t = false)]
+    pub ios_push: bool,
+
+    /// Adresse des Push-Relais für `--ios-push` (nur `https`). Standard ist das Relais des
+    /// Projekts; wer ein eigenes Relais betreibt (`push-relais/`), trägt es hier ein.
+    #[arg(
+        long,
+        env = "LIFELINE_IOS_PUSH_RELAIS",
+        default_value = "https://push.rubeen.dev"
+    )]
+    pub ios_push_relais: String,
+
     /// Kontakt des Betreibers dieser Installation (LLH-1547), z. B. `betrieb@example.org`. Steht
     /// in der Kennung (`User-Agent`) jedes ausgehenden Abrufs, damit ein Dienst wie der
     /// öffentliche Nominatim bei zu vielen Anfragen den Betreiber erreicht, statt die Kennung
@@ -899,6 +916,21 @@ impl Config {
         }
         crate::web_push::kontakt_pruefen(kontakt).map_err(anyhow::Error::msg)?;
         Ok(Some(kontakt.to_owned()))
+    }
+
+    /// Die Relais-Adresse für iOS-Push, wenn `--ios-push` an ist; `None` ohne Schalter. Nur
+    /// `https` mit Host; sonst bricht der Start mit Text ab.
+    pub fn ios_push_relais(&self) -> anyhow::Result<Option<reqwest::Url>> {
+        if !self.ios_push {
+            return Ok(None);
+        }
+        let text = self.ios_push_relais.trim();
+        let url = reqwest::Url::parse(text)
+            .map_err(|e| anyhow::anyhow!("--ios-push-relais ist keine Adresse: {e}"))?;
+        if url.scheme() != "https" || url.host_str().is_none() {
+            anyhow::bail!("--ios-push-relais muss eine https://-Adresse sein");
+        }
+        Ok(Some(url))
     }
 
     /// Der Betreiberkontakt für die Kennung ausgehender Abrufe (LLH-1547); `None` ohne Angabe
@@ -2343,5 +2375,40 @@ mod tests {
             &["lifeline-hub", "archiv", "personen", "--einsatz", "7"]
         )
         .is_err());
+    }
+
+    /// iOS-Push ist per Vorgabe aus (LLH, Spec `ios-apns-alarme`); die Relais-Adresse hat eine
+    /// Vorgabe und muss `https` sein.
+    #[test]
+    fn ios_push_vorgabe_aus_und_relais_standard() {
+        let aus = parse_hermetisch(["lifeline-hub"]);
+        assert!(!aus.ios_push);
+        assert_eq!(aus.ios_push_relais, "https://push.rubeen.dev");
+        assert_eq!(aus.ios_push_relais().unwrap(), None);
+
+        let an = parse_hermetisch(["lifeline-hub", "--ios-push"]);
+        assert_eq!(
+            an.ios_push_relais().unwrap().unwrap().as_str(),
+            "https://push.rubeen.dev/"
+        );
+        let eigen = parse_hermetisch([
+            "lifeline-hub",
+            "--ios-push",
+            "--ios-push-relais",
+            "https://relais.example.org",
+        ]);
+        assert_eq!(
+            eigen.ios_push_relais().unwrap().unwrap().host_str(),
+            Some("relais.example.org")
+        );
+        let http = parse_hermetisch([
+            "lifeline-hub",
+            "--ios-push",
+            "--ios-push-relais",
+            "http://relais.example.org",
+        ]);
+        assert!(http.ios_push_relais().is_err());
+        assert!(parse_mit_env("LIFELINE_IOS_PUSH", "true", &["lifeline-hub"]).ios_push);
+        assert!(try_parse_mit_env("LIFELINE_IOS_PUSH", "1", &["lifeline-hub"]).is_err());
     }
 }
