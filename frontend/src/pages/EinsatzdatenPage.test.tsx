@@ -2371,7 +2371,7 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     const vorher = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = rolle;
     try {
-      server.use(http.get('/api/einsaetze/7/fuehrung', () => HttpResponse.json(fuehrung)));
+      server.use(http.get('/api/einsaetze/7/command', () => HttpResponse.json(fuehrung)));
       setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
       expect(await screen.findByRole('button', { name: 'Führung zurückholen …' })).toBeVisible();
       await waitFor(() =>
@@ -2389,7 +2389,7 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     Element.prototype.scrollIntoView = rolle;
     try {
       server.use(
-        http.get('/api/einsaetze/7/fuehrung', () => new HttpResponse(null, { status: 500 })),
+        http.get('/api/einsaetze/7/command', () => new HttpResponse(null, { status: 500 })),
       );
       setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
       await waitFor(() =>

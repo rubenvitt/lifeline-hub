@@ -882,7 +882,7 @@ describe('BenutzerPage', () => {
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
           ]),
         ),
-        http.get('/api/admin/instanz/letzte-schluessel', () =>
+        http.get('/api/admin/instance/last-keys', () =>
           HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
         ),
         http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
@@ -908,7 +908,7 @@ describe('BenutzerPage', () => {
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
           ]),
         ),
-        http.get('/api/admin/instanz/letzte-schluessel', () =>
+        http.get('/api/admin/instance/last-keys', () =>
           HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
         ),
         http.post('/api/benutzer/:id/deaktivieren', () =>
@@ -941,7 +941,7 @@ describe('BenutzerPage', () => {
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
           ]),
         ),
-        http.get('/api/admin/instanz/letzte-schluessel', () =>
+        http.get('/api/admin/instance/last-keys', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
         http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
@@ -969,7 +969,7 @@ describe('BenutzerPage', () => {
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
           ]),
         ),
-        http.get('/api/admin/instanz/letzte-schluessel', () =>
+        http.get('/api/admin/instance/last-keys', () =>
           kaputt ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : HttpResponse.json([]),
         ),
         http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
@@ -1005,7 +1005,7 @@ describe('BenutzerPage', () => {
             benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
           ]),
         ),
-        http.get('/api/admin/instanz/letzte-schluessel', () =>
+        http.get('/api/admin/instance/last-keys', () =>
           HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
         ),
       );
@@ -1491,7 +1491,7 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
           benutzer({ id: 7, anzeigename: 'Max', benutzername: 'max' }),
         ]),
       ),
-      http.get('/api/instanz/stammdaten/herkunft', () =>
+      http.get('/api/instance/master-data/origin', () =>
         HttpResponse.json({
           quelle: 'Hub DRK Landesverband',
           vom_hub: { konto: ['7'] },

@@ -94,7 +94,7 @@ async fn code(hub: &Instanz) -> String {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -107,7 +107,7 @@ async fn einloesen(elw: &Instanz, adresse: &str, code: &str) -> (StatusCode, Val
     common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": adresse, "code": code})),
     )
@@ -115,7 +115,7 @@ async fn einloesen(elw: &Instanz, adresse: &str, code: &str) -> (StatusCode, Val
 }
 
 async fn uebersicht(i: &Instanz) -> Value {
-    let (s, v) = common::anfrage(&i.app, "GET", "/api/admin/instanz", &i.admin, None).await;
+    let (s, v) = common::anfrage(&i.app, "GET", "/api/admin/instance", &i.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v
 }
@@ -206,7 +206,7 @@ async fn code_nur_fuer_admin_mit_unterschriftsschluessel() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -219,9 +219,9 @@ async fn code_nur_fuer_admin_mit_unterschriftsschluessel() {
 
     common::benutzer_anlegen(&hub.app, &hub.admin, "helfer", "keine").await;
     let helfer = common::login_cookie(&hub.app, "helfer", "helferpw1").await;
-    let (s, _) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", &helfer, None).await;
+    let (s, _) = common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", &helfer, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &helfer, None).await;
+    let (s, _) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &helfer, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
@@ -237,7 +237,7 @@ async fn nachlieferung_ueber_mehrere_orgs_bleibt_in_der_grenze() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw_y,
         Some(&json!({"adresse": hub.adresse, "code": c})),
     )
@@ -323,7 +323,7 @@ async fn code_nur_bis_zur_grenze_gueltiger_schluessel() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -452,7 +452,7 @@ async fn zweite_org_erweitert_die_kopplung() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub_sued,
         None,
     )
@@ -465,7 +465,7 @@ async fn zweite_org_erweitert_die_kopplung() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw_sued,
         Some(&json!({"adresse": hub.adresse, "code": c})),
     )
@@ -497,7 +497,7 @@ async fn mitte(ziel: String, anfrage_tauschen: bool) -> String {
     let adresse = format!("http://{}", listener.local_addr().unwrap());
     let fremd = Identitaet::from_parts("mitte", [42u8; 32]).oeffentlich_b64();
     let app = axum::Router::new().route(
-        "/api/instanz/koppeln",
+        "/api/instance/pair",
         axum::routing::post(move |body: axum::body::Bytes| {
             let ziel = ziel.clone();
             let fremd = fremd.clone();
@@ -507,7 +507,7 @@ async fn mitte(ziel: String, anfrage_tauschen: bool) -> String {
                     v["schluessel"] = json!(fremd);
                 }
                 let resp = reqwest::Client::new()
-                    .post(format!("{ziel}/api/instanz/koppeln"))
+                    .post(format!("{ziel}/api/instance/pair"))
                     .json(&v)
                     .send()
                     .await
@@ -623,7 +623,7 @@ async fn melden_roh(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/melden")
+                .uri("/api/instance/check-in")
                 .header(header::AUTHORIZATION, format!("Instanz {token}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(gesendet.to_vec()))
@@ -654,7 +654,7 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/melden")
+                .uri("/api/instance/check-in")
                 .body(Body::from(body.clone()))
                 .unwrap(),
         )
@@ -663,19 +663,19 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instanz/melden").await,
+        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instance/check-in").await,
         StatusCode::OK
     );
     // Veränderter Body
     let mut anders = body.clone();
     anders.push(b' ');
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &anders, "/api/instanz/melden").await,
+        melden_roh(&hub, &elw_i, &hub_k, &body, &anders, "/api/instance/check-in").await,
         StatusCode::UNAUTHORIZED
     );
     // Anderer Pfad im Token
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instanz/anders").await,
+        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instance/other").await,
         StatusCode::UNAUTHORIZED
     );
     // Anderes Ziel
@@ -686,7 +686,7 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
             "andere-instanz",
             &body,
             &body,
-            "/api/instanz/melden"
+            "/api/instance/check-in"
         )
         .await,
         StatusCode::UNAUTHORIZED
@@ -694,7 +694,7 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
     // Unbekannte Instanz
     let fremd = Identitaet::from_parts("unbekannt", [77u8; 32]);
     assert_eq!(
-        melden_roh(&hub, &fremd, &hub_k, &body, &body, "/api/instanz/melden").await,
+        melden_roh(&hub, &fremd, &hub_k, &body, &body, "/api/instance/check-in").await,
         StatusCode::UNAUTHORIZED
     );
 
@@ -704,7 +704,7 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
         &AnfrageDraft {
             ziel_kennung: &hub_k,
             methode: "POST",
-            pfad: "/api/instanz/melden",
+            pfad: "/api/instance/check-in",
             body: &body,
         },
         chrono::Utc::now().timestamp(),
@@ -713,7 +713,7 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
         hub.app.clone().oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/melden")
+                .uri("/api/instance/check-in")
                 .header(header::AUTHORIZATION, format!("Instanz {token}"))
                 .body(Body::from(body.clone()))
                 .unwrap(),
@@ -730,7 +730,7 @@ async fn zu_alter_stand_zeigt_update_noetig() {
     let hub_k = identitaet_von(&hub).await.kennung;
     let body = meldung(lifeline_hub::instanz::PROTOKOLL + 2);
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instanz/melden").await,
+        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instance/check-in").await,
         StatusCode::OK
     );
     assert_eq!(
@@ -751,7 +751,7 @@ async fn meldung_ueber_der_listengrenze_ist_400() {
         .to_string()
         .into_bytes();
     assert_eq!(
-        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instanz/melden").await,
+        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instance/check-in").await,
         StatusCode::BAD_REQUEST
     );
 }
@@ -763,7 +763,7 @@ async fn widerrufen(i: &Instanz) -> Value {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{id}/revoke"),
         &i.admin,
         None,
     )
@@ -904,7 +904,7 @@ async fn gegenzeichnen(hub: &Instanz, id: i64, mit: &SoftwarePasskey) -> (Status
     let (s, start) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/unterschrift/{id}/gegenzeichnen/start"),
+        &format!("/api/admin/instance/signing-keys/{id}/countersign/start"),
         &hub.admin,
         None,
     )
@@ -915,7 +915,7 @@ async fn gegenzeichnen(hub: &Instanz, id: i64, mit: &SoftwarePasskey) -> (Status
     common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss"),
+        &format!("/api/admin/instance/signing-keys/{id}/countersign/finish"),
         &hub.admin,
         Some(&json!({"zeremonie": start["zeremonie"], "assertion": assertion})),
     )
@@ -999,7 +999,7 @@ async fn bestaetigen(i: &Instanz, wer: &str, id: i64, zeichen: &str) -> (StatusC
     common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/admin/instanz/unterschrift/{id}/bestaetigen"),
+        &format!("/api/admin/instance/signing-keys/{id}/confirm"),
         wer,
         Some(&json!({"fingerabdruck_ende": zeichen})),
     )
@@ -1040,7 +1040,7 @@ async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
     assert_eq!(zeile["gegengezeichnet_von"], "Admin", "{zeile}");
     assert_eq!(zeile["unterzeichner_fingerabdruck"], fp_a, "{zeile}");
     assert!(zeile["erklaert_at"].as_str().is_some(), "{zeile}");
-    let pfad = format!("/api/admin/instanz/unterschrift/{id}/bestaetigen");
+    let pfad = format!("/api/admin/instance/signing-keys/{id}/confirm");
     // Ohne Feld oder leer: 400.
     let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &elw.admin, Some(&json!({}))).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
@@ -1104,7 +1104,7 @@ async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
 #[tokio::test]
 async fn zurueckgewiesener_schluessel_bleibt_es_nach_der_naechsten_meldung() {
     let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
-    let pfad = format!("/api/admin/instanz/unterschrift/{id}/zurueckweisen");
+    let pfad = format!("/api/admin/instance/signing-keys/{id}/reject");
     let (s, v) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zustand"], "abgelehnt");
@@ -1168,7 +1168,7 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
             .fetch_one(&hub.pool)
             .await
             .unwrap();
-    let pfad = format!("/api/admin/instanz/unterschrift/{id_a}/widerrufen");
+    let pfad = format!("/api/admin/instance/signing-keys/{id_a}/revoke");
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
 
@@ -1202,7 +1202,7 @@ async fn letzte_schluessel(i: &Instanz, wer: &str) -> Value {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        "/api/admin/instanz/letzte-schluessel",
+        "/api/admin/instance/last-keys",
         wer,
         None,
     )
@@ -1313,7 +1313,7 @@ async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
             .await
             .unwrap();
     assert_eq!(zustand, "widerrufen");
-    let (s, u) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &zweit, None).await;
+    let (s, u) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &zweit, None).await;
     assert_eq!(s, StatusCode::OK, "{u}");
     assert_eq!(u["kopplungen"][0]["ohne_gueltigen_schluessel"], true, "{u}");
     // Ein danach registrierter Schlüssel wartet auf eine Gegenzeichnung, die niemand leisten
@@ -1345,7 +1345,7 @@ async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/admin/instanz/unterschrift/{id_z}/widerrufen"),
+        &format!("/api/admin/instance/signing-keys/{id_z}/revoke"),
         &zweit,
         None,
     )
@@ -1438,7 +1438,7 @@ async fn registrieren_nur_fuer_admins() {
     let (s, _) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/unterschrift/registrieren/start",
+        "/api/admin/instance/signing-keys/register/start",
         &helfer,
         Some(r#"{"bezeichnung":"Stick"}"#),
     )
@@ -1480,7 +1480,7 @@ async fn koppeln_roh(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/koppeln")
+                .uri("/api/instance/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(body.to_string()))
                 .unwrap(),
@@ -1514,7 +1514,7 @@ async fn code_org_y(hub: &Instanz) -> String {
         .unwrap();
     }
     let y = common::login_cookie(&hub.app, "yadmin", "yadminpw1").await;
-    let (s, v) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", &y, None).await;
+    let (s, v) = common::anfrage(&hub.app, "POST", "/api/admin/instance/codes", &y, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     v["code"].as_str().unwrap().to_string()
 }
@@ -1756,7 +1756,7 @@ async fn zurueckgespielt_hub_widerruf_erreicht_den_elw() {
     assert!(fremder_am_elw(&elw, "b").await.is_some());
     staende_zurueck(&hub, &elw, 1000).await;
     verloren_am_hub(&hub, c).await;
-    let pfad = format!("/api/admin/instanz/unterschrift/{b}/widerrufen");
+    let pfad = format!("/api/admin/instance/signing-keys/{b}/revoke");
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     elw_meldet(&elw).await;
@@ -1776,7 +1776,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_widerruf_erreicht_den_elw() {
     // Die verlorenen Stände liegen über der Uhr des Hubs (seine Uhr geht nach): D1 greift nicht.
     staende_zurueck(&hub, &elw, -10_000).await;
     verloren_am_hub(&hub, c).await;
-    let pfad = format!("/api/admin/instanz/unterschrift/{b}/widerrufen");
+    let pfad = format!("/api/admin/instance/signing-keys/{b}/revoke");
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     elw_meldet(&elw).await;
@@ -1923,7 +1923,7 @@ async fn zurueckgespielt_hub_wartender_schluessel_faellt_und_ist_nicht_mehr_zu_b
 #[tokio::test]
 async fn zurueckgespielt_hub_zurueckgewiesener_schluessel_bleibt_zurueckgewiesen() {
     let (hub, elw, id, _fp) = mit_wartendem_schluessel().await;
-    let pfad = format!("/api/admin/instanz/unterschrift/{id}/zurueckweisen");
+    let pfad = format!("/api/admin/instance/signing-keys/{id}/reject");
     let (s, v) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     hub_verliert_schluessel(&hub, "b").await;

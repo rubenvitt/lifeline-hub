@@ -96,7 +96,7 @@ pub struct MeldenOrg {
 /// Meldung.
 pub const UNTERSCHRIFT_ANFRAGE_BYTES: usize = 12 * 1024;
 
-/// Body von `POST /api/instanz/melden`.
+/// Body von `POST /api/instance/check-in`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeldenAnfrage {
     pub name: String,
@@ -347,9 +347,9 @@ pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
 }
 
 /// Pfad der signierten Aussage über das TLS-Zertifikat (design.md D3).
-pub const ZERTIFIKAT_PFAD: &str = "/api/instanz/zertifikat";
+pub const ZERTIFIKAT_PFAD: &str = "/api/instance/certificate";
 
-/// Antwort auf `POST /api/instanz/zertifikat`: der Fingerabdruck des Zertifikats, das die
+/// Antwort auf `POST /api/instance/certificate`: der Fingerabdruck des Zertifikats, das die
 /// erreichte Seite gerade zeigt, von ihr signiert.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZertifikatAussage {
@@ -1292,7 +1292,7 @@ pub fn start(pool: SqlitePool) {
 
 // ── Erreichte Seite ──────────────────────────────────────────────────────────────────────────
 
-/// Beantwortet eine Meldung (Handler `POST /api/instanz/melden`): hält fest, was das Gegenüber
+/// Beantwortet eine Meldung (Handler `POST /api/instance/check-in`): hält fest, was das Gegenüber
 /// über sich sagt, übernimmt dessen Widerrufe und liefert Widerrufe und Unterschriftsschlüssel
 /// je Org.
 pub async fn handle_meldung(

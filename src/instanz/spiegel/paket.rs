@@ -1,5 +1,5 @@
 //! Das Paket des Abgleichs (design.md D6): dieselbe Form in Anfrage und Antwort von
-//! `POST /api/instanz/spiegel`. Jede Liste hat eine Obergrenze, das Ganze [`SPIEGEL_MAX`]; ein
+//! `POST /api/instance/mirror`. Jede Liste hat eine Obergrenze, das Ganze [`SPIEGEL_MAX`]; ein
 //! neues Feld kommt mit `serde(default)` hinzu, damit eine ältere Gegenseite es überliest.
 
 use serde::{Deserialize, Serialize};

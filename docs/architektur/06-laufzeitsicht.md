@@ -296,15 +296,15 @@ sequenceDiagram
   participant A as Instanz A (src/routes/instanz.rs)
   participant E as Instanz E (src/instanz/melden.rs)
   participant AE as frontend Admin E
-  AA->>A: POST /api/admin/instanz/codes (nur mit eigenem Unterschriftsschlüssel)
+  AA->>A: POST /api/admin/instance/codes (nur mit eigenem Unterschriftsschlüssel)
   A-->>AA: Code (16 Zeichen, 15 min), Fingerabdruck A
-  AE->>E: POST /api/admin/instanz/einloesen {adresse, code}
-  E->>A: POST /api/instanz/koppeln {suche, Schlüssel E, Prüfwert E}
+  AE->>E: POST /api/admin/instance/redeem {adresse, code}
+  E->>A: POST /api/instance/pair {suche, Schlüssel E, Prüfwert E}
   A->>A: Prüfwert E, Code verbrauchen, Kopplung angebahnt
   A-->>E: Schlüssel A, Org, Unterschriftsschlüssel, Prüfwert A (signiert)
   E->>E: Prüfwert A und Signatur, Kopplung aktiv
   loop alle 60 s (bei Fehlern verdoppelt bis 10 min)
-    E->>A: POST /api/instanz/melden (Anfrage-JWT)
+    E->>A: POST /api/instance/check-in (Anfrage-JWT)
     A->>A: Extractor: Signatur, Ziel, Pfad, Body-Hash, Zeit, jti
     A-->>E: Stand, Widerrufe, neue Unterschriftsschlüssel (signiert)
   end
@@ -326,15 +326,15 @@ zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
 sequenceDiagram
   participant E as ELW 2, meldet sich (src/instanz/melden.rs)
   participant A as ELW 1, erreicht (src/routes/instanz.rs)
-  E->>E: GET /api/admin/instanz/lan (src/instanz/entdeckung.rs, mDNS)
-  E->>A: POST /api/instanz/koppeln (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
+  E->>E: GET /api/admin/instance/lan (src/instanz/entdeckung.rs, mDNS)
+  E->>A: POST /api/instance/pair (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
   A-->>E: signiert: art vor_ort, tls_zertifikat = Fingerabdruck
   E->>E: Fingerabdruck = gesehenes Zertifikat? dann Pin speichern
   loop Melden und Abgleich
     E->>A: Anfrage nur über den Client mit Pin (src/instanz/zertifikat.rs)
   end
   Note over A: Neustart, neues Zertifikat
-  E->>A: POST /api/instanz/zertifikat (ohne Nutzdaten, ohne Pin)
+  E->>A: POST /api/instance/certificate (ohne Nutzdaten, ohne Pin)
   A-->>E: signiert: neuer Fingerabdruck
   E->>A: Meldung mit neuem Pin
 ```
@@ -367,7 +367,7 @@ sequenceDiagram
   H->>H: antrag::schicht: Spiegel, BEANTRAGBAR, Verweise lokal → fremd
   H-->>SB: 202 {antrag: ausstehend}
   loop Tick 1 s; je Kopplung 5 s bei Aktivität, sonst Takt der Meldung
-    E->>H: POST /api/instanz/spiegel {quittungen, antraege, staende, lieferungen ab spiegel_ziel, abrufe, anhang_teile}
+    E->>H: POST /api/instance/mirror {quittungen, antraege, staende, lieferungen ab spiegel_ziel, abrufe, anhang_teile}
     H->>H: Lieferung übernehmen (Merker, spiegel_herkunft, Stand nur vorwärts)
     H-->>E: {antraege (jetzt zugestellt), staende, abrufe, …} signiert
     E->>E: spiegel_ziel = staende der Antwort
@@ -451,7 +451,7 @@ sequenceDiagram
   H-->>AH: Erklärung, Challenge = SHA-256 der Erklärung
   AH->>H: …/notuebernahme/abschluss {Assertion}
   H->>H: Unterschrift gegen eigenen gültigen Schlüssel, Hub führt (n+1, Hub)
-  E->>H: POST /api/instanz/melden {fuehrung: Akten seit Quittung}
+  E->>H: POST /api/instance/check-in {fuehrung: Akten seit Quittung}
   H-->>E: Akte (n+1, Hub) mit Erklärung und Unterschrift
   alt Unterschrift von einem am ELW gültigen Schlüssel
     E->>E: offen halten, ELW schreibt weiter, Benachrichtigung „Führung übernommen“
@@ -757,7 +757,7 @@ sequenceDiagram
   EN->>EA: melden(Anlass): ziele, vormerken (hinweis_ausgang)
   EA->>ET: wecken
   EN->>EN: Zeilen und Live wie immer; Push an alle, die der Hub nicht erreicht
-  ET->>H: POST /api/instanz/spiegel {lieferungen, hinweise}
+  ET->>H: POST /api/instance/mirror {lieferungen, hinweise}
   H->>H: Zeilen übernehmen, dann hinweis::annehmen (abbilden, hinweis_eingang)
   H-->>ET: hinweis_quittungen (ELW löscht sie aus dem Ausgang)
   H->>HN: nach dem Commit melden bzw. erledigen
@@ -813,7 +813,7 @@ sequenceDiagram
   `403` (gesperrt) beendet den Versand für `SPERRE_GILT_STUNDEN` (24 h), danach versucht der
   nächste Versand es einmal mit demselben Zugang (angenommen: Sperre weg; wieder `403`: sie gilt
   ab jetzt neu). Solange sie steht, meldet `GET /api/ios-push` `relais_gesperrt`, und
-  `GET /api/admin/instanz` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
+  `GET /api/admin/instance` nennt sie für die Warnung auf der Seite „Instanzkopplung“.
 - Das Relais setzt `apns-expiration` auf 12 Stunden, `apns-priority` 10 und für einen Alarm
   `interruption-level: time-sensitive`, für einen Hinweis `active` (`push-relais/src/apns.rs`).
   Ohne Extension oder Schlüssel bleibt der Rückfalltitel „Alarm“ bzw. „Neue Benachrichtigung“.

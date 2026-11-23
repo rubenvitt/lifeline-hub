@@ -32,7 +32,7 @@ export const server = setupServer(
    * Halter des letzten Unterschriftsschlüssels (LLH-1605) — keiner als Default. Die
    * Benutzerverwaltung fragt sie für ihre Warnung beim Mount ab; Tests mit Halter überschreiben.
    */
-  http.get('/api/admin/instanz/letzte-schluessel', () => HttpResponse.json([])),
+  http.get('/api/admin/instance/last-keys', () => HttpResponse.json([])),
   /**
    * Adapter der Org (LLH-2018) — keine Art, kein Adapter als Default, der Stand jedes Servers bis
    * zur ersten produktiven Art. Die Seite Anbindungen fragt sie beim Mount ab; Tests mit Adaptern
@@ -107,7 +107,7 @@ export const server = setupServer(
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
   // Herkunft der Stammdaten (LLH-1493): ohne Kopplung keine Quelle, nichts gesperrt. Jeder
   // Stammdaten-Reiter fragt sie ab; ein Test mit Hub-Zeilen überschreibt per `server.use`.
-  http.get('/api/instanz/stammdaten/herkunft', () =>
+  http.get('/api/instance/master-data/origin', () =>
     HttpResponse.json({ vom_hub: {}, admins_ohne_passkey: [] }),
   ),
   /**

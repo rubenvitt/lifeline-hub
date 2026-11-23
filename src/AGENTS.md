@@ -486,7 +486,7 @@ Herleitung in
 
 - **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
   und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener
-  Token-Vergleich. Nur `POST /api/instanz/koppeln` ist öffentlich (IP-Sperre, einheitlich 401).
+  Token-Vergleich. Nur `POST /api/instance/pair` ist öffentlich (IP-Sperre, einheitlich 401).
 - **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
   meldet sich; die erreichte Seite baut nie eine Verbindung auf.
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
@@ -688,7 +688,7 @@ Herleitung in
     ohne Gegenzeichnung (`GegenzeichnungPflicht::NurBestaetigung`); dort wartet jeder auf einen
     Admin. Ein Widerruf gilt je Credential-ID für jede Zeile der Org.
   - **Über `vor_ort` gehen Nutzdaten nur über `zertifikat::client(pin)`**; ein Zertifikatswechsel
-    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instanz/zertifikat`). Kein
+    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instance/certificate`). Kein
     eigener Client für eine Direktkopplung.
   - **„Übersetzt über die Herkunft“ heißt `spiegel::abgleich::uebersetzt`** (meldende Seite einer
     Standardkopplung), nicht `richtung == MeldetSich`. Ein neuer Verweis auf Stammdaten in einer
@@ -965,7 +965,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `SPERRE_GILT_STUNDEN` (24 h) nichts senden; danach versucht der nächste Versand es einmal mit
   demselben Zugang (angenommen: Sperre weg, wieder `403`: erneuert). Solange sie steht, meldet
   `GET /api/ios-push` `relais_gesperrt` (die Oberfläche zeigt statt des Schalters den Hinweis) und
-  `GET /api/admin/instanz` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
+  `GET /api/admin/instance` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
 - **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
   anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet

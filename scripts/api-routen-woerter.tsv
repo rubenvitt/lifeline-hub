@@ -9,13 +9,16 @@ app-code	-
 audit	-
 auth	-
 backup	-
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 bulk	-
 callback	-
 care	Betreuung
 case-file	Einsatzakte
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
+check-in	melden
 code	-
 codes	-
 command	Führung
@@ -24,9 +27,13 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
+countersign	gegenzeichnen
 damages	Schäden
+decline	ablehnen
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 download	-
 emergency-takeover	Notübernahme
@@ -42,6 +49,7 @@ fonts	-
 forces	Kräfte
 gauges	Pegel
 glyphs	-
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 import	-
@@ -53,10 +61,12 @@ integrations	Anbindungen
 ios-push	-
 jwks.json	-
 lan	-
+last-keys	letzte Schlüssel
 live	-
 login	-
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -64,9 +74,11 @@ material	Material
 matrix	-
 me	-
 mirror	Spiegel
+object	widersprechen
 oidc	-
 openapi.json	-
 orders	Befehle
+origin	Herkunft
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
@@ -81,22 +93,28 @@ providers	-
 proxy	-
 raster	-
 read	gelesen
+reclaim	zurückholen
 redeem	einlösen
 register	-
 registration	-
+reject	zurückweisen
 release-notes	Versionsstand
 reliefs	Ablösungen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
+resync	erneut abgleichen
 retention	Aufbewahrung
+revoke	widerrufen
 seats	Plätze
 sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
