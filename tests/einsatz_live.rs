@@ -298,7 +298,7 @@ async fn wiederherstellen_meldet_den_audit_eintrag_im_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{einsatz}/wiederherstellen"),
+        &format!("/api/retention/incidents/{einsatz}/restore"),
         &admin,
         Some(r#"{"retention_bis":null}"#),
     )

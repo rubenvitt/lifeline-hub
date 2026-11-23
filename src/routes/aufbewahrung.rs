@@ -2,15 +2,15 @@
 //!
 //! | Methode | Pfad | Zweck |
 //! |---|---|---|
-//! | GET  | `/api/aufbewahrung` | Übersicht der eigenen Organisation |
-//! | GET  | `/api/aufbewahrung/einsaetze/{id}` | Archivakte: Kopf, Zustand, Register |
-//! | GET  | `/api/aufbewahrung/einsaetze/{id}/etb` | Archiv-ETB (`typ`, `before_lfd_nr`, `limit`) |
-//! | POST | `/api/aufbewahrung/einsaetze/{id}/wiederherstellen` | Wiederherstellen |
-//! | GET  | `/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege` | Anträge (Art. 17, LFH-751) |
-//! | POST | `/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege` | Antrag stellen |
-//! | POST | `/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen` | Rücknahme |
-//! | POST | `/api/aufbewahrung/einsaetze/{id}/personensuche` | Pseudonyme Suche (liest nur) |
-//! | GET  | `/api/aufbewahrung/einsaetze/{id}/archiv` | Gültiger Archivblock (age, LLH-1494) |
+//! | GET  | `/api/retention` | Übersicht der eigenen Organisation |
+//! | GET  | `/api/retention/incidents/{id}` | Archivakte: Kopf, Zustand, Register |
+//! | GET  | `/api/retention/incidents/{id}/etb` | Archiv-ETB (`typ`, `before_lfd_nr`, `limit`) |
+//! | POST | `/api/retention/incidents/{id}/restore` | Wiederherstellen |
+//! | GET  | `/api/retention/incidents/{id}/redaction-requests` | Anträge (Art. 17, LFH-751) |
+//! | POST | `/api/retention/incidents/{id}/redaction-requests` | Antrag stellen |
+//! | POST | `/api/retention/incidents/{id}/redaction-requests/{aid}/undo` | Rücknahme |
+//! | POST | `/api/retention/incidents/{id}/person-search` | Pseudonyme Suche (liest nur) |
+//! | GET  | `/api/retention/incidents/{id}/archive` | Gültiger Archivblock (age, LLH-1494) |
 //!
 //! **Die Lesesperre der regulären Einsatz-Routen bleibt unberührt** — eine Ausnahme in
 //! `darf_lesen` gäbe Personen mit Namen, Anhänge und Export wieder frei. Jeder Handler nimmt
@@ -52,7 +52,7 @@ async fn archivkopf(
     Ok(kopf)
 }
 
-/// GET /api/aufbewahrung — alle abgeschlossenen Einsätze der eigenen Organisation mit
+/// GET /api/retention — alle abgeschlossenen Einsätze der eigenen Organisation mit
 /// ihrem Aufbewahrungszustand. Die Organisation kommt aus dem Benutzer, nie aus der Anfrage.
 pub async fn uebersicht(
     State(state): State<AppState>,
@@ -63,7 +63,7 @@ pub async fn uebersicht(
     ))
 }
 
-/// GET /api/aufbewahrung/einsaetze/{id} — pseudonyme Archivakte (Retain-Projektion).
+/// GET /api/retention/incidents/{id} — pseudonyme Archivakte (Retain-Projektion).
 pub async fn akte(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -83,7 +83,7 @@ pub struct ArchivEtbParams {
     pub limit: Option<i64>,
 }
 
-/// GET /api/aufbewahrung/einsaetze/{id}/etb — Archiv-ETB im Wortlaut, neueste zuerst.
+/// GET /api/retention/incidents/{id}/etb — Archiv-ETB im Wortlaut, neueste zuerst.
 pub async fn etb(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -129,7 +129,7 @@ pub struct Wiederherstellen {
     pub retention_bis: Option<Option<String>>,
 }
 
-/// POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen — Löschvormerkung während der
+/// POST /api/retention/incidents/{id}/restore — Löschvormerkung während der
 /// Karenz aufheben und neue Frist setzen, mit ETB-Audit des Admins. 400 Feld fehlt oder
 /// unlesbar, 422 Frist nicht in der Zukunft oder Einsatz nicht vorgemerkt, 409 Karenz
 /// abgelaufen oder geschwärzt.
@@ -234,7 +234,7 @@ fn ziel_aus(eingabe: &AntragZielEingabe) -> Result<ZielAngabe, AppError> {
     }
 }
 
-/// GET /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege — alle Anträge des Einsatzes,
+/// GET /api/retention/incidents/{id}/redaction-requests — alle Anträge des Einsatzes,
 /// neueste zuerst.
 pub async fn antraege(
     State(state): State<AppState>,
@@ -245,7 +245,7 @@ pub async fn antraege(
     Ok(Json(antrag::liste(&state.pool, kopf.id, Utc::now()).await?))
 }
 
-/// POST /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege — Löschersuchen stellen (201).
+/// POST /api/retention/incidents/{id}/redaction-requests — Löschersuchen stellen (201).
 /// 400 Form (Zielart, `ziel.id`, Aktenzeichen, leere Bestätigung), 404 Person nicht in diesem
 /// Einsatz, 422 Bestätigung falsch, Stammkraft oder Medienkontakt, 409 aktiv, geschwärzt oder schon ein
 /// offener bzw. vollzogener Antrag. Schwärzt NICHT: das tut der Purge-Lauf nach 24 Stunden.
@@ -289,7 +289,7 @@ pub async fn antrag_stellen(
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
-/// POST /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen — Rücknahme
+/// POST /api/retention/incidents/{id}/redaction-requests/{aid}/undo — Rücknahme
 /// innerhalb von 24 Stunden. 404 unbekannt, 409 vollzogen, zurückgenommen oder zu spät.
 pub async fn antrag_zuruecknehmen(
     State(state): State<AppState>,
@@ -311,7 +311,7 @@ pub struct Personensuche {
     pub suchtext: String,
 }
 
-/// POST /api/aufbewahrung/einsaetze/{id}/personensuche — pseudonyme Suche nach Name oder
+/// POST /api/retention/incidents/{id}/person-search — pseudonyme Suche nach Name oder
 /// Rufnummer. Liest nur (POST nur wegen des Bodys). 400 Suchtext zu kurz, 409 geschwärzt.
 pub async fn personensuche(
     State(state): State<AppState>,
@@ -339,7 +339,7 @@ pub async fn personensuche(
     ))
 }
 
-/// GET /api/aufbewahrung/einsaetze/{id}/archiv — der gültige Block des Archivs (LLH-1494, K7),
+/// GET /api/retention/incidents/{id}/archive — der gültige Block des Archivs (LLH-1494, K7),
 /// so verschlüsselt, wie er abgelegt ist. Öffnen kann ihn nur, wer einen der privaten
 /// Archiv-Schlüssel der Org hat. Jeder Abruf steht in der Admin-Spur.
 pub async fn archiv_herunterladen(

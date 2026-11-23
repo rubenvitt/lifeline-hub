@@ -19,7 +19,7 @@ import { apiDateiMitName, apiGet, apiSend, mitParametern } from './client';
 /**
  * Aufbewahrung abgeschlossener Einsätze (LFH-23).
  *
- * Der Archiv-Namensraum `/api/aufbewahrung` steht NEBEN der Lesesperre der regulären Routen: nur
+ * Der Archiv-Namensraum `/api/retention` steht NEBEN der Lesesperre der regulären Routen: nur
  * der System-Admin der eigenen Organisation kommt hinein (sonst 403), ein unbekannter Einsatz ist
  * 404, ein aktiver 409. Bis auf Wiederherstellen und Löschersuchen (Antrag, Rücknahme; LFH-751)
  * liest er nur. Die Frist ändert man am
@@ -27,23 +27,23 @@ import { apiDateiMitName, apiGet, apiSend, mitParametern } from './client';
  * wiederherstellen), an einem geschwärzten 409.
  */
 
-const BASIS = '/api/aufbewahrung';
+const BASIS = '/api/retention';
 
-/** `GET /api/aufbewahrung` — abgeschlossene Einsätze der eigenen Organisation. */
+/** `GET /api/retention` — abgeschlossene Einsätze der eigenen Organisation. */
 export function ladeAufbewahrung(): Promise<AufbewahrungEintrag[]> {
   return apiGet<AufbewahrungEintrag[]>(BASIS);
 }
 
-/** `GET /api/aufbewahrung/einsaetze/{id}` — pseudonyme Archivakte. */
+/** `GET /api/retention/incidents/{id}` — pseudonyme Archivakte. */
 export function ladeArchivAkte(einsatzId: number): Promise<ArchivAkte> {
-  return apiGet<ArchivAkte>(`${BASIS}/einsaetze/${einsatzId}`);
+  return apiGet<ArchivAkte>(`${BASIS}/incidents/${einsatzId}`);
 }
 
 /** Ein Archivblock ist eine ganze Einsatz-Datenbank; 15 s reichen dafür nicht immer. */
 const ARCHIV_TIMEOUT_MS = 120_000;
 
 /**
- * `GET /api/aufbewahrung/einsaetze/{id}/archiv` — der gültige Archivblock (LLH-1494), age-
+ * `GET /api/retention/incidents/{id}/archive` — der gültige Archivblock (LLH-1494), age-
  * verschlüsselt. Jeder Abruf steht im Zugangsprotokoll.
  */
 /** Der gültige Block mit dem Namen, den der Server ihm gibt (seine Nummer kann sich seit dem
@@ -51,7 +51,7 @@ const ARCHIV_TIMEOUT_MS = 120_000;
 export function ladeArchivBlock(
   einsatzId: number,
 ): Promise<{ datei: Blob; dateiname: string | null }> {
-  return apiDateiMitName(`${BASIS}/einsaetze/${einsatzId}/archiv`, {
+  return apiDateiMitName(`${BASIS}/incidents/${einsatzId}/archive`, {
     timeoutMs: ARCHIV_TIMEOUT_MS,
   });
 }
@@ -63,13 +63,13 @@ interface ArchivEtbFilter {
   limit?: number;
 }
 
-/** `GET /api/aufbewahrung/einsaetze/{id}/etb` — Archiv-ETB, neueste zuerst. */
+/** `GET /api/retention/incidents/{id}/etb` — Archiv-ETB, neueste zuerst. */
 export function ladeArchivEtb(
   einsatzId: number,
   filter: ArchivEtbFilter = {},
 ): Promise<ArchivEtbEintrag[]> {
   return apiGet<ArchivEtbEintrag[]>(
-    mitParametern(`${BASIS}/einsaetze/${einsatzId}/etb`, {
+    mitParametern(`${BASIS}/incidents/${einsatzId}/etb`, {
       typ: filter.typ,
       before_lfd_nr: filter.beforeLfdNr,
       limit: filter.limit,
@@ -77,12 +77,12 @@ export function ladeArchivEtb(
   );
 }
 
-/** `POST …/wiederherstellen` — Vormerkung aufheben, neue Frist setzen (Pflicht). */
+/** `POST …/restore` — Vormerkung aufheben, neue Frist setzen (Pflicht). */
 export function stelleWiederHer(
   einsatzId: number,
   body: WiederherstellenBody,
 ): Promise<ArchivAkte> {
-  return apiSend<ArchivAkte>(`${BASIS}/einsaetze/${einsatzId}/wiederherstellen`, 'POST', body);
+  return apiSend<ArchivAkte>(`${BASIS}/incidents/${einsatzId}/restore`, 'POST', body);
 }
 
 /** `PUT /api/einsaetze/{id}/aufbewahrungsfrist` — Frist setzen, ändern oder aufheben. */
@@ -101,13 +101,13 @@ export function setzeNachbereitung(
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/nachbereitung`, 'PUT', body);
 }
 
-/** `GET …/schwaerzungsantraege` — Löschersuchen nach Art. 17 des Einsatzes, neueste zuerst. */
+/** `GET …/redaction-requests` — Löschersuchen nach Art. 17 des Einsatzes, neueste zuerst. */
 export function ladeSchwaerzungsantraege(einsatzId: number): Promise<Schwaerzungsantrag[]> {
-  return apiGet<Schwaerzungsantrag[]>(`${BASIS}/einsaetze/${einsatzId}/schwaerzungsantraege`);
+  return apiGet<Schwaerzungsantrag[]>(`${BASIS}/incidents/${einsatzId}/redaction-requests`);
 }
 
 /**
- * `POST …/schwaerzungsantraege` — Löschersuchen stellen (201). Schwärzt nicht sofort: der
+ * `POST …/redaction-requests` — Löschersuchen stellen (201). Schwärzt nicht sofort: der
  * Purge-Lauf vollzieht 24 Stunden später, bis dahin ist der Antrag zurücknehmbar.
  */
 export function stelleSchwaerzungsantrag(
@@ -115,29 +115,29 @@ export function stelleSchwaerzungsantrag(
   body: NeuerSchwaerzungsantrag,
 ): Promise<Schwaerzungsantrag> {
   return apiSend<Schwaerzungsantrag>(
-    `${BASIS}/einsaetze/${einsatzId}/schwaerzungsantraege`,
+    `${BASIS}/incidents/${einsatzId}/redaction-requests`,
     'POST',
     body,
   );
 }
 
-/** `POST …/schwaerzungsantraege/{aid}/zuruecknehmen` — liefert die aktualisierte Liste. */
+/** `POST …/redaction-requests/{aid}/undo` — liefert die aktualisierte Liste. */
 export function nimmSchwaerzungsantragZurueck(
   einsatzId: number,
   antragId: number,
 ): Promise<Schwaerzungsantrag[]> {
   return apiSend<Schwaerzungsantrag[]>(
-    `${BASIS}/einsaetze/${einsatzId}/schwaerzungsantraege/${antragId}/zuruecknehmen`,
+    `${BASIS}/incidents/${einsatzId}/redaction-requests/${antragId}/undo`,
     'POST',
   );
 }
 
 /**
- * `POST …/personensuche` — pseudonyme Suche nach Name oder Rufnummer. POST, damit der Suchtext
+ * `POST …/person-search` — pseudonyme Suche nach Name oder Rufnummer. POST, damit der Suchtext
  * im Body steht und in keinem Protokoll; die Antwort trägt nie Namen oder Kontakte.
  */
 export function suchePersonen(einsatzId: number, suchtext: string): Promise<PersonTreffer[]> {
-  return apiSend<PersonTreffer[]>(`${BASIS}/einsaetze/${einsatzId}/personensuche`, 'POST', {
+  return apiSend<PersonTreffer[]>(`${BASIS}/incidents/${einsatzId}/person-search`, 'POST', {
     suchtext,
   });
 }

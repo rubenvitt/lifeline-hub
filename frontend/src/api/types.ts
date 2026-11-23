@@ -1976,7 +1976,7 @@ export type ZugangsAngaben = S['ZugangsAngaben'];
 // ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
 /** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sieben Werte, `retention::zustand`). */
 export type AufbewahrungZustand = S['AufbewahrungZustand'];
-/** Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). */
+/** Zeile der Aufbewahrungsübersicht (`GET /api/retention`). */
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
 /** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
 export type ArchivAkte = S['ArchivAkteAnzeige'];
@@ -1992,7 +1992,7 @@ export type ArchivSchaden = S['ArchivSchadenAnzeige'];
 /** ETB-Eintrag der Archivakte im Wortlaut, ohne Anhänge und Rückverweise. */
 export type ArchivEtbEintrag = S['ArchivEtbEintragAnzeige'];
 
-/** Body von `POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen`. Kein Backend-Schema,
+/** Body von `POST /api/retention/incidents/{id}/restore`. Kein Backend-Schema,
  *  FE-lokal. `retention_bis` ist PFLICHT: ein Zeitpunkt in der Zukunft (UTC,
  *  `YYYY-MM-DD HH:mm:ss`) oder `null` für unbegrenzt. */
 export interface WiederherstellenBody {
@@ -2024,7 +2024,7 @@ export type Schwaerzungsantrag = S['SchwaerzungsantragAnzeige'];
 /** Treffer der pseudonymen Personensuche — ohne Name oder Kontakt. */
 export type PersonTreffer = S['PersonTrefferAnzeige'];
 
-/** Body von `POST …/schwaerzungsantraege`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
+/** Body von `POST …/redaction-requests`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
  *  Einsatz und ist bei einer Person Pflicht; `bestaetigung` ist die eingetippte Kennung. */
 export interface NeuerSchwaerzungsantrag {
   /** Eine Person per `id` oder per `kennung` (`R-042`, am archivierten Einsatz, LLH-1712). */

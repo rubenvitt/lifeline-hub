@@ -76,7 +76,7 @@ async fn lage() -> Lage {
 }
 
 fn antraege_uri(e: i64) -> String {
-    format!("/api/aufbewahrung/einsaetze/{e}/schwaerzungsantraege")
+    format!("/api/retention/incidents/{e}/redaction-requests")
 }
 
 fn personen_antrag(id: i64, bestaetigung: &str) -> Value {
@@ -255,7 +255,7 @@ async fn aktiver_und_geschwaerzter_einsatz_sind_409() {
     let (s, _) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/aufbewahrung/einsaetze/{}/personensuche", l.einsatz),
+        &format!("/api/retention/incidents/{}/person-search", l.einsatz),
         &l.admin,
         Some(&json!({"suchtext": "Mustermann"})),
     )
@@ -351,7 +351,7 @@ async fn einsatz_antrag_zustand_und_ruecknahme() {
     let aid = v["id"].as_i64().unwrap();
     let faellig = v["faellig_at"].clone();
 
-    let (_, ue) = anfrage(&l.app, "GET", "/api/aufbewahrung", &l.admin, None).await;
+    let (_, ue) = anfrage(&l.app, "GET", "/api/retention", &l.admin, None).await;
     let zeile = ue
         .as_array()
         .unwrap()
@@ -363,7 +363,7 @@ async fn einsatz_antrag_zustand_und_ruecknahme() {
     let (_, akte) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{}", l.einsatz),
+        &format!("/api/retention/incidents/{}", l.einsatz),
         &l.admin,
         None,
     )
@@ -371,7 +371,7 @@ async fn einsatz_antrag_zustand_und_ruecknahme() {
     assert_eq!(akte["zustand"], "schwaerzung_beantragt");
 
     // Rücknahme: 404 unbekannt, 200, dann 409; Zustand wieder aus der Frist.
-    let rueck = |a: i64| format!("{uri}/{a}/zuruecknehmen");
+    let rueck = |a: i64| format!("{uri}/{a}/undo");
     let (s, _) = anfrage(&l.app, "POST", &rueck(999_999), &l.admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(&l.app, "POST", &rueck(aid), &l.leit, None).await;
@@ -382,7 +382,7 @@ async fn einsatz_antrag_zustand_und_ruecknahme() {
     assert_eq!(liste[0]["zuruecknehmbar"], false);
     let (s, _) = anfrage(&l.app, "POST", &rueck(aid), &l.admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
-    let (_, ue) = anfrage(&l.app, "GET", "/api/aufbewahrung", &l.admin, None).await;
+    let (_, ue) = anfrage(&l.app, "GET", "/api/retention", &l.admin, None).await;
     let zeile = ue
         .as_array()
         .unwrap()
@@ -409,7 +409,7 @@ async fn einsatz_antrag_zustand_und_ruecknahme() {
 #[tokio::test]
 async fn personensuche_pseudonym_ohne_cache_und_nur_fuer_den_admin() {
     let l = lage().await;
-    let uri = format!("/api/aufbewahrung/einsaetze/{}/personensuche", l.einsatz);
+    let uri = format!("/api/retention/incidents/{}/person-search", l.einsatz);
     let (s, _) = anfrage_json(
         &l.app,
         "POST",
@@ -560,7 +560,7 @@ async fn personen_antrag_bis_zum_vollzug() {
     let (_, akte) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{}", l.einsatz),
+        &format!("/api/retention/incidents/{}", l.einsatz),
         &l.admin,
         None,
     )
@@ -603,14 +603,7 @@ async fn antrag_etb_eintraege_gehen_live_hinaus() {
     assert!(s.is_success(), "{s}: {v}");
     etb.pruefe(&app, &admin, einsatz, "Antrag stellen").await;
     let aid = v["id"].as_i64().unwrap();
-    let (s, v) = anfrage(
-        &app,
-        "POST",
-        &format!("{uri}/{aid}/zuruecknehmen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&app, "POST", &format!("{uri}/{aid}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     etb.pruefe(&app, &admin, einsatz, "Antrag zurücknehmen")
         .await;

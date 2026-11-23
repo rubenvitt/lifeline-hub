@@ -26,14 +26,6 @@
 /api/admin/instanz/unterschrift/{id}/zurueckweisen
 /api/antraege/abgelehnt
 /api/antraege/abgelehnt/{antrag_id}
-/api/aufbewahrung
-/api/aufbewahrung/einsaetze/{id}
-/api/aufbewahrung/einsaetze/{id}/archiv
-/api/aufbewahrung/einsaetze/{id}/etb
-/api/aufbewahrung/einsaetze/{id}/personensuche
-/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege
-/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen
-/api/aufbewahrung/einsaetze/{id}/wiederherstellen
 /api/benachrichtigungen
 /api/benachrichtigungen/{id}
 /api/benachrichtigungen/{id}/quittieren
