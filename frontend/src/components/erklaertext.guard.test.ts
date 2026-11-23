@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import { visibleTexts } from '../lib/sourceAst';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -22,8 +22,8 @@ import { describe, expect, it } from 'vitest';
  * tatsächlichen Zahl ist ebenfalls rot — die Schuld schrumpft nur, wer einen Satz entfernt,
  * verkleinert den Eintrag im selben Commit.
  *
- * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * Wie `dichte.guard.test.ts`: `pnpm lint` läuft mit `--max-warnings 0`, eine rot geborene Regel
+ * ── Warum ein Vitest-Guard und keine Lint-Regel ─────────────────────────────────
+ * Wie `dichte.guard.test.ts`: `pnpm lint` bricht bei jeder Warnung, eine rot geborene Regel
  * würde abgeschaltet statt befolgt.
  *
  * ── Was dieser Guard NICHT sieht (Teil des Vertrags) ────────────────────────────
@@ -86,29 +86,10 @@ const OFFEN: Record<string, number> = {};
  */
 const AUSNAHMEN: ReadonlySet<string> = new Set(['hilfe/rundgang/rundgangTexte.ts']);
 
-/** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */
-function texteAus(quelle: string, dateiname = 'x.tsx'): { text: string; zeile: number }[] {
-  const datei = ts.createSourceFile(dateiname, quelle, ts.ScriptTarget.Latest, true);
-  const texte: { text: string; zeile: number }[] = [];
-  const merke = (knoten: ts.Node, text: string) =>
-    texte.push({ text, zeile: datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1 });
-  const besuche = (knoten: ts.Node) => {
-    if (ts.isImportDeclaration(knoten) || ts.isExportDeclaration(knoten)) return;
-    if (ts.isStringLiteral(knoten) || ts.isNoSubstitutionTemplateLiteral(knoten))
-      merke(knoten, knoten.text);
-    else if (ts.isTemplateHead(knoten) || ts.isTemplateMiddle(knoten) || ts.isTemplateTail(knoten))
-      merke(knoten, knoten.text);
-    else if (ts.isJsxText(knoten)) merke(knoten, knoten.text);
-    ts.forEachChild(knoten, besuche);
-  };
-  besuche(datei);
-  return texte;
-}
-
 /** Treffer einer Quelle als „Zeile: Mustername“. */
 function erklaerTreffer(quelle: string, dateiname = 'x.tsx'): string[] {
   const treffer: string[] = [];
-  for (const { text, zeile } of texteAus(quelle, dateiname)) {
+  for (const { text, line: zeile } of visibleTexts(dateiname, quelle)) {
     // JSX-Text bricht Zeilen um; ein Muster soll über den Umbruch hinweg treffen.
     const flach = text.replace(/\s+/g, ' ');
     for (const { name, muster } of MUSTER)

@@ -79,7 +79,7 @@ export default function StandortFeld({
     return () => {
       anfrage.current += 1;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Einhängen
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- nur beim Einhängen
   }, []);
 
   if (value) {

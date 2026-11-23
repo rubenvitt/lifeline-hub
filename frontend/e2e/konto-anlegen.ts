@@ -35,7 +35,7 @@ export async function kontoAnlegen(
     expect(await login.json(), `Erstanmeldung ${daten.benutzername}`).toEqual({
       passwort_wechsel_erforderlich: true,
     });
-    const festgelegt = await person.post('/api/auth/passwort/festlegen', {
+    const festgelegt = await person.post('/api/auth/password/set', {
       data: { neues_passwort: daten.passwort },
     });
     expect(festgelegt.ok(), `Festlegen ${daten.benutzername}: ${festgelegt.status()}`).toBe(true);

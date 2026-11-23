@@ -128,7 +128,7 @@ class AnmeldungTest {
         val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
         val skript = Anmeldung.einloeseSkript(server, code, verifier)
         assertTrue("""window.location.origin !== "https:\/\/elw.local:8443"""" in skript, skript)
-        assertTrue("'/api/auth/app-code/einloesen'" in skript, skript)
+        assertTrue("'/api/auth/app-code/redeem'" in skript, skript)
         assertTrue("""code: "$code"""" in skript, skript)
         assertTrue("""verifier: "$verifier"""" in skript, skript)
         assertEquals(1, skript.split(code).size - 1)

@@ -15,7 +15,7 @@ import { dialogSteht } from './dialog-kern';
 
 /** Öffnet „Neuen Einsatz anlegen“ und liefert den Dialog, sobald er eingeblendet ist. */
 export async function einsatzDialogOeffnen(page: Page): Promise<Locator> {
-  // eslint-disable-next-line no-restricted-syntax -- die eine Stelle, die den Dialog öffnet
+  // oxlint-disable-next-line lfh/e2e-riegel -- die eine Stelle, die den Dialog öffnet
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   const dialog = await dialogSteht(page, 'Neuen Einsatz anlegen');
   // Die Vorbelegung ist Pflichtfeld: fehlte sie, hielte die Formularprüfung das Abschicken still

@@ -35,7 +35,7 @@ export default function BausteinPlatzhalterModal({
     if (offenePlatzhalter.length === 0) {
       onEinsetzen(setzeBausteinEin(baustein, einsatz, {}, konventionen));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [baustein]);
 
   const dialogOffen = baustein !== null && offenePlatzhalter.length > 0;

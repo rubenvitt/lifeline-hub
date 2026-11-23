@@ -153,6 +153,23 @@ jobs:
               -f state="$state" -f context=ADR-Nummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
+      # Der deutsche Bestand der API-Routen wächst nicht (LLH-1979, ADR-0085). Im Bündel `schnell`
+      # fehlt der Basis-Ref (flacher Checkout), dort fällt nur dieser Vergleich laut aus; hier ist
+      # die Basis geholt. Kein eigener Status: das Ergebnis geht in „Ergebnis der Prüfung“ ein,
+      # und ein roter Befund überspringt den Autofix nicht.
+      - name: Bestand der deutschen API-Routen gegen die Basis
+        id: routen
+        env:
+          BASIS: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ ! -x scripts/check-api-routen.sh ]; then
+            echo "::notice::API-Routen übersprungen: der PR trägt check-api-routen.sh nicht."
+            echo "code=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          code=0
+          scripts/check-api-routen.sh --basis "origin/$BASIS" || code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
       # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit dem Recht, das der
       # Push braucht. Die App hat Bypass-Rechte auf `alpha`; die Grenzen dagegen stehen in
       # migrationen-autofix.sh und seinem Selbsttest.
@@ -214,6 +231,8 @@ jobs:
         env:
           CODE: ${{ steps.pruefen.outputs.code }}
           CODE_ADR: ${{ steps.adr.outputs.code }}
+          CODE_ROUTEN: ${{ steps.routen.outputs.code }}
         run: |
           [ "$CODE" = 0 ] || exit "$CODE"
-          exit "${CODE_ADR:-0}"
+          [ "${CODE_ADR:-0}" = 0 ] || exit "$CODE_ADR"
+          exit "${CODE_ROUTEN:-0}"

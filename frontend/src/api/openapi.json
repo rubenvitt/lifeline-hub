@@ -4083,7 +4083,7 @@
       },
       "BenachrichtigungArt": {
         "type": "string",
-        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0363_benachrichtigung_adapter.sql`)\nspiegelt `ALLE`.",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0364_benachrichtigung_adapter.sql`)\nspiegelt `ALLE`.",
         "enum": [
           "sofortmeldung",
           "sofortmeldung_eskaliert",
@@ -22898,7 +22898,7 @@
       },
       "VersionsstandAnzeige": {
         "type": "object",
-        "description": "Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`.",
+        "description": "Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`.",
         "required": [
           "laufend"
         ],

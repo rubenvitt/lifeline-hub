@@ -20,31 +20,41 @@ class VertragTest {
 
     @Test
     fun `ShellInfo liest die Wire-Felder und ignoriert neue`() {
-        val json = """{"version":"1.0.0-alpha.300","shell_contract":1,"assets":["a.js"]}"""
+        val json = """{"version":"1.0.0-alpha.300","shell_contract":2,"assets":["a.js"]}"""
         val info = Json { ignoreUnknownKeys = true }.decodeFromString(ShellInfo.serializer(), json)
-        assertEquals(ShellInfo("1.0.0-alpha.300", 1), info)
+        assertEquals(ShellInfo("1.0.0-alpha.300", 2), info)
     }
 
+    /** Vertrag 2 (LLH-1979): der Login-Pfad heißt `/api/auth/app-code/redeem`. */
     @Test
-    fun `die App kennt genau den ersten Vertrag`() {
-        assertEquals(listOf(1), LifelineKern.bekannteVertraege)
+    fun `die App kennt genau den zweiten Vertrag`() {
+        assertEquals(listOf(2), LifelineKern.bekannteVertraege)
+    }
+
+    /** Ein Server mit Vertrag 1 kennt nur `/api/auth/app-code/einloesen`: für die App zu alt. */
+    @Test
+    fun `ein Server mit Vertrag 1 ist zu alt`() {
+        assertEquals(
+            Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_ALT, ShellInfo("1.0.0-alpha.300", 1)),
+            Vertragspruefung.evaluate(shell(1), null),
+        )
     }
 
     @Test
     fun `ein bekannter Vertrag ist verträglich`() {
         assertEquals(
-            Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0-alpha.300", 1)),
-            Vertragspruefung.evaluate(shell(1), null),
+            Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0-alpha.300", 2)),
+            Vertragspruefung.evaluate(shell(2), null),
         )
     }
 
     @Test
     fun `ein größerer Vertrag heißt App aktualisieren`() {
         assertEquals(
-            Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, ShellInfo("2.0.0", 2)),
-            Vertragspruefung.evaluate(shell(2, "2.0.0"), 1),
+            Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, ShellInfo("2.0.0", 3)),
+            Vertragspruefung.evaluate(shell(3, "2.0.0"), 2),
         )
-        assertEquals(Fehlerklasse.ZU_NEU, Vertragspruefung.evaluate(shell(2), 1).fehlerklasse)
+        assertEquals(Fehlerklasse.ZU_NEU, Vertragspruefung.evaluate(shell(3), 2).fehlerklasse)
     }
 
     @Test
@@ -56,13 +66,13 @@ class VertragTest {
     fun `ohne Endpunkt ist der Server zu alt`() {
         assertEquals(
             Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_ALT, null),
-            Vertragspruefung.evaluate(antwort(404, typ = "text/plain"), 1),
+            Vertragspruefung.evaluate(antwort(404, typ = "text/plain"), 2),
         )
         // JSON ohne lesbaren Vertrag nennt keinen Vertrag.
         for (typ in listOf("application/json", "application/json; charset=utf-8", "Application/JSON")) {
             assertEquals(
                 Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_ALT, null),
-                Vertragspruefung.evaluate(antwort(200, """{"status":"ok"}""", typ), 1),
+                Vertragspruefung.evaluate(antwort(200, """{"status":"ok"}""", typ), 2),
                 typ,
             )
         }
@@ -70,8 +80,8 @@ class VertragTest {
 
     @Test
     fun `der Vertrag gilt auch mit Zeichensatz im ContentType`() {
-        val abruf = antwort(200, """{"version":"1.0.0","shell_contract":1}""", "application/json; charset=utf-8")
-        assertEquals(Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0", 1)), Vertragspruefung.evaluate(abruf, null))
+        val abruf = antwort(200, """{"version":"1.0.0","shell_contract":2}""", "application/json; charset=utf-8")
+        assertEquals(Vertragsergebnis.Vertraeglich(ShellInfo("1.0.0", 2)), Vertragspruefung.evaluate(abruf, null))
     }
 
     /** Ein Captive Portal antwortet mit 200 und HTML: das ist nicht der Server. */
@@ -82,7 +92,7 @@ class VertragTest {
             val abruf = antwort(200, portal, typ)
             assertEquals(
                 Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-                Vertragspruefung.evaluate(abruf, 1),
+                Vertragspruefung.evaluate(abruf, 2),
                 "$typ",
             )
             assertEquals(
@@ -92,13 +102,13 @@ class VertragTest {
             )
             assertEquals(
                 Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, null),
-                Vertragspruefung.evaluate(abruf, 2),
+                Vertragspruefung.evaluate(abruf, 3),
                 "$typ",
             )
         }
         assertEquals(
             Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-            Vertragspruefung.evaluate(antwort(200, """{"version":"9","shell_contract":1}""", "text/html"), null),
+            Vertragspruefung.evaluate(antwort(200, """{"version":"9","shell_contract":2}""", "text/html"), null),
         )
     }
 
@@ -107,7 +117,7 @@ class VertragTest {
         for (status in listOf(301, 302, 303, 307, 308)) {
             assertEquals(
                 Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-                Vertragspruefung.evaluate(antwort(status), 1),
+                Vertragspruefung.evaluate(antwort(status), 2),
                 "$status",
             )
         }
@@ -150,27 +160,27 @@ class VertragTest {
     @Test
     fun `ohne Netz gilt der zuletzt bestätigte Vertrag`() {
         val fehler = ShellAbruf.Fehler(Netzfehler.VERBINDUNG)
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), Vertragspruefung.evaluate(fehler, 1))
+        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), Vertragspruefung.evaluate(fehler, 2))
         assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), Vertragspruefung.evaluate(fehler, null))
-        assertEquals(Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, null), Vertragspruefung.evaluate(fehler, 2))
+        assertEquals(Vertragsergebnis.NichtVertraeglich(Fehlerklasse.ZU_NEU, null), Vertragspruefung.evaluate(fehler, 3))
         assertEquals(
             Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR),
-            Vertragspruefung.evaluate(antwort(502), 1),
+            Vertragspruefung.evaluate(antwort(502), 2),
         )
     }
 
     @Test
     fun `ein Zertifikatsfehler ist kein Nicht-erreichbar`() {
         val fehler = ShellAbruf.Fehler(Netzfehler.ZERTIFIKAT)
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 1))
+        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 2))
         // Auch ein zuletzt unverträglicher Server zeigt zuerst die Anleitung zum Zertifikat:
         // ohne Vertrauen erfährt die App den heutigen Vertrag nicht.
-        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 2))
+        assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.ZERTIFIKAT), Vertragspruefung.evaluate(fehler, 3))
     }
 
     @Test
     fun `ein abgebrochener Abruf ist kein Fehler der Seite`() {
-        val ergebnis = Vertragspruefung.evaluate(ShellAbruf.Fehler(Netzfehler.ABGEBROCHEN), 1)
+        val ergebnis = Vertragspruefung.evaluate(ShellAbruf.Fehler(Netzfehler.ABGEBROCHEN), 2)
         assertEquals(Vertragsergebnis.NichtErreichbar(Fehlerklasse.NICHT_ERREICHBAR), ergebnis)
     }
 

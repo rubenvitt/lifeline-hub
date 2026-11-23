@@ -3,7 +3,7 @@
 //! Zwei Teile:
 //! - [`erzeuge_einmalpasswort`]: das Passwort, das die Administration einer Person vergibt.
 //! - Der kurzlebige Zwischenzustand zwischen einem Passwort-Login auf ein Konto unter
-//!   Änderungszwang und `POST /api/auth/passwort/festlegen`. Dasselbe Muster wie
+//!   Änderungszwang und `POST /api/auth/password/set`. Dasselbe Muster wie
 //!   `totp/state.rs`: Der Client bekommt nur einen hochentropischen Schlüssel im HttpOnly-Cookie
 //!   `passwort_wechsel`, nie die `benutzer_id`. Bis zum Festlegen gibt es keine Sitzung, also
 //!   übernimmt kein Tab und kein Offline-Schnappschuss die Person (Design D1).

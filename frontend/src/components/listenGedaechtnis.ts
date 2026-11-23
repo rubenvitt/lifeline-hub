@@ -303,7 +303,7 @@ export function useListenGedaechtnis<K extends string = string>(
   useEffect(() => {
     if (anfang.ausSpeicher || anfang.sucheRaeumen) melde(anfang.zustand);
     // Nur beim Aufbau.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- einmalig, `anfang` steht fest
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- einmalig, `anfang` steht fest
   }, []);
 
   const aktuelleSpalten = useRef<SpaltenWahl | null>(spaltenStart);

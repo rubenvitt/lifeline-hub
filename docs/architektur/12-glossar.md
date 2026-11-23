@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 22.11.2026 (Schlüsselwechsel, LLH-2025; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
+Stand: 22.11.2026 (Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -8,6 +8,8 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 [`modul-benennung`](../../openspec/specs/modul-benennung/spec.md) mit dem `label` in
 `frontend/src/einsatz/modulRegistry.ts`. Die Begriffe rund um Meldungen stehen in der Tabelle
 „Begriffe“ von [`docs/design/2026-10-21-meldungsmodell/README.md`](../design/2026-10-21-meldungsmodell/README.md).
+Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
+`scripts/api-routen-woerter.tsv` ([ADR-0085](entscheidungen/ADR-0085-api-routen-sind-englisch-nach-glossar.md)).
 
 ## 12.1 Fachbegriffe
 
