@@ -980,9 +980,7 @@ describe('SchaedenPage', () => {
     const { client } = render(einsatzAktiv, [basisSchaden()]);
     await screen.findByText('S-001');
 
-    server.use(
-      http.get('/api/einsaetze/1/damages', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/damages', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.schaeden(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();

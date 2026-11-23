@@ -2410,21 +2410,18 @@ for (const viewport of [
         });
         expect(schaden.ok(), await schaden.text()).toBeTruthy();
         const { id: schadenId } = (await schaden.json()) as { id: number };
-        const bild = await page.request.post(
-          `/api/einsaetze/${einsatzId}/map/background-images`,
-          {
-            multipart: {
-              datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
-              ecken: JSON.stringify([
-                [8.796, 53.08],
-                [8.804, 53.08],
-                [8.804, 53.075],
-                [8.796, 53.075],
-              ]),
-              name: MODUS_BILD,
-            },
+        const bild = await page.request.post(`/api/einsaetze/${einsatzId}/map/background-images`, {
+          multipart: {
+            datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
+            ecken: JSON.stringify([
+              [8.796, 53.08],
+              [8.804, 53.08],
+              [8.804, 53.075],
+              [8.796, 53.075],
+            ]),
+            name: MODUS_BILD,
           },
-        );
+        });
         expect(bild.ok(), await bild.text()).toBeTruthy();
 
         // Dichte ZUERST: `stelleDichte` lädt neu, und `?platzieren=` ist ein Auftrag, den die Karte

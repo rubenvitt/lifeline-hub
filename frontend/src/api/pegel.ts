@@ -59,7 +59,10 @@ export function setzePrognose(
 
 /** Löscht die Prognose eines Pegels (idempotent); Antwort: die ganze Liste. */
 export function loeschePrognose(einsatzId: number, pegelId: number): Promise<PegelAnzeige[]> {
-  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/gauges/${pegelId}/forecast`, 'DELETE');
+  return apiSend<PegelAnzeige[]>(
+    `/api/einsaetze/${einsatzId}/gauges/${pegelId}/forecast`,
+    'DELETE',
+  );
 }
 
 /**

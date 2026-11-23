@@ -319,14 +319,10 @@ export function schliesseSchadenAb(
   abschluss_grund: string,
   notiz?: string,
 ): Promise<Schaden> {
-  return apiSend<Schaden>(
-    `/api/einsaetze/${einsatzId}/damages/${schadenId}/close`,
-    'POST',
-    {
-      abschluss_grund,
-      notiz: notiz ?? null,
-    },
-  );
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/damages/${schadenId}/close`, 'POST', {
+    abschluss_grund,
+    notiz: notiz ?? null,
+  });
 }
 
 export function storniereSchaden(einsatzId: number, schadenId: number): Promise<void> {

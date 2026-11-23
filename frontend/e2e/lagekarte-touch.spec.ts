@@ -105,7 +105,9 @@ async function einsatzMitLage(page: Page): Promise<number> {
   await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
   // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur der Knopf „Stand sichern“
   // (LLH-1936), und die Tests mit ausgeklappter Zeitachse hätten kein Band.
-  await post(page, `/api/einsaetze/${einsatzId}/situation-snapshots`, { bezeichnung: 'Stand vor Ort' });
+  await post(page, `/api/einsaetze/${einsatzId}/situation-snapshots`, {
+    bezeichnung: 'Stand vor Ort',
+  });
   return einsatzId;
 }
 

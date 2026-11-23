@@ -644,7 +644,10 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
     // lückenhaft, sondern leer, und „unvollständig, nicht leer" wäre falsch. Im Historien-Modus
     // gibt es keinen Ersatzstand.
     basisHandler([
-      http.get('/api/einsaetze/1/situation-snapshots/3', () => new HttpResponse(null, { status: 500 })),
+      http.get(
+        '/api/einsaetze/1/situation-snapshots/3',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
     ]);
     renderSeite('/einsaetze/1/lagekarte?snapshot=3');
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
@@ -989,7 +992,9 @@ describe('LagekartePage', () => {
 
   it('rendert verortete Lagemeldungen als Marker; Klick öffnet Inspector mit Backlink zur Quell-Meldung', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/situation/reports', () => HttpResponse.json([LAGEMELDUNG_VERORTET])),
+      http.get('/api/einsaetze/1/situation/reports', () =>
+        HttpResponse.json([LAGEMELDUNG_VERORTET]),
+      ),
     ]);
     const user = userEvent.setup();
     renderSeite();

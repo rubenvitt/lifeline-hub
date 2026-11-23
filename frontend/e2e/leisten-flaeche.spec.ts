@@ -679,9 +679,7 @@ async function matrixEinsatz(
     });
     expect(zone.ok(), await zone.text()).toBeTruthy();
   }
-  const gebiete = (await (
-    await page.request.get(`/api/einsaetze/${id}/hazard-areas`)
-  ).json()) as {
+  const gebiete = (await (await page.request.get(`/api/einsaetze/${id}/hazard-areas`)).json()) as {
     id: number;
     label: string;
   }[];

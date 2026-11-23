@@ -940,10 +940,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Abschließen: der Grund steht im Dialog, kein Toast', async () => {
     render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }), [
-      http.post(
-        '/api/einsaetze/1/damages/10/close',
-        abgelehnt('Schaden ist storniert', 409),
-      ),
+      http.post('/api/einsaetze/1/damages/10/close', abgelehnt('Schaden ist storniert', 409)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];

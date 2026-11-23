@@ -469,14 +469,9 @@ test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungs
     id: number;
     ist_standard: boolean;
   }[];
-  await senden(
-    page,
-    'patch',
-    `${basis}/map-views/${ansichten.find((a) => a.ist_standard)!.id}`,
-    {
-      layer_sichtbar: { einsatzort: true, person: true },
-    },
-  );
+  await senden(page, 'patch', `${basis}/map-views/${ansichten.find((a) => a.ist_standard)!.id}`, {
+    layer_sichtbar: { einsatzort: true, person: true },
+  });
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await karteBereit(page);
   await springe(page, FERN, 12);

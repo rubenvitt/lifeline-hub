@@ -893,9 +893,7 @@ describe('EinsatzabschnittePage', () => {
     const { client } = renderPage();
     await findInTree('Nord');
 
-    server.use(
-      http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
 
     const hinweis = await screen.findByText('Stand womöglich veraltet');
@@ -1243,9 +1241,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     const { client } = rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
     await within(organigramm).findByRole('link', { name: 'Nord' });
-    server.use(
-      http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
     const hinweis = await screen.findByText('Stand womöglich veraltet');
     const stand = organigramm.querySelector('[data-lfh="org-stand"]') as HTMLElement;

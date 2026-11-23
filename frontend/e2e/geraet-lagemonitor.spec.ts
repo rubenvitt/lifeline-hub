@@ -127,12 +127,9 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
   });
-  const flaeche = await page.request.patch(
-    `/api/einsaetze/${e}/sectors/${abschnitt.id}/area`,
-    {
-      data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
-    },
-  );
+  const flaeche = await page.request.patch(`/api/einsaetze/${e}/sectors/${abschnitt.id}/area`, {
+    data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
+  });
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
   // D12 (Change `kcjecn9e-benachrichtigungskonzept`): eine offene Sofortmeldung kommt nur als Zahl.
   await anlegen(page, `/api/einsaetze/${e}/meldungen`, {

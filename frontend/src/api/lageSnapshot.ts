@@ -11,7 +11,9 @@ export function ladeLageSnapshot(
   einsatzId: number,
   snapshotId: number,
 ): Promise<LageSnapshotDokument> {
-  return apiGet<LageSnapshotDokument>(`/api/einsaetze/${einsatzId}/situation-snapshots/${snapshotId}`);
+  return apiGet<LageSnapshotDokument>(
+    `/api/einsaetze/${einsatzId}/situation-snapshots/${snapshotId}`,
+  );
 }
 
 /** „Stand sichern": friert das volle Lagebild ein und legt einen unveränderlichen Stand an. */
@@ -19,7 +21,11 @@ export function erzeugeLageSnapshot(
   einsatzId: number,
   daten: NeuerLageSnapshot = {},
 ): Promise<LageSnapshotDokument> {
-  return apiSend<LageSnapshotDokument>(`/api/einsaetze/${einsatzId}/situation-snapshots`, 'POST', daten);
+  return apiSend<LageSnapshotDokument>(
+    `/api/einsaetze/${einsatzId}/situation-snapshots`,
+    'POST',
+    daten,
+  );
 }
 
 /** Einen Stand löschen (Dokumenten-Vernichtung, nur Einsatzleitung). */

@@ -303,9 +303,7 @@ test('Schleuse, Fokus: ein aufgelöster Abschnitt unter dem Fokus bleibt als Pla
   const vorher = await spalten
     .filter({ has: page.getByRole('link', { name: 'Einsatzabschnitt 3', exact: true }) })
     .boundingBox();
-  const antwort = await page.request.delete(
-    `/api/einsaetze/${einsatzId}/sectors/${abschnitte[2]}`,
-  );
+  const antwort = await page.request.delete(`/api/einsaetze/${einsatzId}/sectors/${abschnitte[2]}`);
   expect(antwort.ok(), `Auflösen: ${await antwort.text()}`).toBeTruthy();
 
   // Der Link wird zum Platzhalter ohne Link; der Fokus fällt nicht auf `body`, sondern auf die

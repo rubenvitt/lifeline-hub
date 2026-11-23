@@ -2330,9 +2330,7 @@ describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([rot, gruen])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs])),
-      http.get('/api/einsaetze/1/sectors', () =>
-        HttpResponse.json([{ id: 30, name: 'EA Nord' }]),
-      ),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([{ id: 30, name: 'EA Nord' }])),
     );
     return renderMitProviders(
       <Routes>
