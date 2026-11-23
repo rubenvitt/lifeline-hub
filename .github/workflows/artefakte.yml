@@ -7,6 +7,9 @@
 # Freigabe und hält sie bei rotem Bau auf, bei Vorab-Tags (Alpha, Beta) erst danach, ohne
 # Release oder Deployment aufzuhalten. Die iOS-App (LLH-1978, ios.yml) geht nach der Freigabe jedes
 # Tags zu TestFlight, verteilt je Kanal (LLH-1988, ADR-0080) und ebenfalls ohne aufzuhalten (Job `ios`).
+# Die Android-App (LLH-1989, android.yml) baut nach der Freigabe jedes Tags ihre signierte APK, hängt
+# sie ans Release und schreibt ihre Update-Kanäle fort (`android-alpha`, `android-beta`,
+# `android-stabil`), auch ohne aufzuhalten (Job `android`).
 #
 # EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
 # und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
@@ -368,6 +371,26 @@ jobs:
     uses: ./.github/workflows/ios.yml
     with:
       tag: ${{ needs.vorbereiten.outputs.tag }}
+    secrets: inherit
+
+  # ── Android-App (LLH-1989, Bau und Ablage in android.yml) ───────────────────────────
+  # Nach der Freigabe für jeden Kanal: signierte APK ans Release, Manifest und feste APK in die
+  # Kanäle (Entwurf D9). Wie `ios` hängt der Job an `freigeben` und steht in keinem `needs` davor:
+  # ein roter Bau oder fehlende Geheimnisse halten weder Release noch Deployment auf, es fehlt nur
+  # die APK dieses Tags. Nur aus release.yml (`freigeben`); fehlt die APK, startet ein Nachbau
+  # `android.yml` per Hand (eine schon abgelegte APK ersetzt er nie, Kopf von android.yml).
+  android:
+    name: Android-App (APK)
+    needs: [vorbereiten, freigeben]
+    if: >-
+      ${{ !cancelled() && inputs.freigeben
+      && needs.freigeben.result == 'success' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/android.yml
+    with:
+      tag: ${{ needs.vorbereiten.outputs.tag }}
+      version: ${{ needs.vorbereiten.outputs.version }}
     secrets: inherit
 
   docker:

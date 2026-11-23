@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { dialogSteht } from './dialog-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -72,9 +73,7 @@ test('Eintreffen melden und als Einheit übernehmen mit Ziel BR Nord (LLH-1383)'
   const eingetroffen = page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"]');
   const karte = eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`);
   await karte.getByRole('button', { name: 'Als Einheit übernehmen' }).click();
-  const dialog = page.getByRole('dialog', { name: '„RTW“ als Einheit übernehmen' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, '„RTW“ als Einheit übernehmen');
   // Vorbelegt: die Rufnamen der Zusage, der Typ aus der Art, der Haken für den Raum.
   await expect(dialog).toContainText('83-1');
   await expect(dialog).toContainText('83-2');

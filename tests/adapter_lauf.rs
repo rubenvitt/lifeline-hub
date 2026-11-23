@@ -1,6 +1,9 @@
 //! Der Hintergrundlauf der Adapter (LLH-2017, Design-Doc „Lauf“): Erfolg, Wartezeit nach einem
 //! vorübergehenden Fehler, Anhalten bei einem Fehler, der einen Menschen braucht, und wieder
 //! fällig nach dem Ersetzen eines Geheimnisses. Mit einer Test-Art, ohne Netz.
+//!
+//! Dazu die Störungsmeldung an die Admins (LLH-2026): einmal je Störung, „gestört“ erst ab 30
+//! Minuten, Entwarnung nach der Rückkehr, nichts bei gesperrtem Geheimnisspeicher.
 
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
@@ -11,7 +14,8 @@ use serde_json::{json, Value};
 
 mod adapter_testart;
 mod common;
-use common::{anfrage_json, fremde_org_anlegen, login_cookie, setup_mit_state};
+use common::{anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_state};
+use lifeline_hub::live::LiveHub;
 
 const LISTE: &str = "/api/admin/adapter";
 const TOKEN: &str = "token-0815";
@@ -19,22 +23,54 @@ const TOKEN: &str = "token-0815";
 struct Umgebung {
     app: axum::Router,
     pool: sqlx::SqlitePool,
+    live: LiveHub,
     rahmen: lifeline_hub::adapter::Rahmen,
     art: std::sync::Arc<adapter_testart::TestArt>,
     admin: String,
+    /// Zweiter System-Admin der Org.
+    admin2: String,
+    /// Führungskraft der Org: sieht Anbindungen, ändert sie nicht.
+    fuehrungskraft: String,
+    /// System-Admin einer fremden Org.
+    fremd: String,
 }
 
 async fn umgebung() -> Umgebung {
     let (rahmen, art, _) = adapter_testart::rahmen();
     let r = rahmen.clone();
-    let (app, pool) = setup_mit_state(move |s| s.adapter = r).await;
+    let mut live = None;
+    let (app, pool) = setup_mit_state(|s| {
+        s.adapter = r;
+        live = Some(s.live.clone());
+    })
+    .await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "admin2", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE benutzername = 'admin2'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let admin2 = login_cookie(&app, "admin2", "admin2pw1").await;
+    benutzer_anlegen(&app, &admin, "fuehrung", "fuehrungskraft").await;
+    let fuehrungskraft = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
+    let (fremde_org, _) =
+        fremde_org_anlegen(&pool, "Fremde Orga", "fremdadmin", "fremdpw123", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE org_id = ?")
+        .bind(fremde_org)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fremd = login_cookie(&app, "fremdadmin", "fremdpw123").await;
     Umgebung {
         app,
         pool,
+        live: live.unwrap(),
         rahmen,
         art,
         admin,
+        admin2,
+        fuehrungskraft,
+        fremd,
     }
 }
 
@@ -82,8 +118,50 @@ impl Umgebung {
     }
 
     async fn lauf(&self, jetzt: chrono::DateTime<Utc>) {
-        durchgang(&self.pool, &self.rahmen, jetzt).await.unwrap();
+        durchgang(&self.pool, &self.rahmen, &self.live, jetzt)
+            .await
+            .unwrap();
     }
+
+    /// Die Benachrichtigungen, die `cookie` sieht (`GET /api/benachrichtigungen`), jüngste zuerst.
+    async fn meldungen(&self, cookie: &str) -> Vec<Value> {
+        let (s, v) = anfrage_json(&self.app, "GET", "/api/benachrichtigungen", cookie, None).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        v.as_array().unwrap().clone()
+    }
+
+    /// Die Arten der Meldungen, die `cookie` sieht, älteste zuerst, mit „offen“ oder „quittiert“.
+    async fn arten(&self, cookie: &str) -> Vec<(String, bool)> {
+        let mut aus: Vec<(String, bool)> = self
+            .meldungen(cookie)
+            .await
+            .iter()
+            .map(|m| {
+                (
+                    m["art"].as_str().unwrap().to_string(),
+                    m.get("quittiert_at").is_none(),
+                )
+            })
+            .collect();
+        aus.reverse();
+        aus
+    }
+
+    async fn gemeldet(&self, id: &str) -> Option<String> {
+        sqlx::query_scalar("SELECT gemeldet FROM adapter WHERE id = ?")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap()
+    }
+}
+
+fn offen(art: &str) -> (String, bool) {
+    (art.to_string(), true)
+}
+
+fn erledigt(art: &str) -> (String, bool) {
+    (art.to_string(), false)
 }
 
 fn zeit(t: chrono::DateTime<Utc>) -> String {
@@ -229,7 +307,9 @@ async fn fehlendes_geheimnis_und_fehlender_schluessel_brauchen_eingriff() {
     // Derselbe Bestand nach einem Neustart ohne Schlüssel: gesperrt.
     let id2 = u.adapter(true).await;
     let ohne = adapter_testart::rahmen_mit(&u.art, None);
-    durchgang(&u.pool, &ohne, Utc::now()).await.unwrap();
+    durchgang(&u.pool, &ohne, &u.live, Utc::now())
+        .await
+        .unwrap();
     let a = u.ansicht(&id2).await;
     assert_eq!(a["angehalten_grund"], "geheimnisspeicher_gesperrt");
 
@@ -239,7 +319,9 @@ async fn fehlendes_geheimnis_und_fehlender_schluessel_brauchen_eingriff() {
         &u.art,
         Some(lifeline_hub::adapter::geheimnis::GeheimnisSchluessel::generate()),
     );
-    durchgang(&u.pool, &anderer, Utc::now()).await.unwrap();
+    durchgang(&u.pool, &anderer, &u.live, Utc::now())
+        .await
+        .unwrap();
     let a = u.ansicht(&id3).await;
     assert_eq!(a["angehalten_grund"], "geheimnis_unlesbar");
     assert!(u.art.gesehen().is_empty());
@@ -402,7 +484,9 @@ async fn start_mit_schluessel_nimmt_wegen_des_speichers_angehaltene_wieder_auf()
     let u = umgebung().await;
     let id = u.adapter(true).await;
     let ohne = adapter_testart::rahmen_mit(&u.art, None);
-    durchgang(&u.pool, &ohne, Utc::now()).await.unwrap();
+    durchgang(&u.pool, &ohne, &u.live, Utc::now())
+        .await
+        .unwrap();
     assert_eq!(
         u.ansicht(&id).await["angehalten_grund"],
         "geheimnisspeicher_gesperrt"
@@ -432,4 +516,439 @@ async fn start_mit_schluessel_nimmt_wegen_des_speichers_angehaltene_wieder_auf()
         .await
         .unwrap();
     assert_eq!(u.ansicht(&id).await["zustand"], "aus");
+}
+
+// ───────────────────── Störungsmeldung an die Admins (LLH-2026) ─────────────────────
+
+fn abgelehnt() -> Result<i64, Fehlschlag> {
+    Err(Fehlschlag {
+        art: AdapterFehler::Abgelehnt,
+        status: Some(401),
+    })
+}
+
+fn verbindung() -> Result<i64, Fehlschlag> {
+    Err(Fehlschlag::new(AdapterFehler::Verbindung))
+}
+
+/// Läuft fällige Durchgänge bis `bis`, jeweils zum nächsten geplanten Abruf.
+async fn laufen_bis(u: &Umgebung, id: &str, bis: chrono::DateTime<Utc>) {
+    loop {
+        let naechster: Option<String> =
+            sqlx::query_scalar("SELECT naechster_abruf_at FROM adapter WHERE id = ?")
+                .bind(id)
+                .fetch_one(&u.pool)
+                .await
+                .unwrap();
+        let Some(t) = naechster.and_then(|n| lifeline_hub::zeit::parse_utc(&n)) else {
+            return;
+        };
+        if t > bis {
+            return;
+        }
+        u.lauf(t).await;
+    }
+}
+
+#[tokio::test]
+async fn anhalten_meldet_genau_einmal_an_die_admins() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    u.art.plane(abgelehnt());
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    u.lauf(t0 + Duration::hours(3)).await;
+
+    for cookie in [&u.admin, &u.admin2] {
+        let m = u.meldungen(cookie).await;
+        assert_eq!(m.len(), 1, "{m:?}");
+        assert_eq!(m[0]["art"], "adapter_eingriff");
+        assert_eq!(m[0]["stufe"], "hinweis");
+        assert!(m[0]["einsatz_id"].is_null());
+        assert_eq!(m[0]["titel"], "Anbindung braucht Eingriff");
+        assert_eq!(m[0]["detail"], "Quelle · Zugang abgelehnt (401)");
+        assert_eq!(
+            m[0]["pfad"],
+            format!("/admin/einstellungen/anbindungen/adapter/{id}")
+        );
+    }
+    assert!(u.meldungen(&u.fuehrungskraft).await.is_empty());
+    assert!(u.meldungen(&u.fremd).await.is_empty());
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("eingriff"));
+}
+
+#[tokio::test]
+async fn kurze_stoerung_meldet_nicht() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    for _ in 0..5 {
+        u.art.plane(verbindung());
+    }
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    laufen_bis(&u, &id, t0 + Duration::minutes(29)).await;
+    assert!(u.art.gesehen().len() >= 4, "{:?}", u.art.gesehen());
+    assert!(u.meldungen(&u.admin).await.is_empty());
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn lange_stoerung_meldet_einmal_ab_dreissig_minuten() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    for _ in 0..10 {
+        u.art.plane(verbindung());
+    }
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    laufen_bis(&u, &id, t0 + Duration::minutes(31)).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    let m = u.meldungen(&u.admin).await;
+    assert_eq!(m[0]["detail"], "Quelle · Keine Verbindung zum Ziel");
+
+    laufen_bis(&u, &id, t0 + Duration::minutes(80)).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("gestoert"));
+}
+
+#[tokio::test]
+async fn eskalation_ersetzt_die_stoerungsmeldung() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    for _ in 0..6 {
+        u.art.plane(verbindung());
+    }
+    u.art.plane(abgelehnt());
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    laufen_bis(&u, &id, t0 + Duration::hours(2)).await;
+    assert_eq!(
+        u.arten(&u.admin).await,
+        [erledigt("adapter_gestoert"), offen("adapter_eingriff")]
+    );
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("eingriff"));
+}
+
+#[tokio::test]
+async fn erholung_erledigt_und_entwarnt() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    for _ in 0..6 {
+        u.art.plane(verbindung());
+    }
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    // Sechs Fehlschläge, dann Erfolg (leeres Skript).
+    laufen_bis(&u, &id, t0 + Duration::hours(2)).await;
+    assert_eq!(
+        u.arten(&u.admin).await,
+        [erledigt("adapter_gestoert"), offen("adapter_wieder_ok")]
+    );
+    let m = u.meldungen(&u.admin2).await;
+    assert_eq!(m[0]["titel"], "Anbindung läuft wieder");
+    assert_eq!(m[0]["detail"], "Quelle");
+    assert_eq!(u.gemeldet(&id).await, None);
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+}
+
+#[tokio::test]
+async fn erfolg_ohne_meldung_entwarnt_nicht() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    u.art.plane(verbindung());
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    u.lauf(t0 + Duration::minutes(2)).await;
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+    assert!(u.meldungen(&u.admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn gesperrter_speicher_meldet_nicht() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    let ohne = adapter_testart::rahmen_mit(&u.art, None);
+    durchgang(&u.pool, &ohne, &u.live, Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(
+        u.ansicht(&id).await["angehalten_grund"],
+        "geheimnisspeicher_gesperrt"
+    );
+    lifeline_hub::adapter::lauf::beim_start(&u.pool, &u.rahmen)
+        .await
+        .unwrap();
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+    assert!(u.meldungen(&u.admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn unlesbares_geheimnis_meldet() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    let anderer = adapter_testart::rahmen_mit(
+        &u.art,
+        Some(lifeline_hub::adapter::geheimnis::GeheimnisSchluessel::generate()),
+    );
+    durchgang(&u.pool, &anderer, &u.live, Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_eingriff")]);
+    assert_eq!(
+        u.meldungen(&u.admin).await[0]["detail"],
+        "Quelle · Geheimnis mit anderem Schlüssel gesetzt"
+    );
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("eingriff"));
+}
+
+#[tokio::test]
+async fn veralteter_abruf_meldet_nicht() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    u.art.plane(abgelehnt());
+    *u.art.waehrenddessen.lock().unwrap() = Some((
+        u.pool.clone(),
+        format!("UPDATE adapter SET stand = stand + 1 WHERE id = '{id}'"),
+    ));
+    u.lauf(Utc::now()).await;
+    assert!(u.meldungen(&u.admin).await.is_empty());
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn meldung_enthaelt_keine_einstellung_und_kein_geheimnis() {
+    let u = umgebung().await;
+    let (s, v) = anfrage_json(
+        &u.app,
+        "POST",
+        LISTE,
+        &u.admin,
+        Some(&json!({
+            "art": "test",
+            "name": "Quelle",
+            "intervall_s": 60,
+            "einstellungen": { "adresse": "https://ziel.example/pfad?schluessel=abc123", "gruppe": "g7" }
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["id"].as_str().unwrap().to_string();
+    u.set_token(&id, TOKEN).await;
+    u.art.plane(abgelehnt());
+    u.lauf(Utc::now()).await;
+    let m = u.meldungen(&u.admin).await;
+    assert_eq!(m.len(), 1);
+    let alles = serde_json::to_string(&m).unwrap();
+    for verboten in [TOKEN, "ziel.example", "abc123", "g7"] {
+        assert!(!alles.contains(verboten), "{verboten} in {alles}");
+    }
+    let (s, einzeln) = anfrage_json(
+        &u.app,
+        "GET",
+        &format!("/api/benachrichtigungen/{}", m[0]["id"]),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!einzeln.to_string().contains(TOKEN));
+    // Ein Fremder bekommt 404.
+    let (s, _) = anfrage_json(
+        &u.app,
+        "GET",
+        &format!("/api/benachrichtigungen/{}", m[0]["id"]),
+        &u.fremd,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+// ───────────────────── Admin greift ein (LLH-2026) ─────────────────────
+
+/// Ein Adapter, den der Lauf mit 401 angehalten und gemeldet hat.
+async fn eingriff_gemeldet(u: &Umgebung) -> String {
+    let id = u.adapter(true).await;
+    u.art.plane(abgelehnt());
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_eingriff")]);
+    id
+}
+
+/// Ein Adapter, der als gestört gemeldet ist (sechs Verbindungsfehler über 30 Minuten), und der
+/// Zeitpunkt, bis zu dem gelaufen wurde.
+async fn stoerung_gemeldet(u: &Umgebung) -> (String, chrono::DateTime<Utc>) {
+    let id = u.adapter(true).await;
+    for _ in 0..20 {
+        u.art.plane(verbindung());
+    }
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    let bis = t0 + Duration::minutes(31);
+    laufen_bis(u, &id, bis).await;
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    (id, bis)
+}
+
+async fn post(u: &Umgebung, pfad: &str) -> StatusCode {
+    let (s, _) = anfrage_json(&u.app, "POST", pfad, &u.admin, None).await;
+    s
+}
+
+#[tokio::test]
+async fn fortsetzen_erledigt_ohne_entwarnung() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    assert_eq!(
+        post(&u, &format!("{LISTE}/{id}/fortsetzen")).await,
+        StatusCode::OK
+    );
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+    // Auch der nächste Erfolg entwarnt nicht: der Admin weiß es schon.
+    u.lauf(Utc::now()).await;
+    assert_eq!(u.ansicht(&id).await["zustand"], "ok");
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+}
+
+#[tokio::test]
+async fn neues_geheimnis_erledigt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    u.set_token(&id, "neues-token").await;
+    assert_eq!(u.arten(&u.admin2).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn wirksame_aenderung_nach_anhalten_erledigt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    let (s, v) = anfrage_json(
+        &u.app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &u.admin,
+        Some(&json!({ "einstellungen": { "gruppe": "neu" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn anhalten_durch_admin_erledigt_stoerung() {
+    let u = umgebung().await;
+    let (id, _) = stoerung_gemeldet(&u).await;
+    assert_eq!(
+        post(&u, &format!("{LISTE}/{id}/anhalten")).await,
+        StatusCode::OK
+    );
+    assert_eq!(u.arten(&u.admin).await, [erledigt("adapter_gestoert")]);
+    assert_eq!(u.gemeldet(&id).await, None);
+}
+
+#[tokio::test]
+async fn umbenennen_laesst_merker_stehen() {
+    let u = umgebung().await;
+    let (id, _) = stoerung_gemeldet(&u).await;
+    let (s, v) = anfrage_json(
+        &u.app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &u.admin,
+        Some(&json!({ "name": "Quelle Nord" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_gestoert")]);
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("gestoert"));
+}
+
+#[tokio::test]
+async fn loeschen_erledigt_und_raeumt() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    let (s, _) = anfrage_json(&u.app, "DELETE", &format!("{LISTE}/{id}"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE adapter_id = ?")
+        .bind(&id)
+        .fetch_one(&u.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+    assert!(u.meldungen(&u.admin).await.is_empty());
+}
+
+// ───────────────────── Review-Befunde (LLH-2026) ─────────────────────
+
+/// Meldet die Org des Adapters bei einem Hub an: Schreibwege am Adapter sind dann gesperrt (409).
+async fn an_den_hub(u: &Umgebung) {
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&u.pool)
+        .await
+        .unwrap();
+    let kopplung: i64 = sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, gegenueber_adresse, zustand, art) VALUES ('hub-a', 'X', 'Hub Kreis', 'meldet_sich', \
+         'https://hub.example', 'aktiv', 'standard') RETURNING id",
+    )
+    .fetch_one(&u.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
+         VALUES (?, ?, 'hub-a/1', 'Kreis')",
+    )
+    .bind(kopplung)
+    .bind(org)
+    .execute(&u.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn gescheitertes_loeschen_laesst_die_meldung_offen() {
+    let u = umgebung().await;
+    let id = eingriff_gemeldet(&u).await;
+    an_den_hub(&u).await;
+    let (s, _) = anfrage_json(&u.app, "DELETE", &format!("{LISTE}/{id}"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(u.arten(&u.admin).await, [offen("adapter_eingriff")]);
+    assert_eq!(u.gemeldet(&id).await.as_deref(), Some("eingriff"));
+}
+
+#[tokio::test]
+async fn meldung_nur_fuer_admins_der_org_lesbar() {
+    let u = umgebung().await;
+    eingriff_gemeldet(&u).await;
+    let id = u.meldungen(&u.admin2).await[0]["id"].clone();
+    let pfad = format!("/api/benachrichtigungen/{id}");
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Nicht mehr Admin: 404, die Liste lässt sie aus.
+    sqlx::query("UPDATE benutzer SET system_rolle = 'keiner' WHERE benutzername = 'admin2'")
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(u.meldungen(&u.admin2).await.is_empty());
+
+    // Wieder Admin, aber in einer anderen Org: ebenso.
+    let (fremde_org, _) =
+        fremde_org_anlegen(&u.pool, "Dritte Orga", "dritter", "drittpw123", "keine").await;
+    sqlx::query(
+        "UPDATE benutzer SET system_rolle = 'admin', org_id = ? WHERE benutzername = 'admin2'",
+    )
+    .bind(fremde_org)
+    .execute(&u.pool)
+    .await
+    .unwrap();
+    let (s, _) = anfrage_json(&u.app, "GET", &pfad, &u.admin2, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(u.meldungen(&u.admin2).await.is_empty());
 }

@@ -458,6 +458,11 @@ pub struct MaterialPatch<'a> {
     pub kategorie: Option<Option<&'a str>>,
     pub bestandsnummer: Option<Option<&'a str>>,
     pub traegerorganisation: Option<Option<&'a str>>,
+    /// Wer den Status setzt (LLH-1986): bei einem echten Wechsel in `status_gesetzt_von`, damit
+    /// nur diese Person ihn zurücknimmt; `None` lässt keine Rücknahme zu.
+    pub gesetzt_von: Option<i64>,
+    /// Zeitpunkt des Wechsels (`status_gesetzt_at`, Kennung der Rücknahme); `None` = jetzt.
+    pub gesetzt_at: Option<&'a str>,
 }
 
 impl MaterialPatch<'_> {
@@ -591,6 +596,120 @@ pub async fn update_tx(
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    // Rücknahme eines Statuswechsels (LLH-1986, Design E1): ein echter Wechsel merkt sich wer,
+    // wann und den Status davor; eine geänderte Menge oder Art überholt ihn, auch im selben
+    // Patch, weil die Rücknahme sonst einen Stand herstellte, den es so nie gab.
+    let menge_oder_art =
+        patch.menge.is_some_and(|m| m != menge) || patch.art.is_some_and(|a| a != art);
+    if menge_oder_art {
+        vergiss_statuswechsel_tx(conn, einsatz_id, em_id).await?;
+    } else if patch.status.is_some_and(|neu| neu != status) {
+        sqlx::query(
+            "UPDATE einsatz_material SET status_gesetzt_von = ?, \
+                    status_gesetzt_at = COALESCE(?, datetime('now')), status_vorher = ? \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(patch.gesetzt_von)
+        .bind(patch.gesetzt_at)
+        .bind(status.as_str())
+        .bind(em_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Leert, was die Zeile für die Rücknahme ihres letzten Statuswechsels hält (LLH-1986): Menge,
+/// Art, Aufteilen und Herausnehmen überholen den gemerkten Wechsel.
+pub async fn vergiss_statuswechsel_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_material SET status_gesetzt_von = NULL, status_gesetzt_at = NULL, \
+                status_vorher = NULL \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Nimmt einen Statuswechsel einer Materialzeile zurück (LLH-1986), in der Transaktion des
+/// Aufrufers. Riegel über [`crate::status_ruecknahme::pruefe`] (Kennung `status_gesetzt_at`);
+/// die herzustellende Zeile muss [`check_zeile`] bestehen, sonst `Conflict` mit Grund.
+/// Herausgenommenes Material → `Conflict` wie jeder Schreibweg.
+pub async fn status_zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    beleg: &crate::material::MaterialStatusRuecknahmeBeleg,
+) -> Result<(), AppError> {
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    type Zeile = (
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        String,
+        i64,
+        i64,
+    );
+    let (status, gesetzt_at, gesetzt_von, vorher, art, menge, ausgegeben): Zeile = sqlx::query_as(
+        "SELECT status, status_gesetzt_at, status_gesetzt_von, status_vorher, art, menge, \
+                    ausgegeben \
+             FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let status = MaterialStatus::try_from(status).map_err(AppError::Internal)?;
+    crate::status_ruecknahme::pruefe(
+        &crate::status_ruecknahme::Gemerkt {
+            status,
+            kennung: gesetzt_at,
+            gesetzt_von,
+        },
+        &beleg.status,
+        &beleg.gesetzt_at,
+        benutzer_id,
+        jetzt,
+    )?;
+    let vorher = vorher
+        .map(MaterialStatus::try_from)
+        .transpose()
+        .map_err(AppError::Internal)?
+        .ok_or_else(crate::status_ruecknahme::conflict)?;
+    let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
+    check_zeile(art, menge, ausgegeben, vorher, false).map_err(|e| match e {
+        AppError::UnprocessableEntity(m) => AppError::Conflict(format!(
+            "Der Statuswechsel lässt sich nicht zurücknehmen: {m}"
+        )),
+        andere => andere,
+    })?;
+    let r = sqlx::query(
+        "UPDATE einsatz_material SET status = ?, status_gesetzt_von = NULL, \
+                status_gesetzt_at = NULL, status_vorher = NULL \
+         WHERE id = ? AND einsatz_id = ? AND status = ? AND status_gesetzt_at = ?",
+    )
+    .bind(vorher.as_str())
+    .bind(em_id)
+    .bind(einsatz_id)
+    .bind(beleg.status.as_str())
+    .bind(&beleg.gesetzt_at)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Veraltet);
+    }
     Ok(())
 }
 
@@ -697,6 +816,8 @@ pub async fn teile_auf_tx(
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
+    // Aufteilen überholt einen gemerkten Statuswechsel (LLH-1986); die neue Zeile hat keinen.
+    vergiss_statuswechsel_tx(conn, einsatz_id, em_id).await?;
     sqlx::query("UPDATE einsatz_material SET menge = menge - ? WHERE id = ? AND einsatz_id = ?")
         .bind(menge)
         .bind(em_id)
@@ -916,6 +1037,7 @@ async fn set_beendet_tx(
     // `zuletzt_entlassen_at` überdauert das erneute Disponieren (Storno-Sperre, design.md D3).
     let r = sqlx::query(
         "UPDATE einsatz_material SET beendet_at = ?1, beendet_von = ?2, beendet_als = ?3, \
+             status_gesetzt_von = NULL, status_gesetzt_at = NULL, status_vorher = NULL, \
              zuletzt_entlassen_at = CASE WHEN ?3 = 'entlassen' THEN ?1 \
                                          ELSE zuletzt_entlassen_at END \
          WHERE id = ?4 AND einsatz_id = ?5 AND beendet_at IS NULL",

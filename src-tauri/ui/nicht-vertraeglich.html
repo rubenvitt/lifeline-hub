@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  Seite „nicht verträglich“ der Desktop-Hülle (LLH-1982, Spec `huellen-vertrag`): der Server spricht
+  einen Hüllen-Vertrag (`GET /api/shell`), den diese App nicht kennt. Die Hülle lädt seine
+  Oberfläche nicht und setzt diese Seite ins Fenster (src-tauri/src/main.rs,
+  `show_nicht_vertraeglich`); prüfen und laden entscheidet die Hülle, hier steht nur die Bedienung.
+  Texte wie die Status-Seiten der iOS-App (docs/betrieb/ios-app.md). Gestaltung in stil.css.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lifeline Hub – Server nicht verträglich</title>
+    <link rel="stylesheet" href="stil.css" />
+    <script src="nicht-vertraeglich.js" defer></script>
+  </head>
+  <body>
+    <main class="karte">
+      <p class="augenbraue">Lifeline Hub</p>
+      <h1 id="titel">Server nicht verträglich</h1>
+      <p><code id="adresse"></code></p>
+      <p id="hinweis"></p>
+      <p id="server-version" hidden></p>
+      <p id="app-version"></p>
+      <p id="fehler" role="alert"></p>
+      <div class="aktionen">
+        <button type="button" id="update" class="primaer" hidden>Nach Update suchen</button>
+        <button type="button" id="erneut" class="sekundaer">Erneut prüfen</button>
+        <button type="button" id="wechseln" class="sekundaer">Server wechseln</button>
+      </div>
+    </main>
+  </body>
+</html>

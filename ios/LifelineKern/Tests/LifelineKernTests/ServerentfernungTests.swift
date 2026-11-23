@@ -19,12 +19,15 @@ final class ServerentfernungTests: XCTestCase {
         lager = liste.add(try ServerAdresse.parse("https://lager.example"), name: "Lager")
     }
 
-    func testDieReihenfolgeIstWebviewSpeicherEintrag() async throws {
+    func testDieReihenfolgeIstWebviewSpeicherVorratEintrag() async throws {
         let dienste = Dienste(liste: liste)
         try await Serverentfernung.run(lager.id, dienste: dienste)
         XCTAssertEqual(
             dienste.schritte,
-            [.closeWebView(lager.id), .removeDatenspeicher(lager.id), .removeEintrag(lager.id)])
+            [
+                .closeWebView(lager.id), .removeDatenspeicher(lager.id), .removeVorrat(lager.id),
+                .removeEintrag(lager.id),
+            ])
         XCTAssertEqual(dienste.liste.eintraege.map(\.id), [elw.id])
     }
 
@@ -90,6 +93,7 @@ private final class Dienste: Entfernungsdienste {
     enum Schritt: Equatable {
         case closeWebView(UUID)
         case removeDatenspeicher(UUID)
+        case removeVorrat(UUID)
         case removeEintrag(UUID)
     }
 
@@ -113,6 +117,8 @@ private final class Dienste: Entfernungsdienste {
         waehrendDesLoeschens?(self)
         if let speicherFehler { throw Fehler(errorDescription: speicherFehler) }
     }
+
+    func removeVorrat(_ id: UUID) { schritte.append(.removeVorrat(id)) }
 
     func removeEintrag(_ id: UUID) throws(Serverliste.ListError) {
         try liste.remove(id)

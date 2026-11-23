@@ -12,7 +12,8 @@ use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
 use crate::material::ort::{self, MaterialOrt, OrtPatch};
 use crate::material::{
     EinsatzMaterialAnzeige, MaterialArt, MaterialEntlassungAntwort, MaterialEntlassungVorzustand,
-    MaterialRuecknahmeAntwort, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX,
+    MaterialPatchAntwort, MaterialRuecknahmeAntwort, MaterialStatus, MaterialStatusRuecknahmeBeleg,
+    ADHOC_TEXT_MAX, BEMERKUNG_MAX,
 };
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max, trimme_tri,
@@ -375,7 +376,7 @@ pub async fn update(
     PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
     Query(params): Query<NurWennFreiParams>,
     JsonBody(body): JsonBody<DispoPatchBody>,
-) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+) -> Result<Json<MaterialPatchAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     if let Some(menge) = body.menge {
@@ -494,6 +495,7 @@ pub async fn update(
         w
     };
 
+    let jetzt = crate::zeit::jetzt();
     let patch = MaterialPatch {
         menge: body.menge,
         ausgegeben: body.ausgegeben,
@@ -505,6 +507,8 @@ pub async fn update(
         kategorie: tri(&kategorie),
         bestandsnummer: tri(&bestandsnummer),
         traegerorganisation: tri(&traeger),
+        gesetzt_von: Some(ctx.benutzer.id),
+        gesetzt_at: Some(&jetzt),
     };
 
     // F06/LFH-244 Tier-A: Domänen-Update und die System-ETB-Einträge atomar in EINER Tx (BEGIN
@@ -574,6 +578,65 @@ pub async fn update(
         Ok((vorher, nachher, etb_ids))
     })?;
     super::etb_verteilen(&state, einsatz_id, etb_ids);
+    sse_material(&state, einsatz_id, em_id);
+    notify_orte(&state, einsatz_id, &vorher, &nachher);
+    // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel ohne geänderte Menge oder
+    // Art (die überholen ihn, `update_tx`).
+    let status_ruecknahme = (vorher.status != nachher.status
+        && vorher.menge == nachher.menge
+        && vorher.art == nachher.art)
+        .then(|| MaterialStatusRuecknahmeBeleg {
+            vorher_status: Some(vorher.status),
+            status: nachher.status,
+            gesetzt_at: jetzt.clone(),
+        });
+    Ok(Json(MaterialPatchAntwort {
+        material: nachher,
+        status_ruecknahme,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen — „Rückgängig“ nach einem
+/// Statuswechsel (LLH-1986, Regel `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines
+/// Statuswechsels“). Body ist der Beleg aus der Antwort des PATCH. Status inzwischen anders →
+/// 409 `veraltet`; andere Person, abgelaufene Frist, inzwischen geänderte Menge oder Art → 409 mit
+/// Grund. Ein ETB-Eintrag, Live-Meldungen wie beim Wechsel.
+pub async fn status_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+    JsonBody(beleg): JsonBody<MaterialStatusRuecknahmeBeleg>,
+) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (vorher, nachher, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        disposition_repo::status_zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            em_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &beleg,
+        )
+        .await?;
+        let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_statuswechsel_zurueckgenommen(
+                &nachher.bezeichnung,
+                nachher.status,
+                vorher.status,
+            ),
+        )
+        .await?;
+        Ok((vorher, nachher, etb_id))
+    })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, em_id);
     notify_orte(&state, einsatz_id, &vorher, &nachher);
     Ok(Json(nachher))

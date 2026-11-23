@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import {
   detailBereit,
   seedEinheitPersonalGesperrt,
@@ -895,10 +896,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
      * erst danach greift die Skalierung. Die `ant-zoom`-Klasse verschwindet erst, wenn
      * rc-motion fertig ist.
      */
-    await expect(
-      page.locator('.ant-modal'),
-      'die Einblendung der Palette ist durch',
-    ).not.toHaveClass(/ant-zoom/);
+    await eingeblendet(page.getByRole('listbox'));
     /**
      * Auf die Listbox gescopt: `role="option"` vergibt auch jedes antd-`Select`-Dropdown.
      */
@@ -2954,9 +2952,7 @@ test('Unterkunft planen (LLH-1525): Grundlage, Kopfaktionen und Dialog „Nachfo
     await kopfAktionen
       .getByRole('button', { name: 'Nachforderungen anlegen', exact: true })
       .click();
-    const dialog = page.getByRole('dialog', { name: `Nachforderungen für ${UNTERKUNFT_STELLE}` });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const dialog = await dialogSteht(page, `Nachforderungen für ${UNTERKUNFT_STELLE}`);
     const posten = await mindestensKnoten(
       dialog.locator('label.ant-checkbox-wrapper'),
       3,
@@ -4306,13 +4302,10 @@ test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', asy
  * sonst mäße der Test die Animation statt des Felds.
  */
 async function modalRuht(page: Page) {
+  await eingeblendet(page.locator('.ant-modal'));
   await page.waitForFunction(() => {
     const m = document.querySelector('.ant-modal');
-    return (
-      m != null &&
-      m.getAnimations({ subtree: true }).length === 0 &&
-      !/ant-zoom-(enter|appear)/.test(m.className)
-    );
+    return m != null && m.getAnimations({ subtree: true }).length === 0;
   });
 }
 
@@ -5626,8 +5619,7 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
       const eintreffen = page.getByRole('button', { name: 'Eintreffen buchen' });
       const eintreffenHoehe = await haeltStufe(eintreffen, soll, `„Eintreffen buchen“ (${dichte})`);
       await eintreffen.click();
-      const dialog = page.getByRole('dialog', { name: 'Eintreffen buchen' });
-      await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+      const dialog = await dialogSteht(page, 'Eintreffen buchen');
       const trefferHoehe = await alleHaltenStufe(
         dialog.getByRole('button', { name: /^Eintreffen Florian BR \d$/ }),
         soll,

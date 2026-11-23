@@ -28,7 +28,11 @@ das geladene Fenster. Ein Deeplink außerhalb des Fensters holt den Anruf einzel
 Einfrieren holt, mit den Kennungen auf, mit denen sie kam (`extendEinfrierstand`, `ladeWeiter`):
 erkannt an der Referenz, nie an der Position, denn mit dem Deckel fällt am anderen Ende eine Seite
 heraus. Ein Nachtrag aus einer selbst geholten Seite gilt so nicht als „neuer Anruf“, ein fremder
-Nachtrag beim Live-Neuladen schon.
+Nachtrag beim Live-Neuladen schon. Der eingefrorene Stand merkt sich dazu den gezeigten Bereich
+(jüngster und ältester Anruf in der Ordnung des Servers, LLH-2066): was außerhalb davon nachrückt,
+weil im Fenster einer herausfiel („offene Rückrufe“: erledigt), ist verschoben, nicht neu, und
+steht sofort. Unter dem Bereich gilt das immer, darüber nur ohne Kopf im Fenster; „Ältere laden“
+und „Neuere laden“ erweitern den Bereich.
 
 **Funkprotokoll-Ordnung** (LLH-1149, Spec `stab-infotelefon`, Herleitung
 `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D10): dieselbe

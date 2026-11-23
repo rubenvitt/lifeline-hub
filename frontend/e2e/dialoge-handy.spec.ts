@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogSteht, eingeblendet } from './dialog-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle, type Rolle } from './rollen-kern';
 
 /**
@@ -59,8 +60,7 @@ const zeitraumWahl = (page: Page) => page.locator('[data-lfh="etb-zeitraum"]');
 async function oeffneZeitraum(page: Page, tippen = false) {
   if (tippen) await zeitraumWahl(page).tap();
   else await zeitraumWahl(page).click();
-  await expect(page.getByPlaceholder('von', { exact: true })).toBeVisible();
-  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+  await eingeblendet(page.getByPlaceholder('von', { exact: true }));
 }
 
 /** Der Kalender-Knopf neben einem Zeitfeld (`anzeige/ZeitpunktEingabe.tsx`, LLH-1070). */
@@ -203,9 +203,8 @@ async function ruhigerPunktImStreifen(page: Page, g: Groesse = HANDY) {
 /** Das offene Blatt liegt im Schirm und lässt oben einen Streifen zum Wegtippen frei. */
 async function pruefeBlatt(page: Page, wo: string, g: Groesse = HANDY) {
   const p = panel(page);
-  await expect(p).toBeVisible();
   // Erst nach der Einblendung messen: währenddessen ist das Popover skaliert.
-  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+  await eingeblendet(p);
   const k = await kasten(p);
   expect(liegtIn(k, schirm(g)), `${wo}: Panel ${JSON.stringify(k)} liegt nicht im Schirm`).toBe(
     true,
@@ -313,9 +312,7 @@ async function pruefeEtbFilter(
 /** Serienmaske: „Betroffene erfassen“ über ihre Adresse (`?neu=1`). */
 async function pruefeSerienfuss(page: Page, einsatzId: string, wer: string) {
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-  const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const dialog = await dialogSteht(page, 'Betroffene erfassen');
 
   const rahmen = await kasten(dialog);
   const knoepfe = [
@@ -525,9 +522,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
     await stelleDichte(page, 'kompakt');
     await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
     await stufeAngekommen(page, 'kompakt');
-    const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const dialog = await dialogSteht(page, 'Betroffene erfassen');
     const serie = dialog.getByRole('button', { name: 'Speichern und nächste', exact: true });
     const kuerzel = serie.locator('.lfh-serien-kuerzel');
     await expect(kuerzel).toBeVisible();
@@ -550,8 +545,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
     await oeffneZeitraum(page);
     const von = page.getByPlaceholder('von', { exact: true });
     await kalenderKnopf(von).click();
-    await expect(panel(page)).toBeVisible();
-    await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+    await eingeblendet(panel(page));
     await expect(panel(page)).not.toHaveClass(/lfh-zeit-blatt/);
     const feld = await kasten(von);
     const p = await kasten(panel(page));

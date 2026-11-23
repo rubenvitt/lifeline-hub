@@ -13,7 +13,7 @@ use crate::personal::disposition_repo::{self, AdhocDaten, DispositionPatch};
 use crate::personal::status_repo;
 use crate::personal::{
     EinsatzPersonalAnzeige, FuehrungskraftKarte, PersonalEntlassungAntwort,
-    PersonalEntlassungRuecknahmeAntwort, PersonalEntlassungVorzustand,
+    PersonalEntlassungRuecknahmeAntwort, PersonalEntlassungVorzustand, PersonalPatchAntwort,
 };
 use crate::personal::{ADHOC_TEXT_MAX, BEMERKUNG_MAX, EINSATZFUNKTION_MAX};
 use crate::routes::support::{
@@ -21,6 +21,7 @@ use crate::routes::support::{
     pflicht_max, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::StaerkePosition;
+use crate::status_ruecknahme::HandStatusRuecknahmeBeleg;
 use crate::zeitachse::repo as zeitachse_repo;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -354,7 +355,7 @@ pub async fn update(
     ctx: EinsatzSchreibzugriff<Personal>,
     PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
-) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
+) -> Result<Json<PersonalPatchAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     if let Some(sid) = body.status_id {
         if !status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {
@@ -437,6 +438,7 @@ pub async fn update(
         w
     };
 
+    let jetzt = crate::zeit::jetzt();
     let patch = DispositionPatch {
         status_id: body.status_id,
         staerke_position: tri(&body.staerke_position),
@@ -445,6 +447,8 @@ pub async fn update(
         name: name.as_deref(),
         funktion: tri(&funktion),
         traegerorganisation: tri(&traeger),
+        gesetzt_von: Some(ctx.benutzer.id),
+        gesetzt_at: Some(&jetzt),
     };
 
     // F06/LFH-244 Tier-A: Dispo-UPDATE und die System-ETB-Einträge (Statuswechsel, geänderte
@@ -452,7 +456,6 @@ pub async fn update(
     // selbst; der Reload liefert die frische, aufgelöste Anzeige für die ETB-Texte UND die
     // Response; SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let jetzt = crate::zeit::jetzt();
     let (vorher, nachher, betroffen, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let mut etb_ids = Vec::new();
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
@@ -462,7 +465,8 @@ pub async fn update(
             // LFH-552: ein markierter Status schreibt die Zeitachse mit; ein Verstoß gegen die
             // Perioden-Regeln wird verschluckt, der Statuswechsel gelingt immer.
             if let Some(sid) = nachher.status_id {
-                zeitachse_repo::aus_personalstatus_tx(
+                // Das Ereignis merkt sich die Zeile für „Rückgängig“ (LLH-1986).
+                if let Some(ereignis) = zeitachse_repo::aus_personalstatus_id_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,
@@ -470,7 +474,11 @@ pub async fn update(
                     sid,
                     &jetzt,
                 )
-                .await?;
+                .await?
+                {
+                    disposition_repo::merke_status_ereignis_tx(conn, einsatz_id, ep_id, ereignis)
+                        .await?;
+                }
             }
             let alt = vorher.status_label.as_deref().unwrap_or("—");
             let neu = nachher.status_label.as_deref().unwrap_or("—");
@@ -524,7 +532,70 @@ pub async fn update(
             super::einsatz_uhs::sse_uhs(&state, einsatz_id, uhs_id);
         }
     }
-    Ok(Json(nachher))
+    // Beleg für „Rückgängig“ (LLH-1986), nur bei einem echten Wechsel.
+    let status_ruecknahme = if vorher.status_id != nachher.status_id {
+        Some(HandStatusRuecknahmeBeleg {
+            vorher_status_id: vorher.status_id,
+            status_id: nachher.status_id,
+            gesetzt_at: jetzt.clone(),
+        })
+    } else {
+        None
+    };
+    Ok(Json(PersonalPatchAntwort {
+        personal: nachher,
+        status_ruecknahme,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen — „Rückgängig“ nach einem
+/// Statuswechsel (LLH-1986, Regel `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines
+/// Statuswechsels“). Body ist der Beleg aus der Antwort des PATCH. Status inzwischen anders →
+/// 409 `veraltet`; andere Person, abgelaufene Frist oder eine Zeitachse, die das Streichen nicht
+/// trägt → 409 mit Grund. Ein ETB-Eintrag, Live-Meldungen wie beim Wechsel.
+pub async fn status_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
+    JsonBody(beleg): JsonBody<HandStatusRuecknahmeBeleg>,
+) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (beruehrt, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let beruehrt = disposition_repo::status_zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &beleg,
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::personal::etb_text_statuswechsel_zurueckgenommen(
+                &anzeige.name,
+                anzeige.status_label.as_deref(),
+                vorher.status_label.as_deref(),
+            ),
+        )
+        .await?;
+        Ok((beruehrt, anzeige, etb_id))
+    })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
+    sse_personal(&state, einsatz_id, ep_id);
+    for weitere in beruehrt.personen.iter().filter(|p| **p != ep_id) {
+        sse_personal(&state, einsatz_id, *weitere);
+    }
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
+    Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,

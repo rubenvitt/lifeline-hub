@@ -733,10 +733,12 @@ async fn melden_einmal_mit(
     })?;
     let (aktiv, offen) = {
         let mut conn = pool.acquire().await?;
-        (
-            repo::list_orgs_aktiv(&mut conn, kopplung.id).await?,
-            repo::list_orgs_widerruf_offen(&mut conn, kopplung.id).await?,
-        )
+        let mut offen = repo::list_orgs_widerruf_offen(&mut conn, kopplung.id).await?;
+        // Mehr offene Widerrufe, als eine Meldung tragen darf, gehen in Portionen: Als gemeldet
+        // gilt nur, was hier mitgeht, der Rest folgt mit der nächsten Meldung (LLH-2019). Die
+        // aktiven Zuordnungen begrenzt schon `repo::check_org_platz`.
+        offen.truncate(ORGS_MAX);
+        (repo::list_orgs_aktiv(&mut conn, kopplung.id).await?, offen)
     };
     // Führung je Einsatz (LLH-1491, D3): Akten seit der letzten Quittung des Gegenübers.
     let fuehrung_an = super::fuehrung::is_enabled(pool).await?;
