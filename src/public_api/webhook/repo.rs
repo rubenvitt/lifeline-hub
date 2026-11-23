@@ -35,7 +35,7 @@ pub struct Webhook {
     pub angelegt_at: String,
     pub geaendert_at: String,
     /// Fingerabdruck des Zielzertifikats (SHA-256, Hex); gesetzt zählt nur dieses Zertifikat
-    /// (LLH-1872, ADR-0088).
+    /// (LLH-1872, ADR-0092).
     pub zertifikat_pin: Option<String>,
 }
 

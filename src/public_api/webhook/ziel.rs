@@ -189,7 +189,7 @@ pub fn normalize_pin(roh: &str) -> Result<Option<String>, PinFehler> {
 }
 
 /// Die einzige Stelle mit den Schutzeinstellungen der Webhooks (ADR-0046); `tls` ersetzt die
-/// Vertrauensanker des Systems (Fingerabdruck oder Erfassung, ADR-0088).
+/// Vertrauensanker des Systems (Fingerabdruck oder Erfassung, ADR-0092).
 fn baue_client(lan_erlaubt: bool, tls: Option<rustls::ClientConfig>) -> reqwest::Client {
     let mut builder = client_builder(Zweck::Webhook)
         .no_proxy()

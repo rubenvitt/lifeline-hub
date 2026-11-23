@@ -1,5 +1,5 @@
 ---
-id: ADR-0088
+id: ADR-0092
 titel: Ein Webhook mit Fingerabdruck vertraut nur diesem Zertifikat
 status: akzeptiert
 datum: 2026-11-22
@@ -11,7 +11,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-wx6bfsmc-webhook-zertifikat-pin-design.md
 ---
 
-# ADR-0088: Ein Webhook mit Fingerabdruck vertraut nur diesem Zertifikat
+# ADR-0092: Ein Webhook mit Fingerabdruck vertraut nur diesem Zertifikat
 
 ## Regeln
 
