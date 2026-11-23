@@ -67,9 +67,7 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
   const { rollen } = useRollen();
   return (
     <>
-      <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
-        erteilt
-      </span>
+      <span style={{ display: 'block', ...monoStil('meta'), color: rollen.schwach }}>erteilt</span>
       <span>
         <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>

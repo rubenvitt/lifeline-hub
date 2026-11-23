@@ -3,9 +3,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 import { einsatzAnlegen } from './einsatz-kern';
 
 /**
- * LFH-644: Kein Kurzetikett der IconRail ist breiter als die Rail. „ERFASSUNG“ (9 px Versalien,
- * Sperrung .06em) stand breiter als die 60-px-Spalte und verlor links den ersten Buchstaben
- * (Befund 9 der Hellmodus-Prüfliste LFH-618).
+ * LFH-644: Kein Kurzetikett der IconRail ist breiter als die Rail. „ERFASSUNG“ (damals 9 px
+ * Versalien, Sperrung .06em) stand breiter als die 60-px-Spalte und verlor links den ersten
+ * Buchstaben (Befund 9 der Hellmodus-Prüfliste LFH-618). Seit LLH-2044: 11 px, Sperrung .04em,
+ * Rail 64 px.
  *
  * ZWEI Messungen je Etikett, weil jede allein eine Lücke hat:
  * - `scrollWidth <= clientWidth` (Akzeptanzkriterium) trägt nur, solange das Etikett auf die
@@ -17,7 +18,7 @@ import { einsatzAnlegen } from './einsatz-kern';
  * Rollenunabhängig: `kategorien` ist eine statische Liste, die Rail zeigt sie jeder Rolle gleich.
  * Gemessen in beiden Modi (die Rail ist in beiden dunkel, die Schrift dieselbe — der Durchgang
  * belegt das, statt es anzunehmen) und in jeder Stufe: in `handschuh` wächst die Rail, die
- * Schrift nicht, also sind `kompakt`/`komfortabel` (60 px) die engen Fälle.
+ * Schrift nicht, also sind `kompakt`/`komfortabel` (64 px) die engen Fälle.
  */
 
 const BREITEN = [1440, 1024] as const;

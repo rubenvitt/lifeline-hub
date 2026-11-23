@@ -137,7 +137,7 @@ export default function MatrixPaneel({
           <span className={MATRIX_KLASSE.fueller} />
           <span
             className={MATRIX_KLASSE.stufen}
-            style={{ ...monoStil('metaKlein'), color: rollen.schwach }}
+            style={{ ...monoStil('meta'), color: rollen.schwach }}
           >
             {stufen.map((l) => (
               <span
