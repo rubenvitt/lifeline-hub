@@ -267,7 +267,12 @@ export default function InfotelefonPage() {
       .querySelector(`[data-anruf="${hervorgehoben}"]`)
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben, isHervorgehobenLoaded]);
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, hierErfasst);
+  const { sichtbar, zurueckgehalten } = teileZufluss(
+    gefiltert,
+    gefroren,
+    hierErfasst,
+    kopfImFenster,
+  );
 
   /**
    * „Ältere laden“ / „Neuere laden“ (LLH-1886): Die geholte Seite antwortet auf eine eigene
@@ -285,12 +290,7 @@ export default function InfotelefonPage() {
     const seiten = ergebnis.data?.pages ?? [];
     const geholt = richtung === 'aelter' ? seiten[seiten.length - 1] : seiten[0];
     if (geholt == null || vorher.has(geholt)) return;
-    setGefroren((g) =>
-      extendEinfrierstand(
-        g,
-        geholt.map((a) => a.id),
-      ),
-    );
+    setGefroren((g) => extendEinfrierstand(g, geholt));
   }
   /*
    * Funkprotokoll (LLH-1149): Öffnen am Ende, Mitlaufen am Ende, Anker beim Nachladen oben.

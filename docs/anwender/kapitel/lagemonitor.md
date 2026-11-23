@@ -118,7 +118,9 @@ null, endet sie vorzeitig.
 
 Der Monitor zeigt nur Zahlen, die Karte, die Bezeichnungen der nächsten Programmpunkte und in der
 Zeile „Was brennt“ die Namen von Einheiten und Abschnitten, keine Personendaten und keine Namen von
-Personen, keine Texte von Meldungen, Aufträgen oder Erinnerungen. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
+Personen, keine Texte von Meldungen, Aufträgen oder Erinnerungen. Ist ein Modul im Einsatz
+ausgeblendet, fehlt seine Angabe in „Was brennt“ wie im Überblick, ohne dass der Monitor „Stand
+unvollständig“ meldet; die Kacheln „Meldungen“ und „Betroffene“ zählen dagegen weiter. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
 hervorgehoben. Er schreibt
 nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
 keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.

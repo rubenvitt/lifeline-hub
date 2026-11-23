@@ -514,6 +514,14 @@ async fn check_art(
         if alt.art() != code.art && repo::is_art_fest(conn, alt.id).await? {
             return Ok(Some(AppError::Conflict(repo::art_konflikt(alt.art()))));
         }
+        // Sonst scheiterte das Anlegen der Zuordnung danach am selben Grund und ginge als
+        // einheitlicher 401 hinaus, gezählt als Fehlversuch (LLH-2019). Nur bei einer Kopplung,
+        // in der die Gegenstelle sich hier meldet: jede andere lehnt das Koppeln ohnehin ab.
+        if alt.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet) {
+            if let Some(voll) = repo::check_org_platz(conn, alt.id).await? {
+                return Ok(Some(voll));
+            }
+        }
     }
     if a.nur_vor_ort && code.art != InstanzKopplungArt::VorOrt {
         return Ok(Some(AppError::Conflict(

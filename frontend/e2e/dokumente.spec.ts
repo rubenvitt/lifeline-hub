@@ -1,4 +1,5 @@
 import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
+import { eingeblendet } from './dialog-kern';
 import { kopfFilterWaehlen } from './kopffilter-kern';
 import { waehleIn } from './auswahl-kern';
 import { ohneDevtoolsKnopf, pruefeFokusVerdeckung } from './fokus-kern';
@@ -273,7 +274,7 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   const ok = rueckfrage.getByRole('button', { name: 'Entfernen' });
   await expect(ok, 'das OK der Rückfrage ist rot').toHaveClass(/ant-btn-dangerous/);
   // Erst nach der Zoom-Einblendung klicken: währenddessen nimmt das Modal keinen Klick an.
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await eingeblendet(rueckfrage);
   await ok.click();
   await expect(rueckfrage, 'die Rückfrage schließt mit dem OK').toBeHidden();
   await expect(page.getByRole('link', { name: 'Lageplan Nord' })).toHaveCount(0);
@@ -473,7 +474,7 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
       const dialog = ablegenDialog(page);
       await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
       // Erst nach der Zoom-Einblendung messen: währenddessen ist der Dialog skaliert.
-      await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+      await eingeblendet(dialog);
 
       const ziele: Record<string, Locator> = {
         'Download-Anker': anker,
@@ -538,7 +539,7 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
       const blasenKnoepfe = blase.locator('.ant-popconfirm-buttons button');
       await expect(blasenKnoepfe).toHaveCount(2);
       // Erst nach der Einblendung messen: währenddessen ist die Blase skaliert.
-      await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+      await eingeblendet(blase);
       for (const [i, knopf] of [blasenKnoepfe.first(), blasenKnoepfe.last()].entries()) {
         const h = await hoehe(knopf);
         messwerte.push(`Rückfrage Knopf ${i + 1}: ${h} px`);
@@ -597,7 +598,7 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
    * bei „Schließen“ neu. Gemessen mit 8-fach gedrosselter CPU: ohne dieses Tor 15 von 20 rot,
    * mit Tor 0 von 20.
    */
-  await expect(dialog, 'Dialog fertig eingeblendet').not.toHaveClass(/ant-zoom-(enter|appear)/);
+  await eingeblendet(dialog);
 
   // Tab-Reihenfolge im Dialog, gemessen. rc-upload hüllt den Knopf in ein `span`, das ohne
   // `hasControlInside` selbst `role=button` und `tabIndex` trüge; die Rückwärtsreihe prüft das.
@@ -871,7 +872,7 @@ for (const viewport of [FUEKW, HANDSCHIRM]) {
       await page.getByRole('button', { name: 'Dokument ablegen' }).click();
       const dialog = ablegenDialog(page);
       await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
-      await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+      await eingeblendet(dialog);
       // Datei gewählt und Bezug aufgeklappt: jedes mögliche Dialogziel steht im Baum.
       await dialog
         .locator('input[type="file"]')

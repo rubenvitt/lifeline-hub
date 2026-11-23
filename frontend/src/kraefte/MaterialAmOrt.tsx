@@ -43,6 +43,7 @@ import {
 } from './materialPosten';
 import { materialKopfzahl } from './materialVerdichtungKern';
 import { useMaterialOrt } from './useMaterialOrt';
+import { useMaterialStatusQuittung } from './useStatusQuittung';
 
 /**
  * Material an EINEM Ort — Einheit, Fahrzeug, UHS oder Bereitstellungsraum — mit EINEM Baustein
@@ -257,10 +258,13 @@ export default function MaterialAmOrt({
   };
 
   // Status am Ort (LLH-1133): derselbe Weg wie die Materialliste, die Ablehnung an der Zeile.
+  const quittiereStatus = useMaterialStatusQuittung(einsatzId);
   const statusWechsel = useMutation({
     mutationFn: async (v: { p: MaterialAmOrtPosten; status: MaterialStatus }) => {
-      await setzeMaterialStatus(einsatzId, v.p.id, v.status);
+      const antwort = await setzeMaterialStatus(einsatzId, v.p.id, v.status);
       await syncOrt();
+      // Die Quittung mit Rückweg (LLH-1986), erst wenn der Ort den neuen Stand zeigt.
+      quittiereStatus(antwort);
     },
     onMutate: (v) => zeilen.beginne(v.p.id),
     onError: (e, v) => zeilen.melde(v.p.id, e, 'Status nicht geändert'),

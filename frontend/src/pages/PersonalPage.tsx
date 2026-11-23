@@ -53,6 +53,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { usePersonalStatusQuittung } from '../kraefte/useStatusQuittung';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
@@ -221,12 +222,20 @@ export default function PersonalPage() {
   // und Einsatzfunktion zeigen ihren Grund selbst an der Angabe (`InlineAngabe`, D4).
   const zeilen = useZeilenFehler<number>();
 
+  const quittiereStatus = usePersonalStatusQuittung(einsatzId, statusQuery.data);
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzPersonal,
     { epId: number; statusId: number }
   >({
     queryKey: einsatzKeys.personal(einsatzId),
-    mutationFn: (v) => updateDisposition(einsatzId, v.epId, { status_id: v.statusId }),
+    // Den Beleg merken, die Zeile ohne ihn in den Cache; die Quittung mit Rückweg (LLH-1986).
+    mutationFn: async (v) => {
+      const { status_ruecknahme, ...kraft } = await updateDisposition(einsatzId, v.epId, {
+        status_id: v.statusId,
+      });
+      if (status_ruecknahme) quittiereStatus({ ...kraft, status_ruecknahme });
+      return kraft;
+    },
     zeilenId: (v) => v.epId,
     ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
     onBeginn: (v) => zeilen.beginne(v.epId),

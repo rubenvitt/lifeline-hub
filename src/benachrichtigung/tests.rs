@@ -54,7 +54,10 @@ fn org_arten_sind_aufnahme_und_neuer_einsatz_und_unwetter_nur_einstellung() {
         org,
         vec![
             &BenachrichtigungArt::EinsatzAufnahme,
-            &BenachrichtigungArt::EinsatzNeu
+            &BenachrichtigungArt::EinsatzNeu,
+            &BenachrichtigungArt::AdapterEingriff,
+            &BenachrichtigungArt::AdapterGestoert,
+            &BenachrichtigungArt::AdapterWiederOk,
         ]
     );
     let nur: Vec<_> = BenachrichtigungArt::ALLE
@@ -62,6 +65,67 @@ fn org_arten_sind_aufnahme_und_neuer_einsatz_und_unwetter_nur_einstellung() {
         .filter(|a| a.nur_einstellung())
         .collect();
     assert_eq!(nur, vec![&BenachrichtigungArt::Unwetter]);
+}
+
+/// Störungen einer Anbindung (LLH-2026): Eingänge an die Admins der Org, nie am Einsatz
+/// einstellbar, ohne Modul.
+#[test]
+fn adapter_arten_sind_eingang_und_nicht_am_einsatz_einstellbar() {
+    for art in [
+        BenachrichtigungArt::AdapterEingriff,
+        BenachrichtigungArt::AdapterGestoert,
+        BenachrichtigungArt::AdapterWiederOk,
+    ] {
+        assert_eq!(art.stufe(), BenachrichtigungStufe::Hinweis, "{art:?}");
+        assert!(art.ist_org(), "{art:?}");
+        assert!(!art.vorgabe_einstellbar(), "{art:?}");
+    }
+    assert_eq!(BenachrichtigungBezugTyp::Adapter.modul(), None);
+}
+
+/// Eine Benachrichtigung hängt an genau einem Ort: einem Einsatz oder einem Adapter (LLH-2026).
+#[tokio::test]
+async fn benachrichtigung_hat_genau_einen_ort() {
+    let pool = crate::db::test_pool().await;
+    crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let (benutzer_id, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query("INSERT INTO adapter (id, org_id, art, name, intervall_s) VALUES ('a1', ?, 'test', 'Quelle', 60)")
+        .bind(org_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let einsatz_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (?, 'E') RETURNING id",
+    )
+    .bind(org_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let einfuegen = |einsatz: Option<i64>, adapter: Option<&'static str>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO benachrichtigung (einsatz_id, adapter_id, benutzer_id, art, stufe, \
+                     bezug_typ, bezug_id, erstellt_at) \
+                 VALUES (?, ?, ?, 'adapter_eingriff', 'hinweis', 'adapter', 1, '2026-11-22 10:00:00')",
+            )
+            .bind(einsatz)
+            .bind(adapter)
+            .bind(benutzer_id)
+            .execute(&pool)
+            .await
+        }
+    };
+    assert!(einfuegen(None, Some("a1")).await.is_ok());
+    assert!(einfuegen(Some(einsatz_id), None).await.is_ok());
+    assert!(einfuegen(None, None).await.is_err());
+    assert!(einfuegen(Some(einsatz_id), Some("a1")).await.is_err());
 }
 
 #[test]
@@ -1037,4 +1101,285 @@ async fn hinweis_zur_abloesenden_einheit_nennt_die_festgehaltene_einheit() {
             .as_deref(),
         Some("Ablösung für Rettungsstaffel")
     );
+}
+
+// ───────────────────── Ort Adapter (LLH-2026) ─────────────────────
+
+/// Org mit Admin („admin“), zweitem Admin, inaktivem Admin, Führungskraft, Admin einer fremden
+/// Org und Adapter `a1` („Quelle“). Liefert `(pool, org_id, [admin, admin2, inaktiv,
+/// fuehrungskraft, fremd])`.
+async fn adapter_umgebung() -> (SqlitePool, i64, [i64; 5]) {
+    let pool = crate::db::test_pool().await;
+    crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let (admin, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let fremde_org: i64 =
+        sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd') RETURNING id")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let konto = |org: i64,
+                 name: &'static str,
+                 system: &'static str,
+                 org_rolle: &'static str,
+                 aktiv: bool| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
+                     system_rolle, org_rolle, aktiv) VALUES (?, ?, ?, 'x', ?, ?, ?) RETURNING id",
+            )
+            .bind(org)
+            .bind(name)
+            .bind(name)
+            .bind(system)
+            .bind(org_rolle)
+            .bind(aktiv)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let admin2 = konto(org_id, "admin2", "admin", "keine", true).await;
+    let inaktiv = konto(org_id, "alt", "admin", "keine", false).await;
+    let fk = konto(org_id, "fk", "keiner", "fuehrungskraft", true).await;
+    let fremd = konto(fremde_org, "fremd", "admin", "keine", true).await;
+    sqlx::query(
+        "INSERT INTO adapter (id, org_id, art, name, intervall_s, einstellungen, \
+             angehalten_grund, letzter_fehler_art, letzter_fehler_status) \
+         VALUES ('a1', ?, 'test', 'Quelle', 60, '{\"url\":\"https://nutzer:pw@ziel.example\"}', \
+                 'abgelehnt', 'abgelehnt', 401)",
+    )
+    .bind(org_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    (pool, org_id, [admin, admin2, inaktiv, fk, fremd])
+}
+
+async fn konto_laden(pool: &SqlitePool, id: i64) -> crate::auth::Benutzer {
+    sqlx::query_as(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+             aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+fn adapter_anlass(org_id: i64, art: BenachrichtigungArt) -> Anlass {
+    Anlass::adapter(
+        org_id,
+        "a1",
+        art,
+        Bezug::neu(BenachrichtigungBezugTyp::Adapter, 7),
+    )
+}
+
+#[tokio::test]
+async fn adapter_anlass_erreicht_nur_admins_der_org() {
+    let (pool, org_id, [admin, admin2, ..]) = adapter_umgebung().await;
+    let live = crate::live::LiveHub::new();
+    let empfaenger = melden(
+        &pool,
+        &live,
+        adapter_anlass(org_id, BenachrichtigungArt::AdapterEingriff),
+    )
+    .await;
+    assert_eq!(empfaenger, vec![admin, admin2]);
+    let zeilen: Vec<(Option<i64>, Option<String>, String, i64)> = sqlx::query_as(
+        "SELECT einsatz_id, adapter_id, stufe, bezug_id FROM benachrichtigung ORDER BY benutzer_id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeilen,
+        vec![
+            (None, Some("a1".into()), "hinweis".into(), 7),
+            (None, Some("a1".into()), "hinweis".into(), 7),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn adapter_art_abgeschaltet_ist_still() {
+    let (pool, org_id, [admin, admin2, ..]) = adapter_umgebung().await;
+    sqlx::query(
+        "INSERT INTO benutzer_einstellungen (benutzer_id, schluessel, wert, geaendert_at) \
+         VALUES (?, ?, '[\"adapter_gestoert\"]', '2026-11-22 10:00:00')",
+    )
+    .bind(admin2)
+    .bind(crate::benutzer_einstellungen::SCHLUESSEL_BENACHRICHTIGUNGEN_AUS)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let live = crate::live::LiveHub::new();
+    let laut = melden(
+        &pool,
+        &live,
+        adapter_anlass(org_id, BenachrichtigungArt::AdapterGestoert),
+    )
+    .await;
+    assert_eq!(laut, vec![admin]);
+    let still: String =
+        sqlx::query_scalar("SELECT stufe FROM benachrichtigung WHERE benutzer_id = ?")
+            .bind(admin2)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(still, "still");
+}
+
+#[tokio::test]
+async fn adapter_zeile_nur_fuer_admin_der_org_lesbar() {
+    let (pool, _, [admin, _, _, fk, fremd]) = adapter_umgebung().await;
+    let darf = |id: i64| {
+        let pool = pool.clone();
+        async move {
+            let b = konto_laden(&pool, id).await;
+            adapter::darf_lesen(&pool, &b, "a1").await.unwrap()
+        }
+    };
+    assert!(darf(admin).await);
+    assert!(!darf(fk).await);
+    assert!(!darf(fremd).await);
+    sqlx::query("UPDATE benutzer SET system_rolle = 'keiner' WHERE id = ?")
+        .bind(admin)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(!darf(admin).await);
+}
+
+#[tokio::test]
+async fn adapter_geloescht_nimmt_seine_zeilen_mit() {
+    let (pool, org_id, _) = adapter_umgebung().await;
+    let live = crate::live::LiveHub::new();
+    melden(
+        &pool,
+        &live,
+        adapter_anlass(org_id, BenachrichtigungArt::AdapterEingriff),
+    )
+    .await;
+    sqlx::query("DELETE FROM adapter WHERE id = 'a1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+async fn adapter_text_nennt_name_und_fehler() {
+    let (pool, _, _) = adapter_umgebung().await;
+    let eingriff = adapter::text(&pool, BenachrichtigungArt::AdapterEingriff, "a1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(eingriff.titel, "Anbindung braucht Eingriff");
+    assert_eq!(
+        eingriff.detail.as_deref(),
+        Some("Quelle · Zugang abgelehnt (401)")
+    );
+    assert_eq!(eingriff.pfad, "/admin/einstellungen/anbindungen/adapter/a1");
+
+    sqlx::query(
+        "UPDATE adapter SET angehalten_grund = NULL, letzter_fehler_art = 'status', \
+             letzter_fehler_status = 503 WHERE id = 'a1'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let gestoert = adapter::text(&pool, BenachrichtigungArt::AdapterGestoert, "a1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(gestoert.titel, "Anbindung gestört");
+    assert_eq!(
+        gestoert.detail.as_deref(),
+        Some("Quelle · Ziel antwortete mit Fehler (503)")
+    );
+    let ok = adapter::text(&pool, BenachrichtigungArt::AdapterWiederOk, "a1")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ok.titel, "Anbindung läuft wieder");
+    assert_eq!(ok.detail.as_deref(), Some("Quelle"));
+    // Nie Einstellungen (URL mit Zugangsdaten) im Text.
+    for t in [&eingriff, &gestoert, &ok] {
+        let alles = format!("{} {:?} {}", t.titel, t.detail, t.pfad);
+        assert!(
+            !alles.contains("ziel.example") && !alles.contains("pw@"),
+            "{alles}"
+        );
+    }
+    // Ein verschwundener Adapter hat keinen Text.
+    assert!(
+        adapter::text(&pool, BenachrichtigungArt::AdapterEingriff, "weg")
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn adapter_pfad_kodiert_die_kennung() {
+    assert_eq!(
+        adapter::pfad("a b/c"),
+        "/admin/einstellungen/anbindungen/adapter/a%20b%2Fc"
+    );
+}
+
+#[tokio::test]
+async fn erledigen_adapter_quittiert_offene() {
+    let (pool, org_id, _) = adapter_umgebung().await;
+    let live = crate::live::LiveHub::new();
+    melden(
+        &pool,
+        &live,
+        adapter_anlass(org_id, BenachrichtigungArt::AdapterGestoert),
+    )
+    .await;
+    assert_eq!(erledigen_adapter(&pool, &live, org_id, "a1").await, 2);
+    let offen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE quittiert_at IS NULL")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(offen, 0);
+    assert_eq!(erledigen_adapter(&pool, &live, org_id, "a1").await, 0);
+}
+
+/// Die Detailzeile einer Adapter-Meldung liest Org-Stammdaten des Adapters, nie seine
+/// Einstellungen (LLH-2026; neben der Schwärzung, die nur Einsatzdaten kennt).
+#[tokio::test]
+async fn detail_adapter_liest_nur_adapterspalten() {
+    let pool = crate::db::test_pool().await;
+    // Das SQL der Detailzeile liest genau diese Liste, nicht mehr.
+    let sql = adapter::detail_sql();
+    for (_, spalte) in adapter::DETAIL_ADAPTER_SPALTEN {
+        assert!(sql.contains(spalte), "{spalte} fehlt in {sql}");
+    }
+    assert!(!sql.contains("einstellungen"), "{sql}");
+    assert!(!sql.contains('*'), "{sql}");
+    for (tabelle, spalte) in adapter::DETAIL_ADAPTER_SPALTEN {
+        assert_eq!(*tabelle, "adapter");
+        assert_ne!(*spalte, "einstellungen");
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "SELECT {spalte} FROM {tabelle} LIMIT 0"
+        )))
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_else(|e| panic!("{tabelle}.{spalte}: {e}"));
+    }
 }

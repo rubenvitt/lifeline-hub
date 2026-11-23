@@ -12,15 +12,16 @@
  * Die iOS-Hülle (`ios/App/Huelle/huelle.js`, Change t39ltxxi, Spec `huellen-vertrag`) setzt dazu
  * `platform: 'ios'`, `version` und `haptics(kind)`. Die Desktop-Hüllen setzen seit LLH-1982
  * `platform` (`'macos'`, `'windows'`) und `version` (`src-tauri/src/kennung.js`); ältere tun es
- * nicht. Jedes Feld wird einzeln geprüft.
+ * nicht. Die Android-Hülle (`android/app/src/main/assets/huelle.js`, LLH-1989) setzt dieselben
+ * Felder wie iOS mit `platform: 'android'`, aber ohne `setAppBadge`. Jedes Feld wird einzeln geprüft.
  */
 
 declare global {
   interface Window {
     __LIFELINE_HUELLE__?: {
-      /** Kennwort der Plattform: `'ios'`, `'macos'`, `'windows'`; Desktop-Hüllen vor LLH-1982 nichts. */
+      /** Kennwort der Plattform: `'ios'`, `'android'`, `'macos'`, `'windows'`; Desktop-Hüllen vor LLH-1982 nichts. */
       readonly platform?: string;
-      /** Volle Versionsangabe der Hülle (iOS: `LifelineVersion`, Desktop: Workspace-Version). */
+      /** Volle Versionsangabe der Hülle (iOS: `LifelineVersion`, Android: `versionName`, Desktop: Workspace-Version). */
       readonly version?: string;
       /** Haptik der Hülle (Spec `huellen-vertrag`): nimmt jede Art an, tut für unbekannte nichts. */
       readonly haptics?: (kind: string) => unknown;
@@ -96,14 +97,14 @@ export function huelleAppBadge(): ((count: number) => Promise<void>) | null {
 }
 
 /**
- * Läuft die Seite in einer App-Hülle (Desktop oder iOS)? Dort meldet die Hülle selbst (D7); Web
+ * Läuft die Seite in einer App-Hülle (Desktop, iOS oder Android)? Dort meldet die Hülle selbst (D7); Web
  * Push (LLH-1223) bietet die Seite in keiner Hülle an (Spec `web-push`).
  */
 export function inHuelle(): boolean {
   return window.__LIFELINE_HUELLE__ != null;
 }
 
-/** Kennwort der Plattform der Hülle (`'ios'`, `'macos'`, `'windows'`); `null` im Browser und in Desktop-Hüllen vor LLH-1982. */
+/** Kennwort der Plattform der Hülle (`'ios'`, `'android'`, `'macos'`, `'windows'`); `null` im Browser und in Desktop-Hüllen vor LLH-1982. */
 export function huellePlatform(): string | null {
   const platform = window.__LIFELINE_HUELLE__?.platform;
   return typeof platform === 'string' ? platform : null;

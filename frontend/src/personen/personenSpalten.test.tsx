@@ -500,9 +500,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   /**
    * Ohne Netz gesperrt mit Grund an der Zelle (LLH-1103, design.md D8, Spec
-   * `personendaten-bearbeiten`, „Ohne Netz gesperrt“): die Mutation liefe mit `networkMode:
-   * 'online'` in die Pause und überschriebe nach der Rückkehr still einen Wert, den niemand
-   * gesehen hat. Ein getippter Entwurf bleibt stehen.
+   * `personendaten-bearbeiten`, „Ohne Netz gesperrt“): es gibt keinen PATCH-Weg in die Queue,
+   * und der Grund steht da, bevor jemand tippt. Ein getippter Entwurf bleibt stehen.
    */
   it('ohne Netz gesperrt mit Grund an der Zelle', async () => {
     renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, zustand: 'gehfähig' })}</>);
@@ -540,8 +539,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
     } finally {
       setzeOnline(true);
     }
-    // Mutationsprobe: das Senden ohne Netz nicht sperren — die pausierte Mutation holt nach der
-    // Rückkehr still nach, rot.
+    // Mutationsprobe: das Senden ohne Netz nicht sperren — die Mutation geht hinaus (hier
+    // antwortet MSW, im Feld scheiterte sie mit `NetzFehler`), rot.
     await new Promise((r) => setTimeout(r, 30));
     expect(koerper).toEqual([]);
     fireEvent.blur(screen.getByRole('textbox'));

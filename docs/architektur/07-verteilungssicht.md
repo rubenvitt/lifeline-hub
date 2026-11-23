@@ -1,9 +1,9 @@
 # 7. Verteilungssicht
 
-Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 22.11.2026 (Push-Relais für iOS, LLH-1981; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
-SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App oder iOS-App darauf zu. Einen
+SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App, iOS-App oder Android-App darauf zu. Einen
 festen Einsatzrechner gibt es nicht ([`docs/betrieb/packaging.md`](../betrieb/packaging.md),
 „Datenträger: Mindest-Schreibrate“). Den Server trägt ein Mini-PC oder Notebook im
 Einsatzleitwagen genauso wie ein Container beim Hoster. Gebaut werden vier Server-Plattformen
@@ -17,6 +17,7 @@ flowchart LR
     BR["Browser / PWA<br/>frontend + Service Worker<br/>IndexedDB"]
     DT["Desktop-App src-tauri<br/>(Webview, macOS/Windows)"]
     IOS["iOS-App ios<br/>(WKWebView, iPhone/iPad)"]
+    AND["Android-App android<br/>(WebView, Handy/Tablet)"]
     GK["Gekoppeltes Gerät<br/>(Browser, Funktionsansicht)"]
   end
   subgraph SR["Server-Rechner (Mini-PC, Notebook, VM oder Container)"]
@@ -41,6 +42,7 @@ flowchart LR
   BR -->|"HTTPS (SSE, REST)"| RP
   DT -->|HTTPS| RP
   IOS -->|"HTTPS, GET /api/shell"| RP
+  AND -->|"HTTPS, GET /api/shell"| RP
   GK -->|HTTPS| RP
   RP --> LH
   BR -.->|"direkt ohne Proxy"| LH
@@ -59,6 +61,7 @@ flowchart LR
   LH -.->|"iOS-Push (--ios-push)"| RL
   RL -.->|"HTTP/2"| APNS
   APNS -.->|Push| IOS
+  AND -.->|"Update android.json + APK"| GH
 ```
 
 Gestrichelte Pfeile sind optional oder brauchen Internet. Ohne Internet läuft der Server weiter:
@@ -73,6 +76,7 @@ Offline-Karten liegen in `karten/`, der Rest scheitert still oder ist abgeschalt
 | PWA im Browser | dasselbe Frontend, vom Server ausgeliefert; installierbar und offline nur im sicheren Kontext | `frontend/vite.config.ts` (`VitePWA`), [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 | Desktop-App | Tauri-Hülle ohne Anwendungslogik, lädt die https-Adresse des Servers; macOS ab 14 arm64 (`.dmg`, signiert und notarisiert), Windows 10/11 x64 (`-setup.exe`, nicht signiert); Linux wird nur übersetzt | `src-tauri/tauri.conf.json`, `.github/workflows/desktop.yml`, [`desktop-app.md`](../betrieb/desktop-app.md) |
 | iOS-App | Swift-App (SwiftUI und WKWebView) ohne Anwendungslogik, lädt die Oberfläche des gewählten Servers; iPhone und iPad ab iOS 17.4, Bundle-ID `dev.rubeen.lifeline.ios`; nur über TestFlight an Tags der Kanäle `beta` und `main`, nicht im App Store | `ios/project.yml`, `.github/workflows/ios.yml`, `scripts/ios/testflight.sh`, [`ios-app.md`](../betrieb/ios-app.md) |
+| Android-App | Kotlin-App (Jetpack Compose und Android-WebView) ohne Anwendungslogik, lädt die Oberfläche des gewählten Servers; Handys und Tablets ab Android 10 (`minSdk` 29), Paket `dev.rubeen.lifeline.android`; nur als signierte APK an den GitHub-Releases jedes Kanals, nicht über Google Play; eigener Updater liest `android.json` seines Kanals | `android/app/build.gradle.kts`, `.github/workflows/android.yml`, `scripts/android/release-apk.sh`, `scripts/release/android-kanal.mjs`, [`android-app.md`](../betrieb/android-app.md) |
 | `karten-service` | Region-Build-Dienst; Linux-Binary und Abbild `ghcr.io/rubenvitt/lifeline-hub-karten-service` auf `debian:13-slim` mit `make`, `sqlite3` und Docker-CLI | `karten-service/Dockerfile`, Job `docker-karten` in `artefakte.yml`, [Runbook](../ops/lfh-204-karten-service-ops-runbook.md) |
 | `push-relais` | Relais für iOS-Push, betrieben vom Projekt (`https://push.rubeen.dev`); ein Lifeline-Server braucht es nicht selbst; Linux-Binary und Abbild `ghcr.io/rubenvitt/lifeline-hub-push-relais` auf `distroless/cc-debian13:nonroot`, `linux/amd64` und `linux/arm64` | `push-relais/Dockerfile`, Job `docker-relais` in `artefakte.yml`, [`push-relais.md`](../betrieb/push-relais.md) |
 | `website` | statische Astro-Seite auf Cloudflare Pages, Produktions-Branch `alpha`, nicht im Binary | [`website/AGENTS.md`](../../website/AGENTS.md) |
@@ -110,6 +114,7 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 | Endgerät, Browserprofil oder Webview | IndexedDB `lifeline-lagebild`, `lifeline-offline`, `lifeline-ortcache`, ETB-Entwürfe; Liste aller Orte in `GERAETESPEICHER` | `frontend/src/offline/geraetRaeumung.ts`, [`endgeraete.md`](../betrieb/endgeraete.md) |
 | Desktop-App | `verbindung.json` (Server, `bekannt`), `kanal.json` (Update-Kanal) im App-Konfigurationsverzeichnis (`app_config_dir`, Kennung `dev.rubeen.lifeline.desktop`) | `src-tauri/src/verbindung.rs`, `src-tauri/src/kanal.rs`, [`desktop-app.md`](../betrieb/desktop-app.md) |
 | iOS-App | Serverliste `server.json` und Push-Kennungen je Server `push.json` in Application Support, Schalter „Haptik“ in `UserDefaults`, Zahl der Server in den `UserDefaults` der App Group; Schlüssel des iOS-Push im gemeinsamen Schlüsselbund von App und Extension; je Server ein eigener `WKWebsiteDataStore` mit der UUID des Eintrags (Cookies, IndexedDB, Cache) | `ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift` (`Serverablage`), `ios/LifelineKern/Sources/LifelineKern/PushAnmeldungen.swift` (`Pushablage`), `ios/Gemeinsam/Schluesselbund.swift`, `ios/App/Webview.swift` (`Webviewfabrik`), [`ios-app.md`](../betrieb/ios-app.md) |
+| Android-App | Serverliste `filesDir/lifeline/server.json`; Schalter „Haptik“, Update-Kanal und Stand des Updaters in `SharedPreferences("lifeline")`; geladenes Update unter `noBackupFilesDir/update/`, Downloads zum Teilen höchstens 24 h unter `cacheDir/downloads/`; je Server ein eigenes WebView-Profil mit der UUID des Eintrags (Cookies, IndexedDB, Service Worker, Cache); keine Cloud-Sicherung (`allowBackup="false"`) | `android/app/src/main/kotlin/dev/rubeen/lifeline/android/MainActivity.kt`, `android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Serverablage.kt`, `android/app/src/main/kotlin/dev/rubeen/lifeline/android/web/WebviewFabrik.kt`, `android/app/src/main/AndroidManifest.xml`, [`android-app.md`](../betrieb/android-app.md) |
 | `push-relais` | Volume `/data` mit `push-relais.sqlite` (Server, Hash des Geheimnisses, Sperre; keine Tokens), `.p8` nur lesbar eingehängt unter `/geheimnisse/AuthKey.p8` | `push-relais/Dockerfile`, `push-relais/src/speicher.rs`, [`push-relais.md`](../betrieb/push-relais.md) |
 | `karten-service` | Volume `/opt/karten-build/out`, Ergebnis im Objektspeicher | `karten-service/Dockerfile`, `karten-service/src/storage/s3.rs` |
 
@@ -128,11 +133,13 @@ verschlüsselten Datenträger; die Anwendung verschlüsselt nicht selbst und pr�
 | Klartext-HTTP | funktioniert, aber ohne Service Worker, PWA, Passkey, Eigenposition und Einwurf | [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 
 Die Desktop-App nimmt nur `https` mit Hostnamen an ([`desktop-app.md`](../betrieb/desktop-app.md),
-„Erster Start“), die iOS-App ebenso (gemeinsame Fälle `src-tauri/faelle/`). Sie prüft Zertifikate
-wie das System ohne Ausnahme: ein Server im Einsatz-LAN braucht ein Zertifikat aus mkcert oder
-einer eigenen CA, deren Profil auf dem Gerät eingeschaltet ist; das selbst signierte
-Rückfall-Zertifikat aus `src/tls/mod.rs` reicht dafür nicht ([`ios-app.md`](../betrieb/ios-app.md),
-„CA-Profil für das Einsatz-LAN“). Ohne HTTP/2 teilen sich alle Tabs eines Profils etwa sechs Verbindungen je Origin; jede offene
+„Erster Start“), iOS- und Android-App ebenso (gemeinsame Fälle `src-tauri/faelle/`). Sie prüfen
+Zertifikate wie das System ohne Ausnahme: ein Server im Einsatz-LAN braucht ein Zertifikat aus
+mkcert oder einer eigenen CA, deren Profil (iOS) bzw. CA-Zertifikat (Android, Nutzer-CAs laut
+`android/app/src/main/res/xml/network_security_config.xml`) auf dem Gerät installiert ist; das
+selbst signierte Rückfall-Zertifikat aus `src/tls/mod.rs` reicht dafür nicht
+([`ios-app.md`](../betrieb/ios-app.md), „CA-Profil für das Einsatz-LAN“;
+[`android-app.md`](../betrieb/android-app.md), „CA-Zertifikat für das Einsatz-LAN“). Ohne HTTP/2 teilen sich alle Tabs eines Profils etwa sechs Verbindungen je Origin; jede offene
 SSE-Verbindung belegt eine davon ([`betrieb-tls.md`](../betrieb-tls.md), LFH-264).
 
 ## 7.6 Konfiguration
@@ -183,6 +190,7 @@ flowchart LR
   F -->|alpha| DEP["deployment.yml<br/>→ Pull-Agent am Server"]
   F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
   F -->|beta, stabil| IOSJ["ios → ios.yml<br/>→ TestFlight"]
+  F -->|"alpha, beta, stabil"| ANDJ["android → android.yml<br/>→ APK, android-alpha/-beta/-stabil"]
 ```
 
 Jeder Workflow hört entweder auf einen PR oder auf einen Push, damit ein PR keine Jobs der
@@ -216,6 +224,14 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
   `artefakte.yml`, `ios.yml`, `scripts/ios/testflight.sh`), nie bei Alpha; ein roter Upload hält
   das Release nicht auf. `ios.yml` lässt sich auch von Hand mit einem Tag starten. Signiert wird
   automatisch über einen App-Store-Connect-API-Schlüssel ([`ios-app.md`](../betrieb/ios-app.md)).
+- Die Android-App baut nach der Freigabe jedes Tags der Kanäle `alpha`, `beta` und `main` eine
+  signierte APK (Job `android` in `artefakte.yml`, `android.yml`, `scripts/android/release-apk.sh`)
+  und hängt sie ans Release, ohne je eine schon abgelegte zu überschreiben
+  (`scripts/android/apk-ablegen.sh`); ein roter Bau hält das Release nicht auf. Das Manifest
+  `android.json` und eine APK unter festem Namen liegen in den Kanal-Releases `android-alpha`,
+  `android-beta` und `android-stabil`, nur vorwärts (`scripts/release/android-kanal.mjs`); auch
+  stabil nicht unter `releases/latest/download/`, das bis zum fertigen Bau leer wäre. Signiert wird mit einem Schlüssel für immer aus den
+  Geheimnissen `ANDROID_KEY*` ([`android-app.md`](../betrieb/android-app.md)).
 - Beta (LLH-1545, [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md)):
   `kanal-nachziehen.yml` bringt einen veröffentlichten Alpha-Tag nach `beta`
   (`scripts/release/kanal-nachziehen.sh`, Angleich-Commit gegen die Konflikte des
@@ -229,7 +245,7 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
   Signaturschlüssel der Desktop-App: [`desktop-app.md`](../betrieb/desktop-app.md).
 - **Wo die CI läuft** ([ADR-0078](entscheidungen/ADR-0078-alle-ci-jobs-laufen-auf-github.md)):
   alle Jobs auf den gehosteten Runnern von GitHub (`ubuntu-latest`, die Desktop- und iOS-Builds
-  auf ihren Plattformen). Der eigene Server für Rust-Suite und e2e (LLH-1666, LLH-2014) ist am
+  auf ihren Plattformen, die Android-APK auf `ubuntu-latest` mit dessen Android-SDK). Der eigene Server für Rust-Suite und e2e (LLH-1666, LLH-2014) ist am
   22.11.2026 zurückgebaut.
 
 ## 7.8 Beobachtbarkeit und Betrieb

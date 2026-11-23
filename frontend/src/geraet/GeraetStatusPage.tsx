@@ -15,6 +15,7 @@ import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { Paneel, Stapel, Status, monoStil, useRollen } from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einheitStatusAnzeige, fmsEtikett } from '../kraefte/meldebildRaster';
+import { useEinheitStatusQuittung } from '../kraefte/useStatusQuittung';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 
 /**
@@ -55,10 +56,15 @@ export default function GeraetStatusPage() {
   const darfSetzen =
     darfImEinsatzSchreiben(einsatzQuery.data) && !ohneVerbindung && einheit != null && !mitFahrzeug;
 
+  const quittiereStatus = useEinheitStatusQuittung(einsatzId, katalogQuery.data);
   const setzen = useMutation({
     mutationFn: (statusId: number) => setzeEinheitStatus(einsatzId, einheitId!, statusId),
     onMutate: () => setFehler(null),
-    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+    // Die Quittung mit Rückweg (LLH-1986): ein Fehlgriff im Knopfraster ist sofort zurückzunehmen.
+    onSuccess: (antwort) => {
+      quittiereStatus(antwort);
+      return qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    },
     onError: (e) => setFehler(e),
   });
 

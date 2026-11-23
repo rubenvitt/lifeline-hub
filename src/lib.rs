@@ -77,6 +77,7 @@ pub mod schichtmodell;
 pub mod sprechgruppe;
 pub mod staerke;
 pub mod static_files;
+pub mod status_ruecknahme;
 pub mod stichwort;
 pub mod storno;
 #[cfg(test)]

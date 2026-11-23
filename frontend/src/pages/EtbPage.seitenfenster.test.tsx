@@ -59,6 +59,11 @@ let gesamt = GESAMT;
 let abrufe: string[] = [];
 /** Ältere Seiten unter dieser Nummer antworten mit 500 (Sprung scheitert am Server). */
 let fehlerUnter: number | null = null;
+/**
+ * Wird beim nächsten Abruf ohne Cursor (der Kopf) aufgerufen, nachdem die Antwort feststeht: ein
+ * fremder Eintrag, der während des Abrufs eintrifft (LLH-2036).
+ */
+let waehrendKopfabruf: (() => void) | null = null;
 
 function tagebuch() {
   return http.get('/api/einsaetze/7/etb', ({ request }) => {
@@ -76,7 +81,13 @@ function tagebuch() {
       return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
     }
     const unter = vor != null ? alle.filter((n) => n < Number(vor)) : alle;
-    return HttpResponse.json(unter.slice(0, limit).map(eintrag));
+    const antwort = unter.slice(0, limit).map(eintrag);
+    if (vor == null && waehrendKopfabruf) {
+      const hinterher = waehrendKopfabruf;
+      waehrendKopfabruf = null;
+      hinterher();
+    }
+    return HttpResponse.json(antwort);
   });
 }
 
@@ -170,7 +181,25 @@ beforeEach(async () => {
   gesamt = GESAMT;
   abrufe = [];
   fehlerUnter = null;
+  waehrendKopfabruf = null;
 });
+
+/** Klickt „Neuere laden“, bis der Knopf fehlt; liefert die Zahl der Klicks. */
+async function neuereBisZumKopf(user: ReturnType<typeof userEvent.setup>): Promise<number> {
+  await screen.findByRole('button', { name: 'Neuere laden' });
+  let runden = 0;
+  while (screen.queryByRole('button', { name: 'Neuere laden' })) {
+    runden += 1;
+    if (runden > 20) throw new Error('„Neuere laden“ endet nicht');
+    await user.click(screen.getByRole('button', { name: 'Neuere laden' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Neuere laden' })).not.toHaveClass(
+        'ant-btn-loading',
+      ),
+    ).catch(() => undefined);
+  }
+  return runden;
+}
 
 describe('EtbPage — Seitenfenster (LFH-947)', () => {
   it('nach einem Sprung 12 Seiten tief kostet ein etb-Ereignis höchstens 5 Listenabrufe', async () => {
@@ -238,6 +267,46 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     expect(abrufe.some((a) => a.includes('after_lfd_nr='))).toBe(true);
   }, 120000);
 
+  it('„Neuere laden“ endet mit der neuesten Seite, ohne leeren Extraklick (LLH-2036)', async () => {
+    gesamt = 700;
+    const user = userEvent.setup();
+    const { container } = setup('/einsaetze/7/etb?eintrag=50');
+    await warteAufHervorhebung(container, 50);
+
+    await neuereBisZumKopf(user);
+    await waitFor(() => expect(zeile(container, 700)).not.toBeNull());
+    // Die Seitengrenzen des Rückwegs liegen auf denen des Hinwegs (100er-Schritte ab 700). Mit
+    // genau einer Seitengröße kam die Seite 700…601 voll, und ein weiterer Klick holte über 700
+    // eine leere Seite. Eine `neuer`-Seite fragt deshalb einen Eintrag mehr an.
+    const nachOben = abrufe.filter((a) => a.includes('after_lfd_nr='));
+    expect(nachOben.length).toBeGreaterThan(0);
+    nachOben.forEach((a) => expect(a).toContain('limit=101'));
+    expect(abrufe.some((a) => a.includes('after_lfd_nr=700'))).toBe(false);
+  }, 120000);
+
+  it('nach dem Rückweg bleibt der Kopf auch beim Live-Neuladen im Fenster (LLH-2036)', async () => {
+    gesamt = 700;
+    const user = userEvent.setup();
+    const { container, client } = setup('/einsaetze/7/etb?eintrag=50');
+    await warteAufHervorhebung(container, 50);
+    // Während man tief liest, kommen 99 Einträge dazu: der Rückweg endet mit der Seite 799…701,
+    // die nicht voll ist und damit der Kopf.
+    gesamt = 799;
+    await neuereBisZumKopf(user);
+    await waitFor(() => expect(zeile(container, 799)).not.toBeNull());
+
+    // Zwei fremde Einträge kommen live: trüge die vorderste Seite noch ihren Cursor `neuer: 700`,
+    // läse das Neuladen nur die Einträge direkt darüber — sie würde „voll“, der neueste fehlte und
+    // „Neuere laden“ stünde wieder da, obwohl das Fenster am Kopf war.
+    gesamt = 801;
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: einsatzKeys.etb(7) });
+    });
+    await waitFor(() => expect(zeile(container, 801)).not.toBeNull());
+    expect(zeile(container, 800)).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
+  }, 120000);
+
   it('ein Sprung über ein tiefes Fenster lädt neuere Seiten nach und hebt hervor', async () => {
     const user = userEvent.setup();
     const { container } = setup('/einsaetze/7/etb?eintrag=50');
@@ -262,6 +331,29 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     await user.keyboard('{Enter}');
     await user.type(feld, 'Pegel steigt{Enter}');
     await waitFor(() => expect(zeile(container, GESAMT + 1)).not.toBeNull(), { timeout: 30000 });
+    expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
+  }, 120000);
+
+  it('ein fremder Eintrag während des Rücksprungs zum Kopf fehlt danach nicht (LLH-2036)', async () => {
+    const user = userEvent.setup();
+    const { container, client } = setup('/einsaetze/7/etb?eintrag=50');
+    await warteAufHervorhebung(container, 50);
+
+    // Der Kopf ist geholt, da trifft ein fremder Eintrag samt Live-Ereignis ein. Der Kopf ist dann
+    // älter als das Ereignis und darf nicht als frisch gelten (`components/listenFenster.ts`,
+    // `zumKopf`).
+    waehrendKopfabruf = () => {
+      gesamt += 1;
+      void client.invalidateQueries({ queryKey: einsatzKeys.etb(7) });
+    };
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await user.clear(von);
+    await user.paste('Florian 3');
+    await user.keyboard('{Enter}');
+    await user.type(feld, 'Pegel steigt{Enter}');
+    await waitFor(() => expect(zeile(container, GESAMT + 1)).not.toBeNull(), { timeout: 30000 });
+    await waitFor(() => expect(zeile(container, GESAMT + 2)).not.toBeNull(), { timeout: 30000 });
     expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
   }, 120000);
 
