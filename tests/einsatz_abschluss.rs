@@ -81,7 +81,7 @@ async fn der_abschluss_eintrag_steht_vor_den_frist_eintraegen_und_wird_mitgemeld
     let (status, body) = anfrage_json(
         &app,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         &admin,
         Some(&json!({ "retention_dauer_tage": 30, "nachbereitung_tage": 7 })),
     )
@@ -644,7 +644,7 @@ async fn ein_geraet_bekommt_403() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),

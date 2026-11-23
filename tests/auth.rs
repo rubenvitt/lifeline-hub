@@ -283,7 +283,7 @@ async fn providers_admin_lesen_fuehrungskraft_ja_ohne_rolle_nein_schalten_nur_ad
         r#"{"anzeigename":"Frieda Führung","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#,
         r#"{"anzeigename":"Otto Ohne","benutzername":"otto","passwort":"ottopw123"}"#,
     ] {
-        let (status, _) = anfrage(&app, "POST", "/api/benutzer", &admin, Some(body)).await;
+        let (status, _) = anfrage(&app, "POST", "/api/users", &admin, Some(body)).await;
         assert_eq!(status, StatusCode::CREATED);
     }
     common::zwang_aufheben("frieda").await;

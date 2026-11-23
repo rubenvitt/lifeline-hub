@@ -117,7 +117,7 @@ describe('HilfePage', () => {
   it('druckt ohne Anmeldung, ohne die Organisation zu laden', async () => {
     let abgefragt = false;
     server.use(
-      http.get('/api/organisation', () => {
+      http.get('/api/organization', () => {
         abgefragt = true;
         return HttpResponse.json({}, { status: 401 });
       }),

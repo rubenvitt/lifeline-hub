@@ -13,7 +13,7 @@ async fn nicht_admin_anlegen(app: &axum::Router, admin_cookie: &str) {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(
@@ -31,7 +31,7 @@ async fn get_liefert_bootstrap_default_hilfsorganisation() {
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "GET", "/api/organisation", &admin_cookie, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/organization", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["tz_organisation"], "hilfsorganisation");
     assert_eq!(json["name"], "Test-Orga");
@@ -47,7 +47,7 @@ async fn patch_als_admin_setzt_org_default() {
         .oneshot(
             Request::builder()
                 .method("PATCH")
-                .uri("/api/organisation")
+                .uri("/api/organization")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie.clone())
                 .body(Body::from(r#"{"tz_organisation":"feuerwehr"}"#))
@@ -58,7 +58,7 @@ async fn patch_als_admin_setzt_org_default() {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Danach liefert GET den neuen Wert.
-    let (status, json) = anfrage(&app, "GET", "/api/organisation", &admin_cookie, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/organization", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["tz_organisation"], "feuerwehr");
 }
@@ -74,7 +74,7 @@ async fn patch_unbekannte_organisation_ist_400() {
     let (status, antwort) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin_cookie,
         Some(r#"{"tz_organisation":"quatsch"}"#),
     )
@@ -84,7 +84,7 @@ async fn patch_unbekannte_organisation_ist_400() {
     let (status, antwort) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin_cookie,
         Some(r#"{"tz_organisation":"feuerwehr"}"#),
     )
@@ -104,7 +104,7 @@ async fn patch_als_nicht_admin_ist_403() {
         .oneshot(
             Request::builder()
                 .method("PATCH")
-                .uri("/api/organisation")
+                .uri("/api/organization")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, erika_cookie)
                 .body(Body::from(r#"{"tz_organisation":"feuerwehr"}"#))
@@ -119,7 +119,7 @@ async fn patch_als_nicht_admin_ist_403() {
 
 /// Liest den aktuellen Namen über die Route (dieselbe Sicht wie das Frontend).
 async fn org_name(app: &axum::Router, cookie: &str) -> String {
-    let (status, json) = anfrage(app, "GET", "/api/organisation", cookie, None).await;
+    let (status, json) = anfrage(app, "GET", "/api/organization", cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     json["name"].as_str().unwrap().to_string()
 }
@@ -132,7 +132,7 @@ async fn patch_name_benennt_um_und_folgender_get_liefert_ihn() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin,
         Some(r#"{"name":"  DRK Kreisverband Musterstadt  "}"#),
     )
@@ -153,7 +153,7 @@ async fn patch_name_grenze_zaehlt_zeichen_nicht_bytes() {
 
     let genau = "ä".repeat(120);
     let body = format!(r#"{{"name":"{genau}"}}"#);
-    let (status, json) = anfrage(&app, "PATCH", "/api/organisation", &admin, Some(&body)).await;
+    let (status, json) = anfrage(&app, "PATCH", "/api/organization", &admin, Some(&body)).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(org_name(&app, &admin).await, genau);
 }
@@ -165,7 +165,7 @@ async fn patch_name_leer_oder_zu_lang_ist_400_und_unveraendert() {
 
     let zu_lang = format!(r#"{{"name":"{}"}}"#, "a".repeat(121));
     for body in [r#"{"name":"   "}"#, r#"{"name":""}"#, zu_lang.as_str()] {
-        let (status, json) = anfrage(&app, "PATCH", "/api/organisation", &admin, Some(body)).await;
+        let (status, json) = anfrage(&app, "PATCH", "/api/organization", &admin, Some(body)).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {json:?}");
         assert_eq!(org_name(&app, &admin).await, "Test-Orga", "{body}");
     }
@@ -181,13 +181,13 @@ async fn patch_ungueltiger_name_schreibt_auch_die_vorgabe_nicht() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin,
         Some(r#"{"name":"   ","tz_organisation":"feuerwehr"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (_, json) = anfrage(&app, "GET", "/api/organisation", &admin, None).await;
+    let (_, json) = anfrage(&app, "GET", "/api/organization", &admin, None).await;
     assert_eq!(json["tz_organisation"], "hilfsorganisation");
     assert_eq!(json["name"], "Test-Orga");
 }
@@ -200,7 +200,7 @@ async fn patch_nur_vorgabe_laesst_den_namen_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin,
         Some(r#"{"tz_organisation":"thw"}"#),
     )
@@ -215,7 +215,7 @@ async fn patch_ohne_aenderbares_feld_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "PATCH", "/api/organisation", &admin, Some("{}")).await;
+    let (status, json) = anfrage(&app, "PATCH", "/api/organization", &admin, Some("{}")).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
 }
 
@@ -230,7 +230,7 @@ async fn patch_name_als_nicht_admin_ist_403() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &erika,
         Some(r#"{"name":"Gekapert"}"#),
     )
@@ -249,7 +249,7 @@ async fn zweiter_bootstrap_laesst_gepflegten_namen_stehen() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin,
         Some(r#"{"name":"Gepflegter Name"}"#),
     )

@@ -7,7 +7,7 @@ import type { StammdatenArt } from '../api/types';
  * `server.use(…)` über den Standard aus `test/server.ts` (ohne Quelle) legen.
  */
 export function herkunftHandler(vomHub: Partial<Record<StammdatenArt, string[]>>) {
-  return http.get('/api/instanz/stammdaten/herkunft', () =>
+  return http.get('/api/instance/master-data/origin', () =>
     HttpResponse.json({
       quelle: 'Hub DRK Landesverband',
       vom_hub: vomHub,

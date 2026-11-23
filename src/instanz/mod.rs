@@ -27,9 +27,12 @@ use utoipa::ToSchema;
 
 /// Protokollversion dieser Instanz (design.md D5). Wer sie erhöht, hält die vorige im Code, bis
 /// die übernächste kommt; das Schema von Melden bleibt über alle Versionen nur additiv. 3 seit
-/// LLH-1497 ([`PROTOKOLL_VOR_ORT`]), 4 seit LLH-1678 ([`PROTOKOLL_FUEHRUNG_VOR_ORT`]); Version 3
-/// bleibt voll verständlich, die neuen Felder sind optional.
-pub const PROTOKOLL: u32 = 4;
+/// LLH-1497 ([`PROTOKOLL_VOR_ORT`]), 4 seit LLH-1678 ([`PROTOKOLL_FUEHRUNG_VOR_ORT`]).
+///
+/// 6 seit LLH-2053: Die Wege heißen englisch (`/api/instance/…`, harter Schnitt in der Alpha), ein
+/// Stand mit 4 erreicht keinen mehr. Der Sprung über 5 hinweg legt jedes Gegenüber, das zuletzt 4
+/// meldete, außerhalb des Fensters, und die Übersicht zeigt „Update nötig“ statt „passt“.
+pub const PROTOKOLL: u32 = 6;
 
 /// Ab dieser Protokollversion kennt eine Instanz den Abgleich der Einsätze (LLH-1492, design.md
 /// D6); mit einem älteren Gegenüber wird nicht gespiegelt.

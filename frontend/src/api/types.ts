@@ -14,7 +14,7 @@ export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
 /** Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) mit `geraet`. */
 export type MeAntwort = S['MeAntwort'];
-// Bestand der Bereitschaft (LLH-1820, `GET /api/verwaltung/bereitschaft`).
+// Bestand der Bereitschaft (LLH-1820, `GET /api/administration/inventory`).
 export type Bereitschaft = S['Bereitschaft'];
 
 // ============================== Gerätekopplung (LFH-892) ==============================
@@ -98,6 +98,8 @@ export type InstanzProtokoll = S['InstanzProtokoll'];
 export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
 export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
 export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
+/** Ein Hub, dessen iOS-Push das Relais sperrt (LLH-2074). */
+export type IosPushHubSperre = S['IosPushHubSperre'];
 export type EinsatzVerwahrungAnzeige = S['EinsatzVerwahrungAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
 export type AbgelehnterAntragAnzeige = S['AbgelehnterAntragAnzeige'];
@@ -212,7 +214,7 @@ export type DemoVorgang = S['DemoVorgang'];
 // ============================== Admin — Org-weite Einstellungen ==============================
 export type OrgEinstellungen = S['OrgEinstellungenAnzeige'];
 
-/** PUT-Body für org-weite Einstellungen (PUT /api/org-einstellungen, Vollersatz).
+/** PUT-Body für org-weite Einstellungen (PUT /api/org-settings, Vollersatz).
  *  Kein Backend-Schema, FE-lokal. */
 export interface OrgEinstellungenUpdate {
   zeitzone: string | null;
@@ -250,7 +252,7 @@ export type BenoetigteRolle = 'admin' | 'fuehrungskraft' | 'einsatzfuehrung';
  *  (`false` nur, wenn die Organisation das Modul ausblendet). */
 export type OrgModulEinstellung = S['OrgModulEinstellung'];
 
-/** Org-weite Modul-Vorgaben (GET /api/org-modul-einstellungen): Map modul_key → Vorgabe; fehlt ein
+/** Org-weite Modul-Vorgaben (GET /api/org-module-settings): Map modul_key → Vorgabe; fehlt ein
  *  Key, gibt die Organisation nichts vor (sichtbar, frei). Die Map ist FE-lokal, der Eintrag nicht. */
 export type OrgModulEinstellungen = Record<string, OrgModulEinstellung>;
 
@@ -820,7 +822,7 @@ export type Fuehrungsfunktion = S['Fuehrungsfunktion'];
 export type FuehrungsfunktionEintrag = S['FuehrungsfunktionAnzeige'];
 export type AktuelleBesetzung = S['AktuelleBesetzung'];
 
-/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-fuehrungsfunktionen/{funktion}`. */
+/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-command-roles/{funktion}`. */
 export interface FuehrungsfunktionUpdate {
   /** Leer = Standardlabel. */
   label?: string | null;
@@ -1135,7 +1137,7 @@ export interface PlanungUebernehmenBody extends PlanungUebernahmeBody {
   stand: number;
 }
 
-/** Kein Backend-Schema: `POST /api/planungen`; Einsatzart fehlt = Sanitätsdienst. */
+/** Kein Backend-Schema: `POST /api/plans`; Einsatzart fehlt = Sanitätsdienst. */
 export interface PlanungBody {
   bezeichnung: string;
   einsatzart?: Einsatzart;
@@ -1146,7 +1148,7 @@ export interface PlanungBody {
   min_ruhe_minuten?: number;
 }
 
-/** Kein Backend-Schema: `PATCH /api/planungen/{id}`; `version` Pflicht (409), `null` = leeren. */
+/** Kein Backend-Schema: `PATCH /api/plans/{id}`; `version` Pflicht (409), `null` = leeren. */
 export interface PlanungAendernBody {
   version: number;
   bezeichnung?: string;
@@ -1161,7 +1163,7 @@ export interface PlanungAendernBody {
 }
 
 /**
- * Kein Backend-Schema: `POST …/posten`. Bei `einheit` höchstens eins von Vorlage und Fahrzeug,
+ * Kein Backend-Schema: `POST …/posts`. Bei `einheit` höchstens eins von Vorlage und Fahrzeug,
  * bei `uhs` Pflicht der Typ. `soll_anzahl`/`quali_soll` fehlen = die der Vorlage bzw. des
  * Fahrzeugs, `null` = keins.
  */
@@ -1177,7 +1179,7 @@ export interface PlanungPostenBody {
   quali_soll?: QualiSollEingabe[] | null;
 }
 
-/** Kein Backend-Schema: `PATCH …/posten/{pid}`; die Herkunft bleibt, `null` = leeren. */
+/** Kein Backend-Schema: `PATCH …/posts/{pid}`; die Herkunft bleibt, `null` = leeren. */
 export interface PlanungPostenAendernBody {
   bezeichnung?: string;
   abschnitt?: string | null;
@@ -1190,7 +1192,7 @@ export interface PlanungPostenAendernBody {
 export type PlanungPersonEingabe =
   { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number };
 
-/** Kein Backend-Schema: `POST …/bloecke`; `posten_id` `null` = die Pause. */
+/** Kein Backend-Schema: `POST …/blocks`; `posten_id` `null` = die Pause. */
 export interface PlanungBlockBody {
   posten_id: number | null;
   von: string;
@@ -1201,7 +1203,7 @@ export interface PlanungBlockBody {
   notiz?: string;
 }
 
-/** Kein Backend-Schema: `PATCH …/bloecke/{bid}`; `version` Pflicht (409), `posten_id: null` = Pause. */
+/** Kein Backend-Schema: `PATCH …/blocks/{bid}`; `version` Pflicht (409), `posten_id: null` = Pause. */
 export interface PlanungBlockAendernBody {
   version: number;
   posten_id?: number | null;
@@ -1214,7 +1216,7 @@ export interface PlanungBlockAendernBody {
   notiz?: string | null;
 }
 
-/** Kein Backend-Schema: `POST …/erzeugen`; ohne Länge gilt die Schichtlänge des Postens. */
+/** Kein Backend-Schema: `POST …/generate`; ohne Länge gilt die Schichtlänge des Postens. */
 export interface PlanungErzeugenBody {
   posten_id: number | null;
   von: string;
@@ -1962,11 +1964,11 @@ export interface EinheitenAusNachforderungEingabe {
 // ============================== Zugangsprotokoll (LFH-1097) ==============================
 /** Ereignis der Anmeldespur (`auth_audit`). */
 export type AnmeldeEreignis = S['Ereignis'];
-/** Zeile der Anmeldespur (`GET /api/zugangsprotokoll/anmeldungen`). */
+/** Zeile der Anmeldespur (`GET /api/access-log/logins`). */
 export type AnmeldeEintrag = S['AnmeldeEintragAnzeige'];
 /** Aktion der Admin-Spur (`admin_audit`). */
 export type AdminAktion = S['AdminAktion'];
-/** Zeile der Admin-Spur (`GET /api/zugangsprotokoll/zugangsaenderungen`). */
+/** Zeile der Admin-Spur (`GET /api/access-log/access-changes`). */
 export type Zugangsaenderung = S['ZugangsaenderungAnzeige'];
 /** Anmeldeweg eines Eintrags der Anmeldespur und einer Sitzung (LFH-1152). */
 export type Anmeldeweg = S['Anmeldeweg'];

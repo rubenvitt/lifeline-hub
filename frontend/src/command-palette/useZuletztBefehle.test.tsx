@@ -34,7 +34,7 @@ beforeEach(() => {
 /** Der PUT-Handler ist in allen Fassungen derselbe — er quittiert mit genau dem Fach,
  *  das er entgegengenommen hat. */
 const putHandler = () =>
-  http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+  http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
     const body = (await request.json()) as { wert: string };
     puts.push({ schluessel: String(params.schluessel), wert: body.wert });
     return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
@@ -51,11 +51,11 @@ const flush = () =>
 function handler(serverStand: BenutzerEinstellungen) {
   return [
     meHandler(nutzer),
-    http.get('/api/benutzer-einstellungen', () => {
+    http.get('/api/user-settings', () => {
       gets += 1;
       return HttpResponse.json(serverStand);
     }),
-    http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+    http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
       return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
@@ -139,7 +139,7 @@ describe('useZuletztBefehle', () => {
   it('verschluckt einen abgelehnten Schreibvorgang, ohne den Stand zu verlieren', async () => {
     server.use(
       ...handler(stand([])),
-      http.put('/api/benutzer-einstellungen/:schluessel', () =>
+      http.put('/api/user-settings/:schluessel', () =>
         HttpResponse.json({ error: 'Unbekannter Einstellungs-Schlüssel' }, { status: 400 }),
       ),
     );
@@ -159,7 +159,7 @@ describe('useZuletztBefehle', () => {
   it('holt ohne angemeldeten Benutzer nichts — auch nicht über einen Schreibvorgang', async () => {
     // Kein `/api/auth/me`-Handler → der Default liefert 401 → benutzer = null.
     server.use(
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         gets += 1;
         return HttpResponse.json(stand([]));
       }),
@@ -201,7 +201,7 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
         sitzung = nutzerB;
         return HttpResponse.json(nutzerB);
       }),
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         gets += 1;
         // Das Fach hängt serverseitig AN DER SITZUNG, nie am Pfad; der Client trennt die beiden nur über
         // seinen Key.
@@ -274,7 +274,7 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
     });
     const handler = [
       meHandler(nutzer),
-      http.get('/api/benutzer-einstellungen', async () => {
+      http.get('/api/user-settings', async () => {
         gets += 1;
         await frei;
         return HttpResponse.json(stand(ids));
@@ -345,7 +345,7 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
   it('schreibt gar nicht, wenn der Bestand nicht zu laden ist', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/benutzer-einstellungen', () => {
+      http.get('/api/user-settings', () => {
         gets += 1;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),

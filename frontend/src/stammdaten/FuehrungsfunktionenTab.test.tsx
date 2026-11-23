@@ -52,7 +52,7 @@ describe('FuehrungsfunktionenTab', () => {
     server.use(
       meHandler(benutzer('admin')),
       http.get('/api/fuehrungsfunktionen', () => HttpResponse.json(katalog)),
-      http.put('/api/org-fuehrungsfunktionen/s4', async ({ request }) => {
+      http.put('/api/org-command-roles/s4', async ({ request }) => {
         const body = (await request.json()) as { label: string | null };
         gesendet.push(body);
         katalog = [eintrag('s4', body.label ?? 'Versorgung', 'Versorgung')];
@@ -84,7 +84,7 @@ describe('FuehrungsfunktionenTab', () => {
     server.use(
       meHandler(benutzer('admin')),
       http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([eintrag('s6', 'IuK')])),
-      http.put('/api/org-fuehrungsfunktionen/s7', async ({ request }) => {
+      http.put('/api/org-command-roles/s7', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([
           eintrag('s6', 'IuK'),

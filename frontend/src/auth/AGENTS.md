@@ -77,7 +77,7 @@ im 5-min-Takt.
   `e2e/sitzung-beenden.spec.ts`.
 - Beenden lässt Konto, Passwort und Zweitfaktor unberührt; Sitzungen gekoppelter Geräte
   (`kopplung_id`) stehen weder in der Liste noch werden sie beendet. Admin-Routen
-  (`/api/benutzer/{id}/sitzungen…`) prüfen die Organisation, fremd = 404. Die aktuelle Sitzung
+  (`/api/users/{id}/sessions…`) prüfen die Organisation, fremd = 404. Die aktuelle Sitzung
   endet nur über Abmelden (422). Je beendete Sitzung ein Spureintrag: selbst `auth_audit`,
   Admin `admin_audit`, beide `sitzung_beendet`.
 - `SitzungsListe` fragt nicht nach (umkehrbar durch erneutes Anmelden), „Alle … beenden“ steht

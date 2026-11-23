@@ -1,10 +1,16 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+access	Zugang
+access-changes	Zugangsänderungen
+access-log	Zugangsprotokoll
 accommodation	Unterkunft
+acknowledge	quittieren
 activate	aktivieren
 adapter	-
 admin	-
+administration	Verwaltung
 agenda-items	Programmpunkte
+alarm	Alarmmeldung
 animals	Tiere
 api	-
 app-code	-
@@ -15,19 +21,25 @@ audit	-
 auth	-
 auto-update	automatische Aktualisierung
 backup	-
+blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
 buildable-regions	baubare Regionen
 bulk	-
+calculators	Rechner
 callback	-
 cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
 check	prüfen
+check-in	melden
+client-errors	Client-Fehler
 close	abschließen
 closure	Abschluss
 code	-
@@ -38,12 +50,19 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
+countersign	gegenzeichnen
 damages	Schäden
+deactivate	deaktivieren
+decline	ablehnen
+demo-data	Demo-Daten
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 download	-
 emergency-takeover	Notübernahme
+end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
@@ -51,16 +70,20 @@ evacuation	Evakuierung
 events	-
 existing	vorhandene
 export	-
+external	extern
 fetch-certificate	Zertifikat abrufen
 finish	-
 follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 gauges	Pegel
+generate	erzeugen
 glyphs	-
 grant	Freigabe
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 import	-
 incidents	Einsätze
 info-line	Infotelefon
@@ -68,14 +91,18 @@ instance	Instanz
 intake	Einwurf
 intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
+inventory	Bestand
 ios-push	-
 jwks.json	-
 key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 live	-
 login	-
+logins	Anmeldungen
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -90,12 +117,22 @@ module-defaults	Modulvorgaben
 module-overrides	Modul-Overrides
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
+object	widersprechen
 offline	-
 offline-maps	Offline-Karten
 oidc	-
+one-time-password	Einmalpasswort
 online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
+org-accommodation-guidelines	Org-Unterkunft-Richtwerte
+org-archive-keys	Org-Archiv-Schlüssel
+org-command-roles	Org-Führungsfunktionen
+org-module-settings	Org-Modul-Einstellungen
+org-settings	Org-Einstellungen
+organization	Organisation
+origin	Herkunft
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -112,23 +149,31 @@ position	-
 positions	Stellen
 posts	Posten
 presence	Präsenz
+preview	Vorschau
 providers	-
 proxy	-
 raster	-
 read	gelesen
+reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference-values	Richtwerte
 register	-
 registration	-
+reimport	neu importieren
+reject	zurückweisen
+rejected	abgelehnt
 release-notes	Versionsstand
 reliefs	Ablösungen
 reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
@@ -141,6 +186,7 @@ set	festlegen
 settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
@@ -151,7 +197,9 @@ staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
 status	-
+storage	Datenträger
 style.json	-
+subscription	Abo
 system	-
 talk-groups	Sprechgruppen
 tasks	Aufträge
@@ -160,6 +208,7 @@ tile	-
 tilejson	-
 tiles	-
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 uhs	UHS
@@ -167,6 +216,7 @@ undo	zurücknehmen
 units	Einheiten
 unregister	-
 update-now	jetzt aktualisieren
+user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge

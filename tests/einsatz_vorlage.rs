@@ -464,7 +464,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        "/api/org-modul-einstellungen/fernmeldewesen",
+        "/api/org-module-settings/fernmeldewesen",
         &admin,
         Some(r#"{"benoetigte_rolle":null,"sichtbar":false}"#),
     )

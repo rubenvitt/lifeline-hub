@@ -1,7 +1,7 @@
 import { apiGet, apiSend, apiUpload } from './client';
 import type { OrganisationInfo } from './types';
 
-const PFAD = '/api/organisation';
+const PFAD = '/api/organization';
 const LOGO_PFAD = `${PFAD}/logo`;
 
 /** L‑2: Lädt die Organisations-Stammdaten inkl. taktischer Default-Organisation und Logo. */

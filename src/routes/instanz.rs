@@ -1,7 +1,7 @@
 //! Instanzkopplung (LLH-1490, Herleitung
 //! `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`): Verwaltung durch den
-//! Org-Admin (`/api/admin/instanz/…`) und die Routen, die eine andere Instanz ruft
-//! (`/api/instanz/…`: Einlösen öffentlich, Melden signiert). Herleitung im `design.md` der
+//! Org-Admin (`/api/admin/instance/…`) und die Routen, die eine andere Instanz ruft
+//! (`/api/instance/…`: Einlösen öffentlich, Melden signiert). Herleitung im `design.md` der
 //! Change, D2–D11.
 
 use crate::app::AppState;
@@ -91,7 +91,7 @@ pub struct InstanzUebersicht {
     pub schluessel: Vec<UnterschriftSchluesselAnzeige>,
 }
 
-/// GET /api/admin/instanz — Identität dieser Instanz, Kopplungen und Unterschriftsschlüssel der
+/// GET /api/admin/instance — Identität dieser Instanz, Kopplungen und Unterschriftsschlüssel der
 /// eigenen Org. Lesen darf, wer die Verwaltung sieht (wie die Lagemonitore); handeln nur der
 /// Admin.
 pub async fn uebersicht(
@@ -149,7 +149,7 @@ pub struct KopplungscodeAntwort {
     pub art: InstanzKopplungArt,
 }
 
-/// Body von `POST /api/admin/instanz/codes`; ohne Body eine Standardkopplung.
+/// Body von `POST /api/admin/instance/codes`; ohne Body eine Standardkopplung.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct CodeAusstellenBody {
     /// `vor_ort` für eine Direktkopplung zweier Instanzen im selben Netz (LLH-1497).
@@ -157,7 +157,7 @@ pub struct CodeAusstellenBody {
     pub art: Option<String>,
 }
 
-/// POST /api/admin/instanz/codes — stellt einen Kopplungscode für die Org des Admins aus. Nur mit
+/// POST /api/admin/instance/codes — stellt einen Kopplungscode für die Org des Admins aus. Nur mit
 /// eigenem gültigem Unterschriftsschlüssel (409), damit die gekoppelte Instanz mindestens einen
 /// Admin-Schlüssel der Org kennt (Spec `instanz-kopplung`).
 pub async fn code_ausstellen(
@@ -254,7 +254,7 @@ pub struct OrgLeitung {
     pub name: String,
 }
 
-/// Body von `POST /api/instanz/koppeln` (design.md D2). Der Code selbst ist nicht dabei.
+/// Body von `POST /api/instance/pair` (design.md D2). Der Code selbst ist nicht dabei.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KoppelnAnfrage {
     pub suche: String,
@@ -273,7 +273,7 @@ pub struct KoppelnAnfrage {
     pub nur_vor_ort: bool,
 }
 
-/// Antwort auf `POST /api/instanz/koppeln`, zusätzlich signiert (Kopf [`ANTWORT_KOPF`]).
+/// Antwort auf `POST /api/instance/pair`, zusätzlich signiert (Kopf [`ANTWORT_KOPF`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KoppelnAntwort {
     pub kennung: String,
@@ -317,7 +317,7 @@ fn is_zu_lang(text: &str, max: usize) -> bool {
     text.is_empty() || text.chars().count() > max
 }
 
-/// POST /api/instanz/koppeln — eine andere Instanz löst einen Kopplungscode dieser Instanz ein.
+/// POST /api/instance/pair — eine andere Instanz löst einen Kopplungscode dieser Instanz ein.
 /// Öffentlich (das Gegenüber ist noch nicht bekannt). Reihenfolge wie bei der Gerätekopplung:
 /// Sperre der Adresse (429), dann prüfen; jeder Fehlschlag ist einheitlich 401.
 pub async fn koppeln(
@@ -539,7 +539,7 @@ pub struct EinloesenBody {
     pub code: String,
 }
 
-/// POST /api/admin/instanz/einloesen — koppelt diese Instanz mit dem Code einer anderen. Die
+/// POST /api/admin/instance/redeem — koppelt diese Instanz mit dem Code einer anderen. Die
 /// Org des Admins wird an die Org des Ausstellers gebunden; danach meldet sich diese Instanz
 /// sofort.
 pub async fn einloesen(
@@ -692,6 +692,11 @@ impl From<AppError> for EinloesenFehler {
     }
 }
 
+/// Ein unsigniertes 404 beim Einlösen: Die Adresse kennt `/api/instance/pair` nicht, etwa weil
+/// dort ein Stand vor den englischen Wegen läuft (LLH-2053).
+const KOPPELN_UNBEKANNT: &str = "kennt den Weg zum Koppeln nicht. Ist dort eine Instanz mit einem \
+     anderen Softwarestand, beide auf denselben Stand bringen; sonst die Adresse prüfen.";
+
 async fn send_einloesen_mit(
     i: &Identitaet,
     adresse: &str,
@@ -724,7 +729,7 @@ async fn send_einloesen_mit(
         nur_vor_ort,
     };
     let resp = client
-        .post(format!("{adresse}/api/instanz/koppeln"))
+        .post(format!("{adresse}/api/instance/pair"))
         .json(&anfrage)
         .send()
         .await
@@ -768,6 +773,10 @@ async fn send_einloesen_mit(
                 "Die andere Instanz lehnt gerade weitere Versuche ab. Bitte kurz warten.".into(),
             )
             .into())
+        }
+        404 => {
+            let text = format!("Die Instanz unter {adresse} {KOPPELN_UNBEKANNT}");
+            return Err(AppError::BadGateway(text).into());
         }
         s => return Err(EinloesenFehler::Netz(format!("Antwort {s}"))),
     }
@@ -834,12 +843,17 @@ async fn send_einloesen_mit(
 
 // ── Melden ───────────────────────────────────────────────────────────────────────────────────
 
-/// POST /api/instanz/melden — eine gekoppelte Instanz meldet sich (signiert, design.md D4).
+/// POST /api/instance/check-in — eine gekoppelte Instanz meldet sich (signiert, design.md D4).
 pub async fn melden(
     State(state): State<AppState>,
     anfrage: GekoppelteInstanz,
 ) -> Result<Response, AppError> {
     let body: MeldenAnfrage = anfrage.json()?;
+    // Sperrt das Push-Relais diese Instanz, erfährt es der ELW (LLH-2074).
+    let ios_push_gesperrt_seit = match state.live.ios_push() {
+        Some(_) => crate::ios_push::repo::relais_gesperrt_seit(&state.pool).await?,
+        None => None,
+    };
     let antwort = melden::handle_meldung(
         &state.pool,
         &anfrage.identitaet,
@@ -847,12 +861,13 @@ pub async fn melden(
         &body,
         state.live.web_push().is_some(),
         state.live.ios_push().is_some(),
+        ios_push_gesperrt_seit,
     )
     .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
-/// Antwort von `GET /api/admin/instanz/lan`.
+/// Antwort von `GET /api/admin/instance/lan`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct InstanzLanAntwort {
     /// Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`).
@@ -861,7 +876,7 @@ pub struct InstanzLanAntwort {
     pub gefunden: Vec<crate::instanz::entdeckung::InstanzGefunden>,
 }
 
-/// GET /api/admin/instanz/lan — sucht einige Sekunden nach angekündigten Instanzen im lokalen
+/// GET /api/admin/instance/lan — sucht einige Sekunden nach angekündigten Instanzen im lokalen
 /// Netz (LLH-1497, Spec `instanz-entdeckung`, „Liste „Im Netz gefunden“ beim Einlösen“). Nur für
 /// Admins; eine Ankündigung begründet kein Vertrauen.
 pub async fn lan(
@@ -885,7 +900,7 @@ pub async fn lan(
     }))
 }
 
-/// POST /api/instanz/zertifikat — signierte Aussage über das eigene TLS-Zertifikat für die
+/// POST /api/instance/certificate — signierte Aussage über das eigene TLS-Zertifikat für die
 /// meldende Seite einer Direktkopplung (LLH-1497, design.md D3). Ohne Nutzdaten; die meldende
 /// Seite vergleicht die Aussage mit dem Zertifikat, das sie gesehen hat.
 pub async fn zertifikat(
@@ -905,7 +920,7 @@ pub async fn zertifikat(
 
 // ── Abgleich der Einsätze (LLH-1492) ─────────────────────────────────────────────────────────
 
-/// POST /api/instanz/spiegel — eine gekoppelte Instanz gleicht Einsätze ab (signiert, design.md
+/// POST /api/instance/mirror — eine gekoppelte Instanz gleicht Einsätze ab (signiert, design.md
 /// D6): Lieferungen ihrer Einsätze und ihre Stände der unseren hinein, unsere hinaus.
 pub async fn spiegel_abgleich(
     State(state): State<AppState>,
@@ -988,7 +1003,7 @@ async fn modul_freigabe_fuer(
     })
 }
 
-/// GET /api/einsaetze/{id}/bruchstelle — die nicht übernommenen Erfassungen eines Spiegels nach
+/// GET /api/einsaetze/{id}/breaks — die nicht übernommenen Erfassungen eines Spiegels nach
 /// einer Notübernahme (LLH-1646, N2): offen, nach Zeit; Inhalte nur mit Freigabe des Moduls.
 pub async fn bruchstelle_liste(
     State(state): State<AppState>,
@@ -1005,7 +1020,7 @@ async fn bruchstelle_geaendert(state: &AppState, einsatz_id: i64) {
     crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
 }
 
-/// POST /api/einsaetze/{id}/bruchstelle/{bruch_id}/antrag — stellt eine nicht übernommene
+/// POST /api/einsaetze/{id}/breaks/{bruch_id}/request — stellt eine nicht übernommene
 /// Erfassung als Antrag an den Führer (LLH-1646, N1, N3). 202 mit dem Antrag wie eine Erfassung
 /// am Spiegel; ein zweites Stellen liefert denselben Antrag.
 pub async fn bruchstelle_stellen(
@@ -1047,7 +1062,7 @@ pub async fn bruchstelle_stellen(
     )))
 }
 
-/// POST /api/einsaetze/{id}/bruchstelle/antraege — stellt alle nachreichbaren Erfassungen in der
+/// POST /api/einsaetze/{id}/breaks/requests — stellt alle nachreichbaren Erfassungen in der
 /// Reihenfolge ihrer Zeit (LLH-1646, N5). Was noch nicht geht, bleibt offen und steht mit Grund in
 /// der Antwort.
 pub async fn bruchstelle_alle_stellen(
@@ -1068,7 +1083,7 @@ pub async fn bruchstelle_alle_stellen(
     Ok(Json(ergebnis))
 }
 
-/// POST /api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen — legt eine nicht übernommene
+/// POST /api/einsaetze/{id}/breaks/{bruch_id}/discard — legt eine nicht übernommene
 /// Erfassung ab (LLH-1646, N6). Auch am abgeschlossenen Einsatz und nach beendetem Abgleich.
 pub async fn bruchstelle_verwerfen(
     State(state): State<AppState>,
@@ -1089,7 +1104,7 @@ pub async fn bruchstelle_verwerfen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/antraege/abgelehnt — die eigenen abgelehnten Anträge an Einsätzen, die kein Spiegel
+/// GET /api/requests/rejected — die eigenen abgelehnten Anträge an Einsätzen, die kein Spiegel
 /// mehr sind (LLH-1648, nach der Verwahrung am Hub). Einsatzübergreifend und ohne Einsatz-Lese-Gate:
 /// nach der Schonfrist liest die Person den Einsatz nicht mehr, ihren Antrag aber schon.
 pub async fn antraege_abgelehnt(
@@ -1101,7 +1116,7 @@ pub async fn antraege_abgelehnt(
     ))
 }
 
-/// DELETE /api/antraege/abgelehnt/{antrag_id} — verwirft einen davon (204; fremd oder am Spiegel
+/// DELETE /api/requests/rejected/{antrag_id} — verwirft einen davon (204; fremd oder am Spiegel
 /// 404).
 pub async fn antrag_abgelehnt_verwerfen(
     State(state): State<AppState>,
@@ -1115,7 +1130,7 @@ pub async fn antrag_abgelehnt_verwerfen(
 
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────
 
-/// POST /api/admin/instanz/kopplungen/{id}/widerrufen — nimmt die Org des Admins aus der Kopplung.
+/// POST /api/admin/instance/pairings/{id}/revoke — nimmt die Org des Admins aus der Kopplung.
 /// Ohne Org-Zuordnung gilt die Kopplung als widerrufen. Meldet sich diese Instanz beim Gegenüber,
 /// geht der Widerruf sofort signiert hinaus; sonst erfährt das Gegenüber ihn bei seiner nächsten
 /// Meldung. Idempotent.
@@ -1171,7 +1186,7 @@ pub async fn widerrufen(
 
 // ── Stammdaten (LLH-1493) ────────────────────────────────────────────────────────────────────
 
-/// POST /api/admin/instanz/kopplungen/{id}/stammdaten-neu — „Erneut abgleichen“ an der meldenden
+/// POST /api/admin/instance/pairings/{id}/resync — „Erneut abgleichen“ an der meldenden
 /// Seite (design.md D5): Stand der Org-Zuordnung des Admins auf 0, Hinweise leer; die nächste
 /// Meldung holt alles neu und gleicht ab. 422 an der erreichten Seite.
 pub async fn stammdaten_neu(
@@ -1208,7 +1223,7 @@ pub struct ElwVerlorenAntwort {
     pub konten: i64,
 }
 
-/// POST /api/admin/instanz/kopplungen/{id}/verloren — „ELW verloren“ an der erreichten Seite
+/// POST /api/admin/instance/pairings/{id}/lost — „ELW verloren“ an der erreichten Seite
 /// (LLH-1493, design.md D8): widerruft die Org-Zuordnung des Admins, macht Passwort und zweiten
 /// Faktor jedes Kontos ungültig, dessen Geheimnisse dorthin gingen, und beendet dessen Sitzungen.
 /// Wieder hinein geht es per Passkey oder Einmalpasswort. 422 an der meldenden Seite.
@@ -1310,7 +1325,7 @@ pub async fn elw_verloren(
     }))
 }
 
-/// GET /api/instanz/stammdaten/herkunft — welche Stammdaten der eigenen Org vom Hub kommen
+/// GET /api/instance/master-data/origin — welche Stammdaten der eigenen Org vom Hub kommen
 /// (design.md D9). Lesen darf jede angemeldete Person: die Oberfläche sperrt danach die
 /// Bearbeitung, verrät aber nichts, was die Listen nicht ohnehin zeigen.
 pub async fn stammdaten_herkunft(
@@ -1354,7 +1369,7 @@ pub struct UnterschriftRegistrierenStart {
     pub optionen: CreationChallengeResponse,
 }
 
-/// POST /api/admin/instanz/unterschrift/registrieren/start — beginnt die Registrierung eines
+/// POST /api/admin/instance/signing-keys/register/start — beginnt die Registrierung eines
 /// Unterschriftsschlüssels. Eigener, zufälliger User-Handle je Schlüssel: der Anmeldeweg findet
 /// ihn nie (design.md D7).
 pub async fn registrieren_start(
@@ -1391,7 +1406,7 @@ pub struct RegistrierenAbschlussBody {
     pub antwort: RegisterPublicKeyCredential,
 }
 
-/// POST /api/admin/instanz/unterschrift/registrieren/abschluss — schließt die Registrierung ab.
+/// POST /api/admin/instance/signing-keys/register/finish — schließt die Registrierung ab.
 /// Nur ES256 (P-256); ein RSA-Passkey wird mit 422 abgelehnt.
 pub async fn registrieren_abschluss(
     State(state): State<AppState>,
@@ -1487,7 +1502,7 @@ pub struct UnterschriftGegenzeichnenStart {
     pub erklaerung: String,
 }
 
-/// POST /api/admin/instanz/unterschrift/{id}/gegenzeichnen/start — bildet die Erklärung, mit der
+/// POST /api/admin/instance/signing-keys/{id}/countersign/start — bildet die Erklärung, mit der
 /// der Admin einen wartenden Schlüssel seiner Org gegenzeichnet. Die Challenge entsteht hier, nie
 /// im Browser.
 pub async fn gegenzeichnen_start(
@@ -1555,7 +1570,7 @@ pub struct GegenzeichnenAbschlussBody {
     pub assertion: UnterschriftAssertion,
 }
 
-/// POST /api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss — prüft die Unterschrift
+/// POST /api/admin/instance/signing-keys/{id}/countersign/finish — prüft die Unterschrift
 /// des Admins über die Erklärung mit einem seiner gültigen Schlüssel und macht den neuen gültig.
 pub async fn gegenzeichnen_abschluss(
     State(state): State<AppState>,
@@ -1625,7 +1640,7 @@ pub async fn gegenzeichnen_abschluss(
     Ok(Json(anzeige))
 }
 
-/// GET /api/admin/instanz/letzte-schluessel — Konten der eigenen Org, deren Deaktivieren oder
+/// GET /api/admin/instance/last-keys — Konten der eigenen Org, deren Deaktivieren oder
 /// Herabstufen die Kopplungen ohne gültigen Unterschriftsschlüssel zurückließe; die
 /// Benutzerverwaltung warnt davor (LLH-1605, design.md D5).
 pub async fn letzte_schluessel(
@@ -1647,7 +1662,7 @@ pub struct BestaetigenBody {
     pub fingerabdruck_ende: String,
 }
 
-/// POST /api/admin/instanz/unterschrift/{id}/bestaetigen — bestätigt einen vom Gegenüber
+/// POST /api/admin/instance/signing-keys/{id}/confirm — bestätigt einen vom Gegenüber
 /// nachgelieferten, wartenden Schlüssel (LLH-1605, design.md D3). Verlangt die letzten vier
 /// Zeichen des Fingerabdrucks (422, wenn sie nicht passen); ein eigener Unterschriftsschlüssel ist
 /// nicht nötig.
@@ -1666,7 +1681,7 @@ pub async fn unterschrift_bestaetigen(
     decide_unterschrift(&state, &admin, peer_ip, id, Some(&eingabe)).await
 }
 
-/// POST /api/admin/instanz/unterschrift/{id}/zurueckweisen — weist einen vom Gegenüber
+/// POST /api/admin/instance/signing-keys/{id}/reject — weist einen vom Gegenüber
 /// nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig.
 pub async fn unterschrift_zurueckweisen(
     State(state): State<AppState>,
@@ -1744,7 +1759,7 @@ async fn decide_unterschrift(
     ))
 }
 
-/// POST /api/admin/instanz/unterschrift/{id}/widerrufen — widerruft einen lokalen
+/// POST /api/admin/instance/signing-keys/{id}/revoke — widerruft einen lokalen
 /// Unterschriftsschlüssel der Org. Der letzte gültige einer Org, die ihre Schlüssel an eine
 /// gekoppelte Instanz verteilt, bleibt (409). Idempotent.
 pub async fn unterschrift_widerrufen(

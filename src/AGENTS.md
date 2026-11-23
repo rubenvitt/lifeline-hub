@@ -142,7 +142,7 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 
 ## Backend — Öffentliche API v1 (LLH-1653)
 
-Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0022](../docs/architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0096](../docs/architektur/entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec `oeffentliche-api-vertrag`, Herleitung
 `openspec/changes/archive/2026-11-12-h5zpb97t-oeffentliche-api-vertrag/design.md`):
 - **Routen nur in `public_api::router()`** per `.routes(routes!(handler))`, jeder Handler mit
@@ -486,12 +486,15 @@ Herleitung in
 
 - **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
   und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener
-  Token-Vergleich. Nur `POST /api/instanz/koppeln` ist öffentlich (IP-Sperre, einheitlich 401).
+  Token-Vergleich. Nur `POST /api/instance/pair` ist öffentlich (IP-Sperre, einheitlich 401).
 - **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
   meldet sich; die erreichte Seite baut nie eine Verbindung auf.
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
   kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
-  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv. Einzige Ausnahme ist der Sprung
+  4 → 6 mit den englischen Wegen (LLH-2053, harter Schnitt in der Alpha, ADR-0085): Zwischen 4
+  und 6 geht auch Melden nicht; ein unsigniertes 404 beim Melden oder Einlösen heißt „anderer
+  Softwarestand“ (`melden::deute_unsigniert`, `routes::instanz`). Ab 1.0.0 bleibt ein umbenannter Weg als Alias erreichbar.
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
   haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
   gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein
@@ -688,7 +691,7 @@ Herleitung in
     ohne Gegenzeichnung (`GegenzeichnungPflicht::NurBestaetigung`); dort wartet jeder auf einen
     Admin. Ein Widerruf gilt je Credential-ID für jede Zeile der Org.
   - **Über `vor_ort` gehen Nutzdaten nur über `zertifikat::client(pin)`**; ein Zertifikatswechsel
-    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instanz/zertifikat`). Kein
+    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instance/certificate`). Kein
     eigener Client für eine Direktkopplung.
   - **„Übersetzt über die Herkunft“ heißt `spiegel::abgleich::uebersetzt`** (meldende Seite einer
     Standardkopplung), nicht `richtung == MeldetSich`. Ein neuer Verweis auf Stammdaten in einer
@@ -942,7 +945,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `LiveHub::ios_push()` `None`, und die Routen antworten 404. Ereignisse ohne Einsatz (Störung
   einer Anbindung, LLH-2026) gehen mit (LLH-2077): im Klartext fehlt dann `e`, die App gruppiert
   sie im Thread `<kennung>-org`.
-- **Klartext aus derselben Stelle wie `GET /api/benachrichtigungen/{id}`**
+- **Klartext aus derselben Stelle wie `GET /api/notifications/{id}`**
   (`ios_push::inhalt::klartext`): Titel, Detail, Pfad; gäbe die Route 404, gehen Rückfalltitel der
   Stufe („Alarm“ / „Neue Benachrichtigung“) und `/einsaetze/{e}`, ohne Einsatz
   `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
@@ -966,7 +969,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `SPERRE_GILT_STUNDEN` (24 h) nichts senden; danach versucht der nächste Versand es einmal mit
   demselben Zugang (angenommen: Sperre weg, wieder `403`: erneuert). Solange sie steht, meldet
   `GET /api/ios-push` `relais_gesperrt` (die Oberfläche zeigt statt des Schalters den Hinweis) und
-  `GET /api/admin/instanz` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
+  `GET /api/admin/instance` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
 - **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
   anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet
@@ -1088,8 +1091,8 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 `src/demo/`, `src/routes/demo_daten.rs`; Schalter `--demo-daten`/`LIFELINE_DEMO_DATEN=true`
 (Vorgabe aus). Herleitung: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`.
 - 404 ohne Schalter kommt aus der Registrierung (`RouterOptionen { demo_daten }`,
-  `build_router_mit`); das Frontend liest nur `GET /api/demo-daten` (`admin/useDemoDaten.ts`).
-- **Lagen** (LLH-1576): `DemoLage` ist Pfadsegment (`/api/demo-daten/{lage}`, `/neu`) und
+  `build_router_mit`); das Frontend liest nur `GET /api/demo-data` (`admin/useDemoDaten.ts`).
+- **Lagen** (LLH-1576): `DemoLage` ist Pfadsegment (`/api/demo-data/{lage}`, `/reimport`) und
   `demo_import.szenario`; je Org und Lage höchstens ein aktiver Kopf (Index in 0290). Eine neue
   Lage = `Szenario` in eigener Datei (`src/demo/szenario_*.rs`) mit eigenen Stammdaten-Kennungen
   (`demo_herkunft` ist je Datensatz eindeutig) und ein Wert in `DemoLage`; GET liefert immer alle

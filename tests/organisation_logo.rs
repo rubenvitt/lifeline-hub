@@ -1,5 +1,5 @@
-//! Logo der Organisation (LFH-22): `POST|GET|DELETE /api/organisation/logo` und das Feld
-//! `logo` an `GET /api/organisation`.
+//! Logo der Organisation (LFH-22): `POST|GET|DELETE /api/organization/logo` und das Feld
+//! `logo` an `GET /api/organization`.
 //!
 //! Der fail-closed-Pfad des Virenscans (503) steht in `tests/organisation_logo_scan.rs`:
 //! `init_scan_config` setzt eine prozessweite OnceLock und kippte hier jeden Upload auf 503.
@@ -20,7 +20,7 @@ mod common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
 const MIB: usize = 1024 * 1024;
-const LOGO: &str = "/api/organisation/logo";
+const LOGO: &str = "/api/organization/logo";
 
 /// Valides 1x1-PNG.
 fn png() -> Vec<u8> {
@@ -135,7 +135,7 @@ async fn logo_holen(
 }
 
 async fn org(app: &axum::Router, cookie: &str) -> Value {
-    let (status, json) = anfrage(app, "GET", "/api/organisation", cookie, None).await;
+    let (status, json) = anfrage(app, "GET", "/api/organization", cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     json
 }
@@ -446,7 +446,7 @@ async fn patch_antwort_traegt_das_logo_mit() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        "/api/organisation",
+        "/api/organization",
         &admin,
         Some(r#"{"name":"Neu"}"#),
     )

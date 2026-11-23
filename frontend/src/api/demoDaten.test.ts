@@ -34,26 +34,26 @@ describe('api/demoDaten (LFH-690)', () => {
       return HttpResponse.json(NIE);
     };
     server.use(
-      http.get('/api/demo-daten', merke),
-      http.post('/api/demo-daten/:lage', merke),
-      http.post('/api/demo-daten/:lage/neu', merke),
-      http.delete('/api/demo-daten/:lage', merke),
+      http.get('/api/demo-data', merke),
+      http.post('/api/demo-data/:lage', merke),
+      http.post('/api/demo-data/:lage/reimport', merke),
+      http.delete('/api/demo-data/:lage', merke),
     );
     await ladeDemoDatenStatus();
     await importiereDemoDaten('stadtfest');
     await importiereDemoDatenNeu('stadtfest');
     await entferneDemoDaten('starkregen');
     expect(gesehen).toEqual([
-      'GET /api/demo-daten',
-      'POST /api/demo-daten/stadtfest',
-      'POST /api/demo-daten/stadtfest/neu',
-      'DELETE /api/demo-daten/starkregen',
+      'GET /api/demo-data',
+      'POST /api/demo-data/stadtfest',
+      'POST /api/demo-data/stadtfest/reimport',
+      'DELETE /api/demo-data/starkregen',
     ]);
   });
 
   it('reicht einen 409 als ApiError mit Servertext durch', async () => {
     server.use(
-      http.post('/api/demo-daten/starkregen', () =>
+      http.post('/api/demo-data/starkregen', () =>
         HttpResponse.json({ error: 'Demo-Daten sind bereits importiert' }, { status: 409 }),
       ),
     );

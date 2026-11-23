@@ -29,8 +29,8 @@ const beispielAnzeige: OrgEinstellungen = {
 };
 
 describe('ladeOrgEinstellungen', () => {
-  it('sendet GET an /api/org-einstellungen und liefert das Objekt', async () => {
-    server.use(http.get('/api/org-einstellungen', () => HttpResponse.json(beispielAnzeige)));
+  it('sendet GET an /api/org-settings und liefert das Objekt', async () => {
+    server.use(http.get('/api/org-settings', () => HttpResponse.json(beispielAnzeige)));
     await expect(ladeOrgEinstellungen()).resolves.toEqual(beispielAnzeige);
   });
 
@@ -56,13 +56,13 @@ describe('ladeOrgEinstellungen', () => {
       geaendert_at: null,
       geaendert_von: null,
     };
-    server.use(http.get('/api/org-einstellungen', () => HttpResponse.json(leer)));
+    server.use(http.get('/api/org-settings', () => HttpResponse.json(leer)));
     await expect(ladeOrgEinstellungen()).resolves.toEqual(leer);
   });
 });
 
 describe('speichereOrgEinstellungen', () => {
-  it('sendet PUT an /api/org-einstellungen mit dem Update-Body', async () => {
+  it('sendet PUT an /api/org-settings mit dem Update-Body', async () => {
     let empfangenerBody: unknown;
     const update: OrgEinstellungenUpdate = {
       zeitzone: 'UTC',
@@ -83,7 +83,7 @@ describe('speichereOrgEinstellungen', () => {
       geocoder_url: null,
     };
     server.use(
-      http.put('/api/org-einstellungen', async ({ request }) => {
+      http.put('/api/org-settings', async ({ request }) => {
         empfangenerBody = await request.json();
         return HttpResponse.json({
           ...update,
@@ -119,7 +119,7 @@ describe('speichereOrgEinstellungen', () => {
       geocoder_url: null,
     };
     server.use(
-      http.put('/api/org-einstellungen', async ({ request }) => {
+      http.put('/api/org-settings', async ({ request }) => {
         empfangenerBody = await request.json();
         return HttpResponse.json({
           ...update,
@@ -135,27 +135,27 @@ describe('speichereOrgEinstellungen', () => {
 });
 
 describe('ladeOrgModulEinstellungen', () => {
-  it('sendet GET an /api/org-modul-einstellungen und liefert die Map', async () => {
+  it('sendet GET an /api/org-module-settings und liefert die Map', async () => {
     const map = {
       etb: { benoetigte_rolle: 'admin', sichtbar: true },
       lagebesprechung: { benoetigte_rolle: null, sichtbar: false },
     };
-    server.use(http.get('/api/org-modul-einstellungen', () => HttpResponse.json(map)));
+    server.use(http.get('/api/org-module-settings', () => HttpResponse.json(map)));
     await expect(ladeOrgModulEinstellungen()).resolves.toEqual(map);
   });
 
   it('liefert leere Map wenn keine Overrides gesetzt', async () => {
-    server.use(http.get('/api/org-modul-einstellungen', () => HttpResponse.json({})));
+    server.use(http.get('/api/org-module-settings', () => HttpResponse.json({})));
     await expect(ladeOrgModulEinstellungen()).resolves.toEqual({});
   });
 });
 
 describe('setzeOrgModulEinstellung', () => {
-  it('sendet PUT an /api/org-modul-einstellungen/:modulKey mit Rolle und Sichtbarkeit', async () => {
+  it('sendet PUT an /api/org-module-settings/:modulKey mit Rolle und Sichtbarkeit', async () => {
     let empfangenerBody: unknown;
     let empfangenerKey: string | undefined;
     server.use(
-      http.put('/api/org-modul-einstellungen/:modulKey', async ({ request, params }) => {
+      http.put('/api/org-module-settings/:modulKey', async ({ request, params }) => {
         empfangenerBody = await request.json();
         empfangenerKey = params.modulKey as string;
         return new HttpResponse(null, { status: 204 });
@@ -169,7 +169,7 @@ describe('setzeOrgModulEinstellung', () => {
   it('erlaubt null als Rolle (kein Rollen-Zwang)', async () => {
     let empfangenerBody: unknown;
     server.use(
-      http.put('/api/org-modul-einstellungen/:modulKey', async ({ request }) => {
+      http.put('/api/org-module-settings/:modulKey', async ({ request }) => {
         empfangenerBody = await request.json();
         return new HttpResponse(null, { status: 204 });
       }),
@@ -180,10 +180,7 @@ describe('setzeOrgModulEinstellung', () => {
 
   it('gibt void zurück (204 No Content)', async () => {
     server.use(
-      http.put(
-        '/api/org-modul-einstellungen/:modulKey',
-        () => new HttpResponse(null, { status: 204 }),
-      ),
+      http.put('/api/org-module-settings/:modulKey', () => new HttpResponse(null, { status: 204 })),
     );
     const result = await setzeOrgModulEinstellung('etb', {
       benoetigte_rolle: 'admin',

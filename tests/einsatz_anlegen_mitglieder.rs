@@ -47,7 +47,7 @@ async fn deaktivieren(app: &axum::Router, admin: &str, id: i64) {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/benutzer/{id}/deaktivieren"),
+        &format!("/api/users/{id}/deactivate"),
         admin,
         None,
     )

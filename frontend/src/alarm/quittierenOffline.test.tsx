@@ -71,15 +71,15 @@ function live(b: BenachrichtigungAnzeige) {
 function serverMit(liste: BenachrichtigungAnzeige[], offen: BenachrichtigungAnzeige[] = []) {
   const quittiert: number[] = [];
   server.use(
-    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+    http.get('/api/notifications/:id', ({ params }) => {
       const b = liste.find((x) => x.id === Number(params.id));
       return b ? HttpResponse.json(b) : HttpResponse.json({ error: 'weg' }, { status: 404 });
     }),
-    http.get('/api/benachrichtigungen', () => HttpResponse.json(offen)),
+    http.get('/api/notifications', () => HttpResponse.json(offen)),
     http.get('/api/einsaetze/:id/notifications', () =>
       HttpResponse.json({ eintraege: liste, ungelesen: liste.length }),
     ),
-    http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {
+    http.post('/api/notifications/:id/acknowledge', ({ params }) => {
       quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -175,7 +175,7 @@ describe('Eingang einzeln quittieren ohne Netz (LLH-1477)', () => {
     });
     // Das Senden scheitert an der Leitung: die Zeile bleibt, wie vor dem Abgleich.
     serverMit([vorgemerkt, offen], [offen, vorgemerkt]);
-    server.use(http.post('/api/benachrichtigungen/:id/quittieren', () => HttpResponse.error()));
+    server.use(http.post('/api/notifications/:id/acknowledge', () => HttpResponse.error()));
     rendern();
 
     await waitFor(() => expect(within(band()).getByText('Auftrag #1802')).toBeInTheDocument());

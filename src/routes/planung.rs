@@ -1,5 +1,5 @@
 //! Routen der Vorplanung ohne Einsatz (LLH-1585, Spec `vorplanung`, design.md D6). Pfade unter
-//! `/api/planungen`.
+//! `/api/plans`.
 //!
 //! Gate: das Recht, Einsätze anzulegen, in der eigenen Organisation (`planung::zugriff`): ohne
 //! Recht 403, eine fremde oder unbekannte Planung 404. Feldfehler 400, Zusammenhang und fremde
@@ -66,7 +66,7 @@ async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige
     .await
 }
 
-/// GET /api/planungen/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
+/// GET /api/plans/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
 /// die Planung lesen darf. Helfer der Planung sind immer sichtbar (keine Modulsperre).
 pub async fn export(
     State(state): State<AppState>,
@@ -125,7 +125,7 @@ fn schichtlaenge(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppEr
 // Planung
 // ---------------------------------------------------------------------------------------------
 
-/// GET /api/planungen — die Planungen der eigenen Organisation mit Kennzahlen.
+/// GET /api/plans — die Planungen der eigenen Organisation mit Kennzahlen.
 pub async fn list(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
@@ -156,7 +156,7 @@ pub struct PlanungAnlegen {
     min_ruhe_minuten: Option<i64>,
 }
 
-/// POST /api/planungen — legt eine Planung an (201, ganze Planung). Bezeichnung doppelt 409.
+/// POST /api/plans — legt eine Planung an (201, ganze Planung). Bezeichnung doppelt 409.
 pub async fn create(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
@@ -199,7 +199,7 @@ pub async fn create(
     ))
 }
 
-/// GET /api/planungen/{id}
+/// GET /api/plans/{id}
 pub async fn load(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -233,7 +233,7 @@ pub struct PlanungAendern {
     min_ruhe_minuten: Option<Option<i64>>,
 }
 
-/// PATCH /api/planungen/{id} — Kopf, CAS über `version` (409).
+/// PATCH /api/plans/{id} — Kopf, CAS über `version` (409).
 pub async fn update(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -291,7 +291,7 @@ pub async fn update(
     Ok(Json(planung(&state, &z).await?))
 }
 
-/// DELETE /api/planungen/{id} — samt Posten, Blöcken und Helfern (204).
+/// DELETE /api/plans/{id} — samt Posten, Blöcken und Helfern (204).
 pub async fn delete(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -360,7 +360,7 @@ fn herkunft(req: &PostenAnlegen) -> Result<Herkunft, AppError> {
     }
 }
 
-/// POST /api/planungen/{id}/posten — am Ende der Reihenfolge (201, ganze Planung). Höchstens
+/// POST /api/plans/{id}/posts — am Ende der Reihenfolge (201, ganze Planung). Höchstens
 /// [`POSTEN_MAX`] je Planung (422), Bezeichnung in der Planung doppelt 409.
 pub async fn create_posten(
     State(state): State<AppState>,
@@ -395,7 +395,7 @@ pub struct PostenAendern {
     quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
 }
 
-/// PATCH /api/planungen/{id}/posten/{pid} — Bezeichnung, Abschnitt, Schichtlänge, Soll; die
+/// PATCH /api/plans/{id}/posts/{pid} — Bezeichnung, Abschnitt, Schichtlänge, Soll; die
 /// Herkunft bleibt. Bestehende Blöcke behalten ihr Soll.
 pub async fn update_posten(
     State(state): State<AppState>,
@@ -425,7 +425,7 @@ pub struct PostenLoeschenParams {
     mit_bloecken: bool,
 }
 
-/// DELETE /api/planungen/{id}/posten/{pid}?mit_bloecken=true — samt seinen Blöcken; sind darin
+/// DELETE /api/plans/{id}/posts/{pid}?mit_bloecken=true — samt seinen Blöcken; sind darin
 /// Personen eingeteilt, nur mit `mit_bloecken` (422 sonst).
 pub async fn delete_posten(
     State(state): State<AppState>,
@@ -451,7 +451,7 @@ pub struct Reihenfolge {
     posten_ids: Vec<i64>,
 }
 
-/// PUT /api/planungen/{id}/posten/reihenfolge — die ganze Reihenfolge (jeder Posten genau
+/// PUT /api/plans/{id}/posts/order — die ganze Reihenfolge (jeder Posten genau
 /// einmal, 422 sonst).
 pub async fn reihenfolge(
     State(state): State<AppState>,
@@ -496,7 +496,7 @@ pub struct BlockAnlegen {
     notiz: Option<String>,
 }
 
-/// POST /api/planungen/{id}/bloecke — liefert die ganze Planung (201).
+/// POST /api/plans/{id}/blocks — liefert die ganze Planung (201).
 pub async fn create_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -546,7 +546,7 @@ pub struct BlockAendern {
     notiz: Option<Option<String>>,
 }
 
-/// PATCH /api/planungen/{id}/bloecke/{bid} — CAS über `version` (409).
+/// PATCH /api/plans/{id}/blocks/{bid} — CAS über `version` (409).
 pub async fn update_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -573,7 +573,7 @@ pub async fn update_block(
     Ok(Json(planung(&state, &z).await?))
 }
 
-/// DELETE /api/planungen/{id}/bloecke/{bid}?version=… (409 bei veraltetem Stand).
+/// DELETE /api/plans/{id}/blocks/{bid}?version=… (409 bei veraltetem Stand).
 pub async fn delete_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -602,7 +602,7 @@ pub struct Erzeugen {
     laenge_minuten: Option<i64>,
 }
 
-/// POST /api/planungen/{id}/erzeugen — füllt den Zeitraum am Posten mit Schichten (alles oder
+/// POST /api/plans/{id}/generate — füllt den Zeitraum am Posten mit Schichten (alles oder
 /// nichts). Ohne Länge und ohne Schichtlänge des Postens 422. Liefert die ganze Planung (201).
 pub async fn erzeugen(
     State(state): State<AppState>,
@@ -629,7 +629,7 @@ pub async fn erzeugen(
 // Helfer
 // ---------------------------------------------------------------------------------------------
 
-/// POST /api/planungen/{id}/helfer (201, der Helfer).
+/// POST /api/plans/{id}/helpers (201, der Helfer).
 pub async fn create_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -643,7 +643,7 @@ pub async fn create_helfer(
     Ok((StatusCode::CREATED, Json(helfer)))
 }
 
-/// PATCH /api/planungen/{id}/helfer/{hid}
+/// PATCH /api/plans/{id}/helpers/{hid}
 pub async fn update_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -658,7 +658,7 @@ pub async fn update_helfer(
     Ok(Json(helfer))
 }
 
-/// DELETE /api/planungen/{id}/helfer/{hid} — nimmt den Helfer aus allen Blöcken.
+/// DELETE /api/plans/{id}/helpers/{hid} — nimmt den Helfer aus allen Blöcken.
 pub async fn delete_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -676,7 +676,7 @@ pub async fn delete_helfer(
 // Programmpunkte (LLH-1583)
 // ---------------------------------------------------------------------------------------------
 
-/// POST /api/planungen/{id}/programmpunkte (201, der Programmpunkt). Grenzen wie am Einsatz:
+/// POST /api/plans/{id}/agenda-items (201, der Programmpunkt). Grenzen wie am Einsatz:
 /// Bezeichnung Pflicht und höchstens 100 Zeichen, Zeitpunkt im Jahresbereich (400), höchstens 50
 /// je Planung (422).
 pub async fn create_programmpunkt(
@@ -703,7 +703,7 @@ pub async fn create_programmpunkt(
     Ok((StatusCode::CREATED, Json(p)))
 }
 
-/// PATCH /api/planungen/{id}/programmpunkte/{pid} — Bezeichnung und/oder Zeitpunkt.
+/// PATCH /api/plans/{id}/agenda-items/{pid} — Bezeichnung und/oder Zeitpunkt.
 pub async fn update_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -733,7 +733,7 @@ pub async fn update_programmpunkt(
     Ok(Json(p))
 }
 
-/// DELETE /api/planungen/{id}/programmpunkte/{pid} (204).
+/// DELETE /api/plans/{id}/agenda-items/{pid} (204).
 pub async fn delete_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
@@ -771,7 +771,7 @@ fn check_entscheidungen(e: Entscheidungen) -> Result<Entscheidungen, AppError> {
     Ok(e)
 }
 
-/// POST /api/planungen/{id}/uebernahme/vorschau — gleicht die Planung mit dem Ziel ab und
+/// POST /api/plans/{id}/transfer/preview — gleicht die Planung mit dem Ziel ab und
 /// schreibt nichts; Fehler stehen in der Antwort (200). Ein laufender Einsatz: fremd oder
 /// unbekannt 404, ohne Schreibrecht, Ablösung oder Personal 403, abgeschlossen 409. Eine schon
 /// übernommene Planung 409. Die Antwort trägt den Stand der Planung (LLH-1610).
@@ -788,7 +788,7 @@ pub async fn uebernahme_vorschau(
     }))
 }
 
-/// POST /api/planungen/{id}/uebernahme — wie die Vorschau, schreibt aber in EINER Transaktion:
+/// POST /api/plans/{id}/transfer — wie die Vorschau, schreibt aber in EINER Transaktion:
 /// neuer Einsatz (wenn gewählt), Plan des Einsatzes und Vermerk an der Planung. Danach ist die
 /// Planung schreibgeschützt, ein zweiter Aufruf 409. Fehler des Abgleichs 422 (Zeilen). Ohne
 /// `stand` 400; hat sich die Planung seit der Vorschau geändert, 409 (LLH-1610).

@@ -47,7 +47,7 @@ async fn load(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, Strin
 }
 
 async fn stadtfest(app: &axum::Router, admin: &str) -> i64 {
-    let (s, v) = anfrage(app, "POST", "/api/demo-daten/stadtfest", admin, None).await;
+    let (s, v) = anfrage(app, "POST", "/api/demo-data/stadtfest", admin, None).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     v["lagen"]
         .as_array()
@@ -219,7 +219,7 @@ async fn planung_export_in_leeren_einsatz_und_zweiter_lauf() {
     let (app, _pool) = setup_mit_optionen(AN).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     stadtfest(&app, &admin).await;
-    let (s, liste) = anfrage(&app, "GET", "/api/planungen", &admin, None).await;
+    let (s, liste) = anfrage(&app, "GET", "/api/plans", &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{liste}");
     let p = liste
         .as_array()
@@ -229,8 +229,8 @@ async fn planung_export_in_leeren_einsatz_und_zweiter_lauf() {
         .unwrap_or_else(|| panic!("Demo-Planung fehlt: {liste}"))["id"]
         .as_i64()
         .unwrap();
-    let (_, planung) = anfrage(&app, "GET", &format!("/api/planungen/{p}"), &admin, None).await;
-    let (s, typ, mappe) = load(&app, &format!("/api/planungen/{p}/export"), &admin).await;
+    let (_, planung) = anfrage(&app, "GET", &format!("/api/plans/{p}"), &admin, None).await;
+    let (s, typ, mappe) = load(&app, &format!("/api/plans/{p}/export"), &admin).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(typ, XLSX_TYP);
 
@@ -328,10 +328,10 @@ async fn rechte_und_abgeschlossener_einsatz() {
     assert_eq!(s, StatusCode::OK);
 
     // Planung: nur, wer planen darf; eine fremde ist 404.
-    let (_, liste) = anfrage(&app, "GET", "/api/planungen", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/plans", &admin, None).await;
     let p = liste[0]["id"].as_i64().unwrap();
-    let (s, _, _) = load(&app, &format!("/api/planungen/{p}/export"), &bert).await;
+    let (s, _, _) = load(&app, &format!("/api/plans/{p}/export"), &bert).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _, _) = load(&app, "/api/planungen/999999/export", &admin).await;
+    let (s, _, _) = load(&app, "/api/plans/999999/export", &admin).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }

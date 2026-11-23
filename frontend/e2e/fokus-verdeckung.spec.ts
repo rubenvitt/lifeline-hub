@@ -166,7 +166,7 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
   const LAUF = Date.now();
   const LANGER_NAME = 'Maximiliane Kirchgassner-Wohlfahrt';
   for (let i = 0; i < 8; i += 1) {
-    const antwort = await page.request.post('/api/benutzer', {
+    const antwort = await page.request.post('/api/users', {
       data: {
         anzeigename: `${LANGER_NAME} ${i}`,
         benutzername: `e2e-fokus-${LAUF}-${i}`,
@@ -2195,7 +2195,7 @@ test('Erste Zeile (LLH-1358): Benutzerliste — rückwärts steht kein Ziel unte
   const LAUF = Date.now();
   const ANZAHL = 12;
   for (let i = 0; i < ANZAHL; i += 1) {
-    const antwort = await page.request.post('/api/benutzer', {
+    const antwort = await page.request.post('/api/users', {
       data: {
         anzeigename: `Erste Zeile ${LAUF} ${String(i).padStart(2, '0')}`,
         benutzername: `e2e-erste-${LAUF}-${i}`,

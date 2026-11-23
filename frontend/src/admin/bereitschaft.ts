@@ -1,7 +1,7 @@
 // Wertung der Bereitschaft (LLH-1820, Entwurf
 // `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`).
 // Die einzige Stelle, die bestimmt, was für einen Einsatz „fehlt“: der Server zählt nur
-// (`GET /api/verwaltung/bereitschaft`), Demo-Zeilen zählen nicht zum Bestand.
+// (`GET /api/administration/inventory`), Demo-Zeilen zählen nicht zum Bestand.
 import type { Bereitschaft } from '../api/types';
 
 export type BestandKey =

@@ -28,10 +28,10 @@ pub const BODY_MAX: usize = 64 * 1024;
 pub const MELDEN_MAX: usize = 192 * 1024;
 
 /// Pfad, der auch bei zu großem Abstand der Protokollversionen geht (design.md D5).
-pub const MELDEN_PFAD: &str = "/api/instanz/melden";
+pub const MELDEN_PFAD: &str = "/api/instance/check-in";
 
 /// Pfad des Abgleichs der Einsätze (LLH-1492, design.md D6); er trägt größere Pakete.
-pub const SPIEGEL_PFAD: &str = "/api/instanz/spiegel";
+pub const SPIEGEL_PFAD: &str = "/api/instance/mirror";
 
 /// Körpergrenze je Pfad: der Abgleich trägt Lieferungen, Melden die Liste aller Orgs, alles
 /// andere bleibt bei [`BODY_MAX`].
@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn melden_geht_immer_anderes_nur_im_fenster() {
         assert!(check_protokoll(MELDEN_PFAD, PROTOKOLL + 5).is_ok());
-        assert!(check_protokoll("/api/instanz/etwas", PROTOKOLL + 1).is_ok());
-        let fehler = check_protokoll("/api/instanz/etwas", PROTOKOLL + 2).unwrap_err();
+        assert!(check_protokoll("/api/instance/something", PROTOKOLL + 1).is_ok());
+        let fehler = check_protokoll("/api/instance/something", PROTOKOLL + 2).unwrap_err();
         assert_eq!(fehler.status(), axum::http::StatusCode::UPGRADE_REQUIRED);
     }
 
@@ -224,6 +224,6 @@ mod tests {
         );
         assert_eq!(body_max(MELDEN_PFAD), MELDEN_MAX);
         assert_eq!(body_max(super::super::melden::ZERTIFIKAT_PFAD), BODY_MAX);
-        assert_eq!(body_max("/api/instanz/etwas"), BODY_MAX);
+        assert_eq!(body_max("/api/instance/something"), BODY_MAX);
     }
 }

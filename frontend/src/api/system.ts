@@ -6,7 +6,7 @@ import { apiGet } from './client';
  * 403, anonym 401.
  */
 
-/** `GET /api/system/datentraeger` — letztes Ergebnis der Datenträgerprüfung. */
+/** `GET /api/system/storage` — letztes Ergebnis der Datenträgerprüfung. */
 export function ladeDatentraegerStatus(): Promise<DatentraegerStatus> {
-  return apiGet<DatentraegerStatus>('/api/system/datentraeger');
+  return apiGet<DatentraegerStatus>('/api/system/storage');
 }

@@ -18,7 +18,7 @@ export function setzeOrgUnterkunftRichtwert(
   wert: number | null,
 ): Promise<UnterkunftRichtwerte> {
   return apiSend<UnterkunftRichtwerte>(
-    `/api/org-unterkunft-richtwerte/${encodeURIComponent(schluessel)}`,
+    `/api/org-accommodation-guidelines/${encodeURIComponent(schluessel)}`,
     'PUT',
     { wert },
   );
