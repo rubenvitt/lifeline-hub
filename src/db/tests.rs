@@ -15029,7 +15029,8 @@ async fn migration_0369_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
     for pfad in alt {
         sqlx::query(
             "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, \
-             benutzer_id, erfasst_at) VALUES (?, 'x', 'POST', ?, '{}', ?, '2026-11-23 10:00:00')",
+             benutzer_id, erfasst_at, geaendert_at) \
+             VALUES (?, 'x', 'POST', ?, '{}', ?, '2026-11-23 10:00:00', '2026-11-23 10:00:00')",
         )
         .bind(einsatz)
         .bind(pfad)
