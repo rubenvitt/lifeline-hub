@@ -209,8 +209,8 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-    http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
+    http.get('/api/external-agencies', () => HttpResponse.json(externeStellen)),
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
@@ -225,7 +225,7 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeugListe)),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personalListe)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(stammFahrzeuge)),
+    http.get('/api/vehicles', () => HttpResponse.json(stammFahrzeuge)),
   );
   const routen = (
     <Routes>
@@ -1450,7 +1450,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       benutzer: { ...admin, system_rolle: 'keiner' },
     });
     server.use(
-      http.get('/api/fahrzeuge', () => {
+      http.get('/api/vehicles', () => {
         abrufe += 1;
         return HttpResponse.json(stammFahrzeuge);
       }),
@@ -1500,7 +1500,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Rufname: ohne Stammdaten bleiben die disponierten Vorschläge (LFH-1187)', async () => {
     setup();
     server.use(
-      http.get('/api/fahrzeuge', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/vehicles', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     );
     fuehrungsstelleMitschnitt();
     const user = userEvent.setup();
@@ -2043,8 +2043,8 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
       ),
       http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json(mitglieder)),
       http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-      http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/external-agencies', () => HttpResponse.json(externeStellen)),
       http.get('/api/einsaetze/:id/ort-vorschau', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),

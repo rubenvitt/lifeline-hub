@@ -71,7 +71,7 @@ const FAELLE: Fall[] = [
     render: () => {
       server.use(
         meHandler(admin),
-        http.get('/api/fahrzeuge', () =>
+        http.get('/api/vehicles', () =>
           HttpResponse.json([
             {
               id: 1,
@@ -92,7 +92,7 @@ const FAELLE: Fall[] = [
             },
           ]),
         ),
-        http.get('/api/fahrzeug-vorschlaege', () =>
+        http.get('/api/vehicle-suggestions', () =>
           HttpResponse.json({ fahrzeugtyp: [], traegerorganisation: [], standort: [] }),
         ),
       );
@@ -108,7 +108,7 @@ const FAELLE: Fall[] = [
     render: () => {
       server.use(
         meHandler(admin),
-        http.get('/api/personal', () =>
+        http.get('/api/personnel', () =>
           HttpResponse.json([
             {
               id: 1,
@@ -126,7 +126,9 @@ const FAELLE: Fall[] = [
             },
           ]),
         ),
-        http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: [] })),
+        http.get('/api/personnel-suggestions', () =>
+          HttpResponse.json({ traegerorganisation: [] }),
+        ),
       );
       renderMitProviders(<PersonalTab />);
     },
@@ -140,7 +142,7 @@ const FAELLE: Fall[] = [
     render: () => {
       server.use(
         meHandler(admin),
-        http.get('/api/sprechgruppen', () =>
+        http.get('/api/talk-groups', () =>
           HttpResponse.json([
             {
               id: 1,
@@ -238,7 +240,7 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     setzeViewportBreite(390);
     const gesetzt: string[] = [];
     server.use(
-      http.post('/api/fahrzeuge/:id/:ziel', ({ params }) => {
+      http.post('/api/vehicles/:id/:ziel', ({ params }) => {
         gesetzt.push(`${String(params.id)} ${String(params.ziel)}`);
         return HttpResponse.json({});
       }),
@@ -274,7 +276,7 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
   });
 
   it.each([
-    ['Sprechgruppen', 3, '/api/sprechgruppen/:id/deaktivieren', 'Sprechgruppe deaktivieren'],
+    ['Sprechgruppen', 3, '/api/talk-groups/:id/deactivate', 'Sprechgruppe deaktivieren'],
   ] as const)(
     '%s: scheitert die Deaktivierung, schließt die Rückfrage trotzdem',
     async (_name, index, pfad, knopfName) => {
@@ -320,7 +322,7 @@ describe('Verwaltungstabellen: Kontextmenü am breiten Schirm (LLH-1599)', () =>
     let freigeben: () => void = () => {};
     server.use(
       http.post(
-        '/api/fahrzeuge/:id/:ziel',
+        '/api/vehicles/:id/:ziel',
         () =>
           new Promise<Response>((r) => {
             freigeben = () => r(HttpResponse.json({}));

@@ -36,7 +36,7 @@ const VORLAGEN: EinsatzVorlage[] = [
 function setup(benutzer: typeof admin, vorlagen = VORLAGEN) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/einsatz-vorlagen', () => HttpResponse.json(vorlagen)),
+    http.get('/api/incident-templates', () => HttpResponse.json(vorlagen)),
   );
   return renderMitProviders(<EinsatzVorlagenTab />);
 }
@@ -57,7 +57,7 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
 
   it('Spalte „Schichtmodell“ nennt das Modell der Vorlage (LLH-1313)', async () => {
     server.use(
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           {
             id: 9,
@@ -100,7 +100,7 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
     let geloescht: number | null = null;
     setup(admin);
     server.use(
-      http.delete('/api/einsatz-vorlagen/:id', ({ params }) => {
+      http.delete('/api/incident-templates/:id', ({ params }) => {
         geloescht = Number(params.id);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -117,7 +117,7 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
   it('ein abgelehntes Löschen nennt den Grund über der Seite', async () => {
     setup(admin);
     server.use(
-      http.delete('/api/einsatz-vorlagen/:id', () =>
+      http.delete('/api/incident-templates/:id', () =>
         HttpResponse.json({ error: 'Vorlage nicht gefunden' }, { status: 404 }),
       ),
     );
@@ -142,7 +142,7 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
   it('ein gescheiterter Abruf zeigt den Fehler, nicht den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsatz-vorlagen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incident-templates', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<EinsatzVorlagenTab />);
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();

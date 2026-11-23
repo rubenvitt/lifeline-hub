@@ -45,7 +45,7 @@ const EINSATZ_FAHRZEUGE = [
 
 function stammHandler() {
   return [
-    http.get('/api/personal', () =>
+    http.get('/api/personnel', () =>
       HttpResponse.json([
         stammPerson(50, 'Erika Frei'),
         stammPerson(51, 'Gebunden'),
@@ -53,7 +53,7 @@ function stammHandler() {
         stammPerson(53, 'Demo Dora', { ist_demo: true }),
       ]),
     ),
-    http.get('/api/fahrzeuge', () =>
+    http.get('/api/vehicles', () =>
       HttpResponse.json([
         stammFahrzeug(70, '83-1'),
         stammFahrzeug(71, 'Florian 2', { fahrzeugtyp: 'RTW' }),
@@ -234,7 +234,7 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
     await waitFor(() =>
       expect(abgerufen).toEqual(
         expect.arrayContaining([
-          '/api/fahrzeuge?nur_im_dienst=true',
+          '/api/vehicles?nur_im_dienst=true',
           '/api/einsaetze/1/fahrzeuge?entlassene=1',
         ]),
       ),
@@ -306,7 +306,7 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
     await waitFor(() =>
       expect(abgerufen).toEqual(
         expect.arrayContaining([
-          '/api/personal?nur_im_dienst=true',
+          '/api/personnel?nur_im_dienst=true',
           '/api/einsaetze/1/personal?entlassene=1',
         ]),
       ),

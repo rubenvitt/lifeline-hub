@@ -7,7 +7,7 @@ use serde_json::Value;
 mod common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
-const PFAD: &str = "/api/einsatz-vorlagen";
+const PFAD: &str = "/api/incident-templates";
 
 /// Die Vorlagen der eigenen Organisation als (Status, Liste).
 async fn vorlagen(app: &axum::Router, cookie: &str) -> (StatusCode, Vec<Value>) {
@@ -242,7 +242,7 @@ async fn ohne_admin_rechte_nur_lesen() {
         ("DELETE", format!("{PFAD}/{manv}"), None),
         (
             "PUT",
-            "/api/stichwort-vorschlaege/1/vorlage".to_string(),
+            "/api/keyword-suggestions/1/template".to_string(),
             Some(r#"{"vorlage_id":null}"#),
         ),
     ] {
@@ -284,7 +284,7 @@ async fn vorlagen_anderer_organisationen_sind_unsichtbar() {
 
 /// id des Stichwort-Vorschlags mit diesem Text und seine Kopplung (fehlt = keine).
 async fn stichwort(app: &axum::Router, cookie: &str, text: &str) -> (i64, Option<i64>) {
-    let (status, json) = anfrage(app, "GET", "/api/stichwort-vorschlaege", cookie, None).await;
+    let (status, json) = anfrage(app, "GET", "/api/keyword-suggestions", cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     let v = json
         .as_array()
@@ -309,7 +309,7 @@ async fn stichwort_koppeln_loesen_und_vorlage_loeschen() {
     // Ab Werk gekoppelt (LLH-1816, Design-Doc D1); für das Koppeln erst lösen.
     assert_eq!(kopplung, Some(manv), "Start-Stichwort kommt gekoppelt");
 
-    let pfad = format!("/api/stichwort-vorschlaege/{sw}/vorlage");
+    let pfad = format!("/api/keyword-suggestions/{sw}/template");
     let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(r#"{"vorlage_id":null}"#)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(stichwort(&app, &admin, "MANV15").await.1, None);
@@ -340,7 +340,7 @@ async fn stichwort_koppeln_loesen_und_vorlage_loeschen() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        "/api/stichwort-vorschlaege/999999/vorlage",
+        "/api/keyword-suggestions/999999/template",
         &admin,
         Some(r#"{"vorlage_id":null}"#),
     )
@@ -597,7 +597,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
 
 /// Legt ein Schichtmodell der eigenen Organisation über die Route an; liefert seine id.
 async fn schichtmodell(app: &axum::Router, cookie: &str, body: &str) -> i64 {
-    let (status, json) = anfrage(app, "POST", "/api/schichtmodelle", cookie, Some(body)).await;
+    let (status, json) = anfrage(app, "POST", "/api/shift-models", cookie, Some(body)).await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
     json["id"].as_i64().unwrap()
 }
@@ -797,7 +797,7 @@ async fn geloeschtes_modell_loest_die_vorlage() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/schichtmodelle/{zwoelf}"),
+        &format!("/api/shift-models/{zwoelf}"),
         &admin,
         None,
     )

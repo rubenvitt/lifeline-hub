@@ -91,8 +91,8 @@ function setup(p: Planung = planung(), route = planungPfad(5), steuerhoehe?: num
   server.use(
     meHandler(adminFixture()),
     http.get('/api/planungen/5', () => HttpResponse.json(p)),
-    http.get('/api/personal', () => HttpResponse.json([])),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/personnel', () => HttpResponse.json([])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
   );
   const seite = (
     <>
@@ -196,7 +196,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup(planung(), planungPfad(5, 'posten'));
     server.use(
-      http.get('/api/einheit-vorlagen', () =>
+      http.get('/api/unit-templates', () =>
         HttpResponse.json([
           {
             id: 40,
@@ -480,7 +480,7 @@ describe('PlanungPage (LLH-1586)', () => {
       let uebernahmeBody: unknown;
       setup();
       server.use(
-        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
         http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
           anfragen.push(await request.json());
@@ -526,7 +526,7 @@ describe('PlanungPage (LLH-1586)', () => {
       const uebernahmen: unknown[] = [];
       setup();
       server.use(
-        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
         http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
           anfragen.push(await request.json());
@@ -585,7 +585,7 @@ describe('PlanungPage (LLH-1586)', () => {
       let vorschauen = 0;
       setup();
       server.use(
-        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
         http.post('/api/planungen/5/uebernahme/vorschau', () => {
           vorschauen += 1;
@@ -614,7 +614,7 @@ describe('PlanungPage (LLH-1586)', () => {
       const anfragen: unknown[] = [];
       setup();
       server.use(
-        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () =>
           HttpResponse.json([
             {
@@ -693,7 +693,7 @@ describe('PlanungPage (LLH-1586)', () => {
     it('Fehler in der Vorschau sperren das Übernehmen', async () => {
       setup();
       server.use(
-        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
         http.post('/api/planungen/5/uebernahme/vorschau', () =>
           HttpResponse.json(

@@ -110,8 +110,8 @@ function render(
       ),
     ),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
-    http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
+    http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+    http.get('/api/vehicles', () => HttpResponse.json([])), // Pool (nur_im_dienst)
     // Beladung im Aufklapper (LLH-1225 D11): Materialliste und die Namen der Orte im Angebot.
     http.get('/api/einsaetze/7/material', () => HttpResponse.json(optionen.material ?? [])),
     http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
@@ -284,8 +284,8 @@ describe('FahrzeugePage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
-      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+      http.get('/api/vehicles', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
       <Routes>
@@ -306,8 +306,8 @@ describe('FahrzeugePage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
-      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+      http.get('/api/vehicles', () => HttpResponse.json([])),
     );
     function Suche() {
       return <output data-testid="suche">{useLocation().search}</output>;
@@ -1715,8 +1715,8 @@ describe('FahrzeugePage · Datenzustände', () => {
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
-    http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+    http.get('/api/vehicles', () => HttpResponse.json([])),
   ];
 
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
@@ -1766,14 +1766,14 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('der Fehler des Statuskatalogs bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
-    zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/vehicle-statuses', () => new HttpResponse(null, { status: 500 })));
     const text = 'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich';
     expect(await screen.findByText(text)).toBeInTheDocument();
     const alarm = screen.getByText(text).closest<HTMLElement>('[role="alert"]')!;
     const knopf = within(alarm).getByRole('button', { name: 'Erneut abrufen' });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
-    server.use(http.get('/api/fahrzeug-status', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/vehicle-statuses', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
@@ -1812,7 +1812,7 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
-    zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/vehicle-statuses', () => new HttpResponse(null, { status: 500 })));
     expect(
       await screen.findByText(
         'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
@@ -1831,7 +1831,7 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Fahrzeuge"', async () => {
-    zeige(http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/vehicles', () => new HttpResponse(null, { status: 500 })));
     await screen.findByText('Noch keine Fahrzeuge disponiert');
     await oeffneStammAuswahl();
     expect(
@@ -2051,8 +2051,8 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([stand])),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/einheiten', einheiten),
-      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+      http.get('/api/vehicles', () => HttpResponse.json([])),
       http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
         const body = await request.json();
         patches.push(body);
@@ -2400,8 +2400,8 @@ describe('FahrzeugePage · Demo-Marke', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(efs)),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
-      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-      http.get('/api/fahrzeuge', () => HttpResponse.json(pool)),
+      http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+      http.get('/api/vehicles', () => HttpResponse.json(pool)),
     );
     return renderMitProviders(
       <Routes>
@@ -2516,7 +2516,7 @@ describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.
   });
 
   it('öffnet den Dialog vorbelegt mit dem Funkrufnamen', async () => {
-    server.use(http.get('/api/einheit-typen', () => HttpResponse.json([])));
+    server.use(http.get('/api/unit-types', () => HttpResponse.json([])));
     render(einsatz(), [], adhoc);
     await screen.findByText('Florian Nachbarstadt 44/1');
     await waehleImZeilenmenue('Florian Nachbarstadt 44/1', 'Als eigene Einheit führen …');

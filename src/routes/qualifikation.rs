@@ -43,7 +43,7 @@ pub struct PatchQualifikation {
     pub schliesst_ein_id: Option<Option<i64>>,
 }
 
-/// GET /api/qualifikationen — aktive Katalog-Einträge (eigene Org), für die Auswahl.
+/// GET /api/qualifications — aktive Katalog-Einträge (eigene Org), für die Auswahl.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -51,7 +51,7 @@ pub async fn liste(
     Ok(Json(repo::liste(&state.pool, benutzer.org_id).await?))
 }
 
-/// POST /api/qualifikationen — Admin. Dublette label → Conflict, ungültiger Einschluss 422.
+/// POST /api/qualifications — Admin. Dublette label → Conflict, ungültiger Einschluss 422.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -69,7 +69,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(q)))
 }
 
-/// PATCH /api/qualifikationen/{id} — Admin, echter Teil-Patch (LFH-306):
+/// PATCH /api/qualifications/{id} — Admin, echter Teil-Patch (LFH-306):
 /// Feld absent = unverändert. Ein vorhandenes, aber leeres `label` ist 400.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -97,7 +97,7 @@ pub async fn aktualisieren(
     Ok(Json(q))
 }
 
-/// POST /api/qualifikationen/{id}/deaktivieren — Admin (Soft-Delete statt Löschen).
+/// POST /api/qualifications/{id}/deactivate — Admin (Soft-Delete statt Löschen).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

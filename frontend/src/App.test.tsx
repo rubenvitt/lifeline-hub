@@ -554,8 +554,8 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
-      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/vehicle-statuses', () => HttpResponse.json([])),
+      http.get('/api/vehicles', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/fahrzeuge');
     // Teilstring: der Einsatz-Status-Tag steht innerhalb der Überschrift („Fahrzeuge aktiv").

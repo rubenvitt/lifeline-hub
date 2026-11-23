@@ -16,7 +16,7 @@ async fn fahrzeug(app: &axum::Router, admin: &str, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         admin,
         Some(&format!(r#"{{"funkrufname":"{name}"}}"#)),
     )
@@ -29,7 +29,7 @@ async fn personal(app: &axum::Router, admin: &str, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -88,7 +88,7 @@ async fn zaehlt_den_bestand_der_eigenen_org() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/fahrzeuge/{ausser}/ausser-dienst"),
+        &format!("/api/vehicles/{ausser}/out-of-service"),
         &admin,
         None,
     )
@@ -102,7 +102,7 @@ async fn zaehlt_den_bestand_der_eigenen_org() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        "/api/einsatz-vorlagen",
+        "/api/incident-templates",
         &admin,
         Some(r#"{"bezeichnung":"Testlage LLH-1820","ausgeblendet":[]}"#),
     )

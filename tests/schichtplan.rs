@@ -28,7 +28,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str)
 }
 
 async fn quali_id(app: &axum::Router, cookie: &str, label: &str) -> i64 {
-    let (_, k) = anfrage(app, "GET", "/api/qualifikationen", cookie, None).await;
+    let (_, k) = anfrage(app, "GET", "/api/qualifications", cookie, None).await;
     k.as_array()
         .unwrap()
         .iter()
@@ -42,7 +42,7 @@ async fn stamm_mit_quali(app: &axum::Router, admin: &str, name: &str, quals: &[i
     let (s, json) = anfrage_json(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&json!({"name": name, "qualifikation_ids": quals})),
     )

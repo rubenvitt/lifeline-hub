@@ -6,7 +6,7 @@
 //! via Reverse-Geocoding (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
 //! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
 //!
-//! GET /api/ort-vorschau?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname als Vorschlag“): derselbe
+//! GET /api/location-preview?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname als Vorschlag“): derselbe
 //! Ortsname ohne Einsatz, etwa beim Anlegen ([`in_org`]). Nur wer Einsätze anlegen darf, wie die
 //! Ortssuche der Organisation; keine Peilung, denn ohne Einsatz gibt es keinen Bezugspunkt.
 //! Ausgelastet oder nicht erreichbar heißt in beiden Einstiegen: 200 ohne `ortsname`.
@@ -99,7 +99,7 @@ pub struct OrtVorschauOrgParams {
     pub lon: f64,
 }
 
-/// GET /api/ort-vorschau?lat=&lon= — Ortsname ohne Einsatz (LLH-1376), Geocoder der eigenen
+/// GET /api/location-preview?lat=&lon= — Ortsname ohne Einsatz (LLH-1376), Geocoder der eigenen
 /// Organisation. Das Recht wird vor der Koordinate geprüft: ohne Recht 403, nie 400.
 pub async fn in_org(
     State(state): State<AppState>,

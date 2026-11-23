@@ -200,7 +200,7 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
 
 /// Ob ein Typ zur Org gehört. Ohne `aktiv`-Filter: ein deaktivierter Typ bleibt für bestehende
 /// Einheiten gültig, damit deren PATCH nicht scheitert; neue Typen wählt das Frontend aus
-/// `GET /api/einheit-typen` (nur aktive). Executor-generisch für `einheit::repo::anlegen_tx`.
+/// `GET /api/unit-types` (nur aktive). Executor-generisch für `einheit::repo::anlegen_tx`.
 pub async fn ist_in_org(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,

@@ -57,7 +57,7 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
 function setup() {
   server.use(
     meHandler(admin),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
   );
   return renderMitProviders(<EinsaetzePage />);
 }
@@ -206,7 +206,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -236,7 +236,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/schichtmodelle', () => {
+      http.get('/api/shift-models', () => {
         beantwortet = true;
         return HttpResponse.json([
           {
@@ -341,7 +341,7 @@ describe('EinsaetzePage', () => {
           einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
         ]),
       ),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -372,7 +372,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -474,13 +474,13 @@ describe('EinsaetzePage', () => {
 
 describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () => {
   // Eigene Fixture/Hilfen statt `einsatz()`/`setup()`: die decken weder
-  // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/stichwort-vorschlaege`-Mock ab,
+  // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/keyword-suggestions`-Mock ab,
   // das der Anlegedialog bei jedem Mount abruft (`onUnhandledFrame: 'error'`).
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json(liste)),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   }
   function render() {
@@ -1232,7 +1232,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
-      http.get('/api/ort-suche', ({ request }) => {
+      http.get('/api/location-search', ({ request }) => {
         begriffe.push(new URL(request.url).searchParams.get('q')!);
         return HttpResponse.json({
           zustand: 'ok',
@@ -1247,7 +1247,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         });
       }),
       // Ort-Vorschau ohne Einsatz (LLH-1376): nur der Ortsname.
-      http.get('/api/ort-vorschau', () =>
+      http.get('/api/location-preview', () =>
         HttpResponse.json({ ortsname: 'Marktplatz 3, 12345 Musterstadt' }),
       ),
     );
@@ -1364,7 +1364,7 @@ describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json(liste)),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(<EinsaetzePage />);
     const liefere = async (naechste: EinsatzAnzeige[]) => {
@@ -1514,7 +1514,7 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   });
 

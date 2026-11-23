@@ -2,15 +2,15 @@ import type { StichwortVorschlag } from './types';
 import { apiGet, apiSend } from './client';
 
 export function listeStichwortVorschlaege(): Promise<StichwortVorschlag[]> {
-  return apiGet<StichwortVorschlag[]>('/api/stichwort-vorschlaege');
+  return apiGet<StichwortVorschlag[]>('/api/keyword-suggestions');
 }
 
 export function legeStichwortVorschlagAn(text: string): Promise<StichwortVorschlag> {
-  return apiSend<StichwortVorschlag>('/api/stichwort-vorschlaege', 'POST', { text });
+  return apiSend<StichwortVorschlag>('/api/keyword-suggestions', 'POST', { text });
 }
 
 export function loescheStichwortVorschlag(id: number): Promise<void> {
-  return apiSend<void>(`/api/stichwort-vorschlaege/${id}`, 'DELETE');
+  return apiSend<void>(`/api/keyword-suggestions/${id}`, 'DELETE');
 }
 
 /**
@@ -21,7 +21,7 @@ export function setzeStichwortVorlage(
   id: number,
   vorlageId: number | null,
 ): Promise<StichwortVorschlag> {
-  return apiSend<StichwortVorschlag>(`/api/stichwort-vorschlaege/${id}/vorlage`, 'PUT', {
+  return apiSend<StichwortVorschlag>(`/api/keyword-suggestions/${id}/template`, 'PUT', {
     vorlage_id: vorlageId,
   });
 }

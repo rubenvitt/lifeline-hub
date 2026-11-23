@@ -126,7 +126,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            "/api/fahrzeug-status",
+            "/api/vehicle-statuses",
             &self.admin,
             Some(
                 &json!({ "label": label, "kategorie": "gebunden", "zeitachse_marke": marke })

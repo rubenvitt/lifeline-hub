@@ -38,7 +38,7 @@ const status: {
 function render(benutzer: typeof admin, statusListe: typeof status = status) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/fahrzeug-status', () => HttpResponse.json(statusListe)),
+    http.get('/api/vehicle-statuses', () => HttpResponse.json(statusListe)),
   );
   return renderMitProviders(<StatusKatalogTab />);
 }
@@ -170,7 +170,7 @@ describe('StatusKatalogTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/vehicle-statuses', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<StatusKatalogTab />);
 
@@ -196,7 +196,7 @@ describe('StatusKatalogTab', () => {
   it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.post('/api/fahrzeug-status', async ({ request }) => {
+      http.post('/api/vehicle-statuses', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({
           id: 9,
@@ -338,7 +338,7 @@ describe('StatusKatalogTab', () => {
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
-      http.patch('/api/fahrzeug-status/1', () =>
+      http.patch('/api/vehicle-statuses/1', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -374,7 +374,7 @@ describe('StatusKatalogTab', () => {
   it('behält Farbe, FMS-Anker, Sortierung und Zeitachsen-Marke, wenn niemand aufklappt', async () => {
     let ruempf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+      http.patch('/api/vehicle-statuses/1', async ({ request }) => {
         ruempf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -417,7 +417,7 @@ describe('StatusKatalogTab', () => {
   it('ein aufgeklappt geleertes Feld kommt auch geleert an', async () => {
     let ruempf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+      http.patch('/api/vehicle-statuses/1', async ({ request }) => {
         ruempf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -494,7 +494,7 @@ describe('StatusKatalogTab', () => {
     it('Leeren der Marke schickt null (Vollersatz entfernt sie)', async () => {
       let ruempf: Record<string, unknown> | null = null;
       server.use(
-        http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+        http.patch('/api/vehicle-statuses/1', async ({ request }) => {
           ruempf = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json({ id: 1 });
         }),

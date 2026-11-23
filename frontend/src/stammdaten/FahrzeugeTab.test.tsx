@@ -47,8 +47,8 @@ function render(
 ) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/fahrzeug-vorschlaege', () =>
+    http.get('/api/vehicles', () => HttpResponse.json(fahrzeuge)),
+    http.get('/api/vehicle-suggestions', () =>
       HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: [], standort: [] }),
     ),
   );
@@ -116,12 +116,12 @@ describe('FahrzeugeTab', () => {
       freigeben = resolve;
     });
     server.use(
-      http.post('/api/fahrzeuge/:id/ausser-dienst', async ({ params }) => {
+      http.post('/api/vehicles/:id/out-of-service', async ({ params }) => {
         gerufen.push(`ausser-dienst/${params.id}`);
         await gate;
         return HttpResponse.json({ ...fahrzeug, dienststatus: 'ausser_dienst' });
       }),
-      http.post('/api/fahrzeuge/:id/in-dienst', async ({ params }) => {
+      http.post('/api/vehicles/:id/in-service', async ({ params }) => {
         gerufen.push(`in-dienst/${params.id}`);
         await gate;
         return HttpResponse.json({ ...fahrzeug, id: 2, dienststatus: 'in_dienst' });
@@ -244,8 +244,8 @@ describe('FahrzeugeTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/fahrzeug-vorschlaege', () =>
+      http.get('/api/vehicles', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/vehicle-suggestions', () =>
         HttpResponse.json({ fahrzeugtyp: [], traegerorganisation: [], standort: [] }),
       ),
     );
@@ -273,7 +273,7 @@ describe('FahrzeugeTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
   it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/fahrzeuge/:id/ausser-dienst', () => {
+      http.post('/api/vehicles/:id/out-of-service', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json(

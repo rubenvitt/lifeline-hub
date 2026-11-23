@@ -130,7 +130,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
       await rememberRequest(info);
       return HttpResponse.json({ id: 10 });
     }),
-    http.get('/api/personal-status', () => {
+    http.get('/api/personnel-statuses', () => {
       if (a.statusFehler) {
         a.statusFehler.abgerufen = true;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
@@ -140,7 +140,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
       ]);
     }),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
     http.put('/api/einsaetze/7/einheiten/:eid/personal/:ep', async (info) => {
       await rememberRequest(info);
       return new HttpResponse(null, { status: 204 });

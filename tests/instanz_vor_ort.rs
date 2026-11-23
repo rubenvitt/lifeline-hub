@@ -1378,7 +1378,7 @@ async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselbe
     let (s, v) = common::anfrage_json(
         &elw1.app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &elw1.admin,
         Some(&json!({"funkrufname": "Geliehen 1"})),
     )

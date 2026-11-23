@@ -13,7 +13,7 @@ use common::{
     setup_mit_pool_und_live,
 };
 
-const PFAD: &str = "/api/einheit-vorlagen";
+const PFAD: &str = "/api/unit-templates";
 
 async fn org_von(pool: &sqlx::SqlitePool, benutzername: &str) -> i64 {
     sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = ?")

@@ -49,15 +49,15 @@ function handler(
 ) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/personal', () => HttpResponse.json(personal)),
-    http.get('/api/personal-vorschlaege', () =>
+    http.get('/api/personnel', () => HttpResponse.json(personal)),
+    http.get('/api/personnel-suggestions', () =>
       HttpResponse.json({ traegerorganisation: ['DRK Musterstadt'] }),
     ),
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
     ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
-    http.patch('/api/personal/5', async ({ request }) => {
+    http.patch('/api/personnel/5', async ({ request }) => {
       onPatch(await request.json());
       return HttpResponse.json(person);
     }),
@@ -103,7 +103,7 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     let abrufe = 0;
     handler();
     server.use(
-      http.get('/api/personal', () => {
+      http.get('/api/personnel', () => {
         abrufe += 1;
         return HttpResponse.json([person]);
       }),

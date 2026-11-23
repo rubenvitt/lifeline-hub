@@ -3,7 +3,7 @@ import type { FuehrungsfunktionEintrag, Fuehrungsfunktion, FuehrungsfunktionUpda
 
 /** Wirksamer Katalog der eigenen Organisation (LFH-549); S7 nur, wenn eingeschaltet. */
 export function ladeFuehrungsfunktionen(): Promise<FuehrungsfunktionEintrag[]> {
-  return apiGet<FuehrungsfunktionEintrag[]>('/api/fuehrungsfunktionen');
+  return apiGet<FuehrungsfunktionEintrag[]>('/api/command-roles');
 }
 
 /** Label bzw. S7-Schalter setzen (nur System-Admin); liefert den neuen wirksamen Katalog. */

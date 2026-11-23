@@ -85,7 +85,7 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("POST", "/api/client-fehler"),
     ("GET", "/api/organisation"),
     ("GET", "/api/organisation/logo"),
-    ("GET", "/api/fahrzeug-status"),
+    ("GET", "/api/vehicle-statuses"),
     ("GET", "/api/karte/config"),
     ("GET", "/api/karte/offline/tiles/{z}/{x}/{y}"),
     ("GET", "/api/karte/offline/welt/tiles/{z}/{x}/{y}"),
@@ -875,7 +875,7 @@ mod tests {
             // übernehmen. Was erwartet wird, liest das Gerät nur über `…/erwartet` (LLH-1387).
             // Den Stammdaten-Katalog liest das Gerät nie, Treffer nur über `…/stamm-treffer`
             // (LLH-1300).
-            ("GET", "/api/einheit-vorlagen"),
+            ("GET", "/api/unit-templates"),
             (
                 "GET",
                 "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
@@ -973,7 +973,7 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage",
             ),
-            ("GET", "/api/verpflegung-vorlagen"),
+            ("GET", "/api/catering-templates"),
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen"),
             ("GET", "/api/einsaetze/{id}/personal"),
@@ -1052,7 +1052,7 @@ mod tests {
             ["einheiten", "auftraege", "meldungen", "personen"]
         );
         for (m, p) in [
-            ("GET", "/api/fahrzeug-status"),
+            ("GET", "/api/vehicle-statuses"),
             ("GET", "/api/einsaetze/{id}/einheiten"),
             ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
             (
@@ -1094,7 +1094,7 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
             ("PATCH", "/api/einsaetze/{id}/meldungen/{mid}"),
-            ("POST", "/api/fahrzeug-status"),
+            ("POST", "/api/vehicle-statuses"),
         ] {
             assert!(!darf_route(e, m, p), "Einheitengerät darf {m} {p} nicht");
         }

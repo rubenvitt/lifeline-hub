@@ -168,7 +168,7 @@ pub async fn liste(
     Ok(Json(material.iter().map(|m| m.anzeige()).collect()))
 }
 
-/// GET /api/material-kategorien — abgeleitete Kategorie-Vorschläge (eigene Org).
+/// GET /api/material-categories — abgeleitete Kategorie-Vorschläge (eigene Org).
 pub async fn kategorien(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -200,7 +200,7 @@ pub async fn aktualisieren(
     Ok(Json(m.anzeige()))
 }
 
-/// POST /api/material/{id}/ausser-dienst — Admin (Soft-Delete).
+/// POST /api/material/{id}/out-of-service — Admin (Soft-Delete).
 pub async fn ausser_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -210,7 +210,7 @@ pub async fn ausser_dienst(
     Ok(Json(m.anzeige()))
 }
 
-/// POST /api/material/{id}/in-dienst — Admin (Reaktivierung; Conflict bei Nummernkollision).
+/// POST /api/material/{id}/in-service — Admin (Reaktivierung; Conflict bei Nummernkollision).
 pub async fn in_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

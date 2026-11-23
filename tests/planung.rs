@@ -231,7 +231,7 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
     let (s, fz) = post(
         &app,
         &admin,
-        "/api/fahrzeuge",
+        "/api/vehicles",
         json!({"funkrufname": "KTW 1", "staerke_fuehrer": 0, "staerke_unterfuehrer": 1,
                "staerke_mannschaft": 1}),
     )

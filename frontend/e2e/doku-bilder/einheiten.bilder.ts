@@ -138,7 +138,7 @@ test.describe(KAPITEL, () => {
   test('Seite „Einheit aus Vorlage bilden“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const vorlagen = await page.request.get('/api/einheit-vorlagen');
+    const vorlagen = await page.request.get('/api/unit-templates');
     expect(vorlagen.ok(), `Vorlagen: ${vorlagen.status()}`).toBe(true);
     const zug = ((await vorlagen.json()) as { id: number; name: string }[]).find(
       (v) => v.name === 'Sanitätszug Musterstadt',

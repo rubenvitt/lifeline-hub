@@ -1,8 +1,10 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accommodation	Unterkunft
+accommodation-guidelines	Unterkunft-Richtwerte
 adapter	-
 admin	-
+also-local	auch lokal
 animals	Tiere
 api	-
 app-code	-
@@ -15,6 +17,7 @@ callback	-
 care	Betreuung
 case-file	Einsatzakte
 catering	Verpflegung
+catering-templates	Verpflegungsvorlagen
 chat	-
 code	-
 codes	-
@@ -25,6 +28,7 @@ comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
 damages	Schäden
+deactivate	deaktivieren
 dev	-
 devices	Geräte
 discoverable	-
@@ -33,9 +37,11 @@ emergency-takeover	Notübernahme
 end-others	andere beenden
 enroll	-
 etb	ETB
+etb-snippets	ETB-Bausteine
 evacuation	Evakuierung
 events	-
 export	-
+external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
 finish	-
 fonts	-
@@ -45,6 +51,8 @@ glyphs	-
 hazard-areas	Gefahrengebiete
 health	-
 import	-
+in-service	in Dienst
+incident-templates	Einsatzvorlagen
 incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
@@ -52,8 +60,11 @@ intake	Einwurf
 integrations	Anbindungen
 ios-push	-
 jwks.json	-
+keyword-suggestions	Stichwortvorschläge
 lan	-
 live	-
+location-preview	Ortsvorschau
+location-search	Ortssuche
 login	-
 logo	-
 logout	-
@@ -61,16 +72,20 @@ map	Karte
 marker	-
 master-data	Stammdaten
 material	Material
+material-categories	Materialkategorien
 matrix	-
 me	-
 mirror	Spiegel
 oidc	-
 openapi.json	-
 orders	Befehle
+out-of-service	außer Dienst
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
 personnel	Personal
+personnel-statuses	Personalstatus
+personnel-suggestions	Personalvorschläge
 persons	Personen
 plan	-
 plans	Planungen
@@ -79,6 +94,7 @@ positions	Stellen
 posts	Posten
 providers	-
 proxy	-
+qualifications	Qualifikationen
 raster	-
 read	gelesen
 redeem	einlösen
@@ -96,6 +112,7 @@ sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen
 shell	-
+shift-models	Schichtmodelle
 shift-plan	Schichtplan
 situation	Lage
 situation-monitor	Lagemonitor
@@ -111,6 +128,7 @@ style.json	-
 system	-
 talk-groups	Sprechgruppen
 tasks	Aufträge
+template	Vorlage
 test	-
 tile	-
 tilejson	-
@@ -119,10 +137,14 @@ totp	-
 transport	-
 triage	Sichtung
 uhs	UHS
+unit-templates	Einheitsvorlagen
+unit-types	Einheitstypen
 units	Einheiten
 unregister	-
 users	Benutzer
 v1	-
+vehicle-statuses	Fahrzeugstatus
+vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
 web-push	-
 webauthn	-

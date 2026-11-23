@@ -136,8 +136,8 @@ describe('useExterneStellenQuelle', () => {
     let angelegt: unknown;
     server.use(
       meHandler(adminFixture()),
-      http.get('/api/externe-stellen', () => HttpResponse.json([])),
-      http.post('/api/externe-stellen', async ({ request }) => {
+      http.get('/api/external-agencies', () => HttpResponse.json([])),
+      http.post('/api/external-agencies', async ({ request }) => {
         angelegt = await request.json();
         return HttpResponse.json(stelle({ id: 77, bezeichnung: 'Polizei' }), { status: 201 });
       }),
@@ -154,7 +154,7 @@ describe('useExterneStellenQuelle', () => {
   it('sperrt die Übernahme ohne Recht mit dem Grund der Stammdaten-Seiten', async () => {
     server.use(
       meHandler(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft' })),
-      http.get('/api/externe-stellen', () => HttpResponse.json([])),
+      http.get('/api/external-agencies', () => HttpResponse.json([])),
     );
     const { result } = renderHook(() => useExterneStellenQuelle({ uebernahme: true }), {
       wrapper: wrapper(),
@@ -164,7 +164,7 @@ describe('useExterneStellenQuelle', () => {
 
   it('ohne Übernahme (ETB) nur Vorschläge', async () => {
     server.use(
-      http.get('/api/externe-stellen', () =>
+      http.get('/api/external-agencies', () =>
         HttpResponse.json([stelle({ id: 1, bezeichnung: 'ILS Musterkreis' })]),
       ),
     );

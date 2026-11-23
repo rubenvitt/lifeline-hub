@@ -9,7 +9,7 @@ import type { UnterkunftRichtwerte } from './types';
 
 /** Basis und Werte der eigenen Organisation. */
 export function ladeOrgUnterkunftRichtwerte(): Promise<UnterkunftRichtwerte> {
-  return apiGet<UnterkunftRichtwerte>('/api/unterkunft-richtwerte');
+  return apiGet<UnterkunftRichtwerte>('/api/accommodation-guidelines');
 }
 
 /** Org-Wert setzen, `null` = zurück zur Vorgabe (nur System-Admin). */

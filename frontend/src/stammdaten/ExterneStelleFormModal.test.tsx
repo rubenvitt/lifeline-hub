@@ -72,7 +72,7 @@ describe('ExterneStelleFormModal', () => {
   it('„Zuständige Leitstelle“ nur bei Art Leitstelle, angelegt mit Markierung', async () => {
     let body: unknown = null;
     server.use(
-      http.post('/api/externe-stellen', async ({ request }) => {
+      http.post('/api/external-agencies', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ ...ils, id: 9 });
       }),
@@ -106,7 +106,7 @@ describe('ExterneStelleFormModal', () => {
   it('Bearbeiten sendet nur Geändertes; unverändert geht keine Anfrage hinaus', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.patch('/api/externe-stellen/4', async ({ request }) => {
+      http.patch('/api/external-agencies/4', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json(ils);
       }),
@@ -128,7 +128,7 @@ describe('ExterneStelleFormModal', () => {
   it('eine Rufnummernänderung trägt die Markierung „zuständig“ nicht mit', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/api/externe-stellen/4', async ({ request }) => {
+      http.patch('/api/external-agencies/4', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(ils);
       }),
@@ -149,7 +149,7 @@ describe('ExterneStelleFormModal', () => {
   it('Artwechsel weg von Leitstelle nimmt die Markierung mit', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/api/externe-stellen/4', async ({ request }) => {
+      http.patch('/api/external-agencies/4', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(ils);
       }),
@@ -165,7 +165,7 @@ describe('ExterneStelleFormModal', () => {
 
   it('nennt eine Ablehnung (409) im Dialog', async () => {
     server.use(
-      http.post('/api/externe-stellen', () =>
+      http.post('/api/external-agencies', () =>
         HttpResponse.json(
           { error: 'Eine externe Stelle mit dieser Bezeichnung gibt es schon' },
           { status: 409 },

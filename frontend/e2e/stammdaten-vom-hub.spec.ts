@@ -12,7 +12,7 @@ test('Stammdaten vom Hub: Zeile gesperrt mit Grund, Ergänzung vor Ort bearbeitb
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
   const anlegen = async (funkrufname: string) => {
-    const antwort = await page.request.post('/api/fahrzeuge', { data: { funkrufname } });
+    const antwort = await page.request.post('/api/vehicles', { data: { funkrufname } });
     expect(antwort.ok()).toBe(true);
     return ((await antwort.json()) as { id: number }).id;
   };

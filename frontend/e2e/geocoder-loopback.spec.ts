@@ -19,7 +19,7 @@ test('der Lauf fragt keinen öffentlichen Geocoder: Ort-Vorschau ohne Ortsnamen'
   );
 
   // Berlin, Pariser Platz: der öffentliche Nominatim kennt hier eine Adresse.
-  const vorschau = await page.request.get('/api/ort-vorschau?lat=52.5163&lon=13.3777');
+  const vorschau = await page.request.get('/api/location-preview?lat=52.5163&lon=13.3777');
   expect(vorschau.ok(), await vorschau.text()).toBe(true);
   expect(await vorschau.json()).not.toHaveProperty('ortsname');
 });

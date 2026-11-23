@@ -47,13 +47,13 @@ const vorschlaege = {
 
 function handler(onSend: (body: unknown) => void = () => {}, status = 200) {
   server.use(
-    http.post('/api/fahrzeuge', async ({ request }) => {
+    http.post('/api/vehicles', async ({ request }) => {
       onSend(await request.json());
       if (status !== 200)
         return HttpResponse.json({ error: 'Funkrufname bereits vergeben' }, { status });
       return HttpResponse.json({ ...fahrzeug, id: 9 });
     }),
-    http.patch('/api/fahrzeuge/1', async ({ request }) => {
+    http.patch('/api/vehicles/1', async ({ request }) => {
       onSend(await request.json());
       return HttpResponse.json(fahrzeug);
     }),
@@ -296,7 +296,7 @@ describe('FahrzeugFormModal — Schnellerfassung (LFH-346/A7)', () => {
   });
 
   /**
-   * `PATCH /api/fahrzeuge/{id}` ist ein echter Teil-Patch (LFH-306): fehlender Key =
+   * `PATCH /api/vehicles/{id}` ist ein echter Teil-Patch (LFH-306): fehlender Key =
    * unverändert, `null` = LEEREN, und `leerZuNull(undefined)` ist `null`. Ein Vollersatz-Mapper
    * löschte bei jedem Bearbeiten OPTA, Standort, FMS-ISSI, Tragenkapazität, Soll-Stärke und
    * Bemerkung — still.

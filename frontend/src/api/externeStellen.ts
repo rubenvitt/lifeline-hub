@@ -26,14 +26,14 @@ export interface ExterneStellePatch {
  */
 export function fetchExterneStellen(umfang: 'aktiv' | 'alle'): Promise<ExterneStelle[]> {
   return apiGet<ExterneStelle[]>(
-    umfang === 'alle' ? '/api/externe-stellen?nur_aktive=false' : '/api/externe-stellen',
+    umfang === 'alle' ? '/api/external-agencies?nur_aktive=false' : '/api/external-agencies',
   );
 }
 
 export function createExterneStelle(daten: NeueExterneStelle): Promise<ExterneStelle> {
-  return apiSend<ExterneStelle>('/api/externe-stellen', 'POST', daten);
+  return apiSend<ExterneStelle>('/api/external-agencies', 'POST', daten);
 }
 
 export function updateExterneStelle(id: number, patch: ExterneStellePatch): Promise<ExterneStelle> {
-  return apiSend<ExterneStelle>(`/api/externe-stellen/${id}`, 'PATCH', patch);
+  return apiSend<ExterneStelle>(`/api/external-agencies/${id}`, 'PATCH', patch);
 }

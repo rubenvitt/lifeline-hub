@@ -10,7 +10,7 @@ export function sucheOrtImEinsatz(einsatzId: number, begriff: string): Promise<O
   );
 }
 
-/** GET /api/ort-suche — ohne Einsatz, für „Einsatz anlegen“ (wer Einsätze anlegen darf). */
+/** GET /api/location-search — ohne Einsatz, für „Einsatz anlegen“ (wer Einsätze anlegen darf). */
 export function sucheOrtInOrg(begriff: string): Promise<OrtSucheAntwort> {
-  return apiGet<OrtSucheAntwort>(mitParametern('/api/ort-suche', { q: begriff }));
+  return apiGet<OrtSucheAntwort>(mitParametern('/api/location-search', { q: begriff }));
 }

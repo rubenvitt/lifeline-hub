@@ -113,7 +113,7 @@ async fn personalstatus_schreibt_die_zeitachse() {
     let (_, z) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
     assert_eq!(arten(&z), vec![paar("alarmierung", "status")]);
 
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let id_von = |label: &str| {
         katalog
             .as_array()
@@ -763,7 +763,7 @@ async fn schon_eingetroffen_in_einheit(w: &Welt, name: &str) -> i64 {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let im_einsatz = katalog
         .as_array()
         .unwrap()

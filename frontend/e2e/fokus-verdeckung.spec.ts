@@ -618,7 +618,7 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     name: 'Fahrzeug-Detailseite',
     feld: 'Funkrufname',
     seite: async (page: Page) => {
-      const antwort = await page.request.post('/api/fahrzeuge', {
+      const antwort = await page.request.post('/api/vehicles', {
         data: { funkrufname: `E2E-FOKUS ${Date.now()}`, fahrzeugtyp: 'LF 20' },
       });
       expect(
@@ -635,10 +635,10 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     name: 'Einheiten-Vorlage-Detailseite',
     feld: 'Name',
     seite: async (page: Page) => {
-      const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+      const typen = (await (await page.request.get('/api/unit-types')).json()) as {
         id: number;
       }[];
-      const antwort = await page.request.post('/api/einheit-vorlagen', {
+      const antwort = await page.request.post('/api/unit-templates', {
         data: { name: `E2E-FOKUS Vorlage ${Date.now()}`, typ_id: typen[0].id },
       });
       expect(

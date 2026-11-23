@@ -4567,7 +4567,7 @@ async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
     assert_eq!((s, v), (StatusCode::OK, json!([])), "zu kurz");
     let (s, _) = anfrage_json(&app, "GET", &pfad(sued, "florian"), &geraet, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
-    for katalog in ["/api/einheit-vorlagen", "/api/fahrzeuge"] {
+    for katalog in ["/api/unit-templates", "/api/vehicles"] {
         let (s, _) = anfrage_json(&app, "GET", katalog, &geraet, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{katalog}");
     }
@@ -6902,7 +6902,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
                 }],
             })),
         ),
-        ("GET", "/api/verpflegung-vorlagen".to_string(), None),
+        ("GET", "/api/catering-templates".to_string(), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
@@ -7985,7 +7985,7 @@ async fn einheitengeraet_setzt_nur_den_eigenen_status() {
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
     let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
 
-    let (s, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
+    let (s, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{stati}");
     let status = &stati.as_array().unwrap()[0];
     let status_id = status["id"].as_i64().unwrap();
@@ -8042,7 +8042,7 @@ async fn einheitengeraet_nimmt_eigenen_handstatus_zurueck() {
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
     let basis = format!("/api/einsaetze/{}/einheiten", l.einsatz);
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &geraet, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &geraet, None).await;
     let status_id = stati.as_array().unwrap()[0]["id"].as_i64().unwrap();
 
     let (s, v) = anfrage_json(

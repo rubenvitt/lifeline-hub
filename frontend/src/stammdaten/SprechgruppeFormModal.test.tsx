@@ -25,8 +25,8 @@ const sprechgruppe: Sprechgruppe = {
 
 function handler() {
   server.use(
-    http.post('/api/sprechgruppen', () => HttpResponse.json({ ...sprechgruppe, id: 9 })),
-    http.patch('/api/sprechgruppen/4', () => HttpResponse.json(sprechgruppe)),
+    http.post('/api/talk-groups', () => HttpResponse.json({ ...sprechgruppe, id: 9 })),
+    http.patch('/api/talk-groups/4', () => HttpResponse.json(sprechgruppe)),
   );
 }
 
@@ -71,7 +71,7 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
    */
   it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
     server.use(
-      http.patch('/api/sprechgruppen/4', () =>
+      http.patch('/api/talk-groups/4', () =>
         HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -109,7 +109,7 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
   it('öffnet Netz und Sicherheit beim Bearbeiten und trägt sie mit (LFH-1030)', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/api/sprechgruppen/4', async ({ request }) => {
+      http.patch('/api/talk-groups/4', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(sprechgruppe);
       }),
@@ -137,7 +137,7 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
   it('legt ohne Netz und Sicherheit mit beiden leer an; der Bereich ist zu', async () => {
     let body: unknown = null;
     server.use(
-      http.post('/api/sprechgruppen', async ({ request }) => {
+      http.post('/api/talk-groups', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ ...sprechgruppe, id: 9 });
       }),

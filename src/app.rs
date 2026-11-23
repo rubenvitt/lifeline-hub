@@ -2298,7 +2298,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::archiv_empfaenger::pruefen),
         )
         .route(
-            "/api/fuehrungsfunktionen",
+            "/api/command-roles",
             get(routes::fuehrungsfunktion::katalog),
         )
         .route(
@@ -2307,7 +2307,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Richtwerte des Unterkunftsrechners (LLH-1520, design.md D2).
         .route(
-            "/api/unterkunft-richtwerte",
+            "/api/accommodation-guidelines",
             get(routes::unterkunft_richtwerte::org_lesen),
         )
         .route(
@@ -2323,29 +2323,26 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::org_einstellungen::modul_einstellung_setzen),
         )
         // Ortssuche ohne Einsatz, für „Einsatz anlegen“ (LFH-1175).
-        .route("/api/ort-suche", get(routes::ort_suche::in_org))
+        .route("/api/location-search", get(routes::ort_suche::in_org))
         // Ortsname ohne Einsatz, für das Ortsfeld beim Anlegen (LLH-1376).
-        .route("/api/ort-vorschau", get(routes::ort_vorschau::in_org))
+        .route("/api/location-preview", get(routes::ort_vorschau::in_org))
         .route(
-            "/api/externe-stellen",
+            "/api/external-agencies",
             get(routes::externe_stelle::list).post(routes::externe_stelle::create),
         )
         .route(
-            "/api/externe-stellen/{id}",
+            "/api/external-agencies/{id}",
             patch(routes::externe_stelle::update),
         )
-        .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
+        .route("/api/keyword-suggestions", get(routes::stichwort::liste))
+        .route("/api/keyword-suggestions", post(routes::stichwort::anlegen))
         .route(
-            "/api/stichwort-vorschlaege",
-            post(routes::stichwort::anlegen),
-        )
-        .route(
-            "/api/stichwort-vorschlaege/{id}",
+            "/api/keyword-suggestions/{id}",
             delete(routes::stichwort::loeschen),
         )
         // LLH-1375: Kopplung eines Stichworts an eine Einsatz-Vorlage.
         .route(
-            "/api/stichwort-vorschlaege/{id}/vorlage",
+            "/api/keyword-suggestions/{id}/template",
             put(routes::stichwort::set_vorlage),
         )
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
@@ -2414,171 +2411,171 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
         .route(
-            "/api/einsatz-vorlagen",
+            "/api/incident-templates",
             get(routes::einsatz_vorlage::list).post(routes::einsatz_vorlage::create),
         )
         .route(
-            "/api/einsatz-vorlagen/{id}",
+            "/api/incident-templates/{id}",
             put(routes::einsatz_vorlage::update).delete(routes::einsatz_vorlage::delete),
         )
-        .route("/api/fahrzeuge", get(routes::fahrzeug::liste))
-        .route("/api/fahrzeuge", post(routes::fahrzeug::anlegen))
+        .route("/api/vehicles", get(routes::fahrzeug::liste))
+        .route("/api/vehicles", post(routes::fahrzeug::anlegen))
         .route(
-            "/api/fahrzeug-vorschlaege",
+            "/api/vehicle-suggestions",
             get(routes::fahrzeug::vorschlaege),
         )
+        .route("/api/vehicles/{id}", patch(routes::fahrzeug::aktualisieren))
         .route(
-            "/api/fahrzeuge/{id}",
-            patch(routes::fahrzeug::aktualisieren),
-        )
-        .route(
-            "/api/fahrzeuge/{id}/ausser-dienst",
+            "/api/vehicles/{id}/out-of-service",
             post(routes::fahrzeug::ausser_dienst),
         )
         .route(
-            "/api/fahrzeuge/{id}/in-dienst",
+            "/api/vehicles/{id}/in-service",
             post(routes::fahrzeug::in_dienst),
         )
         .route("/api/material", get(routes::material::liste))
         .route("/api/material", post(routes::material::anlegen))
         .route(
-            "/api/material-kategorien",
+            "/api/material-categories",
             get(routes::material::kategorien),
         )
         .route("/api/material/{id}", patch(routes::material::aktualisieren))
         .route(
-            "/api/material/{id}/ausser-dienst",
+            "/api/material/{id}/out-of-service",
             post(routes::material::ausser_dienst),
         )
         .route(
-            "/api/material/{id}/in-dienst",
+            "/api/material/{id}/in-service",
             post(routes::material::in_dienst),
         )
-        .route("/api/fahrzeug-status", get(routes::fahrzeug_status::liste))
+        .route("/api/vehicle-statuses", get(routes::fahrzeug_status::liste))
         .route(
-            "/api/fahrzeug-status",
+            "/api/vehicle-statuses",
             post(routes::fahrzeug_status::anlegen),
         )
         .route(
-            "/api/fahrzeug-status/{id}",
+            "/api/vehicle-statuses/{id}",
             patch(routes::fahrzeug_status::aktualisieren),
         )
         .route(
-            "/api/fahrzeug-status/{id}/deaktivieren",
+            "/api/vehicle-statuses/{id}/deactivate",
             post(routes::fahrzeug_status::deaktivieren),
         )
-        .route("/api/personal", get(routes::personal::liste))
-        .route("/api/personal", post(routes::personal::anlegen))
+        .route("/api/personnel", get(routes::personal::liste))
+        .route("/api/personnel", post(routes::personal::anlegen))
         .route(
-            "/api/personal-vorschlaege",
+            "/api/personnel-suggestions",
             get(routes::personal::vorschlaege),
         )
-        .route("/api/personal/{id}", patch(routes::personal::aktualisieren))
         .route(
-            "/api/personal/{id}/ausser-dienst",
+            "/api/personnel/{id}",
+            patch(routes::personal::aktualisieren),
+        )
+        .route(
+            "/api/personnel/{id}/out-of-service",
             post(routes::personal::ausser_dienst),
         )
         .route(
-            "/api/personal/{id}/in-dienst",
+            "/api/personnel/{id}/in-service",
             post(routes::personal::in_dienst),
         )
-        .route("/api/personal-status", get(routes::personal_status::liste))
         .route(
-            "/api/personal-status",
+            "/api/personnel-statuses",
+            get(routes::personal_status::liste),
+        )
+        .route(
+            "/api/personnel-statuses",
             post(routes::personal_status::anlegen),
         )
         .route(
-            "/api/personal-status/{id}",
+            "/api/personnel-statuses/{id}",
             patch(routes::personal_status::aktualisieren),
         )
         .route(
-            "/api/personal-status/{id}/deaktivieren",
+            "/api/personnel-statuses/{id}/deactivate",
             post(routes::personal_status::deaktivieren),
         )
-        .route("/api/etb-bausteine", get(routes::etb_baustein::liste))
-        .route("/api/etb-bausteine", post(routes::etb_baustein::anlegen))
+        .route("/api/etb-snippets", get(routes::etb_baustein::liste))
+        .route("/api/etb-snippets", post(routes::etb_baustein::anlegen))
         .route(
-            "/api/etb-bausteine/{id}",
+            "/api/etb-snippets/{id}",
             patch(routes::etb_baustein::aktualisieren),
         )
         .route(
-            "/api/etb-bausteine/{id}/deaktivieren",
+            "/api/etb-snippets/{id}/deactivate",
             post(routes::etb_baustein::deaktivieren),
         )
-        .route("/api/qualifikationen", get(routes::qualifikation::liste))
-        .route("/api/qualifikationen", post(routes::qualifikation::anlegen))
+        .route("/api/qualifications", get(routes::qualifikation::liste))
+        .route("/api/qualifications", post(routes::qualifikation::anlegen))
         .route(
-            "/api/qualifikationen/{id}",
+            "/api/qualifications/{id}",
             patch(routes::qualifikation::aktualisieren),
         )
         .route(
-            "/api/qualifikationen/{id}/deaktivieren",
+            "/api/qualifications/{id}/deactivate",
             post(routes::qualifikation::deaktivieren),
         )
         // Einheiten-Vorlagen (LLH-1042): Lesen für alle der Org, Schreiben Admin.
         .route(
-            "/api/einheit-vorlagen",
+            "/api/unit-templates",
             get(routes::einheit_vorlage::list).post(routes::einheit_vorlage::create),
         )
         .route(
-            "/api/einheit-vorlagen/{id}",
+            "/api/unit-templates/{id}",
             patch(routes::einheit_vorlage::update),
         )
         .route(
-            "/api/einheit-vorlagen/{id}/fahrzeuge",
+            "/api/unit-templates/{id}/vehicles",
             put(routes::einheit_vorlage::replace_fahrzeuge),
         )
         .route(
-            "/api/einheit-vorlagen/{id}/personal",
+            "/api/unit-templates/{id}/personnel",
             put(routes::einheit_vorlage::replace_personal),
         )
         .route(
-            "/api/einheit-vorlagen/{id}/material",
+            "/api/unit-templates/{id}/material",
             put(routes::einheit_vorlage::replace_material),
         )
         // Verpflegungsplan (LLH-1058): Lesen für alle der Org, Schreiben Admin.
         .route(
-            "/api/verpflegung-vorlagen",
+            "/api/catering-templates",
             get(routes::verpflegung_vorlage::list).post(routes::verpflegung_vorlage::create),
         )
         .route(
-            "/api/verpflegung-vorlagen/{vid}",
+            "/api/catering-templates/{vid}",
             patch(routes::verpflegung_vorlage::update),
         )
         // Schichtmodelle (LLH-1122): Lesen für alle der Org, Schreiben Admin.
         .route(
-            "/api/schichtmodelle",
+            "/api/shift-models",
             get(routes::schichtmodell::list).post(routes::schichtmodell::create),
         )
         .route(
-            "/api/schichtmodelle/{sid}",
+            "/api/shift-models/{sid}",
             put(routes::schichtmodell::update).delete(routes::schichtmodell::delete),
         )
-        .route("/api/einheit-typen", get(routes::einheit_typ::liste))
-        .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))
+        .route("/api/unit-types", get(routes::einheit_typ::liste))
+        .route("/api/unit-types", post(routes::einheit_typ::anlegen))
         .route(
-            "/api/einheit-typen/{id}",
+            "/api/unit-types/{id}",
             patch(routes::einheit_typ::aktualisieren),
         )
         .route(
-            "/api/einheit-typen/{id}/deaktivieren",
+            "/api/unit-types/{id}/deactivate",
             post(routes::einheit_typ::deaktivieren),
         )
+        .route("/api/talk-groups", get(routes::sprechgruppe::liste_katalog))
+        .route("/api/talk-groups", post(routes::sprechgruppe::anlegen))
         .route(
-            "/api/sprechgruppen",
-            get(routes::sprechgruppe::liste_katalog),
-        )
-        .route("/api/sprechgruppen", post(routes::sprechgruppe::anlegen))
-        .route(
-            "/api/sprechgruppen/auch-lokal",
+            "/api/talk-groups/also-local",
             get(routes::sprechgruppe::liste_auch_lokal),
         )
         .route(
-            "/api/sprechgruppen/{id}",
+            "/api/talk-groups/{id}",
             patch(routes::sprechgruppe::aktualisieren),
         )
         .route(
-            "/api/sprechgruppen/{id}/deaktivieren",
+            "/api/talk-groups/{id}/deactivate",
             post(routes::sprechgruppe::deaktivieren),
         )
         .route(

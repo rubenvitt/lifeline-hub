@@ -40,7 +40,7 @@ const labels = (c: HTMLElement) =>
 function render(benutzer: typeof admin, katalog: typeof quals = quals) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/qualifikationen', () => HttpResponse.json(katalog)),
+    http.get('/api/qualifications', () => HttpResponse.json(katalog)),
   );
   return renderMitProviders(<QualifikationenTab />);
 }
@@ -114,7 +114,7 @@ describe('QualifikationenTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/qualifikationen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/qualifications', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<QualifikationenTab />);
 
@@ -139,7 +139,7 @@ describe('QualifikationenTab', () => {
   it('die Schnellerfassung legt mit Label und Sortier-Vorgabe an', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.post('/api/qualifikationen', async ({ request }) => {
+      http.post('/api/qualifications', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({ id: 9, label: 'Zugführer', sortier: 0 });
       }),
@@ -201,7 +201,7 @@ describe('QualifikationenTab', () => {
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
-      http.patch('/api/qualifikationen/1', () =>
+      http.patch('/api/qualifications/1', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -224,7 +224,7 @@ describe('QualifikationenTab', () => {
 
   it('zeigt nach Abbrechen und erneutem Bearbeiten keinen alten Grund', async () => {
     server.use(
-      http.patch('/api/qualifikationen/1', () =>
+      http.patch('/api/qualifications/1', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -257,7 +257,7 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
   it('Deaktivieren: der Hinweis steht und geht beim nächsten Absenden', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/qualifikationen/:id/deaktivieren', () => {
+      http.post('/api/qualifications/:id/deactivate', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json(
@@ -286,10 +286,10 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
 
   it('Anlegen: der Hinweis steht, das Feld behält den Text, Deaktivieren räumt ihn', async () => {
     server.use(
-      http.post('/api/qualifikationen', () =>
+      http.post('/api/qualifications', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 409 }),
       ),
-      http.post('/api/qualifikationen/:id/deaktivieren', () => new Promise<never>(() => {})),
+      http.post('/api/qualifications/:id/deactivate', () => new Promise<never>(() => {})),
     );
     render(admin);
     await screen.findByText('Sanitäter');
@@ -309,7 +309,7 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
   it('„Schließt ein“: Spalte zeigt die Stufe, die Auswahl lässt Kreise weg, Speichern schickt sie', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.patch('/api/qualifikationen/1', async ({ request }) => {
+      http.patch('/api/qualifications/1', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({ ...kette[0], schliesst_ein_id: 4 });
       }),

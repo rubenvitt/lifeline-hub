@@ -30,7 +30,7 @@ pub struct ListQuery {
     pub nur_aktive: Option<bool>,
 }
 
-/// GET /api/einheit-vorlagen — Vorlagen der eigenen Organisation samt Fahrzeugen und
+/// GET /api/unit-templates — Vorlagen der eigenen Organisation samt Fahrzeugen und
 /// Stammbesetzung; ohne `nur_aktive=false` nur die aktiven.
 pub async fn list(
     State(state): State<AppState>,
@@ -63,7 +63,7 @@ pub struct VorlageBody {
     pub sortier: i64,
 }
 
-/// POST /api/einheit-vorlagen — Admin. Neue Vorlage (aktiv). Feldfehler 400 (leerer Name,
+/// POST /api/unit-templates — Admin. Neue Vorlage (aktiv). Feldfehler 400 (leerer Name,
 /// Grenzen, halbes Soll), fremder Typ oder fremde Unterstellung 422, Name doppelt 409.
 pub async fn create(
     State(state): State<AppState>,
@@ -145,7 +145,7 @@ fn check_tri(
     Ok(wert)
 }
 
-/// PATCH /api/einheit-vorlagen/{id} — Admin, Teil-Patch. Fremde oder unbekannte id → 404;
+/// PATCH /api/unit-templates/{id} — Admin, Teil-Patch. Fremde oder unbekannte id → 404;
 /// Zyklus, fremder Typ, fremde Unterstellung oder ein Fahrzeug doppelt im neuen Baum → 422.
 pub async fn update(
     State(state): State<AppState>,
@@ -188,7 +188,7 @@ pub struct FahrzeugeBody {
     pub fahrzeug_ids: Vec<i64>,
 }
 
-/// PUT /api/einheit-vorlagen/{id}/fahrzeuge — Admin. Ersetzt die Stamm-Fahrzeuge durch genau
+/// PUT /api/unit-templates/{id}/vehicles — Admin. Ersetzt die Stamm-Fahrzeuge durch genau
 /// diese Liste (Reihenfolge = Anzeige). Zu lang → 400; fremd, neu außer Dienst oder schon im
 /// selben Baum → 422; Personen auf einem entfernten Fahrzeug verlieren die Bindung.
 pub async fn replace_fahrzeuge(
@@ -215,7 +215,7 @@ pub struct PersonalBody {
     pub personal: Vec<PersonalZeile>,
 }
 
-/// PUT /api/einheit-vorlagen/{id}/personal — Admin. Ersetzt die Stammbesetzung durch genau diese
+/// PUT /api/unit-templates/{id}/personnel — Admin. Ersetzt die Stammbesetzung durch genau diese
 /// Liste. Unbekannte Position oder zu lang → 400; fremde oder neu außer Dienst gestellte Person,
 /// Fahrzeug außerhalb der Vorlage oder Person schon im selben Baum → 422.
 pub async fn replace_personal(
@@ -257,7 +257,7 @@ pub struct MaterialBody {
     pub material: Vec<MaterialZeile>,
 }
 
-/// PUT /api/einheit-vorlagen/{id}/material — Admin (LLH-1261). Ersetzt die Material-Positionen
+/// PUT /api/unit-templates/{id}/material — Admin (LLH-1261). Ersetzt die Material-Positionen
 /// durch genau diese Liste (Reihenfolge = Anzeige). Zu lang oder Menge unter 1 → 400; fremdes oder
 /// neu außer Dienst gestelltes Material, Fahrzeug außerhalb der Vorlage, Gerät über der
 /// Höchstmenge und Gerät mit Bestandsnummer mit Menge über 1 oder zweimal im Baum → 422.

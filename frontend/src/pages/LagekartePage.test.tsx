@@ -422,7 +422,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     // Fahrzeugstatus-Katalog für den Sprechwunsch im Paneel „Ausgewählt“ (eon26eat D2).
-    http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
+    http.get('/api/vehicle-statuses', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),

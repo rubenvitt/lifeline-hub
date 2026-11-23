@@ -577,7 +577,7 @@ async fn letzte_person_ausser_dienst_legt_nichts_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/personal/{}/ausser-dienst", v.rettsan2),
+        &format!("/api/personnel/{}/out-of-service", v.rettsan2),
         &admin,
         None,
     )
@@ -740,7 +740,7 @@ async fn fremde_unbekannte_und_deaktivierte_vorlage() {
     let (s, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einheit-vorlagen/{}", v.zug),
+        &format!("/api/unit-templates/{}", v.zug),
         &admin,
         Some(r#"{"aktiv":false}"#),
     )

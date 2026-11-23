@@ -48,18 +48,18 @@ function stelleBereit(liste: Schichtmodell[] = [SAND, HOCHWASSER]) {
   const aufrufe: string[] = [];
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/schichtmodelle', () => HttpResponse.json(liste)),
-    http.post('/api/schichtmodelle', async ({ request }) => {
+    http.get('/api/shift-models', () => HttpResponse.json(liste)),
+    http.post('/api/shift-models', async ({ request }) => {
       const body = await request.json();
       aufrufe.push(`POST ${JSON.stringify(body)}`);
       return HttpResponse.json({ id: 9, ist_demo: false, ...(body as object) }, { status: 201 });
     }),
-    http.put('/api/schichtmodelle/:id', async ({ request, params }) => {
+    http.put('/api/shift-models/:id', async ({ request, params }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push(`PUT ${params.id} ${JSON.stringify(body)}`);
       return HttpResponse.json({ id: Number(params.id), ist_demo: false, ...body });
     }),
-    http.delete('/api/schichtmodelle/:id', ({ params }) => {
+    http.delete('/api/shift-models/:id', ({ params }) => {
       aufrufe.push(`DELETE ${params.id}`);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -215,7 +215,7 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
   it('nennt in der Rückfrage die Vorlagen, die das Modell verlieren (LLH-1313)', async () => {
     stelleBereit();
     server.use(
-      http.get('/api/einsatz-vorlagen', () =>
+      http.get('/api/incident-templates', () =>
         HttpResponse.json([
           { id: 1, bezeichnung: 'Unwetter', schichtmodell_id: 2, ausgeblendet: [], sortier: 10 },
           { id: 2, bezeichnung: 'MANV', schichtmodell_id: 2, ausgeblendet: [], sortier: 20 },
@@ -236,7 +236,7 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
   it('nennt nur die Vorlagen des gewählten Modells', async () => {
     stelleBereit();
     server.use(
-      http.get('/api/einsatz-vorlagen', () =>
+      http.get('/api/incident-templates', () =>
         HttpResponse.json([
           { id: 1, bezeichnung: 'Unwetter', schichtmodell_id: 2, ausgeblendet: [], sortier: 10 },
           { id: 3, bezeichnung: 'Kleinlage', schichtmodell_id: 1, ausgeblendet: [], sortier: 30 },

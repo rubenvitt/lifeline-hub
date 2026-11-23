@@ -8,7 +8,7 @@ async fn fahrzeug_anlegen(app: &axum::Router, admin: &str, funkrufname: &str) ->
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         admin,
         Some(&format!(
             r#"{{"funkrufname":"{funkrufname}","kennzeichen":"XX-AB 1"}}"#
@@ -255,7 +255,7 @@ async fn stamm_fahrzeug_ausser_dienst_ist_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/fahrzeuge/{fz}/ausser-dienst"),
+        &format!("/api/vehicles/{fz}/out-of-service"),
         &admin,
         None,
     )
@@ -452,7 +452,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let ef = json["id"].as_i64().unwrap();
 
     // Anderen 'gebunden'-Status aus dem Seed holen ('4 – Am Einsatzort').
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let am_einsatzort = stati
         .as_array()
         .unwrap()
@@ -756,7 +756,7 @@ async fn status_seit_nur_bei_echtem_statuswechsel() {
     assert_eq!(j["status_seit"], alt, "derselbe Status ist kein Wechsel");
 
     // Anderer Status → springt.
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let anderer = stati
         .as_array()
         .unwrap()
@@ -897,7 +897,7 @@ async fn statuswechsel_feuert_einheit_nur_fuer_fahrzeug_einer_einheit() {
     let frei = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
     let im_zug = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
     let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let am_einsatzort = stati
         .as_array()
         .unwrap()
@@ -1096,7 +1096,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
         .await;
         assert!(s.is_success(), "{pfad}: {j}");
     }
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let s2 = stati
         .as_array()
         .unwrap()
@@ -1244,7 +1244,7 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
 
     // Ein Statuswechsel ist eine Spur.
     let gewechselt = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 3").await;
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let anderer = stati
         .as_array()
         .unwrap()
@@ -1402,7 +1402,7 @@ async fn fahrzeug_zeile(
 
 /// Kennung eines Katalogstatus nach seinem Label.
 async fn status_nach_label(app: &axum::Router, cookie: &str, label: &str) -> i64 {
-    let (_, stati) = anfrage(app, "GET", "/api/fahrzeug-status", cookie, None).await;
+    let (_, stati) = anfrage(app, "GET", "/api/vehicle-statuses", cookie, None).await;
     stati
         .as_array()
         .unwrap()
@@ -2079,7 +2079,7 @@ async fn statuswechsel_welt() -> (
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "85-1").await;
     let einheit = in_einheit(&app, &admin, einsatz, ef).await;
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let nach_anfang = |p: &str| {
         stati
             .as_array()
@@ -2293,7 +2293,7 @@ async fn rueckname_nach_elf_minuten_ist_409() {
 #[tokio::test]
 async fn rueckname_scheitert_an_der_zeitachse_und_aendert_nichts() {
     let (app, pool, admin, einsatz, ef, einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
-    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let heim = stati
         .as_array()
         .unwrap()

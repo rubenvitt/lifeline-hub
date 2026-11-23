@@ -127,7 +127,7 @@ test.describe(KAPITEL, () => {
         adhoc: { name: OHNE_EINHEIT, funktion: 'Helfer' },
       });
 
-      for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personal', kraft);
+      for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personnel', kraft);
     } finally {
       await api.dispose();
     }

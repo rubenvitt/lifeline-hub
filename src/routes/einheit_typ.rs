@@ -154,7 +154,7 @@ fn normalisiere_patch(
     })
 }
 
-/// GET /api/einheit-typen — aktive Katalog-Einträge der eigenen Org (für Auswahl).
+/// GET /api/unit-types — aktive Katalog-Einträge der eigenen Org (für Auswahl).
 /// Alle eingeloggten Nutzer.
 pub async fn liste(
     State(state): State<AppState>,
@@ -163,7 +163,7 @@ pub async fn liste(
     Ok(Json(typ_repo::liste(&state.pool, benutzer.org_id).await?))
 }
 
-/// POST /api/einheit-typen — Admin. Dublette label → Conflict.
+/// POST /api/unit-types — Admin. Dublette label → Conflict.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -175,7 +175,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(t)))
 }
 
-/// PATCH /api/einheit-typen/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
+/// PATCH /api/unit-types/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
 /// unverändert, `null` = leeren. Das Soll-Trio wird gegen den Effektivzustand geprüft.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -193,7 +193,7 @@ pub async fn aktualisieren(
     Ok(Json(t))
 }
 
-/// POST /api/einheit-typen/{id}/deaktivieren — Admin (Soft-Delete).
+/// POST /api/unit-types/{id}/deactivate — Admin (Soft-Delete).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

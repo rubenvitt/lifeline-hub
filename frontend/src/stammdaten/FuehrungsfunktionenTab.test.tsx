@@ -51,7 +51,7 @@ describe('FuehrungsfunktionenTab', () => {
     const gesendet: unknown[] = [];
     server.use(
       meHandler(benutzer('admin')),
-      http.get('/api/fuehrungsfunktionen', () => HttpResponse.json(katalog)),
+      http.get('/api/command-roles', () => HttpResponse.json(katalog)),
       http.put('/api/org-fuehrungsfunktionen/s4', async ({ request }) => {
         const body = (await request.json()) as { label: string | null };
         gesendet.push(body);
@@ -83,7 +83,7 @@ describe('FuehrungsfunktionenTab', () => {
     const gesendet: unknown[] = [];
     server.use(
       meHandler(benutzer('admin')),
-      http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([eintrag('s6', 'IuK')])),
+      http.get('/api/command-roles', () => HttpResponse.json([eintrag('s6', 'IuK')])),
       http.put('/api/org-fuehrungsfunktionen/s7', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([
@@ -106,7 +106,7 @@ describe('FuehrungsfunktionenTab', () => {
   it('erklärt ohne Adminrecht die Sperre und lässt nichts bearbeiten', async () => {
     server.use(
       meHandler(benutzer('keiner')),
-      http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([eintrag('s4', 'Versorgung')])),
+      http.get('/api/command-roles', () => HttpResponse.json([eintrag('s4', 'Versorgung')])),
     );
     renderMitProviders(<FuehrungsfunktionenTab />);
     expect(await screen.findByText('nur System-Admin')).toBeInTheDocument();

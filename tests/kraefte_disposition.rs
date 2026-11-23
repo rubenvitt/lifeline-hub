@@ -7,12 +7,12 @@ use serde_json::Value;
 mod common;
 use common::*;
 
-/// Stamm-Fahrzeug (`/api/fahrzeuge`); liefert die id.
+/// Stamm-Fahrzeug (`/api/vehicles`); liefert die id.
 async fn stammfahrzeug(app: &axum::Router, admin: &str, funkrufname: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         admin,
         Some(&format!(r#"{{"funkrufname":"{funkrufname}"}}"#)),
     )
@@ -26,7 +26,7 @@ async fn stammperson(app: &axum::Router, admin: &str, name: &str, traeger: &str)
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&format!(
             r#"{{"name":"{name}","traegerorganisation":"{traeger}"}}"#
@@ -211,7 +211,7 @@ async fn eine_person_ausser_dienst_lehnt_mit_grund_ab_und_legt_nichts_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/personal/{ruhend}/ausser-dienst"),
+        &format!("/api/personnel/{ruhend}/out-of-service"),
         &admin,
         None,
     )

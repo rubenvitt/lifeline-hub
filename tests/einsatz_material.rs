@@ -339,7 +339,7 @@ async fn stamm_material_ausser_dienst_ist_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/material/{mid}/ausser-dienst"),
+        &format!("/api/material/{mid}/out-of-service"),
         &admin,
         None,
     )

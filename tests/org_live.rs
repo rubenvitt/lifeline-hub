@@ -572,18 +572,18 @@ async fn wiederherstellen_meldet_einsatzliste() {
 const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
     (
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         r#"{"funkrufname":"Test 1","kennzeichen":"XX-T 1"}"#,
     ),
     (
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         r#"{"label":"Reserve","kategorie":"verfuegbar"}"#,
     ),
-    ("POST", "/api/personal", r#"{"name":"Test Person"}"#),
+    ("POST", "/api/personnel", r#"{"name":"Test Person"}"#),
     (
         "POST",
-        "/api/personal-status",
+        "/api/personnel-statuses",
         r#"{"label":"Reserve","kategorie":"verfuegbar"}"#,
     ),
     (
@@ -591,27 +591,27 @@ const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
         "/api/material",
         r#"{"bezeichnung":"Decke","kategorie":"Betreuung"}"#,
     ),
-    ("POST", "/api/qualifikationen", r#"{"label":"Hundeführer"}"#),
-    ("POST", "/api/einheit-typen", r#"{"label":"Verband"}"#),
+    ("POST", "/api/qualifications", r#"{"label":"Hundeführer"}"#),
+    ("POST", "/api/unit-types", r#"{"label":"Verband"}"#),
     (
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         r#"{"bezeichnung":"TMO 1","betriebsart":"TMO","sortier":1}"#,
     ),
     (
         "POST",
-        "/api/etb-bausteine",
+        "/api/etb-snippets",
         r#"{"typ":"meldung","label":"X","inhalt":"x"}"#,
     ),
-    ("POST", "/api/stichwort-vorschlaege", r#"{"text":"Sturm"}"#),
+    ("POST", "/api/keyword-suggestions", r#"{"text":"Sturm"}"#),
     (
         "POST",
-        "/api/einsatz-vorlagen",
+        "/api/incident-templates",
         r#"{"bezeichnung":"Großbrand","ausgeblendet":["tiere"]}"#,
     ),
     (
         "POST",
-        "/api/externe-stellen",
+        "/api/external-agencies",
         r#"{"bezeichnung":"ILS Musterkreis","art":"leitstelle"}"#,
     ),
     (
@@ -660,12 +660,12 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     let ohne = login_cookie(&app, "ohnebezug", "ohnebezugpw1").await;
     let mut rx = live.abonniere_org();
 
-    let (status, _) = anfrage(&app, "GET", "/api/fahrzeuge", &admin, None).await;
+    let (status, _) = anfrage(&app, "GET", "/api/vehicles", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &ohne,
         Some(r#"{"funkrufname":"X 1"}"#),
     )
@@ -674,7 +674,7 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"X","kategorie":"quatsch"}"#),
     )
@@ -683,7 +683,7 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/fahrzeuge/999999",
+        "/api/vehicles/999999",
         &admin,
         Some(r#"{"funkrufname":"Y 1"}"#),
     )
@@ -691,16 +691,16 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     assert!(status.is_client_error(), "{status}");
     // Doppelte externe Stelle (409) und Markierung an einer Nicht-Leitstelle (422, LFH-1194).
     let rumpf = r#"{"bezeichnung":"Polizei","art":"polizei"}"#;
-    let (status, json) = anfrage(&app, "POST", "/api/externe-stellen", &admin, Some(rumpf)).await;
+    let (status, json) = anfrage(&app, "POST", "/api/external-agencies", &admin, Some(rumpf)).await;
     assert_eq!(status, StatusCode::CREATED);
     let polizei = json["id"].as_i64().unwrap();
     org_eingegangen(&mut rx);
-    let (status, _) = anfrage(&app, "POST", "/api/externe-stellen", &admin, Some(rumpf)).await;
+    let (status, _) = anfrage(&app, "POST", "/api/external-agencies", &admin, Some(rumpf)).await;
     assert_eq!(status, StatusCode::CONFLICT);
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/externe-stellen/{polizei}"),
+        &format!("/api/external-agencies/{polizei}"),
         &admin,
         Some(r#"{"zustaendig":true}"#),
     )
@@ -736,7 +736,7 @@ async fn stammdaten_erreichen_auf_der_leitung_nur_die_eigene_org() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Leitung"}"#),
     )
