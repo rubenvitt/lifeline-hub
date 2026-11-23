@@ -1,22 +1,31 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 accommodation	Unterkunft
+activate	aktivieren
 adapter	-
 admin	-
 animals	Tiere
 api	-
 app-code	-
 archive	Archiv
+attempts	Versuche
 audit	-
 auth	-
+auto-update	automatische Aktualisierung
 backup	-
 briefings	Lagebesprechungen
+build	bauen
+build-status	Baustatus
+buildable-regions	baubare Regionen
 bulk	-
 callback	-
+cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
+catalog	Katalog
 catering	Verpflegung
 chat	-
+check	prüfen
 code	-
 codes	-
 command	Führung
@@ -36,6 +45,7 @@ enroll	-
 etb	ETB
 evacuation	Evakuierung
 events	-
+existing	vorhandene
 export	-
 fetch-certificate	Zertifikat abrufen
 finish	-
@@ -50,9 +60,11 @@ incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
+intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 ios-push	-
 jwks.json	-
+key	Schlüssel
 lan	-
 live	-
 login	-
@@ -65,12 +77,17 @@ material	Material
 matrix	-
 me	-
 mirror	Spiegel
+offline	-
+offline-maps	Offline-Karten
 oidc	-
+online-sources	Online-Quellen
 openapi.json	-
 orders	Befehle
+overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+pause	anhalten
 person-search	Personensuche
 personnel	Personal
 persons	Personen
@@ -94,11 +111,15 @@ requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 restore	wiederherstellen
+resume	fortsetzen
 retention	Aufbewahrung
+revoke	widerrufen
 seats	Plätze
+secrets	Geheimnisse
 sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen
+settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
 situation	Lage
@@ -126,6 +147,7 @@ uhs	UHS
 undo	zurücknehmen
 units	Einheiten
 unregister	-
+update-now	jetzt aktualisieren
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge
@@ -133,3 +155,4 @@ web-push	-
 webauthn	-
 webhook	-
 whereabouts	Verbleib
+world	Welt

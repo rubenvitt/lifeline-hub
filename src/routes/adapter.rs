@@ -649,7 +649,7 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/admin/adapter/{id}/geheimnisse/{name} — setzt oder ersetzt ein Geheimnis (204). Ohne
+/// PUT /api/admin/adapter/{id}/secrets/{name} — setzt oder ersetzt ein Geheimnis (204). Ohne
 /// Schlüssel des Speichers 422. Der Wert steht nirgends im Klartext, auch nicht in der Spur.
 pub async fn set_geheimnis(
     State(state): State<AppState>,
@@ -722,7 +722,7 @@ pub async fn set_geheimnis(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/admin/adapter/{id}/geheimnisse/{name} — entfernt ein Geheimnis (204); nicht
+/// DELETE /api/admin/adapter/{id}/secrets/{name} — entfernt ein Geheimnis (204); nicht
 /// gesetzt → 404.
 pub async fn delete_geheimnis(
     State(state): State<AppState>,
@@ -750,7 +750,7 @@ pub async fn delete_geheimnis(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/admin/adapter/{id}/pruefen — „Verbindung prüfen“: ruft einmal ab, übernimmt nichts,
+/// POST /api/admin/adapter/{id}/check — „Verbindung prüfen“: ruft einmal ab, übernimmt nichts,
 /// ändert den Zustand nicht; der Versuch steht im Verlauf. Kein Eintrag in der Admin-Spur.
 pub async fn check(
     State(state): State<AppState>,
@@ -774,7 +774,7 @@ pub async fn check(
     }))
 }
 
-/// POST /api/admin/adapter/{id}/anhalten — nur aus „aktiv“, sonst 422.
+/// POST /api/admin/adapter/{id}/pause — nur aus „aktiv“, sonst 422.
 pub async fn halt(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -806,7 +806,7 @@ pub async fn halt(
     Ok(Json(anzeige(&mut conn, &state.adapter, &a, true).await?))
 }
 
-/// POST /api/admin/adapter/{id}/fortsetzen — nur aus „angehalten“, sonst 422; sofort fällig.
+/// POST /api/admin/adapter/{id}/resume — nur aus „angehalten“, sonst 422; sofort fällig.
 pub async fn resume(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -843,7 +843,7 @@ async fn meldung_erledigen(state: &AppState, org_id: i64, id: &str, war_gemeldet
     }
 }
 
-/// GET /api/admin/adapter/{id}/versuche — die letzten Versuche, neueste zuerst.
+/// GET /api/admin/adapter/{id}/attempts — die letzten Versuche, neueste zuerst.
 pub async fn list_versuche(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

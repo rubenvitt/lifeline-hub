@@ -2003,35 +2003,35 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der
         // Fremdsysteme selbst liegt unter `/api/v1/` (`public_api`).
         .route(
-            "/api/admin/anbindungen",
+            "/api/admin/integrations",
             get(routes::anbindungen::liste).post(routes::anbindungen::anlegen),
         )
         .route(
-            "/api/admin/anbindungen/{id}",
+            "/api/admin/integrations/{id}",
             get(routes::anbindungen::laden).patch(routes::anbindungen::aendern),
         )
         .route(
-            "/api/admin/anbindungen/{id}/code",
+            "/api/admin/integrations/{id}/code",
             post(routes::anbindungen::code),
         )
         .route(
-            "/api/admin/anbindungen/{id}/widerrufen",
+            "/api/admin/integrations/{id}/revoke",
             post(routes::anbindungen::widerrufen),
         )
         // LLH-1656: Webhook einer Anbindung. Zugestellt wird im Hintergrund
         // (`public_api::webhook::lauf`).
         .route(
-            "/api/admin/anbindungen/{id}/webhook",
+            "/api/admin/integrations/{id}/webhook",
             post(routes::anbindungen_webhook::create)
                 .patch(routes::anbindungen_webhook::update)
                 .delete(routes::anbindungen_webhook::delete),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",
+            "/api/admin/integrations/{id}/webhook/resume",
             post(routes::anbindungen_webhook::wieder_aufnehmen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/test",
+            "/api/admin/integrations/{id}/webhook/test",
             post(routes::anbindungen_webhook::test),
         )
         .route(
@@ -2039,7 +2039,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::anbindungen_webhook::zertifikat_abrufen),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/versuche",
+            "/api/admin/integrations/{id}/webhook/attempts",
             get(routes::anbindungen_webhook::versuche),
         )
         // LLH-2017: Adapter verwalten (ADR-0077). Abgerufen wird im Hintergrund (`adapter::lauf`).
@@ -2054,37 +2054,34 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::adapter::delete),
         )
         .route(
-            "/api/admin/adapter/{id}/geheimnisse/{name}",
+            "/api/admin/adapter/{id}/secrets/{name}",
             put(routes::adapter::set_geheimnis).delete(routes::adapter::delete_geheimnis),
         )
         .route(
-            "/api/admin/adapter/{id}/pruefen",
+            "/api/admin/adapter/{id}/check",
             post(routes::adapter::check),
         )
+        .route("/api/admin/adapter/{id}/pause", post(routes::adapter::halt))
         .route(
-            "/api/admin/adapter/{id}/anhalten",
-            post(routes::adapter::halt),
-        )
-        .route(
-            "/api/admin/adapter/{id}/fortsetzen",
+            "/api/admin/adapter/{id}/resume",
             post(routes::adapter::resume),
         )
         .route(
-            "/api/admin/adapter/{id}/versuche",
+            "/api/admin/adapter/{id}/attempts",
             get(routes::adapter::list_versuche),
         )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(
-            "/api/admin/einwurf-zugaenge",
+            "/api/admin/intake-credentials",
             get(routes::einwurf_zugaenge::liste).post(routes::einwurf_zugaenge::anlegen),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/schluessel",
+            "/api/admin/intake-credentials/{id}/key",
             post(routes::einwurf_zugaenge::schluessel_wechseln),
         )
         .route(
-            "/api/admin/einwurf-zugaenge/{id}/widerrufen",
+            "/api/admin/intake-credentials/{id}/revoke",
             post(routes::einwurf_zugaenge::widerrufen),
         )
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
@@ -2099,7 +2096,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // 256 MiB und die gemeinsame Upload-Grenze; dem Zeitbudget entzogen
         // (`zulassung::OHNE_ZULASSUNGSGRENZE`).
         .route(
-            "/api/admin/archiv/einspielen",
+            "/api/admin/archive/import",
             post(routes::archiv_einspielen::einspielen)
                 .layer(DefaultBodyLimit::max(ARCHIV_BLOCK_BODY_MAX))
                 .route_layer(upload_grenze.clone())
@@ -2719,126 +2716,123 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     };
 
     let router = router
-        .route("/api/karte/config", get(routes::karte::config))
-        .route(
-            "/api/karte/fachebenen/{quelle}",
-            get(routes::karte::fachebenen),
-        )
+        .route("/api/map/config", get(routes::karte::config))
+        .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
-            "/api/karte/offline/tiles/{z}/{x}/{y}",
+            "/api/map/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
         // Eingebettete Welt-Übersicht: der statische „welt“-Pfad steht vor der `{karte_id}`-Route.
         .route(
-            "/api/karte/offline/welt/tiles/{z}/{x}/{y}",
+            "/api/map/offline/world/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_welt_tiles),
         )
         // Region-adressierter Tile-Endpoint: je sichtbarer Region eine eigene Vector-Source.
         .route(
-            "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}",
+            "/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles_region),
         )
         // Eingebettete Offline-Glyphs/Sprite (rust-embed).
         .route(
-            "/api/karte/offline/fonts/{fontstack}/{datei}",
+            "/api/map/offline/fonts/{fontstack}/{datei}",
             get(routes::karte::offline_fonts),
         )
         .route(
-            "/api/karte/offline/sprites/{datei}",
+            "/api/map/offline/sprites/{datei}",
             get(routes::karte::offline_sprite),
         )
         // Style-/Tile-Proxy: verbirgt Upstream-Key und -URL, nur mit Sitzung (LFH-1072), damit
         // Fremde das Anbieter-Kontingent nicht verbrauchen.
         .route(
-            "/api/karte/proxy/{id}/style.json",
+            "/api/map/proxy/{id}/style.json",
             get(routes::karte::proxy_style),
         )
         .route(
-            "/api/karte/proxy/{id}/raster/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/raster/{z}/{x}/{y}",
             get(routes::karte::proxy_raster),
         )
         .route(
-            "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
+            "/api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
             get(routes::karte::proxy_tile),
         )
         .route(
-            "/api/karte/proxy/{id}/tilejson/{slot}",
+            "/api/map/proxy/{id}/tilejson/{slot}",
             get(routes::karte::proxy_tilejson),
         )
         .route(
-            "/api/karte/proxy/{id}/sprite/{rest}",
+            "/api/map/proxy/{id}/sprite/{rest}",
             get(routes::karte::proxy_sprite),
         )
         .route(
-            "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+            "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
             get(routes::karte::proxy_glyphs),
         )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
-            "/api/karte/online-quellen",
+            "/api/map/online-sources",
             get(routes::karte::online_liste).post(routes::karte::online_anlegen),
         )
         .route(
-            "/api/karte/online-quellen/katalog",
+            "/api/map/online-sources/catalog",
             get(routes::karte::online_katalog),
         )
         .route(
-            "/api/karte/online-quellen/{id}",
+            "/api/map/online-sources/{id}",
             patch(routes::karte::online_aktualisieren).delete(routes::karte::online_loeschen),
         )
         .route(
-            "/api/karte/offline-karten",
+            "/api/map/offline-maps",
             get(routes::karte::offline_liste).post(routes::karte::offline_registrieren),
         )
         // Statische Segmente (katalog/download) vor /{id} — matchit priorisiert statisch.
         .route(
-            "/api/karte/offline-karten/katalog",
+            "/api/map/offline-maps/catalog",
             get(routes::karte::offline_katalog),
         )
         .route(
-            "/api/karte/offline-karten/vorhandene",
+            "/api/map/offline-maps/existing",
             get(routes::karte::offline_vorhandene),
         )
         .route(
-            "/api/karte/offline-karten/download",
+            "/api/map/offline-maps/download",
             post(routes::karte::offline_download),
         )
         .route(
-            "/api/karte/offline-karten/bauen",
+            "/api/map/offline-maps/build",
             post(routes::karte::offline_bauen),
         )
         .route(
-            "/api/karte/offline-karten/baubare-regionen",
+            "/api/map/offline-maps/buildable-regions",
             get(routes::karte::offline_baubare_regionen),
         )
         .route(
-            "/api/karte/offline-karten/bau-status",
+            "/api/map/offline-maps/build-status",
             get(routes::karte::offline_bau_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung",
+            "/api/map/offline-maps/auto-update",
             get(routes::karte::offline_aktualisierung_status),
         )
         .route(
-            "/api/karte/offline-karten/aktualisierung/einstellung",
+            "/api/map/offline-maps/auto-update/settings",
             put(routes::karte::offline_aktualisierung_einstellen),
         )
         .route(
-            "/api/karte/offline-karten/{id}/jetzt-aktualisieren",
+            "/api/map/offline-maps/{id}/update-now",
             post(routes::karte::offline_jetzt_aktualisieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/aktivieren",
+            "/api/map/offline-maps/{id}/activate",
             post(routes::karte::offline_aktivieren),
         )
         .route(
-            "/api/karte/offline-karten/{id}/abbrechen",
+            "/api/map/offline-maps/{id}/cancel",
             post(routes::karte::offline_abbrechen),
         )
         .route(
-            "/api/karte/offline-karten/{id}",
+            "/api/map/offline-maps/{id}",
             delete(routes::karte::offline_loeschen),
         );
 

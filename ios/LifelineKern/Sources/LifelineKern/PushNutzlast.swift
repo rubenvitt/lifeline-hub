@@ -22,11 +22,13 @@ public struct PushMeldung: Equatable, Sendable {
     public let titel: String
     public let untertitel: String?
     public let text: String?
-    /// Gruppiert die Meldungen eines Einsatzes (`threadIdentifier`).
+    /// Gruppiert die Meldungen eines Einsatzes (`threadIdentifier`); die ohne Einsatz in einem
+    /// Thread je Server (`<kennung>-org`, LLH-2077).
     public let thread: String
     /// Pfad, den das Antippen öffnet.
     public let pfad: String
-    public let einsatzId: Int
+    /// `nil` bei einer Meldung ohne Einsatz (Störung einer Anbindung).
+    public let einsatzId: Int?
 }
 
 /// Die Nutzlast einer Push-Nachricht lesen: erst den Umschlag, nach dem Entschlüsseln den
@@ -55,12 +57,12 @@ public enum PushNutzlast {
 
     /// Der Klartext wie `ios_push::inhalt::Klartext`. Gelesen mit `JSONDecoder`, nicht mit
     /// `JSONSerialization`: dort brückt Darwin jede Zahl 0 oder 1 auch zu `Bool`, und Einsatz 1
-    /// ginge verloren. `e` muss eine ganze Zahl sein (`true` und `"1"` nicht); ein Textfeld mit
-    /// falschem Typ zählt als fehlend wie ein leeres.
+    /// ginge verloren. `e` fehlt ohne Einsatz (LLH-2077); steht es da, muss es eine ganze Zahl sein
+    /// (`true` und `"1"` nicht). Ein Textfeld mit falschem Typ zählt als fehlend wie ein leeres.
     struct Klartext: Decodable {
         let v: Int?
         let s: String?
-        let e: Int
+        let e: Int?
         let b: Int?
         let stufe: String?
         let titel: String?
@@ -75,7 +77,7 @@ public enum PushNutzlast {
 
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            e = try c.decode(Int.self, forKey: .e)
+            e = try c.decodeIfPresent(Int.self, forKey: .e)
             func zahl(_ k: CodingKeys) -> Int? { (try? c.decodeIfPresent(Int.self, forKey: k)) ?? nil }
             func text(_ k: CodingKeys) -> String? {
                 let roh = (try? c.decodeIfPresent(String.self, forKey: k)) ?? nil
@@ -97,20 +99,22 @@ public enum PushNutzlast {
     /// Baut die Meldung aus dem entschlüsselten Klartext. Titel wie `pushInhalt` im Service Worker
     /// (`alarm-sw.js`): mit Absender „‹titel› · ‹absender›“; Text ist der Wortlaut, sonst das
     /// Detail. Der Name des Servers (`s`) steht nur bei mehr als einem Server im Untertitel. `nil`,
-    /// wenn der Klartext kein Objekt mit Titel und Einsatz ist. `kennung` (die der Anmeldung)
-    /// macht den Thread je Server eindeutig. Leere Texte zählen als fehlend.
+    /// wenn der Klartext kein Objekt mit Titel ist. `kennung` (die der Anmeldung) macht den Thread
+    /// je Server eindeutig. Ohne Einsatz gruppiert der Thread `org`, und ohne Pfad geht es wie im
+    /// Service Worker zu den Anbindungen. Leere Texte zählen als fehlend.
     public static func meldung(
         aus klartext: Data, serverAnzahl: Int, kennung: String? = nil
     ) -> PushMeldung? {
         guard let k = try? JSONDecoder().decode(Klartext.self, from: klartext),
             let titel = k.titel
         else { return nil }
+        let gruppe = k.e.map(String.init) ?? "org"
         return PushMeldung(
             titel: k.absender.map { "\(titel) · \($0)" } ?? titel,
             untertitel: serverAnzahl > 1 ? k.s : nil,
             text: k.wortlaut ?? k.detail,
-            thread: kennung.map { "\($0)-\(k.e)" } ?? "\(k.e)",
-            pfad: k.pfad ?? "/einsaetze/\(k.e)",
+            thread: kennung.map { "\($0)-\(gruppe)" } ?? gruppe,
+            pfad: k.pfad ?? k.e.map { "/einsaetze/\($0)" } ?? "/admin/einstellungen/anbindungen",
             einsatzId: k.e)
     }
 }

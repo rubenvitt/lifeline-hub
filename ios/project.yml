@@ -56,6 +56,10 @@ targets:
       # (frontend/src/huelle/iosVorwaermen.test.ts), die App per `callAsyncJavaScript`.
       - path: App/Huelle/vorwaermen.js
         buildPhase: resources
+      # Sperrt den Standort in Unterframes (LLH-2071); Vitest führt es aus
+      # (frontend/src/huelle/iosUnterframe.test.ts), die App als WKUserScript in jedem Frame.
+      - path: App/Huelle/unterframe-standort.js
+        buildPhase: resources
       # Privacy-Manifest (Required-Reason-APIs) liegt an der Wurzel des App-Bündels.
       - path: App/PrivacyInfo.xcprivacy
         buildPhase: resources
@@ -87,6 +91,8 @@ targets:
         LSRequiresIPhoneOS: true
         NSCameraUsageDescription: Die Kamera liest den QR-Code mit der Adresse des Einsatzservers.
         NSLocalNetworkUsageDescription: Lifeline verbindet sich mit dem Einsatzserver im lokalen Netz, etwa mit elw.local.
+        # Standort nur im Vordergrund (LLH-2071): kein Always, kein UIBackgroundModes location.
+        NSLocationWhenInUseUsageDescription: Lifeline zeigt deinen Standort auf der Lagekarte und übernimmt ihn auf Wunsch in Ortsfelder. Er bleibt auf dem Gerät, bis du ihn selbst speicherst.
         CFBundleURLTypes:
           - CFBundleURLName: dev.rubeen.lifeline.ios
             CFBundleURLSchemes:

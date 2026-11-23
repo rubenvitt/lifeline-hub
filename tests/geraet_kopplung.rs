@@ -1769,13 +1769,13 @@ async fn geraet_erreicht_den_kachel_proxy() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            "/api/karte/proxy/999/raster/64/0/0",
+            "/api/map/proxy/999/raster/64/0/0",
             geraet,
             None,
         )
         .await;
         assert_eq!(s, StatusCode::NO_CONTENT);
-        let (s, _) = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", geraet, None).await;
+        let (s, _) = anfrage(&app, "GET", "/api/map/proxy/999/style.json", geraet, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
     }
 }

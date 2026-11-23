@@ -100,7 +100,7 @@ fn angaben(z: &EinwurfZugang) -> Option<ZugangsAngaben> {
     })
 }
 
-/// GET /api/admin/einwurf-zugaenge — alle Einwurf-Zugänge der eigenen Org, widerrufene
+/// GET /api/admin/intake-credentials — alle Einwurf-Zugänge der eigenen Org, widerrufene
 /// eingeschlossen.
 pub async fn liste(
     State(state): State<AppState>,
@@ -124,7 +124,7 @@ pub async fn liste(
     }))
 }
 
-/// POST /api/admin/einwurf-zugaenge — legt einen Zugang an und gibt seinen Schlüssel aus.
+/// POST /api/admin/intake-credentials — legt einen Zugang an und gibt seinen Schlüssel aus.
 /// Admin-Spur `einwurf_zugang_angelegt`.
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -176,7 +176,7 @@ pub async fn anlegen(
     ))
 }
 
-/// POST /api/admin/einwurf-zugaenge/{id}/schluessel — gibt dem Zugang einen neuen Schlüssel.
+/// POST /api/admin/intake-credentials/{id}/key — gibt dem Zugang einen neuen Schlüssel.
 /// Der alte gilt ab sofort nicht mehr. Ein widerrufener Zugang und der gekoppelte ELW: 409.
 /// Admin-Spur `einwurf_zugang_schluessel_gewechselt`.
 pub async fn schluessel_wechseln(
@@ -223,7 +223,7 @@ pub async fn schluessel_wechseln(
     }))
 }
 
-/// POST /api/admin/einwurf-zugaenge/{id}/widerrufen — wirkt sofort. Idempotent; die Admin-Spur
+/// POST /api/admin/intake-credentials/{id}/revoke — wirkt sofort. Idempotent; die Admin-Spur
 /// schreibt nur die Wirkung. Auch am gekoppelten ELW möglich.
 pub async fn widerrufen(
     State(state): State<AppState>,

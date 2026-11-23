@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 
 // Fixture-Basemap der Lagekarte ohne Netz und ohne Seed (LFH-356, LFH-558): `page.route`
-// beantwortet `/api/karte/config`, Style-JSON und Kacheln. `page.route` greift auch für die
+// beantwortet `/api/map/config`, Style-JSON und Kacheln. `page.route` greift auch für die
 // Anfragen des maplibre-Workers. VEKTOR, weil maplibre Raster-Kacheln auf dem Hauptthread lädt —
 // nur eine Vector-Source geht durch den Worker.
 //
@@ -80,10 +80,10 @@ export interface FixtureKartenConfig {
   }[];
 }
 
-/** `/api/karte/config` beantworten. Ohne Offline-Region ist die Offline-Grundlage gesperrt. */
+/** `/api/map/config` beantworten. Ohne Offline-Region ist die Offline-Grundlage gesperrt. */
 export async function kartenConfigBeantworten(page: Page, config: FixtureKartenConfig) {
   const regionen = config.offline_regionen ?? [];
-  await page.route('**/api/karte/config', (route: Route) =>
+  await page.route('**/api/map/config', (route: Route) =>
     route.fulfill({
       json: {
         karten_bau_verfuegbar: false,

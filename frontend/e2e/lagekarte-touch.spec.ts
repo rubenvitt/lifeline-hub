@@ -1005,7 +1005,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
     );
     // Hermetisch: die KRITIS-Ebene liefert vier Objekte an EINER Stelle — ein Bündel.
     let buendelOrt: [number, number] | null = null;
-    await page.route('**/api/karte/fachebenen/kritis**', (route) =>
+    await page.route('**/api/map/overlays/kritis**', (route) =>
       route.fulfill({
         json: {
           quelle: 'kritis',
@@ -1520,7 +1520,7 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     );
     // Hermetisch: eine DWD-Warnfläche über der Osthälfte der Zone.
     const [lng, lat] = EINZEL;
-    await page.route('**/api/karte/fachebenen/dwd**', (route) =>
+    await page.route('**/api/map/overlays/dwd**', (route) =>
       route.fulfill({
         json: {
           quelle: 'dwd',

@@ -18,6 +18,7 @@ const kennungSkript = liesSkript('src-tauri/src/kennung.js');
 const benachrichtigungSkript = liesSkript('src-tauri/src/benachrichtigung.js');
 const faehigkeitenSkript = liesSkript('src-tauri/src/faehigkeiten.js');
 const iosSkript = liesSkript('ios/App/Huelle/huelle.js');
+const iosUnterframeSkript = liesSkript('ios/App/Huelle/unterframe-standort.js');
 const androidSkript = liesSkript('android/app/src/main/assets/huelle.js');
 
 /** Der Platzhalter, den beide Hüllen (iOS und Android) beim Einspielen durch ihre volle Version ersetzen. */
@@ -141,6 +142,25 @@ export function antworteIosHuelle(id: number, fehler: string | null, wert?: unkn
   antwort(id, fehler, wert);
 }
 
+/** Rückkanal der iOS-Hülle für laufende Standort-Beobachtungen (LLH-2071). */
+type IosStandort = (id: number, fehler: string | null, position: unknown) => void;
+
+/** Meldet als iOS-Hülle eine Position (oder einen Fehler) an die Beobachtung `id`. */
+export function meldeIosStandort(id: number, fehler: string | null, position: unknown = null) {
+  const melde = (window as unknown as { __LIFELINE_LOCATION__?: IosStandort })
+    .__LIFELINE_LOCATION__;
+  if (typeof melde !== 'function') throw new Error('Kein Standort-Rückkanal der iOS-Hülle');
+  melde(id, fehler, position);
+}
+
+/**
+ * Führt `ios/App/Huelle/unterframe-standort.js` aus, wie die Hülle es in jedem Frame tut, mit
+ * einem eigenen `window` und `navigator` (jsdom kennt keine Unterframes).
+ */
+export function starteIosUnterframe(fenster: object, navigator: object) {
+  new Function('window', 'navigator', iosUnterframeSkript)(fenster, navigator);
+}
+
 /** Stub des Objekts `window.lifeline`, das `addWebMessageListener` der Android-Hülle einhängt. */
 export interface AndroidBruecke {
   postMessage: (text: string) => void;
@@ -190,5 +210,8 @@ export function beendeHuelle() {
   delete (window as unknown as { __TAURI_INTERNALS__?: HuellenIpc }).__TAURI_INTERNALS__;
   delete (window as unknown as { webkit?: unknown }).webkit;
   delete (window as unknown as { __LIFELINE_REPLY__?: unknown }).__LIFELINE_REPLY__;
+  delete (window as unknown as { __LIFELINE_LOCATION__?: unknown }).__LIFELINE_LOCATION__;
+  // Der Polyfill der iOS-Hülle liegt als eigene Eigenschaft auf `navigator` (LLH-2071).
+  delete (navigator as unknown as { geolocation?: unknown }).geolocation;
   window.print = originalPrint;
 }

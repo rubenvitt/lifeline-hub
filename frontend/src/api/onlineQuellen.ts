@@ -3,7 +3,7 @@ import type { OnlineStyle, OnlineStyleTyp } from './karte';
 import type { components } from './types.generated';
 
 /**
- * Frontend-Seam für die Online-Basemap-Quellen (`/api/karte/online-quellen`); Komponenten
+ * Frontend-Seam für die Online-Basemap-Quellen (`/api/map/online-sources`); Komponenten
  * importieren ausschließlich von hier. `OnlineQuelle` ist ein Re-Export des generierten Schemas,
  * `OnlineQuelleBody` bleibt als Eingabe-DTO handgepflegt.
  */
@@ -31,25 +31,25 @@ export interface OnlineQuelleBody {
 }
 
 export function listeOnlineQuellen(): Promise<OnlineQuelle[]> {
-  return apiGet<OnlineQuelle[]>('/api/karte/online-quellen');
+  return apiGet<OnlineQuelle[]>('/api/map/online-sources');
 }
 
 export function legeOnlineQuelleAn(body: OnlineQuelleBody): Promise<OnlineQuelle> {
-  return apiSend<OnlineQuelle>('/api/karte/online-quellen', 'POST', body);
+  return apiSend<OnlineQuelle>('/api/map/online-sources', 'POST', body);
 }
 
 export function aktualisiereOnlineQuelle(
   id: number,
   body: OnlineQuelleBody,
 ): Promise<OnlineQuelle> {
-  return apiSend<OnlineQuelle>(`/api/karte/online-quellen/${id}`, 'PATCH', body);
+  return apiSend<OnlineQuelle>(`/api/map/online-sources/${id}`, 'PATCH', body);
 }
 
 export function loescheOnlineQuelle(id: number): Promise<void> {
-  return apiSend<void>(`/api/karte/online-quellen/${id}`, 'DELETE');
+  return apiSend<void>(`/api/map/online-sources/${id}`, 'DELETE');
 }
 
 /** Server-autoritativer Vorschlagskatalog (kuratierte Styles, ohne id/sortier/aktiv). */
 export function ladeOnlineQuellenKatalog(): Promise<OnlineStyle[]> {
-  return apiGet<OnlineStyle[]>('/api/karte/online-quellen/katalog');
+  return apiGet<OnlineStyle[]>('/api/map/online-sources/catalog');
 }
