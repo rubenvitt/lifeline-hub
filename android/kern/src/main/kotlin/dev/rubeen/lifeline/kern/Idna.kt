@@ -10,16 +10,35 @@ import java.text.Normalizer
  * Gleiches Ergebnis wie das Rust-Crate `url` der Desktop-Hülle (URL-Standard, UTS 46
  * nicht-transitional) für die gemeinsamen Fälle (`src-tauri/faelle/adresse.json`): Faltung über
  * NFKC und Kleinschreibung, `ß` und `ς` bleiben (`java.net.IDN` machte nach IDNA 2003 `ss` und `σ`
- * daraus), Punkt-Varianten trennen Labels, unsichtbare Verbinder werden abgelehnt. ICU fehlt dem
+ * daraus), Punkt-Varianten trennen Labels, unsichtbare Füllzeichen fallen weg, Verbinder und im
+ * Host verbotene Zeichen werden abgelehnt. Nicht nachgebildet sind die Bidi-Regel, die Regel für
+ * ein Kombinationszeichen am Labelanfang und der Kontext, in dem UTS 46 einen Verbinder erlaubt:
+ * solche Hosts nimmt der Kern an oder lehnt sie ab, wo `url` es umgekehrt hielte. Das ist kein
+ * Loch, denn der WebView lädt genau die Adresse, die der Kern speichert. ICU fehlt dem
  * Kern (kein SDK), deshalb der Punycode-Kodierer nach RFC 3492 hier. Der iOS-Kern braucht keinen:
  * dort liefert Foundation den Host so (`URLComponents.encodedHost`).
  */
 internal object Idna {
     /** Zero-Width-Non-Joiner und -Joiner: der URL-Standard lehnt sie hier ab (CheckJoiners). */
-    private val verbinder = setOf('‌', '‍')
+    private val verbinder = setOf('\u200c', '\u200d')
+
+    /**
+     * Zeichen, die UTS 46 ersatzlos entfernt („ignored“): weiches Trennzeichen, Combining Grapheme
+     * Joiner, mongolische Variantenwähler, Zero-Width-Space, Word Joiner, Invisible Plus,
+     * Variantenwähler und Byte Order Mark. Sie kommen beim Einfügen aus anderen Programmen mit.
+     */
+    private val fuellzeichen = Regex("[\u00ad\u034f\u180b-\u180f\u200b\u2060\u2064\ufe00-\ufe0f\ufeff]")
+
+    /**
+     * Im Host verboten (URL-Standard, „forbidden domain code point“), geprüft **nach** der Faltung:
+     * NFKC macht aus `：`, `＠` und `／` erst hier `:`, `@` und `/`, also nachdem `Adresse.kt` Port
+     * und Zugangsdaten abgetrennt hat. Ohne diese Prüfung umginge
+     * `https://elw.local：8443＠evil.example` die Sperre für Zugangsdaten (Review LLH-2070).
+     */
+    private val verboten = Regex("[\\u0000-\\u0020#%/:<>?@\\[\\\\\\]^|\\u007f\\p{Cc}]")
 
     /** Der ideografische Punkt trennt Labels wie `.`; NFKC bildet `．` und `｡` auf ihn oder `.` ab. */
-    private const val IDEOGRAFISCHER_PUNKT = '。'
+    private const val IDEOGRAFISCHER_PUNKT = '\u3002'
 
     /**
      * Wandelt einen Host in seine ASCII-Form; ein reiner ASCII-Host wird nur klein. `null`, wenn
@@ -28,7 +47,8 @@ internal object Idna {
     fun toAscii(host: String): String? {
         if (host.all { it.code < 0x80 }) return host.lowercase()
         if (host.any { it in verbinder }) return null
-        val gefaltet = fold(host).replace(IDEOGRAFISCHER_PUNKT, '.')
+        val gefaltet = fold(host.replace(fuellzeichen, "")).replace(IDEOGRAFISCHER_PUNKT, '.')
+        if (verboten.containsMatchIn(gefaltet)) return null
         val labels = gefaltet.split('.').map { label ->
             if (label.all { it.code < 0x80 }) label else "xn--" + (punycode(label) ?: return null)
         }
