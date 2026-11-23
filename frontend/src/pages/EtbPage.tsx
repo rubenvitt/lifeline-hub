@@ -23,6 +23,7 @@ import {
   erteileAuftragAusEtb,
   ladeEtbZaehler,
   listeEtb,
+  SEITENGROESSE,
   type EtbFilterWerte,
   type NeuerEintrag,
 } from '../api/etb';
@@ -82,13 +83,13 @@ import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { abgelehntSchluessel, baueZeilen } from '../etb/etbZeile';
+import { ETB_CURSOR, etbSeitenAbfrage, sprungRichtung } from '../etb/seitenfenster';
 import {
-  ETB_MAX_SEITEN,
-  naechsterSeitenParam,
-  sprungRichtung,
-  vorigerSeitenParam,
-  type EtbSeitenParam,
-} from '../etb/seitenfenster';
+  fensterOptionen,
+  useKopfAnnehmen,
+  type FensterParam,
+} from '../components/fensterBeideRichtungen';
+import { zumKopf as fensterZumKopf } from '../components/listenFenster';
 import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -273,23 +274,19 @@ export default function EtbPage() {
   const einheiten = einheitenFrei ? einheitenQuery.data : undefined;
 
   /**
-   * Seitenfenster (LFH-947, `etb/seitenfenster.ts`): höchstens `ETB_MAX_SEITEN` Seiten, in beide
+   * Seitenfenster (LFH-947, `etb/seitenfenster.ts`; seit LLH-2036 über
+   * `components/fensterBeideRichtungen.ts`): höchstens `FENSTER_MAX_SEITEN` Seiten, in beide
    * Richtungen blätterbar. Ein Live-Ereignis lädt damit höchstens so viele Seiten neu, wie im
-   * Fenster liegen — nicht so viele, wie je geblättert wurde.
+   * Fenster liegen — nicht so viele, wie je geblättert wurde. Eine nicht volle `neuer`-Seite vorn
+   * wird zum Kopf (`useKopfAnnehmen`), damit das nächste Neuladen die neuesten Einträge liest.
    */
+  const etbListenSchluessel = einsatzKeys.etbListe(einsatzId, filter);
   const etbQuery = useInfiniteQuery({
-    queryKey: einsatzKeys.etbListe(einsatzId, filter),
-    queryFn: ({ pageParam }) =>
-      listeEtb(einsatzId, {
-        ...filter,
-        before_lfd_nr: pageParam && 'aelter' in pageParam ? pageParam.aelter : undefined,
-        after_lfd_nr: pageParam && 'neuer' in pageParam ? pageParam.neuer : undefined,
-      }),
-    initialPageParam: undefined as EtbSeitenParam,
-    maxPages: ETB_MAX_SEITEN,
-    getNextPageParam: (letzte, _alle, param) => naechsterSeitenParam(letzte, param),
-    getPreviousPageParam: (erste, _alle, param) => vorigerSeitenParam(erste, param),
+    queryKey: etbListenSchluessel,
+    queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, ...etbSeitenAbfrage(pageParam) }),
+    ...fensterOptionen(ETB_CURSOR, SEITENGROESSE),
   });
+  useKopfAnnehmen(etbListenSchluessel, etbQuery.data, SEITENGROESSE);
 
   /*
    * Exakte Zählungen (LFH-612, Spec `etb-zaehler`, kwc2yszv D7), alle unter dem `etb`-Präfix, das
@@ -758,22 +755,15 @@ export default function EtbPage() {
   /**
    * Steht das Fenster tief im Tagebuch, läge der eigene neue Eintrag außerhalb (LFH-947): das
    * Neuladen nach dem Senden beginnt bei der ersten gehaltenen Seite. Die Seite holt deshalb den
-   * Kopf und ersetzt das Fenster durch ihn. Scheitert der Abruf, bleibt das Fenster, wie es ist —
-   * kein `resetQueries`, das ließe bei schlechtem Netz eine leere Zeitachse zurück.
+   * Kopf und ersetzt das Fenster durch ihn (`zumKopf` in `components/listenFenster.ts`, LLH-2036):
+   * Scheitert der Abruf, bleibt das Fenster, wie es ist — kein `resetQueries`, das ließe bei
+   * schlechtem Netz eine leere Zeitachse zurück. Kam während des Abrufs ein Live-Ereignis, wird der
+   * Kopf noch einmal geholt.
    */
   async function zumKopf() {
-    const schluessel = einsatzKeys.etbListe(einsatzId, filter);
-    let kopf: EtbEintragAnzeige[];
-    try {
-      kopf = await listeEtb(einsatzId, filter);
-    } catch {
-      return;
-    }
-    await qc.cancelQueries({ queryKey: schluessel, exact: true });
-    qc.setQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel, {
-      pages: [kopf],
-      pageParams: [undefined],
-    });
+    await fensterZumKopf(qc, einsatzKeys.etbListe(einsatzId, filter), () =>
+      listeEtb(einsatzId, filter),
+    );
   }
 
   /**
@@ -806,7 +796,8 @@ export default function EtbPage() {
     // Scheitert das Nachladen, liegt nur der alte Stand vor: dort fehlte auch ein passender
     // Eintrag. Ohne Antwort des Servers wird nichts behauptet.
     if (qc.getQueryState(schluessel)?.status === 'error') return;
-    const daten = qc.getQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel);
+    const daten =
+      qc.getQueryData<InfiniteData<EtbEintragAnzeige[], FensterParam<number>>>(schluessel);
     const da = daten?.pages[0]?.some((x) => x.id === angenommen.id) ?? false;
     if (!da) setAusserhalb({ id: angenommen.id, lfd_nr: angenommen.lfd_nr, fuer: filterText });
   }
