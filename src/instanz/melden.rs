@@ -258,6 +258,11 @@ pub fn normalize_adresse(eingabe: &str) -> Result<String, AppError> {
     Ok(basis)
 }
 
+/// Text, wenn das Gegenüber einen Weg der Kopplung nicht kennt (unsigniertes 404): Es hat einen
+/// anderen Softwarestand, etwa vor oder nach den englischen Routen (LLH-2053).
+pub const ANDERER_STAND: &str = "Die andere Instanz kennt diesen Weg nicht, vermutlich hat sie \
+     einen anderen Softwarestand. Beide Instanzen auf denselben Stand bringen.";
+
 /// Warum eine Nachricht an das Gegenüber scheiterte.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError {
@@ -556,6 +561,9 @@ async fn send_signed_mit<A: Serialize, T: DeserializeOwned>(
             .unwrap_or_default();
         return Err(if (200..300).contains(&status) {
             SendError::AntwortUngueltig("ohne Signatur".into())
+        } else if status == 404 && pfad == MELDEN_PFAD {
+            // Melden kennt jeder Stand, ein 404 heißt also: anderer Weg, anderer Stand.
+            SendError::Abgelehnt(status, ANDERER_STAND.into())
         } else {
             SendError::Abgelehnt(status, text)
         });

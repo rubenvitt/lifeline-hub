@@ -769,6 +769,14 @@ async fn send_einloesen_mit(
             )
             .into())
         }
+        404 => {
+            return Err(AppError::BadGateway(format!(
+                "Die Instanz unter {adresse} kennt den Weg zum Koppeln nicht. Ist dort eine Instanz \
+                 mit einem anderen Softwarestand, beide auf denselben Stand bringen; sonst die \
+                 Adresse prüfen."
+            ))
+            .into())
+        }
         s => return Err(EinloesenFehler::Netz(format!("Antwort {s}"))),
     }
     let nicht_vertrauenswuerdig = |grund: &str| {

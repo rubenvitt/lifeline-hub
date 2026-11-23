@@ -885,6 +885,72 @@ async fn ausfall_des_gegenuebers_steht_an_der_kopplung() {
     assert_eq!(k["zustand"], "aktiv");
 }
 
+/// Eine Instanz eines Stands, der die Wege der Kopplung anders nennt (LLH-2053): jede API-Route
+/// ist ihr unbekannt und antwortet wie der Fallback mit unsigniertem 404.
+async fn fremder_stand() -> String {
+    let router = axum::Router::new().fallback(|| async {
+        (
+            StatusCode::NOT_FOUND,
+            axum::Json(json!({"error": "Nicht gefunden"})),
+        )
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let adresse = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    adresse
+}
+
+/// Seit LLH-2053 heißen die Wege englisch, und das Protokoll sprang von 4 auf 6: Ein Gegenüber,
+/// das zuletzt 4 meldete, liegt außerhalb des Fensters, und die Seite sagt das ohne Netz.
+#[tokio::test]
+async fn ein_gegenueber_mit_protokoll_4_braucht_ein_update() {
+    let (hub, _elw) = gekoppelt().await;
+    sqlx::query("UPDATE instanz_kopplung SET gegenueber_protokoll = 4")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        uebersicht(&hub).await["kopplungen"][0]["protokoll"],
+        "update_gegenueber"
+    );
+}
+
+#[tokio::test]
+async fn melden_an_einen_anderen_stand_nennt_den_softwarestand() {
+    let (_hub, elw) = gekoppelt().await;
+    sqlx::query("UPDATE instanz_kopplung SET gegenueber_adresse = ?")
+        .bind(fremder_stand().await)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let k = &uebersicht(&elw).await["kopplungen"][0];
+    assert!(
+        k["letzter_fehler"]
+            .as_str()
+            .unwrap()
+            .contains("anderen Softwarestand"),
+        "{k}"
+    );
+}
+
+#[tokio::test]
+async fn einloesen_an_einem_anderen_stand_nennt_den_softwarestand() {
+    let hub = instanz().await;
+    let elw = instanz().await;
+    schluessel(&hub, &SoftwarePasskey::new("a", [1u8; 32]), "Stick A").await;
+    let c = code(&hub).await;
+    let (s, v) = einloesen(&elw, &fremder_stand().await, &c).await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY, "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("anderen Softwarestand"),
+        "{v}"
+    );
+}
+
 #[tokio::test]
 async fn instanz_ohne_kopplung_meldet_nichts() {
     let i = instanz().await;
