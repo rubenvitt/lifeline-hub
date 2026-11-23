@@ -486,12 +486,15 @@ Herleitung in
 
 - **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
   und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener
-  Token-Vergleich. Nur `POST /api/instanz/koppeln` ist öffentlich (IP-Sperre, einheitlich 401).
+  Token-Vergleich. Nur `POST /api/instance/pair` ist öffentlich (IP-Sperre, einheitlich 401).
 - **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
   meldet sich; die erreichte Seite baut nie eine Verbindung auf.
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
   kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
-  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv. Einzige Ausnahme ist der Sprung
+  4 → 6 mit den englischen Wegen (LLH-2053, harter Schnitt in der Alpha, ADR-0085): Zwischen 4
+  und 6 geht auch Melden nicht; ein unsigniertes 404 beim Melden oder Einlösen heißt „anderer
+  Softwarestand“ (`melden::deute_unsigniert`, `routes::instanz`). Ab 1.0.0 bleibt ein umbenannter Weg als Alias erreichbar.
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
   haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
   gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein
@@ -688,7 +691,7 @@ Herleitung in
     ohne Gegenzeichnung (`GegenzeichnungPflicht::NurBestaetigung`); dort wartet jeder auf einen
     Admin. Ein Widerruf gilt je Credential-ID für jede Zeile der Org.
   - **Über `vor_ort` gehen Nutzdaten nur über `zertifikat::client(pin)`**; ein Zertifikatswechsel
-    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instanz/zertifikat`). Kein
+    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instance/certificate`). Kein
     eigener Client für eine Direktkopplung.
   - **„Übersetzt über die Herkunft“ heißt `spiegel::abgleich::uebersetzt`** (meldende Seite einer
     Standardkopplung), nicht `richtung == MeldetSich`. Ein neuer Verweis auf Stammdaten in einer
@@ -966,7 +969,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `SPERRE_GILT_STUNDEN` (24 h) nichts senden; danach versucht der nächste Versand es einmal mit
   demselben Zugang (angenommen: Sperre weg, wieder `403`: erneuert). Solange sie steht, meldet
   `GET /api/ios-push` `relais_gesperrt` (die Oberfläche zeigt statt des Schalters den Hinweis) und
-  `GET /api/admin/instanz` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
+  `GET /api/admin/instance` `ios_push_relais_gesperrt_seit` (Warnung auf „Instanzkopplung“).
 - **Eine fremde Kennung übernimmt nur dasselbe Gerät:** gehört sie mit anderem Token einem
   anderen Konto, ersetzt `PUT` sie nur mit demselben Schlüssel, sonst 422 (`repo::anmelden`).
 - **Lebensdauer der Anmeldung** (Upsert auf `token`, eine Zeile je Gerät): sie endet

@@ -749,7 +749,10 @@ oder Schwärzen des Einsatzes ist die Liste leer.
 ### Hinweise an einer Kopplung
 
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst
-nichts. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
+nichts. Liegt eine Seite noch vor der Umstellung der Schnittstelle (Ende November 2026),
+erreichen sich die Installationen gar nicht mehr, auch nicht zum Melden: An der Kopplung steht dann „Die andere Instanz kennt diesen Weg nicht, vermutlich hat sie
+einen anderen Softwarestand“, beim Einlösen eines Codes „… kennt den Weg zum Koppeln nicht“. Dann
+beide Installationen auf denselben Stand bringen. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
 Installationen einander ab.
 
 Nach dem Zurückspielen einer Sicherung zeigt die Kopplung meist „… hat schon spätere Führungsakten

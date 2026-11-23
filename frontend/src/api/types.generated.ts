@@ -4755,7 +4755,7 @@ export interface components {
          * @enum {string}
          */
         InstanzKopplungZustand: "angebahnt" | "aktiv" | "widerrufen" | "vom_gegenueber_widerrufen";
-        /** @description Antwort von `GET /api/admin/instanz/lan`. */
+        /** @description Antwort von `GET /api/admin/instance/lan`. */
         InstanzLanAntwort: {
             /** @description Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`). */
             aus: boolean;

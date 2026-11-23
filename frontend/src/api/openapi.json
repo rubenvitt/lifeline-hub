@@ -11903,7 +11903,7 @@
       },
       "InstanzLanAntwort": {
         "type": "object",
-        "description": "Antwort von `GET /api/admin/instanz/lan`.",
+        "description": "Antwort von `GET /api/admin/instance/lan`.",
         "required": [
           "aus",
           "gefunden"

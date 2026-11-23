@@ -82,7 +82,7 @@ async fn gekoppelt_mit(hub_an: bool, elw_an: bool) -> (Instanz, Instanz) {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -91,7 +91,7 @@ async fn gekoppelt_mit(hub_an: bool, elw_an: bool) -> (Instanz, Instanz) {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
@@ -131,7 +131,7 @@ async fn fuehrung(i: &Instanz, einsatz: i64) -> Value {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fuehrung"),
+        &format!("/api/einsaetze/{einsatz}/command"),
         &i.admin,
         None,
     )
@@ -143,7 +143,7 @@ async fn fuehrung(i: &Instanz, einsatz: i64) -> Value {
 /// Die Akten des Gegenübers an einer Instanz (Seite „Instanzkopplung“).
 async fn fremde(i: &Instanz) -> Vec<Value> {
     let (s, v) =
-        common::anfrage(&i.app, "GET", "/api/admin/instanz/fuehrung", &i.admin, None).await;
+        common::anfrage(&i.app, "GET", "/api/admin/instance/command", &i.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v.as_array().unwrap().clone()
 }
@@ -238,7 +238,7 @@ async fn elw_einsatz(hub: &Instanz, elw: &Instanz) -> (i64, i64) {
 async fn hub_uebernimmt_mit_unterschrift(hub: &Instanz, akte: i64, grund: &str) -> Value {
     let (s, start) = post(
         hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/start"),
         json!({"grund": grund}),
     )
     .await;
@@ -246,7 +246,7 @@ async fn hub_uebernimmt_mit_unterschrift(hub: &Instanz, akte: i64, grund: &str) 
     let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
     let (s, v) = post(
         hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/abschluss"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/finish"),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -268,7 +268,7 @@ async fn ohne_schalter_fliesst_nichts_und_die_routen_sind_404() {
     let (s, _) = common::anfrage(
         &elw.app,
         "GET",
-        &format!("/api/einsaetze/{e}/fuehrung"),
+        &format!("/api/einsaetze/{e}/command"),
         &elw.admin,
         None,
     )
@@ -276,7 +276,7 @@ async fn ohne_schalter_fliesst_nichts_und_die_routen_sind_404() {
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -321,7 +321,7 @@ async fn ohne_schalter_sind_die_akten_des_gegenuebers_404() {
     let (s, v) = common::anfrage(
         &elw.app,
         "GET",
-        "/api/admin/instanz/fuehrung",
+        "/api/admin/instance/command",
         &elw.admin,
         None,
     )
@@ -329,7 +329,7 @@ async fn ohne_schalter_sind_die_akten_des_gegenuebers_404() {
     assert_eq!(s, StatusCode::NOT_FOUND, "Liste: {v}");
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        &format!("/api/admin/instance/command/{akte}/request"),
         json!({}),
     )
     .await;
@@ -403,7 +403,7 @@ async fn elw_uebergibt_zur_verwahrung_und_schreibt_danach_nicht_mehr() {
     assert!(s.is_success(), "{s}");
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -422,7 +422,7 @@ async fn elw_uebergibt_zur_verwahrung_und_schreibt_danach_nicht_mehr() {
     abgleichen(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -444,7 +444,7 @@ async fn nach_uebergabe_ist_schreiben_409_und_lesen_bleibt() {
     let (e, _) = elw_einsatz(&hub, &elw).await;
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -471,7 +471,7 @@ async fn nach_uebergabe_ist_schreiben_409_und_lesen_bleibt() {
     // Übergeben kann nur, wer führt.
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -487,7 +487,7 @@ async fn fuehrungspersonal_bedient_die_fuehrung_nicht() {
     let (s, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         &cookie,
         Some(&json!({"an": hub.kennung})),
     )
@@ -496,7 +496,7 @@ async fn fuehrungspersonal_bedient_die_fuehrung_nicht() {
     let (s, _) = common::anfrage(
         &elw.app,
         "GET",
-        &format!("/api/einsaetze/{e}/fuehrung"),
+        &format!("/api/einsaetze/{e}/command"),
         &cookie,
         None,
     )
@@ -546,7 +546,7 @@ async fn lagemonitor(i: &Instanz, einsatz: i64) -> String {
 async fn den_verlauf_lesen_personen_aber_keine_geraete() {
     let (_hub, elw) = gekoppelt().await;
     let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
-    let pfad = format!("/api/einsaetze/{e}/fuehrung");
+    let pfad = format!("/api/einsaetze/{e}/command");
 
     let geraet = lagemonitor(&elw, e).await;
     let (s, _) = common::anfrage(
@@ -582,7 +582,7 @@ async fn unterschrift_der_einsatzleitung_ohne_admin_rolle_ist_403() {
     let (s, v) = common::anfrage(
         &elw.app,
         "GET",
-        &format!("/api/einsaetze/{e}/fuehrung"),
+        &format!("/api/einsaetze/{e}/command"),
         &leitung,
         None,
     )
@@ -591,7 +591,7 @@ async fn unterschrift_der_einsatzleitung_ohne_admin_rolle_ist_403() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/fuehrung/notuebernahme/start"),
+        &format!("/api/einsaetze/{e}/command/emergency-takeover/start"),
         &leitung,
         Some(&json!({"grund": "ohne Verbindung"})),
     )
@@ -689,14 +689,14 @@ async fn unterschrift_eines_admins_einer_anderen_org_ist_403() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/code"),
+        &format!("/api/einsaetze/{spiegel}/command/emergency-takeover/code"),
         &fremd,
         Some(&json!({"grund": "ohne Verbindung", "code": "kaputt"})),
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 
-    let start = format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/start");
+    let start = format!("/api/einsaetze/{spiegel}/command/emergency-takeover/start");
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
@@ -721,7 +721,7 @@ async fn abschluss_der_unterschrift_ohne_admin_rolle_ist_403() {
     let (_, akte) = elw_einsatz(&hub, &elw).await;
     let spiegel = einsatz_der_akte(&hub, akte).await;
     einsatzleitung_am_spiegel(&hub, spiegel, 1).await;
-    let pfad = format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme");
+    let pfad = format!("/api/einsaetze/{spiegel}/command/emergency-takeover");
     let (s, start) = post(
         &hub,
         &format!("{pfad}/start"),
@@ -737,7 +737,7 @@ async fn abschluss_der_unterschrift_ohne_admin_rolle_ist_403() {
         .unwrap();
     let (s, v) = post(
         &hub,
-        &format!("{pfad}/abschluss"),
+        &format!("{pfad}/finish"),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -756,7 +756,7 @@ async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     assert_eq!(fremde(&elw).await[0]["fuehrer_kennung"], hub.kennung);
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        &format!("/api/admin/instance/command/{akte}/request"),
         json!({}),
     )
     .await;
@@ -802,18 +802,13 @@ async fn anfrage_nur_von_einem_admin_der_org() {
     let (s, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        &format!("/api/admin/instance/command/{akte}/request"),
         &cookie,
         Some(&json!({})),
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _) = post(
-        &elw,
-        "/api/admin/instanz/fuehrung/99999/anfragen",
-        json!({}),
-    )
-    .await;
+    let (s, _) = post(&elw, "/api/admin/instance/command/99999/request", json!({})).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -843,18 +838,18 @@ async fn akte_einer_anderen_org_ist_404() {
     let (s, v) = common::anfrage(
         &elw.app,
         "GET",
-        "/api/admin/instanz/fuehrung",
+        "/api/admin/instance/command",
         &cookie,
         None,
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v, json!([]), "die Liste der fremden Org bleibt leer");
-    for pfad in ["anfragen", "notuebernahme"] {
+    for pfad in ["request", "emergency-takeover"] {
         let (s, v) = common::anfrage_json(
             &elw.app,
             "POST",
-            &format!("/api/admin/instanz/fuehrung/{akte}/{pfad}"),
+            &format!("/api/admin/instance/command/{akte}/{pfad}"),
             &cookie,
             Some(&json!({"grund": "Probe"})),
         )
@@ -904,22 +899,22 @@ async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
     anderer_einsatz_unter(&elw, akte, &neu).await;
 
     for (pfad, body) in [
-        ("uebergeben", json!({"an": hub.kennung})),
+        ("hand-over", json!({"an": hub.kennung})),
         ("code", json!({"an": hub.kennung})),
-        ("anfragen", json!({})),
-        ("notuebernahme", json!({"grund": "Funkausfall"})),
-        ("notuebernahme/start", json!({"grund": "Funkausfall"})),
+        ("request", json!({})),
+        ("emergency-takeover", json!({"grund": "Funkausfall"})),
+        ("emergency-takeover/start", json!({"grund": "Funkausfall"})),
         (
-            "notuebernahme/code",
+            "emergency-takeover/code",
             json!({"grund": "Funkausfall", "code": "AAAA"}),
         ),
-        ("bestaetigen", json!({})),
-        ("widersprechen", json!({})),
+        ("confirm", json!({})),
+        ("object", json!({})),
     ] {
         let (s, v) = post(
             &elw,
             &mit_kennung(
-                &format!("/api/admin/instanz/fuehrung/{akte}/{pfad}"),
+                &format!("/api/admin/instance/command/{akte}/{pfad}"),
                 &gezeigt,
             ),
             body,
@@ -936,10 +931,7 @@ async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
 
     let (s, v) = post(
         &elw,
-        &mit_kennung(
-            &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
-            &neu,
-        ),
+        &mit_kennung(&format!("/api/admin/instance/command/{akte}/request"), &neu),
         json!({}),
     )
     .await;
@@ -947,7 +939,7 @@ async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
     assert_eq!(v["anfrage_offen"], true);
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        &format!("/api/admin/instance/command/{akte}/request"),
         json!({}),
     )
     .await;
@@ -1062,7 +1054,7 @@ async fn unterschrift_fuer_einen_anderen_einsatz_unter_derselben_id_wird_abgeleh
     let (_, akte) = elw_einsatz(&hub, &elw).await;
     let (s, start) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/start"),
         json!({"grund": "Funkausfall"}),
     )
     .await;
@@ -1071,7 +1063,7 @@ async fn unterschrift_fuer_einen_anderen_einsatz_unter_derselben_id_wird_abgeleh
     let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/abschluss"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/finish"),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -1089,14 +1081,14 @@ async fn notuebernahme_gegen_den_hub_nimmt_er_ohne_rueckfrage_an() {
     let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
     let (s, _) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": " "}),
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Grund Pflicht");
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;
@@ -1214,7 +1206,7 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
 
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -1235,7 +1227,7 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     // Ohne offene Übernahme ist Bestätigen 409.
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -1331,7 +1323,7 @@ async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_e
     };
     let (s, start) = post(
         &hub,
-        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/start"),
+        &format!("/api/admin/instance/signing-keys/{id_b}/countersign/start"),
         json!({}),
     )
     .await;
@@ -1339,7 +1331,7 @@ async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_e
     let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/abschluss"),
+        &format!("/api/admin/instance/signing-keys/{id_b}/countersign/finish"),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -1351,7 +1343,7 @@ async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_e
             .unwrap();
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/unterschrift/{id_a}/widerrufen"),
+        &format!("/api/admin/instance/signing-keys/{id_a}/revoke"),
         json!({}),
     )
     .await;
@@ -1386,7 +1378,7 @@ async fn bestaetigen_mit_widerrufenem_schluessel_ist_409() {
         .unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -1405,7 +1397,7 @@ async fn widerspruch_heisst_rueckuebernahme() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e}/command/object"),
         json!({}),
     )
     .await;
@@ -1418,7 +1410,7 @@ async fn widerspruch_heisst_rueckuebernahme() {
     assert_eq!(a["fuehrer_kennung"], elw.kennung);
     assert_eq!(a["epoche"], 3);
     assert_eq!(a["art"], "widerspruch");
-    let (_, u) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let (_, u) = common::anfrage(&hub.app, "GET", "/api/admin/instance", &hub.admin, None).await;
     assert!(
         u["kopplungen"][0]["hinweis"]
             .as_str()
@@ -1452,7 +1444,7 @@ async fn bruchstelle_ist_die_letzte_meldung_vor_der_uebernahme() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -1476,7 +1468,7 @@ async fn offen_am_elw() -> (Instanz, Instanz, i64) {
 async fn bestaetigen_ist_409_geaendert(elw: &Instanz, e: i64) {
     let (s, v) = post(
         elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -1704,7 +1696,7 @@ async fn notuebernahme_ohne_eigenen_schluessel_und_ohne_code_ist_409() {
         .unwrap();
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/start"),
         json!({"grund": "Probe"}),
     )
     .await;
@@ -1713,7 +1705,7 @@ async fn notuebernahme_ohne_eigenen_schluessel_und_ohne_code_ist_409() {
     // Gegen die meldende Seite geht es nicht ohne Beweis.
     let (s, _) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Probe"}),
     )
     .await;
@@ -1725,7 +1717,7 @@ async fn notuebernahme_ohne_eigenen_schluessel_und_ohne_code_ist_409() {
 async fn code_am_elw(hub: &Instanz, elw: &Instanz, e: i64) -> String {
     let (s, v) = post(
         elw,
-        &format!("/api/einsaetze/{e}/fuehrung/code"),
+        &format!("/api/einsaetze/{e}/command/code"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -1752,7 +1744,7 @@ async fn abgabe_per_code_und_eingabe_am_hub() {
     assert!(gespeichert.is_some_and(|g| !g.contains(&code.replace('-', ""))));
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": code.to_lowercase()}),
     )
     .await;
@@ -1797,7 +1789,7 @@ async fn klemmender_meldeversuch_laesst_keine_uebernahme_ohne_spur() {
     code_am_elw(&hub, &elw, e).await;
     let (s, _) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": "ABCD-EFGH-JKMN-PQRS"}),
     )
     .await;
@@ -1845,21 +1837,21 @@ async fn falscher_code_wirft_die_fuehrung_an_den_elw_zurueck() {
     code_am_elw(&hub, &elw, e).await;
     let (s, _) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": "ABCD-EFGH-JKMN-PQRS"}),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "der Hub kann den Code nicht prüfen");
     let (s, _) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": "ABCD-EFGH-JKMN-PQRT"}),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "führt schon");
     let (s, _) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": "kurz"}),
     )
     .await;
@@ -1884,7 +1876,7 @@ async fn nach_zweitem_code(erster_gilt: bool) -> (Instanz, Instanz, i64) {
     let erster = code_am_elw(&hub, &elw, e).await;
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "vertippt", "code": "ABCD-EFGH-JKMN-PQRS"}),
     )
     .await;
@@ -1912,7 +1904,7 @@ async fn nach_zweitem_code(erster_gilt: bool) -> (Instanz, Instanz, i64) {
     let eingabe = if erster_gilt { erster } else { zweiter };
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": "per Funk", "code": eingabe}),
     )
     .await;
@@ -1959,7 +1951,7 @@ async fn weiterer_elw(hub: &Instanz) -> Instanz {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -1968,7 +1960,7 @@ async fn weiterer_elw(hub: &Instanz) -> Instanz {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
@@ -2004,7 +1996,7 @@ async fn akte_und_einsatz(elw: &Instanz) -> (i64, i64) {
 async fn notuebernahme_gegen_hub(elw: &Instanz, akte: i64) {
     let (s, v) = post(
         elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;
@@ -2017,7 +2009,7 @@ async fn notuebernahme_gegen_hub(elw: &Instanz, akte: i64) {
 async fn anfragen_und_melden(elw: &Instanz, akte: i64) {
     let (s, v) = post(
         elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        &format!("/api/admin/instance/command/{akte}/request"),
         json!({}),
     )
     .await;
@@ -2030,7 +2022,7 @@ async fn an_hub_zurueck(elw: &Instanz, hub: &Instanz, einsatz: i64) {
     abgleichen(elw).await;
     let (s, v) = post(
         elw,
-        &format!("/api/einsaetze/{einsatz}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{einsatz}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -2239,7 +2231,7 @@ async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahm
     let (s, v) = common::anfrage(
         &elw2.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &elw2.admin,
         None,
     )
@@ -2248,7 +2240,7 @@ async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahm
     let (s, v) = common::anfrage_json(
         &elw1.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw1.admin,
         Some(&json!({"adresse": elw2.adresse, "code": v["code"]})),
     )
@@ -2261,13 +2253,13 @@ async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahm
     );
     let (s, v) = post(
         &elw2,
-        &format!("/api/einsaetze/{e2}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e2}/command/object"),
         json!({}),
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     // Der Widerruf dieser zusätzlichen Kopplung räumt den Konflikt mit dem Hub nicht ab.
-    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instanz", &elw2.admin, None).await;
+    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instance", &elw2.admin, None).await;
     let k = u["kopplungen"]
         .as_array()
         .unwrap()
@@ -2278,7 +2270,7 @@ async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahm
         .unwrap();
     let (s, v) = post(
         &elw2,
-        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{k}/revoke"),
         json!({}),
     )
     .await;
@@ -2290,11 +2282,11 @@ async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahm
 async fn der_widerruf_der_kopplung_raeumt_den_konflikt_ab() {
     let (_hub, _elw1, elw2, _h, _e1, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
     assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
-    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instanz", &elw2.admin, None).await;
+    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instance", &elw2.admin, None).await;
     let id = u["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw2,
-        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{id}/revoke"),
         json!({}),
     )
     .await;
@@ -2360,7 +2352,7 @@ async fn widerspricht_die_elw_der_fuehrung_des_hubs_nimmt_er_ihre_naechste_epoch
     let (hub, b, h, e_b) = hub_fuehrt_mit_der_epoche_einer_anderen_elw().await;
     let (s, v) = post(
         &b,
-        &format!("/api/einsaetze/{e_b}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e_b}/command/object"),
         json!({}),
     )
     .await;
@@ -2377,7 +2369,7 @@ async fn bestaetigt_die_elw_die_fuehrung_des_hubs_wird_sie_spiegel() {
     let (hub, b, h, e_b) = hub_fuehrt_mit_der_epoche_einer_anderen_elw().await;
     let (s, v) = post(
         &b,
-        &format!("/api/einsaetze/{e_b}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e_b}/command/confirm"),
         json!({}),
     )
     .await;
@@ -2458,7 +2450,7 @@ async fn hub_holt_von_elw1_zurueck(
             schalter(&hub, true).await;
             let (s, v) = post(
                 &hub,
-                &format!("/api/einsaetze/{h}/fuehrung/zurueckholen"),
+                &format!("/api/einsaetze/{h}/command/reclaim"),
                 json!({"grund": "ELW 1 abgebaut"}),
             )
             .await;
@@ -2535,7 +2527,7 @@ async fn bestaetigt_elw_2_die_zurueckgeholte_fuehrung_des_hubs_wird_sie_spiegel(
     haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
     let (s, v) = post(
         &elw2,
-        &format!("/api/einsaetze/{e2}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e2}/command/confirm"),
         json!({}),
     )
     .await;
@@ -2563,7 +2555,7 @@ async fn widerspricht_elw_2_der_zurueckgeholten_fuehrung_nimmt_der_hub_ihre_naec
     haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
     let (s, v) = post(
         &elw2,
-        &format!("/api/einsaetze/{e2}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e2}/command/object"),
         json!({}),
     )
     .await;
@@ -2611,7 +2603,7 @@ async fn bestaetigen_des_konflikts_macht_die_unterlegene_elw_zum_spiegel() {
     elw_meldet(&z.gross).await;
     let (s, v) = post(
         &z.gross,
-        &format!("/api/einsaetze/{}/fuehrung/bestaetigen", z.e_gross),
+        &format!("/api/einsaetze/{}/command/confirm", z.e_gross),
         json!({}),
     )
     .await;
@@ -2664,7 +2656,7 @@ async fn widerspruch_gegen_den_dritten_ist_422() {
     elw_meldet(&z.klein).await;
     let (s, v) = post(
         &z.klein,
-        &format!("/api/einsaetze/{}/fuehrung/widersprechen", z.e_klein),
+        &format!("/api/einsaetze/{}/command/object", z.e_klein),
         json!({}),
     )
     .await;
@@ -2681,17 +2673,17 @@ async fn nach_dem_widerruf_holt_der_elw_seinen_einsatz_zurueck() {
     let (e, _) = elw_einsatz(&hub, &elw).await;
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
     assert_eq!(s, StatusCode::OK);
     ist_spiegel_mit_antraegen(&elw, e).await;
-    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instance", &elw.admin, None).await;
     let id = u["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{id}/revoke"),
         json!({}),
     )
     .await;
@@ -2731,7 +2723,7 @@ async fn ueberhoehte_epoche_wird_nicht_uebernommen() {
     // Die Kopplung lebt weiter: eine Übergabe geht noch durch.
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -2747,11 +2739,11 @@ async fn widerruf_raeumt_eine_offene_uebernahme() {
     hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
     elw_meldet(&elw).await;
     assert!(fuehrung(&elw, e).await["offen"].is_object());
-    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instance", &elw.admin, None).await;
     let id = u["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, _) = post(
         &elw,
-        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{id}/revoke"),
         json!({}),
     )
     .await;
@@ -2764,7 +2756,7 @@ async fn widerruf_raeumt_eine_offene_uebernahme() {
     assert_eq!(f["fuehrend"], true);
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -2779,7 +2771,7 @@ async fn zweiter_elw(hub: &Instanz) -> Instanz {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -2788,7 +2780,7 @@ async fn zweiter_elw(hub: &Instanz) -> Instanz {
     let (s, v) = common::anfrage_json(
         &elw2.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw2.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
@@ -2807,7 +2799,7 @@ async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
     let akte2 = fremde(&elw2).await[0]["id"].as_i64().unwrap();
     let (s, _) = post(
         &elw2,
-        &format!("/api/admin/instanz/fuehrung/{akte2}/anfragen"),
+        &format!("/api/admin/instance/command/{akte2}/request"),
         json!({}),
     )
     .await;
@@ -2853,7 +2845,7 @@ async fn ein_ueberholter_anfrage_merker_gibt_die_fuehrung_nicht_ab() {
     // ELW 1 fragt auf Epoche 1 an, meldet aber erst, als der Hub schon an ELW 2 gegeben hat.
     let (s, v) = post(
         &elw1,
-        &format!("/api/admin/instanz/fuehrung/{akte1}/anfragen"),
+        &format!("/api/admin/instance/command/{akte1}/request"),
         json!({}),
     )
     .await;
@@ -2861,7 +2853,7 @@ async fn ein_ueberholter_anfrage_merker_gibt_die_fuehrung_nicht_ab() {
     assert_eq!(v["anfrage_offen"], true);
     let (s, _) = post(
         &elw2,
-        &format!("/api/admin/instanz/fuehrung/{akte2}/anfragen"),
+        &format!("/api/admin/instance/command/{akte2}/request"),
         json!({}),
     )
     .await;
@@ -2875,7 +2867,7 @@ async fn ein_ueberholter_anfrage_merker_gibt_die_fuehrung_nicht_ab() {
     let e2 = einsatz_der_akte(&elw2, akte2).await;
     let (s, v) = post(
         &elw2,
-        &format!("/api/einsaetze/{e2}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e2}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -2979,7 +2971,7 @@ async fn nach_der_uebergabe_schreibt_der_hub_und_der_elw_stellt_antraege() {
     );
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3038,7 +3030,7 @@ async fn uebergabe_ohne_abgleich_ist_409() {
     assert_eq!(s, StatusCode::CREATED);
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3108,7 +3100,7 @@ async fn notuebernahme_am_hub_macht_den_spiegel_beschreibbar() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3169,7 +3161,7 @@ async fn meldung_nach_dem_bruch_verlaesst_den_spiegel() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3219,7 +3211,7 @@ async fn schwaerzung_beim_fuehrer_raeumt_die_bruchstelle_am_spiegel() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3336,7 +3328,7 @@ async fn schwaerzung_auf_beiden_seiten_der_trennung_raeumt_die_bruchstelle() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3411,7 +3403,7 @@ async fn eigene_schwaerzung_in_der_trennung(vorher_geschwaerzt: bool) {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3452,7 +3444,7 @@ async fn eine_grosse_bruchstelle_klaert_sich_ueber_mehrere_runden() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3503,7 +3495,7 @@ async fn verweise_von_spaeteren_seiten_blockieren_die_bruchstelle_nicht() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3592,7 +3584,7 @@ async fn bruchstelle_raeumt_nur_im_eigenen_einsatz() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3644,7 +3636,7 @@ async fn rueckuebergabe_bringt_keine_doppelten() {
     abgleichen(&elw).await;
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3657,7 +3649,7 @@ async fn rueckuebergabe_bringt_keine_doppelten() {
     abgleichen(&elw).await;
     let (s, v) = post(
         &hub,
-        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{h}/command/hand-over"),
         json!({"an": elw.kennung}),
     )
     .await;
@@ -3704,7 +3696,7 @@ async fn ein_offener_antrag_am_spiegel_wird_beim_wechsel_genau_einmal_ausgefuehr
     assert_eq!(s, StatusCode::ACCEPTED, "{v}");
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3780,7 +3772,7 @@ async fn antraege_ohne_eigene_erfassung_werden_beim_wechsel_ausgefuehrt() {
 
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3827,7 +3819,7 @@ async fn ein_anhang_den_der_neue_fuehrer_nicht_hat_kommt_vom_alten() {
         .unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -3919,7 +3911,7 @@ async fn bruch_nach_notuebernahme() -> (Instanz, Instanz, i64, i64, String) {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -3936,7 +3928,7 @@ async fn bruchstelle(i: &Instanz, cookie: &str, einsatz: i64) -> Vec<Value> {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/bruchstelle"),
+        &format!("/api/einsaetze/{einsatz}/breaks"),
         cookie,
         None,
     )
@@ -3987,7 +3979,7 @@ async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
 
     // Stellen, zweimal: derselbe Antrag.
     let pfad = format!(
-        "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+        "/api/einsaetze/{e}/breaks/{}/request",
         etb_bruch["id"].as_i64().unwrap()
     );
     let (s, v1) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
@@ -4001,7 +3993,7 @@ async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &format!("/api/einsaetze/{e}/breaks/requests"),
         &erika,
         Some(&json!({})),
     )
@@ -4082,7 +4074,7 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/{meldung_id}/verwerfen"),
+        &format!("/api/einsaetze/{e}/breaks/{meldung_id}/discard"),
         &erika,
         Some(&json!({})),
     )
@@ -4099,7 +4091,7 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/{etb_id}/antrag"),
+        &format!("/api/einsaetze/{e}/breaks/{etb_id}/request"),
         &erika,
         Some(&json!({})),
     )
@@ -4127,7 +4119,7 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/{etb_id}/antrag"),
+        &format!("/api/einsaetze/{e}/breaks/{etb_id}/request"),
         &erika,
         Some(&json!({})),
     )
@@ -4178,9 +4170,9 @@ async fn ohne_schreibrecht_kein_nachreichen() {
         .unwrap();
     drop(conn);
     for pfad in [
-        format!("/api/einsaetze/{e}/bruchstelle/{id}/antrag"),
-        format!("/api/einsaetze/{e}/bruchstelle/{id}/verwerfen"),
-        format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        format!("/api/einsaetze/{e}/breaks/{id}/request"),
+        format!("/api/einsaetze/{e}/breaks/{id}/discard"),
+        format!("/api/einsaetze/{e}/breaks/requests"),
     ] {
         let (s, v) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}: {v}");
@@ -4253,7 +4245,7 @@ async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -4309,7 +4301,7 @@ async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
 
     // Die Person stellen, zweimal: derselbe Antrag. Die Zeile bleibt, bis die Kette durch ist.
     let pfad = format!(
-        "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+        "/api/einsaetze/{e}/breaks/{}/request",
         person["id"].as_i64().unwrap()
     );
     let (s, v1) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
@@ -4332,7 +4324,7 @@ async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
         &elw.app,
         "POST",
         &format!(
-            "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+            "/api/einsaetze/{e}/breaks/{}/request",
             sichtung_bekannt["id"].as_i64().unwrap()
         ),
         &erika,
@@ -4435,7 +4427,7 @@ async fn ein_abgelehnter_eintrag_der_kette_kommt_als_eigene_zeile_zurueck() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &format!("/api/einsaetze/{e}/breaks/requests"),
         &erika,
         Some(&json!({})),
     )
@@ -4465,7 +4457,7 @@ async fn bruch_stellen(i: &Instanz, cookie: &str, einsatz: i64, bruch: i64) -> (
     common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bruchstelle/{bruch}/antrag"),
+        &format!("/api/einsaetze/{einsatz}/breaks/{bruch}/request"),
         cookie,
         Some(&json!({})),
     )
@@ -4515,7 +4507,7 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -4549,7 +4541,7 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &format!("/api/einsaetze/{e}/breaks/requests"),
         &erika,
         Some(&json!({})),
     )
@@ -5280,7 +5272,7 @@ async fn uebergabe_an_den_hub_bei_gleicher_einsatznummer() {
     assert_eq!(nummer(&hub, eigen).await, alt, "beide Seiten zählen ab 1");
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -5318,7 +5310,7 @@ async fn anfrage_des_elw_bei_gleicher_einsatznummer() {
     let alt = nummer(&elw, e).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -5334,7 +5326,7 @@ async fn anfrage_des_elw_bei_gleicher_einsatznummer() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/anfragen"),
+        &format!("/api/einsaetze/{e}/command/request"),
         json!({}),
     )
     .await;
@@ -5382,7 +5374,7 @@ async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e}/command/object"),
         json!({}),
     )
     .await;
@@ -5473,7 +5465,7 @@ async fn widerspruch_nach_erfassung_am_hub() -> (Instanz, Instanz, i64, i64) {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e}/command/object"),
         json!({}),
     )
     .await;
@@ -5567,7 +5559,7 @@ async fn nach_widerspruch_bleibt_eine_vom_elw_stammende_zeile() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e}/command/object"),
         json!({}),
     )
     .await;
@@ -5680,7 +5672,7 @@ async fn nach_widerspruch_steht_die_neue_zeile_unter_alter_id_in_der_bruchstelle
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        &format!("/api/einsaetze/{e}/command/object"),
         json!({}),
     )
     .await;
@@ -5725,7 +5717,7 @@ async fn bestaetigte_notuebernahme_ersetzt_am_elw_die_geloeschte_zeile() {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        &format!("/api/einsaetze/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -5791,7 +5783,7 @@ async fn neue_zeile_unter_alter_id_nach_uebergabe() -> (Instanz, Instanz, i64, i
     abgleichen(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -5830,7 +5822,7 @@ async fn nach_notuebernahme_durch_den_elw_steht_die_neue_zeile_unter_alter_id_in
     let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;
@@ -5878,7 +5870,7 @@ async fn merker_bleibt_bis_der_juengste_stand_der_zeile_quittiert_ist() {
     let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;
@@ -5900,7 +5892,7 @@ async fn abgeglichene_rueckgabe_raeumt_den_merker() {
     abgleichen(&elw).await;
     let (s, v) = post(
         &hub,
-        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{h}/command/hand-over"),
         json!({"an": elw.kennung}),
     )
     .await;
@@ -5927,7 +5919,7 @@ async fn neue_zeile_unter_alter_id_in_anderem_einsatz() -> (Instanz, Instanz, i6
     abgleichen(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -5961,7 +5953,7 @@ async fn gegen_auf_eine_in_anderem_einsatz_neu_vergebene_id_laesst_die_zeile_dor
     let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub nicht erreichbar"}),
     )
     .await;
@@ -6165,7 +6157,7 @@ async fn erklaerung_ueber_der_grenze_ist_422_und_genau_an_der_grenze_gilt_sie() 
 
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{sonde_id}/notuebernahme"),
+        &format!("/api/admin/instance/command/{sonde_id}/emergency-takeover"),
         json!({"grund": "Sonde"}),
     )
     .await;
@@ -6175,7 +6167,7 @@ async fn erklaerung_ueber_der_grenze_ist_422_und_genau_an_der_grenze_gilt_sie() 
     let vorher = verlauf_zahl(&elw, ziel_id).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{ziel_id}/notuebernahme"),
+        &format!("/api/admin/instance/command/{ziel_id}/emergency-takeover"),
         json!({"grund": grund_mit_bytes(ERKLAERUNG_BYTES + 1 - rest)}),
     )
     .await;
@@ -6190,7 +6182,7 @@ async fn erklaerung_ueber_der_grenze_ist_422_und_genau_an_der_grenze_gilt_sie() 
 
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{ziel_id}/notuebernahme"),
+        &format!("/api/admin/instance/command/{ziel_id}/emergency-takeover"),
         json!({"grund": grund_mit_bytes(ERKLAERUNG_BYTES - rest)}),
     )
     .await;
@@ -6223,7 +6215,7 @@ async fn langer_bestandsname_wird_in_der_erklaerung_gekuerzt_und_der_hub_nimmt_a
     let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
     let (s, v) = post(
         &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover"),
         json!({"grund": "Hub ohne Verbindung"}),
     )
     .await;
@@ -6261,7 +6253,7 @@ async fn zu_grosse_erklaerung_am_hub_ist_422_vor_unterschrift_und_mit_code() {
     let (hub, elw) = gekoppelt().await;
     set_anzeigename(&hub, &"\u{1}".repeat(lifeline_hub::auth::ANZEIGENAME_MAX)).await;
     let (_, akte) = elw_einsatz(&hub, &elw).await;
-    let start = format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start");
+    let start = format!("/api/admin/instance/command/{akte}/emergency-takeover/start");
 
     let (s, sonde) = post(&hub, &start, json!({"grund": "Sonde"})).await;
     assert_eq!(s, StatusCode::OK, "{sonde}");
@@ -6275,7 +6267,7 @@ async fn zu_grosse_erklaerung_am_hub_ist_422_vor_unterschrift_und_mit_code() {
 
     let (s, v) = post(
         &hub,
-        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        &format!("/api/admin/instance/command/{akte}/emergency-takeover/code"),
         json!({"grund": zu_gross, "code": "2345 6789 ABCD EFGH"}),
     )
     .await;
@@ -6595,7 +6587,7 @@ async fn kopplung_widerrufen(i: &Instanz, gegenueber: &Instanz) {
             .unwrap();
     let (s, v) = post(
         i,
-        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &format!("/api/admin/instance/pairings/{id}/revoke"),
         json!({}),
     )
     .await;
@@ -6649,7 +6641,7 @@ async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -6658,7 +6650,7 @@ async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
     let (s, v) = common::anfrage_json(
         &elw1.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw1.admin,
         Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
     )
@@ -6699,7 +6691,7 @@ async fn an_den_hub_uebergeben(hub: &Instanz, elw: &Instanz) -> (i64, i64, Strin
     abgleichen(elw).await;
     let (s, v) = post(
         elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -6861,7 +6853,7 @@ async fn spiegel_ohne_kopplung() -> (Instanz, Instanz, i64) {
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
@@ -6876,7 +6868,7 @@ async fn zurueckholen(i: &Instanz, cookie: &str, einsatz: i64, grund: &str) -> (
     common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fuehrung/zurueckholen"),
+        &format!("/api/einsaetze/{einsatz}/command/reclaim"),
         cookie,
         Some(&json!({ "grund": grund })),
     )
@@ -6969,7 +6961,7 @@ async fn solange_die_fuehrung_gekoppelt_ist_ist_zurueckholen_409() {
     let (e, _) = elw_einsatz(&hub, &elw).await;
     let (s, _) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;
