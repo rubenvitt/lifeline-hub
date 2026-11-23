@@ -580,7 +580,7 @@ async fn abmeldung_begrenzt_und_entdoppelt_die_personen() {
 // ---------- Registrierliste drucken (LLH-1616, Change `iw8hjb93-registrierliste-drucken`) ----------
 
 fn druck(e: i64, sid: i64) -> String {
-    format!("{}/druck", reg(e, sid))
+    format!("{}/print", reg(e, sid))
 }
 
 /// Einträge `registrierliste` im Zugriffsprotokoll je Person (`None` = listenweit).

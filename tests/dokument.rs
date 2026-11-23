@@ -992,7 +992,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{schaden_pfad}/{lid}/datei"),
+        &format!("{schaden_pfad}/{lid}/file"),
         &frieda,
         None,
     )
@@ -1043,7 +1043,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
         assert_eq!(s, StatusCode::OK, "{art:?}: Dokumente sieht sie");
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments",
             art.segment()
         );
         let (s, _) = anfrage(&app, "GET", &modul_pfad, &frieda, None).await;
@@ -1051,7 +1051,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("{modul_pfad}/{lid}/datei"),
+            &format!("{modul_pfad}/{lid}/file"),
             &frieda,
             None,
         )

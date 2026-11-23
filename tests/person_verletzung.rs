@@ -599,8 +599,8 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
     let p = person["id"].as_i64().unwrap();
 
     for (name, unterpfad, body) in [
-        ("Verletzung", "verletzungen", unterarm()),
-        ("Maßnahme", "massnahmen", json!({"art": "sauerstoff"})),
+        ("Verletzung", "injuries", unterarm()),
+        ("Maßnahme", "interventions", json!({"art": "sauerstoff"})),
         ("Transport", "transport", json!({"prioritaet": "sofort"})),
     ] {
         let (s, kraft) = post(

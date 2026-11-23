@@ -273,7 +273,7 @@ async fn schaden_datei(
     .await
     .unwrap();
     (
-        format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge/{linker}/datei"),
+        format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge/{linker}/file"),
         aid,
     )
 }
@@ -760,7 +760,7 @@ async fn tier_und_uhs_liefern_bereinigt_und_das_original_mit_vermerk() {
         let (aid, besitzer, linker) =
             erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", &foto).await;
         let pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{linker}/datei",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
             art.segment()
         );
 
@@ -804,7 +804,7 @@ async fn tier_und_uhs_original_nur_fuer_die_einsatzleitung() {
         )
         .await;
         let pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{linker}/datei",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
             art.segment()
         );
         let (s, _, _) = laden(&app, &original(&pfad), &frieda, None).await;

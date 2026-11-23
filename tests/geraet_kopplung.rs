@@ -3671,16 +3671,16 @@ async fn replay_am_geraet_legt_jeden_eintrag_einmal_an() {
     let basis = format!("/api/einsaetze/{einsatz}/persons/{pid}");
     let schritte = [
         (
-            "sichtung",
+            "triage",
             json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin,
                    "zeitpunkt_at": zeit(-900), "client_id": "tab-s"}),
         ),
         (
-            "notizen",
+            "notes",
             json!({"text": "stabil", "zeitpunkt_at": zeit(-800), "client_id": "tab-n"}),
         ),
         (
-            "verbleib",
+            "whereabouts",
             json!({"art": "transport", "bestaetigt_personal_id": aerztin,
                    "zeitpunkt_at": zeit(-700), "client_id": "tab-v"}),
         ),
@@ -5834,8 +5834,8 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
 
     // Sichtung und Anlass über die eigene Route gibt es am Gerät ebenfalls nicht.
     for (route, body) in [
-        ("sichtung", json!({"kategorie": "SK3"})),
-        ("anlass", json!({"anlass": "psychisch"})),
+        ("triage", json!({"kategorie": "SK3"})),
+        ("reason", json!({"anlass": "psychisch"})),
     ] {
         let (s, _) = anfrage_json(
             &app,
@@ -7697,7 +7697,7 @@ async fn transport_am_uhs_geraet() {
 /// bestätigte Maßnahme und hebt sie auf; eine Maßnahme einer fremden UHS bleibt 404.
 #[tokio::test]
 async fn massnahme_am_uhs_geraet() {
-    let lage = pat_kern_am_geraet("massnahmen", json!({"art": "sauerstoff"})).await;
+    let lage = pat_kern_am_geraet("interventions", json!({"art": "sauerstoff"})).await;
     let (_, d) = anfrage(
         &lage.app,
         "GET",
@@ -9354,7 +9354,7 @@ async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{belegung}/{aus}/zuruecknehmen"),
+        &format!("{belegung}/{aus}/retract"),
         &geraet,
         None,
     )

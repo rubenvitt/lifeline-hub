@@ -1517,7 +1517,7 @@ async fn entfernte_tier_und_uhs_datei_bleibt_generisch_gesperrt() {
         let (aid, besitzer, lid) =
             erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", MINI_JPEG).await;
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{lid}",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{lid}",
             art.segment()
         );
         let (s, _) = anfrage(&app, "DELETE", &modul_pfad, &admin, None).await;
