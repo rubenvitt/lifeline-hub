@@ -16,6 +16,7 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { bestaetigeVerwerfen } from '../test/verwerfen';
+import { cssForm } from '../test/cssForm';
 
 /**
  * Seite „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung (LFH-550), Abschluss und Verlauf — aus
@@ -542,7 +543,9 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const z = zeile(p, 'auftraege');
     // Die Bezeichnungsspalte ist gedeckelt (16 em, auf schmalen Schirmen 40 %), der Wert beginnt
     // linksbündig direkt daneben, nicht am anderen Rand der Paneelbreite.
-    expect(z.style.gridTemplateColumns).toBe('minmax(0, min(16em, 40%)) minmax(0, 1fr)');
+    expect(z.style.gridTemplateColumns).toBe(
+      cssForm('grid-template-columns', 'minmax(0, min(16em, 40%)) minmax(0, 1fr)'),
+    );
     const wert = z.querySelector<HTMLElement>('[data-teil="wert"]')!;
     expect(wert.style.textAlign).toBe('');
     expect([...z.children].map((k) => k.textContent)).toEqual([

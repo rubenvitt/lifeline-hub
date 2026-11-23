@@ -15,6 +15,12 @@ const wohin = () => screen.getByRole('combobox', { name: 'Wohin' });
 const anzahl = () => screen.getByLabelText('Anzahl');
 const details = () => screen.getByLabelText('Details / Zweck');
 const absetzen = () => userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+/** Klappt „Weitere Angaben“ auf, wie man es vor dem Tippen tut: ein Feld unter zugeklapptem
+ *  Abschnitt nimmt keinen Fokus, in jsdom ab 31 wie im Browser (LLH-2023). */
+async function weitereAngabenOeffnen() {
+  const kopf = screen.getByRole('button', { name: /^Weitere Angaben/ });
+  if (kopf.getAttribute('aria-expanded') !== 'true') await userEvent.click(kopf);
+}
 
 /** Katalog „Externe Stellen“ ohne zuständige Leitstelle, wenn ein Test nichts anderes setzt. */
 function katalog(stellen: ExterneStelle[] = []) {
@@ -39,6 +45,7 @@ describe('NachforderungFormular — Serienerfassung', () => {
 
     await userEvent.click(screen.getByRole('checkbox', { name: /Werte behalten/ }));
     await userEvent.type(was(), 'RTW');
+    await weitereAngabenOeffnen();
     await userEvent.type(details(), 'Zwei RTW zur Verstärkung');
     await userEvent.type(adressat(), 'Leitstelle Nord');
     await userEvent.click(screen.getByRole('button', { name: /Speichern und n/ }));
@@ -54,6 +61,7 @@ describe('NachforderungFormular — Serienerfassung', () => {
     renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
 
     await userEvent.type(was(), 'RTW');
+    await weitereAngabenOeffnen();
     await userEvent.type(details(), 'Zwei RTW');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
@@ -145,6 +153,7 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
     katalog(KATALOG);
     renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
     await waitFor(() => expect(adressat()).toHaveValue('ILS Musterkreis'));
+    await weitereAngabenOeffnen();
     await userEvent.clear(adressat());
     await userEvent.type(adressat(), 'Leitstelle Nachbarkreis');
 
@@ -174,6 +183,7 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
     katalog(KATALOG);
     renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
     await waitFor(() => expect(adressat()).toHaveValue('ILS Musterkreis'));
+    await weitereAngabenOeffnen();
     await userEvent.clear(adressat());
     await kategorieWaehlen('Andere BOS');
     await kategorieWaehlen('Leitstelle');
@@ -211,6 +221,7 @@ describe('NachforderungFormular — Stellenbezug (LLH-1082)', () => {
     );
 
     await userEvent.type(was(), 'Feldbetten');
+    await weitereAngabenOeffnen();
     await userEvent.type(details(), 'Feldbetten für die Nacht');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() =>

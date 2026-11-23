@@ -66,9 +66,12 @@ describe('MeldungFormular', () => {
     );
     // Antds Vorgabebreite (90 px) schnitt den Platzhalter neben „Min“ zu „Frist (…“ ab. Die Hülle
     // des Felds nimmt bis zur Stufe `schmal` (200 px) und schrumpft am schmalen Schirm (LFH-1151).
-    expect(
-      screen.getByLabelText('Bestätigungsfrist in Minuten').closest('.lfh-formfeld'),
-    ).toHaveStyle({ flexBasis: 'var(--lfh-feld-schmal)', flexShrink: '1' });
+    // Gesetzt, nicht berechnet: berechnet löst jsdom die Stufe zur Pixelzahl auf (LLH-2023).
+    const huelle = screen
+      .getByLabelText('Bestätigungsfrist in Minuten')
+      .closest<HTMLElement>('.lfh-formfeld')!;
+    expect(huelle.style.flexBasis).toBe('var(--lfh-feld-schmal)');
+    expect(huelle).toHaveStyle({ flexShrink: '1' });
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));

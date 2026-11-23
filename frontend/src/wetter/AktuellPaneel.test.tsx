@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type { WetterAktuell, WetterAnzeige } from '../api/types';
 import { AktuellPaneel } from './WetterPaneele';
+import { cssForm } from '../test/cssForm';
 
 const BERLIN = { zeitzone: 'Europe/Berlin' };
 /** 2026-10-01 06:10:00 UTC = 08:10 Berlin. */
@@ -84,7 +85,9 @@ describe('AktuellPaneel (LFH-864)', () => {
   it('vier Kennzahlen stehen 2 × 2 — drei plus eins ließe eine leere Zelle', () => {
     zeige(ok(messung()));
     const band = paneel().querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
-    expect(band.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+    expect(band.style.gridTemplateColumns).toBe(
+      cssForm('grid-template-columns', 'repeat(2, minmax(0, 1fr))'),
+    );
     expect(band.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(4);
   });
 

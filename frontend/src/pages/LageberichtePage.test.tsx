@@ -20,6 +20,7 @@ import { FUEHRUNGSPROBLEME_QUELLE } from '../lageberichte/fuehrungsproblemeUeber
 import { LAGEENTWICKLUNG_QUELLE } from '../lageberichte/lageentwicklungUebernahme';
 import { SCHADENLAGE_QUELLE } from '../lageberichte/schadenlageUebernahme';
 import type { UebernahmeQuelle } from '../lageberichte/uebernahmeQuelle';
+import { cssForm } from '../test/cssForm';
 
 const admin = adminFixture({
   anzeigename: 'A',
@@ -1089,7 +1090,9 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
     const { container } = setupListe([freigegeben, entwurf]);
     await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
     const raster = container.querySelector<HTMLElement>('[data-lfh="lageberichte-uebersicht"]');
-    expect(raster?.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
+    expect(raster?.style.gridTemplateColumns).toBe(
+      cssForm('grid-template-columns', 'minmax(0, 1fr)'),
+    );
   });
 });
 

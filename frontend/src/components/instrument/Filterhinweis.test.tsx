@@ -66,7 +66,7 @@ describe('Filterhinweis (LLH-1071)', () => {
     const band = screen.getByRole('status');
     // Der Test rendert ohne Nachttheme: die Hellpalette gilt.
     expect(band.style.background).toBe(hexZuRgb(farbenHell.achtungFlaeche));
-    expect(band.style.borderInlineStart).toContain(farbenHell.achtung);
+    expect(band.style.borderInlineStart).toContain(hexZuRgb(farbenHell.achtung));
     expect(band.style.color).toBe(hexZuRgb(farbenHell.achtungText));
   });
 });

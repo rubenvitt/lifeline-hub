@@ -29,6 +29,7 @@ import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { ThemeModeProvider, useWarnsperre } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
 import { adminFixture } from '../test/fixtures';
+import { cssForm } from '../test/cssForm';
 
 /** Die Hilfe-Seitenleiste (LLH-1824): ihr Öffner, oder keiner wie auf dem Gerät. */
 const hilfe = vi.hoisted(() => ({
@@ -226,7 +227,7 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     setzeViewportBreite(breite);
     zeige();
     await oeffne();
-    expect((await screen.findByRole('menu')).style.width).toBe(erwartet);
+    expect((await screen.findByRole('menu')).style.width).toBe(cssForm('width', erwartet));
   });
 
   describe('„Hilfe zu dieser Seite“, wo der Kopf keinen Platz für „?“ hat (LLH-1824)', () => {

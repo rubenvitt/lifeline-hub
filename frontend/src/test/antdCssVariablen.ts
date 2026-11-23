@@ -13,9 +13,11 @@
  * cssVar-Schlüssel bedingungslos.
  *
  * **Der Filter** entfernt aus den Stilen, die antds CSS-in-JS über `updateCSS` einhängt, jede
- * Custom-Property-DEKLARATION. Selektoren, `display: none` und Werte mit `var()` bleiben. Da
- * jsdom `var()` ohnehin nicht auflöst, ändert sich keine berechnete Standard-Eigenschaft;
- * verloren geht nur `getPropertyValue('--ant-…')`, die kein Test stellt.
+ * Custom-Property-DEKLARATION. Selektoren, `display: none` und Werte mit `var()` bleiben. Seit
+ * jsdom 31 löst `getComputedStyle` `var()` auf (LLH-2023): ein antd-Wert aus `var(--ant-…)` fällt
+ * ohne die Deklaration auf seinen Ausgangswert zurück, wie im Browser bei unbekannter Variable.
+ * Kein Test prüft antds berechnete Token-Werte; eigene Variablen (`--lfh-…`) bleiben, weil nur
+ * Stile mit `data-rc-order` gefiltert werden.
  *
  * Erkannt wird ein antd-Stil am Attribut `data-rc-order`, das `updateCSS` VOR `innerHTML`
  * setzt; eigene `<style>` von Tests bleiben unberührt.

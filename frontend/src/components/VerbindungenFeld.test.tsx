@@ -38,8 +38,10 @@ describe('VerbindungenAngabe (LLH-1134)', () => {
     );
     expect(screen.getByRole('link', { name: 'a@b.de' })).toHaveAttribute('href', 'mailto:a@b.de');
     // Ein `<a>` erbt keine Steuerhöhe: der Verweis trägt den Boden der Staffel (LLH-1426).
+    // Gesetzt, nicht berechnet: als Flex-Kind wird `inline-flex` wie im Browser zu `flex`
+    // blockifiziert; beides trägt `min-height`, ein bloßes `inline` nicht.
     for (const link of screen.getAllByRole('link')) {
-      expect(link).toHaveStyle({ display: 'inline-flex' });
+      expect(link.style.display).toBe('inline-flex');
       expect(link.style.minHeight).toMatch(/^\d+px$/);
     }
     expect(screen.getByText('nur tagsüber')).toBeInTheDocument();

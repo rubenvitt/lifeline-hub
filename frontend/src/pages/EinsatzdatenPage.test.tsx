@@ -27,6 +27,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { setzeViewportBreite } from '../test/viewport';
 import { tippeZeit } from '../test/zeitEingabe';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { cssForm } from '../test/cssForm';
 
 /**
  * Der PATCH-Körper ohne den Altwert des Feld-CAS (LLH-1831): die Tests dieser Datei vergleichen die
@@ -485,7 +486,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-1170)', () => {
     setup();
     await screen.findByRole('region', { name: 'Erstmeldung' });
     const raster = document.querySelector<HTMLElement>('[data-lfh="einsatzdaten-paneele"]');
-    expect(raster?.style.gridTemplateColumns).toBe(spalten);
+    expect(raster?.style.gridTemplateColumns).toBe(cssForm('grid-template-columns', spalten));
   });
 
   it('LFH-617: die Einsatznummer ist Anzeige — die Leitstellen-Nr. geht ohne sie in den PATCH', async () => {

@@ -11,6 +11,7 @@ import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtig
 import { zoneZuruecksetzenFuerTests } from '../alarm/alarmZoneSpeicher';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
+import { erzeugeBildschleife } from './bildschleife';
 import { setzeStueckweise } from '../components/stueckweise';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import { installiereAnfragenGrenze, trenneOffeneAnfragen } from './offeneAnfragen';
@@ -76,6 +77,43 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   }
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
+// Keine Leinwand in der Suite (LLH-2023). jsdom 31 zeichnet über `@napi-rs/canvas`, sobald das Paket
+// installiert ist (hier über pdfjs-dist), und `textBreite` mäße dann mit den Schriften der Maschine:
+// dieselbe Spaltenbreite wäre in CI und lokal eine andere Zahl. Ohne Kontext schätzt `textBreite`
+// wie unter jsdom 30 (`components/textBreite.ts`); echte Messung prüfen e2e und Browser.
+HTMLCanvasElement.prototype.getContext = function getContext() {
+  return null;
+} as typeof HTMLCanvasElement.prototype.getContext;
+
+// Bildschleife auf echten Timern (LLH-2023); Begründung in ./bildschleife.ts. Beim Abbau der Datei
+// angehalten: ein danach fälliges Bild liefe sonst in die abgebaute Umgebung („Document is not
+// defined“). Ein Test, der `requestAnimationFrame` selbst fälscht, ersetzt diese Fassung solange.
+{
+  const schleife = erzeugeBildschleife();
+  for (const ziel of new Set([globalThis, window])) {
+    Object.assign(ziel, {
+      requestAnimationFrame: schleife.requestAnimationFrame,
+      cancelAnimationFrame: schleife.cancelAnimationFrame,
+    });
+  }
+  afterAll(schleife.anhalten);
+}
+
+// Ein schließendes antd-Menü nimmt keinen Fokus (LLH-2023). Der späte `autoFocus` eines Dropdowns
+// (`raf(focusMenu, 3)`) feuert auch, wenn das Menü schon wieder schließt, und zog den Fokus aus dem
+// danach geöffneten Dialog: Getipptes ging verloren (LLH-1390, `test/menue.ts`). Im Browser holt die
+// Fokusfalle des Dialogs ihn zurück; in jsdom läuft die Schließbewegung nie zu Ende, das Portal
+// bleibt mit `pointer-events: none` stehen (so erkennt es auch `offenesMenue`). Wächter:
+// ./schliessendesMenue.test.ts.
+{
+  const echtesFocus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function focus(this: HTMLElement, optionen?: FocusOptions) {
+    const portal = this.closest<HTMLElement>('.ant-dropdown');
+    if (portal?.style.pointerEvents === 'none') return;
+    echtesFocus.call(this, optionen);
+  };
 }
 
 // antds Breakpoint-Beobachter braucht `matchMedia`. Der Stub in ./viewport ist
