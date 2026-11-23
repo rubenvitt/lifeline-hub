@@ -2061,10 +2061,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/adapter/{id}/check",
             post(routes::adapter::check),
         )
-        .route(
-            "/api/admin/adapter/{id}/pause",
-            post(routes::adapter::halt),
-        )
+        .route("/api/admin/adapter/{id}/pause", post(routes::adapter::halt))
         .route(
             "/api/admin/adapter/{id}/resume",
             post(routes::adapter::resume),

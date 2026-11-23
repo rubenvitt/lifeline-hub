@@ -226,14 +226,7 @@ async fn aendern_neuer_code_und_widerruf() {
     .unwrap();
     assert_eq!(offen, 1, "nur der jüngste Code ist offen");
 
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zustand"], "widerrufen");
     assert!(v["widerrufen_at"].is_string());
@@ -244,14 +237,7 @@ async fn aendern_neuer_code_und_widerruf() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let nachher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admin_audit")
         .fetch_one(&pool)
@@ -310,14 +296,7 @@ async fn am_gekoppelten_elw_ist_anlegen_gesperrt() {
     let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/code"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
     // Widerrufen bleibt möglich.
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
 }
 

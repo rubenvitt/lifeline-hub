@@ -382,14 +382,7 @@ async fn widerrufene_anbindung_bekommt_keinen_webhook() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = anbindung(&app, &admin).await;
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert!(s.is_success());
     let (s, _) = einrichten(
         &app,
@@ -474,14 +467,7 @@ async fn widerruf_antwortet_mit_dem_webhook() {
         json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
     )
     .await;
-    let (s, z) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, z) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert!(s.is_success());
     assert_eq!(z["webhook"]["zustand"], "ruht", "{z}");
     assert_eq!(z["webhook"]["ruht_grund"], "zugang_widerrufen");

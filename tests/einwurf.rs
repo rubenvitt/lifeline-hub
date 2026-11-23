@@ -314,14 +314,7 @@ async fn wechsel_gibt_einen_neuen_schluessel_und_der_alte_gilt_sofort_nicht_mehr
         StatusCode::NO_CONTENT
     );
 
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let neu = v["schluessel"].as_str().unwrap().to_string();
     assert_ne!(neu, alt);
@@ -370,14 +363,7 @@ async fn widerruf_wirkt_sofort_und_schreibt_die_spur_einmal() {
     // Der zweite Widerruf ist ohne Wirkung und ohne Eintrag; ein Wechsel ist 409.
     let (s, _) = anfrage_json(&app, "POST", &widerrufen, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
     let aktionen: Vec<String> = spur(&pool).await.into_iter().map(|e| e.0).collect();
     assert_eq!(
@@ -411,14 +397,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
 
     let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
@@ -461,14 +440,7 @@ async fn direktkopplung_vor_ort_sperrt_keine_einwuerfe() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
 }
 
@@ -924,14 +896,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     let (app, _pool, admin) = setup().await;
     let (id, alt) = zugang(&app, &admin, "BOSWatch alt", "alarmmeldungen:write").await;
     let (_, gueltig) = zugang(&app, &admin, "BOSWatch neu", "alarmmeldungen:write").await;
-    anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/revoke"),
-        &admin,
-        None,
-    )
-    .await;
+    anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     let quelle = "198.51.100.212:5000";
     for _ in 0..12 {
         let antwort = sende(
@@ -965,14 +930,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
 async fn abgeloeste_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     let (app, _pool, admin) = setup().await;
     let (id, alt) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
-    let (_, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (_, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     let neu = v["schluessel"].as_str().unwrap().to_string();
     let quelle = "198.51.100.213:5000";
     let von = |schluessel: String| {
@@ -1014,14 +972,7 @@ async fn abgelaufener_zugang_bekommt_keinen_neuen_schluessel() {
         .execute(&pool)
         .await
         .unwrap();
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/key"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/key"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
     assert_eq!(
         spur(&pool).await.len(),
