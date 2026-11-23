@@ -89,7 +89,7 @@ Herleitung: `openspec/changes/archive/2026-10-10-lfh-1121-einmalpasswort/design.
 
 - **Vor dem Festlegen gibt es keine Sitzung:** ein Passwort-Login (und `totp/finish`) auf ein Konto
   unter `passwort_wechsel_pflicht` liefert `{passwort_wechsel_erforderlich: true}` und nur das
-  Cookie `passwort_wechsel`; erst `POST /api/auth/passwort/festlegen` legt die Sitzung an. Der
+  Cookie `passwort_wechsel`; erst `POST /api/auth/password/set` legt die Sitzung an. Der
   Client übernimmt erst danach (`AuthContext.passwortFestlegen`), sonst schriebe er den
   Offline-Schnappschuss und andere Tabs übernähmen eine Person ohne Sitzung.
 - Den Zwang setzen „Benutzer anlegen“ und „Einmalpasswort vergeben“; aufgehoben wird er nur durch

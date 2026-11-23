@@ -37,7 +37,7 @@ class ServerlisteSeiteTest {
             LifelineThema {
                 ServerlisteSeite(
                     liste = liste,
-                    seite = Ablauf.Seite.Web(elw, vertrag = 1),
+                    seite = Ablauf.Seite.Web(elw, vertrag = 2),
                     onWechseln = {},
                     onZurOberflaeche = {},
                     onUmbenennen = { _, _ -> },

@@ -214,12 +214,19 @@ Spec `webhook-zustellung`, Herleitung
   Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
   `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
 - **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
-  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver). Einzige
+  Ausnahme ist `ziel::hole_fingerabdruck`: er baut über dieselbe `ziel::baue_client` einen Client,
+  der nach dem Zertifikat abbricht und nie eine Anfrage sendet (Fingerabdruck unten).
 - **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
   danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
   Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.
 - **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
   Sekunden-Auflösung.
+- **Fingerabdruck** (LLH-1872,
+  [ADR-0092](../docs/architektur/entscheidungen/ADR-0092-ein-webhook-mit-fingerabdruck-vertraut-nur-diesem-zertifikat.md)):
+  ein Client je `(lan, pin)` aus `ziel::client`, TLS nur über
+  `instanz::zertifikat::tls_config`, das Abrufen vom Ziel nur über `ziel::hole_fingerabdruck`
+  mit dem `Erfasser`. Ein geänderter Fingerabdruck zählt im Repo wie ein neues Ziel.
 
 ## Backend — Adapter (LLH-2017)
 
@@ -240,6 +247,8 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/geheimnisse/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
   Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
+  Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
+  (LLH-2025); sonst ändert nichts ein Chiffrat, ohne den Wert neu zu setzen.
   Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
   URL), entfernt die Geheimnisse; eine neue Art mit URL-Feldern erbt das, ohne eigenen Code.
 - **Fehlercodes:** ein neuer Code kommt in `AdapterFehler` samt Einteilung in
@@ -247,7 +256,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
   `frontend/src/api/adapter.ts`.
 - **Störung melden** (LLH-2026,
-  [ADR-0084](../docs/architektur/entscheidungen/ADR-0084-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
+  [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   nur der Lauf meldet, über den Merker `adapter.gemeldet` (`repo::mark_gemeldet` in seiner
   Transaktion, `zustand::meldung_nach_fehlschlag` entscheidet: Eingriff sofort, gestört ab 30
   Minuten, gesperrter Speicher nie). Ein Admin-Schreibweg, der einen Stopp aufhebt oder setzt
@@ -691,8 +700,12 @@ Herleitung in
   (`melden::MeldenAnfrage`, `MeldenAntwort`) und in `instanz_kopplung.gegenueber_rolle_mitarbeit`
   (Migration 0359). Ein Gegenüber ohne sie bekommt `mitarbeit` als `beobachter`; ein eingehendes
   `beobachter` eines solchen Gegenübers überschreibt ein lokales `mitarbeit` nicht; kippt die
-  Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus.
-- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
+  Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus. Hat ein
+  Spiegel `mitarbeit` gegen einen älteren Führer festgehalten, meldet er sie beim selben Wechsel
+  einmal nach (`spiegel::nachtrag`, Tabelle `mitarbeit_nachtrag`); der Führer hebt nur unter den
+  Bedingungen aus ADR-0088 an.
+- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback),
+  `tests/instanz_mitarbeit_nachtrag.rs` (Rückgabe und Notübernahme an eine ältere Instanz).
 
 ## Backend — Erfassungs-Gate (LLH-1817)
 
@@ -845,7 +858,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Client per `GET`.
 - **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
   Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
-- **Zwei Orte** (LLH-2026, ADR-0084): eine Zeile hängt an einem Einsatz oder an einem Adapter
+- **Zwei Orte** (LLH-2026, ADR-0086): eine Zeile hängt an einem Einsatz oder an einem Adapter
   (`Ort`, `benachrichtigung.adapter_id`, CHECK genau einer). Am Adapter gilt nur
   `Adressat::OrgAdmins` (aktive System-Admins seiner Org); Empfänger, Leserecht (`darf_lesen`) und
   Text stehen nur in `benachrichtigung::adapter`, Erledigen für alle nur über

@@ -91,7 +91,7 @@ export function useBefehle(
   /**
    * Der Speicher liegt in localStorage, nicht in React: gelesen wird bei JEDEM Render (höchstens
    * drei Einträge). Memoisiert über die Zeichenkette statt das je Render frische Array, damit die
-   * Dependency-Liste vollständig bleibt, ohne `eslint-disable`.
+   * Dependency-Liste vollständig bleibt, ohne `oxlint-disable`.
    */
   const benutzerId = benutzer?.id ?? null;
   const zuletztSchluessel =

@@ -354,7 +354,7 @@ final class AppModell {
         var liste = Serverliste()
         let elw = liste.add(try! ServerAdresse.parse("https://elw.local:8443"), name: "ELW 1")
         let lager = liste.add(try! ServerAdresse.parse("https://lager.example"), name: "Lager")
-        try? liste.markVerbunden(elw.id, am: Date(timeIntervalSince1970: 1_800_000_000), vertrag: 1)
+        try? liste.markVerbunden(elw.id, am: Date(timeIntervalSince1970: 1_800_000_000), vertrag: 2)
         _ = lager
         return liste
     }
@@ -382,7 +382,7 @@ final class AppModell {
             seite = .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0"))
         case .web, .fremdeSeite:
             // Den Webview baut `start()` (`zeigeBeispielseite`).
-            seite = .web(elw, vertrag: 1)
+            seite = .web(elw, vertrag: 2)
             zeigtZurOberflaeche = testzustand == .fremdeSeite
         }
     }

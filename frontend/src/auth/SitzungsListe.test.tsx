@@ -43,7 +43,7 @@ function liste() {
 describe('SitzungsListe (LFH-1092)', () => {
   it('markiert die aktuelle statt eines Knopfs und zeigt Unbekanntes ehrlich', async () => {
     server.use(
-      http.get('/api/auth/sitzungen', () =>
+      http.get('/api/auth/sessions', () =>
         HttpResponse.json([sitzung(A, 'Firefox · Windows', true), sitzung(B, null)]),
       ),
     );
@@ -67,14 +67,14 @@ describe('SitzungsListe (LFH-1092)', () => {
   it('beendet eine Sitzung und lädt die Liste neu', async () => {
     let geloescht: string | null = null;
     server.use(
-      http.get('/api/auth/sitzungen', () =>
+      http.get('/api/auth/sessions', () =>
         HttpResponse.json(
           geloescht
             ? [sitzung(A, 'Firefox · Windows', true)]
             : [sitzung(A, 'Firefox · Windows', true), sitzung(B, 'Safari · iPadOS')],
         ),
       ),
-      http.delete('/api/auth/sitzungen/:kennung', ({ params }) => {
+      http.delete('/api/auth/sessions/:kennung', ({ params }) => {
         geloescht = String(params.kennung);
         return HttpResponse.json({ beendet: 1 });
       }),
@@ -90,7 +90,7 @@ describe('SitzungsListe (LFH-1092)', () => {
   it('bietet „Alle anderen beenden“ ab zwei anderen an', async () => {
     let gesendet = false;
     server.use(
-      http.get('/api/auth/sitzungen', () =>
+      http.get('/api/auth/sessions', () =>
         HttpResponse.json(
           gesendet
             ? [sitzung(A, 'Firefox · Windows', true)]
@@ -101,7 +101,7 @@ describe('SitzungsListe (LFH-1092)', () => {
               ],
         ),
       ),
-      http.post('/api/auth/sitzungen/andere-beenden', () => {
+      http.post('/api/auth/sessions/end-others', () => {
         gesendet = true;
         return HttpResponse.json({ beendet: 2 });
       }),
@@ -115,10 +115,10 @@ describe('SitzungsListe (LFH-1092)', () => {
 
   it('zeigt einen abgelehnten Versuch an der Liste', async () => {
     server.use(
-      http.get('/api/auth/sitzungen', () =>
+      http.get('/api/auth/sessions', () =>
         HttpResponse.json([sitzung(A, 'Firefox · Windows', true), sitzung(B, 'Safari · iPadOS')]),
       ),
-      http.delete('/api/auth/sitzungen/:kennung', () =>
+      http.delete('/api/auth/sessions/:kennung', () =>
         HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
       ),
     );

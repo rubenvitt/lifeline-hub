@@ -300,7 +300,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       setText(null);
       setDiscarded(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `setDiscarded` meldet nur weiter
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `setDiscarded` meldet nur weiter
   }, [wertKey]);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit

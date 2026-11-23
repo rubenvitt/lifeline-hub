@@ -68,7 +68,7 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
       pruefe(value?.unterfuehrer, GRENZEN, 'uf');
       pruefe(value?.mannschaft, GRENZEN, 'm');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   function melde(nf: Feld, nuf: Feld, nm: Feld) {

@@ -294,7 +294,7 @@ export default function NachrichtenStrom({
     }
     if (!amBodenRef.current) return;
     el?.scrollTo?.({ top: el.scrollHeight });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- wächst die jüngste id, nicht der Kopf
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- wächst die jüngste id, nicht der Kopf
   }, [juengsteId]);
 
   /*

@@ -150,9 +150,9 @@ describe('apiGet bei unterbrochener Sitzung (LLH-1770)', () => {
   });
 
   it('angemeldete Lesewege unter /api/auth/ warten wie jede Leseanfrage', async () => {
-    server.use(http.get('/api/auth/sitzungen', () => HttpResponse.json([])));
+    server.use(http.get('/api/auth/sessions', () => HttpResponse.json([])));
     sitzungSperren();
-    const abruf = apiGet('/api/auth/sitzungen');
+    const abruf = apiGet('/api/auth/sessions');
     let fertig = false;
     void abruf.then(() => (fertig = true));
     await new Promise((r) => setTimeout(r, 20));

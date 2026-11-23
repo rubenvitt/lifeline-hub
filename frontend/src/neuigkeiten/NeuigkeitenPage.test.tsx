@@ -21,8 +21,8 @@ function versionsstand(zuletzt?: string) {
     ...(zuletzt ? { zuletzt_gestartet: zuletzt } : {}),
   };
   return [
-    http.get('/api/versionsstand', () => HttpResponse.json(stand)),
-    http.post('/api/versionsstand/gelesen', () => HttpResponse.json(stand)),
+    http.get('/api/release-notes', () => HttpResponse.json(stand)),
+    http.post('/api/release-notes/read', () => HttpResponse.json(stand)),
   ];
 }
 
@@ -68,10 +68,10 @@ describe('NeuigkeitenPage', () => {
   it('markiert die laufende Version beim Öffnen als gelesen', async () => {
     let aufgerufen = false;
     server.use(
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({ laufend: LAUFEND, gelesen_bis: ZULETZT }),
       ),
-      http.post('/api/versionsstand/gelesen', () => {
+      http.post('/api/release-notes/read', () => {
         aufgerufen = true;
         return HttpResponse.json({ laufend: LAUFEND, gelesen_bis: LAUFEND });
       }),
@@ -86,10 +86,10 @@ describe('NeuigkeitenPage', () => {
   it('markiert nichts und verweist auf die Aktualisierung, wenn die Notizen der laufenden Version fehlen', async () => {
     let aufgerufen = false;
     server.use(
-      http.get('/api/versionsstand', () =>
+      http.get('/api/release-notes', () =>
         HttpResponse.json({ laufend: '99.0.0', gelesen_bis: LAUFEND, zuletzt_gestartet: LAUFEND }),
       ),
-      http.post('/api/versionsstand/gelesen', () => {
+      http.post('/api/release-notes/read', () => {
         aufgerufen = true;
         return HttpResponse.json({ laufend: '99.0.0', gelesen_bis: '99.0.0' });
       }),

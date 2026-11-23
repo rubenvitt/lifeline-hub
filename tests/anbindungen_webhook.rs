@@ -27,6 +27,11 @@ fn pfad(id: &str) -> String {
     format!("{LISTE}/{id}/webhook")
 }
 
+/// Neue Routen sind englisch (ADR-0085), die übrigen Webhook-Routen stehen noch im Bestand.
+fn abruf_pfad(id: &str) -> String {
+    format!("/api/admin/integrations/{id}/webhook/fetch-certificate")
+}
+
 async fn einrichten(app: &axum::Router, admin: &str, id: &str, body: Value) -> (StatusCode, Value) {
     anfrage_json(app, "POST", &pfad(id), admin, Some(&body)).await
 }
@@ -480,4 +485,233 @@ async fn widerruf_antwortet_mit_dem_webhook() {
     assert!(s.is_success());
     assert_eq!(z["webhook"]["zustand"], "ruht", "{z}");
     assert_eq!(z["webhook"]["ruht_grund"], "zugang_widerrufen");
+}
+
+// ---------------------------------------------------------------- Fingerabdruck (LLH-1872)
+
+const PIN: &str = "ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12";
+const PIN_ANDERS: &str = "cd12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12";
+
+fn gross_mit_doppelpunkten(pin: &str) -> String {
+    pin.to_ascii_uppercase()
+        .as_bytes()
+        .chunks(2)
+        .map(|c| std::str::from_utf8(c).unwrap())
+        .collect::<Vec<_>>()
+        .join(":")
+}
+
+async fn aktionen(pool: &sqlx::SqlitePool) -> Vec<String> {
+    spur(pool).await.into_iter().map(|e| e.0).collect()
+}
+
+async fn patch(app: &axum::Router, admin: &str, id: &str, body: Value) -> (StatusCode, Value) {
+    anfrage_json(app, "PATCH", &pfad(id), admin, Some(&body)).await
+}
+
+#[tokio::test]
+async fn pin_beim_einrichten_wird_normalisiert_und_protokolliert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    let (s, w) = einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({
+            "url": "https://empfaenger.example/hook",
+            "arten": ["einsatz.created"],
+            "zertifikat_pin": gross_mit_doppelpunkten(PIN)
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{w}");
+    assert_eq!(w["zertifikat_pin"], PIN);
+    let eintraege = spur(&pool).await;
+    let n = eintraege.len();
+    assert_eq!(eintraege[n - 2].0, "maschinenzugang_webhook_angelegt");
+    assert_eq!(eintraege[n - 1].0, "maschinenzugang_webhook_pin_gesetzt");
+    assert!(eintraege[n - 1].2.as_deref().unwrap().contains(PIN));
+}
+
+#[tokio::test]
+async fn ungueltiger_pin_400() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    let (s, v) = einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"], "zertifikat_pin": "abc" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(v.to_string().contains("zertifikat_pin"), "{v}");
+}
+
+#[tokio::test]
+async fn pin_setzen_wechseln_entfernen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
+    )
+    .await;
+
+    let (s, w) = patch(&app, &admin, &id, json!({ "zertifikat_pin": PIN })).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["zertifikat_pin"], PIN);
+    let (aktion, _, detail) = spur(&pool).await.pop().unwrap();
+    assert_eq!(aktion, "maschinenzugang_webhook_pin_gesetzt");
+    assert!(!detail.unwrap().contains("fingerabdruck_vorher"));
+
+    let (s, w) = patch(&app, &admin, &id, json!({ "zertifikat_pin": PIN_ANDERS })).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    let (aktion, _, detail) = spur(&pool).await.pop().unwrap();
+    assert_eq!(aktion, "maschinenzugang_webhook_pin_gesetzt");
+    let detail = detail.unwrap();
+    assert!(
+        detail.contains(PIN_ANDERS) && detail.contains(PIN),
+        "{detail}"
+    );
+
+    let (s, w) = patch(&app, &admin, &id, json!({ "zertifikat_pin": null })).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert!(w.get("zertifikat_pin").is_none(), "{w}");
+    let (aktion, _, detail) = spur(&pool).await.pop().unwrap();
+    assert_eq!(aktion, "maschinenzugang_webhook_pin_entfernt");
+    assert!(detail.unwrap().contains(PIN_ANDERS));
+
+    // Nur der Pin änderte sich: nie `…_geaendert`.
+    assert!(!aktionen(&pool)
+        .await
+        .contains(&"maschinenzugang_webhook_geaendert".to_string()));
+}
+
+#[tokio::test]
+async fn hostwechsel_ohne_pin_angabe_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"], "zertifikat_pin": PIN }),
+    )
+    .await;
+    let (s, v) = patch(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://anderer.example/" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(v.to_string().contains("Neues Ziel"), "{v}");
+
+    let (s, w) = patch(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://anderer.example/", "zertifikat_pin": null }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert!(w.get("zertifikat_pin").is_none());
+    assert!(aktionen(&pool).await.ends_with(&[
+        "maschinenzugang_webhook_geaendert".to_string(),
+        "maschinenzugang_webhook_pin_entfernt".to_string()
+    ]));
+}
+
+#[tokio::test]
+async fn pfadwechsel_behaelt_den_pin() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/a", "arten": ["einsatz.created"], "zertifikat_pin": PIN }),
+    )
+    .await;
+    let (s, w) = patch(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example:8443/b?x=1" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["zertifikat_pin"], PIN);
+}
+
+#[tokio::test]
+async fn pin_sieht_auch_wer_nur_liest() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"], "zertifikat_pin": PIN }),
+    )
+    .await;
+    benutzer_anlegen(&app, &admin, "erika", "fuehrungskraft").await;
+    let fk = login_cookie(&app, "erika", "erikapw1").await;
+    let (_, ansicht) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}"), &fk, None).await;
+    assert_eq!(ansicht["webhook"]["zertifikat_pin"], PIN);
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &abruf_pfad(&id),
+        &fk,
+        Some(&json!({ "url": "https://empfaenger.example/", "lan_erlaubt": false })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn abruf_prueft_die_url_und_schreibt_die_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    let abruf = abruf_pfad(&id);
+    let vorher = spur(&pool).await.len();
+
+    // Ungültige oder interne Ziele: 400, kein Eintrag (auch ohne eingerichteten Webhook).
+    for body in [
+        json!({ "url": "https://127.0.0.1/", "lan_erlaubt": true }),
+        json!({ "url": "https://localhost./x", "lan_erlaubt": true }),
+        json!({ "url": "http://empfaenger.example/", "lan_erlaubt": false }),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &abruf, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body} {v}");
+    }
+    assert_eq!(spur(&pool).await.len(), vorher);
+
+    // Nicht erreichbar: 200 mit Fehlerart, ohne Fingerabdruck, mit Eintrag.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &abruf,
+        &admin,
+        Some(&json!({ "url": "https://ziel.invalid/hook", "lan_erlaubt": false })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("fingerabdruck").is_none(), "{v}");
+    assert!(v["fehler_art"].is_string(), "{v}");
+    let (aktion, _, detail) = spur(&pool).await.pop().unwrap();
+    assert_eq!(aktion, "maschinenzugang_webhook_zertifikat_abgerufen");
+    assert!(detail.unwrap().contains("ziel.invalid"));
 }

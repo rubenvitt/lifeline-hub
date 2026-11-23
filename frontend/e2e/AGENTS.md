@@ -14,7 +14,8 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
 - **Angemeldet wird über die API** (LLH-1665): `anmeldenPerApi` aus `e2e/anmelde-kern.ts`, dahinter
   `anmelden`, `anmeldenAls`, `anmeldenAlsAdmin`, `wechsleZu…`. `{ startseite: false }`, wenn der
   nächste Schritt ohnehin ein `goto` ist. Das Formular füllen nur die Specs, die die Anmeldung
-  selbst prüfen; Riegel `no-restricted-syntax` mit Ausnahmeliste in `frontend/eslint.config.js`.
+  selbst prüfen; Riegel `lfh/e2e-anmeldeformular` (`frontend/lint/riegel-plugin.js`) mit Ausnahmeliste in
+  `frontend/.oxlintrc.json`.
   Wer die Kanalmeldung an andere Tabs braucht (Konfliktdialog, LFH-387), meldet im zweiten Tab
   über die Anmeldeseite an (`anmeldenImFormular`): die API-Anmeldung meldet nichts an andere Tabs.
   Einen Einsatz, dessen Dialog der Fall nicht prüft, legt `einsatzPerApi` aus `e2e/einsatz-kern.ts`
@@ -44,7 +45,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   der sichtbare Grund und keine 403 beim Laden.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
-  `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.
+  `lfh/e2e-riegel` für `e2e/**` (`frontend/lint/riegel-plugin.js`).
 - e2e ist selbsttragend, braucht aber das Debug-Binary; Schritt 7 baut bei Bedarf den Prod-Bundle
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
@@ -65,14 +66,14 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
 - **Einen Einsatz über die Oberfläche legt nur `e2e/einsatz-kern.ts` an** (LFH-1114):
   `einsatzDialogOeffnen` wartet, bis der Dialog „Neuen Einsatz anlegen“ ausgezoomt ist; ein
   früherer Klick fiel unter Last neben „Anlegen“ (kein POST, Dialog offen). Wer die Oberfläche
-  nicht prüft, legt über die API an. Riegel `no-restricted-syntax` für `e2e/**`. Allgemein gilt
+  nicht prüft, legt über die API an. Riegel `lfh/e2e-riegel` für `e2e/**`. Allgemein gilt
   der nächste Punkt.
 - **Erst klicken, wenn der Dialog steht** (LLH-2067, nach LFH-1114 und LLH-2065): in ein
   antd-Modal, ein Popconfirm oder ein Popover erst klicken, tippen oder messen, wenn
   `dialogSteht(page, name)` bzw. `eingeblendet(locator)` aus `e2e/dialog-kern.ts` ihn als
   stehend meldet. Während der Einblendung (`ant-zoom-appear`, `ant-zoom-big-appear`) nimmt er
   unter Last keinen Klick sicher an, und jeder Kasten ist skaliert. Geprüft wird am Ziel und
-  seinen Vorfahren, nie seitenweit. Riegel `no-restricted-syntax`: kein Literal mit `ant-zoom`
+  seinen Vorfahren, nie seitenweit. Riegel `lfh/e2e-einblendung`: kein Literal mit `ant-zoom`
   in `e2e/**` außer `dialog-kern.ts` und `doku-bilder/` (eigener Kern mit angehaltener Uhr).
   Specs, die heute ohne Wartezeit klicken, stellt um, wer sie ohnehin ändert. Herleitung:
   `docs/superpowers/specs/2026-11-22-djjc6x03-dialog-erst-eingeblendet-design.md`.

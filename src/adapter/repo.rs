@@ -317,6 +317,47 @@ pub async fn load_chiffrate(
     .await
 }
 
+/// Alle Geheimnisse an den Schlüssel mit `fingerabdruck`, für den Schlüsselwechsel (LLH-2025):
+/// `(adapter_id, name, chiffrat)`.
+pub async fn load_chiffrate_mit_fp(
+    conn: &mut SqliteConnection,
+    fingerabdruck: &str,
+) -> Result<Vec<(String, String, Vec<u8>)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT adapter_id, name, chiffrat FROM adapter_geheimnis WHERE schluessel_fp = ? \
+         ORDER BY adapter_id, name",
+    )
+    .bind(fingerabdruck)
+    .fetch_all(conn)
+    .await
+}
+
+/// Ersetzt das Chiffrat eines Geheimnisses, das noch an `fp_alt` liegt, durch eines an `fp_neu`
+/// (LLH-2025). Wert, `gesetzt_at`, `gesetzt_von` und der Stand des Adapters bleiben: das
+/// Geheimnis selbst ändert sich nicht. Liefert, ob die Zeile getroffen wurde.
+pub async fn update_chiffrat(
+    conn: &mut SqliteConnection,
+    adapter_id: &str,
+    name: &str,
+    chiffrat: &[u8],
+    fp_neu: &str,
+    fp_alt: &str,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE adapter_geheimnis SET chiffrat = ?, schluessel_fp = ? \
+         WHERE adapter_id = ? AND name = ? AND schluessel_fp = ?",
+    )
+    .bind(chiffrat)
+    .bind(fp_neu)
+    .bind(adapter_id)
+    .bind(name)
+    .bind(fp_alt)
+    .execute(conn)
+    .await?
+    .rows_affected()
+        == 1)
+}
+
 /// Ob ein Geheimnis der Org an einen anderen Schlüssel als `fingerabdruck` gespeichert ist
 /// (`None`: überhaupt eines). Für den Zustand des Speichers in der Verwaltung.
 pub async fn has_fremde_chiffrate(

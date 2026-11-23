@@ -238,7 +238,7 @@ export default function AbloesungKarte({
         <span style={{ ...monoStil('mono', 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={spalte.zeit} rolle="kurz" />
         </span>
-        <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{spalte.wort}</span>
+        <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
         <Stapel abstand="xs">
