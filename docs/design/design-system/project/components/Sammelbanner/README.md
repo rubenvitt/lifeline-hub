@@ -5,7 +5,7 @@ Bedien-Leitlinie Festlegung 6: Live-Updates springen nicht unter dem Cursor, CLS
 WCAG 3.2.5).
 
 Grund `bannerGrund`, Kante `bannerLinie`, Pfeilicon in `bedien`, Text 12 in
-`bedienText` (Kontrast Tag 7,19 · Nacht 9,71), rechts die Aktion Mono in `bedien`.
+`bedienText` (Kontrast Tag 7,19 · Nacht 9,71), rechts die Aktion in Meta in `bedien`.
 Blau, nicht Rot: ein neuer Eintrag ist eine Bedienaufforderung, keine Gefahr.
 
 `role="status"` — höflich angesagt, nie unterbrechend. Das Banner ist die EINE Meldung

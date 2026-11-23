@@ -29,6 +29,7 @@ import {
   Stapel,
   Status,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
@@ -610,7 +611,7 @@ function StatusZeile({
         {seit}
       </Stapel>
       {s.verteilung && (
-        <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{s.verteilung}</span>
+        <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>{s.verteilung}</span>
       )}
       {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
     </Stapel>

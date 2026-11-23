@@ -10,6 +10,7 @@ import {
   Datenfeld,
   Datenraster,
   monoStil,
+  schriftStil,
   Paneel,
   Stapel,
   Textstufe,
@@ -90,7 +91,7 @@ export default function EinheitAufgeloestAnsicht({
         )}
       </span>
       {p.ist_fuehrer && (
-        <span style={{ ...monoStil('meta'), color: rollen.text2 }} title="Einheitsführer">
+        <span style={{ ...schriftStil('meta'), color: rollen.text2 }} title="Einheitsführer">
           EF
         </span>
       )}

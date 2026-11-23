@@ -1,9 +1,10 @@
 ---
 id: ADR-0087
 titel: Text hat einen Boden von 11 px und kommt wie Mono, Abstand und Feldbreite aus benannten Stufen
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-23
 ersetzt: ADR-0071
+ersetzt_durch: ADR-0094
 gilt_fuer:
   - frontend/src/theme/tokens.ts
   - frontend/src/theme/rollen.css

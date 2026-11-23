@@ -1,7 +1,7 @@
 import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode, Ref } from 'react';
-import { monoStil, useRollen } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Sammelbanner — „12 neue Meldungen" statt eingeschobener Zeilen (Neuentwurf S4;
@@ -9,7 +9,7 @@ import { monoStil, useRollen } from './rollenwerte';
  * WCAG 3.2.5).
  *
  * Grund `bannerGrund`, Kante `bannerLinie`, Pfeilicon in `bedien`, Text 12 in
- * `bedienText` (Kontrast Tag 7,19 · Nacht 9,71), rechts die Aktion Mono in `bedien`.
+ * `bedienText` (Kontrast Tag 7,19 · Nacht 9,71), rechts die Aktion in Meta in `bedien`.
  * Blau, nicht Rot: ein neuer Eintrag ist eine Bedienaufforderung, keine Gefahr.
  *
  * `role="status"` — höflich angesagt, nie unterbrechend. Das Banner ist die EINE Meldung
@@ -126,7 +126,7 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
         <Button
           type="link"
           onClick={aktion.onKlick}
-          style={{ ...monoStil('meta'), paddingInline: token.paddingXS }}
+          style={{ ...schriftStil('meta'), paddingInline: token.paddingXS }}
         >
           {aktion.label}
         </Button>
