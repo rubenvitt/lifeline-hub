@@ -257,8 +257,8 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
   // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
   it.each<[string, string, Pick<Aufbau, 'aktiv' | 'entlassene'>]>([
     ['aktiv', '', {}],
-    ['aktiv', '/personal', {}],
-    ['entlassen', '/personal', { aktiv: [], entlassene: [kraft()] }],
+    ['aktiv', '/personnel', {}],
+    ['entlassen', '/personnel', { aktiv: [], entlassene: [kraft()] }],
   ])(
     'gescheiterter Neuabruf (%s, /api/einsaetze/7%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (_lage, unterpfad, aufbau) => {

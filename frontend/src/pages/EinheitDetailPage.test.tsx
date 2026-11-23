@@ -848,7 +848,7 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
 describe('EinheitDetailPage · Datenzustände', () => {
   // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
-  it.each(['', '/einheiten'] as const)(
+  it.each(['', '/units'] as const)(
     'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = zeige();
@@ -979,8 +979,10 @@ describe('EinheitDetailPage · Listen nur mit Freigabe (D5)', () => {
   /** Zählt die Abrufe der drei Einsatzlisten; der Rest kommt aus `handlers`. */
   function zaehleAbrufe(gesperrt: string[]) {
     const abrufe: string[] = [];
+    // Gezählt wird der Modulschlüssel, abgefragt der englische Pfad (ADR-0085).
+    const segment: Record<string, string> = { personal: 'personnel', fahrzeuge: 'vehicles' };
     const liste = (pfad: string) =>
-      http.get(`/api/einsaetze/1/${pfad}`, () => {
+      http.get(`/api/einsaetze/1/${segment[pfad] ?? pfad}`, () => {
         abrufe.push(pfad);
         return HttpResponse.json([]);
       });

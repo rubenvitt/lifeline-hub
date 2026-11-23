@@ -120,7 +120,7 @@ test.describe(KAPITEL, () => {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
         menge: 2,
       });
-      await fuelle(api, 'post', `${pfad}/${pavillon.id}/entlassen`);
+      await fuelle(api, 'post', `${pfad}/${pavillon.id}/release`);
       // Ein freies Gerät für den Dialog „Material disponieren“: die Demo-Geräte stehen alle im
       // Einsatz, ihre Optionen sind gesperrt (LLH-1487).
       await fuelle(api, 'post', '/api/material', {

@@ -31,7 +31,7 @@ const uhsVorlage: SchichtplanWechselVorlage = {
 };
 
 function render(vorlage: SchichtplanWechselVorlage) {
-  server.use(http.get(`${PFAD}/bloecke/5/wechsel`, () => HttpResponse.json(vorlage)));
+  server.use(http.get(`${PFAD}/blocks/5/handovers`, () => HttpResponse.json(vorlage)));
   const onSchliessen = vi.fn();
   renderMitProviders(
     <SchichtplanWechselDialog einsatzId={1} blockId={5} onSchliessen={onSchliessen} />,
@@ -43,7 +43,7 @@ describe('SchichtplanWechselDialog', () => {
   it('belegt den Wechsel an der UHS vor und schickt die Auswahl', async () => {
     let rumpf: unknown = null;
     server.use(
-      http.post(`${PFAD}/bloecke/5/wechsel`, async ({ request }) => {
+      http.post(`${PFAD}/blocks/5/handovers`, async ({ request }) => {
         rumpf = await request.json();
         return HttpResponse.json({ id: 9 }, { status: 201 });
       }),
@@ -88,7 +88,7 @@ describe('SchichtplanWechselDialog', () => {
   it('nimmt einen vollzogenen Wechsel zurück', async () => {
     let zurueck = false;
     server.use(
-      http.post(`${PFAD}/wechsel/9/zuruecknehmen`, () => {
+      http.post(`${PFAD}/handovers/9/undo`, () => {
         zurueck = true;
         return HttpResponse.json({ id: 9 });
       }),

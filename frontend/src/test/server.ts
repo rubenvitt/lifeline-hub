@@ -205,7 +205,7 @@ export const server = setupServer(
   http.get('/api/einsaetze/:einsatzId/units/timeline', () => HttpResponse.json([])),
   http.get('/api/einsaetze/:einsatzId/personnel/timeline', () => HttpResponse.json([])),
   // Grenzwerte der Einstufung (LLH-730): die Vorgaben des Schichtplans, wie ohne eigenen Wert.
-  http.get('/api/einsaetze/:einsatzId/:modul/zeitachse/grenzwerte', () =>
+  http.get('/api/einsaetze/:einsatzId/:modul/timeline/limits', () =>
     HttpResponse.json({
       max_dienst_minuten: 720,
       min_ruhe_minuten: 480,
@@ -213,7 +213,7 @@ export const server = setupServer(
       min_ruhe_eigen: false,
     }),
   ),
-  http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/zeitachse', () =>
+  http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/timeline', () =>
     HttpResponse.json({ ereignisse: [], perioden: [] }),
   ),
   /**

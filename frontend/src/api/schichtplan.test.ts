@@ -58,14 +58,14 @@ describe('Schichtplan-API (LLH-1552)', () => {
     await deleteSchichtplanHelfer(7, 2);
     expect(seen).toEqual([
       `GET ${basis}`,
-      `POST ${basis}/bloecke {"posten":{"art":"uhs","uhs_id":3},"von":"2026-11-06 10:00:00","bis":"2026-11-06 12:00:00","personen":[{"art":"helfer","helfer_id":2}]}`,
-      `PATCH ${basis}/bloecke/5 {"version":2,"posten":{"art":"pause"}}`,
-      `DELETE ${basis}/bloecke/5?version=3`,
-      `POST ${basis}/erzeugen {"posten":{"art":"einheit","einheit_id":4},"von":"2026-11-06 14:00:00","bis":"2026-11-06 20:00:00","laenge_minuten":120}`,
-      `PATCH ${basis}/grenzwerte {"max_dienst_minuten":null}`,
-      `POST ${basis}/helfer {"name":"Cem"}`,
-      `PATCH ${basis}/helfer/2 {"telefon":null}`,
-      `DELETE ${basis}/helfer/2`,
+      `POST ${basis}/blocks {"posten":{"art":"uhs","uhs_id":3},"von":"2026-11-06 10:00:00","bis":"2026-11-06 12:00:00","personen":[{"art":"helfer","helfer_id":2}]}`,
+      `PATCH ${basis}/blocks/5 {"version":2,"posten":{"art":"pause"}}`,
+      `DELETE ${basis}/blocks/5?version=3`,
+      `POST ${basis}/generate {"posten":{"art":"einheit","einheit_id":4},"von":"2026-11-06 14:00:00","bis":"2026-11-06 20:00:00","laenge_minuten":120}`,
+      `PATCH ${basis}/limits {"max_dienst_minuten":null}`,
+      `POST ${basis}/helpers {"name":"Cem"}`,
+      `PATCH ${basis}/helpers/2 {"telefon":null}`,
+      `DELETE ${basis}/helpers/2`,
     ]);
   });
 });

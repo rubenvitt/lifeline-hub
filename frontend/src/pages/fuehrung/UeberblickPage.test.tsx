@@ -20,6 +20,13 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { saveStartlisteAusgeblendet } from './startlisteSpeicher';
 import { pruefeKachelGrenzen } from '../../test/kachelWaechter';
 
+/** Quelle und Modul heißen wie ihr Datenschlüssel, der Pfad ist englisch (ADR-0085). */
+const API_SEGMENT: Record<string, string> = {
+  einheiten: 'units',
+  personal: 'personnel',
+  fahrzeuge: 'vehicles',
+};
+
 dayjs.extend(utc);
 
 /**
@@ -1690,7 +1697,7 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
-          http.get(`/api/einsaetze/1/${quelle}`, async () => {
+          http.get(`/api/einsaetze/1/${API_SEGMENT[quelle] ?? quelle}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
           }),
@@ -1748,7 +1755,7 @@ describe('UeberblickPage', () => {
 
         server.use(
           http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
-          http.get(`/api/einsaetze/1/${modul}`, async () => {
+          http.get(`/api/einsaetze/1/${API_SEGMENT[modul] ?? modul}`, async () => {
             abrufe.n += 1;
             await tor;
             return HttpResponse.json(volleDaten[modul] as object);

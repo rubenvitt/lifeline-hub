@@ -975,7 +975,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
         'meldungen',
         'auftraege',
         'abschnitte',
-        'einheiten',
+        'units',
       ].map((pfad) => http.get(`/api/einsaetze/:id/${pfad}`, () => HttpResponse.json([]))),
     );
     return renderMitProviders(
