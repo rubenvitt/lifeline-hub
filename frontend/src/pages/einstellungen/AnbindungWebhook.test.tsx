@@ -68,28 +68,28 @@ const zugang = (extra: Record<string, unknown> = {}) => ({
 function stelleBereit(z: Record<string, unknown>, versuche: unknown[] = []) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   server.use(
-    http.get('/api/admin/anbindungen', () =>
+    http.get('/api/admin/integrations', () =>
       HttpResponse.json({ zugaenge: [z], gesperrt_grund: null, instanz_fingerabdruck: 'ABCD' }),
     ),
-    http.get('/api/admin/einwurf-zugaenge', () =>
+    http.get('/api/admin/intake-credentials', () =>
       HttpResponse.json({ zugaenge: [], gesperrt_grund: null, transport: 'tls' }),
     ),
-    http.get('/api/admin/anbindungen/a/webhook/versuche', () => HttpResponse.json(versuche)),
-    http.post('/api/admin/anbindungen/a/webhook', async ({ request }) => {
+    http.get('/api/admin/integrations/a/webhook/attempts', () => HttpResponse.json(versuche)),
+    http.post('/api/admin/integrations/a/webhook', async ({ request }) => {
       const body = await request.json();
       aufrufe.push({ pfad: 'einrichten', body });
       return HttpResponse.json(webhook(body as Record<string, unknown>), { status: 201 });
     }),
-    http.patch('/api/admin/anbindungen/a/webhook', async ({ request }) => {
+    http.patch('/api/admin/integrations/a/webhook', async ({ request }) => {
       const body = await request.json();
       aufrufe.push({ pfad: 'aendern', body });
       return HttpResponse.json(webhook());
     }),
-    http.post('/api/admin/anbindungen/a/webhook/wieder-aufnehmen', () => {
+    http.post('/api/admin/integrations/a/webhook/resume', () => {
       aufrufe.push({ pfad: 'weiter', body: null });
       return HttpResponse.json(webhook());
     }),
-    http.post('/api/admin/anbindungen/a/webhook/test', () => {
+    http.post('/api/admin/integrations/a/webhook/test', () => {
       aufrufe.push({ pfad: 'test', body: null });
       return HttpResponse.json({ erfolg: false, status: 503, fehler_art: 'status', dauer_ms: 41 });
     }),
@@ -327,7 +327,7 @@ describe('Webhook · Befunde aus dem Review (LLH-1656)', () => {
     let antworten: () => void = () => {};
     server.use(
       http.get(
-        '/api/admin/anbindungen/a/webhook/versuche',
+        '/api/admin/integrations/a/webhook/attempts',
         () =>
           new Promise<Response>((fertig) => {
             antworten = () => fertig(HttpResponse.json([]));
@@ -348,7 +348,7 @@ describe('Webhook · Befunde aus dem Review (LLH-1656)', () => {
   it('Verlauf: ein Fehler sagt, dass er nicht ladbar ist', async () => {
     stelleBereit(zugang({ webhook: webhook() }));
     server.use(
-      http.get('/api/admin/anbindungen/a/webhook/versuche', () =>
+      http.get('/api/admin/integrations/a/webhook/attempts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -362,14 +362,14 @@ describe('Webhook · Befunde aus dem Review (LLH-1656)', () => {
     // Der Server kennt nach dem PATCH das neue Ziel, auch beim Neuabruf der Liste.
     let stand = webhook();
     server.use(
-      http.get('/api/admin/anbindungen', () =>
+      http.get('/api/admin/integrations', () =>
         HttpResponse.json({
           zugaenge: [zugang({ webhook: stand })],
           gesperrt_grund: null,
           instanz_fingerabdruck: 'ABCD',
         }),
       ),
-      http.patch('/api/admin/anbindungen/a/webhook', async ({ request }) => {
+      http.patch('/api/admin/integrations/a/webhook', async ({ request }) => {
         aufrufe.push({ pfad: 'aendern', body: await request.json() });
         stand = webhook({
           url: 'https://neu.example/',

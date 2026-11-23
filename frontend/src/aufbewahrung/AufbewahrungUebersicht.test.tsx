@@ -338,7 +338,7 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
     server.use(
       meHandler(ME_ADMIN),
       http.get('/api/aufbewahrung', () => HttpResponse.json(EINTRAEGE)),
-      http.get('/api/admin/archiv/einspielen', () => {
+      http.get('/api/admin/archive/import', () => {
         abfrage.gefragt = true;
         return verfuegbar === 'fehler'
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
@@ -426,7 +426,7 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
     await waitFor(() => expect(anfragen).toHaveLength(1));
     const fd = anfragen[0].body as FormData;
-    expect(anfragen[0].url).toBe('/api/admin/archiv/einspielen');
+    expect(anfragen[0].url).toBe('/api/admin/archive/import');
     expect([...fd.keys()]).toEqual(['schluessel', 'block']);
     expect(fd.get('schluessel')).toBe(SCHLUESSEL);
     expect(fd.get('block')).toBe(BLOCK);

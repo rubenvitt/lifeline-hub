@@ -863,7 +863,7 @@ export interface components {
             /** @description Bis wann dieser Block gilt; `None` = so lange wie der Einsatz. */
             gueltig_bis?: string | null;
         };
-        /** @description Was eingespielt wurde (`POST /api/admin/archiv/einspielen`). */
+        /** @description Was eingespielt wurde (`POST /api/admin/archive/import`). */
         ArchivEingespieltAnzeige: {
             bezeichnung: string;
             /** Format: int64 */
@@ -885,7 +885,7 @@ export interface components {
             loeschen_at: string;
             org_name: string;
         };
-        /** @description Antwort von `GET /api/admin/archiv/einspielen`. */
+        /** @description Antwort von `GET /api/admin/archive/import`. */
         ArchivEinspielenVerfuegbarkeit: {
             /**
              * @description `false` an einer Instanz, bei der sich eine andere meldet (Hub): dort gehört kein privater

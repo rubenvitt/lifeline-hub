@@ -2238,7 +2238,7 @@
       },
       "ArchivEingespieltAnzeige": {
         "type": "object",
-        "description": "Was eingespielt wurde (`POST /api/admin/archiv/einspielen`).",
+        "description": "Was eingespielt wurde (`POST /api/admin/archive/import`).",
         "required": [
           "einsatz_id",
           "bezeichnung",
@@ -2291,7 +2291,7 @@
       },
       "ArchivEinspielenVerfuegbarkeit": {
         "type": "object",
-        "description": "Antwort von `GET /api/admin/archiv/einspielen`.",
+        "description": "Antwort von `GET /api/admin/archive/import`.",
         "required": [
           "verfuegbar"
         ],

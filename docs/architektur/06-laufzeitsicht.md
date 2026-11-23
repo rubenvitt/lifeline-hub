@@ -528,7 +528,7 @@ sequenceDiagram
   participant Admin as frontend Anbindungen
   participant Hub as lifeline-hub (src/routes/anbindungen.rs, src/public_api/)
   participant F as Fremdsystem (crates/lifeline-machine-client)
-  Admin->>Hub: POST /api/admin/anbindungen {name, scopes}
+  Admin->>Hub: POST /api/admin/integrations {name, scopes}
   Hub-->>Admin: Code (16 Zeichen, 15 min)
   F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
   Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
@@ -558,7 +558,7 @@ sequenceDiagram
   participant Admin as frontend Anbindungen
   participant Hub as lifeline-hub (src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/)
   participant A as Absender (BOSWatch, FE2, OsmAnd)
-  Admin->>Hub: POST /api/admin/einwurf-zugaenge {name, scope}
+  Admin->>Hub: POST /api/admin/intake-credentials {name, scope}
   Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
   A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
   Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
@@ -636,7 +636,7 @@ sequenceDiagram
   participant Hub as lifeline-hub (src/routes/adapter.rs, src/adapter/)
   participant DB as SQLite (adapter, adapter_geheimnis, adapter_versuch)
   participant Q as Quelle (Divera, HiOrg …)
-  Admin->>Hub: PUT /api/admin/adapter/{id}/geheimnisse/accesskey {wert}
+  Admin->>Hub: PUT /api/admin/adapter/{id}/secrets/accesskey {wert}
   Hub->>DB: Chiffrat (age, Schlüssel aus der Umgebung) und Fingerabdruck
   Hub-->>Admin: 204, der Wert kommt nie zurück
   loop alle 5 s: fällige Adapter
@@ -655,7 +655,7 @@ sequenceDiagram
   15 min))`; ein Fehler, den ein Mensch beheben muss, hält an (`src/adapter/zustand.rs`). Ein
   neues Geheimnis oder geänderte Einstellungen machen einen so angehaltenen Adapter sofort
   wieder fällig.
-- „Verbindung prüfen“ (`POST …/pruefen`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
+- „Verbindung prüfen“ (`POST …/check`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
   der Versuch steht im Verlauf (`lauf::probe`).
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
