@@ -520,7 +520,7 @@ sequenceDiagram
 
 Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
 eigenen Tabellen (LLH-1652,
-[ADR-0093](entscheidungen/ADR-0093-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
+[ADR-0095](entscheidungen/ADR-0095-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 
 ```mermaid

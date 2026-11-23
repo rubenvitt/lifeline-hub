@@ -1,6 +1,6 @@
 # Maschinenzugang: Fremdsysteme an Lifeline Hub anbinden
 
-Stand: 12.11.2026 · LLH-1652, LLH-1638, LLH-1524 · Regeln: [ADR-0093](../architektur/entscheidungen/ADR-0093-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
+Stand: 12.11.2026 · LLH-1652, LLH-1638, LLH-1524 · Regeln: [ADR-0095](../architektur/entscheidungen/ADR-0095-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec `maschinenzugang`, Vertrag der API: [`public-v1.json`](public-v1.json).
 
 Ein Fremdsystem (Alarm-Adapter, Lagemonitor, Einsatzbuch, Rechner) meldet sich mit einem eigenen

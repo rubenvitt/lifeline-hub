@@ -14,7 +14,7 @@ pub const LAENGE: usize = 16;
 pub const GUELTIG_MINUTEN: i64 = 15;
 /// Salz der Ableitung; trägt die Fassung des Verfahrens.
 const SALZ: &[u8] = b"lifeline-instanzkopplung/1";
-/// Salz der Ableitung für den Code eines Maschinenzugangs (Fremdsystem, ADR-0093). Ein eigenes
+/// Salz der Ableitung für den Code eines Maschinenzugangs (Fremdsystem, ADR-0095). Ein eigenes
 /// Salz trennt beide Verfahren: Derselbe Code ergibt eine andere `suche` und andere Schlüssel.
 pub const SALZ_MACHINE: &[u8] = b"lifeline-machine-client/1";
 
