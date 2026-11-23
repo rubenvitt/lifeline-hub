@@ -61,14 +61,15 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Querbezug aus einem fremden Bereich braucht eine Regel dort, `bereiche.test.sh` sucht
     fehlende). `--auswahl` zeigt die Schritte nur an; ohne Argument läuft alles. Die CI wählt
     nicht mehr nach Bereichen.
-  - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Ein neuer Push bricht die
-    **Testjobs** des laufenden Laufs ab (Concurrency je Job: `rust`, `frontend` je Anteil, `e2e`,
-    `ios`, `android`, `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
+  - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Gestartete **Testjobs**
+    laufen zu Ende (ADR-0091, LLH-2035; Concurrency je Job ohne Abbruch: `rust`, `frontend` je
+    Anteil, `e2e`, `ios`, `android`, `berichte`). Je Job wartet höchstens ein Lauf; ein neuer Push
+    ersetzt nur den wartenden, und dessen Lauf deckt die übersprungenen Zwischenstände mit ab. Der **Release** hat eine eigene
     Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
     Lauf mit abgebrochenen oder roten Tests released nicht (`needs`). Nie
     `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den
-    jüngsten Lauf** eines Kanal-Branches: ein neu gestarteter Job eines älteren Laufs tritt in
-    dieselbe Gruppe und bricht die Tests des jüngeren ab.
+    jüngsten Lauf** eines Kanal-Branches: ein neu gestarteter Job eines älteren Laufs tritt als
+    wartender in dieselbe Gruppe und verdrängt den wartenden Job des jüngeren.
   - **Label-Ereignisse:** `pr.yml` hört auf `labeled`; die Schnellprüfungen laufen dabei
     immer neu, nie übersprungen (ein übersprungener jüngster Check zählte grün). Auto-Merge-
     Ereignisse gehören nicht nach `pr.yml`.
