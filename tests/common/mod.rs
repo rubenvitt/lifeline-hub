@@ -435,7 +435,7 @@ pub async fn standard_ansicht_id(app: &axum::Router, cookie: &str, einsatz: i64)
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        &format!("/api/einsaetze/{einsatz}/map-views"),
         cookie,
         None,
     )
@@ -454,7 +454,7 @@ pub async fn karten_ansicht_anlegen(
     let (status, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        &format!("/api/einsaetze/{einsatz}/map-views"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )

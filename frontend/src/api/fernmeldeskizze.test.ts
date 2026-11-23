@@ -143,8 +143,8 @@ describe('api/fernmeldeskizze — Einzel-Zuordnungen (D5)', () => {
     await ordneSprechgruppeZu(7, { art: 'komponente', id: 2 }, 31);
     await loeseSprechgruppe(7, { art: 'komponente', id: 2 }, 31);
     expect(a).toEqual([
-      { methode: 'PUT', pfad: `${E}/abschnitte/1/sprechgruppen/31`, body: undefined },
-      { methode: 'DELETE', pfad: `${E}/abschnitte/1/sprechgruppen/31`, body: undefined },
+      { methode: 'PUT', pfad: `${E}/sectors/1/talk-groups/31`, body: undefined },
+      { methode: 'DELETE', pfad: `${E}/sectors/1/talk-groups/31`, body: undefined },
       { methode: 'PUT', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
       { methode: 'DELETE', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
       { methode: 'PUT', pfad: `${E}/fuehrungsstelle/sprechgruppen/31`, body: undefined },

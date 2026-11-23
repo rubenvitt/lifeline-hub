@@ -226,7 +226,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage_json(
         &app,
         "PUT",
-        &format!("{basis}/lagekennzahl-wahl"),
+        &format!("{basis}/situation-metric-selection"),
         &admin,
         Some(&json!({"gewaehlt": ["sanitaetsdienst"]})),
     )
@@ -537,7 +537,7 @@ async fn karte_kommt_mit_fassung_und_nur_wenn_sie_sich_geaendert_hat() {
     let (s, z) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zonen"),
+        &format!("{basis}/zones"),
         &admin,
         Some(
             &json!({"typ": "absperrbereich", "geometrie_typ": "Polygon", "geometrie": POLY,
@@ -625,7 +625,7 @@ async fn lage_traegt_keine_namen_freitexte_oder_personenkennungen() {
     post(
         &app,
         &admin,
-        &format!("{basis}/freie-zeichen"),
+        &format!("{basis}/free-symbols"),
         json!({
             "lat": 52.95, "lon": 10.55,
             "zeichen_spec": STELLE_SANITAET,

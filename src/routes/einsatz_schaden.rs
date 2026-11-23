@@ -352,7 +352,7 @@ pub fn schaeden_csv(schaeden: &[SchadenAnzeige]) -> String {
     csv
 }
 
-/// GET /api/einsaetze/{id}/schaeden/export — CSV aller nicht stornierten Schäden, älteste Nummer
+/// GET /api/einsaetze/{id}/damages/export — CSV aller nicht stornierten Schäden, älteste Nummer
 /// zuerst (LLH-1115). Aufzählungen in Worten wie die Oberfläche; Gefahr und Schadensgrad leer,
 /// wenn nicht angegeben. Ohne Geschädigte: die Liste ist eine Lageübersicht, kein Register
 /// betroffener Personen. Gleiches Gate wie die Liste, nicht auditiert.

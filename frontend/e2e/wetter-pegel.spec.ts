@@ -169,13 +169,13 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
 
 /** Stellt Pegel, Verlauf und Wetter auf Literale. */
 async function stelle(page: Page, einsatzId: string, wetterAntwort: unknown) {
-  await page.route(`**/api/einsaetze/${einsatzId}/pegel`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: PEGEL }) : route.continue(),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/pegel/verlauf`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/gauges/history`, (route) =>
     route.fulfill({ json: VERLAUF }),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
     route.fulfill({ json: wetterAntwort }),
   );
 }

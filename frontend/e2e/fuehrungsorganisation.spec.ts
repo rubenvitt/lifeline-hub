@@ -183,7 +183,7 @@ test('live: ein umgehängter Unterabschnitt steht ohne Neuladen am neuen Ort', a
       .filter({ has: page.getByRole('link', { name, exact: true }) });
   await expect(spalte(ABSCHNITT).getByRole('link', { name: 'Unterabschnitt Deich' })).toBeVisible();
 
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/abschnitte/${unter}`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();
@@ -304,7 +304,7 @@ test('Schleuse, Fokus: ein aufgelöster Abschnitt unter dem Fokus bleibt als Pla
     .filter({ has: page.getByRole('link', { name: 'Einsatzabschnitt 3', exact: true }) })
     .boundingBox();
   const antwort = await page.request.delete(
-    `/api/einsaetze/${einsatzId}/abschnitte/${abschnitte[2]}`,
+    `/api/einsaetze/${einsatzId}/sectors/${abschnitte[2]}`,
   );
   expect(antwort.ok(), `Auflösen: ${await antwort.text()}`).toBeTruthy();
 
@@ -335,7 +335,7 @@ test('Schleuse, Zeiger: ein umgehängter Unterabschnitt springt nicht unter dem 
   await ziel(page).hover();
   await expect(stand(page)).toHaveText('Live pausiert');
   const vorher = await rechteck(page);
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/abschnitte/${unter}`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();

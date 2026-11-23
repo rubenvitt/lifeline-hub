@@ -283,7 +283,7 @@ async fn einheit_abschnitt_extern_und_freitext_benachrichtigen_niemanden() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/abschnitte", w.einsatz),
+        &format!("/api/einsaetze/{}/sectors", w.einsatz),
         &w.admin,
         Some(&json!({ "name": "Süd" })),
     )

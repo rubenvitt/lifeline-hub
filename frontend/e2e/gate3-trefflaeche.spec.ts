@@ -1978,7 +1978,7 @@ async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
     { data: { mittel: 'festnetz', wert: '0421 112' } },
   );
   expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
-  const abschnitt = await page.request.post(`${basis}/abschnitte`, {
+  const abschnitt = await page.request.post(`${basis}/sectors`, {
     data: { name: 'Abschnitt Nord', verbindungen: [{ mittel: 'mobil', wert: '0170 1' }] },
   });
   expect(abschnitt.ok(), `Seeding Abschnitt: ${await abschnitt.text()}`).toBeTruthy();

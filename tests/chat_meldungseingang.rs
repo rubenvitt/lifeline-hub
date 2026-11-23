@@ -126,7 +126,7 @@ async fn lage_aus_dem_chat_steht_in_den_lagemeldungen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let lage = lesen(&app, &admin, &format!("/api/einsaetze/{e}/lage/meldungen")).await;
+    let lage = lesen(&app, &admin, &format!("/api/einsaetze/{e}/situation/reports")).await;
     assert_eq!(lage.len(), 1, "{lage:?}");
     assert_eq!(lage[0]["meldungsart"], "lagemeldung");
 }

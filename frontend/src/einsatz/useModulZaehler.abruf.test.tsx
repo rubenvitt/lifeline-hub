@@ -157,7 +157,7 @@ describe.each([
 );
 
 describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
-  const WETTER = '/api/einsaetze/7/wetter';
+  const WETTER = '/api/einsaetze/7/weather';
   const JETZT = Date.now();
   const um = (ms: number) => new Date(JETZT + ms).toISOString();
   const ALLE_ANDEREN = [...ANDERE, 'betreuung', 'evakuierung'];

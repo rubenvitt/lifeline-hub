@@ -128,7 +128,7 @@ function stelleBereit({
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([e])),
-    http.get('/api/einsaetze/7/abschnitte', () => {
+    http.get('/api/einsaetze/7/sectors', () => {
       abgerufen.push('abschnitte');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),

@@ -99,7 +99,7 @@ function bereit(g: GeraetAnzeige = monitor) {
         einsatzFixture({ id: 7, bezeichnung: 'Stadtfest', meine_rolle: 'beobachter' }),
       ),
     ),
-    http.get('/api/einsaetze/7/lagemonitor', () => lagebildAntwort()),
+    http.get('/api/einsaetze/7/situation-monitor', () => lagebildAntwort()),
   );
 }
 

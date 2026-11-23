@@ -988,7 +988,7 @@ async fn pruefe_skelett(
         format!("/api/einsaetze/{e}/etb"),
         format!("/api/einsaetze/{e}/personen"),
         format!("/api/einsaetze/{e}/tiere"),
-        format!("/api/einsaetze/{e}/schaeden"),
+        format!("/api/einsaetze/{e}/damages"),
         format!("/api/einsaetze/{e}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;
@@ -1125,7 +1125,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden"),
+        &format!("{basis}/damages"),
         json!({
             "typ": "sachschaden", "ausmass": "mittel", "ort": "Birkenallee-9",
             "gefahrenart": "elektrizitaet", "schadensgrad": "teilzerstoert",
@@ -1139,7 +1139,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden/{sid}/uebergeben"),
+        &format!("{basis}/damages/{sid}/hand-over"),
         json!({ "uebergeben_an": "Dachdecker-Ruehl" }),
     )
     .await;
@@ -1147,7 +1147,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden/{sid}/abschliessen"),
+        &format!("{basis}/damages/{sid}/close"),
         json!({ "abschluss_grund": "behoben" }),
     )
     .await;
@@ -1157,7 +1157,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/zonen"),
+        &format!("{basis}/zones"),
         json!({
             "typ": "absperrbereich", "geometrie_typ": "Polygon", "label": "Sperrzone-Lindenplatz",
             "geometrie": r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#

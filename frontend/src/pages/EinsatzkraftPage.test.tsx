@@ -121,7 +121,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
       requests.push(`GET ${new URL(request.url).pathname}`);
       return HttpResponse.json(FAHRZEUGE);
     }),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/uhs', ({ request }) => {
       requests.push(`GET ${new URL(request.url).pathname}`);
       return HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]);

@@ -436,7 +436,7 @@ async fn gesicherter_lagestand_enthaelt_keine_namentliche_zahl() {
     let (s, dok) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )
@@ -615,7 +615,7 @@ async fn gesicherter_lagestand_enthaelt_keine_leitung_und_keinen_kontaktweg() {
     let (s, dok) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

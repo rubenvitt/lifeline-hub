@@ -96,7 +96,7 @@ function rendere(
       aenderungen.push({ id: String(params.dokId), body });
       return HttpResponse.json(dokument({ ...(body as object), id: Number(params.dokId) }));
     }),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/etb', () => HttpResponse.json([])),
   );

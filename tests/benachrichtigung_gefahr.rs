@@ -83,7 +83,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/zonen", self.einsatz),
+            &format!("/api/einsaetze/{}/zones", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )

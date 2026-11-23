@@ -58,7 +58,7 @@ function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] }
     http.get(`${BASIS}/modul-freigaben`, () => HttpResponse.json(freigabenFixture())),
     http.get(`${BASIS}/modul-zaehler`, () => HttpResponse.json(zaehler)),
     http.get(`${BASIS}/personen`, () => HttpResponse.json(over.personen ?? [])),
-    http.get(`${BASIS}/abschnitte`, () =>
+    http.get(`${BASIS}/sectors`, () =>
       HttpResponse.json([
         {
           id: 5,

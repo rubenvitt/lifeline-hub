@@ -45,7 +45,7 @@ async fn standardansicht_wird_lazy_geseedet_aus_einstellungen() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/karten-ansichten"),
+        &format!("/api/einsaetze/{e}/map-views"),
         &cookie,
         None,
     )
@@ -68,7 +68,7 @@ async fn zweiter_get_seedet_nicht_neu() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
 
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let (_, v1) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let (_, v2) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     assert_eq!(v1.as_array().unwrap().len(), 1);
@@ -84,7 +84,7 @@ async fn get_nicht_existenter_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        "/api/einsaetze/999999/karten-ansichten",
+        "/api/einsaetze/999999/map-views",
         &cookie,
         None,
     )
@@ -100,7 +100,7 @@ async fn patch_ueberschreibt_konfiguration() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
 
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
@@ -139,7 +139,7 @@ async fn patch_unbekannter_basemap_modus_ist_400() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
@@ -160,7 +160,7 @@ async fn patch_unbekanntes_theme_ist_400() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
@@ -182,7 +182,7 @@ async fn standard_aid(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (_, v) = anfrage_json(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        &format!("/api/einsaetze/{einsatz}/map-views"),
         cookie,
         None,
     )
@@ -200,14 +200,14 @@ async fn delete_feuert_objekt_layer_sse() {
     let (app, live) = setup_mit_live().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     standard_aid(&app, &cookie, e).await;
     let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &cookie,
         Some(&json!({
             "typ": "absperrbereich", "geometrie_typ": "Polygon",
@@ -239,7 +239,7 @@ async fn post_legt_zweite_ansicht_an() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     standard_aid(&app, &cookie, e).await; // seed
 
     let (s, v) = anfrage_json(
@@ -273,7 +273,7 @@ async fn post_leerer_name_ist_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/karten-ansichten"),
+        &format!("/api/einsaetze/{e}/map-views"),
         &cookie,
         Some(&json!({"name": "   "})),
     )
@@ -291,7 +291,7 @@ async fn post_unbekannter_basemap_modus_ist_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/karten-ansichten"),
+        &format!("/api/einsaetze/{e}/map-views"),
         &cookie,
         Some(&json!({"name": "X", "basemap_modus": "satellit"})),
     )
@@ -305,7 +305,7 @@ async fn patch_benennt_um_ohne_config_zu_beruehren() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let aid = standard_aid(&app, &cookie, e).await;
 
     // Config setzen
@@ -342,7 +342,7 @@ async fn patch_standard_setzen_verschiebt_flag() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let alt_standard = standard_aid(&app, &cookie, e).await;
 
     let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Neu"}))).await;
@@ -384,7 +384,7 @@ async fn delete_standardansicht_ist_422() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let standard = standard_aid(&app, &cookie, e).await;
     // eine zweite Ansicht existiert, damit „letzte" nicht der Grund ist
     anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Zwei"}))).await;
@@ -399,7 +399,7 @@ async fn delete_letzte_ansicht_ist_422() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     let standard = standard_aid(&app, &cookie, e).await;
     let (s, _) = anfrage_json(&app, "DELETE", &format!("{url}/{standard}"), &cookie, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "letzte Ansicht bleibt");
@@ -412,7 +412,7 @@ async fn delete_freigeben_gibt_objekte_frei() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     standard_aid(&app, &cookie, e).await;
     let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
@@ -421,7 +421,7 @@ async fn delete_freigeben_gibt_objekte_frei() {
     let (zs, zone) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &cookie,
         Some(&json!({
             "typ": "absperrbereich", "geometrie_typ": "Polygon",
@@ -448,7 +448,7 @@ async fn delete_freigeben_gibt_objekte_frei() {
     let (_, zonen) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &cookie,
         None,
     )
@@ -471,7 +471,7 @@ async fn delete_loeschen_entfernt_objekte() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
-    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    let url = format!("/api/einsaetze/{e}/map-views");
     standard_aid(&app, &cookie, e).await;
     let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
@@ -479,7 +479,7 @@ async fn delete_loeschen_entfernt_objekte() {
     let (_, zone) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &cookie,
         Some(&json!({
             "typ": "absperrbereich", "geometrie_typ": "Polygon",
@@ -503,7 +503,7 @@ async fn delete_loeschen_entfernt_objekte() {
     let (_, zonen) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &cookie,
         None,
     )
@@ -530,7 +530,7 @@ async fn delete_fremde_ansicht_ist_404() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/karten-ansichten"),
+        &format!("/api/einsaetze/{e2}/map-views"),
         &cookie,
         Some(&json!({"name": "Zwei"})),
     )
@@ -538,7 +538,7 @@ async fn delete_fremde_ansicht_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e1}/karten-ansichten/{fremde}"),
+        &format!("/api/einsaetze/{e1}/map-views/{fremde}"),
         &cookie,
         None,
     )
@@ -558,7 +558,7 @@ async fn patch_fremde_ansicht_ist_404() {
     let (_, v2) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e2}/karten-ansichten"),
+        &format!("/api/einsaetze/{e2}/map-views"),
         &cookie,
         None,
     )
@@ -569,7 +569,7 @@ async fn patch_fremde_ansicht_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e1}/karten-ansichten/{fremde_aid}"),
+        &format!("/api/einsaetze/{e1}/map-views/{fremde_aid}"),
         &cookie,
         Some(&json!({"basemap_modus": "blind"})),
     )

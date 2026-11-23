@@ -147,7 +147,7 @@ test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede
   const einsatzId = await saeen(page);
   for (const [i, label] of ['Sektor A', 'Sektor B', 'Sektor C'].entries()) {
     const x = 10 + i / 20;
-    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',

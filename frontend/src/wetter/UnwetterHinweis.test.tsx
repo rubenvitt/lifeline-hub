@@ -35,7 +35,7 @@ async function hinweisBei(jetzt: string): Promise<string> {
       await new Promise((r) => setTimeout(r, 50));
       return HttpResponse.json({ zeitzone: 'America/New_York' });
     }),
-    http.get('/api/einsaetze/7/wetter', () =>
+    http.get('/api/einsaetze/7/weather', () =>
       HttpResponse.json({
         warnungen: {
           zustand: 'ok',

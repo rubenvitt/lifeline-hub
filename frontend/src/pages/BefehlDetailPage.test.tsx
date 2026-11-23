@@ -1196,7 +1196,7 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
 
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([ABSCHNITT])),
+      http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])),
     );
     vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);

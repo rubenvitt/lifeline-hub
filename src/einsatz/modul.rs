@@ -152,9 +152,9 @@ modul_marker! {
 /// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
 pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
-    ("/api/einsaetze/{id}/lage/meldungen", Some("lagemeldungen")),
+    ("/api/einsaetze/{id}/situation/reports", Some("lagemeldungen")),
     // LLH-1031: Kenntnisnahme der Lagemeldungen, auch unter der Kennung der Meldung.
-    ("/api/einsaetze/{id}/lage/gesehen", Some("lagemeldungen")),
+    ("/api/einsaetze/{id}/situation/seen", Some("lagemeldungen")),
     (
         "/api/einsaetze/{id}/meldungen/{mid}/lage-gesehen",
         Some("lagemeldungen"),
@@ -192,7 +192,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
     ("/api/einsaetze/{id}/evakuierung", Some("evakuierung")),
     ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
-    ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
+    ("/api/einsaetze/{id}/damages", Some("schaeden")),
     ("/api/einsaetze/{id}/tiere", Some("tiere")),
     (
         "/api/einsaetze/{id}/bereitstellungsraeume",
@@ -225,24 +225,24 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/programmpunkte", None),
     ("/api/einsaetze/{id}/ort-vorschau", None),
     ("/api/einsaetze/{id}/ort-suche", None),
-    ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
-    ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
-    ("/api/einsaetze/{id}/zonen", Some("lagekarte")),
-    ("/api/einsaetze/{id}/freie-zeichen", Some("lagekarte")),
+    ("/api/einsaetze/{id}/hazard-areas", Some("gefahrenzonen")),
+    ("/api/einsaetze/{id}/sectors", Some("einsatzabschnitte")),
+    ("/api/einsaetze/{id}/zones", Some("lagekarte")),
+    ("/api/einsaetze/{id}/free-symbols", Some("lagekarte")),
     // Hintergrundbilder und Führungskräfte-Positionen leben auf der Lagekarte.
-    ("/api/einsaetze/{id}/karte", Some("lagekarte")),
+    ("/api/einsaetze/{id}/map", Some("lagekarte")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
     // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
-    ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
-    ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
-    ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
+    ("/api/einsaetze/{id}/weather", Some("wetter-pegel")),
+    ("/api/einsaetze/{id}/map-views", Some("lagekarte")),
+    ("/api/einsaetze/{id}/situation-snapshots", Some("lagekarte")),
     ("/api/einsaetze/{id}/anhaenge", None),
     // Pegel-Kennzahl (LFH-606): steht auf Dashboard und Überblick — modul-los wie die
     // Einsatz-Kopfdaten.
-    ("/api/einsaetze/{id}/pegel", None),
+    ("/api/einsaetze/{id}/gauges", None),
     // Wahl der Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, modul-los wie der
     // Pegel. Die Zahl dazu liefert der Modulzähler, gefiltert nach Modulrecht.
-    ("/api/einsaetze/{id}/lagekennzahl-wahl", None),
+    ("/api/einsaetze/{id}/situation-metric-selection", None),
     // Live-Feed (F01/LFH-227): modul-lose Gate-Route. Die Modul-Berechtigung wirkt
     // NICHT als Türsteher, sondern als Post-Filter pro Event im SSE-Builder — ein
     // Modul-Gate hier würde die anderen Module wieder mit durchlassen.
@@ -253,7 +253,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/modul-zaehler", None),
     // Lagebild des Lagemonitors (LFH-892): verdichtete Zahlen ohne Personenbezug, nur für ein
     // gekoppeltes Gerät dieser Ansicht (der Handler weist alles andere mit 403 ab).
-    ("/api/einsaetze/{id}/lagemonitor", None),
+    ("/api/einsaetze/{id}/situation-monitor", None),
     // Modulfreigaben (LFH-669): modul-los wie die Zähler. Die Antwort IST die Auskunft über
     // die Modulrechte des Benutzers; ein Modul-Gate davor wäre ein Zirkel.
     ("/api/einsaetze/{id}/modul-freigaben", None),
@@ -303,7 +303,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/einsaetze/{id}/anbindungen", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.
-    ("/api/einsaetze/{id}/lagebild-freigaben", None),
+    ("/api/einsaetze/{id}/situation-picture-shares", None),
 ];
 
 /// Der Einsatz selbst (`GET`/`PATCH /api/einsaetze/{id}`). In [`key_fuer_pfad`] trifft dieser
@@ -422,7 +422,7 @@ mod tests {
         );
         // Eigenständiger Lage-Pfad → eigener Key, NICHT "meldungen".
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/lage/meldungen"),
+            key_fuer_pfad("/api/einsaetze/{id}/situation/reports"),
             Some(Some("lagemeldungen"))
         );
         // Betreuung (LFH-639): Stellen und Belegungen hängen unter einem Präfix.
@@ -499,11 +499,11 @@ mod tests {
         // Wetter & Pegel (LFH-633): der Wetter-Endpunkt ist am Modul gegatet, der Pegelverlauf
         // bleibt unter dem modul-losen Pegel-Präfix.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/wetter"),
+            key_fuer_pfad("/api/einsaetze/{id}/weather"),
             Some(Some("wetter-pegel"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/pegel/verlauf"),
+            key_fuer_pfad("/api/einsaetze/{id}/gauges/history"),
             Some(None)
         );
         // Nicht registriert.

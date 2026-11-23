@@ -59,7 +59,7 @@ async fn lagebild(app: &axum::Router, schluessel: &str) -> Value {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebild-freigaben")
+    format!("/api/einsaetze/{einsatz}/situation-picture-shares")
 }
 
 /// Legt einen Link an und liefert `(antwort, schluessel)`.
@@ -285,7 +285,7 @@ async fn stufe_lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_namen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&json!({
             "lat": 52.95, "lon": 10.55,
@@ -366,7 +366,7 @@ async fn stufe_oeffentlich_zeigt_nur_gesamtzahlen_einsatzort_und_absperrungen() 
         let (s, z) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &format!("/api/einsaetze/{einsatz}/zones"),
             &admin,
             Some(&body),
         )

@@ -37,7 +37,7 @@ interface Abschnitt {
 
 /** Abschnitt des Demo-Einsatzes nach Kurzbezeichnung. */
 async function abschnitt(page: Page, einsatz: number, kurz: string): Promise<Abschnitt> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/abschnitte`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/sectors`);
   expect(antwort.ok(), `Abschnitte: ${antwort.status()}`).toBe(true);
   const a = ((await antwort.json()) as Abschnitt[]).find((x) => x.kurzbezeichnung === kurz);
   expect(a, `Abschnitt ${kurz} im Demo-Einsatz`).toBeDefined();

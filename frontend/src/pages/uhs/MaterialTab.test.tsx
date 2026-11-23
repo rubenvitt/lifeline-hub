@@ -123,7 +123,7 @@ function render({
   server.use(
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => {
       abrufe.push('material');

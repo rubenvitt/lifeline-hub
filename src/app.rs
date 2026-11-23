@@ -469,7 +469,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
         .route(
-            "/api/einsaetze/{id}/lagemonitor",
+            "/api/einsaetze/{id}/situation-monitor",
             get(routes::lagemonitor::lagebild),
         )
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
@@ -629,12 +629,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Gewählte Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, Gate `OhneModul`.
         .route(
-            "/api/einsaetze/{id}/lagekennzahl-wahl",
+            "/api/einsaetze/{id}/situation-metric-selection",
             put(routes::lagekennzahl_wahl::setzen),
         )
         // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(
-            "/api/einsaetze/{id}/pegel",
+            "/api/einsaetze/{id}/gauges",
             get(routes::pegel::liste)
                 .put(routes::pegel::ersetzen)
                 .post(routes::pegel::anfuegen),
@@ -642,19 +642,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // 24-h-Verlauf je Pegel, modul-los wie die Liste. Das statische Segment `verlauf` schlägt
         // `{pegel_id}`.
         .route(
-            "/api/einsaetze/{id}/pegel/verlauf",
+            "/api/einsaetze/{id}/gauges/history",
             get(routes::pegel::verlauf),
         )
         // Wetter am Einsatzort, am Modul `wetter-pegel` gegatet. Ein Quellausfall ist kein
         // HTTP-Fehler, sondern ein Zustand je Teil.
-        .route("/api/einsaetze/{id}/wetter", get(routes::wetter::anzeige))
+        .route("/api/einsaetze/{id}/weather", get(routes::wetter::anzeige))
         // Prognose am einzelnen Pegel: eigene Routen, nicht im Vollersatz-PUT.
         .route(
-            "/api/einsaetze/{id}/pegel/{pegel_id}/prognose",
+            "/api/einsaetze/{id}/gauges/{pegel_id}/forecast",
             put(routes::pegel::prognose_setzen).delete(routes::pegel::prognose_loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/pegel/{pegel_id}/vorhersage",
+            "/api/einsaetze/{id}/gauges/{pegel_id}/prediction",
             get(routes::pegel::vorhersage_lesen),
         )
         // Stab (S1–S6) und Ablösung. `vorgaben` steht vor `{aid}` nur zur Lesbarkeit.
@@ -1024,13 +1024,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::meldung::auftrag_erteilen),
         )
         .route(
-            "/api/einsaetze/{id}/lage/meldungen",
+            "/api/einsaetze/{id}/situation/reports",
             get(routes::meldung::lage_liste),
         )
         // Kenntnisnahme über die Kennung der Meldung (LLH-1031); die alten Pfade mit der Kennung
         // des Lageobjekts gibt es nicht mehr.
         .route(
-            "/api/einsaetze/{id}/lage/gesehen",
+            "/api/einsaetze/{id}/situation/seen",
             post(routes::meldung::lage_angezeigte_gesehen),
         )
         .route(
@@ -1203,12 +1203,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::zeitachse::person_periode_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/karte/fuehrungskraefte",
+            "/api/einsaetze/{id}/map/commanders",
             get(routes::einsatz_personal::karte_fuehrungskraefte),
         )
         // Adresssuche der Lagekarte (LFH-638): Forward-Geocoding, am Modul Lagekarte (`/karte`).
         .route(
-            "/api/einsaetze/{id}/karte/ort-suche",
+            "/api/einsaetze/{id}/map/place-search",
             get(routes::karte_ort_suche::ort_suche),
         )
         .route(
@@ -1451,66 +1451,66 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden",
+            "/api/einsaetze/{id}/damages",
             get(routes::einsatz_schaden::liste),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden",
+            "/api/einsaetze/{id}/damages",
             post(routes::einsatz_schaden::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/marker",
+            "/api/einsaetze/{id}/damages/marker",
             get(routes::einsatz_schaden::marker),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/kennzahlen",
+            "/api/einsaetze/{id}/damages/metrics",
             get(routes::einsatz_schaden::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/auswahl",
+            "/api/einsaetze/{id}/damages/options",
             get(routes::einsatz_schaden::auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/export",
+            "/api/einsaetze/{id}/damages/export",
             get(routes::einsatz_schaden::export),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}",
+            "/api/einsaetze/{id}/damages/{sid}",
             get(routes::einsatz_schaden::detail),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}",
+            "/api/einsaetze/{id}/damages/{sid}",
             patch(routes::einsatz_schaden::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/uebergeben",
+            "/api/einsaetze/{id}/damages/{sid}/hand-over",
             post(routes::einsatz_schaden::uebergeben),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/abschliessen",
+            "/api/einsaetze/{id}/damages/{sid}/close",
             post(routes::einsatz_schaden::abschliessen),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}",
+            "/api/einsaetze/{id}/damages/{sid}",
             delete(routes::einsatz_schaden::stornieren),
         )
         // Schaden-Anhänge: Modul-Gate `schaeden`; Upload/Download wie die Dokumentenablage.
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
+            "/api/einsaetze/{id}/damages/{sid}/attachments",
             get(routes::schaden_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
+            "/api/einsaetze/{id}/damages/{sid}/attachments",
             post(routes::schaden_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}",
+            "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}",
             delete(routes::schaden_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
+            "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file",
             get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
         // LLH-1491: Führung je Einsatz zwischen gekoppelten Instanzen (Schalter
@@ -1591,11 +1591,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1496: Lagebild für Externe, Links je Empfänger (Einsatzleitung, auch am Spiegel).
         .route(
-            "/api/einsaetze/{id}/lagebild-freigaben",
+            "/api/einsaetze/{id}/situation-picture-shares",
             get(routes::lagebild_extern::liste).post(routes::lagebild_extern::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/lagebild-freigaben/{fid}/widerrufen",
+            "/api/einsaetze/{id}/situation-picture-shares/{fid}/revoke",
             post(routes::lagebild_extern::widerrufen),
         )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
@@ -1765,29 +1765,29 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_bereitstellungsraum::abruf_aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte",
+            "/api/einsaetze/{id}/sectors",
             get(routes::einsatzabschnitt::list),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte",
+            "/api/einsaetze/{id}/sectors",
             post(routes::einsatzabschnitt::create),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte/{aid}",
+            "/api/einsaetze/{id}/sectors/{aid}",
             patch(routes::einsatzabschnitt::update),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte/{aid}/flaeche",
+            "/api/einsaetze/{id}/sectors/{aid}/area",
             patch(routes::einsatzabschnitt::flaeche)
                 .layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg}",
+            "/api/einsaetze/{id}/sectors/{aid}/talk-groups/{sg}",
             put(routes::einsatzabschnitt::sprechgruppe_zuordnen)
                 .delete(routes::einsatzabschnitt::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte/{aid}",
+            "/api/einsaetze/{id}/sectors/{aid}",
             delete(routes::einsatzabschnitt::aufloesen),
         )
         .route(
@@ -1880,92 +1880,92 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::befehl::anlage_datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/karten-ansichten",
+            "/api/einsaetze/{id}/map-views",
             get(routes::karten_ansicht::liste).post(routes::karten_ansicht::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/karten-ansichten/{aid}",
+            "/api/einsaetze/{id}/map-views/{aid}",
             patch(routes::karten_ansicht::patch).delete(routes::karten_ansicht::loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/lage-snapshots",
+            "/api/einsaetze/{id}/situation-snapshots",
             get(routes::lage_snapshot::liste).post(routes::lage_snapshot::erzeugen),
         )
         .route(
-            "/api/einsaetze/{id}/lage-snapshots/{sid}",
+            "/api/einsaetze/{id}/situation-snapshots/{sid}",
             get(routes::lage_snapshot::einzeln)
                 .patch(routes::lage_snapshot::patch)
                 .delete(routes::lage_snapshot::loeschen),
         )
-        .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
+        .route("/api/einsaetze/{id}/zones", get(routes::lage_zone::liste))
         .route(
-            "/api/einsaetze/{id}/zonen",
+            "/api/einsaetze/{id}/zones",
             post(routes::lage_zone::anlegen).layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/zonen/{zid}",
+            "/api/einsaetze/{id}/zones/{zid}",
             patch(routes::lage_zone::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/zonen/{zid}",
+            "/api/einsaetze/{id}/zones/{zid}",
             delete(routes::lage_zone::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/freie-zeichen",
+            "/api/einsaetze/{id}/free-symbols",
             get(routes::freies_zeichen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/freie-zeichen",
+            "/api/einsaetze/{id}/free-symbols",
             post(routes::freies_zeichen::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/freie-zeichen/{zid}",
+            "/api/einsaetze/{id}/free-symbols/{zid}",
             patch(routes::freies_zeichen::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/freie-zeichen/{zid}",
+            "/api/einsaetze/{id}/free-symbols/{zid}",
             delete(routes::freies_zeichen::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/karte/hintergrundbilder",
+            "/api/einsaetze/{id}/map/background-images",
             get(routes::karte_hintergrundbild::liste),
         )
         .route(
-            "/api/einsaetze/{id}/karte/hintergrundbilder",
+            "/api/einsaetze/{id}/map/background-images",
             post(routes::karte_hintergrundbild::hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
+            "/api/einsaetze/{id}/map/background-images/{bildId}/download",
             get(routes::karte_hintergrundbild::herunterladen).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
+            "/api/einsaetze/{id}/map/background-images/{bildId}",
             patch(routes::karte_hintergrundbild::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
+            "/api/einsaetze/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/gefahrengebiete",
+            "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
         )
         .route(
-            "/api/einsaetze/{id}/gefahrengebiete/{gid}",
+            "/api/einsaetze/{id}/hazard-areas/{gid}",
             patch(routes::gefahr::umbenennen),
         )
         .route(
-            "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix",
+            "/api/einsaetze/{id}/hazard-areas/{gid}/matrix",
             get(routes::gefahr::matrix),
         )
         .route(
-            "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung",
+            "/api/einsaetze/{id}/hazard-areas/{gid}/matrix/rating",
             put(routes::gefahr::bewerten),
         )
         .route(
-            "/api/einsaetze/{id}/gefahrengebiete/{gid}/beurteilung",
+            "/api/einsaetze/{id}/hazard-areas/{gid}/assessment",
             post(routes::gefahr::beurteilen),
         )
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf

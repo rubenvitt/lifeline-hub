@@ -14,7 +14,7 @@ import type { ObjektEintrag } from './objektsuche';
  * Tippen ohne Server, Adresse erst auf Enter über `…/karte/ort-suche`.
  */
 
-const PFAD = '/api/einsaetze/7/karte/ort-suche';
+const PFAD = '/api/einsaetze/7/map/place-search';
 const BERLIN = { lat: 52.52194, lon: 13.41321 };
 
 function marker(typ: MarkerTyp, id: number, label: string): ObjektEintrag {

@@ -100,7 +100,7 @@ function render(
   server.use(
     // Mit Freigabe des Moduls Einheiten lädt die Liste die Einheiten stets (LLH-1073, design.md D5).
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheitenDaten)),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     meHandler(optionen.benutzer ?? nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     // Aktive und entlassene Fahrzeuge teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).

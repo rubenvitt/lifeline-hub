@@ -276,7 +276,7 @@ test('1180 px mit offenem Modulmenü: die Stärke steht auf Höhe des Abschnitts
 }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `Rahmen Überblick ${Date.now()}`);
-  const ab = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+  const ab = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
     data: { name: 'Abschnitt Nordufer' },
   });
   expect(ab.ok(), `Abschnitt: ${ab.status()}`).toBe(true);

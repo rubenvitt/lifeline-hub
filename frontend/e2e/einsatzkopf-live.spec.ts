@@ -169,7 +169,7 @@ test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashb
     .first();
   await expect(platzEins).toContainText('Verbleib offen');
 
-  const festlegen = await page.request.post(`/api/einsaetze/${id}/pegel`, {
+  const festlegen = await page.request.post(`/api/einsaetze/${id}/gauges`, {
     data: { station_uuid: 'a6ee8177-107b-47dd-bcfd-30960ccc6e9c', name: 'Hann. Münden' },
   });
   expect(festlegen.status()).toBe(201);

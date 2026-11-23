@@ -2277,7 +2277,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -2687,7 +2687,7 @@ async fn live_einheit_erreicht_verpflegungsleser() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         &frieda,
         None,
     )
@@ -2702,7 +2702,7 @@ async fn live_einheit_erreicht_verpflegungsleser() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/abschnitte/{deich}"),
+        &format!("/api/einsaetze/{e}/sectors/{deich}"),
         &admin,
         Some(r#"{"name":"Deich Nord"}"#),
     )

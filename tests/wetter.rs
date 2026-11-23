@@ -1,4 +1,4 @@
-//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/wetter`,
+//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/weather`,
 //! samt aktuellen Bedingungen (LFH-864).
 //!
 //! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`,
@@ -171,7 +171,7 @@ fn current_weather() -> Value {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/wetter")
+    format!("/api/einsaetze/{einsatz}/weather")
 }
 
 /// Einsatzort per Kopfdaten-PATCH setzen. Bremen-Mitte, nicht auf einer Rundungsgrenze.
@@ -322,7 +322,7 @@ async fn tote_quelle_ist_ausfall_fuer_alle_teile_und_trotzdem_200() {
     let (status, _) = anfrage(
         &u.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         &admin,
         None,
     )

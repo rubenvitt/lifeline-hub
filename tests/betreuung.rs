@@ -26,7 +26,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -2467,7 +2467,7 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_stellen_und_bezirke() {
             t.sort();
             t
         };
-    let abschnitt_uri = format!("/api/einsaetze/{e}/abschnitte/{nord}");
+    let abschnitt_uri = format!("/api/einsaetze/{e}/sectors/{nord}");
 
     let mut rx = live.abonniere(e);
     let erwartet = vec![

@@ -217,7 +217,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
   });
-  await senden(page, 'post', `${basis}/zonen`, {
+  await senden(page, 'post', `${basis}/zones`, {
     typ: 'evakuierungsbezirk',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify(FLAECHE),
@@ -292,7 +292,7 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
   });
-  await senden(page, 'post', `${basis}/zonen`, {
+  await senden(page, 'post', `${basis}/zones`, {
     typ: 'evakuierungsbezirk',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify(FLAECHE),

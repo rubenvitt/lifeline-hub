@@ -28,7 +28,7 @@ async fn gefahrengebiet_anlegen(
     let (status, z) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         cookie,
         Some(&body),
     )
@@ -43,7 +43,7 @@ async fn matrix_leer_dann_put_dann_upsert() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix");
 
     let (_, leer) = anfrage(&app, "GET", &u, &admin, None).await;
     assert_eq!(leer.as_array().unwrap().len(), 0);
@@ -83,7 +83,7 @@ async fn keine_bleibt_als_meldung_in_der_liste() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix");
     anfrage(
         &app,
         "PUT",
@@ -118,7 +118,7 @@ async fn ungueltiger_enum_ist_400_kombination_bleibt_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating");
     assert_eq!(
         anfrage(
             &app,
@@ -180,7 +180,7 @@ async fn zu_lange_erlaeuterung_oder_meldeweg_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let m = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix");
+    let m = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix");
     let u = format!("{m}/bewertung");
     let mit = |objekt: &str, beschreibung: String, gemeldet_von: String| {
         json!({
@@ -276,7 +276,7 @@ async fn etb_bei_warnstufenwechsel_nicht_bei_reiner_beschreibung() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating");
 
     anfrage(
         &app,
@@ -329,7 +329,7 @@ async fn sse_feuert_bei_put() {
     anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )
@@ -349,7 +349,7 @@ async fn gebiete_liste_zeigt_zonen_und_hoechste_warnstufe() {
     anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "mittel")),
     )
@@ -358,7 +358,7 @@ async fn gebiete_liste_zeigt_zonen_und_hoechste_warnstufe() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -382,7 +382,7 @@ async fn fremdes_einsatz_gid_ist_notfound() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{b}/gefahrengebiete/{gid_a}/matrix"),
+        &format!("/api/einsaetze/{b}/hazard-areas/{gid_a}/matrix"),
         &admin,
         None,
     )
@@ -403,7 +403,7 @@ async fn berechtigung_beobachter_liest_schreibt_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix"),
+            &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix"),
             &erika_c,
             None
         )
@@ -415,7 +415,7 @@ async fn berechtigung_beobachter_liest_schreibt_nicht() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+            &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
             &erika_c,
             Some(&bewertung("brand", "menschen", "hoch"))
         )
@@ -436,7 +436,7 @@ async fn org_isolation_fremder_nutzer_abgewiesen() {
     let get = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix"),
         &fremd,
         None,
     )
@@ -457,7 +457,7 @@ async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
     let (status, g) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}"),
         &admin,
         Some(&json!({"label":"Süd"}).to_string()),
     )
@@ -469,7 +469,7 @@ async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
     let (s2, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{b}/gefahrengebiete/{gid}"),
+        &format!("/api/einsaetze/{b}/hazard-areas/{gid}"),
         &admin,
         Some(&json!({"label":"X"}).to_string()),
     )
@@ -487,7 +487,7 @@ async fn zu_lange_gebietsbezeichnung_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}");
 
     let genau = "ä".repeat(GEBIET_LABEL_MAX);
     let (status, g) = anfrage(
@@ -517,7 +517,7 @@ async fn zu_lange_gebietsbezeichnung_ist_400() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -546,7 +546,7 @@ async fn patch_ohne_label_laesst_label_stehen() {
     let (status, g) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}"),
         &admin,
         Some("{}"),
     )
@@ -565,7 +565,7 @@ async fn patch_label_null_loescht_label() {
     let (status, g) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}"),
         &admin,
         Some(&json!({ "label": Value::Null }).to_string()),
     )
@@ -579,7 +579,7 @@ async fn patch_label_null_loescht_label() {
     let (status, g2) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid2}"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid2}"),
         &admin,
         Some(&json!({"label":"   "}).to_string()),
     )
@@ -602,7 +602,7 @@ async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )
@@ -688,7 +688,7 @@ async fn beurteilung_bestaetigen_setzt_gebiet_schreibt_etb_und_meldet_live() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Hangrutsch Kirchberg").await;
-    let liste_u = format!("/api/einsaetze/{einsatz}/gefahrengebiete");
+    let liste_u = format!("/api/einsaetze/{einsatz}/hazard-areas");
 
     let (_, vorher) = anfrage(&app, "GET", &liste_u, &admin, None).await;
     let gebiet = vorher[0].as_object().unwrap();
@@ -750,7 +750,7 @@ async fn zellaenderung_frischt_nur_bestehende_beurteilung_auf() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let liste_u = format!("/api/einsaetze/{einsatz}/gefahrengebiete");
+    let liste_u = format!("/api/einsaetze/{einsatz}/hazard-areas");
     let put = |warn: &'static str| {
         let app = app.clone();
         let admin = admin.clone();
@@ -817,7 +817,7 @@ async fn beurteilung_braucht_schreibrecht_und_eigenes_gebiet() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/beurteilung"),
+            &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/assessment"),
             &erika_c,
             None
         )
@@ -829,7 +829,7 @@ async fn beurteilung_braucht_schreibrecht_und_eigenes_gebiet() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{anderer}/gefahrengebiete/{gid}/beurteilung"),
+            &format!("/api/einsaetze/{anderer}/hazard-areas/{gid}/assessment"),
             &admin,
             None
         )
@@ -850,7 +850,7 @@ async fn bezeichnung_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}");
 
     let (s, g) = anfrage(
         &app,
@@ -876,7 +876,7 @@ async fn bezeichnung_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -904,7 +904,7 @@ async fn bezeichnung_leer_erwartet_und_andere_angabe_dazwischen_ohne_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
-    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+    let u = format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}");
     let (s, _) = anfrage(
         &app,
         "PATCH",
@@ -947,7 +947,7 @@ async fn bezeichnung_altwert_ohne_aenderung_ist_422() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}"),
         &admin,
         Some(&json!({"erwartet":{"label":"Nord"}}).to_string()),
     )
@@ -966,7 +966,7 @@ async fn bewertung_etb_geht_live_hinaus() {
     let (s, z) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
         &admin,
         Some(&bewertung("brand", "menschen", "hoch")),
     )

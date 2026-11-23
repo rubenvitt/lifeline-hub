@@ -1,5 +1,5 @@
 //! Integrationstests der Schaden-Anhänge (LFH-21): je Spec-Szenario ein Test über die
-//! Routen `/api/einsaetze/{id}/schaeden/{sid}/anhaenge…` — Ablegen, Allowlist und Größe,
+//! Routen `/api/einsaetze/{id}/damages/{sid}/attachments…` — Ablegen, Allowlist und Größe,
 //! Rechte über das Modul Schäden, Zugehörigkeit zu Einsatz und Schaden, Lebenszyklus,
 //! Entfernen, Download mit ETag, pseudonyme ETB-Spur und Live-Verteilung.
 //!
@@ -18,7 +18,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, schaden: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge")
+    format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).
@@ -150,7 +150,7 @@ async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/damages"),
         cookie,
         Some(r#"{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1"}"#),
     )
@@ -533,7 +533,7 @@ async fn stornierter_schaden_ist_409_beim_schreiben_und_bleibt_lesbar() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/schaeden/{schaden}"),
+        &format!("/api/einsaetze/{einsatz}/damages/{schaden}"),
         &admin,
         None,
     )
@@ -572,7 +572,7 @@ async fn uebergebener_und_abgeschlossener_schaden_nehmen_dateien_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden/{s1}/uebergeben"),
+        &format!("/api/einsaetze/{einsatz}/damages/{s1}/hand-over"),
         &admin,
         Some(r#"{"uebergeben_an":"Bauhof"}"#),
     )
@@ -581,7 +581,7 @@ async fn uebergebener_und_abgeschlossener_schaden_nehmen_dateien_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden/{s2}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/damages/{s2}/close"),
         &admin,
         Some(r#"{"abschluss_grund":"behoben"}"#),
     )

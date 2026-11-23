@@ -28,7 +28,7 @@ beforeEach(() => {
       return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/einstellungen', () => HttpResponse.json({})),
-    http.get('/api/einsaetze/:id/karte/ort-suche', () => {
+    http.get('/api/einsaetze/:id/map/place-search', () => {
       zaehler.ortSuche = (zaehler.ortSuche ?? 0) + 1;
       return HttpResponse.json({ zustand: 'ok', treffer: [] });
     }),

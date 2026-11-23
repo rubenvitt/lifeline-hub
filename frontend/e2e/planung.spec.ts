@@ -239,7 +239,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   expect(schichtplan.bloecke).toHaveLength(1);
   expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
   const abschnitte = await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/abschnitte`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/sectors`)
   ).json();
   expect(abschnitte.map((a: { name: string }) => a.name)).toEqual(['Festmeile']);
   expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);

@@ -549,7 +549,7 @@ async function gate1Vorbereiten(
 
 /** Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff. */
 async function wetterStub(page: Page, einsatzId: string) {
-  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
     route.fulfill({
       json: {
         ort: { name: 'Samtgemeinde Sottrum-Hellwege-Horstedt-Reeßum', kreis: 'Rotenburg (Wümme)' },
@@ -2119,7 +2119,7 @@ async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
  */
 async function seedeDokumente(page: Page): Promise<string> {
   const einsatzId = await neuerEinsatz(page, `E2E Fükw-Dokumente ${Date.now()}`);
-  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/abschnitte`, {
+  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/sectors`, {
     name: 'Sanitätsdienst',
   });
   for (const [titel, kategorie, dateiname, mimeType, buffer, bezug] of [

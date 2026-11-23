@@ -9802,7 +9802,7 @@ export interface components {
             daten?: components["schemas"]["WetterAktuell"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/weather`. */
         WetterAnzeige: {
             aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;

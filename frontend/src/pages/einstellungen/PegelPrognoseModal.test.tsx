@@ -28,8 +28,8 @@ const PEGEL = {
 function routen() {
   const bodies: unknown[] = [];
   server.use(
-    http.get('/api/einsaetze/1/pegel/1/vorhersage', () => HttpResponse.json({})),
-    http.put('/api/einsaetze/1/pegel/1/prognose', async ({ request }) => {
+    http.get('/api/einsaetze/1/gauges/1/prediction', () => HttpResponse.json({})),
+    http.put('/api/einsaetze/1/gauges/1/forecast', async ({ request }) => {
       bodies.push(await request.json());
       return HttpResponse.json([PEGEL]);
     }),

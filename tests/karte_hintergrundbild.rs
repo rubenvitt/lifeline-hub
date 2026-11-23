@@ -73,7 +73,7 @@ async fn upload_bild(
             Request::builder()
                 .method("POST")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder"
+                    "/api/einsaetze/{einsatz_id}/map/background-images"
                 ))
                 .header(header::COOKIE, cookie)
                 .header(
@@ -106,7 +106,7 @@ async fn download_bild(
             Request::builder()
                 .method("GET")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder/{bild_id}/download"
+                    "/api/einsaetze/{einsatz_id}/map/background-images/{bild_id}/download"
                 ))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
@@ -258,7 +258,7 @@ async fn upload_liste_download_roundtrip() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        &format!("/api/einsaetze/{einsatz}/map/background-images"),
         &admin,
         None,
     )
@@ -376,7 +376,7 @@ async fn download_bild_inm(
     let mut req = Request::builder()
         .method("GET")
         .uri(format!(
-            "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder/{bild_id}/download"
+            "/api/einsaetze/{einsatz_id}/map/background-images/{bild_id}/download"
         ))
         .header(header::COOKIE, cookie);
     if let Some(etag) = if_none_match {
@@ -494,7 +494,7 @@ async fn upload_bild_ansicht(
             Request::builder()
                 .method("POST")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder"
+                    "/api/einsaetze/{einsatz_id}/map/background-images"
                 ))
                 .header(header::COOKIE, cookie)
                 .header(
@@ -551,7 +551,7 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder?ansicht={x}"),
+        &format!("/api/einsaetze/{einsatz}/map/background-images?ansicht={x}"),
         &admin,
         None,
     )
@@ -592,7 +592,7 @@ async fn fremde_ansicht_id_ist_404() {
         let (s, v) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder/{bid}"),
+            &format!("/api/einsaetze/{einsatz}/map/background-images/{bid}"),
             &admin,
             Some(&json!({"ansicht_id": aid}).to_string()),
         )
@@ -603,7 +603,7 @@ async fn fremde_ansicht_id_ist_404() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        &format!("/api/einsaetze/{einsatz}/map/background-images"),
         &admin,
         None,
     )
@@ -763,7 +763,7 @@ async fn unbereinigbares_bild_wird_beim_hochladen_abgewiesen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        &format!("/api/einsaetze/{einsatz}/map/background-images"),
         &admin,
         None,
     )

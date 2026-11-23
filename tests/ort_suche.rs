@@ -267,7 +267,7 @@ async fn treffer_umgebung_org_grenze_und_ausfall() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/ort-suche?q=abc"),
+        &format!("/api/einsaetze/{einsatz}/map/place-search?q=abc"),
         &fritz,
         None,
     )

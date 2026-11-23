@@ -27,14 +27,14 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
-  const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+  const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
     data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Hauptstr. 1' },
   });
   expect(schaden.ok(), await schaden.text()).toBeTruthy();
   const schadenId = (await schaden.json()).id as number;
   for (const name of ['dach.jpg', 'giebel.jpg']) {
     const antwort = await page.request.post(
-      `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/anhaenge`,
+      `/api/einsaetze/${einsatzId}/damages/${schadenId}/attachments`,
       { multipart: { datei: { name, mimeType: 'image/jpeg', buffer: FOTO_JPEG } } },
     );
     expect(antwort.status(), await antwort.text()).toBe(201);

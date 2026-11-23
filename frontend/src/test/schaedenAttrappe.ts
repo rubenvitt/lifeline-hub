@@ -17,7 +17,7 @@ import type { Ausmass, Gefahrentyp, Schaden, SchadenStatus, SchadenTyp } from '.
  */
 export function schaedenAttrappe(einsatzId: number, quelle: () => readonly object[]) {
   const abrufe: URLSearchParams[] = [];
-  const basis = `/api/einsaetze/${einsatzId}/schaeden`;
+  const basis = `/api/einsaetze/${einsatzId}/damages`;
   const alle = () => quelle() as readonly Schaden[];
 
   const liste = (q: URLSearchParams): Schaden[] => {

@@ -21,7 +21,7 @@ const entferne = vi.mocked(entferneSchadenAnhang);
 const legeAb = vi.mocked(legeSchadenAnhangAb);
 afterEach(() => vi.clearAllMocks());
 
-const PFAD = '/api/einsaetze/1/schaeden/10/anhaenge';
+const PFAD = '/api/einsaetze/1/damages/10/attachments';
 const schaden = { id: 10, registrier_nr: 3, storniert_at: null as string | null };
 const anhang = (id: number, dateiname: string, mime = 'image/jpeg') => ({
   id,
@@ -85,7 +85,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     const dach = await screen.findByRole('link', {
       name: 'dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen',
     });
-    expect(dach).toHaveAttribute('href', '/api/einsaetze/1/schaeden/10/anhaenge/5/datei');
+    expect(dach).toHaveAttribute('href', '/api/einsaetze/1/damages/10/attachments/5/file');
     expect(dach).toHaveAttribute('download', 'dach.jpg');
     expect(dach.getAttribute('href')).not.toMatch(/^\/api\/einsaetze\/1\/anhaenge/);
     const links = within(paneel()).getAllByRole('link');

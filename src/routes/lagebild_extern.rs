@@ -108,7 +108,7 @@ fn dauer_wort(dauer: LagebildDauer) -> &'static str {
     }
 }
 
-/// GET /api/einsaetze/{id}/lagebild-freigaben — die Links dieses Einsatzes an dieser Instanz,
+/// GET /api/einsaetze/{id}/situation-picture-shares — die Links dieses Einsatzes an dieser Instanz,
 /// mit Protokoll. Nur die Einsatzleitung, wie die Geräte.
 pub async fn liste(
     State(state): State<AppState>,
@@ -132,7 +132,7 @@ pub struct LagebildFreigabeMitSchluessel {
     pub schluessel: String,
 }
 
-/// POST /api/einsaetze/{id}/lagebild-freigaben — legt einen Link an. Der ETB-Eintrag entsteht
+/// POST /api/einsaetze/{id}/situation-picture-shares — legt einen Link an. Der ETB-Eintrag entsteht
 /// in derselben Transaktion, am Spiegel als Antrag.
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -187,7 +187,7 @@ pub async fn anlegen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/lagebild-freigaben/{fid}/widerrufen — der Link gilt sofort nicht
+/// POST /api/einsaetze/{id}/situation-picture-shares/{fid}/revoke — der Link gilt sofort nicht
 /// mehr. Idempotent; das ETB nennt nur die Wirkung.
 pub async fn widerrufen(
     State(state): State<AppState>,

@@ -237,7 +237,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('ein 403 trotz Freigabe: kein Zugriff, kein Drucken', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/schaeden`, () =>
+      http.get(`/api/einsaetze/${E}/damages`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );

@@ -77,7 +77,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -986,7 +986,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let schaden_pfad = format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge");
+    let schaden_pfad = format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments");
     let (s, _) = anfrage(&app, "GET", &schaden_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Schadensroute");
     let (s, _) = anfrage(
