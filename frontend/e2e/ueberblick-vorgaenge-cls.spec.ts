@@ -148,14 +148,14 @@ type Folge = 'Listen zuletzt' | 'Marken zuletzt' | 'Gliederung zuletzt' | 'natü
 const FOLGEN: Folge[] = ['Listen zuletzt', 'Marken zuletzt', 'Gliederung zuletzt', 'natürlich'];
 
 /**
- * Die Listen der Abschnitte, die sichtbar laden, ohne Unterpfade (`/nachforderungen/arten` gehört
+ * Die Listen der Abschnitte, die sichtbar laden, ohne Unterpfade (`/resource-requests/types` gehört
  * nicht dazu). Aufträge, Erinnerungen und Ablösungen speisen auch die Marken und halten die Reihen
  * auf (`MARKEN`).
  */
-const LISTEN = ['meldungen', 'nachforderungen'];
+const LISTEN = ['reports', 'resource-requests'];
 
 /** Listen der offenen Vorgänge, aus denen auch „Nächste Marken“ rechnet (LLH-1748). */
-const MARKEN = ['auftraege', 'erinnerungen', 'abloesungen'];
+const MARKEN = ['tasks', 'reminders', 'abloesungen'];
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ (`abschnittZeilen`), ohne Unterpfade. */
 const GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];

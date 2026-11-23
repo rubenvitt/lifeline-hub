@@ -23,7 +23,7 @@ const A4_HOCH = { breite: 595.28, hoehe: 841.89 };
 
 async function befehlEntwurf(page: Page, einsatzId: string): Promise<number> {
   const a = api(page, einsatzId);
-  const { id } = await a.post('befehle', { vorlage: 'befehl_lad', titel: 'Befehl mit Skizze' });
+  const { id } = await a.post('orders', { vorlage: 'befehl_lad', titel: 'Befehl mit Skizze' });
   await a.patch(`orders/${id}`, {
     abschnitte: ['lage', 'auftrag', 'durchfuehrung'].map((schluessel) => ({
       schluessel,

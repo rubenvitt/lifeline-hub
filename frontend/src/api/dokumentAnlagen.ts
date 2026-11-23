@@ -62,7 +62,7 @@ export function entferneDokumentAnlage(
 }
 
 /**
- * Bild der Anlage über die Dokumentroute, nie über `/anhaenge/{aid}` des Einsatzes (dort 404).
+ * Bild der Anlage über die Dokumentroute, nie über `/attachments/{aid}` des Einsatzes (dort 404).
  * Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
  */
 export function dokumentAnlageDateiPfad(

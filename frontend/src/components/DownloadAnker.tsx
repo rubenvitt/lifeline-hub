@@ -76,7 +76,7 @@ export function downloadAnkerStil(token: {
 
 interface Props {
   /**
-   * Download-Adresse — immer die modul-gegatete Route, nie `/anhaenge/{aid}` des Einsatzes.
+   * Download-Adresse — immer die modul-gegatete Route, nie `/attachments/{aid}` des Einsatzes.
    * Einzige Ausnahme ist der Chat (n:m, kein Eintrag in `MODUL_LINKER`): seine Anhänge laden
    * über die generische Route, die sie an lebenden Nachrichten freigibt (`routes/anhang.rs`).
    */

@@ -137,7 +137,7 @@ export async function ladeEtbAnhangHoch(
 
 /**
  * Download-Pfad eines ETB-Anhangs: ein API-Pfad, keine Navigation, deshalb nicht in
- * `routing/deeplinks.ts`. Die generische Route `/anhaenge/{aid}` antwortet für ETB-Anhänge 404.
+ * `routing/deeplinks.ts`. Die generische Route `/attachments/{aid}` antwortet für ETB-Anhänge 404.
  */
 export function etbAnhangPfad(einsatzId: number, eintragId: number, anhangId: number): string {
   return `/api/einsaetze/${einsatzId}/etb/${eintragId}/attachments/${anhangId}`;

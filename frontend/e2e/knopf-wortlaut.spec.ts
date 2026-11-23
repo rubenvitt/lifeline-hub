@@ -85,7 +85,7 @@ async function ueberhang(page: Page): Promise<number> {
 
 async function seede(page: Page): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, `E2E Knopfwortlaut ${Date.now()}`);
-  const meldungId = await post(page, einsatzId, 'meldungen', {
+  const meldungId = await post(page, einsatzId, 'reports', {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Nord gesperrt',
@@ -93,16 +93,16 @@ async function seede(page: Page): Promise<string> {
   });
   // Gesichtet: die Vorwärtsbewegung heißt dann „Bearbeitung beginnen", der längste Text.
   await post(page, einsatzId, `reports/${meldungId}/status`, { status: 'gesichtet' });
-  await post(page, einsatzId, 'erinnerungen', {
+  await post(page, einsatzId, 'reminders', {
     titel: 'Lagemeldung an die Leitstelle',
     faellig_at: '2030-01-01 10:00',
   });
-  await post(page, einsatzId, 'nachforderungen', {
+  await post(page, einsatzId, 'resource-requests', {
     art: 'Fahrzeug',
     bezeichnung: 'RTW Wortlaut',
     adressat_kategorie: 'leitstelle',
   });
-  await post(page, einsatzId, 'auftraege', {
+  await post(page, einsatzId, 'tasks', {
     auftrag_text: 'Erkundung Brücke Nord',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
   });

@@ -722,7 +722,7 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
     {
       name: 'ETB',
       pfad: `/einsaetze/${matrixId}/etb`,
-      verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/zaehler)/,
+      verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/counters)/,
       anker: async () =>
         // 8 gesäte Meldungen; die 2 Systemeinträge der beiden angelegten Gefahrengebiete sind in
         // der Vorgabe ausgeblendet (kwc2yszv D6).

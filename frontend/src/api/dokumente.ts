@@ -68,7 +68,7 @@ export function entferneDokument(einsatzId: number, dokumentId: number): Promise
   return apiSend<void>(`${basis(einsatzId)}/${dokumentId}`, 'DELETE');
 }
 
-/** Download über die modul-gegatete Route — nie über `/anhaenge` (dort 404, LFH-632 E8). */
+/** Download über die modul-gegatete Route — nie über `/attachments` (dort 404, LFH-632 E8). */
 export function dokumentDownloadPfad(einsatzId: number, dokumentId: number): string {
   return `${basis(einsatzId)}/${dokumentId}/file`;
 }

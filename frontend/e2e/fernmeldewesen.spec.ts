@@ -91,7 +91,7 @@ test.describe('Fernmeldewesen (LLH-1180)', () => {
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page, `E2E Fernmeldewesen Anlage ${Date.now()}`);
     await seedeGrund(page, id);
-    const { id: befehlId } = await api(page, id).post('befehle', {
+    const { id: befehlId } = await api(page, id).post('orders', {
       vorlage: 'befehl_lad',
       titel: 'Befehl mit Skizze',
     });
