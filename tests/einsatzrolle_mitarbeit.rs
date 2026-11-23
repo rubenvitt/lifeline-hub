@@ -22,7 +22,7 @@ async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         cookie,
         None,
     )
@@ -41,7 +41,7 @@ async fn nachricht(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kanal}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kanal}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
     )
@@ -59,7 +59,7 @@ async fn mitarbeit_schreibt_bearbeitet_und_loescht_eigene_chatnachricht() {
     let (s, m) = nachricht(&app, einsatz, kid, &mit, "Erster Stand").await;
     assert_eq!(s, StatusCode::CREATED, "{m:?}");
     let mid = m["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}");
+    let uri = format!("/api/einsaetze/{einsatz}/chat/messages/{mid}");
 
     let (s, _) = anfrage(
         &app,
@@ -87,7 +87,7 @@ async fn mitarbeit_bearbeitet_fremde_chatnachricht_nicht() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
         &mit,
         Some(r#"{"inhalt":"Übernommen"}"#),
     )
@@ -108,7 +108,7 @@ async fn mitarbeit_legt_keinen_chatkanal_an_und_setzt_keinen_bezug() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &mit,
         Some(r#"{"name":"Neu"}"#),
     )
@@ -117,7 +117,7 @@ async fn mitarbeit_legt_keinen_chatkanal_an_und_setzt_keinen_bezug() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &mit,
         Some(r#"{"typ":"schaden","ziel_id":1}"#),
     )
@@ -160,7 +160,7 @@ async fn mitarbeit_laedt_anhang_hoch_und_loescht_eigenen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/anhaenge");
+    let uri = format!("/api/einsaetze/{einsatz}/attachments");
 
     let (s, v) = multipart_post(&app, &uri, &mit, Some(("a.png", MINI_PNG)), &[]).await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
@@ -211,7 +211,7 @@ async fn mitarbeit_loescht_keinen_anhang_einer_fremden_chatnachricht() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kid = default_kanal(&app, einsatz, &admin).await;
     let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/anhaenge");
+    let uri = format!("/api/einsaetze/{einsatz}/attachments");
 
     let (s, v) = multipart_post(&app, &uri, &admin, Some(("c.png", MINI_PNG)), &[]).await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
@@ -219,7 +219,7 @@ async fn mitarbeit_loescht_keinen_anhang_einer_fremden_chatnachricht() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"Mit Foto","anhang_ids":[{aid}]}}"#)),
     )
@@ -257,7 +257,7 @@ async fn meldung_senden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         cookie,
         Some(&meldung_body(extra).to_string()),
     )
@@ -274,7 +274,7 @@ async fn meldung_korrigieren(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -285,7 +285,7 @@ async fn meldungen_liste(app: &axum::Router, einsatz: i64, cookie: &str) -> Vec<
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         cookie,
         None,
     )
@@ -438,7 +438,7 @@ async fn mitarbeit_bestaetigt_weist_zu_und_erteilt_keinen_auftrag() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/{pfad}"),
+            &format!("/api/einsaetze/{einsatz}/reports/{mid}/{pfad}"),
             &mit,
             Some(&body),
         )
@@ -453,7 +453,7 @@ async fn mitarbeit_meldung_offline_replay_gibt_gespeicherte_zurueck() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (id, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/meldungen");
+    let uri = format!("/api/einsaetze/{einsatz}/reports");
     let body = meldung_body(serde_json::json!({ "client_id": "offline-mit-1" })).to_string();
 
     let (s1, erst) =
@@ -507,7 +507,7 @@ async fn mitarbeit_korrigiert_eigene_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -676,7 +676,7 @@ async fn mitarbeit_berichtigt_etb_eintrag_einer_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -736,7 +736,7 @@ async fn mitarbeit_berichtigt_berichtigung_einer_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -800,7 +800,7 @@ async fn etb_anzeige_nennt_meldung_in_der_lage() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -836,7 +836,7 @@ async fn etb_foto_hochladen(
 ) -> (StatusCode, serde_json::Value) {
     multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/etb/attachments"),
         cookie,
         Some(("foto.png", MINI_PNG)),
         &[],
@@ -993,7 +993,7 @@ async fn mitarbeit_erteilt_keinen_etb_auftrag() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb/{eid}/auftrag"),
+        &format!("/api/einsaetze/{einsatz}/etb/{eid}/task"),
         &mit,
         Some(
             r#"{"auftrag_text":"x","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,

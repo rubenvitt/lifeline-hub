@@ -2689,7 +2689,7 @@ async fn uebernehmen_bezuege_und_zustaende() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/meldungen/{meldung}/bestaetigen"),
+        &format!("/api/einsaetze/{eid}/reports/{meldung}/confirm"),
         &cookie,
         None,
     )
@@ -3199,7 +3199,7 @@ async fn abruf_mit_auftrag_legt_auftrag_an_einheit_an() {
         let a = fetch_json(
             &l.app,
             &l.admin,
-            &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+            &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
         )
         .await;
         assert_eq!(a["auftrag_text"], "Sandsackverbau");
@@ -3400,7 +3400,7 @@ async fn abruf_fahrzeug_ohne_einheit_mit_auftrag_an_fahrzeug() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["empfaenger"][0]["empfaenger_typ"], "fahrzeug");
@@ -3661,7 +3661,7 @@ async fn abruf_zuruecknehmen_laesst_unterstellung_und_auftrag() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["vollzug_status"], "offen", "Auftrag bleibt: {a}");

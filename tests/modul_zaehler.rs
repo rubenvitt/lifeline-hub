@@ -128,7 +128,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
         v["personen"]["gesamt"].as_i64(),
         Some(liste.as_array().unwrap().len() as i64)
     );
-    let etb = get(&app, &admin, &format!("{basis}/etb/zaehler")).await;
+    let etb = get(&app, &admin, &format!("{basis}/etb/counters")).await;
     assert_eq!(v["etb"]["gesamt"], etb["gesamt"], "{v:?}");
 }
 
@@ -145,20 +145,20 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
             "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00"
         })
         .to_string();
-        let m = post(&app, &admin, &format!("{basis}/meldungen"), &body).await;
+        let m = post(&app, &admin, &format!("{basis}/reports"), &body).await;
         meldungen.push(m["id"].as_i64().unwrap());
     }
     post(
         &app,
         &admin,
-        &format!("{basis}/meldungen/{}/status", meldungen[1]),
+        &format!("{basis}/reports/{}/status", meldungen[1]),
         r#"{"status":"gesichtet"}"#,
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/meldungen/{}/status", meldungen[2]),
+        &format!("{basis}/reports/{}/status", meldungen[2]),
         r#"{"status":"erledigt"}"#,
     )
     .await;
@@ -179,35 +179,35 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     post(
         &app,
         &admin,
-        &format!("{basis}/auftraege"),
+        &format!("{basis}/tasks"),
         &auftrag("Deich sichern", Some("2026-06-01 10:00:00")),
     )
     .await;
     let a2 = post(
         &app,
         &admin,
-        &format!("{basis}/auftraege"),
+        &format!("{basis}/tasks"),
         &auftrag("Sandsäcke", None),
     )
     .await;
     let a3 = post(
         &app,
         &admin,
-        &format!("{basis}/auftraege"),
+        &format!("{basis}/tasks"),
         &auftrag("Sperrung", Some("2026-06-01 11:00:00")),
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/auftraege/{}/vollzug", a2["id"]),
+        &format!("{basis}/tasks/{}/execution", a2["id"]),
         r#"{"status":"in_arbeit"}"#,
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/auftraege/{}/vollzug", a3["id"]),
+        &format!("{basis}/tasks/{}/execution", a3["id"]),
         r#"{"status":"vollzogen","vollzugsmeldung":"x"}"#,
     )
     .await;
@@ -216,21 +216,21 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     post(
         &app,
         &admin,
-        &format!("{basis}/erinnerungen"),
+        &format!("{basis}/reminders"),
         r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#,
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/erinnerungen"),
+        &format!("{basis}/reminders"),
         r#"{"titel":"Ablösung","faellig_at":"2099-01-01 10:00"}"#,
     )
     .await;
 
     let v = zaehler(&app, &admin, einsatz).await;
 
-    let liste = get(&app, &admin, &format!("{basis}/meldungen")).await;
+    let liste = get(&app, &admin, &format!("{basis}/reports")).await;
     let offen = anzahl(&liste, |m| m["ist_offen"] == json!(true));
     let neu = anzahl(&liste, |m| {
         m["ist_offen"] == json!(true) && m["status"] == "neu"
@@ -245,7 +245,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
         "{v:?}"
     );
 
-    let liste = get(&app, &admin, &format!("{basis}/auftraege")).await;
+    let liste = get(&app, &admin, &format!("{basis}/tasks")).await;
     let ist_offen =
         |a: &Value| a["bearbeitungsstatus"] == "offen" || a["bearbeitungsstatus"] == "in_arbeit";
     let offen = anzahl(&liste, ist_offen);
@@ -267,7 +267,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
         "{v:?}"
     );
 
-    let liste = get(&app, &admin, &format!("{basis}/erinnerungen")).await;
+    let liste = get(&app, &admin, &format!("{basis}/reminders")).await;
     let faellig = anzahl(&liste, |e| {
         e["ist_faellig"] == json!(true) && e["status"] == "offen"
     });
@@ -277,7 +277,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     // Der Zähler lässt die Fristen aus, die am offenen Auftrag stehen (`src/AGENTS.md`,
     // „Automatische Fristen stehen am Bezug“, LLH-1908). Die des vollzogenen bleibt: ihn zeigt
     // keine Liste offener Aufträge mehr, seine Quittung fehlt aber noch.
-    let auftraege = get(&app, &admin, &format!("{basis}/auftraege")).await;
+    let auftraege = get(&app, &admin, &format!("{basis}/tasks")).await;
     let offene_auftraege: Vec<i64> = auftraege
         .as_array()
         .unwrap()
@@ -337,13 +337,7 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
             "inhalt": "Lage", "ereigniszeit": "2026-06-12 09:00:00",
             "meldungsart": art, "prioritaet": prio,
         });
-        let m = post(
-            &app,
-            &admin,
-            &format!("{basis}/meldungen"),
-            &body.to_string(),
-        )
-        .await;
+        let m = post(&app, &admin, &format!("{basis}/reports"), &body.to_string()).await;
         ids.push(m["id"].as_i64().unwrap());
     }
     for (id, eingang) in [
@@ -371,7 +365,7 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
         let (status, m) = anfrage(
             &app,
             "POST",
-            &format!("{basis}/meldungen/{id}/bestaetigen"),
+            &format!("{basis}/reports/{id}/confirm"),
             &admin,
             None,
         )
@@ -425,14 +419,8 @@ async fn auto_frist_zaehlt_als_erinnerung_wenn_der_bezug_sie_nicht_traegt() {
         })
         .to_string()
     };
-    let erledigt = post(
-        &app,
-        &admin,
-        &format!("{basis}/meldungen"),
-        &sofort("Deich"),
-    )
-    .await;
-    post(&app, &admin, &format!("{basis}/meldungen"), &sofort("MANV")).await;
+    let erledigt = post(&app, &admin, &format!("{basis}/reports"), &sofort("Deich")).await;
+    post(&app, &admin, &format!("{basis}/reports"), &sofort("MANV")).await;
     sqlx::query(
         "UPDATE erinnerung SET faellig_at = '2000-01-01 00:00:00' WHERE quelle = 'auto_frist'",
     )
@@ -448,7 +436,7 @@ async fn auto_frist_zaehlt_als_erinnerung_wenn_der_bezug_sie_nicht_traegt() {
     post(
         &app,
         &admin,
-        &format!("{basis}/meldungen/{}/status", erledigt["id"]),
+        &format!("{basis}/reports/{}/status", erledigt["id"]),
         r#"{"status":"erledigt"}"#,
     )
     .await;
@@ -483,28 +471,28 @@ async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
     let abgelaufen = post(
         &app,
         &admin,
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &meldung("Deich bricht", true),
     )
     .await;
     let bestaetigt = post(
         &app,
         &admin,
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &meldung("MANV", true),
     )
     .await;
     let _kuenftig = post(
         &app,
         &admin,
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &meldung("Pegel", true),
     )
     .await;
     let _ohne_pflicht = post(
         &app,
         &admin,
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &meldung("Straße frei", false),
     )
     .await;
@@ -520,14 +508,14 @@ async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/meldungen/{}/bestaetigen", bestaetigt["id"]),
+        &format!("{basis}/reports/{}/confirm", bestaetigt["id"]),
         &admin,
         None,
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{m:?}");
 
-    let liste = get(&app, &admin, &format!("{basis}/meldungen")).await;
+    let liste = get(&app, &admin, &format!("{basis}/reports")).await;
     let alarmiert = anzahl(&liste, |m| {
         m["bestaetigung_pflicht"] == json!(true)
             && m["ist_bestaetigt"] != json!(true)
@@ -545,7 +533,7 @@ async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/meldungen/{}/bestaetigen", abgelaufen["id"]),
+        &format!("{basis}/reports/{}/confirm", abgelaufen["id"]),
         &admin,
         None,
     )
@@ -577,13 +565,7 @@ async fn merkmale_trennen_sich_im_zaehler() {
             "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00",
             "prioritaet": "sofort", "bestaetigung_frist_min": 5
         });
-        let m = post(
-            &app,
-            &admin,
-            &format!("{basis}/meldungen"),
-            &body.to_string(),
-        )
-        .await;
+        let m = post(&app, &admin, &format!("{basis}/reports"), &body.to_string()).await;
         ids.push(m["id"].as_i64().unwrap());
     }
     sqlx::query(
@@ -603,26 +585,26 @@ async fn merkmale_trennen_sich_im_zaehler() {
         "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" }]
     })
     .to_string();
-    post(&app, &admin, &format!("{basis}/auftraege"), &auftrag).await;
-    let quittiert = post(&app, &admin, &format!("{basis}/auftraege"), &auftrag).await;
+    post(&app, &admin, &format!("{basis}/tasks"), &auftrag).await;
+    let quittiert = post(&app, &admin, &format!("{basis}/tasks"), &auftrag).await;
     post(
         &app,
         &admin,
         &format!(
-            "{basis}/auftraege/{}/empfaenger/{}/quittieren",
+            "{basis}/tasks/{}/recipients/{}/acknowledge",
             quittiert["id"], quittiert["empfaenger"][0]["id"]
         ),
         "{}",
     )
     .await;
 
-    let meldungen = get(&app, &admin, &format!("{basis}/meldungen")).await;
+    let meldungen = get(&app, &admin, &format!("{basis}/reports")).await;
     let alarmiert = anzahl(&meldungen, |m| {
         m["bestaetigung_pflicht"] == json!(true)
             && m["ist_bestaetigt"] != json!(true)
             && (m["ist_ueberfaellig"] == json!(true) || m["eskaliert"] == json!(true))
     });
-    let auftraege = get(&app, &admin, &format!("{basis}/auftraege")).await;
+    let auftraege = get(&app, &admin, &format!("{basis}/tasks")).await;
     let ueberfaellig = anzahl(&auftraege, |a| a["ist_ueberfaellig"] == json!(true));
     assert_eq!(
         (alarmiert, ueberfaellig),
@@ -646,7 +628,7 @@ async fn chat_zaehlt_je_benutzer() {
     let karla_id = benutzer_anlegen(&app, &admin, "karla", "keine").await;
     rolle_setzen(&app, &admin, einsatz, karla_id, "fuehrungspersonal").await;
     let karla = login_cookie(&app, "karla", "karlapw1").await;
-    let basis = format!("/api/einsaetze/{einsatz}/chat/kanaele");
+    let basis = format!("/api/einsaetze/{einsatz}/chat/channels");
 
     let kanaele = get(&app, &admin, &basis).await;
     let kid = kanaele[0]["id"].as_i64().unwrap();
@@ -695,7 +677,7 @@ async fn chat_zaehlt_je_benutzer() {
 #[tokio::test]
 async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
     let (app, admin, einsatz) = aufbau().await;
-    let pfad = format!("/api/einsaetze/{einsatz}/dokumente");
+    let pfad = format!("/api/einsaetze/{einsatz}/documents");
     let mut ids = vec![];
     for titel in ["Lageplan", "Funkskizze", "Foto"] {
         let (status, v) = multipart_post(
@@ -726,7 +708,7 @@ async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
 #[tokio::test]
 async fn nachforderungen_zaehlen_wie_die_liste() {
     let (app, admin, einsatz) = aufbau().await;
-    let pfad = format!("/api/einsaetze/{einsatz}/nachforderungen");
+    let pfad = format!("/api/einsaetze/{einsatz}/resource-requests");
     // Je Fall die Stufen, die nach dem Anlegen geschaltet werden.
     let faelle: [&[&str]; 6] = [
         &[],
@@ -744,7 +726,7 @@ async fn nachforderungen_zaehlen_wie_die_liste() {
         let nid = nf["id"].as_i64().unwrap();
         for schritt in *schritte {
             let (ziel, body) = if *schritt == "abgelehnt" {
-                (format!("{pfad}/{nid}/ablehnen"), json!({}))
+                (format!("{pfad}/{nid}/reject"), json!({}))
             } else {
                 (format!("{pfad}/{nid}/status"), json!({ "status": schritt }))
             };
@@ -796,7 +778,7 @@ async fn nachforderungen_ueberfaellig_wie_das_board() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/nachforderungen");
+    let pfad = format!("/api/einsaetze/{einsatz}/resource-requests");
     // Je Fall: Stufen nach der Zusage, Eintreffen verstrichen?
     let faelle: [(&[&str], Option<bool>); 6] = [
         (&[], None),                                  // angefordert
@@ -824,7 +806,7 @@ async fn nachforderungen_ueberfaellig_wie_das_board() {
             post(
                 &app,
                 &admin,
-                &format!("{pfad}/{nid}/zusage"),
+                &format!("{pfad}/{nid}/commitment"),
                 &zusage.to_string(),
             )
             .await;

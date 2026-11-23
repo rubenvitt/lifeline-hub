@@ -46,18 +46,16 @@ async function abschnitt(page: Page, einsatz: number, kurz: string): Promise<Abs
 
 /** Zwei Aufträge an den Teilbaum von EA 1, einmal je Lauf. */
 async function auftraegeErteilen(page: Page, einsatz: number, ea1: number, ea11: number) {
-  const vorhanden = (await (
-    await page.request.get(`/api/einsaetze/${einsatz}/auftraege`)
-  ).json()) as {
+  const vorhanden = (await (await page.request.get(`/api/einsaetze/${einsatz}/tasks`)).json()) as {
     auftrag_text: string;
   }[];
   if (vorhanden.some((a) => a.auftrag_text === AUFTRAG_EA1)) return;
-  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/auftraege`, {
+  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/tasks`, {
     auftrag_text: AUFTRAG_EA1,
     prioritaet: 'dringend',
     empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: ea1 }],
   });
-  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/auftraege`, {
+  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/tasks`, {
     auftrag_text: AUFTRAG_EA11,
     empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: ea11 }],
   });
@@ -65,7 +63,7 @@ async function auftraegeErteilen(page: Page, einsatz: number, ea1: number, ea11:
 
 /** Ein freigegebener Einsatzbefehl an EA 1 und EA 2 (LLH-1190). */
 async function befehlFreigeben(page: Page, einsatz: number, ea1: number, ea2: number) {
-  const b = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${einsatz}/befehle`, {
+  const b = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${einsatz}/orders`, {
     vorlage: 'befehl_lad',
     titel: BEFEHL_TITEL,
     abschnitte: [
@@ -74,13 +72,13 @@ async function befehlFreigeben(page: Page, einsatz: number, ea1: number, ea2: nu
       { schluessel: 'durchfuehrung', text: 'EA 2 übernimmt den Wartebereich.' },
     ],
   });
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/befehle/${b.id}`, {
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/orders/${b.id}`, {
     verteiler: [
       { empfaenger_typ: 'abschnitt', abschnitt_id: ea1 },
       { empfaenger_typ: 'abschnitt', abschnitt_id: ea2 },
     ],
   });
-  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/befehle/${b.id}/freigeben`);
+  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/orders/${b.id}/release`);
 }
 
 /** Koppelt ein Tablet an EA 1, eigener Browserkontext, Uhr angehalten. */

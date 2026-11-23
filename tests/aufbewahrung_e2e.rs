@@ -1192,7 +1192,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/befehle"),
+        &format!("{basis}/orders"),
         json!({ "vorlage": "befehl_lad", "titel": "Befehl Verteiler" }),
     )
     .await["id"]
@@ -1202,7 +1202,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PATCH",
-        &format!("{basis}/befehle/{befehl}"),
+        &format!("{basis}/orders/{befehl}"),
         json!({ "verteiler": [
             { "empfaenger_typ": "extern", "extern_kategorie": "leitstelle",
               "extern_bezeichnung": "ILS-Geheimstadt-5" },

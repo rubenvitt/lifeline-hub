@@ -16,12 +16,12 @@ const TITEL = 'Lagebericht Navigation';
 async function vorbereiten(page: Page) {
   await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   const einsatzId = await einsatzAnlegen(page, `E2E Lagebericht-Blocker ${Date.now()}`);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
     data: { vorlage: 'lagebeurteilung', titel: TITEL },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
   const berichtId = (await antwort.json()).id as number;
-  const api = `/api/einsaetze/${einsatzId}/lageberichte/${berichtId}`;
+  const api = `/api/einsaetze/${einsatzId}/situation-reports/${berichtId}`;
   const liste = `/einsaetze/${einsatzId}/lageberichte`;
   const detail = `${liste}/${berichtId}`;
   return { api, liste, detail };

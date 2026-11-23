@@ -34,7 +34,7 @@ async function seed(page: Page): Promise<string> {
   const basis = `/api/einsaetze/${einsatzId}`;
   for (const name of ['Albers', 'Brandt']) await post(page, `${basis}/personen`, { name });
   await post(page, `${basis}/personen`, { name: 'Claasen', status: 'vermisst' });
-  await post(page, `${basis}/auftraege`, {
+  await post(page, `${basis}/tasks`, {
     auftrag_text: 'Deich sichern',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
     frist_at: '2026-06-01 10:00:00',

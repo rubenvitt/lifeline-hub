@@ -1,11 +1,15 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+accept	abnehmen
 accommodation	Unterkunft
+acknowledge	quittieren
 adapter	-
 admin	-
 animals	Tiere
 api	-
 app-code	-
+assign	zuweisen
+attachments	Anhänge
 audit	-
 auth	-
 backup	-
@@ -15,28 +19,40 @@ callback	-
 care	Betreuung
 case-file	Einsatzakte
 catering	Verpflegung
+channels	Kanäle
 chat	-
+check-ins	Rückmeldungen
 code	-
 codes	-
 command	Führung
 command-post	Führungsstelle
 command-roles	Führungsfunktionen
+commitment	Zusage
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
+complete	erledigen
 config	-
+confirm	bestätigen
+count	Anzahl
+counters	Zähler
 damages	Schäden
 dev	-
 devices	Geräte
 discoverable	-
+distribution	Verteiler
+documents	Dokumente
 download	-
 emergency-takeover	Notübernahme
+enclosures	Anlagen
 end-others	andere beenden
 enroll	-
 etb	ETB
 evacuation	Evakuierung
 events	-
+execution	Vollzug
 export	-
 fetch-certificate	Zertifikat abrufen
+file	Datei
 finish	-
 fonts	-
 forces	Kräfte
@@ -63,6 +79,8 @@ master-data	Stammdaten
 material	Material
 matrix	-
 me	-
+messages	Nachrichten
+metrics	Kennzahlen
 mirror	Spiegel
 oidc	-
 openapi.json	-
@@ -77,20 +95,31 @@ plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+promote-to-etb	zum ETB heraufstufen
+promote-to-task	zum Auftrag heraufstufen
 providers	-
 proxy	-
 raster	-
 read	gelesen
+read-marker	Lesemarke
+recipients	Empfänger
 redeem	einlösen
+reference	Bezug
 register	-
 registration	-
+reject	ablehnen
+release	freigeben
 release-notes	Versionsstand
 reliefs	Ablösungen
+reminders	Erinnerungen
+reopen	wiedereröffnen
 reports	Meldungen
 requests	Anträge
+rescind	aufheben
 reset	-
 resource-requests	Nachforderungen
 retention	Aufbewahrung
+revise	fortschreiben
 seats	Plätze
 sectors	Einsatzabschnitte
 sessions	Sitzungen
@@ -100,7 +129,9 @@ shift-plan	Schichtplan
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
+situation-relevant	lagerelevant
 situation-reports	Lageberichte
+situation-seen	Lage gesehen
 sprite	-
 sprites	-
 staff	Stab
@@ -110,6 +141,7 @@ status	-
 style.json	-
 system	-
 talk-groups	Sprechgruppen
+task	Auftrag
 tasks	Aufträge
 test	-
 tile	-
@@ -118,7 +150,9 @@ tiles	-
 totp	-
 transport	-
 triage	Sichtung
+types	Arten
 uhs	UHS
+undo	zurücknehmen
 units	Einheiten
 unregister	-
 users	Benutzer
@@ -128,3 +162,4 @@ web-push	-
 webauthn	-
 webhook	-
 whereabouts	Verbleib
+withdraw	zurückziehen

@@ -123,7 +123,7 @@ function wortlautAnfang(text) {
 async function pushInhalt(d, signal) {
   const wort = d.inhalt === true ? inhaltTitelWort(d.art, d.bezug_typ) : null;
   if (!wort || typeof d.einsatz_id !== 'number' || typeof d.bezug_id !== 'number') return null;
-  const m = await holeJson(`/api/einsaetze/${d.einsatz_id}/meldungen/${d.bezug_id}`, signal);
+  const m = await holeJson(`/api/einsaetze/${d.einsatz_id}/reports/${d.bezug_id}`, signal);
   if (!m) return null;
   const absender = typeof m.absender === 'string' ? m.absender.trim() : '';
   const wortlaut = typeof m.inhalt === 'string' ? m.inhalt.trim() : '';

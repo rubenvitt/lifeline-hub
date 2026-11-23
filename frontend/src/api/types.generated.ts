@@ -3667,7 +3667,7 @@ export interface components {
             /** @description `zugesagt` oder `unterwegs`. */
             status: components["schemas"]["NachforderungStatus"];
         };
-        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`). */
         EtbAnzahlAnzeige: {
             /**
              * Format: int64
@@ -3845,7 +3845,7 @@ export interface components {
             /** Format: int64 */
             system: number;
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/etb/zaehler`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counters`. */
         EtbZaehlerAnzeige: {
             /**
              * Format: int64

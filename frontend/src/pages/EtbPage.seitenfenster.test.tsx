@@ -124,7 +124,7 @@ function setup(route: string) {
       gesamt += 1;
       return HttpResponse.json(eintrag(gesamt), { status: 201 });
     }),
-    http.get('/api/einsaetze/7/etb/zaehler', () =>
+    http.get('/api/einsaetze/7/etb/counters', () =>
       HttpResponse.json({
         gesamt,
         je_typ: {

@@ -17,7 +17,7 @@ describe('ETB-Anhänge (LFH-117)', () => {
     const ergebnis = ladeEtbAnhangHoch(7, datei);
     const [xhr] = anfragen;
     expect(xhr.methode).toBe('POST');
-    expect(xhr.url).toBe('/api/einsaetze/7/etb/anhaenge');
+    expect(xhr.url).toBe('/api/einsaetze/7/etb/attachments');
     const fd = xhr.body as FormData;
     expect(fd.getAll('datei')).toEqual([datei]);
     xhr.antworten(201, [anzeige]);
@@ -53,8 +53,8 @@ describe('ETB-Anhänge (LFH-117)', () => {
   });
 
   it('baut den Download-Pfad unter dem ETB-Präfix — nie den generischen', () => {
-    expect(etbAnhangPfad(7, 42, 9)).toBe('/api/einsaetze/7/etb/42/anhaenge/9');
-    expect(etbAnhangPfad(7, 42, 9)).not.toMatch(/^\/api\/einsaetze\/7\/anhaenge/);
+    expect(etbAnhangPfad(7, 42, 9)).toBe('/api/einsaetze/7/etb/42/attachments/9');
+    expect(etbAnhangPfad(7, 42, 9)).not.toMatch(/^\/api\/einsaetze\/7\/attachments/);
   });
 });
 
@@ -72,8 +72,8 @@ describe('Ausschluss der Systemeinträge (LFH-958)', () => {
     await zaehleEtb(7, { ohne_system: true });
     const pfade = fetchMock.mock.calls.map(([p]) => String(p));
     expect(pfade[0]).toBe('/api/einsaetze/7/etb?ohne_system=true&before_lfd_nr=40&limit=100');
-    expect(pfade[1]).toBe('/api/einsaetze/7/etb/zaehler?ohne_system=true');
-    expect(pfade[2]).toBe('/api/einsaetze/7/etb/anzahl?ohne_system=true');
+    expect(pfade[1]).toBe('/api/einsaetze/7/etb/counters?ohne_system=true');
+    expect(pfade[2]).toBe('/api/einsaetze/7/etb/count?ohne_system=true');
   });
 
   it('ohne den Schalter fehlt der Parameter ganz', async () => {

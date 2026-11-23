@@ -84,7 +84,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb/lesemarke"),
+        &format!("/api/einsaetze/{e}/etb/read-marker"),
         &i.admin,
         Some(&format!(r#"{{"bis_lfd_nr":{lfd}}}"#)),
     )
@@ -711,7 +711,7 @@ async fn antraege(i: &Instanz, einsatz: i64, cookie: &str) -> Vec<serde_json::Va
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/antraege"),
+        &format!("/api/einsaetze/{einsatz}/requests"),
         cookie,
         None,
     )
@@ -898,7 +898,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage(
         &elw.app,
         "DELETE",
-        &format!("/api/einsaetze/{s}/antraege/{id}"),
+        &format!("/api/einsaetze/{s}/requests/{id}"),
         &spontan_cookie,
         None,
     )
@@ -1051,7 +1051,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/meldungen"),
+        &format!("/api/einsaetze/{s}/reports"),
         &erika,
         Some(
             &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -2156,7 +2156,7 @@ async fn beobachter_beantragt_weiter_nichts() {
             json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-e" }),
         ),
         (
-            format!("/api/einsaetze/{s}/meldungen"),
+            format!("/api/einsaetze/{s}/reports"),
             json!({ "inhalt": "X", "client_id": "b-m" }),
         ),
     ] {
@@ -2179,7 +2179,7 @@ async fn der_fuehrer_lehnt_lagemeldung_und_anordnung_der_mitarbeit_ab() {
                     "client_id": "m-anordnung" }),
         ),
         (
-            format!("/api/einsaetze/{s}/meldungen"),
+            format!("/api/einsaetze/{s}/reports"),
             json!({ "inhalt": "Lage", "meldungsart": "lagemeldung",
                     "ereigniszeit": "2026-11-10 08:00:00", "client_id": "m-lage" }),
         ),

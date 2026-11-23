@@ -177,7 +177,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -185,7 +185,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Deich instabil", "ereigniszeit": "2026-06-12 09:00:00" }),
     )
@@ -193,7 +193,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )
@@ -286,7 +286,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -294,7 +294,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Frau Muster, Hauptstr. 4, vermisst ihren Sohn",
                 "ereigniszeit": "2026-06-12 09:00:00" }),
@@ -303,7 +303,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )

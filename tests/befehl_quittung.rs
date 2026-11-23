@@ -1,6 +1,6 @@
 //! Integrationstests der Quittung je Verteiler-Empfänger am Einsatzbefehl (LLH-1173, Spec
 //! `befehl-quittung`, Herleitung `openspec/changes/archive/2026-10-13-koiqi51u-befehl-quittung/design.md`) über
-//! `POST /api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/{quittieren|zuruecknehmen}`:
+//! `POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/{quittieren|zuruecknehmen}`:
 //! Quittung und Rücknahme samt ETB, Fassungsregel, Rechte, Liste und Live-Ereignis.
 
 use axum::http::StatusCode;
@@ -47,7 +47,7 @@ async fn umgebung() -> Umgebung {
 
 impl Umgebung {
     fn befehl(&self, id: i64) -> String {
-        format!("/api/einsaetze/{}/befehle/{id}", self.einsatz)
+        format!("/api/einsaetze/{}/orders/{id}", self.einsatz)
     }
 
     /// Entwurf mit dem Verteiler „EA Süd, S3 Einsatz“.
@@ -55,7 +55,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/befehle", self.einsatz),
+            &format!("/api/einsaetze/{}/orders", self.einsatz),
             &self.admin,
             Some(BEFEHL),
         )
@@ -92,7 +92,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("{}/fortschreiben", self.befehl(id)),
+            &format!("{}/revise", self.befehl(id)),
             &self.admin,
             Some("{}"),
         )
@@ -106,12 +106,12 @@ impl Umgebung {
     }
 
     async fn quittieren(&self, bid: i64, vid: i64) -> (StatusCode, Value) {
-        self.post(&self.quittung_pfad(bid, vid, "quittieren")).await
+        self.post(&self.quittung_pfad(bid, vid, "acknowledge"))
+            .await
     }
 
     async fn zuruecknehmen(&self, bid: i64, vid: i64) -> (StatusCode, Value) {
-        self.post(&self.quittung_pfad(bid, vid, "zuruecknehmen"))
-            .await
+        self.post(&self.quittung_pfad(bid, vid, "undo")).await
     }
 
     async fn laden(&self, id: i64) -> Value {
@@ -124,7 +124,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/befehle", self.einsatz),
+            &format!("/api/einsaetze/{}/orders", self.einsatz),
             &self.admin,
             None,
         )
@@ -327,7 +327,7 @@ async fn fremde_zeile_und_fremder_einsatz_sind_nicht_vorhanden() {
     let anderer = einsatz_anlegen(&u.app, &u.admin).await;
     let (s, _) = u
         .post(&format!(
-            "/api/einsaetze/{anderer}/befehle/{}/verteiler/{}/quittieren",
+            "/api/einsaetze/{anderer}/orders/{}/distribution/{}/acknowledge",
             id(&a),
             id_of_row(&a, 0)
         ))
@@ -343,7 +343,7 @@ async fn ohne_schreibrecht_ist_quittieren_verboten() {
     let erika = benutzer_anlegen(&u.app, &u.admin, "erika", "keine").await;
     rolle_setzen(&u.app, &u.admin, u.einsatz, erika, "beobachter").await;
     let erika_c = login_cookie(&u.app, "erika", "erikapw1").await;
-    for wort in ["quittieren", "zuruecknehmen"] {
+    for wort in ["acknowledge", "undo"] {
         let (s, _) = anfrage(
             &u.app,
             "POST",
@@ -388,7 +388,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     let (s, j) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/lageberichte", u.einsatz),
+        &format!("/api/einsaetze/{}/situation-reports", u.einsatz),
         &u.admin,
         Some(r#"{"vorlage":"freitext","titel":"Lage 12:00","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"text","text":"Ruhig"}]}"#),
     )
@@ -399,7 +399,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     let (s, liste) = anfrage(
         &u.app,
         "GET",
-        &format!("/api/einsaetze/{}/lageberichte", u.einsatz),
+        &format!("/api/einsaetze/{}/situation-reports", u.einsatz),
         &u.admin,
         None,
     )
@@ -416,7 +416,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     // Es gibt keine Quittungsroute am Lagebericht.
     let (s, _) = u
         .post(&format!(
-            "/api/einsaetze/{}/lageberichte/{lid}/verteiler/1/quittieren",
+            "/api/einsaetze/{}/situation-reports/{lid}/distribution/1/acknowledge",
             u.einsatz
         ))
         .await;
@@ -433,7 +433,7 @@ async fn quittung_und_ruecknahme_gehen_live_ohne_nur_inhalt() {
     let b = u.freigegeben().await;
     let mut rx = live.abonniere(u.einsatz);
 
-    for wort in ["quittieren", "zuruecknehmen"] {
+    for wort in ["acknowledge", "undo"] {
         let (s, _) = u
             .post(&u.quittung_pfad(id(&b), id_of_row(&b, 0), wort))
             .await;

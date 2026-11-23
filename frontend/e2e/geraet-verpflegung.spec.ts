@@ -138,7 +138,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
       .zeitfenster[0];
     // 20 gezählt und zurückgenommen, 50 nachgetragen.
     expect(zf.ausgegeben.gesamt).toBe(50);
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
+    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(liste.find((m) => m.inhalt.startsWith('Fehlmenge Verpflegung'))?.absender).toBe(
       'Verpflegung · Ausgabe Deich',

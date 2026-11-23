@@ -123,7 +123,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/auftraege", self.einsatz),
+            &format!("/api/einsaetze/{}/tasks", self.einsatz),
             &self.admin,
             Some(&json!({ "auftrag_text": "Sandsäcke zum Deich", "empfaenger": empfaenger })),
         )

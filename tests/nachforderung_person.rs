@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/nachforderungen")
+    format!("/api/einsaetze/{einsatz}/resource-requests")
 }
 
 /// „RTW“ für eine Person, mit zusätzlichen Feldern aus `extra`.

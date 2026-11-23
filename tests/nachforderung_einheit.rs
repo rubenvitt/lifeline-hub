@@ -56,7 +56,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         Some(&body.to_string()),
     )
@@ -69,7 +69,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/zusage"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/commitment"),
         cookie,
         Some(&json!({ "rufnamen": ["83-1", "83-2"] }).to_string()),
     )
@@ -95,7 +95,7 @@ async fn status(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/status"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&json!({ "status": stufe }).to_string()),
     )
@@ -130,7 +130,7 @@ async fn lade(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value 
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         None,
     )

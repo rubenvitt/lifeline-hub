@@ -9245,7 +9245,7 @@
       },
       "EtbAnzahlAnzeige": {
         "type": "object",
-        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).",
         "required": [
           "anzahl"
         ],
@@ -9574,7 +9574,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counters`.",
         "required": [
           "gesamt",
           "je_typ"

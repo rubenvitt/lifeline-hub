@@ -28,7 +28,7 @@ async fn auftraege_anzahl(app: &axum::Router, cookie: &str, e: i64) -> usize {
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         cookie,
         None,
     )
@@ -59,7 +59,7 @@ async fn meldung_anlegen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -72,7 +72,7 @@ async fn chat_nachricht_anlegen(app: &axum::Router, cookie: &str, e: i64) -> i64
     let (_, k) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/chat/kanaele"),
+        &format!("/api/einsaetze/{e}/chat/channels"),
         cookie,
         None,
     )
@@ -81,7 +81,7 @@ async fn chat_nachricht_anlegen(app: &axum::Router, cookie: &str, e: i64) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{e}/chat/channels/{kid}/messages"),
         cookie,
         Some(r#"{"inhalt":"Tank anfordern"}"#),
     )
@@ -96,10 +96,10 @@ async fn wege(app: &axum::Router, cookie: &str, e: i64) -> Vec<String> {
     let mid = meldung_anlegen(app, cookie, e).await;
     let cid = chat_nachricht_anlegen(app, cookie, e).await;
     vec![
-        format!("/api/einsaetze/{e}/auftraege"),
-        format!("/api/einsaetze/{e}/etb/{eid}/auftrag"),
-        format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag"),
-        format!("/api/einsaetze/{e}/chat/nachrichten/{cid}/heraufstufen-auftrag"),
+        format!("/api/einsaetze/{e}/tasks"),
+        format!("/api/einsaetze/{e}/etb/{eid}/task"),
+        format!("/api/einsaetze/{e}/reports/{mid}/task"),
+        format!("/api/einsaetze/{e}/chat/messages/{cid}/promote-to-task"),
     ]
 }
 
@@ -156,7 +156,7 @@ async fn gleiche_empfaenger_werden_zu_einer_zeile() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -187,7 +187,7 @@ async fn texte_des_auftrags_sind_begrenzt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/auftraege");
+    let uri = format!("/api/einsaetze/{e}/tasks");
     let extern_ = |b: &str| json!({ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle", "extern_bezeichnung": b });
     let mit_feld = |feld: &str, wert: String| {
         let mut b = json!({ "auftrag_text": "T", "empfaenger": [funktion("S3")] });
@@ -240,7 +240,7 @@ async fn etb_an_der_anordnung_ist_gekappt_und_die_empfaenger_vollstaendig() {
     let (s, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         Some(&auftrag("Deich sichern", empfaenger)),
     )
@@ -272,7 +272,7 @@ async fn textgrenze_eines_empfaengers_kommt_vor_der_422_eines_frueheren() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/auftraege");
+    let uri = format!("/api/einsaetze/{e}/tasks");
     // S7 ist in der Test-Organisation aus: 422 des Zusammenhangs.
     let fremd = json!({ "empfaenger_typ": "funktion", "funktion": "s7" });
     let (s, _) = anfrage(
@@ -321,7 +321,7 @@ async fn ein_typ_mit_leerzeichen_wird_nicht_weggeduppelt() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -340,7 +340,7 @@ async fn zu_langer_aufhebungsgrund_ist_400() {
     let (s, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         Some(&auftrag("T", vec![funktion("EA")])),
     )
@@ -350,7 +350,7 @@ async fn zu_langer_aufhebungsgrund_ist_400() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/rescind"),
         &admin,
         Some(&json!({ "grund": x(2_001) }).to_string()),
     )
@@ -360,7 +360,7 @@ async fn zu_langer_aufhebungsgrund_ist_400() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         &admin,
         None,
     )

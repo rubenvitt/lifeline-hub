@@ -275,7 +275,7 @@ interface AbschnittRohdaten {
   fahrzeuge: EinsatzFahrzeug[];
   material: EinsatzMaterial[];
   auftraege: Auftrag[];
-  /** `GET …/meldungen/rueckmeldungen`; `undefined`, solange nicht (oder nie) geladen. */
+  /** `GET …/reports/check-ins`; `undefined`, solange nicht (oder nie) geladen. */
   rueckmeldungen?: Rueckmeldungen;
 }
 

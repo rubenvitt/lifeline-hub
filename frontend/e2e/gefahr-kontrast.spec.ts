@@ -102,7 +102,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Gefahrknopf ohne Rahmen (LFH-897): der Papierkorb einer Dokumentenzeile.
-    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
       multipart: {
         datei: {
           name: 'Plan Gefahr.pdf',

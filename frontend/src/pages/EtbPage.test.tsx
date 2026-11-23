@@ -137,7 +137,7 @@ function zaehlung(jeTyp: Partial<Record<EtbEintragAnzeige['typ'], number>>) {
     ...jeTyp,
   };
   const gesamt = Object.values(je_typ).reduce((a, b) => a + b, 0);
-  return http.get('/api/einsaetze/7/etb/zaehler', () => HttpResponse.json({ gesamt, je_typ }));
+  return http.get('/api/einsaetze/7/etb/counters', () => HttpResponse.json({ gesamt, je_typ }));
 }
 
 /**
@@ -205,7 +205,7 @@ describe('EtbPage', () => {
   it('LFH-611: zeigt die Lesemarke im Rahmen der Zeitachse, über ihr', async () => {
     setupMSW();
     server.use(
-      http.get('/api/einsaetze/7/etb/lesemarke', () =>
+      http.get('/api/einsaetze/7/etb/read-marker', () =>
         HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 1 }),
       ),
     );
@@ -225,7 +225,7 @@ describe('EtbPage', () => {
   it('die Lesemarke zählt wie die Achse: ohne Systemeinträge, solange sie ausgeblendet sind (Review S4)', async () => {
     const abrufe: string[] = [];
     const handler = [
-      http.get('/api/einsaetze/7/etb/lesemarke', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/read-marker', ({ request }) => {
         abrufe.push(new URL(request.url).search);
         return HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 1 });
       }),
@@ -247,7 +247,7 @@ describe('EtbPage', () => {
     const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
     const handler = [
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])),
-      http.get('/api/einsaetze/7/etb/lesemarke', () =>
+      http.get('/api/einsaetze/7/etb/read-marker', () =>
         HttpResponse.json({
           neue_anzahl: 1,
           hoechste_lfd_nr: 2,
@@ -300,7 +300,7 @@ describe('EtbPage', () => {
       );
       let gesendet: Record<string, unknown> | undefined;
       server.use(
-        http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        http.post('/api/einsaetze/7/reminders', async ({ request }) => {
           gesendet = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json({ id: 1 });
         }),
@@ -342,7 +342,7 @@ describe('EtbPage', () => {
     );
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -562,7 +562,7 @@ describe('EtbPage', () => {
   it('erteilt aus einem ETB-Eintrag einen Auftrag (Text vorbefüllt, POST an /etb/:id/auftrag)', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(
-      http.post('/api/einsaetze/7/etb/1/auftrag', async ({ request }) => {
+      http.post('/api/einsaetze/7/etb/1/task', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 42 }, { status: 201 });
       }),
@@ -662,7 +662,7 @@ describe('EtbPage', () => {
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(
-      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 99 }, { status: 201 });
       }),
@@ -1339,7 +1339,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
 describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', () => {
   /** Zählung wie der Server: 412 Einträge, davon 300 Systemeinträge; der Ausschluss nimmt sie heraus. */
   function zaehler412(zaehlQueries: string[] = []) {
-    return http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+    return http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
       const p = new URL(request.url).searchParams;
       zaehlQueries.push(p.toString());
       const ohne = p.get('ohne_system') === 'true';
@@ -1394,7 +1394,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
     let systemFreigeben: () => void = () => undefined;
     const systemDa = new Promise<void>((r) => (systemFreigeben = r));
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/zaehler', async ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counters', async ({ request }) => {
         const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
         if (!ohne) await systemDa;
         return HttpResponse.json({
@@ -1422,7 +1422,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
 
   it('nennt im Kopf die Einzahl', async () => {
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
         const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
         return HttpResponse.json({
           gesamt: ohne ? 1 : 2,
@@ -1490,7 +1490,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
   it('unter einem Typfilter zählen die Segmente ohne den Typ, der Kopf die Treffer', async () => {
     setzeViewportBreite(1440);
     setup('/einsaetze/7/etb?typ=meldung', [
-      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
         const p = new URL(request.url).searchParams;
         const nurMeldung = p.get('typ') === 'meldung';
         return HttpResponse.json({
@@ -1516,7 +1516,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
   it('Zählung schlägt fehl: Kopf und Typ-Segmente zeigen keine Zahl, die Liste bleibt bedienbar', async () => {
     setzeViewportBreite(1440);
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/zaehler', () =>
+      http.get('/api/einsaetze/7/etb/counters', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -1658,7 +1658,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
   // LFH-748 (D3): der Sendezustand lag in den Entwurfs-Reitern und ging mit der Berichtigung.
   it('lässt den Grund eines gescheiterten Uploads über eine Berichtigung stehen', async () => {
     setup('/einsaetze/7/etb', [
-      http.post('/api/einsaetze/7/etb/anhaenge', () =>
+      http.post('/api/einsaetze/7/etb/attachments', () =>
         HttpResponse.json({ error: 'Speicher des Servers ist voll' }, { status: 507 }),
       ),
     ]);
@@ -1721,7 +1721,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
 
   it('sperrt „Berichtigen", solange ein Entwurf sendet — mit Grund', async () => {
     setup('/einsaetze/7/etb', [
-      http.post('/api/einsaetze/7/etb/anhaenge', () => new Promise<Response>(() => {})),
+      http.post('/api/einsaetze/7/etb/attachments', () => new Promise<Response>(() => {})),
     ]);
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
@@ -1863,7 +1863,7 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
       let aufrufe = 0;
       let freigeben: () => void = () => {};
       setup('/einsaetze/7/etb', [
-        http.post('/api/einsaetze/7/etb/1/auftrag', async () => {
+        http.post('/api/einsaetze/7/etb/1/task', async () => {
           aufrufe += 1;
           if (aufrufe > 1) await new Promise<void>((r) => (freigeben = r));
           return HttpResponse.json({ error: 'Abschnitt aufgelöst' }, { status: 422 });
@@ -1889,7 +1889,7 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
 
     it('zeigt nach Schließen und erneutem Öffnen keinen alten Grund', async () => {
       setup('/einsaetze/7/etb', [
-        http.post('/api/einsaetze/7/etb/1/auftrag', () =>
+        http.post('/api/einsaetze/7/etb/1/task', () =>
           HttpResponse.json({ error: 'Abschnitt aufgelöst' }, { status: 422 }),
         ),
       ]);
@@ -1982,7 +1982,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('zeigt am Eintrag einen Verweis auf die Dokument-Route, mit EINER Sammelabfrage', async () => {
     let abrufe = 0;
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/dokumente', () => {
+      http.get('/api/einsaetze/7/documents', () => {
         abrufe += 1;
         return HttpResponse.json([plan, ohneBezug]);
       }),
@@ -1990,7 +1990,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
     const verweis = await within(await waitFor(zeileEins)).findByRole('link', {
       name: 'Dokument „Lageplan Nord“, 2,0 KB, zu Nr. 1 herunterladen',
     });
-    expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/dokumente/3/datei');
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/documents/3/file');
     expect(screen.queryByRole('link', { name: /Ohne Bezug/ })).toBeNull();
     expect(abrufe).toBe(1);
   });
@@ -2029,7 +2029,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
       http.get('/api/einsaetze/7/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture({ dokumente: { zugriff: false } })),
       ),
-      http.get('/api/einsaetze/7/dokumente', () => {
+      http.get('/api/einsaetze/7/documents', () => {
         abgefragt = true;
         return HttpResponse.json([plan]);
       }),
@@ -2055,7 +2055,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
   it('nimmt ein neues Dokument nach dem Live-Ereignis `dokument` auf', async () => {
     let liste: unknown[] = [];
     const { client } = setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/dokumente', () => HttpResponse.json(liste)),
+      http.get('/api/einsaetze/7/documents', () => HttpResponse.json(liste)),
     ]);
     await screen.findByText('Erste Meldung');
     await waitFor(() =>
@@ -2165,7 +2165,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
       freigeben = r;
     });
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/zaehler', async () => {
+      http.get('/api/einsaetze/7/etb/counters', async () => {
         await zaehlung;
         return HttpResponse.json({
           gesamt: 1,
@@ -2396,7 +2396,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
           p.get('ohne_system') === 'true' ? [eintrag] : [...system, eintrag],
         );
       }),
-      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
         const p = new URL(request.url).searchParams;
         zaehlAbrufe.push(p.toString());
         const ohne = p.get('ohne_system') === 'true';
@@ -2628,7 +2628,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
    * Vorgabe, kein Filter (kwc2yszv D6).
    */
   function zaehlerJeFilter() {
-    return http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+    return http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
       const p = new URL(request.url).searchParams;
       p.delete('ohne_system');
       const gefiltert = p.size > 0;
@@ -2675,7 +2675,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
 
   it('nennt ohne Zählung keine Zahl', async () => {
     setup('/einsaetze/7/etb?typ=meldung', [
-      http.get('/api/einsaetze/7/etb/zaehler', () => HttpResponse.json({}, { status: 500 })),
+      http.get('/api/einsaetze/7/etb/counters', () => HttpResponse.json({}, { status: 500 })),
     ]);
     const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
     expect(band).not.toHaveTextContent(/\d+ von \d+/);

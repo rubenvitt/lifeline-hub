@@ -348,7 +348,7 @@ async fn anlage_ist_ueber_die_generische_route_weder_lad_noch_loeschbar() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let generisch = format!("/api/einsaetze/{einsatz}/anhaenge/{anhang_id}");
+    let generisch = format!("/api/einsaetze/{einsatz}/attachments/{anhang_id}");
     let (s, _) = get_bytes(&app, &generisch, &admin).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(&app, "DELETE", &generisch, &admin, None).await;
@@ -387,7 +387,7 @@ async fn anfuegen_und_entfernen_melden_je_ein_anlagen_ereignis() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         &admin,
         Some(BEFEHL.anlegen),
     )

@@ -1,5 +1,5 @@
 /**
- * Rückmeldung je Einheit/Abschnitt — reine Ableitungen über `GET …/meldungen/rueckmeldungen`.
+ * Rückmeldung je Einheit/Abschnitt — reine Ableitungen über `GET …/reports/check-ins`.
  *
  * Als Rückmeldung zählt JEDE an die Einheit gebundene Meldung, gleich welcher Art. Die
  * Fälligkeit setzt der Server; der Vergleich mit „jetzt" liegt hier, damit die Anzeige mit der

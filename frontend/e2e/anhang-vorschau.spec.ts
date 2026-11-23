@@ -43,7 +43,7 @@ async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
 }
 
 async function etbEintragMitHeic(page: Page, einsatzId: string): Promise<number> {
-  const anhang = await page.request.post(`/api/einsaetze/${einsatzId}/etb/anhaenge`, {
+  const anhang = await page.request.post(`/api/einsaetze/${einsatzId}/etb/attachments`, {
     multipart: { datei: { name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: HEIC } },
   });
   expect(anhang.status(), await anhang.text()).toBe(201);

@@ -71,7 +71,7 @@ export function fruehereArten(
 
 /**
  * Die Schnellwahl: die häufigsten Arten des Einsatzes, dann die üblichen Arten der Organisation
- * (`GET …/nachforderungen/arten`, LLH-1379), aufgefüllt aus {@link GAENGIGE_ARTEN}.
+ * (`GET …/resource-requests/types`, LLH-1379), aufgefüllt aus {@link GAENGIGE_ARTEN}.
  */
 export function schnellwahlArten(
   frueher: readonly string[],

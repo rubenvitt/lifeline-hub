@@ -117,7 +117,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "meldung",
-        "/api/einsaetze/{id}/meldungen",
+        "/api/einsaetze/{id}/reports",
         &[],
         &[
             e("einheit_id", "einsatz_einheit"),
@@ -325,7 +325,7 @@ const fn is_erfassung(pfad: &str) -> bool {
         }
         true
     }
-    gleich(pfad, "/api/einsaetze/{id}/etb") || gleich(pfad, "/api/einsaetze/{id}/meldungen")
+    gleich(pfad, "/api/einsaetze/{id}/etb") || gleich(pfad, "/api/einsaetze/{id}/reports")
 }
 
 /// Arten der Offline-Warteschlange, die keine Anträge sind, mit Grund.
@@ -1765,7 +1765,7 @@ mod tests {
             erfassen,
             BTreeSet::from([
                 ("POST", "/api/einsaetze/{id}/etb"),
-                ("POST", "/api/einsaetze/{id}/meldungen"),
+                ("POST", "/api/einsaetze/{id}/reports"),
             ])
         );
     }

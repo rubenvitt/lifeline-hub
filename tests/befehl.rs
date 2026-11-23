@@ -15,7 +15,7 @@ async fn befehl_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (status, b) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         cookie,
         Some(r#"{"vorlage":"befehl_lad","titel":"Erstbefehl"}"#),
     )
@@ -34,7 +34,7 @@ async fn patch_unbekannter_abschnitts_schluessel_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let bid = befehl_anlegen(&app, &admin, einsatz).await;
-    let u = format!("/api/einsaetze/{einsatz}/befehle/{bid}");
+    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
 
     let (status, antwort) = anfrage(
         &app,
@@ -68,7 +68,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (status, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         &admin,
         Some(
             r#"{"vorlage":"befehl_lad","titel":"Befehl 10:00","zeitstand":"2026-06-02 10:00:00"}"#,
@@ -77,10 +77,10 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "{b:?}");
     let bid = b["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/befehle/{bid}");
+    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
 
     // Leerer Befehl: Struktur vollständig (Skelett), aber ohne Text → 422 mit Wortlaut.
-    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{antwort:?}");
     assert_eq!(
         antwort["error"],
@@ -99,7 +99,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     .await;
     assert_eq!(s, StatusCode::OK);
 
-    let (s, frei) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    let (s, frei) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{frei:?}");
     assert_eq!(frei["status"], "freigegeben");
     assert_eq!(frei["id"], bid);
@@ -135,7 +135,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     );
 
     // Zweite Freigabe: 422 mit dem Wortlaut der Status-Prüfung, kein zweiter Snapshot.
-    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{antwort:?}");
     assert_eq!(antwort["error"], "Befehl ist bereits freigegeben");
     let (_, etb) = anfrage(
@@ -165,7 +165,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         &admin,
         None,
     )
@@ -180,7 +180,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/befehle/{id}"),
+        &format!("/api/einsaetze/{einsatz}/orders/{id}"),
         &admin,
         None,
     )
@@ -199,14 +199,14 @@ async fn einzelauftrag_befehl_bleibt_freigebbar_und_fortschreibbar() {
     let (status, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         &admin,
         Some(r#"{"vorlage":"befehl_ea_zmw","titel":"EA 2. Zug"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{b:?}");
     let bid = b["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/befehle/{bid}");
+    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
 
     let (s, _) = anfrage(
         &app,
@@ -219,17 +219,10 @@ async fn einzelauftrag_befehl_bleibt_freigebbar_und_fortschreibbar() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, frei) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    let (s, frei) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{frei:?}");
 
-    let (s, fort) = anfrage(
-        &app,
-        "POST",
-        &format!("{u}/fortschreiben"),
-        &admin,
-        Some(r#"{}"#),
-    )
-    .await;
+    let (s, fort) = anfrage(&app, "POST", &format!("{u}/revise"), &admin, Some(r#"{}"#)).await;
     assert_eq!(s, StatusCode::CREATED, "{fort:?}");
     assert_eq!(fort["vorlage"], "befehl_ea_zmw");
     assert_eq!(fort["version"], 2);

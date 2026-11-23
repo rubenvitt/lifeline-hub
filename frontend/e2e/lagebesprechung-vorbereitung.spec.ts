@@ -10,7 +10,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  *   ihre Heimat) — ein Rechenweg.
  * - „DAVON ÜBERFÄLLIG": ein vollzogener Auftrag mit abgelaufener Frist und Quittungslücke zählt
  *   weder offen noch überfällig, auf beiden Seiten.
- * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, danach der Bericht offen. Geklickt, nicht nur
+ * - ÜBERNAHME: genau EIN POST auf `…/situation-reports`, danach der Bericht offen. Geklickt, nicht nur
  *   `toBeVisible` (LFH-355).
  * - BEOBACHTER (LFH-435): der Lagestand steht, die Übernahme fehlt.
  * - WERT NEBEN DER BEZEICHNUNG (LLH-1747): bei 1920 × 1080 beginnt der Wert höchstens 400 px rechts
@@ -37,14 +37,10 @@ async function seede(page: Page): Promise<string> {
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
     ...(frist ? { frist_at: frist } : {}),
   });
-  await post(page, `${basis}/auftraege`, auftrag('Deich sichern', '2026-06-01 10:00:00'));
-  await post(page, `${basis}/auftraege`, auftrag('Sandsäcke'));
-  const vollzogen = await post(
-    page,
-    `${basis}/auftraege`,
-    auftrag('Sperrung', '2026-06-01 11:00:00'),
-  );
-  await post(page, `${basis}/auftraege/${vollzogen}/vollzug`, {
+  await post(page, `${basis}/tasks`, auftrag('Deich sichern', '2026-06-01 10:00:00'));
+  await post(page, `${basis}/tasks`, auftrag('Sandsäcke'));
+  const vollzogen = await post(page, `${basis}/tasks`, auftrag('Sperrung', '2026-06-01 11:00:00'));
+  await post(page, `${basis}/tasks/${vollzogen}/execution`, {
     status: 'vollzogen',
     vollzugsmeldung: 'erledigt',
   });
@@ -99,7 +95,7 @@ test('dieselben Zahlen wie das Dashboard, Übernahme in EINEM Aufruf', async ({ 
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/lageberichte`]);
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
   await expect(page.getByText('Quelle: Aufträge/Befehle').first()).toBeVisible();
 });
 

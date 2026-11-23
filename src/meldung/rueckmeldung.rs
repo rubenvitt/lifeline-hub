@@ -21,7 +21,7 @@
 //!
 //! **An wen:** wer im Einsatz Meldungen bearbeiten kann (`Adressat::ModulSchreiber("meldungen")`,
 //! wie der Eingang einer Meldung ohne Empfängerfunktion): die Rückmeldungen liest nur, wer das
-//! Modul Meldungen lesen darf (`GET …/meldungen/rueckmeldungen`). Bezug ist die Einheit; wer
+//! Modul Meldungen lesen darf (`GET …/reports/check-ins`). Bezug ist die Einheit; wer
 //! etwas bekommt, entscheidet [`crate::benachrichtigung::melden`] (`src/AGENTS.md`,
 //! Benachrichtigungen), auch das Leserecht am Modul Einheiten.
 

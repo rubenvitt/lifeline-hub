@@ -12,7 +12,7 @@ import { ApiError } from './client';
 import { ladeBildBlobUrl } from './kartenbilder';
 import { ladePlanBild } from './uhsPlan';
 
-const PFAD = '/api/einsaetze/7/etb/1/anhaenge/2';
+const PFAD = '/api/einsaetze/7/etb/1/attachments/2';
 
 describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
   it('erkennt „wird geholt“ an der 409 mit dem Text des Servers, nicht an jeder 409', () => {

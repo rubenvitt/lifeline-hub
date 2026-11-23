@@ -22,7 +22,7 @@ const AUFTRAGSTEXT = 'Wasserentnahme an der Mühlbachbrücke einrichten und meld
 function auftragServer() {
   const abrufe = { anzahl: 0 };
   server.use(
-    http.get('/api/einsaetze/:id/auftraege/:aid', ({ params }) => {
+    http.get('/api/einsaetze/:id/tasks/:aid', ({ params }) => {
       abrufe.anzahl += 1;
       return HttpResponse.json({
         id: Number(params.aid),
@@ -128,10 +128,10 @@ describe('ladeHinweisInhalt', () => {
 
   it('Befehl und Lagebericht: der Dokumenttitel als Gegenstand', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/befehle/:bid', () =>
+      http.get('/api/einsaetze/:id/orders/:bid', () =>
         HttpResponse.json({ id: 7, titel: ' Räumung Nord ' }),
       ),
-      http.get('/api/einsaetze/:id/lageberichte/:lid', () =>
+      http.get('/api/einsaetze/:id/situation-reports/:lid', () =>
         HttpResponse.json({ id: 8, titel: 'Lage 14 Uhr' }),
       ),
     );
@@ -168,7 +168,7 @@ describe('ladeHinweisInhalt', () => {
 
   it('Nachforderung: Art und Bezeichnung ohne Anzahl (die nennt schon die Detailzeile)', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/nachforderungen', () =>
+      http.get('/api/einsaetze/:id/resource-requests', () =>
         HttpResponse.json([
           { id: 3, anzahl: 2, art: 'RTW', bezeichnung: 'Transport aus der UHS' },
           { id: 4, anzahl: 1, art: 'ELW 1', bezeichnung: null },
@@ -188,7 +188,7 @@ describe('ladeHinweisInhalt', () => {
   it('Chat: Absender und Anfang des Texts, die Nachricht über den Kanal aus dem Sprungpfad', async () => {
     let gefragt: string | null = null;
     server.use(
-      http.get('/api/einsaetze/:id/chat/kanaele/:kid/nachrichten', ({ params, request }) => {
+      http.get('/api/einsaetze/:id/chat/channels/:kid/messages', ({ params, request }) => {
         gefragt = `${String(params.kid)}?${new URL(request.url).searchParams.toString()}`;
         return HttpResponse.json([
           { id: 20, kanal_id: 6, autor_name: 'Anna Berg', inhalt: '@S4 bitte Feldbetten zählen' },
@@ -207,7 +207,7 @@ describe('ladeHinweisInhalt', () => {
 
   it('Chat: eine gelöschte Nachricht nennt nur den Absender', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/chat/kanaele/:kid/nachrichten', () =>
+      http.get('/api/einsaetze/:id/chat/channels/:kid/messages', () =>
         HttpResponse.json([
           {
             id: 20,
@@ -228,10 +228,10 @@ describe('ladeHinweisInhalt', () => {
 
   it('Meldung und Erinnerung laufen über denselben Lader', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/meldungen/:mid', () =>
+      http.get('/api/einsaetze/:id/reports/:mid', () =>
         HttpResponse.json({ id: 77, absender: 'RTW 2', inhalt: 'Lage stabil', status: 'neu' }),
       ),
-      http.get('/api/einsaetze/:id/erinnerungen', () =>
+      http.get('/api/einsaetze/:id/reminders', () =>
         HttpResponse.json([{ id: 5, einsatz_id: 1, titel: 'Pegel prüfen' }]),
       ),
     );
@@ -250,7 +250,7 @@ describe('ladeHinweisInhalt', () => {
 
   it('ein Fehler ergibt null', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/befehle/:bid', () =>
+      http.get('/api/einsaetze/:id/orders/:bid', () =>
         HttpResponse.json({ error: 'weg' }, { status: 404 }),
       ),
     );
@@ -259,7 +259,7 @@ describe('ladeHinweisInhalt', () => {
 
   it(`antwortet der Abruf nicht in ${INHALT_FRIST_MS} ms, ergibt er null`, async () => {
     server.use(
-      http.get('/api/einsaetze/:id/befehle/:bid', async () => {
+      http.get('/api/einsaetze/:id/orders/:bid', async () => {
         await delay('infinite');
         return HttpResponse.json({});
       }),

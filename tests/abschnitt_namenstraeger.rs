@@ -57,7 +57,7 @@ async fn einheit_im_abschnitt(
 async fn dokument_am_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, ab: i64) -> i64 {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/dokumente"),
+        &format!("/api/einsaetze/{einsatz}/documents"),
         cookie,
         Some(("lageplan.pdf", b"%PDF-1.4 inhalt")),
         &[
@@ -186,7 +186,7 @@ async fn umbenennen_meldet_einheiten_dokumente_und_abloesung() {
         assert_eq!(gemeldet(&mut rx), erwartet, "{fall}");
     }
     let einheiten = format!("/api/einsaetze/{eid}/einheiten");
-    let dokumente = format!("/api/einsaetze/{eid}/dokumente");
+    let dokumente = format!("/api/einsaetze/{eid}/documents");
     assert_eq!(
         feld_in_liste(&app, &admin, &einheiten, a, "abschnitt_name").await,
         "Nordost"
@@ -273,7 +273,7 @@ async fn umbenennen_erreicht_leser_ohne_abschnittsrecht() {
         assert_eq!(s, StatusCode::OK, "Override {modul}: {v}");
     }
     let einheiten = format!("/api/einsaetze/{eid}/einheiten");
-    let dokumente = format!("/api/einsaetze/{eid}/dokumente");
+    let dokumente = format!("/api/einsaetze/{eid}/documents");
     let vorgaben = format!("/api/einsaetze/{eid}/abloesungen/vorgaben");
     for (pfad, erwartet) in [
         (

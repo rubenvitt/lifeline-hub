@@ -106,7 +106,7 @@ function bereit() {
       } as BetreuungUebersicht),
     ),
     http.get('/api/einsaetze/7/betreuung/stellen/3/belegungen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/personen/10', () =>
       HttpResponse.json({
         ...hier,

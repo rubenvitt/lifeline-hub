@@ -181,7 +181,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let lid = post(
         &app,
         &admin,
-        &format!("{basis}/lageberichte"),
+        &format!("{basis}/situation-reports"),
         json!({"vorlage": "lagebericht", "titel": "Lage 10:00"}),
     )
     .await["id"]
@@ -190,7 +190,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{basis}/lageberichte/{lid}"),
+        &format!("{basis}/situation-reports/{lid}"),
         &admin,
         Some(&json!({"abschnitte": [
             {"schluessel": "zusammenfassung", "text": "Lage stabil."},
@@ -212,7 +212,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/lageberichte/{lid}/freigeben"),
+        &format!("{basis}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -338,7 +338,7 @@ async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
         post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{einsatz}/meldungen"),
+            &format!("/api/einsaetze/{einsatz}/reports"),
             json!({
                 "absender": "Melder Unbekannt",
                 "empfaenger": "Empfaengerin Vertraulich",

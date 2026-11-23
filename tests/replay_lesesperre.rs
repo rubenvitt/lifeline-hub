@@ -110,7 +110,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Person",
     });
 
-    let url = format!("{basis}/meldungen");
+    let url = format!("{basis}/reports");
     let body = json!({
         "absender":"Florian Nord 1","meldeweg":"funk","ereigniszeit":"2026-06-12 09:00:00",
         "inhalt":"Geheim-Meldung Verletzte","client_id":"r-meldung"

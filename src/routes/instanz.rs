@@ -928,7 +928,7 @@ pub async fn spiegel_abgleich(
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
-/// GET /api/einsaetze/{id}/antraege — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
+/// GET /api/einsaetze/{id}/requests — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
 /// `spiegel-antraege`); an einem eigenen Einsatz leer.
 pub async fn antraege_liste(
     State(state): State<AppState>,
@@ -940,7 +940,7 @@ pub async fn antraege_liste(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/antraege/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
+/// DELETE /api/einsaetze/{id}/requests/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
 /// Lese- statt Schreib-Gate: der Antrag ist Buchführung dieser Instanz, keine Einsatzdaten, und
 /// gehört dem Konto, das ihn gestellt hat.
 pub async fn antrag_verwerfen(

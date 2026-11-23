@@ -135,7 +135,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   );
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
   // D12 (Change `kcjecn9e-benachrichtigungskonzept`): eine offene Sofortmeldung kommt nur als Zahl.
-  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+  await anlegen(page, `/api/einsaetze/${e}/reports`, {
     absender: 'EA Nord',
     meldeweg: 'funk',
     inhalt: 'Keller Familie Erste überflutet',
@@ -176,7 +176,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   });
   const trupp = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Logistiktrupp' });
   const vorZweiStunden = new Date(Date.now() - 120 * 60_000).toISOString();
-  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+  await anlegen(page, `/api/einsaetze/${e}/reports`, {
     absender: 'Logistiktrupp',
     meldeweg: 'funk',
     inhalt: 'Lage ruhig',
@@ -184,12 +184,12 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     ereigniszeit: vorZweiStunden,
     einheit_id: trupp.id,
   });
-  await anlegen(page, `/api/einsaetze/${e}/auftraege`, {
+  await anlegen(page, `/api/einsaetze/${e}/tasks`, {
     auftrag_text: 'Sandsäcke an den Deich',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
     frist_at: wireAb(-60),
   });
-  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+  await anlegen(page, `/api/einsaetze/${e}/reports`, {
     absender: 'EA Nord',
     meldeweg: 'funk',
     inhalt: 'Nachschub Trinkwasser',
@@ -318,7 +318,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
 
     // Steigt die Zahl, verbreitert „Neue Sofortmeldung“ die Kachel „Meldungen“ neben dem
     // Ablauf; auch dann bleibt alles ganz.
-    await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+    await anlegen(page, `/api/einsaetze/${e}/reports`, {
       absender: 'EA Nord',
       meldeweg: 'funk',
       inhalt: 'Zweite Lage',

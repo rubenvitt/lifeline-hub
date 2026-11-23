@@ -14,7 +14,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Die Demo enthält zwei Meldungen der Art Lagemeldung; sie stehen ab der Anlage in der Lage. Der
  * Dialog-Test übernimmt eine weitere, verortete über die Oberfläche, der Zeitleisten-Test drei
- * weitere über `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Die verortete zeigt
+ * weitere über `POST …/reports/{mid}/situation-relevant`, eine davon verortet. Die verortete zeigt
  * keinen Ortsnamen, nur die Peilung: der Geocoder zeigt im Bildlauf auf Loopback (LLH-2063).
  */
 
@@ -33,7 +33,7 @@ interface Meldung {
  * nach laufender Nummer.
  */
 async function offeneMeldungen(page: Page, einsatzId: number): Promise<Meldung[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
   expect(antwort.ok()).toBe(true);
   const liste = (await antwort.json()) as Meldung[];
   const offen = liste
@@ -75,19 +75,29 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     const offen = await offeneMeldungen(page, demo.id);
     // Eine verortet (in der Unterstadt des Demo-Szenarios), eine mit eigenem Lage-Text.
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/meldungen/${offen[0].id}/lagerelevant`, {
-      lat: 50.952,
-      lon: 10.246,
-    });
     await fuelle(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/meldungen/${offen[1].id}/lagerelevant`,
+      `/api/einsaetze/${demo.id}/reports/${offen[0].id}/situation-relevant`,
+      {
+        lat: 50.952,
+        lon: 10.246,
+      },
+    );
+    await fuelle(
+      page,
+      'post',
+      `/api/einsaetze/${demo.id}/reports/${offen[1].id}/situation-relevant`,
       {},
     );
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/meldungen/${offen[2].id}/lagerelevant`, {
-      text: offen[2].inhalt,
-    });
+    await fuelle(
+      page,
+      'post',
+      `/api/einsaetze/${demo.id}/reports/${offen[2].id}/situation-relevant`,
+      {
+        text: offen[2].inhalt,
+      },
+    );
     // Das Bild zeigt nur, was der Server selbst rechnet (die Peilung, sofern ein verorteter Bezug
     // in der Nähe ist): der Geocoder zeigt im Bildlauf auf Loopback (`e2e/geocoder-kern.ts`).
     await uhrAnhalten(page);

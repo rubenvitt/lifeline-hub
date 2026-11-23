@@ -26,7 +26,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, n: usize, richtung: &
         let (s, v) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/auftraege"),
+            &format!("/api/einsaetze/{e}/tasks"),
             cookie,
             Some(&auftrag(&format!("Auftrag {i}"), richtung)),
         )
@@ -108,7 +108,7 @@ async fn phase_trennt_offen_und_abgeschlossen_ohne_phase_bleibt_alles() {
     .await
     .unwrap();
 
-    let basis = format!("/api/einsaetze/{e}/auftraege");
+    let basis = format!("/api/einsaetze/{e}/tasks");
     let (s, v) = get(&app, &admin, &format!("{basis}?phase=offen")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(
@@ -143,7 +143,7 @@ async fn unbekannte_phase_ist_400_und_cursor_ohne_abgeschlossen_ist_422() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{e}/auftraege");
+    let basis = format!("/api/einsaetze/{e}/tasks");
 
     let (s, _) = get(&app, &admin, &format!("{basis}?phase=alle")).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
@@ -189,7 +189,7 @@ async fn erste_seite_hat_die_vorgabe_und_die_klemme_greift() {
         format!("2026-10-01 {:02}:{:02}:00", 10 + i / 60, i % 60)
     })
     .await;
-    let basis = format!("/api/einsaetze/{e}/auftraege?phase=abgeschlossen");
+    let basis = format!("/api/einsaetze/{e}/tasks?phase=abgeschlossen");
 
     let (_, v) = get(&app, &admin, &basis).await;
     let seite = ids(&v);
@@ -212,7 +212,7 @@ async fn folgeseiten_sind_lueckenlos_und_ueberschneidungsfrei_bei_gleichstand() 
     // zwei Seiten heraus oder kämen doppelt.
     abnehmen(&pool, &alle, |i| format!("2026-10-01 10:{:02}:00", i / 3)).await;
 
-    let basis = format!("/api/einsaetze/{e}/auftraege?phase=abgeschlossen&limit=4");
+    let basis = format!("/api/einsaetze/{e}/tasks?phase=abgeschlossen&limit=4");
     let mut gesehen = Vec::new();
     let mut pfad = basis.clone();
     loop {
@@ -248,7 +248,7 @@ async fn richtung_und_empfaenger_wirken_in_jeder_phase_und_in_den_kennzahlen() {
     abnehmen(&pool, &intern[..1], |_| "2026-10-01 10:00:00".into()).await;
     abnehmen(&pool, &extern_[..3], |i| format!("2026-10-01 11:0{i}:00")).await;
 
-    let basis = format!("/api/einsaetze/{e}/auftraege");
+    let basis = format!("/api/einsaetze/{e}/tasks");
     let (_, v) = get(
         &app,
         &admin,
@@ -291,10 +291,10 @@ async fn richtung_und_empfaenger_wirken_in_jeder_phase_und_in_den_kennzahlen() {
             "Filter {filter:?}"
         );
     }
-    let (_, k) = get(&app, &admin, &format!("{basis}/kennzahlen")).await;
+    let (_, k) = get(&app, &admin, &format!("{basis}/metrics")).await;
     assert_eq!(k, json!({ "offen": 3, "abgeschlossen": 4 }));
 
-    let (s, _) = get(&app, &admin, &format!("{basis}/kennzahlen?richtung=quer")).await;
+    let (s, _) = get(&app, &admin, &format!("{basis}/metrics?richtung=quer")).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
@@ -307,29 +307,14 @@ async fn einzelabruf_liefert_den_auftrag_und_fremder_einsatz_ist_404() {
     let eigen = anlegen(&app, &admin, e, 1, "intern").await[0];
     let fremd = anlegen(&app, &admin, anderer, 1, "intern").await[0];
 
-    let (s, v) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/auftraege/{eigen}"),
-    )
-    .await;
+    let (s, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/tasks/{eigen}")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["id"], eigen);
     assert_eq!(v["empfaenger"][0]["snap_anzeige"], "Abschnitt Nord");
 
-    let (s, _) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/auftraege/{fremd}"),
-    )
-    .await;
+    let (s, _) = get(&app, &admin, &format!("/api/einsaetze/{e}/tasks/{fremd}")).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
-    let (s, _) = get(
-        &app,
-        &admin,
-        &format!("/api/einsaetze/{e}/auftraege/999999"),
-    )
-    .await;
+    let (s, _) = get(&app, &admin, &format!("/api/einsaetze/{e}/tasks/999999")).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -344,9 +329,9 @@ async fn beobachter_liest_kennzahlen_und_einzelabruf_wie_die_liste() {
     let beob = login_cookie(&app, "erika", "erikapw1").await;
 
     for pfad in [
-        format!("/api/einsaetze/{e}/auftraege?phase=abgeschlossen"),
-        format!("/api/einsaetze/{e}/auftraege/kennzahlen"),
-        format!("/api/einsaetze/{e}/auftraege/{a}"),
+        format!("/api/einsaetze/{e}/tasks?phase=abgeschlossen"),
+        format!("/api/einsaetze/{e}/tasks/metrics"),
+        format!("/api/einsaetze/{e}/tasks/{a}"),
     ] {
         let (s, v) = get(&app, &beob, &pfad).await;
         assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
@@ -364,7 +349,7 @@ async fn suche_q_wirkt_in_liste_und_kennzahlen_und_ist_begrenzt() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         Some(&auftrag("Keller auspumpen", "intern")),
     )
@@ -373,7 +358,7 @@ async fn suche_q_wirkt_in_liste_und_kennzahlen_und_ist_begrenzt() {
     let keller = v["id"].as_i64().unwrap();
     abnehmen(&pool, &[alle[0]], |_| "2026-10-01 10:00:00".into()).await;
 
-    let basis = format!("/api/einsaetze/{e}/auftraege");
+    let basis = format!("/api/einsaetze/{e}/tasks");
     let (s, v) = get(&app, &admin, &format!("{basis}?q=keller")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(ids(&v), vec![keller]);
@@ -381,20 +366,20 @@ async fn suche_q_wirkt_in_liste_und_kennzahlen_und_ist_begrenzt() {
     assert_eq!(ids(&v), vec![alle[0]], "Kennung #1");
     let (_, v) = get(&app, &admin, &format!("{basis}?phase=abgeschlossen&q=%231")).await;
     assert_eq!(ids(&v), vec![alle[0]]);
-    let (_, k) = get(&app, &admin, &format!("{basis}/kennzahlen?q=keller")).await;
+    let (_, k) = get(&app, &admin, &format!("{basis}/metrics?q=keller")).await;
     assert_eq!(k, json!({ "offen": 1, "abgeschlossen": 0 }));
 
     // Nur Leerzeichen: wie ohne `q`.
     let (s, v) = get(&app, &admin, &format!("{basis}?q=%20%20%20")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(ids(&v).len(), 4);
-    let (_, k) = get(&app, &admin, &format!("{basis}/kennzahlen?q=%20")).await;
+    let (_, k) = get(&app, &admin, &format!("{basis}/metrics?q=%20")).await;
     assert_eq!(k, json!({ "offen": 3, "abgeschlossen": 1 }));
 
     let lang = "x".repeat(201);
     for pfad in [
         format!("{basis}?q={lang}"),
-        format!("{basis}/kennzahlen?q={lang}"),
+        format!("{basis}/metrics?q={lang}"),
     ] {
         let (s, v) = get(&app, &admin, &pfad).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");

@@ -999,7 +999,7 @@ describe('Inspector für Lagemeldungen (LLH-1066)', () => {
   it('mit Schreibrecht: „Lage-Angaben bearbeiten“ ändert den Lage-Text über die Meldung', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/api/einsaetze/1/meldungen/3', async ({ request }) => {
+      http.patch('/api/einsaetze/1/reports/3', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: 3, lfd_nr: 5 });
       }),

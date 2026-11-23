@@ -87,7 +87,7 @@ export interface DatensatzQuellen {
    */
   etbText?: EtbEintragAnzeige[];
   /**
-   * Trefferzahl des ETB-Volltexts OHNE Seitendeckel (`GET …/etb/anzahl`). Trägt den Sammeltreffer
+   * Trefferzahl des ETB-Volltexts OHNE Seitendeckel (`GET …/etb/count`). Trägt den Sammeltreffer
    * „Alle Einträge zu …“; die Einzeltreffer sind auf fünf gedeckelt, die Zahl nicht.
    */
   etbAnzahl?: EtbAnzahl;

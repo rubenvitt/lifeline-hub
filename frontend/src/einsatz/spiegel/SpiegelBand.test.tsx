@@ -47,8 +47,8 @@ function mitServer(liste = antraege) {
   const verworfen: number[] = [];
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
-    http.get('/api/einsaetze/1/antraege', () => HttpResponse.json(liste)),
-    http.delete('/api/einsaetze/1/antraege/:aid', ({ params }) => {
+    http.get('/api/einsaetze/1/requests', () => HttpResponse.json(liste)),
+    http.delete('/api/einsaetze/1/requests/:aid', ({ params }) => {
       verworfen.push(Number(params.aid));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -198,7 +198,7 @@ describe('SpiegelBand: Anträge folgen den Zählern im Kopf (LLH-1492)', () => {
     let abrufe = 0;
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
-      http.get('/api/einsaetze/1/antraege', () => {
+      http.get('/api/einsaetze/1/requests', () => {
         abrufe += 1;
         return HttpResponse.json(antraege);
       }),
@@ -320,7 +320,7 @@ function mitBruchServer(liste = bruchliste) {
     http.get('/api/einsaetze/1', () =>
       HttpResponse.json(einsatzFixture({ spiegel: spiegel({ bruchstelle: liste.length }) })),
     ),
-    http.get('/api/einsaetze/1/antraege', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/requests', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/bruchstelle', () => HttpResponse.json(liste)),
     http.post('/api/einsaetze/1/bruchstelle/antraege', () => {
       aufrufe.push('alle');

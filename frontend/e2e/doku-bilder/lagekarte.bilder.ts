@@ -170,11 +170,11 @@ test.describe(KAPITEL, () => {
     // Die Demo gibt Lagebericht und Befehl frei; der Dialog bietet nur Entwürfe an. Je einer dazu.
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/lageberichte`, {
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/situation-reports`, {
       vorlage: 'lagebericht',
       titel: 'Lage 1400',
     });
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/befehle`, {
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/orders`, {
       vorlage: 'befehl_lad',
       titel: 'Verlegung Behandlungsplatz',
     });

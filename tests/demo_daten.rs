@@ -391,7 +391,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, rm) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen/rueckmeldungen"),
+        &format!("/api/einsaetze/{e}/reports/check-ins"),
         &admin,
         None,
     )

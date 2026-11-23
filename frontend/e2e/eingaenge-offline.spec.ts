@@ -61,7 +61,7 @@ async function zweiEingaenge(page: Page, seite: string): Promise<number> {
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
     for (const n of [1, 2]) {
-      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
         data: {
           absender: `Abschnitt Deich Ost ${n}`,
           meldeweg: 'funk',

@@ -261,7 +261,7 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
     let (status, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         &admin,
         Some(&format!(
             r#"{{"auftrag_text":"Deich sichern","empfaenger":[{{"empfaenger_typ":"einheit","einheit_id":{zug}}}]}}"#
@@ -483,7 +483,7 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
         "{v:?}"
     );
 
-    for pfad in ["etb", "etb/zaehler", "etb/anzahl"] {
+    for pfad in ["etb", "etb/counters", "etb/count"] {
         let (status, v) = anfrage(
             &app,
             "GET",

@@ -99,7 +99,9 @@ export const server = setupServer(
    * Eigene ETB-Lesemarke — „nichts Neues" als Default (echter Serverzustand); die ETB-Seite
    * fragt sie beim Mount ab. Tests des Banners überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/etb/lesemarke', () => HttpResponse.json({ neue_anzahl: 0 })),
+  http.get('/api/einsaetze/:einsatzId/etb/read-marker', () =>
+    HttpResponse.json({ neue_anzahl: 0 }),
+  ),
   /**
    * Modulzähler des Navigationsrahmens — `{}` als Default („kein gezähltes Modul erlaubt", ein
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
@@ -177,7 +179,7 @@ export const server = setupServer(
    * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein
    * echter Serverzustand. Tests mit Dokumenten überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/dokumente', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/documents', () => HttpResponse.json([])),
   /**
    * Wetter — „kein Ort" als Default (LFH-663). Der Rahmen fragt es für Modulzähler und
    * Unwetterhinweis ab (`einsatz/useModulZaehler.ts`, `wetter/useUnwetterHinweis.ts`); „kein

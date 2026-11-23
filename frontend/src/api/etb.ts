@@ -128,7 +128,7 @@ export async function ladeEtbAnhangHoch(
   const fd = new FormData();
   fd.append('datei', datei);
   const angelegt = await apiUploadMitFortschritt<Anhang[]>(
-    `/api/einsaetze/${einsatzId}/etb/anhaenge`,
+    `/api/einsaetze/${einsatzId}/etb/attachments`,
     fd,
     { timeoutMs: UPLOAD_TIMEOUT_MS, onFortschritt },
   );
@@ -140,7 +140,7 @@ export async function ladeEtbAnhangHoch(
  * `routing/deeplinks.ts`. Die generische Route `/anhaenge/{aid}` antwortet für ETB-Anhänge 404.
  */
 export function etbAnhangPfad(einsatzId: number, eintragId: number, anhangId: number): string {
-  return `/api/einsaetze/${einsatzId}/etb/${eintragId}/anhaenge/${anhangId}`;
+  return `/api/einsaetze/${einsatzId}/etb/${eintragId}/attachments/${anhangId}`;
 }
 
 export function erfasseEtb(
@@ -158,7 +158,7 @@ export function erteileAuftragAusEtb(
   eintragId: number,
   daten: NeuerAuftrag,
 ): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/auftrag`, 'POST', daten);
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/task`, 'POST', daten);
 }
 
 /**

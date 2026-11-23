@@ -15,7 +15,7 @@ use common::{
 };
 
 fn marke_uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/etb/lesemarke")
+    format!("/api/einsaetze/{einsatz}/etb/read-marker")
 }
 
 async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {

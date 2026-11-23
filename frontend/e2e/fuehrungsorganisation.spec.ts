@@ -28,7 +28,7 @@ import {
  *   mehreren Zeilen von Spalten, bei 1024, 768 und 390 px ebenso ohne waagerechten Überhang von
  *   Seite und Organigramm.
  * - LIVE: ein per API umgehängter Unterabschnitt steht ohne Neuladen unter dem neuen Abschnitt.
- * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
+ * - ÜBERNAHME: genau EIN POST auf `…/situation-reports`, kein PATCH, danach der Bericht offen.
  *
  * Der Druckpfad bei A4-Breite steht in `fuehrungsorganisation-druck.spec.ts` und läuft dort auch
  * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt „Schleuse im Druck“: er prüft die
@@ -211,7 +211,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/lageberichte`]);
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
 });
 

@@ -100,7 +100,7 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
     ['RTW 2', 'Patient an UHS Süd übergeben'],
     ['Florian Süd 3', 'Pumpe am Schöpfwerk ausgefallen, Ersatz unterwegs'],
   ]) {
-    await post(page, `${basis}/meldungen`, {
+    await post(page, `${basis}/reports`, {
       absender,
       meldeweg: 'funk',
       inhalt,
@@ -112,14 +112,14 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
     ['Sandsackfüllstelle am Bauhof einrichten', 'EA Süd', 120],
     ['Verpflegung für die Nachtschicht anfordern', 'S4', 180],
   ] as const) {
-    await post(page, `${basis}/auftraege`, {
+    await post(page, `${basis}/tasks`, {
       auftrag_text: text,
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: an }],
       frist_at: inMin(fristMin),
     });
   }
   for (const bezeichnung of ['RTW', 'Pumpe 5000 l/min']) {
-    await post(page, `${basis}/nachforderungen`, {
+    await post(page, `${basis}/resource-requests`, {
       art: 'Fahrzeug',
       bezeichnung,
       adressat_kategorie: 'leitstelle',
@@ -130,7 +130,7 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
     ['Lagemeldung an die Leitstelle', 10],
     ['Pegelstand Hann. Münden abfragen', 20],
   ] as const) {
-    await post(page, `${basis}/erinnerungen`, { titel, faellig_at: inMin(min) });
+    await post(page, `${basis}/reminders`, { titel, faellig_at: inMin(min) });
   }
   // Einheiten mit und ohne Abschnitt (LLH-1481): zwei Zeilen der Gliederung.
   const abschnittId = await post(page, `${basis}/abschnitte`, {

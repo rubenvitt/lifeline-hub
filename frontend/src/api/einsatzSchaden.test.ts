@@ -60,6 +60,6 @@ describe('Schaden-Anhänge-API', () => {
   it('baut den Download-Pfad an der Schadensroute, nie an /anhaenge des Einsatzes', () => {
     const p = schadenAnhangDownloadPfad(7, 3, 42);
     expect(p).toBe('/api/einsaetze/7/schaeden/3/anhaenge/42/datei');
-    expect(p.startsWith('/api/einsaetze/7/anhaenge')).toBe(false);
+    expect(p.startsWith('/api/einsaetze/7/attachments')).toBe(false);
   });
 });

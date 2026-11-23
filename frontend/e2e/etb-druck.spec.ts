@@ -119,7 +119,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   const saat = await saeen(page, einsatzId);
 
   // Serverwahrheit zum Vergleich: dieselbe Zählung, die auch der ETB-Kopf nimmt.
-  const zaehler = await (await page.request.get(`/api/einsaetze/${einsatzId}/etb/zaehler`)).json();
+  const zaehler = await (await page.request.get(`/api/einsaetze/${einsatzId}/etb/counters`)).json();
   const gesamt = zaehler.gesamt as number;
   expect(gesamt, 'Vorbedingung: mehr als eine Serverseite (500)').toBeGreaterThan(500);
 
@@ -313,7 +313,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
       .filter(Boolean)
       .join('\n\n');
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
       data: { vorlage: 'lagebericht', titel: 'Lagebericht überlang' },
     }),
   );
@@ -331,7 +331,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
     'zusammenfassung',
   ];
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/lageberichte/${lbId}`, {
+    page.request.patch(`/api/einsaetze/${einsatzId}/situation-reports/${lbId}`, {
       data: {
         abschnitte: abschnitte.map((schluessel, i) => ({
           schluessel,
@@ -342,7 +342,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
   );
   expect(patch.ok(), await patch.text()).toBe(true);
   const frei = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte/${lbId}/freigeben`),
+    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports/${lbId}/release`),
   );
   expect(frei.ok(), await frei.text()).toBe(true);
   const kurz = await erfasse(page, einsatzId, {

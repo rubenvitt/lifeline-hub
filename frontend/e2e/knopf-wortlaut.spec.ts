@@ -92,7 +92,7 @@ async function seede(page: Page): Promise<string> {
     ereigniszeit: new Date().toISOString(),
   });
   // Gesichtet: die Vorwärtsbewegung heißt dann „Bearbeitung beginnen", der längste Text.
-  await post(page, einsatzId, `meldungen/${meldungId}/status`, { status: 'gesichtet' });
+  await post(page, einsatzId, `reports/${meldungId}/status`, { status: 'gesichtet' });
   await post(page, einsatzId, 'erinnerungen', {
     titel: 'Lagemeldung an die Leitstelle',
     faellig_at: '2030-01-01 10:00',

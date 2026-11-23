@@ -49,7 +49,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &admin,
         None,
     )
@@ -92,7 +92,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/chat/kanaele/{}/nachrichten",
+                "/api/einsaetze/{}/chat/channels/{}/messages",
                 self.einsatz, self.kanal
             ),
             cookie,
@@ -314,7 +314,7 @@ async fn bearbeiten_bleibt_still() {
     let (s, v) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/chat/nachrichten/{n}", w.einsatz),
+        &format!("/api/einsaetze/{}/chat/messages/{n}", w.einsatz),
         &w.admin,
         Some(&body.to_string()),
     )

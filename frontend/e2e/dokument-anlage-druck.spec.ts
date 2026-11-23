@@ -24,7 +24,7 @@ const A4_HOCH = { breite: 595.28, hoehe: 841.89 };
 async function befehlEntwurf(page: Page, einsatzId: string): Promise<number> {
   const a = api(page, einsatzId);
   const { id } = await a.post('befehle', { vorlage: 'befehl_lad', titel: 'Befehl mit Skizze' });
-  await a.patch(`befehle/${id}`, {
+  await a.patch(`orders/${id}`, {
     abschnitte: ['lage', 'auftrag', 'durchfuehrung'].map((schluessel) => ({
       schluessel,
       text: `Text ${schluessel}`,
@@ -100,7 +100,7 @@ test('Fernmeldeskizze als Anlage: Bild aus dem Browser, eingefroren mit der Frei
   expect(bild.dunkel, 'die Skizze ist gezeichnet').toBeGreaterThan(0.002);
 
   // Freigeben friert die Anlage ein: kein Entfernen, kein Anfügen mehr.
-  await api(page, einsatzId).post(`befehle/${befehlId}/freigeben`, {});
+  await api(page, einsatzId).post(`orders/${befehlId}/release`, {});
   await page.reload();
   await expect(anker).toBeVisible();
   await expect(

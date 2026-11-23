@@ -559,7 +559,7 @@ async fn statuscodes_404_fremder_einsatz() {
     let (s, nf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/nachforderungen"),
+        &format!("/api/einsaetze/{e2}/resource-requests"),
         &admin,
         Some(r#"{"art":"Verpflegung","bezeichnung":"Verpflegung 60 EP","anzahl":60,"adressat_kategorie":"leitstelle"}"#),
     )
@@ -626,7 +626,7 @@ async fn ausgabe_mit_nachforderung_traegt_nur_die_kennung() {
     let (s, nf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(r#"{"art":"Verpflegung","bezeichnung":"Kanarien-Lieferung 60 EP","anzahl":60,"adressat_kategorie":"leitstelle","begruendung":"Kanarien-Begründung"}"#),
     )
@@ -669,7 +669,7 @@ async fn ausgabe_mit_nachforderung_traegt_nur_die_kennung() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         None,
     )

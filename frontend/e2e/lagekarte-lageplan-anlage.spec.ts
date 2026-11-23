@@ -68,11 +68,11 @@ test('Als Anlage an …: an einen offenen Entwurf und an einen neuen Lagevortrag
   await expect(page.getByText('Lageplan an „Lagebericht · Lage 1200“ angefügt')).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte`));
 
-  const [anlage] = await a.get<Anlage[]>(`lageberichte/${entwurf}/anlagen`);
+  const [anlage] = await a.get<Anlage[]>(`situation-reports/${entwurf}/enclosures`);
   expect(anlage).toMatchObject({ nummer: 1, art: 'lageplan', titel: 'Lageplan' });
   const bild = await bildDerAnlage(
     page,
-    `/api/einsaetze/${einsatzId}/lageberichte/${entwurf}/anlagen/${anlage.id}/datei`,
+    `/api/einsaetze/${einsatzId}/situation-reports/${entwurf}/enclosures/${anlage.id}/file`,
   );
   test.info().annotations.push({
     type: 'messwert',

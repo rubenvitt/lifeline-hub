@@ -87,11 +87,11 @@ function quellen(freigaben = freigabenFixture()) {
     json('/personal/zeitachse', () => wert(roh, 'personalPerioden')),
     json('/fahrzeuge', () => wert(roh, 'fahrzeuge')),
     json('/lageberichte', () => berichte),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid`, ({ params }) => {
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, ({ params }) => {
       zaehle(`/lageberichte/${String(params.lid)}`);
       return HttpResponse.json(berichte.find((b) => b.id === Number(params.lid)));
     }),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid/anlagen`, () => HttpResponse.json([])),
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid/enclosures`, () => HttpResponse.json([])),
     json('/personen', () => wert(roh, 'personen')),
     json('/personen/verbleib-angaben', () => wert(roh, 'personenVerbleibAngaben')),
     json('/personen/druck', () => [person()]),
@@ -126,11 +126,11 @@ function quellen(freigaben = freigabenFixture()) {
       befehl({}),
       befehl({ id: 12, titel: 'Befehl Entwurf', status: 'entwurf' }),
     ]),
-    http.get(`/api/einsaetze/${E}/befehle/:bid`, ({ params }) => {
+    http.get(`/api/einsaetze/${E}/orders/:bid`, ({ params }) => {
       zaehle(`/befehle/${String(params.bid)}`);
       return HttpResponse.json(befehl({ id: Number(params.bid) }));
     }),
-    http.get(`/api/einsaetze/${E}/befehle/:bid/anlagen`, () => HttpResponse.json([])),
+    http.get(`/api/einsaetze/${E}/orders/:bid/enclosures`, () => HttpResponse.json([])),
   );
   return { aufrufe, lageQuelle: wert<LageberichtQuelle>(roh, 'lageberichte') };
 }
@@ -225,7 +225,7 @@ describe('EinsatzakteDruckPage', () => {
   it('scheitert ein Kapitel, ist Drucken gesperrt und das Kapitel genannt', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/auftraege`, () =>
+      http.get(`/api/einsaetze/${E}/tasks`, () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 422 }),
       ),
     );

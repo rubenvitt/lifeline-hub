@@ -428,7 +428,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+    http.get('/api/einsaetze/1/reports/check-ins', () =>
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),

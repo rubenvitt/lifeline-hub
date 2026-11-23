@@ -209,7 +209,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Stamm-Fahrzeugen, ohne Besatzung und Material (`src/bereitstellungsraum/stamm_treffer.rs`).
   Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum (LLH-1387, Gruppe „Aus
   Nachforderungen“) liest das Gerät nur über `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
-  nur Art und Rufnamen); `GET …/nachforderungen` und `nachforderungen` in den Lese-Modulen bleiben
+  nur Art und Rufnamen); `GET …/resource-requests` und `nachforderungen` in den Lese-Modulen bleiben
   gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit (ein einheitenloses
   Fahrzeug wird dabei serverseitig zur Einheit, LLH-1444); eine Stufe schaltet das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
   `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Abrufen ist eine Führungsentscheidung

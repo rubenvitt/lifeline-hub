@@ -2197,7 +2197,7 @@ async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
         format!("/api/einsaetze/{id}"),
         format!("/api/einsaetze/{id}/etb"),
         format!("/api/einsaetze/{id}/personen"),
-        format!("/api/einsaetze/{id}/anhaenge/{aid}"),
+        format!("/api/einsaetze/{id}/attachments/{aid}"),
         format!("/api/einsaetze/{id}/live"),
     ] {
         let resp = app

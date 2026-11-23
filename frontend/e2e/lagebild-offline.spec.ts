@@ -182,7 +182,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     });
     expect(position.ok(), await position.text()).toBeTruthy();
     await post(page, `${basis}/personen`, { name: 'Offlineprobe' });
-    await post(page, `${basis}/auftraege`, {
+    await post(page, `${basis}/tasks`, {
       auftrag_text: 'Offline-Probe Auftrag',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
     });

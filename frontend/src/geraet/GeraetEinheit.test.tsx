@@ -132,13 +132,13 @@ function stelleBereit({
       abgerufen.push('abschnitte');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),
-    http.get('/api/einsaetze/7/befehle', () => {
+    http.get('/api/einsaetze/7/orders', () => {
       abgerufen.push('befehle');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)),
-    http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json(stand.auftraege)),
-    http.post('/api/einsaetze/7/auftraege/:aid/empfaenger/:eid/quittieren', ({ params }) => {
+    http.get('/api/einsaetze/7/tasks', () => HttpResponse.json(stand.auftraege)),
+    http.post('/api/einsaetze/7/tasks/:aid/recipients/:eid/acknowledge', ({ params }) => {
       quittiert.push(`${params.aid}/${params.eid}`);
       return HttpResponse.json(stand.auftraege[0]);
     }),
@@ -146,8 +146,8 @@ function stelleBereit({
       status.push(await request.json());
       return HttpResponse.json(e);
     }),
-    http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
-    http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+    http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
+    http.post('/api/einsaetze/7/reports', async ({ request }) => {
       gesendet.push(await request.json());
       return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
     }),

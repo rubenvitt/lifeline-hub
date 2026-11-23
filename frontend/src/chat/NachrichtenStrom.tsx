@@ -435,7 +435,7 @@ export default function NachrichtenStrom({
                         {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
                          läuft in der Desktop-Hülle ins Leere (LFH-782). */}
                         {n.anhaenge.map((a) => {
-                          const href = `/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`;
+                          const href = `/api/einsaetze/${n.einsatz_id}/attachments/${a.id}`;
                           return (
                             <DownloadAnker
                               key={a.id}

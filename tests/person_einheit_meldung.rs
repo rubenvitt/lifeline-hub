@@ -61,7 +61,7 @@ async fn meldung_anlegen(app: &axum::Router, cookie: &str, e: i64, extra: Value)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -74,7 +74,7 @@ async fn meldungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         cookie,
         None,
     )

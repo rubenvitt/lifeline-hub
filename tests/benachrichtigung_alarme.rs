@@ -328,7 +328,7 @@ async fn bestaetigte_sofortmeldung_eskaliert_nicht() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &w.pfad(&format!("meldungen/{}/bestaetigen", m["id"])),
+        &w.pfad(&format!("reports/{}/confirm", m["id"])),
         &w.cookie("bertram").await,
         None,
     )
@@ -392,7 +392,7 @@ async fn quittierter_empfaenger_bekommt_den_ueberfaelligen_auftrag_nicht() {
         &w.app,
         "POST",
         &w.pfad(&format!(
-            "auftraege/{}/empfaenger/{s3_zeile}/quittieren",
+            "tasks/{}/recipients/{s3_zeile}/acknowledge",
             a["id"]
         )),
         &w.cookie("carlotta").await,
@@ -418,10 +418,7 @@ async fn voll_quittierter_auftrag_alarmiert_niemanden() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &w.pfad(&format!(
-            "auftraege/{}/empfaenger/{zeile}/quittieren",
-            a["id"]
-        )),
+        &w.pfad(&format!("tasks/{}/recipients/{zeile}/acknowledge", a["id"])),
         &w.cookie("bertram").await,
         None,
     )

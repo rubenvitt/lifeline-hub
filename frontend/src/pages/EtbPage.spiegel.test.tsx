@@ -57,7 +57,7 @@ function setup(antraege: unknown[]) {
     meHandler(adminFixture()),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
-    http.get('/api/einsaetze/7/etb/zaehler', () =>
+    http.get('/api/einsaetze/7/etb/counters', () =>
       HttpResponse.json({
         gesamt: 1,
         je_typ: { meldung: 1, anordnung: 0, lage: 0, entscheidung: 0, system: 0, berichtigung: 0 },

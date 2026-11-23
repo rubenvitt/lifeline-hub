@@ -14,7 +14,7 @@ import type {
  *
  * Absender und Wortlaut sind Scrub-Werte: der Server nennt sie weder im Live-Ereignis noch im
  * Text der Benachrichtigung (`src/benachrichtigung/text.rs`, nur Retain-Spalten). Der Client holt
- * sie über die Meldung selbst (`GET …/meldungen/{id}`, Leserecht Meldungen, das jeder Empfänger
+ * sie über die Meldung selbst (`GET …/reports/{id}`, Leserecht Meldungen, das jeder Empfänger
  * hat). Antwortet sie nicht rechtzeitig, bleibt der Text des Servers.
  *
  * Der Service Worker (`public/alarm-sw.js`) zeigt in Push-Meldungen dasselbe, wenn die Person es

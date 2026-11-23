@@ -9,11 +9,11 @@ import type {
 
 /** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
 export function listeBefehle(einsatzId: number): Promise<BefehlKopf[]> {
-  return apiGet<BefehlKopf[]>(`/api/einsaetze/${einsatzId}/befehle`);
+  return apiGet<BefehlKopf[]>(`/api/einsaetze/${einsatzId}/orders`);
 }
 
 export function ladeBefehl(einsatzId: number, id: number): Promise<BefehlAnzeige> {
-  return apiGet<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle/${id}`);
+  return apiGet<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/orders/${id}`);
 }
 
 export interface NeuerBefehl {
@@ -25,7 +25,7 @@ export interface NeuerBefehl {
 }
 
 export function legeBefehlAn(einsatzId: number, daten: NeuerBefehl): Promise<BefehlAnzeige> {
-  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle`, 'POST', daten);
+  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/orders`, 'POST', daten);
 }
 
 interface BefehlPatch {
@@ -41,11 +41,11 @@ export function aktualisiereBefehl(
   id: number,
   patch: BefehlPatch,
 ): Promise<BefehlAnzeige> {
-  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle/${id}`, 'PATCH', patch);
+  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/orders/${id}`, 'PATCH', patch);
 }
 
 export function gibBefehlFrei(einsatzId: number, id: number): Promise<BefehlAnzeige> {
-  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle/${id}/freigeben`, 'POST');
+  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/orders/${id}/release`, 'POST');
 }
 
 export function schreibeBefehlFort(
@@ -53,7 +53,7 @@ export function schreibeBefehlFort(
   id: number,
   zeitstand?: string,
 ): Promise<BefehlAnzeige> {
-  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle/${id}/fortschreiben`, 'POST', {
+  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/orders/${id}/revise`, 'POST', {
     zeitstand,
   });
 }
@@ -65,7 +65,7 @@ export function quittiereBefehlEmpfang(
   eintragId: number,
 ): Promise<BefehlAnzeige> {
   return apiSend<BefehlAnzeige>(
-    `/api/einsaetze/${einsatzId}/befehle/${id}/verteiler/${eintragId}/quittieren`,
+    `/api/einsaetze/${einsatzId}/orders/${id}/distribution/${eintragId}/acknowledge`,
     'POST',
   );
 }
@@ -77,7 +77,7 @@ export function nimmBefehlQuittungZurueck(
   eintragId: number,
 ): Promise<BefehlAnzeige> {
   return apiSend<BefehlAnzeige>(
-    `/api/einsaetze/${einsatzId}/befehle/${id}/verteiler/${eintragId}/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/orders/${id}/distribution/${eintragId}/undo`,
     'POST',
   );
 }

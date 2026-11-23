@@ -73,7 +73,7 @@ async fn auftraege(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         admin,
         None,
     )
@@ -128,7 +128,7 @@ async fn auftrag_erteilen_ohne_auftrags_freigabe_ist_403() {
             let (_, m) = anfrage(
                 &app,
                 "GET",
-                &format!("/api/einsaetze/{einsatz}/meldungen/{id}"),
+                &format!("/api/einsaetze/{einsatz}/reports/{id}"),
                 &admin,
                 None,
             )

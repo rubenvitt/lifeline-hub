@@ -700,7 +700,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const anfragen: Array<Record<string, unknown>> = [];
     rendere({ lage: { personen: [person(1)] } });
     server.use(
-      http.post('/api/einsaetze/1/lageberichte', async ({ request }) => {
+      http.post('/api/einsaetze/1/situation-reports', async ({ request }) => {
         anfragen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ id: 77 }, { status: 201 });
       }),
@@ -727,7 +727,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
   it('scheitert die Übernahme, steht der Fehler an der Seite, und es geht nicht weiter', async () => {
     rendere({});
     server.use(
-      http.post('/api/einsaetze/1/lageberichte', () =>
+      http.post('/api/einsaetze/1/situation-reports', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

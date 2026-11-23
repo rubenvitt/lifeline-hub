@@ -86,7 +86,7 @@ async function klebtAmFuss(page: Page, leiste: string) {
 }
 
 async function lagemeldung(zweiter: APIRequestContext, einsatzId: number, absender: string) {
-  const r = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+  const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
     data: {
       absender,
       meldeweg: 'funk',
@@ -158,7 +158,7 @@ test('Eingangsband rückt über die ETB-Erfassung und die Aktionsleiste des Befe
   });
   expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
-  const befehl = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
+  const befehl = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Einsatzbefehl Übung' },
   });
   expect(befehl.ok(), await befehl.text()).toBe(true);

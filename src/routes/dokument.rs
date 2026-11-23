@@ -27,7 +27,7 @@ pub(super) fn sse(state: &AppState, einsatz_id: i64) {
         .publiziere_einsatz(einsatz_id, LiveEvent::Dokument);
 }
 
-/// GET /api/einsaetze/{id}/dokumente — lebende Dokumente, neueste zuerst.
+/// GET /api/einsaetze/{id}/documents — lebende Dokumente, neueste zuerst.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Dokumente>,
@@ -98,7 +98,7 @@ fn validiere(
     Ok((titel, kategorie, bezug))
 }
 
-/// POST /api/einsaetze/{id}/dokumente — Datei + Metadaten in EINEM Multipart (E6).
+/// POST /api/einsaetze/{id}/documents — Datei + Metadaten in EINEM Multipart (E6).
 pub async fn ablegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Dokumente>,
@@ -163,7 +163,7 @@ pub async fn ablegen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/dokumente/{did}/datei — Download (modul-gegatet, E8).
+/// GET /api/einsaetze/{id}/documents/{did}/file — Download (modul-gegatet, E8).
 pub async fn datei(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Dokumente>,
@@ -194,7 +194,7 @@ pub struct PatchBody {
     pub bezug_id: Option<Option<i64>>,
 }
 
-/// PATCH /api/einsaetze/{id}/dokumente/{did} — Titel, Kategorie und Bezug ändern (LFH-656).
+/// PATCH /api/einsaetze/{id}/documents/{did} — Titel, Kategorie und Bezug ändern (LFH-656).
 /// Die Datei bleibt; eine wirksame Änderung schreibt einen ETB-Nachweis (D2), eine wirkungslose
 /// antwortet 200 ohne ETB und ohne Live-Hinweis.
 pub async fn aendern(
@@ -241,7 +241,7 @@ pub async fn aendern(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/dokumente/{did} — Soft-Delete mit ETB-Nachweis (E1).
+/// DELETE /api/einsaetze/{id}/documents/{did} — Soft-Delete mit ETB-Nachweis (E1).
 pub async fn entfernen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Dokumente>,

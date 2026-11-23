@@ -5382,7 +5382,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       },
     });
     expect(text.ok(), `Text ${was}: ${text.status()} ${await text.text()}`).toBe(true);
-    const frei = await page.request.post(`${E}/${pfad}/${id}/freigeben`);
+    const frei = await page.request.post(`${E}/${pfad}/${id}/release`);
     expect(frei.ok(), `Freigabe ${was}: ${frei.status()} ${await frei.text()}`).toBe(true);
     return id;
   };
@@ -5391,7 +5391,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
     {
       name: 'Lagebericht',
       pfad: `${R}/lageberichte/${await freigegeben(
-        'lageberichte',
+        'situation-reports',
         { vorlage: 'lagebericht', titel: 'Lage 968' },
         [
           'auftrag',
@@ -5413,7 +5413,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
     {
       name: 'Befehl',
       pfad: `${R}/auftraege/befehle/${await freigegeben(
-        'befehle',
+        'orders',
         { vorlage: 'befehl_lad', titel: 'Befehl 968' },
         ['lage', 'auftrag', 'durchfuehrung'],
         'Befehl',

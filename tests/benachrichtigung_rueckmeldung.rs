@@ -74,7 +74,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/meldungen", self.einsatz),
+            &format!("/api/einsaetze/{}/reports", self.einsatz),
             &self.admin,
             Some(
                 &json!({

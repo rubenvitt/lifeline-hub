@@ -16,7 +16,7 @@
 //! ## Warum die Ausnahmeliste methoden-genau ist
 //!
 //! Zwei Ausnahmen teilen ihren Pfad mit einer kurzen Operation im selben `MethodRouter`
-//! (`GET /…/anhaenge/{aid}` mit `DELETE`, `POST /…/hintergrundbilder` mit `GET`). Eine
+//! (`GET /…/attachments/{aid}` mit `DELETE`, `POST /…/hintergrundbilder` mit `GET`). Eine
 //! pfadbasierte Liste befreite die kurzen Operationen mit.
 //!
 //! ## Warum die Ausnahmen auch vom Cap befreit sind
@@ -95,14 +95,14 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Multipart-Upload bis 26 MiB, plus clamd-INSTREAM-Scan im Request (Default 30 s). Alle
     // Uploads hier tragen die gemeinsame Upload-Grenze, alle Downloads eine Download-Grenze
     // (`transfer`).
-    ("POST", "/api/einsaetze/{id}/anhaenge"),
+    ("POST", "/api/einsaetze/{id}/attachments"),
     // Voll-BLOB-Read bis 25 MiB. NUR GET — das DELETE im selben MethodRouter ist ein reiner
     // DB-Delete und bleibt geregelt.
-    ("GET", "/api/einsaetze/{id}/anhaenge/{aid}"),
+    ("GET", "/api/einsaetze/{id}/attachments/{aid}"),
     // Dokumentenablage: Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Nur POST bzw. GET —
     // die Liste und das DELETE bleiben geregelt.
-    ("POST", "/api/einsaetze/{id}/dokumente"),
-    ("GET", "/api/einsaetze/{id}/dokumente/{did}/datei"),
+    ("POST", "/api/einsaetze/{id}/documents"),
+    ("GET", "/api/einsaetze/{id}/documents/{did}/file"),
     // Zweiter Multipart-Upload, ebenfalls mit clamd-Scan. NUR POST — das GET auf demselben
     // Pfad ist die kurze Liste.
     ("POST", "/api/einsaetze/{id}/karte/hintergrundbilder"),
@@ -118,8 +118,11 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // LFH-758): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Über LTE dauert ein
     // 15-MiB-Gutachten länger als das Budget (LFH-938). Nur POST bzw. GET — Liste, DELETE und die
     // Zugriffsliste bleiben geregelt.
-    ("POST", "/api/einsaetze/{id}/etb/anhaenge"),
-    ("GET", "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}"),
+    ("POST", "/api/einsaetze/{id}/etb/attachments"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/etb/{eintrag_id}/attachments/{aid}",
+    ),
     ("POST", "/api/einsaetze/{id}/schaeden/{sid}/anhaenge"),
     (
         "GET",
@@ -139,15 +142,18 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
     // Bild-Anlagen an Lagebericht und Befehl (LFH-1028): dieselbe Kette wie die Anhänge. Nur POST
     // bzw. GET — Liste und DELETE bleiben geregelt.
-    ("POST", "/api/einsaetze/{id}/lageberichte/{lid}/anlagen"),
     (
-        "GET",
-        "/api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid}/datei",
+        "POST",
+        "/api/einsaetze/{id}/situation-reports/{lid}/enclosures",
     ),
-    ("POST", "/api/einsaetze/{id}/befehle/{bid}/anlagen"),
     (
         "GET",
-        "/api/einsaetze/{id}/befehle/{bid}/anlagen/{aid}/datei",
+        "/api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}/file",
+    ),
+    ("POST", "/api/einsaetze/{id}/orders/{bid}/enclosures"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/orders/{bid}/enclosures/{aid}/file",
     ),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-, Tier- und Schadenszahl der Lage.
@@ -351,7 +357,7 @@ mod tests {
     /// Die zwei Pfade mit geteiltem `MethodRouter` sind nur in der langen Richtung befreit.
     #[test]
     fn ausnahme_trifft_methoden_genau() {
-        let anhang = "/api/einsaetze/{id}/anhaenge/{aid}";
+        let anhang = "/api/einsaetze/{id}/attachments/{aid}";
         assert!(ist_ausgenommen(&Method::GET, anhang), "BLOB-Read frei");
         assert!(
             !ist_ausgenommen(&Method::DELETE, anhang),

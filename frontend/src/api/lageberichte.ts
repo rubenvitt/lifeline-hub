@@ -9,11 +9,11 @@ import type {
 
 /** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
 export function listeLageberichte(einsatzId: number): Promise<LageberichtKopf[]> {
-  return apiGet<LageberichtKopf[]>(`/api/einsaetze/${einsatzId}/lageberichte`);
+  return apiGet<LageberichtKopf[]>(`/api/einsaetze/${einsatzId}/situation-reports`);
 }
 
 export function ladeLagebericht(einsatzId: number, id: number): Promise<LageberichtAnzeige> {
-  return apiGet<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte/${id}`);
+  return apiGet<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/situation-reports/${id}`);
 }
 
 interface NeuerLagebericht {
@@ -31,7 +31,11 @@ export function legeLageberichtAn(
   einsatzId: number,
   daten: NeuerLagebericht,
 ): Promise<LageberichtAnzeige> {
-  return apiSend<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte`, 'POST', daten);
+  return apiSend<LageberichtAnzeige>(
+    `/api/einsaetze/${einsatzId}/situation-reports`,
+    'POST',
+    daten,
+  );
 }
 
 interface LageberichtPatch {
@@ -48,7 +52,7 @@ export function aktualisiereLagebericht(
   patch: LageberichtPatch,
 ): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/lageberichte/${id}`,
+    `/api/einsaetze/${einsatzId}/situation-reports/${id}`,
     'PATCH',
     patch,
   );
@@ -56,7 +60,7 @@ export function aktualisiereLagebericht(
 
 export function gibLageberichtFrei(einsatzId: number, id: number): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/lageberichte/${id}/freigeben`,
+    `/api/einsaetze/${einsatzId}/situation-reports/${id}/release`,
     'POST',
   );
 }
@@ -67,7 +71,7 @@ export function schreibeLageberichtFort(
   zeitstand?: string,
 ): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/lageberichte/${id}/fortschreiben`,
+    `/api/einsaetze/${einsatzId}/situation-reports/${id}/revise`,
     'POST',
     { zeitstand },
   );

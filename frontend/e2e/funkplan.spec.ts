@@ -38,7 +38,7 @@ import { waehleDruckweg } from './druckweg-kern';
  *   hier bleiben sie als Annotation stehen, und die Tabelle hat am Fükw keinen Überhang.
  * - LÜCKEN IM ERSTEN BILD bei 1366 × 768 mit offenem Modulpanel (`toBeInViewport`).
  * - 390 px: Tabelle, nicht Karten; die Kennung bleibt fixiert.
- * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
+ * - ÜBERNAHME: genau EIN POST auf `…/situation-reports`, kein PATCH, danach der Bericht offen.
  * - ZEILENLINK: das Ziel jeder Kennung belegt `FunkplanPage.test.tsx` („führt jede Zeile per Link
  *   zu ihrem Pflegeort“); der e2e-Fall dazu entfiel (LLH-1665, Spec `e2e-zuschnitt`).
  * - HÄNGENDER EINZUG (LFH-977): bei 390, 820, 1180 und 1440 px und im Druck bei A4-Breite steht
@@ -225,7 +225,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/lageberichte`]);
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
   await expect(page.getByText(TELEFON)).toHaveCount(0);
 });
@@ -247,7 +247,7 @@ test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befe
   });
   await page.getByRole('button', { name: 'In Befehl übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege/befehle/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/befehle`]);
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/orders`]);
   await expect(page.getByText('Führung und Kommunikation').first()).toBeVisible();
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
   await expect(page.getByText(TELEFON)).toHaveCount(0);

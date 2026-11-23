@@ -119,7 +119,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
       `/api/einsaetze/${e}/bereitstellungsraeume/${sportplatz.id}`,
     );
     expect(((await raum.json()) as { status: string }).status).toBe('aktiv');
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
+    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(
       liste.find((m) => m.inhalt === 'Raum voll, weitere Kräfte zum BR Schule')?.absender,
@@ -419,7 +419,7 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
   }
 
   expect(await einheitenNamens('Florian Nachbar 7'), 'genau eine Einheit').toBe(1);
-  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/meldungen`)).json()) as {
+  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/reports`)).json()) as {
     inhalt: string;
   }[];
   expect(

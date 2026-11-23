@@ -148,7 +148,7 @@ modul_marker! {
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
 /// Gate-Route. Der **längste** passende Präfix gewinnt (`…/lage/meldungen` ist ein
-/// eigener Eintrag, kein Kind von `…/meldungen`). Wächst pro migriertem Modul; nur
+/// eigener Eintrag, kein Kind von `…/reports`). Wächst pro migriertem Modul; nur
 /// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
 pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
@@ -156,11 +156,11 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // LLH-1031: Kenntnisnahme der Lagemeldungen, auch unter der Kennung der Meldung.
     ("/api/einsaetze/{id}/lage/gesehen", Some("lagemeldungen")),
     (
-        "/api/einsaetze/{id}/meldungen/{mid}/lage-gesehen",
+        "/api/einsaetze/{id}/reports/{mid}/situation-seen",
         Some("lagemeldungen"),
     ),
-    ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
-    ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
+    ("/api/einsaetze/{id}/reports", Some("meldungen")),
+    ("/api/einsaetze/{id}/tasks", Some("auftraege")),
     // LLH-1111: Stand und Termin unter `…/lagebesprechung`, Verlauf und Abschluss unter
     // `…/lagebesprechungen` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
     (
@@ -186,7 +186,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modul `infotelefon` (Herleitung `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md`,
     // D3).
     ("/api/einsaetze/{id}/stab/infotelefon", Some("infotelefon")),
-    ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
+    ("/api/einsaetze/{id}/documents", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
@@ -211,9 +211,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
     ("/api/einsaetze/{id}/chat", Some("chat")),
     ("/api/einsaetze/{id}/etb", Some("etb")),
-    ("/api/einsaetze/{id}/erinnerungen", Some("erinnerungen")),
+    ("/api/einsaetze/{id}/reminders", Some("erinnerungen")),
     (
-        "/api/einsaetze/{id}/nachforderungen",
+        "/api/einsaetze/{id}/resource-requests",
         Some("nachforderungen"),
     ),
     // Sprechgruppen, Ort-Vorschau und die Ortssuche des Ortsfelds (LFH-1175) gehören keinem
@@ -236,7 +236,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
     ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
     ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
-    ("/api/einsaetze/{id}/anhaenge", None),
+    ("/api/einsaetze/{id}/attachments", None),
     // Pegel-Kennzahl (LFH-606): steht auf Dashboard und Überblick — modul-los wie die
     // Einsatz-Kopfdaten.
     ("/api/einsaetze/{id}/pegel", None),
@@ -266,7 +266,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/benachrichtigung-vorgaben", None),
     // Eigene Anträge an einem Spiegel (LLH-1492): modul-los. Ein Antrag gehört dem Konto, das ihn
     // gestellt hat; das Modulrecht prüfte schon die Erfassung, aus der er entstand.
-    ("/api/einsaetze/{id}/antraege", None),
+    ("/api/einsaetze/{id}/requests", None),
     // Nicht übernommene Erfassungen nach einer Notübernahme (LLH-1646): modul-los. Jede Zeile
     // gehört einem anderen Modul; der Handler prüft das Modul je Zeile (Inhalt, Stellen,
     // Verwerfen) und das Modul der Antragsart.
@@ -314,7 +314,7 @@ const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
 /// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
 /// ein Präfix trifft nur bei Gleichheit oder wenn direkt danach `/` folgt — sonst würde
-/// z. B. `…/meldungenarchiv` fälschlich als `…/meldungen`-Kind matchen.
+/// z. B. `…/reportsarchiv` fälschlich als `…/reports`-Kind matchen.
 pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
     PFAD_KEY
         .iter()
@@ -413,11 +413,11 @@ mod tests {
     fn pfad_key_laengster_praefix_gewinnt() {
         // Kind-Pfade erben den Modul-Key des Präfixes.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/meldungen"),
+            key_fuer_pfad("/api/einsaetze/{id}/reports"),
             Some(Some("meldungen"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/meldungen/{mid}/status"),
+            key_fuer_pfad("/api/einsaetze/{id}/reports/{mid}/status"),
             Some(Some("meldungen"))
         );
         // Eigenständiger Lage-Pfad → eigener Key, NICHT "meldungen".
@@ -491,9 +491,9 @@ mod tests {
         );
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/stab"), None);
         // Modul-lose Route: registriert, aber kein Key.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/attachments"), Some(None));
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/anhaenge/{aid}"),
+            key_fuer_pfad("/api/einsaetze/{id}/attachments/{aid}"),
             Some(None)
         );
         // Wetter & Pegel (LFH-633): der Wetter-Endpunkt ist am Modul gegatet, der Pegelverlauf
@@ -523,8 +523,8 @@ mod tests {
 
     #[test]
     fn pfad_key_ignoriert_teil_segment_treffer() {
-        // "meldungenarchiv" verlängert das Präfix "meldungen" als Text, ist aber
-        // ein anderes Segment — darf NICHT als "meldungen"-Kind durchgehen.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/meldungenarchiv"), None);
+        // "reportsarchiv" verlängert das Präfix "reports" als Text, ist aber
+        // ein anderes Segment — darf NICHT als "reports"-Kind durchgehen.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/reportsarchiv"), None);
     }
 }

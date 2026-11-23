@@ -27,7 +27,7 @@ interface FormWerte {
 /**
  * Lage-Text und Verortung einer Meldung in der Lage nachträglich setzen, ändern oder leeren
  * (LLH-1066, design.md D6, D9): in der Zeile der Seite Lagemeldungen und im Inspector der
- * Lagekarte. Schreibt über die Korrektur der Meldung (`PATCH …/meldungen/{mid}`), also mit
+ * Lagekarte. Schreibt über die Korrektur der Meldung (`PATCH …/reports/{mid}`), also mit
  * Schreibrecht und Freigabe Meldungen; die Aufrufer zeigen den Knopf nur dann. Ein geänderter
  * Text ist für die Lage wieder neu, ein versetzter Ort nicht. Eine Ablehnung steht im Formular.
  *

@@ -107,7 +107,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur
   `emulateMedia`: erst ohne `sticky` ragte eine Baumtabelle über A4.
-- **„In Lagebericht übernehmen“ ist EIN Aufruf** (LFH-548): `POST …/lageberichte`/`…/befehle`
+- **„In Lagebericht übernehmen“ ist EIN Aufruf** (LFH-548): `POST …/situation-reports`/`…/orders`
   mit `abschnitte` als Startinhalt (`AnlegenBody<A>`, Schlüssel wie beim PATCH, doppelt → 400),
   kein POST + PATCH; Fehler an die Seite.
 - **ETB-Druck** (`pages/EtbDruckPage.tsx`, `etb/EtbDruckTabelle.tsx`): schlichtes `<table>` nach

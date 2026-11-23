@@ -731,8 +731,8 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
         materialListe();
         return HttpResponse.json([], { status: 403 });
       }),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([eigene])),
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([eigene])),
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...eigene, id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -845,7 +845,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     laptopBereit();
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/7/meldungen', () => {
+      http.post('/api/einsaetze/7/reports', () => {
         versuch += 1;
         // Der zweite Versuch bleibt offen: geräumt wird beim Absenden, nicht erst beim Erfolg.
         return versuch === 1
@@ -950,7 +950,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
         HttpResponse.json([einheit(30, 'LF Nord', null), einheit(31, 'RTW 1', 4)]),
       ),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
       http.post('/api/einsaetze/7/bereitstellungsraeume/4/belegung', async ({ request }) => {
         belegt.push(await request.json());
         return HttpResponse.json({}, { status: 201 });
@@ -1024,7 +1024,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     brBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -1057,7 +1057,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     const { raumAbruf } = brBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -1126,11 +1126,11 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
           stellen,
         }),
       ),
-      http.get('/api/einsaetze/7/nachforderungen', () => {
+      http.get('/api/einsaetze/7/resource-requests', () => {
         nachforderungen();
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
     );
     return { nachforderungen };
   }
@@ -1181,7 +1181,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     verpflegungBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),

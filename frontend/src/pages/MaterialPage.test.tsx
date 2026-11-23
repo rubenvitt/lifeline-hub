@@ -2265,7 +2265,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
   function nachforderungen(antwort: () => Response): () => number {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/nachforderungen', () => {
+      http.get('/api/einsaetze/1/resource-requests', () => {
         abrufe += 1;
         return antwort();
       }),

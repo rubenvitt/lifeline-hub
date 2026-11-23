@@ -94,7 +94,7 @@ async function lageberichtSaeen(
   freigeben: boolean,
 ): Promise<number> {
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
       data: { vorlage: 'lagebericht', titel: 'Lagebericht Druckprobe' },
     }),
   );
@@ -102,7 +102,7 @@ async function lageberichtSaeen(
   const id = (await neu.json()).id as number;
   const letzter = LAGEBERICHT_ABSCHNITTE.length - 1;
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/lageberichte/${id}`, {
+    page.request.patch(`/api/einsaetze/${einsatzId}/situation-reports/${id}`, {
       data: {
         abschnitte: LAGEBERICHT_ABSCHNITTE.map((schluessel, i) => ({
           schluessel,
@@ -114,7 +114,7 @@ async function lageberichtSaeen(
   expect(patch.ok(), await patch.text()).toBe(true);
   if (freigeben) {
     const frei = await mitWiederholung(() =>
-      page.request.post(`/api/einsaetze/${einsatzId}/lageberichte/${id}/freigeben`),
+      page.request.post(`/api/einsaetze/${einsatzId}/situation-reports/${id}/release`),
     );
     expect(frei.ok(), await frei.text()).toBe(true);
   }
@@ -123,7 +123,7 @@ async function lageberichtSaeen(
 
 async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Promise<number> {
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
       data: { vorlage: 'befehl_lad', titel: 'Befehl Druckprobe' },
     }),
   );
@@ -131,7 +131,7 @@ async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Pro
   const id = (await neu.json()).id as number;
   const abschnitte = ['lage', 'auftrag', 'durchfuehrung'];
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${id}`, {
+    page.request.patch(`/api/einsaetze/${einsatzId}/orders/${id}`, {
       data: {
         abschnitte: abschnitte.map((schluessel, i) => ({
           schluessel,
@@ -143,7 +143,7 @@ async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Pro
   expect(patch.ok(), await patch.text()).toBe(true);
   if (!freigeben) return id;
   const frei = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/befehle/${id}/freigeben`),
+    page.request.post(`/api/einsaetze/${einsatzId}/orders/${id}/release`),
   );
   expect(frei.ok(), await frei.text()).toBe(true);
   return id;
@@ -171,7 +171,7 @@ async function auftragSaeen(page: Page, einsatzId: string): Promise<number> {
     AUFTRAG_SCHEMAFELDER.map((feld) => [feld, langerText(feld, 3)]),
   );
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
       data: {
         auftrag_text: langerText('auftrag', 2),
         ...felder,
@@ -189,7 +189,7 @@ async function auftragSaeen(page: Page, einsatzId: string): Promise<number> {
   expect(neu.ok(), await neu.text()).toBe(true);
   const id = (await neu.json()).id as number;
   const vollzug = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/auftraege/${id}/vollzug`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/tasks/${id}/execution`, {
       data: { status: 'vollzogen', vollzugsmeldung: `Leitung steht. ${ENDMARKE}` },
     }),
   );
@@ -510,7 +510,7 @@ test('Befehl (Entwurf) mit Verteiler: Druckkopf nennt ihn, das Feld fällt im Dr
   const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Verteiler ${Date.now()}`);
   const id = await befehlSaeen(page, einsatzId, false);
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${id}`, {
+    page.request.patch(`/api/einsaetze/${einsatzId}/orders/${id}`, {
       data: {
         verteiler: [
           {
@@ -662,14 +662,14 @@ function ausgezeichneterText(): string {
 
 async function lagebeurteilungSaeen(page: Page, einsatzId: string): Promise<number> {
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
       data: { vorlage: 'lagebeurteilung', titel: 'Lagebeurteilung Druckprobe' },
     }),
   );
   expect(neu.ok(), await neu.text()).toBe(true);
   const id = (await neu.json()).id as number;
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/lageberichte/${id}`, {
+    page.request.patch(`/api/einsaetze/${einsatzId}/situation-reports/${id}`, {
       data: {
         abschnitte: LAGEBEURTEILUNG_ABSCHNITTE.map((schluessel, i) => ({
           schluessel,

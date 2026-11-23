@@ -1,5 +1,5 @@
 //! Nachträgliche Korrektur einer Meldung (LLH-1066, Spec `meldungseingang`, „Eine Meldung lässt
-//! sich nachträglich korrigieren“ ff.): `PATCH /api/einsaetze/{id}/meldungen/{mid}`.
+//! sich nachträglich korrigieren“ ff.): `PATCH /api/einsaetze/{id}/reports/{mid}`.
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
@@ -25,7 +25,7 @@ async fn melden(app: &axum::Router, cookie: &str, einsatz: i64, extra: Value) ->
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -44,7 +44,7 @@ async fn korrigieren(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -236,7 +236,7 @@ async fn von_bezug_nachgetragen_aktualisiert_die_rueckmeldung() {
         let (s, v) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/meldungen/rueckmeldungen"),
+            &format!("/api/einsaetze/{e}/reports/check-ins"),
             &cookie,
             None,
         )
@@ -311,7 +311,7 @@ async fn verortung_nachgetragen_steht_in_der_lage_mit_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -357,7 +357,7 @@ async fn geaenderter_lage_text_macht_wieder_neu_und_wortlaut_gilt_bei_leer() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen/{mid}/lage-gesehen"),
+        &format!("/api/einsaetze/{e}/reports/{mid}/situation-seen"),
         &admin,
         None,
     )
@@ -427,7 +427,7 @@ async fn aus_der_lage_nehmen_leert_die_lage_angaben() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
         &admin,
         Some(r#"{"text":"Brand aus","lat":52.0,"lon":9.0}"#),
     )
@@ -522,7 +522,7 @@ async fn eingang_bleibt_unveraenderlich_und_unbekanntes_feld_ist_400() {
     let (_, m) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen/{mid}"),
+        &format!("/api/einsaetze/{e}/reports/{mid}"),
         &admin,
         None,
     )

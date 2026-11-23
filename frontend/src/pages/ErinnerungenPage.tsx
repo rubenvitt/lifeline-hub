@@ -248,7 +248,7 @@ export default function ErinnerungenPage() {
   // Zuklappen hängt das Formular aus; beim Aufklappen räumt die Erfassungshülle den alten Grund.
   /**
    * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Erübrigt" schalten mit einem Klick
-   * statt mit Rückfrage; `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen (Status,
+   * statt mit Rückfrage; `POST …/reminders/{eid}/reopen` räumt dafür alle drei Achsen (Status,
    * Vollzug, Quittung). Die nächste Rücknahme räumt den Grund der vorigen.
    */
   const oeffnenMutation = useMutation({

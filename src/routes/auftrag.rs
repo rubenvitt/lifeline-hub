@@ -80,7 +80,7 @@ fn filter_pruefen(
     Ok((richtung, filter))
 }
 
-/// GET /api/einsaetze/{id}/auftraege — Aufträge listen (Lesezugriff, auch Beobachter).
+/// GET /api/einsaetze/{id}/tasks — Aufträge listen (Lesezugriff, auch Beobachter).
 /// Mit `phase=abgeschlossen` seitenweise (LFH-1071, Spec `auftraege-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
@@ -144,7 +144,7 @@ pub struct KennzahlenParams {
     pub q: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/auftraege/kennzahlen — Zahlen des Auftragsboards (LFH-1071, D3).
+/// GET /api/einsaetze/{id}/tasks/metrics — Zahlen des Auftragsboards (LFH-1071, D3).
 pub async fn kennzahlen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Auftraege>,
@@ -168,7 +168,7 @@ pub async fn kennzahlen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/auftraege/{aid} — ein Auftrag des Einsatzes (LFH-1071, Deeplink auf
+/// GET /api/einsaetze/{id}/tasks/{aid} — ein Auftrag des Einsatzes (LFH-1071, Deeplink auf
 /// eine nicht geladene Seite). Einsatzfremd → 404.
 pub async fn detail(
     State(state): State<AppState>,
@@ -196,7 +196,7 @@ fn auftrag_default_quittierung_frist_min(
     crate::einsatz::effektiv::effektive_auftrag_quittierung_frist_min(e, o)
 }
 
-/// POST /api/einsaetze/{id}/auftraege — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
+/// POST /api/einsaetze/{id}/tasks — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
@@ -268,7 +268,7 @@ async fn fordere_im_bereich(
     }
 }
 
-/// POST /api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren — Quittung (Achse 1).
+/// POST /api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge — Quittung (Achse 1).
 pub async fn quittieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
@@ -335,7 +335,7 @@ pub struct VollzugReq {
     pub vollzugsmeldung: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/auftraege/{aid}/vollzug — Bearbeitungsfortschritt (Achse 2).
+/// POST /api/einsaetze/{id}/tasks/{aid}/execution — Bearbeitungsfortschritt (Achse 2).
 pub async fn vollzug(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
@@ -422,7 +422,7 @@ pub async fn vollzug(
     Ok(Json(d))
 }
 
-/// POST /api/einsaetze/{id}/auftraege/{aid}/abnehmen — Führung nimmt Vollzug ab.
+/// POST /api/einsaetze/{id}/tasks/{aid}/accept — Führung nimmt Vollzug ab.
 pub async fn abnehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
@@ -462,7 +462,7 @@ pub struct AufhebenReq {
     pub grund: String,
 }
 
-/// POST /api/einsaetze/{id}/auftraege/{aid}/aufheben — Auftrag mit Grund aufheben (LLH-1098,
+/// POST /api/einsaetze/{id}/tasks/{aid}/rescind — Auftrag mit Grund aufheben (LLH-1098,
 /// Spec `auftrag-aufheben-berichtigen`). Unumkehrbar; schreibt eine Anordnung ins ETB.
 pub async fn aufheben(
     State(state): State<AppState>,
@@ -516,7 +516,7 @@ pub async fn aufheben(
     Ok(Json(d))
 }
 
-/// PATCH /api/einsaetze/{id}/auftraege/{aid} — Auftrag berichtigen, solange er offen ist und
+/// PATCH /api/einsaetze/{id}/tasks/{aid} — Auftrag berichtigen, solange er offen ist und
 /// niemand quittiert hat (LLH-1098, Spec `auftrag-aufheben-berichtigen`). Teil-Patch; ohne
 /// fachliche Änderung weder ETB noch Ereignis.
 pub async fn berichtigen(
