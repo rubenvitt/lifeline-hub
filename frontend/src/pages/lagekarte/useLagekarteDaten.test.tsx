@@ -248,7 +248,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/karte/config', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/map/config', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/einstellungen', () => new HttpResponse(null, { status: 500 })),
       // 403 auf die Rückmeldungen ist für Rollen ohne „Meldungen" der Normalfall und gehört nicht
       // in den Katalog.
@@ -282,7 +282,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -345,7 +345,7 @@ describe('useLagekarteDaten markerLaden', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -412,7 +412,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -585,7 +585,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -932,7 +932,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -1129,7 +1129,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,
@@ -1327,7 +1327,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: false,

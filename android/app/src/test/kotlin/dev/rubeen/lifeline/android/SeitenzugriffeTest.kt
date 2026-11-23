@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.webkit.GeolocationPermissions
 import android.webkit.MimeTypeMap
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -34,6 +35,8 @@ import org.robolectric.annotation.Config
 /**
  * Dateiwahl und Kamera der Oberfläche (Review W4): `<input type="file">` öffnet den Systemdialog,
  * `getUserMedia` bekommt die Kamera nur für den aktiven Server und nur mit dem Recht `CAMERA`.
+ * Den Standort (`navigator.geolocation`, LLH-2071) bekommt ebenso nur der aktive Server, und nur
+ * mit dem Recht der App, fein oder grob.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -48,6 +51,11 @@ class SeitenzugriffeTest {
         var fertig: ((Array<Uri>?) -> Unit)? = null
         var kameraErlaubt = true
         var kameraGefragt = 0
+        var standortErlaubt = true
+        var standortGefragt = 0
+
+        /** Läuft vor der Antwort auf die Rückfrage nach dem Standort (Serverwechsel währenddessen). */
+        var waehrendStandortfrage: () -> Unit = {}
 
         override fun waehleDateien(intent: Intent, fertig: (Array<Uri>?) -> Unit): Boolean {
             this.intent = intent
@@ -59,7 +67,25 @@ class SeitenzugriffeTest {
             kameraGefragt += 1
             fertig(kameraErlaubt)
         }
+
+        override fun standort(fertig: (Boolean) -> Unit) {
+            standortGefragt += 1
+            waehrendStandortfrage()
+            fertig(standortErlaubt)
+        }
     }
+
+    /** Merkt sich die Antwort des Rückrufs an den WebView. */
+    private class Standortantwort : GeolocationPermissions.Callback {
+        val antworten = mutableListOf<Triple<String?, Boolean, Boolean>>()
+
+        override fun invoke(origin: String?, allow: Boolean, retain: Boolean) {
+            antworten += Triple(origin, allow, retain)
+        }
+    }
+
+    private fun fragStandort(origin: String, client: HuellenChromeClient = chrome): Standortantwort =
+        Standortantwort().also { client.onGeolocationPermissionsShowPrompt(origin, it) }
     private val chrome = HuellenChromeClient({ _, _ -> }, aktiverServer = { aktiverServer }, zugriffe = zugriffe)
     private val webView = WebView(context)
 
@@ -211,5 +237,89 @@ class SeitenzugriffeTest {
         shadowOf(activity).grantPermissions(Manifest.permission.CAMERA)
         zugriffe.kamera { ergebnis = it }
         assertEquals(true, ergebnis)
+    }
+
+    @Test
+    fun `der aktive Server bekommt den Standort, wenn die App das Recht hat`() {
+        val antwort = fragStandort("https://elw.local:8443")
+
+        assertEquals(listOf(Triple("https://elw.local:8443", true, false)), antwort.antworten)
+        assertEquals(1, zugriffe.standortGefragt)
+    }
+
+    @Test
+    fun `ohne Recht der App bleibt der Standort zu`() {
+        zugriffe.standortErlaubt = false
+
+        val antwort = fragStandort("https://elw.local:8443")
+
+        assertEquals(listOf(Triple("https://elw.local:8443", false, false)), antwort.antworten)
+    }
+
+    @Test
+    fun `eine fremde Origin bekommt keinen Standort und die App fragt nicht`() {
+        for (origin in listOf("https://idp.example", "http://elw.local:8443", "https://elw.local", "null")) {
+            val antwort = fragStandort(origin)
+            assertEquals(listOf(Triple(origin, false, false)), antwort.antworten)
+        }
+        assertEquals(0, zugriffe.standortGefragt)
+    }
+
+    @Test
+    fun `wechselt der Server während der Rückfrage, bleibt der Standort zu`() {
+        zugriffe.waehrendStandortfrage = { aktiverServer = null }
+
+        val antwort = fragStandort("https://elw.local:8443")
+
+        assertEquals(listOf(Triple("https://elw.local:8443", false, false)), antwort.antworten)
+    }
+
+    @Test
+    fun `ohne Zugriffe lehnt der WebView den Standort ab`() {
+        val ohne = HuellenChromeClient({ _, _ -> }, aktiverServer = { elw })
+
+        val antwort = fragStandort("https://elw.local:8443", ohne)
+
+        assertEquals(listOf(Triple("https://elw.local:8443", false, false)), antwort.antworten)
+    }
+
+    @Suppress("DEPRECATION") // Die Antwort des Systems kommt über diesen Rückruf.
+    @Test
+    fun `die Activity meldet den Standort erlaubt, wenn fein oder grob gewährt ist`() {
+        val steuerung = Robolectric.buildActivity(ComponentActivity::class.java)
+        val zugriffe = Activityzugriffe(steuerung.get())
+        val activity = steuerung.setup().get()
+        var ergebnis: Boolean? = null
+
+        zugriffe.standort { ergebnis = it }
+        val frage = shadowOf(activity).lastRequestedPermission
+        assertArrayEquals(
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            frage.requestedPermissions,
+        )
+        // Android 12+: die Person wählt „ungefähr“, nur das grobe Recht kommt.
+        activity.onRequestPermissionsResult(
+            frage.requestCode,
+            frage.requestedPermissions,
+            intArrayOf(PackageManager.PERMISSION_DENIED, PackageManager.PERMISSION_GRANTED),
+        )
+        assertEquals(true, ergebnis)
+
+        val ohne = Robolectric.buildActivity(ComponentActivity::class.java)
+        val ohneZugriffe = Activityzugriffe(ohne.get())
+        val ohneActivity = ohne.setup().get()
+        ohneZugriffe.standort { ergebnis = it }
+        val zweite = shadowOf(ohneActivity).lastRequestedPermission
+        ohneActivity.onRequestPermissionsResult(
+            zweite.requestCode,
+            zweite.requestedPermissions,
+            intArrayOf(PackageManager.PERMISSION_DENIED, PackageManager.PERMISSION_DENIED),
+        )
+        assertEquals(false, ergebnis)
+
+        shadowOf(ohneActivity).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ergebnis = null
+        ohneZugriffe.standort { ergebnis = it }
+        assertEquals("mit dem groben Recht fragt die App nicht mehr", true, ergebnis)
     }
 }

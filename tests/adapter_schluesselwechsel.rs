@@ -45,7 +45,7 @@ async fn umgebung() -> (Umgebung, String) {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("{LISTE}/{id}/geheimnisse/token"),
+        &format!("{LISTE}/{id}/secrets/token"),
         &admin,
         Some(&json!({ "wert": TOKEN })),
     )

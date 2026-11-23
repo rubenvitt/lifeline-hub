@@ -1,5 +1,5 @@
 //! Webhook einer Anbindung verwalten (LLH-1656, Spec `webhook-zustellung`, design.md D8):
-//! Routen unter `/api/admin/anbindungen/{id}/webhook`, Rechte, Eingaben, Admin-Spur,
+//! Routen unter `/api/admin/integrations/{id}/webhook`, Rechte, Eingaben, Admin-Spur,
 //! Wiederaufnahme und Testereignis.
 
 use axum::http::StatusCode;
@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 mod common;
 use common::{anfrage_json, benutzer_anlegen, login_cookie, setup_mit_pool};
 
-const LISTE: &str = "/api/admin/anbindungen";
+const LISTE: &str = "/api/admin/integrations";
 
 async fn anbindung(app: &axum::Router, admin: &str) -> String {
     let (s, v) = anfrage_json(
@@ -205,7 +205,7 @@ async fn fuehrungskraft_liest_aber_schreibt_nicht() {
     assert!(liste["zugaenge"][0]["webhook"].get("url").is_none());
     let (_, als_admin) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}"), &admin, None).await;
     assert_eq!(als_admin["webhook"]["url"], "https://empfaenger.example/");
-    let (s, _) = anfrage_json(&app, "GET", &format!("{}/versuche", pfad(&id)), &fk, None).await;
+    let (s, _) = anfrage_json(&app, "GET", &format!("{}/attempts", pfad(&id)), &fk, None).await;
     assert_eq!(s, StatusCode::OK);
 
     for (methode, p, body) in [
@@ -220,7 +220,7 @@ async fn fuehrungskraft_liest_aber_schreibt_nicht() {
             Some(json!({ "arten": ["einsatz.closed"], "basis_geaendert_at": "x" })),
         ),
         ("DELETE", pfad(&id), None),
-        ("POST", format!("{}/wieder-aufnehmen", pfad(&id)), None),
+        ("POST", format!("{}/resume", pfad(&id)), None),
         ("POST", format!("{}/test", pfad(&id)), None),
     ] {
         let (s, _) = anfrage_json(&app, methode, &p, &fk, body.as_ref()).await;
@@ -251,7 +251,7 @@ async fn wieder_aufnehmen_liefert_nach_solange_der_rueckstand_besteht() {
         json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
     )
     .await;
-    let weiter = format!("{}/wieder-aufnehmen", pfad(&id));
+    let weiter = format!("{}/resume", pfad(&id));
 
     // Nicht angehalten: 409.
     let (s, _) = anfrage_json(&app, "POST", &weiter, &admin, None).await;
@@ -335,7 +335,7 @@ async fn testereignis_haelt_nur_den_verlauf_fest() {
     let (s, verlauf) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/versuche", pfad(&id)),
+        &format!("{}/attempts", pfad(&id)),
         &admin,
         None,
     )
@@ -367,7 +367,7 @@ async fn entfernen_loescht_webhook_und_verlauf() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("{}/versuche", pfad(&id)),
+        &format!("{}/attempts", pfad(&id)),
         &admin,
         None,
     )
@@ -382,14 +382,7 @@ async fn widerrufene_anbindung_bekommt_keinen_webhook() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = anbindung(&app, &admin).await;
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert!(s.is_success());
     let (s, _) = einrichten(
         &app,
@@ -474,14 +467,7 @@ async fn widerruf_antwortet_mit_dem_webhook() {
         json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
     )
     .await;
-    let (s, z) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, z) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert!(s.is_success());
     assert_eq!(z["webhook"]["zustand"], "ruht", "{z}");
     assert_eq!(z["webhook"]["ruht_grund"], "zugang_widerrufen");

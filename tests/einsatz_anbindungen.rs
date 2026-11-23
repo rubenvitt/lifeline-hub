@@ -442,7 +442,7 @@ async fn widerruf_und_entzug_des_rechts_beenden_die_freigabe() {
     );
 
     // Widerruf: 401 für das Fremdsystem, Freigabe weg, ETB und Admin-Spur nennen es.
-    let (s, w) = anfrage(&app, "POST", &format!("{pfad}/widerrufen"), &admin, None).await;
+    let (s, w) = anfrage(&app, "POST", &format!("{pfad}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{w}");
     assert!(w.get("einsatz_id").is_none());
     assert!(
@@ -471,7 +471,7 @@ async fn widerruf_und_entzug_des_rechts_beenden_die_freigabe() {
         .unwrap()
         .is_empty());
     // Ein zweiter Widerruf schreibt keinen zweiten ETB-Eintrag.
-    anfrage(&app, "POST", &format!("{pfad}/widerrufen"), &admin, None).await;
+    anfrage(&app, "POST", &format!("{pfad}/revoke"), &admin, None).await;
     let etb = system_etb_inhalte(&app, &admin, einsatz).await;
     assert_eq!(zaehle(&etb, "Anbindung „FüKW Anzeige“ widerrufen von"), 1);
 }
@@ -783,7 +783,7 @@ async fn am_spiegel_gilt_die_freigabe_hier_und_das_etb_geht_als_antrag_an_den_fu
     let (status, w) = anfrage(
         &hub.app,
         "POST",
-        &format!("{ANBINDUNGEN}/{}/widerrufen", zweiter.zugang_id),
+        &format!("{ANBINDUNGEN}/{}/revoke", zweiter.zugang_id),
         &hub.admin,
         None,
     )

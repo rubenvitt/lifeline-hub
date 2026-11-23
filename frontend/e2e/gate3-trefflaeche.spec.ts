@@ -4968,7 +4968,7 @@ let kritisBuendelOrt: [number, number] | null = null;
 
 async function fachebenenBeantworten(page: Page) {
   for (const [i, { key, titel, props }] of FACHEBENEN_PROBE.entries()) {
-    await page.route(`**/api/karte/fachebenen/${key}**`, (route) => {
+    await page.route(`**/api/map/overlays/${key}**`, (route) => {
       const punkt = (ll: [number, number], p: Record<string, unknown>) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: ll },

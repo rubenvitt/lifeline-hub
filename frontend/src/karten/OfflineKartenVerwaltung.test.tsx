@@ -75,10 +75,10 @@ function mockBasis(
   const { bauVerfuegbar = false, bauJobs = [], status = {} } = optionen;
   server.use(
     meHandler(benutzer),
-    http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
-    http.get('/api/karte/offline-karten/katalog', () => HttpResponse.json(katalog)),
+    http.get('/api/map/offline-maps', () => HttpResponse.json(karten)),
+    http.get('/api/map/offline-maps/catalog', () => HttpResponse.json(katalog)),
     // Feature-Gate und Bau-UI-Endpunkte — per Vorgabe aus (die Config-Query feuert bei jedem Mount).
-    http.get('/api/karte/config', () =>
+    http.get('/api/map/config', () =>
       HttpResponse.json({
         online_styles: [],
         offline_verfuegbar: false,
@@ -87,10 +87,10 @@ function mockBasis(
         karten_bau_verfuegbar: bauVerfuegbar,
       }),
     ),
-    http.get('/api/karte/offline-karten/baubare-regionen', () => HttpResponse.json([])),
-    http.get('/api/karte/offline-karten/bau-status', () => HttpResponse.json(bauJobs)),
+    http.get('/api/map/offline-maps/buildable-regions', () => HttpResponse.json([])),
+    http.get('/api/map/offline-maps/build-status', () => HttpResponse.json(bauJobs)),
     // LFH-993: Status der Automatik — per Vorgabe an, ohne Kartenbau-Dienst, nichts läuft.
-    http.get('/api/karte/offline-karten/aktualisierung', () =>
+    http.get('/api/map/offline-maps/auto-update', () =>
       HttpResponse.json({ ...STATUS_VORGABE, ...status }),
     ),
   );
@@ -245,10 +245,10 @@ describe('OfflineKartenVerwaltung', () => {
     let regBody: { name: string; pfad: string } | undefined;
     mockBasis(admin, []);
     server.use(
-      http.get('/api/karte/offline-karten/vorhandene', () =>
+      http.get('/api/map/offline-maps/existing', () =>
         HttpResponse.json([{ dateiname: 'osm.bremen.2026-07-02.mbtiles', groesse: 11_600_000 }]),
       ),
-      http.post('/api/karte/offline-karten', async ({ request }) => {
+      http.post('/api/map/offline-maps', async ({ request }) => {
         regBody = (await request.json()) as { name: string; pfad: string };
         return HttpResponse.json({ ...karte, id: 5, name: regBody.name }, { status: 201 });
       }),
@@ -342,7 +342,7 @@ describe('OfflineKartenVerwaltung', () => {
     let abgebrochen = false;
     mockBasis(admin, [karteLaedt]);
     server.use(
-      http.post('/api/karte/offline-karten/2/abbrechen', () => {
+      http.post('/api/map/offline-maps/2/cancel', () => {
         abgebrochen = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -379,7 +379,7 @@ describe('OfflineKartenVerwaltung', () => {
   it('eine abgelehnte Löschung steht an ihrer Zeile', async () => {
     mockBasis(admin, [karte, kleineKarte]);
     server.use(
-      http.delete('/api/karte/offline-karten/3', () =>
+      http.delete('/api/map/offline-maps/3', () =>
         HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 }),
       ),
     );
@@ -400,7 +400,7 @@ describe('OfflineKartenVerwaltung', () => {
   it('ein abgelehntes Abbrechen steht an seiner Zeile', async () => {
     mockBasis(admin, [karte, karteLaedt]);
     server.use(
-      http.post('/api/karte/offline-karten/2/abbrechen', () =>
+      http.post('/api/map/offline-maps/2/cancel', () =>
         HttpResponse.json({ error: 'Download schon fertig' }, { status: 409 }),
       ),
     );
@@ -417,7 +417,7 @@ describe('OfflineKartenVerwaltung', () => {
   it('ein abgelehntes „Jetzt aktualisieren“ steht an seiner Zeile', async () => {
     mockBasis(admin, [karte, kleineKarte]);
     server.use(
-      http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () =>
+      http.post('/api/map/offline-maps/1/update-now', () =>
         HttpResponse.json({ error: 'Kartenbau-Dienst nicht erreichbar' }, { status: 502 }),
       ),
     );
@@ -443,10 +443,10 @@ describe('OfflineKartenVerwaltung', () => {
   it('die nächste Aktion an der Zeile räumt den Grund der vorigen', async () => {
     mockBasis(admin, [karte]);
     server.use(
-      http.delete('/api/karte/offline-karten/1', () =>
+      http.delete('/api/map/offline-maps/1', () =>
         HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 }),
       ),
-      http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () =>
+      http.post('/api/map/offline-maps/1/update-now', () =>
         HttpResponse.json({ phase: 'aktuell' }),
       ),
     );
@@ -473,11 +473,11 @@ describe('OfflineKartenVerwaltung', () => {
     const freigabe = new Promise<void>((r) => (gibFrei = r));
     mockBasis(admin, [karte, kleineKarte]);
     server.use(
-      http.delete('/api/karte/offline-karten/1', async () => {
+      http.delete('/api/map/offline-maps/1', async () => {
         await freigabe;
         return HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 });
       }),
-      http.delete('/api/karte/offline-karten/3', () => new HttpResponse(null, { status: 204 })),
+      http.delete('/api/map/offline-maps/3', () => new HttpResponse(null, { status: 204 })),
     );
     render();
     await screen.findByText('Deutschland – Bayern');
@@ -502,7 +502,7 @@ describe('OfflineKartenVerwaltung', () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+      http.post('/api/map/offline-maps/download', async ({ request }) => {
         postBody = await request.json();
         return HttpResponse.json({ ...karte, status: 'laedt' }, { status: 202 });
       }),
@@ -536,7 +536,7 @@ describe('OfflineKartenVerwaltung', () => {
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     mockBasis(admin);
     server.use(
-      http.get('/api/karte/offline-karten', () =>
+      http.get('/api/map/offline-maps', () =>
         HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 }),
       ),
     );
@@ -565,7 +565,7 @@ describe('OfflineKartenVerwaltung', () => {
     let abrufe = 0;
     mockBasis(admin);
     server.use(
-      http.get('/api/karte/offline-karten', () => {
+      http.get('/api/map/offline-maps', () => {
         abrufe += 1;
         return abrufe === 1
           ? HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 })
@@ -738,7 +738,7 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
     const bodies: unknown[] = [];
     mockBasis(admin);
     server.use(
-      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+      http.put('/api/map/offline-maps/auto-update/settings', async ({ request }) => {
         const b = (await request.json()) as { automatisch: boolean; intervall_stunden: number };
         bodies.push(b);
         return HttpResponse.json({ ...STATUS_VORGABE, ...b });
@@ -761,7 +761,7 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
   it('ein gescheitertes Speichern lässt den Schalter stehen', async () => {
     mockBasis(admin);
     server.use(
-      http.put('/api/karte/offline-karten/aktualisierung/einstellung', () =>
+      http.put('/api/map/offline-maps/auto-update/settings', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -784,7 +784,7 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
     let versuche = 0;
     mockBasis(admin);
     server.use(
-      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+      http.put('/api/map/offline-maps/auto-update/settings', async ({ request }) => {
         versuche += 1;
         if (versuche === 1) return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
         return HttpResponse.json({ ...STATUS_VORGABE, ...((await request.json()) as object) });
@@ -893,7 +893,7 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
       let getroffen = false;
       mockBasis(admin);
       server.use(
-        http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () => {
+        http.post('/api/map/offline-maps/1/update-now', () => {
           getroffen = true;
           return HttpResponse.json({ phase }, { status: code });
         }),

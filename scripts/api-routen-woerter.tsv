@@ -3,24 +3,34 @@
 accept	abnehmen
 accommodation	Unterkunft
 acknowledge	quittieren
+activate	aktivieren
 adapter	-
 admin	-
 animals	Tiere
 api	-
 app-code	-
+archive	Archiv
 assign	zuweisen
 attachments	Anhänge
+attempts	Versuche
 audit	-
 auth	-
+auto-update	automatische Aktualisierung
 backup	-
 briefings	Lagebesprechungen
+build	bauen
+build-status	Baustatus
+buildable-regions	baubare Regionen
 bulk	-
 callback	-
+cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
+catalog	Katalog
 catering	Verpflegung
 channels	Kanäle
 chat	-
+check	prüfen
 check-ins	Rückmeldungen
 code	-
 codes	-
@@ -50,6 +60,7 @@ etb	ETB
 evacuation	Evakuierung
 events	-
 execution	Vollzug
+existing	vorhandene
 export	-
 fetch-certificate	Zertifikat abrufen
 file	Datei
@@ -65,9 +76,11 @@ incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
+intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 ios-push	-
 jwks.json	-
+key	Schlüssel
 lan	-
 live	-
 login	-
@@ -82,12 +95,17 @@ me	-
 messages	Nachrichten
 metrics	Kennzahlen
 mirror	Spiegel
+offline	-
+offline-maps	Offline-Karten
 oidc	-
+online-sources	Online-Quellen
 openapi.json	-
 orders	Befehle
+overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+pause	anhalten
 personnel	Personal
 persons	Personen
 plan	-
@@ -118,12 +136,16 @@ requests	Anträge
 rescind	aufheben
 reset	-
 resource-requests	Nachforderungen
+resume	fortsetzen
 retention	Aufbewahrung
 revise	fortschreiben
+revoke	widerrufen
 seats	Plätze
+secrets	Geheimnisse
 sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen
+settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
 situation	Lage
@@ -155,6 +177,7 @@ uhs	UHS
 undo	zurücknehmen
 units	Einheiten
 unregister	-
+update-now	jetzt aktualisieren
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge
@@ -163,3 +186,4 @@ webauthn	-
 webhook	-
 whereabouts	Verbleib
 withdraw	zurückziehen
+world	Welt

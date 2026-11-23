@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, starteAndroidHuelle } from '../test/huelle';
 import StandortFeld from './StandortFeld';
 
 /** `sofort` am Kontakt des Einheitengeräts (LLH-1580 K6): einmal beim Einhängen ermitteln. */
@@ -45,5 +46,32 @@ describe('StandortFeld sofort', () => {
     render(<StandortFeld onChange={vi.fn()} />);
     await new Promise((r) => setTimeout(r, 10));
     expect(getCurrentPosition).not.toHaveBeenCalled();
+  });
+});
+
+describe('StandortFeld verweigert (LLH-2071)', () => {
+  afterEach(beendeHuelle);
+
+  it('nennt in der App die Einstellungen des Geräts', async () => {
+    starteAndroidHuelle({ bruecke: { postMessage: vi.fn() } });
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (_ok: PositionCallback, fehler: PositionErrorCallback) =>
+          setTimeout(
+            () => fehler({ code: 1, PERMISSION_DENIED: 1 } as GeolocationPositionError),
+            0,
+          ),
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
+      },
+    });
+    render(<StandortFeld sofort onChange={vi.fn()} />);
+    expect(
+      await screen.findByText(
+        'Standortzugriff verweigert – in den Einstellungen des Geräts für Lifeline freigeben, dann erneut einschalten.',
+      ),
+    ).toBeTruthy();
   });
 });

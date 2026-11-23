@@ -16,6 +16,13 @@ Change `t39ltxxi-ios-huelle`.
   Hauptframe und von der Origin des aktiven Servers an; nach einem Wechsel gilt sofort die neue.
   Jeder Server hat seinen eigenen Datenspeicher (`WKWebsiteDataStore(forIdentifier:)` mit der
   UUID des Eintrags).
+- **Standort** (LLH-2071, ADR-0093): `huelle.js` ersetzt `navigator.geolocation` durch die
+  Brücke (`location_current`, `location_watch`, `location_clear`, Rückkanal
+  `__LIFELINE_LOCATION__`). Ob gefragt wird und was geht, entscheidet `Brueckenausfuehrung`, an wen
+  eine Position einer Beobachtung geht, `Standortbeobachtung` (nur an eine Seite des Servers, auf
+  dem sie begann, solange er aktiv ist; Navigation, Schließen und Ende des Web-Prozesses beenden
+  sie). Gefragt wird nur „When in Use“ und erst beim ersten Befehl; die Frist zählt ab der
+  Freigabe. Unterframes sperrt `ios/App/Huelle/unterframe-standort.js` (Code 1).
 - **Wire-Format im Init-Skript:** Kennung `__LIFELINE_HUELLE__` und Befehle der Brücke stehen im
   Kopf von `ios/App/Huelle/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest führt das
   Skript aus (`frontend/src/test/huelle.ts`), eine Änderung zieht die Tests dort mit.
