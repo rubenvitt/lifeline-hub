@@ -65,7 +65,7 @@ async fn lage(app: &axum::Router, cred: &Credentials) -> Option<Value> {
         app,
         cred,
         "GET",
-        "/api/v1/lage?karte=none",
+        "/api/v1/situation?karte=none",
         jetzt(),
         &jti,
         IP,

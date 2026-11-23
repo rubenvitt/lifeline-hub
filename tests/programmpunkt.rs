@@ -357,7 +357,7 @@ async fn lage_der_oeffentlichen_api_traegt_kein_programm() {
         &app,
         &cred,
         "GET",
-        "/api/v1/lage",
+        "/api/v1/situation",
         jetzt(),
         "jti-programm",
         ip,

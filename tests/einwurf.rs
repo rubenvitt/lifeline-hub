@@ -1,6 +1,6 @@
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! Verwaltung unter `/api/admin/einwurf-zugaenge` und die Einwurf-Routen unter
-//! `/api/v1/einwurf/{schluessel}/…`, durch den ganzen Router.
+//! `/api/v1/intake/{schluessel}/…`, durch den ganzen Router.
 //!
 //! Der Zähler für Maschinen und die Drossel gelten prozessweit; jeder Test, der sie berührt,
 //! nimmt eine eigene Quelladresse bzw. einen eigenen Zugang.
@@ -123,7 +123,7 @@ async fn sende(app: &axum::Router, pfad: &str, e: Einwurf<'_>) -> Antwort {
 async fn einwerfen(app: &axum::Router, schluessel: &str, rest: &str) -> Antwort {
     sende(
         app,
-        &format!("/api/v1/einwurf/{schluessel}/{rest}"),
+        &format!("/api/v1/intake/{schluessel}/{rest}"),
         Einwurf::default(),
     )
     .await
@@ -538,7 +538,7 @@ async fn einwurf_landet_in_der_ablage_und_liest_nichts() {
 async fn post_wird_in_jedem_format_roh_abgelegt() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "Divera", "alarmmeldungen:write").await;
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm");
     let json_body = r#"{"external_id": "LS-1", "stichwort": "RD 2"}"#;
     for (typ, body) in [
         ("application/json", json_body.as_bytes().to_vec()),
@@ -579,7 +579,7 @@ async fn post_wird_in_jedem_format_roh_abgelegt() {
 async fn leerer_und_zu_grosser_einwurf_werden_abgelehnt() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm");
 
     let leer = sende(&app, &pfad, Einwurf::default()).await;
     assert_eq!(leer.status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -684,11 +684,11 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
 
     for pfad in [
-        format!("/api/v1/einwurf/{schluessel}"),
-        format!("/api/v1/einwurf/{schluessel}/"),
-        format!("/api/v1/einwurf/{schluessel}/alarmmeldungen"),
-        format!("/api/v1/einwurf/{schluessel}/alarmmeldung/1"),
-        "/api/v1/einwurf".to_string(),
+        format!("/api/v1/intake/{schluessel}"),
+        format!("/api/v1/intake/{schluessel}/"),
+        format!("/api/v1/intake/{schluessel}/alarms"),
+        format!("/api/v1/intake/{schluessel}/alarm/1"),
+        "/api/v1/intake".to_string(),
     ] {
         let antwort = sende(&app, &pfad, Einwurf::default()).await;
         assert_eq!(antwort.status, StatusCode::NOT_FOUND, "{pfad}");
@@ -697,7 +697,7 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     let vorher = anzahl(&pool, "alarmmeldung").await;
     let kopf = sende(
         &app,
-        &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=per-head"),
+        &format!("/api/v1/intake/{schluessel}/alarm?text=per-head"),
         Einwurf {
             methode: "HEAD",
             ..Default::default()
@@ -714,7 +714,7 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     for methode in ["DELETE", "PUT", "PATCH"] {
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{schluessel}/alarmmeldung"),
+            &format!("/api/v1/intake/{schluessel}/alarm"),
             Einwurf {
                 methode,
                 ..Default::default()
@@ -769,7 +769,7 @@ async fn ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403() {
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(liste["transport"], "keiner");
 
-    let pfad = format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a");
+    let pfad = format!("/api/v1/intake/{schluessel}/alarm?text=a");
     let antwort = sende(&app, &pfad, Einwurf::default()).await;
     assert_eq!(antwort.status, StatusCode::FORBIDDEN);
     assert_eq!(antwort.code(), "tls_required");
@@ -796,7 +796,7 @@ async fn ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403() {
         let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{unbekannt}/alarmmeldung?text=a"),
+            &format!("/api/v1/intake/{unbekannt}/alarm?text=a"),
             Einwurf {
                 quelle: Some("198.51.100.202:4000"),
                 ..Default::default()
@@ -899,11 +899,11 @@ async fn zehn_unbekannte_schluessel_sperren_die_quelle_nur_auf_den_maschinenwege
     };
     for _ in 0..10 {
         let unbekannt = lifeline_hub::public_api::einwurf::neuer_schluessel();
-        let antwort = von(format!("/api/v1/einwurf/{unbekannt}/alarmmeldung?text=a")).await;
+        let antwort = von(format!("/api/v1/intake/{unbekannt}/alarm?text=a")).await;
         assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
     }
     // Auch mit gültigem Schlüssel ist die Quelle jetzt gesperrt.
-    let antwort = von(format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a")).await;
+    let antwort = von(format!("/api/v1/intake/{schluessel}/alarm?text=a")).await;
     assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(antwort.code(), "rate_limited");
     assert!(antwort.headers.contains_key(header::RETRY_AFTER));
@@ -936,7 +936,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     for _ in 0..12 {
         let antwort = sende(
             &app,
-            &format!("/api/v1/einwurf/{alt}/alarmmeldung?text=a"),
+            &format!("/api/v1/intake/{alt}/alarm?text=a"),
             Einwurf {
                 quelle: Some(quelle),
                 ..Default::default()
@@ -948,7 +948,7 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     // Derselbe Absender hinter derselben Adresse mit dem neuen Schlüssel: geht.
     let antwort = sende(
         &app,
-        &format!("/api/v1/einwurf/{gueltig}/alarmmeldung?text=a"),
+        &format!("/api/v1/intake/{gueltig}/alarm?text=a"),
         Einwurf {
             quelle: Some(quelle),
             ..Default::default()
@@ -980,7 +980,7 @@ async fn abgeloeste_schluessel_zaehlen_nicht_im_maschinenzaehler() {
         async move {
             sende(
                 &app,
-                &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a"),
+                &format!("/api/v1/intake/{schluessel}/alarm?text=a"),
                 Einwurf {
                     quelle: Some(quelle),
                     ..Default::default()
@@ -1122,7 +1122,7 @@ async fn position_haengt_an_der_kennung_und_ersetzt_ohne_verlauf() {
     // POST mit Formular und eine zweite Kennung.
     let antwort = sende(
         &app,
-        &format!("/api/v1/einwurf/{schluessel}/position"),
+        &format!("/api/v1/intake/{schluessel}/position"),
         Einwurf {
             methode: "POST",
             body: Some((

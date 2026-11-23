@@ -1,10 +1,10 @@
-//! Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0022,
+//! Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0093,
 //! Doku `docs/api/maschinenzugang.md`).
 //!
 //! Ablauf:
 //! 1. Ein Admin legt unter „Anbindungen“ einen Zugang an und gibt den Einmal-Code weiter.
 //! 2. [`prepare_redeem`] erzeugt aus dem Code und einem neuen Schlüssel die Anfrage an
-//!    `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.
+//!    `POST /api/v1/access/redeem`. Der Code selbst geht nie über die Leitung.
 //! 3. [`finish_redeem`] prüft die Antwort und liefert die [`Credentials`] (Schlüsseldatei).
 //! 4. Jede Anfrage trägt `Authorization: Machine <jws>` aus [`Credentials::sign_request`].
 //! 5. Eine Webhook-Zustellung prüft [`Credentials::verify_webhook`] (LLH-1656).
@@ -34,7 +34,7 @@ pub const TYP_EVENT: &str = "lifeline-event+jwt";
 /// Höchste Lebensdauer der Signatur einer Webhook-Zustellung in Sekunden.
 pub const EVENT_LIFETIME_S: i64 = 300;
 
-/// Wert von `?karte=`, mit dem `GET /api/v1/lage` die Karte weglässt.
+/// Wert von `?karte=`, mit dem `GET /api/v1/situation` die Karte weglässt.
 pub const KARTE_NONE: &str = "none";
 /// Höchste Lebensdauer eines Tokens in Sekunden.
 pub const LIFETIME_S: i64 = 60;
@@ -207,7 +207,7 @@ impl Jwk {
     }
 }
 
-/// Body von `POST /api/v1/zugang/redeem`.
+/// Body von `POST /api/v1/access/redeem`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedeemRequest {
     pub lookup: String,
@@ -215,7 +215,7 @@ pub struct RedeemRequest {
     pub proof: String,
 }
 
-/// Antwort auf `POST /api/v1/zugang/redeem`.
+/// Antwort auf `POST /api/v1/access/redeem`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedeemResponse {
     pub zugang_id: String,

@@ -1,6 +1,6 @@
 use utoipa::OpenApi;
 
-/// Das Dokument des Frontends bleibt ohne Pfade (ADR-0004, ADR-0022): Pfade mit Vertrag hat nur
+/// Das Dokument des Frontends bleibt ohne Pfade (ADR-0004, ADR-0093): Pfade mit Vertrag hat nur
 /// die öffentliche API (`docs/api/public-v1.json`).
 #[test]
 fn frontend_dokument_hat_keine_pfade() {

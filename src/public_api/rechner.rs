@@ -1,6 +1,6 @@
 //! Rechner-API Unterkunft und Zelte für Fremdsysteme (LLH-1524, Spec `rechner-api-unterkunft`):
-//! `POST /api/v1/rechner/unterkunft` rechnet und speichert nichts,
-//! `GET /api/v1/rechner/unterkunft/richtwerte` nennt die wirksamen Richtwerte. Beide verlangen den
+//! `POST /api/v1/calculators/accommodation` rechnet und speichert nichts,
+//! `GET /api/v1/calculators/accommodation/reference-values` nennt die wirksamen Richtwerte. Beide verlangen den
 //! Scope `rechner:use` und antworten signiert.
 //!
 //! Hier stehen die Wire-Formen und die Prüfung der Anfrage; gerechnet wird in
@@ -220,7 +220,7 @@ pub struct ZelteAngabe {
     pub frauen: Option<Werte>,
 }
 
-/// Body von `POST /api/v1/rechner/unterkunft`: `weg`, `trennung` und genau der Block des Wegs.
+/// Body von `POST /api/v1/calculators/accommodation`: `weg`, `trennung` und genau der Block des Wegs.
 /// Ein unbekanntes Feld ist 400. Der ganze Body ist höchstens 64 KiB groß.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -242,7 +242,7 @@ pub struct UnterkunftRequest {
     #[schema(value_type = Option<ZelteAngabe>)]
     pub zelte: Option<ObjectOnly<ZelteAngabe>>,
     /// Richtwerte nur für diese Anfrage, Schlüssel → Wert. Schlüssel und Grenzen nennt
-    /// `GET /api/v1/rechner/unterkunft/richtwerte`.
+    /// `GET /api/v1/calculators/accommodation/reference-values`.
     #[schema(value_type = Option<HashMap<String, f64>>)]
     pub richtwerte: Option<Werte>,
     /// Einsatz, dessen Richtwerte gelten sollen. Nur ein Einsatz, den die Einsatzleitung für den
@@ -358,7 +358,7 @@ pub struct RichtwertWirksam {
     pub herkunft: RichtwertEbene,
 }
 
-/// Antwort auf `POST /api/v1/rechner/unterkunft`.
+/// Antwort auf `POST /api/v1/calculators/accommodation`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UnterkunftResponse {
     pub ergebnis: UnterkunftErgebnis,
@@ -395,7 +395,7 @@ pub struct RichtwertAuskunft {
     pub herkunft: RichtwertEbene,
 }
 
-/// Antwort auf `GET /api/v1/rechner/unterkunft/richtwerte`.
+/// Antwort auf `GET /api/v1/calculators/accommodation/reference-values`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UnterkunftRichtwerteResponse {
     /// Stand der Basis (`JJJJ-MM-TT`).
@@ -999,7 +999,7 @@ async fn load_requested_einsatz_werte(
     }
 }
 
-/// Abfrage von `GET /api/v1/rechner/unterkunft/richtwerte`. Der Wert kommt als Text und wird im
+/// Abfrage von `GET /api/v1/calculators/accommodation/reference-values`. Der Wert kommt als Text und wird im
 /// Handler geprüft, damit ein falscher Wert den Code `invalid_field` bekommt (wie `after` in
 /// `super::events`).
 #[derive(Debug, Deserialize)]
@@ -1024,7 +1024,7 @@ fn parse_einsatz_id(roh: Option<&str>) -> Result<Option<i64>, ApiError> {
 /// Einsatz nimmt die Rechnung nur, wenn die Einsatzleitung ihn für den Zugang freigegeben hat.
 #[utoipa::path(
     post,
-    path = "/api/v1/rechner/unterkunft",
+    path = "/api/v1/calculators/accommodation",
     tag = "Rechner",
     operation_id = "calculate_unterkunft",
     security(("machine" = [])),
@@ -1060,7 +1060,7 @@ pub async fn calculate_unterkunft(
 /// Einsatzleitung ihn für den Zugang freigegeben hat.
 #[utoipa::path(
     get,
-    path = "/api/v1/rechner/unterkunft/richtwerte",
+    path = "/api/v1/calculators/accommodation/reference-values",
     tag = "Rechner",
     operation_id = "get_unterkunft_richtwerte",
     security(("machine" = [])),

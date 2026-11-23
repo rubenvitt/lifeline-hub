@@ -1,4 +1,4 @@
-//! Anmeldung eines Fremdsystems an der öffentlichen API (LLH-1652, ADR-0022, Spec
+//! Anmeldung eines Fremdsystems an der öffentlichen API (LLH-1652, ADR-0093, Spec
 //! `maschinenzugang`, design.md D3, D8): der Extractor [`MachineClient`].
 //!
 //! Jede Anfrage trägt `Authorization: Machine <jws>` (Profil `signatur::MACHINE`). Geprüft wird

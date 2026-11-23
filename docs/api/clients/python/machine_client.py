@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Referenz-Beispiel für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0022,
+"""Referenz-Beispiel für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0093,
 Doku docs/api/maschinenzugang.md). Braucht nur `cryptography` (pip install cryptography).
 
     python3 machine_client.py --selftest          # gegen docs/api/machine-auth-testvektoren.json
@@ -112,7 +112,7 @@ def redeem(base_url: str, code: str, key: Ed25519PrivateKey | None = None) -> di
     lookup, k_redeemer, k_issuer = derive_code(code)
     anfrage = {"lookup": lookup, "public_key": {"kty": "OKP", "crv": "Ed25519", "x": pub},
                "proof": mac(k_redeemer, transcript(b"machine-einloeser", lookup, pub))}
-    req = urllib.request.Request(base_url.rstrip("/") + "/api/v1/zugang/redeem", data=compact(anfrage),
+    req = urllib.request.Request(base_url.rstrip("/") + "/api/v1/access/redeem", data=compact(anfrage),
                                  headers={"Content-Type": "application/json"}, method="POST")
     antwort = json.load(urllib.request.urlopen(req))
     return finish_redeem(lookup, k_issuer, key, pub, base_url, antwort)

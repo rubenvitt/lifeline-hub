@@ -1,6 +1,6 @@
 # Maschinenzugang: Fremdsysteme an Lifeline Hub anbinden
 
-Stand: 12.11.2026 · LLH-1652, LLH-1638, LLH-1524 · Regeln: [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Stand: 12.11.2026 · LLH-1652, LLH-1638, LLH-1524 · Regeln: [ADR-0093](../architektur/entscheidungen/ADR-0093-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec `maschinenzugang`, Vertrag der API: [`public-v1.json`](public-v1.json).
 
 Ein Fremdsystem (Alarm-Adapter, Lagemonitor, Einsatzbuch, Rechner) meldet sich mit einem eigenen
@@ -35,12 +35,12 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 
 | Scope                  | Darf                                          |
 | ---------------------- | --------------------------------------------- |
-| `lage:read`            | Lage lesen (`GET /api/v1/lage`)               |
-| `einsaetze:read`       | Einsätze lesen (`GET /api/v1/einsaetze`)      |
+| `lage:read`            | Lage lesen (`GET /api/v1/situation`)               |
+| `einsaetze:read`       | Einsätze lesen (`GET /api/v1/incidents`)      |
 | `events:read`          | Ereignisse abrufen (`GET /api/v1/events`)     |
 | `alarmmeldungen:write` | Alarmmeldungen als Vorschlag einliefern       |
 | `positionen:write`     | Positionen einliefern                         |
-| `rechner:use`          | Rechner nutzen (`/api/v1/rechner/unterkunft`) |
+| `rechner:use`          | Rechner nutzen (`/api/v1/calculators/accommodation`) |
 
 Lese-Scopes mit Einsatzbezug (`lage:read`, `einsaetze:read`) sehen nur den Einsatz, den die
 Einsatzleitung für den Zugang freigegeben hat; siehe „Lage lesen“ und „Einsätze lesen“. Dieselbe
@@ -70,7 +70,7 @@ Der Code selbst geht nie über die Leitung. Aus ihm werden drei Werte abgeleitet
 4. **Prüfwerte:** HMAC-SHA256, Base64url ohne Auffüllung.
 
 ```http
-POST /api/v1/zugang/redeem
+POST /api/v1/access/redeem
 Content-Type: application/json
 
 {"lookup": "<lookup>",
@@ -144,12 +144,12 @@ Jede erfolgreiche Antwort einer angemeldeten Anfrage trägt den Kopf `Lifeline-S
 mit `typ` `lifeline-machine-response+jwt`, `kid` = `instanz_id` und den Claims `iss`
 (`instanz_id`), `aud` (`zugang_id`), `iat`, `exp`, `jti`, `req` (die `jti` der Anfrage),
 `status` und `bh` (SHA-256 des Antwort-Bodys, wie empfangen). Geprüft wird gegen
-`instanz_public_key` aus dem Einlösen; `GET /api/v1/instanz/jwks.json` dient nur dem Wechsel des
+`instanz_public_key` aus dem Einlösen; `GET /api/v1/instance/jwks.json` dient nur dem Wechsel des
 Instanzschlüssels. Die Prüfung ist freiwillig, aber empfohlen.
 
 ## Lage lesen
 
-`GET /api/v1/lage` mit dem Scope `lage:read` liefert das Lagebild genau eines Einsatzes: Kopf,
+`GET /api/v1/situation` mit dem Scope `lage:read` liefert das Lagebild genau eines Einsatzes: Kopf,
 Zahlen zu Betroffenen und Kräften, Belegung der Unfallhilfsstellen, offene Sofortmeldungen als
 Zahl, die Lagemeldung und die Lagekarte. Namen, Personenkennungen und freie Notizen kommen nicht
 vor. Gedacht ist die Route für Anzeigen wie den Lagemonitor im Führungskraftwagen.
@@ -221,11 +221,11 @@ jedes Features; unbekannte Arten überspringt ein Client.
 Die Karte ändert sich selten und ist der größte Teil der Antwort. `karte_etag` nennt ihre
 Fassung:
 
-- `GET /api/v1/lage?karte=<karte_etag>`: Gleicht die genannte Fassung der aktuellen, fehlt
+- `GET /api/v1/situation?karte=<karte_etag>`: Gleicht die genannte Fassung der aktuellen, fehlt
   `karte`, und `karte_etag` bleibt. Sonst kommt die neue Karte mit neuer Fassung.
-- `GET /api/v1/lage?karte=none`: weder `karte` noch `karte_etag`.
+- `GET /api/v1/situation?karte=none`: weder `karte` noch `karte_etag`.
 
-Die Abfrage gehört zum signierten Pfad (`htu` ist `/api/v1/lage?karte=…`).
+Die Abfrage gehört zum signierten Pfad (`htu` ist `/api/v1/situation?karte=…`).
 
 **Prüfen am Terminal.** Ob Anbindung und Freigabe stehen, zeigt
 
@@ -244,7 +244,7 @@ Mit dem Scope `einsaetze:read` liest ein Fremdsystem den Kopf des Einsatzes, den
 Einsatzleitung für seinen Zugang freigegeben hat (Freigabe wie bei „Lage lesen“). Gedacht ist das
 für ein Einsatzbuch, das Stichwort, Ort und Nummern führt.
 
-`GET /api/v1/einsaetze` liefert die Liste und einen Cursor für die Ereignisse:
+`GET /api/v1/incidents` liefert die Liste und einen Cursor für die Ereignisse:
 
 ```json
 {
@@ -270,14 +270,14 @@ für ein Einsatzbuch, das Stichwort, Ort und Nummern führt.
 - `stichwort`, `einsatznummer`, `leitstellen_nr`, `einsatzort` und `koordinate` fehlen, wenn sie
   leer sind. `koordinate` ist WGS 84.
 - Sachverhalt, meldende Stelle, Zahl der Betroffenen, Personen und Mitglieder kommen nicht vor.
-- `GET /api/v1/einsaetze/{id}` liefert denselben Einsatz einzeln. Für jeden anderen Einsatz kommt
+- `GET /api/v1/incidents/{id}` liefert denselben Einsatz einzeln. Für jeden anderen Einsatz kommt
   `404 not_found`, gleich ob er nicht freigegeben, abgeschlossen, fremd oder unbekannt ist.
 
 ## Ereignisse abrufen
 
 Mit dem Scope `events:read` erfährt ein Fremdsystem, dass sich an seinem freigegebenen Einsatz
 etwas getan hat. Ein Ereignis sagt nur, **was** sich geändert hat; den Inhalt liest der Client
-danach über `GET /api/v1/einsaetze` oder `GET /api/v1/lage`.
+danach über `GET /api/v1/incidents` oder `GET /api/v1/situation`.
 
 ```http
 GET /api/v1/events?after=4711&wait=25
@@ -310,8 +310,8 @@ den Stand neu aufbauen (Schritt 1 der Schleife).
 **Die Schleife:**
 
 1. Beim ersten Start den Stand aufbauen und den `cursor` merken: mit `einsaetze:read` über
-   `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und danach
-   `GET /api/v1/lage`. In dieser Reihenfolge, damit keine Änderung zwischen Stand und Cursor fällt.
+   `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und danach
+   `GET /api/v1/situation`. In dieser Reihenfolge, damit keine Änderung zwischen Stand und Cursor fällt.
 2. `GET /api/v1/events?after=<cursor>&wait=25` aufrufen. Der Abruf bleibt höchstens 25 Sekunden
    offen und antwortet, sobald ein Ereignis vorliegt (binnen etwa einer Sekunde).
 3. Die Ereignisse verarbeiten, den neuen `cursor` merken, weiter bei 2. Auch eine leere Antwort
@@ -366,14 +366,14 @@ def get(cred, path):
 
 
 cred = json.load(open("lifeline-zugang.json", encoding="utf-8"))
-cursor = get(cred, "/api/v1/einsaetze")[0]["cursor"]
+cursor = get(cred, "/api/v1/incidents")[0]["cursor"]
 while True:
     try:
         antwort, warten = get(cred, f"/api/v1/events?after={cursor}&wait=25")
     except urllib.error.HTTPError as e:
         if e.code != 410:
             raise
-        cursor = get(cred, "/api/v1/einsaetze")[0]["cursor"]  # cursor_expired: neu aufbauen
+        cursor = get(cred, "/api/v1/incidents")[0]["cursor"]  # cursor_expired: neu aufbauen
         continue
     cursor = antwort["cursor"]
     for ereignis in antwort["events"]:
@@ -407,7 +407,7 @@ Lifeline-Signature: eyJhbGciOiJFZERTQSIsInR5cCI6ImxpZmVsaW5lLWV2ZW50K2p3dCIsImtp
 - Claims: `iss` (Instanzkennung), `aud` (Kennung des Webhooks, steht in der Ansicht unter
   „Webhook-Kennung (aud)“), `iat`, `exp` (höchstens 300 s nach `iat`), `jti` (je Versuch neu),
   `bh` (SHA-256 der empfangenen Bytes, Base64url).
-- Geprüft wird gegen den **Instanzschlüssel aus dem Einlösen**; `GET /api/v1/instanz/jwks.json`
+- Geprüft wird gegen den **Instanzschlüssel aus dem Einlösen**; `GET /api/v1/instance/jwks.json`
   hilft nur beim Schlüsselwechsel. Ein HMAC-Geheimnis gibt es nicht.
 - Wegen `aud` taugt eine Zustellung nur für diesen Webhook: Wer sie an einen anderen Empfänger
   weiterreicht, fällt dort durch.
@@ -464,7 +464,7 @@ def empfange(kopf: str, body: bytes) -> dict:
 - Nach **24 Stunden ohne Erfolg** hält die Instanz den Webhook an; die Seite „Anbindungen“ zeigt
   ihn als angehalten. Ein Admin nimmt ihn wieder auf. Liegt der Rückstand dann noch in der
   Outbox (sieben Tage), kommt er der Reihe nach; sonst setzt der Webhook beim aktuellen Stand an,
-  und der Empfänger liest den Stand über `GET /api/v1/einsaetze` und `GET /api/v1/lage` neu.
+  und der Empfänger liest den Stand über `GET /api/v1/incidents` und `GET /api/v1/situation` neu.
 
 **Testereignis:** „Testereignis senden“ in der Ansicht schickt `{"type":"ping","occurred_at":"…"}`,
 gleich signiert, ohne `Lifeline-Event-Id`. Ein Empfänger, der unbekannte Arten überspringt und
@@ -500,7 +500,7 @@ Mit dem Scope `rechner:use` rechnet ein Fremdsystem eine Unterkunft durch, mit d
 wie der Rechner der Oberfläche (LLH-1524, Spec `rechner-api-unterkunft`). Die Rechnung speichert
 nichts.
 
-`POST /api/v1/rechner/unterkunft` nimmt `weg` (`personen`, `raeume`, `flaeche` oder `zelte`),
+`POST /api/v1/calculators/accommodation` nimmt `weg` (`personen`, `raeume`, `flaeche` oder `zelte`),
 `trennung` (Männer und Frauen getrennt) und genau den Block des Wegs:
 
 ```json
@@ -543,13 +543,13 @@ Organisation keine eigenen Werte gesetzt hat.
 4. sonst die Vorgabe des Programms (`basis`).
 
 Schlüssel, Bezeichnung, Einheit und Grenzen jedes Richtwerts und die Zelttypen nennt
-`GET /api/v1/rechner/unterkunft/richtwerte`, mit `?einsatz_id=<id>` samt den Werten des Einsatzes.
+`GET /api/v1/calculators/accommodation/reference-values`, mit `?einsatz_id=<id>` samt den Werten des Einsatzes.
 
 **Werte eines Einsatzes** (LLH-1856). Die Rechnung nimmt sie mit `"einsatz_id": <id>` im Body, die
 Auskunft mit `?einsatz_id=<id>`. Das geht nur für den Einsatz, den die Einsatzleitung für den
 Zugang freigegeben hat (wie bei „Lage lesen“), und nur, solange er läuft. Freigeben lässt sich ein
 Zugang mit `lage:read` oder `einsaetze:read`; für einen Rechner-Zugang empfiehlt sich
-`einsaetze:read`, denn `GET /api/v1/einsaetze` nennt die `id` des freigegebenen Einsatzes. Jeder
+`einsaetze:read`, denn `GET /api/v1/incidents` nennt die `id` des freigegebenen Einsatzes. Jeder
 andere Einsatz, ob nicht freigegeben, abgeschlossen, fremd oder unbekannt, ergibt stets dieselbe
 `404 not_found`. Ohne `einsatz_id` (oder mit `null`) bleibt der Einsatz außen vor.
 

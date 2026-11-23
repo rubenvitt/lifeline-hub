@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Was ein Anmeldeprofil nach ADR-0034 festlegt: `typ` von Anfrage und Antwort, das Schema im
 /// Kopf `Authorization` und den Kopf der Antwortsignatur. Instanzen und Fremdsysteme
-/// (Maschinenzugang, ADR-0022) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
+/// (Maschinenzugang, ADR-0093) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
 /// Token des einen Profils scheitert am anderen schon am `typ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Profil {
@@ -30,7 +30,7 @@ pub const INSTANZ: Profil = Profil {
     antwort_kopf: "lifeline-instanz-antwort",
 };
 
-/// Fremdsysteme an der öffentlichen API (`/api/v1/`, ADR-0022). Wire-Namen sind Technik und
+/// Fremdsysteme an der öffentlichen API (`/api/v1/`, ADR-0093). Wire-Namen sind Technik und
 /// deshalb englisch (Konzept D9).
 pub const MACHINE: Profil = Profil {
     typ_anfrage: "lifeline-machine+jwt",

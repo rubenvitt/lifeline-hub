@@ -75,7 +75,7 @@ pub async fn einloesen(
     let (s, _, bytes) = senden(
         app,
         "POST",
-        "/api/v1/zugang/redeem",
+        "/api/v1/access/redeem",
         None,
         serde_json::to_vec(&anfrage).unwrap(),
         ip,

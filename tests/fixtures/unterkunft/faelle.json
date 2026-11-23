@@ -1,5 +1,5 @@
 {
-  "_zweck": "Gemeinsame Testfälle des Unterkunfts- und Zeltrechners (LLH-1520, design.md D1). Gelesen von frontend/src/betreuung/unterkunft/rechnerFixture.test.ts und vom Rust-Kern der Rechner-API (LLH-1524, src/public_api/rechner/tests.rs); jede eingabe ist zugleich eine gültige Anfrage an POST /api/v1/rechner/unterkunft. Je Fall: eingabe, richtwerte (Overrides über der Basis aus src/unterkunft/richtwerte_basis.json) und das vollständige erwartete Ergebnis. bezug nennt den Befund aus LLH-1519 (W1–W9) oder die Grenze, die der Fall festhält.",
+  "_zweck": "Gemeinsame Testfälle des Unterkunfts- und Zeltrechners (LLH-1520, design.md D1). Gelesen von frontend/src/betreuung/unterkunft/rechnerFixture.test.ts und vom Rust-Kern der Rechner-API (LLH-1524, src/public_api/rechner/tests.rs); jede eingabe ist zugleich eine gültige Anfrage an POST /api/v1/calculators/accommodation. Je Fall: eingabe, richtwerte (Overrides über der Basis aus src/unterkunft/richtwerte_basis.json) und das vollständige erwartete Ergebnis. bezug nennt den Befund aus LLH-1519 (W1–W9) oder die Grenze, die der Fall festhält.",
   "faelle": [
     {
       "name": "personen_getrennt_50_50",

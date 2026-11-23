@@ -2090,7 +2090,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
         // dem Link (`lagebild_extern::LagebildZugriff`), IP-Sperre wie die Gerätekopplung.
         .route(
-            "/api/extern/v1/lagebild",
+            "/api/external/v1/situation-picture",
             get(routes::lagebild_extern::abruf),
         )
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
@@ -3198,23 +3198,23 @@ mod tests {
     fn pfad_fuer_das_log_traegt_keinen_einwurf_schluessel() {
         let schluessel = crate::public_api::einwurf::neuer_schluessel();
         assert_eq!(
-            pfad_fuer_protokoll(&format!("/api/v1/einwurf/{schluessel}/alarmmeldung")),
-            "/api/v1/einwurf/***/alarmmeldung"
+            pfad_fuer_protokoll(&format!("/api/v1/intake/{schluessel}/alarm")),
+            "/api/v1/intake/***/alarm"
         );
         // Ein Schlüssel nahe der Längengrenze: maskiert passt der Pfad, also wird er nicht gekürzt.
         let lang = format!("/{}/{schluessel}/x", "a".repeat(PFAD_MAX_ZEICHEN - 20));
         let maskiert = pfad_fuer_protokoll(&lang);
         assert!(maskiert.ends_with("/***/x"), "{maskiert}");
         // Ein langer Pfad mit Schlüssel am Anfang: maskiert und gekürzt.
-        let sehr_lang = format!("/api/v1/einwurf/{schluessel}/{}", "a".repeat(400));
+        let sehr_lang = format!("/api/v1/intake/{schluessel}/{}", "a".repeat(400));
         let gekuerzt = pfad_fuer_protokoll(&sehr_lang);
         assert!(
-            gekuerzt.starts_with("/api/v1/einwurf/***/aaa"),
+            gekuerzt.starts_with("/api/v1/intake/***/aaa"),
             "{gekuerzt}"
         );
         assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN);
         // Auch ohne Schrägstrich vor dem Schlüssel.
-        let pfad = format!("/api/v1/einwurf{schluessel}/alarmmeldung");
+        let pfad = format!("/api/v1/intake{schluessel}/alarm");
         let verklebt = pfad_fuer_protokoll(&pfad);
         assert!(!verklebt.contains(&schluessel[7..]), "{verklebt}");
     }
@@ -3291,7 +3291,7 @@ mod tests {
             async move {
                 let mut req = Request::builder()
                     .uri(format!(
-                        "/api/v1/einwurf/{schluessel}/alarmmeldung?text=GEHEIMER-ALARMTEXT"
+                        "/api/v1/intake/{schluessel}/alarm?text=GEHEIMER-ALARMTEXT"
                     ))
                     .body(Body::empty())
                     .unwrap();
@@ -3318,7 +3318,7 @@ mod tests {
 
         let log = puffer.text();
         assert!(
-            log.contains("pfad=/api/v1/einwurf/***/alarmmeldung"),
+            log.contains("pfad=/api/v1/intake/***/alarm"),
             "der Span nennt den maskierten Pfad:\n{log}"
         );
         for schluessel in unbekannte.iter().chain([&gueltig]) {

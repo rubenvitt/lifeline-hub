@@ -1,5 +1,5 @@
 /**
- * Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0022,
+ * Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0093,
  * Doku `docs/api/maschinenzugang.md`). Nur WebCrypto, keine Abhängigkeit, für Node ab 22. Die API
  * erlaubt kein CORS; Browser-Clients fremder Seiten gibt es nicht.
  *

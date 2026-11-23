@@ -520,7 +520,7 @@ sequenceDiagram
 
 Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
 eigenen Tabellen (LLH-1652,
-[ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+[ADR-0093](entscheidungen/ADR-0093-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
 Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 
 ```mermaid
@@ -530,7 +530,7 @@ sequenceDiagram
   participant F as Fremdsystem (crates/lifeline-machine-client)
   Admin->>Hub: POST /api/admin/anbindungen {name, scopes}
   Hub-->>Admin: Code (16 Zeichen, 15 min)
-  F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
+  F->>Hub: POST /api/v1/access/redeem {lookup, public_key, proof}
   Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
   Hub-->>F: zugang_id, instanz_id, Instanzschlüssel, Prüfwert
   F->>Hub: GET /api/v1/me (Authorization: Machine)
@@ -560,7 +560,7 @@ sequenceDiagram
   participant A as Absender (BOSWatch, FE2, OsmAnd)
   Admin->>Hub: POST /api/admin/einwurf-zugaenge {name, scope}
   Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
-  A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
+  A->>Hub: GET /api/v1/intake/<schlüssel>/alarm?…
   Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
   Hub->>Hub: ablage: roh ablegen oder als Wiederholung vermerken
   Hub-->>A: 204 ohne Body (Cache-Control: no-store)
@@ -603,7 +603,7 @@ sequenceDiagram
   Hub->>DB: nach einer Sekunde erneut lesen
   DB-->>Hub: einsatz.updated (4712)
   Hub-->>F: {cursor: 4712, events: [...]} (Lifeline-Signature)
-  F->>Hub: GET /api/v1/einsaetze/42
+  F->>Hub: GET /api/v1/incidents/42
   Hub-->>F: Einsatzkopf
 ```
 
@@ -621,8 +621,8 @@ sequenceDiagram
 - Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
   (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
   `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
-  baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
-  `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
+  baut neu auf: mit `einsaetze:read` über `GET /api/v1/incidents`, sonst über
+  `GET /api/v1/events` ohne `after` und `GET /api/v1/situation`. Stand und Zeilen liest der Abruf aus
   einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
 
 ## 6.6g Adapter ruft ab
