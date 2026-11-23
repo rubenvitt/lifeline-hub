@@ -27,6 +27,7 @@ import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
 import { Status, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
+import IosPushHubBand from '../instanz/IosPushHubBand';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -748,6 +749,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           <FuehrungHinweisband einsatz={einsatz} />
         </EinsatzAnzeigeProvider>
       )}
+      {/* LLH-2074: das Push-Relais sperrt einen Hub, über den die Hinweise reisen; nur Einsatzleitung
+         und Admins der Einsatz-Org sehen es (im Band geprüft). */}
+      {einsatz?.ios_push_hub_gesperrt?.length ? (
+        <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+          <IosPushHubBand einsatz={einsatz} />
+        </EinsatzAnzeigeProvider>
+      ) : null}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"

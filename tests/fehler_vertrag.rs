@@ -317,7 +317,7 @@ async fn ablehnung_je_zeile_liefert_422_im_fehler_envelope_mit_zeilen() {
 }
 
 /// Instanzkopplung (LLH-1490): die Ablehnung einer unsignierten oder zu großen Anfrage an
-/// `/api/instanz/melden` und eines falschen Codes an `/api/instanz/koppeln` kommt im Envelope.
+/// `/api/instance/check-in` und eines falschen Codes an `/api/instance/pair` kommt im Envelope.
 #[tokio::test]
 async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
     let app = common::setup().await;
@@ -326,7 +326,7 @@ async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/melden")
+                .uri("/api/instance/check-in")
                 .header(header::AUTHORIZATION, "Instanz kaputt")
                 .body(Body::from("{}"))
                 .unwrap(),
@@ -340,7 +340,7 @@ async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/koppeln")
+                .uri("/api/instance/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     r#"{"suche":"x","jti":"j","protokoll":1,"kennung":"k","schluessel":"s",

@@ -98,6 +98,8 @@ export type InstanzProtokoll = S['InstanzProtokoll'];
 export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
 export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
 export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
+/** Ein Hub, dessen iOS-Push das Relais sperrt (LLH-2074). */
+export type IosPushHubSperre = S['IosPushHubSperre'];
 export type EinsatzVerwahrungAnzeige = S['EinsatzVerwahrungAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
 export type AbgelehnterAntragAnzeige = S['AbgelehnterAntragAnzeige'];

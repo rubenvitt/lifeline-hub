@@ -96,7 +96,7 @@ pub struct MeldenOrg {
 /// Meldung.
 pub const UNTERSCHRIFT_ANFRAGE_BYTES: usize = 12 * 1024;
 
-/// Body von `POST /api/instanz/melden`.
+/// Body von `POST /api/instance/check-in`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeldenAnfrage {
     pub name: String,
@@ -195,6 +195,13 @@ pub struct MeldenAntwort {
     /// älterer Stand nennt es nicht: dann `false`.
     #[serde(default)]
     pub ios_push: bool,
+    /// Seit wann das Push-Relais die erreichte Seite sperrt (`ios_push_relais.gesperrt_at`, UTC;
+    /// LLH-2074). Nur mit iOS-Push; die Sperre zählt, bis wieder ein Versand durchgeht, auch nach
+    /// Ablauf von `SPERRE_GILT_STUNDEN`. Die meldende Seite zeigt sie der Einsatzleitung, pusht
+    /// aber nicht selbst: die Geräte sind am Hub angemeldet. Ein älterer Stand nennt es nicht:
+    /// dann nicht gesperrt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ios_push_gesperrt_seit: Option<String>,
     /// Die erreichte Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7); wie
     /// [`MeldenAnfrage::rolle_mitarbeit`].
     #[serde(default)]
@@ -256,6 +263,24 @@ pub fn normalize_adresse(eingabe: &str) -> Result<String, AppError> {
     }
     basis.push_str(url.path().trim_end_matches('/'));
     Ok(basis)
+}
+
+/// Text, wenn das Gegenüber einen Weg der Kopplung nicht kennt (unsigniertes 404): Es hat einen
+/// anderen Softwarestand, etwa vor oder nach den englischen Routen (LLH-2053).
+pub const ANDERER_STAND: &str = "Die andere Instanz kennt diesen Weg nicht, vermutlich hat sie \
+     einen anderen Softwarestand. Beide Instanzen auf denselben Stand bringen.";
+
+/// Deutet eine Antwort ohne Signatur auf `pfad`. Melden kennt jeder Stand, ein 404 dort heißt
+/// also: anderer Weg, anderer Stand ([`ANDERER_STAND`]); auf anderen Wegen kann ein 404 auch
+/// „nicht gefunden“ heißen und bleibt, wie es ist.
+fn deute_unsigniert(pfad: &str, status: u16, text: String) -> SendError {
+    if (200..300).contains(&status) {
+        SendError::AntwortUngueltig("ohne Signatur".into())
+    } else if status == 404 && pfad == MELDEN_PFAD {
+        SendError::Abgelehnt(status, ANDERER_STAND.into())
+    } else {
+        SendError::Abgelehnt(status, text)
+    }
 }
 
 /// Warum eine Nachricht an das Gegenüber scheiterte.
@@ -347,9 +372,9 @@ pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
 }
 
 /// Pfad der signierten Aussage über das TLS-Zertifikat (design.md D3).
-pub const ZERTIFIKAT_PFAD: &str = "/api/instanz/zertifikat";
+pub const ZERTIFIKAT_PFAD: &str = "/api/instance/certificate";
 
-/// Antwort auf `POST /api/instanz/zertifikat`: der Fingerabdruck des Zertifikats, das die
+/// Antwort auf `POST /api/instance/certificate`: der Fingerabdruck des Zertifikats, das die
 /// erreichte Seite gerade zeigt, von ihr signiert.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZertifikatAussage {
@@ -554,11 +579,7 @@ async fn send_signed_mit<A: Serialize, T: DeserializeOwned>(
             .ok()
             .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_string))
             .unwrap_or_default();
-        return Err(if (200..300).contains(&status) {
-            SendError::AntwortUngueltig("ohne Signatur".into())
-        } else {
-            SendError::Abgelehnt(status, text)
-        });
+        return Err(deute_unsigniert(pfad, status, text));
     };
     let jetzt = Utc::now().timestamp();
     let claims = signatur::verify_antwort(
@@ -692,6 +713,31 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
 /// beim Aufrufer.
 pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), AppError> {
     melden_einmal_mit(pool, kopplung, true).await
+}
+
+/// Die Sperre des Hubs am Push-Relais aus seiner Meldeantwort (LLH-2074), wie die meldende Seite
+/// sie speichert. Ein kanonischer Zeitpunkt (ADR-0012) gilt wie gemeldet. Einen anderen Wert (ein
+/// fehlerhafter oder fremder Hub) verschluckt sie nicht: die Sperre gilt, mit dem schon
+/// gespeicherten Zeitpunkt oder sonst `jetzt`, damit der Wert nicht bei jeder Meldung springt.
+fn sperrzeit_uebernehmen(
+    kopplung: &KopplungZeile,
+    gemeldet: Option<&str>,
+    jetzt: &str,
+) -> Option<String> {
+    let gemeldet = gemeldet?;
+    if crate::zeit::parse_streng(gemeldet).is_some() {
+        return Some(gemeldet.to_string());
+    }
+    match &kopplung.gegenueber_ios_push_gesperrt_seit {
+        Some(bisher) => Some(bisher.clone()),
+        None => {
+            tracing::warn!(
+                kopplung_id = kopplung.id,
+                "iOS-Push-Sperre des Gegenübers ohne gültigen Zeitpunkt; gilt ab jetzt"
+            );
+            Some(jetzt.to_string())
+        }
+    }
 }
 
 /// Wie [`melden_einmal`]; `aufloesen` erlaubt höchstens ein Neuauflösen der Adresse je Lauf, damit
@@ -883,6 +929,10 @@ async fn melden_einmal_mit(
     } else {
         add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
     };
+    // Sperre des Hubs am Push-Relais (LLH-2074): nur kanonisch gespeichert (ADR-0012).
+    let ios_push_gesperrt_seit =
+        sperrzeit_uebernehmen(kopplung, a.ios_push_gesperrt_seit.as_deref(), &jetzt);
+    let sperre_geaendert = ios_push_gesperrt_seit != kopplung.gegenueber_ios_push_gesperrt_seit;
     let mut abgelehnt_alle = Vec::new();
     let mut vom_gegenueber_widerrufen = Vec::new();
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
@@ -911,6 +961,7 @@ async fn melden_einmal_mit(
             a.hinweise,
             a.web_push,
             a.ios_push,
+            ios_push_gesperrt_seit.as_deref(),
             a.rolle_mitarbeit,
         )
         .await?;
@@ -1076,6 +1127,10 @@ async fn melden_einmal_mit(
     // Admin-Spur der übernommenen Akten.
     fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     if let Some(live) = stammdaten::live() {
+        // Beginnt oder endet die Sperre des Hubs, holen offene Einsätze ihren Kopf neu (Band).
+        if sperre_geaendert {
+            super::spiegel::hinweis::sperre_melden(pool, live, kopplung.id).await;
+        }
         for org_id in &stammdaten_geaendert {
             live.publiziere_stammdaten(*org_id);
         }
@@ -1292,7 +1347,7 @@ pub fn start(pool: SqlitePool) {
 
 // ── Erreichte Seite ──────────────────────────────────────────────────────────────────────────
 
-/// Beantwortet eine Meldung (Handler `POST /api/instanz/melden`): hält fest, was das Gegenüber
+/// Beantwortet eine Meldung (Handler `POST /api/instance/check-in`): hält fest, was das Gegenüber
 /// über sich sagt, übernimmt dessen Widerrufe und liefert Widerrufe und Unterschriftsschlüssel
 /// je Org.
 pub async fn handle_meldung(
@@ -1302,6 +1357,7 @@ pub async fn handle_meldung(
     anfrage: &MeldenAnfrage,
     web_push: bool,
     ios_push: bool,
+    ios_push_gesperrt_seit: Option<String>,
 ) -> Result<MeldenAntwort, AppError> {
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
@@ -1730,6 +1786,7 @@ pub async fn handle_meldung(
         hinweise: true,
         web_push,
         ios_push,
+        ios_push_gesperrt_seit: ios_push_gesperrt_seit.filter(|_| ios_push),
         rolle_mitarbeit: rolle_mitarbeit_melden(),
     })
 }
@@ -1754,6 +1811,33 @@ pub fn rolle_mitarbeit_fuer_tests(an: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Nur ein 404 auf Melden heißt „anderer Softwarestand“ (LLH-2053); auf einem anderen Weg
+    /// bleibt es „nicht gefunden“, ein 2xx ohne Signatur bleibt ungültig.
+    #[test]
+    fn unsigniertes_404_heisst_nur_beim_melden_anderer_stand() {
+        let nicht_gefunden = || "Nicht gefunden".to_string();
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 404, nicht_gefunden()),
+            SendError::Abgelehnt(404, ANDERER_STAND.into())
+        );
+        assert_eq!(
+            deute_unsigniert(
+                crate::instanz::extractor::SPIEGEL_PFAD,
+                404,
+                nicht_gefunden()
+            ),
+            SendError::Abgelehnt(404, nicht_gefunden())
+        );
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 500, nicht_gefunden()),
+            SendError::Abgelehnt(500, nicht_gefunden())
+        );
+        assert_eq!(
+            deute_unsigniert(MELDEN_PFAD, 200, String::new()),
+            SendError::AntwortUngueltig("ohne Signatur".into())
+        );
+    }
 
     fn anfrage(orgs: &[&str], widerrufen: &[&str]) -> MeldenAnfrage {
         MeldenAnfrage {
@@ -1850,6 +1934,7 @@ mod tests {
             hinweise: true,
             web_push: false,
             ios_push: false,
+            ios_push_gesperrt_seit: None,
             rolle_mitarbeit: true,
         }
     }
@@ -2151,6 +2236,10 @@ mod tests {
         assert!(!a.hinweise);
         assert!(!a.web_push);
         assert!(!a.ios_push);
+        assert_eq!(
+            a.ios_push_gesperrt_seit, None,
+            "älterer Hub: nicht gesperrt"
+        );
     }
 
     #[test]

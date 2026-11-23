@@ -18,6 +18,7 @@ auth	-
 auto-update	automatische Aktualisierung
 backup	-
 blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
@@ -30,8 +31,10 @@ care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
 check	prüfen
+check-in	melden
 close	abschließen
 closure	Abschluss
 code	-
@@ -42,9 +45,13 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
+countersign	gegenzeichnen
 damages	Schäden
+decline	ablehnen
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 download	-
 emergency-takeover	Notübernahme
@@ -65,6 +72,7 @@ gauges	Pegel
 generate	erzeugen
 glyphs	-
 grant	Freigabe
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
@@ -79,10 +87,12 @@ ios-push	-
 jwks.json	-
 key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 live	-
 login	-
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -97,6 +107,7 @@ module-defaults	Modulvorgaben
 module-overrides	Modul-Overrides
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
+object	widersprechen
 offline	-
 offline-maps	Offline-Karten
 oidc	-
@@ -104,6 +115,7 @@ online-sources	Online-Quellen
 openapi.json	-
 order	Reihenfolge
 orders	Befehle
+origin	Herkunft
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -125,20 +137,24 @@ providers	-
 proxy	-
 raster	-
 read	gelesen
+reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
 reference-values	Richtwerte
 register	-
 registration	-
+reject	zurückweisen
 release-notes	Versionsstand
 reliefs	Ablösungen
 reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
@@ -151,6 +167,7 @@ set	festlegen
 settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild

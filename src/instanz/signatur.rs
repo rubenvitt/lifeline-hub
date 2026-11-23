@@ -552,7 +552,7 @@ mod tests {
         AnfrageDraft {
             ziel_kennung: "hub",
             methode: "post",
-            pfad: "/api/instanz/melden",
+            pfad: "/api/instance/check-in",
             body,
         }
     }
@@ -563,7 +563,7 @@ mod tests {
             "elw",
             "hub",
             "POST",
-            "/api/instanz/melden",
+            "/api/instance/check-in",
             body,
             jetzt,
         )
@@ -679,7 +679,7 @@ mod tests {
                 "elw",
                 "hub",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -693,7 +693,7 @@ mod tests {
                 "elw",
                 "hub2",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -706,7 +706,7 @@ mod tests {
                 "elw",
                 "hub",
                 "PUT",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -719,7 +719,7 @@ mod tests {
                 "elw",
                 "hub",
                 "POST",
-                "/api/instanz/widerruf",
+                "/api/instance/revocation",
                 b"{}",
                 JETZT
             ),
@@ -769,7 +769,7 @@ mod tests {
             exp: JETZT + 61,
             jti: "x".into(),
             htm: "POST".into(),
-            htu: "/api/instanz/melden".into(),
+            htu: "/api/instance/check-in".into(),
             bh: sha256_b64(b"{}"),
             pv: 1,
         };
@@ -951,7 +951,7 @@ mod tests {
             &zugang(),
             "hub",
             "POST",
-            "/api/instanz/melden",
+            "/api/instance/check-in",
             b"{}",
             JETZT,
         );
@@ -962,7 +962,7 @@ mod tests {
                 "zugang-1",
                 "hub",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),

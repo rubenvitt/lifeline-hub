@@ -334,7 +334,7 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
 describe('QualifikationenTab mit Stammdaten vom Hub (LLH-1493)', () => {
   it('Herkunft als Spalte, Zeile vom Hub ohne Bearbeiten und Deaktivieren', async () => {
     server.use(
-      http.get('/api/instanz/stammdaten/herkunft', () =>
+      http.get('/api/instance/master-data/origin', () =>
         HttpResponse.json({
           quelle: 'Hub DRK Landesverband',
           vom_hub: { qualifikation: ['1'] },

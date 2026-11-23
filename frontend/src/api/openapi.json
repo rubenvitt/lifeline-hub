@@ -7118,6 +7118,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "ios_push_hub_gesperrt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IosPushHubSperre"
+            },
+            "description": "Hubs, über die die Hinweise dieses Einsatzes reisen und deren iOS-Push das Push-Relais\ngerade sperrt (LLH-2074): iPhones von Hub-Konten bekommen nichts, diese Instanz pusht ihnen\nnicht selbst. Die Oberfläche zeigt es Einsatzleitung und Admins der Einsatz-Org. In Liste und\nDetail dieselbe Aussage; fehlt, wenn kein Hub gesperrt ist (und am Spiegel)."
+          },
           "lagekennzahlen": {
             "type": "array",
             "items": {
@@ -11788,6 +11795,13 @@
           "gegenueber_fingerabdruck": {
             "type": "string"
           },
+          "gegenueber_ios_push_gesperrt_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meldende Seite: das Push-Relais sperrt das Gegenüber seit (UTC, LLH-2074); iOS-Push an\nKonten vom Hub kommt nicht an. Fehlt ohne Sperre und an der erreichten Seite."
+          },
           "gegenueber_kennung": {
             "type": "string"
           },
@@ -11903,7 +11917,7 @@
       },
       "InstanzLanAntwort": {
         "type": "object",
-        "description": "Antwort von `GET /api/admin/instanz/lan`.",
+        "description": "Antwort von `GET /api/admin/instance/lan`.",
         "required": [
           "aus",
           "gefunden"
@@ -12147,6 +12161,24 @@
           "passt_nicht",
           "gegenstelle_kennt_aelteres"
         ]
+      },
+      "IosPushHubSperre": {
+        "type": "object",
+        "description": "Ein Hub, über den die Hinweise eines Einsatzes reisen und der iOS-Push anbietet, den das\nPush-Relais aber sperrt (LLH-2074): iPhones von Hub-Konten bekommen dann nichts, und diese\nInstanz pusht ihnen nicht selbst (die Geräte sind am Hub angemeldet). Die Einsatzleitung sieht\nes im Einsatz (`EinsatzAnzeige::ios_push_hub_gesperrt`). Gelesen über die Spalte\n`ios_push_hub_gesperrt_spalte!` in `einsatz::repo`, deren Menge die von [`ziele`] ist.",
+        "required": [
+          "hub_name",
+          "since"
+        ],
+        "properties": {
+          "hub_name": {
+            "type": "string",
+            "description": "Name des Hubs, wie er sich meldet."
+          },
+          "since": {
+            "type": "string",
+            "description": "Seit wann das Relais ihn sperrt (UTC), wie der Hub es meldet."
+          }
+        }
       },
       "IosPushStand": {
         "type": "object",

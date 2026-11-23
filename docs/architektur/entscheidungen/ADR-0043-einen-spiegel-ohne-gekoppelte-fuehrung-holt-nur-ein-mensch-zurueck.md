@@ -42,7 +42,7 @@ verlange 'fuehrung_beendet_sql!' src/einsatz/repo.rs
 verlange 'fuehrung_beendet_sql!\(\)' src/instanz/fuehrung/repo.rs
 verbiete 'dienst::zurueckholen\(' 'src/**/*.rs' ':(exclude)src/routes/fuehrung.rs'
 verlange '^pub async fn zurueckholen' src/instanz/fuehrung/repo.rs src/instanz/fuehrung/dienst.rs
-verlange '/api/einsaetze/\{id\}/fuehrung/zurueckholen' src/app.rs
+verlange '/api/einsaetze/\{id\}/command/reclaim' src/app.rs
 verlange 'is_widerrufen_zum_fuehrer' src/instanz/spiegel/fuehrung.rs
 ```
 

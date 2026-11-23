@@ -50,7 +50,7 @@ test('Instanzkopplung vor Ort: Code gesperrt, Im Netz suchen übernimmt die Adre
     'LAN-Entdeckung ist aus',
   );
 
-  await page.route('**/api/admin/instanz/lan', (route) =>
+  await page.route('**/api/admin/instance/lan', (route) =>
     route.fulfill({
       json: {
         aus: false,
