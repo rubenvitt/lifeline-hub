@@ -267,35 +267,35 @@ ADR-Nummer: ADR-0087 (0085 belegt der offene PR #1614, 0084 steht auf `alpha` do
 '0.04em', versal: true }`, `seitentitel.groesse = 16`, `metaKlein` entfällt (Typ `Schriftstufenname`
 ohne sie). Export `export const SCHRIFT_BODEN = 11;` in `theme/tokens.ts`.
 
-- [ ] **Step 1: Tests** in `rollen.guard.test.ts`: `it('keine Stufe unter dem Schriftboden 11 px (LLH-2044)')`
+- [x] **Step 1: Tests** in `rollen.guard.test.ts`: `it('keine Stufe unter dem Schriftboden 11 px (LLH-2044)')`
   über alle Werte der `schriftskala` (`groesse >= SCHRIFT_BODEN`, `SCHRIFT_BODEN === 11`); Pins
   auf die neuen Werte (Augenbraue, Seitentitel 16, Mono-Stufen 11 bis 14 ohne `metaKlein`,
   `railEtikett`); `--lfh-typo-meta-klein` aus der Liste der bekannten Variablen. Augenbraue-Test:
   `fontSize: '11px'`.
-- [ ] **Step 2: rot sehen** — `vitest run src/theme/rollen.guard.test.ts src/components/instrument/Augenbraue.test.tsx` → FAIL.
-- [ ] **Step 3: umsetzen** (Werte, CSS-Spiegel, Doku-Kommentare an Skala, `monoStil`, IconRail,
+- [x] **Step 2: rot sehen** — `vitest run src/theme/rollen.guard.test.ts src/components/instrument/Augenbraue.test.tsx` → FAIL.
+- [x] **Step 3: umsetzen** (Werte, CSS-Spiegel, Doku-Kommentare an Skala, `monoStil`, IconRail,
   EinsatzSeite), alle `metaKlein`-Aufrufer auf `meta`.
-- [ ] **Step 4: grün sehen** — dieselben Läufe, `vitest run src/theme src/components`, Typecheck → PASS.
-- [ ] **Step 5: Commit** `feat(frontend): Schriftboden 11 px, Seitentitel 16 px, metaKlein entfällt (LLH-2044)`.
+- [x] **Step 4: grün sehen** — dieselben Läufe, `vitest run src/theme src/components`, Typecheck → PASS.
+- [x] **Step 5: Commit** `feat(frontend): Schriftboden 11 px, Seitentitel 16 px, metaKlein entfällt (LLH-2044)`.
 
 ### Task 8: Rail 64 px
 
-- [ ] **Step 1:** `Kopfleiste.test.tsx` erwartet `railBreite` 64 / 64 / 73; `IconRail.test.tsx`
+- [x] **Step 1:** `Kopfleiste.test.tsx` erwartet `railBreite` 64 / 64 / 73; `IconRail.test.tsx`
   Kommentare/Mock auf 64. Rot sehen.
-- [ ] **Step 2:** `RAIL_BREITE = 64` in `components/Kopfleiste.tsx`; Kommentare in `rail-etikett.spec.ts`
+- [x] **Step 2:** `RAIL_BREITE = 64` in `components/Kopfleiste.tsx`; Kommentare in `rail-etikett.spec.ts`
   (11 px, .04em, 64 px) nachziehen. Grün sehen, dann `e2e/rail-etikett.spec.ts` (alle Dichten) → PASS.
-- [ ] **Step 3: Commit** `feat(frontend): Rail 64 px für das 11-px-Etikett (LLH-2044)`.
+- [x] **Step 3: Commit** `feat(frontend): Rail 64 px für das 11-px-Etikett (LLH-2044)`.
 
 ### Task 9: Schuld unter 11 px einrasten
 
-- [ ] **Step 1:** Schuld senken (`lagekarte.css`, `Verlaufslinie.tsx`, `KartenDetailCard.tsx` je 1 → Eintrag fällt);
+- [x] **Step 1:** Schuld senken (`lagekarte.css`, `Verlaufslinie.tsx`, `KartenDetailCard.tsx` je 1 → Eintrag fällt);
   Ratsche läuft rot (mehr Funde als Schuld).
-- [ ] **Step 2:** die drei Stellen auf Stufen; Ratsche und betroffene Tests grün.
-- [ ] **Step 3: Commit** `refactor(frontend): Schriftgrößen unter 11 px auf Stufen (LLH-2044)`.
+- [x] **Step 2:** die drei Stellen auf Stufen; Ratsche und betroffene Tests grün.
+- [x] **Step 3: Commit** `refactor(frontend): Schriftgrößen unter 11 px auf Stufen (LLH-2044)`.
 
 ### Task 10: ADR-0087, Regel
 
-- [ ] ADR-0087 „Text hat einen Boden von 11 px“ ersetzt ADR-0071: übernimmt deren Regeln (Mono-Stufen
+- [x] ADR-0087 „Text hat einen Boden von 11 px“ ersetzt ADR-0071: übernimmt deren Regeln (Mono-Stufen
   jetzt `meta` 11 bis `monoGross` 14), neu „MUST NOT: eine Stufe der `schriftskala` unter 11 px“,
   Prüfung mit den Pins von ADR-0071 plus `SCHRIFT_BODEN = 11`; ADR-0071 `status: ersetzt`,
   `ersetzt_durch: ADR-0087`. `frontend/AGENTS.md`, „`schriftskala`“: Boden, Werte, Verweis.
@@ -303,12 +303,12 @@ ohne sie). Export `export const SCHRIFT_BODEN = 11;` in `theme/tokens.ts`.
 
 ### Task 11: Design System, Anwender-Bilder
 
-- [ ] Design System neu erzeugen. Anwender-Bilder: Augenbraue, Rail und Seitentitel stehen auf
+- [x] Design System neu erzeugen. Anwender-Bilder: Augenbraue, Rail und Seitentitel stehen auf
   fast jeder Ansicht; alle Kapitel neu, committet werden die Bilder, die sich gegenüber einem
   `alpha`-Lauf in derselben Umgebung über das Rauschen hinaus ändern. Commit.
 
 ### Task 12: Gate, Risiko-e2e, PR
 
-- [ ] Gate grün; Risiko-Specs aus dem Entwurf („Für jeden Teil gleich“) plus
+- [x] Gate grün; Risiko-Specs aus dem Entwurf („Für jeden Teil gleich“) plus
   `rail-etikett`, `einsatztauglichkeit-layout`, `seitenkopf-werkzeuganteil`, `kraefte-seitenkopf`,
   `kennzahl*`, `hellmodus-kontrast` → grün oder Platz schaffen. Bilder vorher/nachher, PR `voll`.
