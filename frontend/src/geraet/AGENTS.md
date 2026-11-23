@@ -183,7 +183,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   ohne 0 (Betroffene bzw. Hilfeleistungen ← `personen`, Meldungen ← `meldungen`, Kräfte ←
   `personal` oder `einheiten` wie `kraefteZustand` im Lagebild, Belegung samt Zusatz „an UHS“
   und UHS-Marken ← `unfallhilfsstellen`; „Ablauf“ nie). Der Server liest sie nicht und nennt sie
-  in `ausgeblendet` (`LagemonitorKachel`, `verdichte_ohne`), nur im Handler `lagebild`. Eine
+  in `ausgeblendet` (`LagemonitorKachel`, `load_anzeige`), nur im Handler `lagebild`. Eine
   Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
   (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse
   bleiben ihm fern. Steigt diese Zahl

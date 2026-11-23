@@ -340,7 +340,7 @@ pub async fn lagebild(
         ctx.einsatz.org_id,
     )
     .await?;
-    let mut anzeige = verdichte_ohne(&state.pool, ctx.einsatz.id, &aus).await?;
+    let mut anzeige = load_anzeige(&state.pool, ctx.einsatz.id, &aus).await?;
     let alarm = alarm(
         &state.pool,
         ctx.einsatz.id,
@@ -515,14 +515,14 @@ async fn rueckmeldung_ueberfaellig(
 /// (`routes::lagebild_extern`) und die Lage der öffentlichen API (`public_api::lage`), damit alle
 /// dieselben Zahlen zeigen. Prüft keine Rechte: das tun die Aufrufer.
 pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorAnzeige, AppError> {
-    verdichte_ohne(pool, einsatz_id, &std::collections::HashSet::new()).await
+    load_anzeige(pool, einsatz_id, &std::collections::HashSet::new()).await
 }
 
 /// [`verdichte`] ohne die Kacheln, deren Modul in `aus` steht (LLH-2072): ihre Abfragen laufen
 /// nicht, ihre Werte stehen auf 0 bzw. leer, und [`LagemonitorAnzeige::ausgeblendet`] nennt sie.
 /// Nur der gekoppelte Lagemonitor übergibt eine nicht leere Menge; Lagebild für Externe und
 /// API v1 bleiben bei [`verdichte`].
-pub async fn verdichte_ohne(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     einsatz_id: i64,
     aus: &std::collections::HashSet<&'static str>,
@@ -533,12 +533,12 @@ pub async fn verdichte_ohne(
         .collect();
     let sichtbar = |k: LagemonitorKachel| !ausgeblendet.contains(&k);
     let (betroffene, sanitaetsdienst) = if sichtbar(LagemonitorKachel::Betroffene) {
-        verdichte_betroffene(pool, einsatz_id).await?
+        load_betroffene(pool, einsatz_id).await?
     } else {
         (LagemonitorBetroffene::default(), None)
     };
     let kraefte = if sichtbar(LagemonitorKachel::Kraefte) {
-        verdichte_kraefte(pool, einsatz_id).await?
+        load_kraefte(pool, einsatz_id).await?
     } else {
         LagemonitorKraefte {
             einheiten: 0,
@@ -547,11 +547,11 @@ pub async fn verdichte_ohne(
         }
     };
     let uhs = if sichtbar(LagemonitorKachel::Uhs) {
-        verdichte_uhs(pool, einsatz_id).await?
+        load_uhs(pool, einsatz_id).await?
     } else {
         Vec::new()
     };
-    let zonen = verdichte_zonen(pool, einsatz_id).await?;
+    let zonen = load_zonen(pool, einsatz_id).await?;
     let abschnitte = sqlx::query_as::<_, (i64, String, Option<String>, String)>(
         "SELECT id, name, kurzbezeichnung, flaeche_geojson FROM einsatzabschnitt \
          WHERE einsatz_id = ? AND flaeche_geojson IS NOT NULL ORDER BY sortier, id",
@@ -603,7 +603,7 @@ pub async fn verdichte_ohne(
 }
 
 /// Betroffene und, falls am Einsatz gewählt, die Reihe „Sanitätsdienst“ (LLH-1574).
-async fn verdichte_betroffene(
+async fn load_betroffene(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<(LagemonitorBetroffene, Option<LagemonitorSanitaetsdienst>), AppError> {
@@ -671,10 +671,7 @@ async fn verdichte_betroffene(
 }
 
 /// Kräfte: Einheiten, disponiertes Personal und seine Stärke.
-async fn verdichte_kraefte(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-) -> Result<LagemonitorKraefte, AppError> {
+async fn load_kraefte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorKraefte, AppError> {
     let einheiten: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
     )
@@ -708,10 +705,7 @@ async fn verdichte_kraefte(
 }
 
 /// Nicht aufgelöste UHS mit Belegung, Plätzen und Kräften als Zahl.
-async fn verdichte_uhs(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-) -> Result<Vec<LagemonitorUhs>, AppError> {
+async fn load_uhs(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LagemonitorUhs>, AppError> {
     let zeilen: Vec<(
         i64,
         String,
@@ -757,10 +751,7 @@ async fn verdichte_uhs(
 }
 
 /// Gefahrenzonen für die Monitorkarte.
-async fn verdichte_zonen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-) -> Result<Vec<LagemonitorZone>, AppError> {
+async fn load_zonen(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LagemonitorZone>, AppError> {
     // Gefahrenzonen wie beim Abschnittsgerät (`routes/lage_zone.rs`, `liste`): einsatzweit, ohne
     // Bezirke und Skizzen. Das Gebiet einer Gefahrengebiet-Zone kommt aus der Gebietsliste (eine
     // Rang-Regel für die Warnstufe); deren Name der bestätigenden Person bleibt hier liegen.
