@@ -60,7 +60,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
     `encrypt()` unverändert in Signatur; `fingerabdruck`/`has_schluessel`/`encrypt` beziehen sich
     nur auf den neuen.
 
-- [ ] **Step 1: Failing tests** in `mod tests`:
+- [x] **Step 1: Failing tests** in `mod tests`:
   - `wechsel_liest_alte_und_neue_chiffrate`: `a` = Speicher nur mit Schlüssel A, Chiffrat `ca, fa`;
     `w = new_wechsel(B, A)`; `w.decrypt(&ca, &fa)` == Klartext; `w.fingerabdruck()` == Fp von B;
     `w.fingerabdruck_alt()` == `Some(fa)`.
@@ -70,14 +70,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
     enthält „derselbe“.
   - `debug_zeigt_keinen_schluessel` erweitern: `format!("{w:?}")` enthält keinen der beiden
     Schlüsseltexte, aber beide Fingerabdrücke.
-- [ ] **Step 2:** `cargo test --lib adapter::geheimnis` → FAIL (`new_wechsel` fehlt).
-- [ ] **Step 3: Implementieren.** `Geheimnisspeicher(Option<Arc<Geladen>>)` bekommt den alten als
+- [x] **Step 2:** `cargo test --lib adapter::geheimnis` → FAIL (`new_wechsel` fehlt).
+- [x] **Step 3: Implementieren.** `Geheimnisspeicher(Option<Arc<Geladen>>)` bekommt den alten als
   zweites Feld (z. B. `struct Geheimnisspeicher { neu: Option<Arc<Geladen>>, alt: Option<Arc<Geladen>> }`);
   `Geladen` aus `GeheimnisSchluessel` per gemeinsamer Hilfsfunktion. `decrypt` wählt `neu` oder
   `alt` nach `fingerabdruck == fp`, sonst `Unlesbar`. `Debug`: `Geheimnisspeicher(<fp>)` bzw.
   `Geheimnisspeicher(<fp>, alt <fp_alt>)`. `Default` bleibt „ohne Schlüssel“.
-- [ ] **Step 4:** `cargo test --lib adapter::geheimnis` → PASS.
-- [ ] **Step 5: Commit** `feat(adapter): Geheimnisspeicher liest mit altem und neuem Schlüssel`.
+- [x] **Step 4:** `cargo test --lib adapter::geheimnis` → PASS.
+- [x] **Step 5: Commit** `feat(adapter): Geheimnisspeicher liest mit altem und neuem Schlüssel`.
 
 ### Task 2: Schlüsseldatei lesen
 
@@ -98,16 +98,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
     wenn `mode & 0o077 != 0` (folgt Symlinks, `std::fs::metadata`); sonst und auf anderen
     Plattformen `None`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `schluesseldatei_im_format_von_age_keygen`: Inhalt `"# created: 2026-11-22T10:00:00+01:00\n# public key: age1…\n<KEY>\n"` → Ok, gleicher Fingerabdruck wie `<KEY>`.
   - `schluesseldatei_mit_crlf_und_leerzeichen`: `"# x\r\n<KEY>  \r\n\r\n"` → Ok.
   - `schluesseldatei_ohne_oder_mit_zwei_schluesseln`: nur Kommentare → Err „keine“; zwei Schlüssel → Err „mehr als eine“; Fehlertext enthält keinen der Schlüssel.
   - `schluesseldatei_mit_kaputtem_schluessel_nennt_ihn_nicht`: `"AGE-SECRET-KEY-1kaputt"` → Err, Text ohne „kaputt“.
   - `#[cfg(unix)] offene_rechte_werden_erkannt`: Datei in `tempfile::tempdir()` mit `0o600` → `None`; mit `0o644` → `Some(0o644)`.
-- [ ] **Step 2:** `cargo test --lib adapter::geheimnis` → FAIL.
-- [ ] **Step 3:** Die drei Funktionen implementieren (prüfen, ob `tempfile` schon dev-dependency ist; sonst `std::env::temp_dir()` mit eindeutigem Namen).
-- [ ] **Step 4:** `cargo test --lib adapter::geheimnis` → PASS.
-- [ ] **Step 5: Commit** `feat(adapter): Schlüssel des Geheimnisspeichers aus einer Datei lesen`.
+- [x] **Step 2:** `cargo test --lib adapter::geheimnis` → FAIL.
+- [x] **Step 3:** Die drei Funktionen implementieren (prüfen, ob `tempfile` schon dev-dependency ist; sonst `std::env::temp_dir()` mit eindeutigem Namen).
+- [x] **Step 4:** `cargo test --lib adapter::geheimnis` → PASS.
+- [x] **Step 5: Commit** `feat(adapter): Schlüssel des Geheimnisspeichers aus einer Datei lesen`.
 
 ### Task 3: Konfiguration und Start-Auflösung
 
@@ -130,7 +130,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
     - alt ohne neu: `"alter Schlüssel des Geheimnisspeichers ohne neuen: erst LIFELINE_GEHEIMNIS_SCHLUESSEL oder LIFELINE_GEHEIMNIS_SCHLUESSEL_DATEI setzen"`
     - gleich: `"LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT: alter und neuer Schlüssel sind derselbe"`
 
-- [ ] **Step 1: Failing tests** (`mod tests`, nur über die gesperrten Helfer; Schlüssel per CLI-Flag in `parse_hermetisch([...])`):
+- [x] **Step 1: Failing tests** (`mod tests`, nur über die gesperrten Helfer; Schlüssel per CLI-Flag in `parse_hermetisch([...])`):
   - `geheimnis_schluessel_aus_datei`: Datei mit `<KEY>` (Modus 600) → `load_geheimnisspeicher()` Ok, Fingerabdruck von `<KEY>`, keine Warnung.
   - `#[cfg(unix)] offene_schluesseldatei_warnt`: Modus 644 → Ok, eine Warnung mit Pfad und `644`, ohne `<KEY>`.
   - `wert_und_datei_zugleich_ist_fehler`: `--geheimnis-schluessel <KEY> --geheimnis-schluessel-datei <p>` über `try_parse_mit_env` (beliebige harmlose Variable) → `Err`; ebenso für alt.
@@ -139,10 +139,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
   - `wechsel_aus_env_und_datei`: neu per Datei, alt per Flag → Ok, `fingerabdruck_alt()` == Fp von alt.
   - `leerer_alter_schluessel_wie_leerer_neuer`: `try_parse_mit_env("LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT", "", …).is_ok()` == `try_parse_mit_env("LIFELINE_GEHEIMNIS_SCHLUESSEL", "", …).is_ok()`.
   - `kaputter_alter_schluessel_steht_nicht_im_fehler`: `--geheimnis-schluessel-alt AGE-SECRET-KEY-1kaputt` → Err mit „--geheimnis-schluessel-alt (LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT)“, ohne „kaputt“.
-- [ ] **Step 2:** `cargo test --lib config` → FAIL.
-- [ ] **Step 3:** Felder, Parser und Methode implementieren; Doc-Kommentare der Felder im Stil des bestehenden `geheimnis_schluessel` (wofür, was ohne Angabe gilt, dass Datei und Wert sich ausschließen). Die Datei liest nur `load_geheimnisspeicher`, nicht der Parser.
-- [ ] **Step 4:** `cargo test --lib config` → PASS.
-- [ ] **Step 5: Commit** `feat(config): Schlüssel des Geheimnisspeichers aus Datei und alter Schlüssel für den Wechsel`.
+- [x] **Step 2:** `cargo test --lib config` → FAIL.
+- [x] **Step 3:** Felder, Parser und Methode implementieren; Doc-Kommentare der Felder im Stil des bestehenden `geheimnis_schluessel` (wofür, was ohne Angabe gilt, dass Datei und Wert sich ausschließen). Die Datei liest nur `load_geheimnisspeicher`, nicht der Parser.
+- [x] **Step 4:** `cargo test --lib config` → PASS.
+- [x] **Step 5: Commit** `feat(config): Schlüssel des Geheimnisspeichers aus Datei und alter Schlüssel für den Wechsel`.
 
 ### Task 4: Umschlüsseln beim Start
 
@@ -160,21 +160,21 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
   - `#[derive(Debug, Default, PartialEq, Eq)] pub struct Umschluesselt { pub umgeschluesselt: u64, pub unlesbar: u64 }` in `lauf.rs`.
   - `lauf::umschluesseln(pool: &SqlitePool, speicher: &Geheimnisspeicher) -> Result<Umschluesselt, sqlx::Error>` — ohne alten Schlüssel `Ok(Default)`; sonst eine Transaktion `pool.begin_with("BEGIN IMMEDIATE")`, je Zeile `decrypt` mit altem Fp und `encrypt` (beides in einem `spawn_blocking` je Zeile), `update_chiffrat`, Commit. Nicht zu öffnende Zeile: zählen, unverändert lassen.
 
-- [ ] **Step 1: Failing integration tests** in `tests/adapter_schluesselwechsel.rs` (Aufbau wie `tests/adapter_lauf.rs`: `mod adapter_testart; mod common;`, `setup_mit_state`, Geheimnis per `PUT …/geheimnisse/token`):
+- [x] **Step 1: Failing integration tests** in `tests/adapter_schluesselwechsel.rs` (Aufbau wie `tests/adapter_lauf.rs`: `mod adapter_testart; mod common;`, `setup_mit_state`, Geheimnis per `PUT …/geheimnisse/token`):
   - `wechsel_schluesselt_um_und_adapter_laeuft_weiter`: Adapter mit Token unter Schlüssel A; `w = rahmen` mit `new_wechsel(B, A)`; `umschluesseln(&pool, &w.speicher)` == `{umgeschluesselt: 1, unlesbar: 0}`; `schluessel_fp` aller Zeilen == Fp von B; `durchgang` mit Rahmen nur B → Abruf sah das Token (`art.gesehen()`), Zustand nicht angehalten; Router mit Rahmen nur B (wie `adapter_admin.rs` „anderer Schlüssel“): `speicher == "bereit"`, `is_unlesbar == false`.
   - `zweiter_lauf_aendert_nichts`: nach dem ersten Umschlüsseln erneut → `Default`; `chiffrat` byte-gleich.
   - `kaputte_zeile_bleibt`: zusätzliche Zeile per SQL mit Fp von A und `chiffrat = x'00'` → `{umgeschluesselt: 1, unlesbar: 1}`; die kaputte trägt weiter Fp von A; `count_fremde_chiffrate(&pool, Some(fp_b))` == 1.
   - `ohne_alten_schluessel_nichts`: Rahmen nur mit A → `Default`, Zeile unverändert.
   - `gesetzt_von_und_stand_bleiben`: `gesetzt_at`, `gesetzt_von` der Zeile und `adapter.stand` vor und nach gleich.
-- [ ] **Step 2:** `cargo test --test adapter_schluesselwechsel` → FAIL (Kompilierfehler `umschluesseln`).
-- [ ] **Step 3:** Repo-Funktionen und `umschluesseln` implementieren.
-- [ ] **Step 4:** `src/main.rs`: `let (speicher, warnungen) = config.load_geheimnisspeicher().map_err(|e| anyhow::anyhow!(e))?;` je Warnung `tracing::warn!`; vor `count_fremde_chiffrate`: `umschluesseln` aufrufen. Log:
+- [x] **Step 2:** `cargo test --test adapter_schluesselwechsel` → FAIL (Kompilierfehler `umschluesseln`).
+- [x] **Step 3:** Repo-Funktionen und `umschluesseln` implementieren.
+- [x] **Step 4:** `src/main.rs`: `let (speicher, warnungen) = config.load_geheimnisspeicher().map_err(|e| anyhow::anyhow!(e))?;` je Warnung `tracing::warn!`; vor `count_fremde_chiffrate`: `umschluesseln` aufrufen. Log:
   - Ok mit `unlesbar == 0`: info, Felder `alt`, `neu`, `anzahl`, Text „Geheimnisse der Adapter auf den neuen Schlüssel umgeschlüsselt; LIFELINE_GEHEIMNIS_SCHLUESSEL_ALT kann entfernt werden“.
   - `unlesbar > 0`: zusätzlich warn, Feld `anzahl`, „Geheimnisse ließen sich mit dem alten Schlüssel nicht öffnen: in der Verwaltung neu setzen“.
   - `Err(e)`: warn „Umschlüsseln der Adapter-Geheimnisse fehlgeschlagen, der Server liest mit beiden Schlüsseln: {e}“, Start läuft weiter.
   Nur ausführen, wenn `speicher.fingerabdruck_alt().is_some()`.
-- [ ] **Step 5:** `cargo test --test adapter_schluesselwechsel --test adapter_lauf --test adapter_admin` → PASS; `cargo build` grün.
-- [ ] **Step 6: Commit** `feat(adapter): Geheimnisse beim Start auf den neuen Schlüssel umschlüsseln`.
+- [x] **Step 5:** `cargo test --test adapter_schluesselwechsel --test adapter_lauf --test adapter_admin` → PASS; `cargo build` grün.
+- [x] **Step 6: Commit** `feat(adapter): Geheimnisse beim Start auf den neuen Schlüssel umschlüsseln`.
 
 ### Task 5: ADR, Regeln und Doku
 
@@ -186,8 +186,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z211l8p5cw3oc2zkj34r2rwx
 - Modify: `docs/betrieb/env-registry.md` (drei Zeilen, Liste der maskierten Geheimnisse)
 - Modify: `docs/betrieb/backup-restore.md` („Geheimnisse der Adapter“: Wechsel in drei Schritten, Dateiquelle, alte Sicherungen brauchen den alten Schlüssel)
 
-- [ ] **Step 1:** `scripts/adr-fuer.sh` für alle geänderten Pfade laufen lassen; Mitänderungsregeln aus `docs/architektur/AGENTS.md` und, falls `docs/anwender/kapitel/anbindungen.md` den Schlüssel erklärt, `docs/anwender/AGENTS.md` prüfen und betroffene Stellen mitziehen.
-- [ ] **Step 2:** ADR-0077: Regel „Schlüssel nur aus der Umgebung“ ersetzen durch „MUST NOT: Der Schlüssel liegt in der Datenbank oder einer Sicherung; er kommt aus der Umgebung oder einer Datei, deren Pfad die Umgebung nennt.“; neue Regel „MUST: Für einen Wechsel lädt der Server höchstens einen alten Schlüssel zusätzlich, liest mit dem Schlüssel des passenden Fingerabdrucks, verschlüsselt nur mit dem neuen und schlüsselt beim Start alle Chiffrate des alten in einer Transaktion um.“; Prüfzeile `verlange 'fn umschluesseln\(' src/adapter/lauf.rs`; `herleitung` + Design-Doc und Zunder-Link.
-- [ ] **Step 3:** Übrige Doku nach den Dateien oben; Texte aus dem Design-Doc, Abschnitt „Doku“.
-- [ ] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf; nicht mit `| tail`).
-- [ ] **Step 5: Commit** `docs: Schlüsselwechsel des Geheimnisspeichers in ADR-0077, Betrieb und Kapitel 11`.
+- [x] **Step 1:** `scripts/adr-fuer.sh` für alle geänderten Pfade laufen lassen; Mitänderungsregeln aus `docs/architektur/AGENTS.md` und, falls `docs/anwender/kapitel/anbindungen.md` den Schlüssel erklärt, `docs/anwender/AGENTS.md` prüfen und betroffene Stellen mitziehen.
+- [x] **Step 2:** ADR-0077: Regel „Schlüssel nur aus der Umgebung“ ersetzen durch „MUST NOT: Der Schlüssel liegt in der Datenbank oder einer Sicherung; er kommt aus der Umgebung oder einer Datei, deren Pfad die Umgebung nennt.“; neue Regel „MUST: Für einen Wechsel lädt der Server höchstens einen alten Schlüssel zusätzlich, liest mit dem Schlüssel des passenden Fingerabdrucks, verschlüsselt nur mit dem neuen und schlüsselt beim Start alle Chiffrate des alten in einer Transaktion um.“; Prüfzeile `verlange 'fn umschluesseln\(' src/adapter/lauf.rs`; `herleitung` + Design-Doc und Zunder-Link.
+- [x] **Step 3:** Übrige Doku nach den Dateien oben; Texte aus dem Design-Doc, Abschnitt „Doku“.
+- [x] **Step 4:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf; nicht mit `| tail`).
+  Gelaufen am 22./23.11.2026 in der Cloud-Sitzung wegen des Plattenkontingents in Portionen: `--nur schnell` grün; Rust-Suite (lib, doc, alle 274 Integrationstests, übrige Crates) grün; Dev-Seed als `cargo check --all-targets` grün; Vitest nur die sieben Dateien, die `docs/anwender` lesen (96/96 grün), der Frontend-Code ist unverändert; `lifeline-desktop` nicht baubar (GTK fehlt im Container), `src-tauri` unverändert.
+- [x] **Step 5: Commit** `docs: Schlüsselwechsel des Geheimnisspeichers in ADR-0077, Betrieb und Kapitel 11`.
