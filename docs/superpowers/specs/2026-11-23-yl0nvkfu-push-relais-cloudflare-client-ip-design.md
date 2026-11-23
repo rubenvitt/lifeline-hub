@@ -87,3 +87,37 @@ den Konfigurationsabbruch (beide gesetzt, Hostname in der Liste).
 
 Fehlertexte, Testnamen, genaue Gliederung der Doku-Abschnitte; ob Tests für `client_ip` als
 Unit-Tests im Relais oder nur als Integrationstests laufen.
+
+## Nachtrag 23.11.2026: CDN nur ein Mal (nach dem Review)
+
+**Befund.** Wer den Cloudflare-Bereichen in derselben Liste vertraut wie Traefik, überspringt sie
+beliebig oft. Ein eigener Cloudflare Worker schickt Anfragen aus einem Cloudflare-Bereich
+(Worker-Subrequests tragen etwa `2a06:98c0:3600::103` aus `2a06:98c0::/29`) und setzt
+`X-Forwarded-For` selbst: Die Kette `<frei gewählt>, <Worker>, <Knoten>` endete beim frei
+gewählten Eintrag. Beim Relais hieße das Registrierungen ohne Grenze, beim Hauptserver eine
+umgehbare Anmelde-Bremse (eine Sperre je Konto gibt es dort bewusst nicht,
+`src/auth/rate_limit.rs`). Ruben hat am 23.11.2026 diesen Weg gewählt:
+
+**Zweite Liste für das CDN, ein Eintrag daraus wird höchstens einmal übersprungen.**
+
+- Neue Variablen `PUSH_RELAIS_CDN_PROXIES` und `LIFELINE_CDN_PROXIES` (`--cdn-proxies`), gleiche
+  Parse-Regeln wie die Proxy-Liste. Nur zusammen mit der Proxy-Liste; allein bricht der Start ab.
+- Algorithmus (beide Pakete gleich): Liegt die Gegenstelle nicht in der Proxy-Liste, gilt sie.
+  Sonst `X-Forwarded-For` von rechts: ein Eintrag aus der Proxy-Liste wird übersprungen, solange
+  noch kein CDN-Eintrag kam (mehrere innere Proxys bleiben möglich); der erste Eintrag aus der
+  CDN-Liste wird einmal übersprungen; jeder weitere Eintrag ist der Client, auch wenn er in einer
+  der Listen liegt. Ein unlesbarer Eintrag beendet die Suche wie bisher.
+- Folge für den Worker-Fall: gezählt wird die Adresse des Workers. Alle Worker teilen sich damit
+  eine Grenze (IPv6 je /64), ein einzelner Client hinter Cloudflare ist davon unberührt. Das hängt
+  nicht davon ab, welche Adressen Cloudflare für Worker nutzt.
+- Ohne CDN-Liste verhält sich alles wie bisher.
+- Die Cloudflare-Bereiche gehören in die CDN-Liste, nie in die Proxy-Liste; die Doku sagt das
+  ausdrücklich.
+
+**Zweiter Befund, nur Doku:** `forwardedHeaders.trustedIPs` am Traefik-Einstiegspunkt gilt für
+jeden Dienst dahinter: Was ein Client an `X-Forwarded-*` und `X-Real-Ip` an Cloudflare schickt,
+reicht Traefik dann durch. Die Betriebsdoku nennt das und die Abhilfe (die Header in einer
+Cloudflare-Transform-Rule entfernen oder einen eigenen Einstiegspunkt nutzen).
+
+**Schnitt:** Der Hauptserver ändert sich jetzt auch im Code (`src/extract.rs`, `src/config.rs`,
+`src/main.rs`); weiter nur ein Subsystem (Backend) neben dem Relais.
