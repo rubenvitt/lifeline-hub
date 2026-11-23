@@ -854,7 +854,7 @@ export interface NeueKommunikationsStelle {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/stellen/{sid}/verbindungen`, FE-lokal; zugleich
+ * Kein Backend-Schema: Eingabe-Body von `POST …/positions/{sid}/connections`, FE-lokal; zugleich
  * ein Eintrag der Ersatzliste `verbindungen` an Abschnitt, Einheit und Führungsstelle (LLH-1134).
  */
 export interface NeueVerbindung {

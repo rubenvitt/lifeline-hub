@@ -131,14 +131,8 @@ impl Ziel {
                 json["sprechgruppen"].as_array().unwrap().clone()
             }
             Ziel::Stelle(id) => {
-                let (_, json) = anfrage(
-                    app,
-                    "GET",
-                    &format!("{b}/staff/comms-plan"),
-                    cookie,
-                    None,
-                )
-                .await;
+                let (_, json) =
+                    anfrage(app, "GET", &format!("{b}/staff/comms-plan"), cookie, None).await;
                 let s = json
                     .as_array()
                     .unwrap()

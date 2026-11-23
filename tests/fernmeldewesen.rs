@@ -80,23 +80,23 @@ fn alle_routen(einsatz: i64) -> Vec<(&'static str, String, Option<&'static str>)
         ("GET", s.clone(), None),
         (
             "PUT",
-            format!("{s}/lage/fs"),
+            format!("{s}/layout/fs"),
             Some(r#"{"x":8,"y":16,"version":null}"#),
         ),
-        ("DELETE", format!("{s}/lage"), None),
+        ("DELETE", format!("{s}/layout"), None),
         (
             "PUT",
-            format!("{s}/schriftfeld"),
+            format!("{s}/title-block"),
             Some(r#"{"gez_name":"x"}"#),
         ),
         (
             "POST",
-            format!("{s}/komponenten"),
+            format!("{s}/components"),
             Some(r#"{"art":"repeater"}"#),
         ),
         (
             "POST",
-            format!("{s}/bereiche"),
+            format!("{s}/areas"),
             Some(r#"{"x":0,"y":0,"breite":80,"hoehe":40}"#),
         ),
     ]
@@ -147,7 +147,7 @@ async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("{}/komponenten", skizze_pfad(einsatz)),
+        &format!("{}/components", skizze_pfad(einsatz)),
         &kraft,
         Some(r#"{"art":"repeater"}"#),
     )
@@ -232,7 +232,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/komponenten", skizze_pfad(einsatz)),
+        &format!("{}/components", skizze_pfad(einsatz)),
         &beob,
         Some(r#"{"art":"repeater"}"#),
     )

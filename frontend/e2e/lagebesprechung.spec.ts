@@ -68,8 +68,7 @@ async function abschliessen(page: Page, einsatzId: number, entschluss: string) {
   await dialog.getByLabel('Entschluss').fill(entschluss);
   const gespeichert = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefings`) &&
-      r.request().method() === 'POST',
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefings`) && r.request().method() === 'POST',
   );
   await dialog.getByRole('button', { name: 'Abschließen', exact: true }).click();
   expect((await gespeichert).status()).toBe(201);

@@ -324,10 +324,9 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Kommunikationsplan S6 (LFH-848): eine Behörde mit langer Bezeichnung, langer Nummer und
   // langem Hinweis. Die Antwort ist der ganze Plan; die id der Stelle steht darin.
-  const plan = await page.request.post(
-    `/api/einsaetze/${einsatzId}/staff/comms-plan/positions`,
-    { data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE } },
-  );
+  const plan = await page.request.post(`/api/einsaetze/${einsatzId}/staff/comms-plan/positions`, {
+    data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE },
+  });
   expect(plan.ok(), `Seeding Kommunikationsplan: ${await plan.text()}`).toBeTruthy();
   const stelle = ((await plan.json()) as { id: number; bezeichnung?: string }[]).find(
     (s) => s.bezeichnung === KOMMUNIKATION_STELLE,

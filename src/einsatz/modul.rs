@@ -163,14 +163,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
     // LLH-1111: Stand und Termin unter `…/briefing`, Verlauf und Abschluss unter
     // `…/briefings` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
-    (
-        "/api/einsaetze/{id}/briefing",
-        Some("lagebesprechung"),
-    ),
-    (
-        "/api/einsaetze/{id}/briefings",
-        Some("lagebesprechung"),
-    ),
+    ("/api/einsaetze/{id}/briefing", Some("lagebesprechung")),
+    ("/api/einsaetze/{id}/briefings", Some("lagebesprechung")),
     // LLH-1180: Kommunikationsplan und Fernmeldeskizze liegen unter `…/staff`, gehören
     // aber dem Modul Fernmeldewesen (Herleitung `wgnb0am2-stab-abwaehlbar`, D4). Das Modul `stab`
     // gibt es nicht mehr (i6k6mzed, design.md D1); `…/staff` selbst ist kein Präfix.
@@ -465,16 +459,14 @@ mod tests {
             Some(Some("fernmeldewesen"))
         );
         assert_eq!(
-            key_fuer_pfad(
-                "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}"
-            ),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}"),
             Some(Some("fernmeldewesen"))
         );
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/staff/comms-sketch/areas/{bid}"),
             Some(Some("fernmeldewesen"))
         );
-        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter dem alten Pfad.
+        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter `…/staff/info-line`.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/staff/info-line"),
             Some(Some("infotelefon"))

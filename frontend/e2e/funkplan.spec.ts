@@ -362,7 +362,7 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   // Bedingung statt Betriebsart (LFH-1030): lange Angaben brechen um, statt zu überhängen.
   await expect(tmo).toContainText(`TMO · ${SG_NETZ} · ${SG_SICHERHEIT}`);
   await expect(tmo).toContainText(EINHEIT_RUF);
-  // `POST …/einsaetze/{id}/sprechgruppen` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
+  // `POST …/einsaetze/{id}/talk-groups` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
   await expect(tmo).toContainText('einsatzlokal');
   // TMO vor DMO, die lokale ohne Zuordnung mit „keine“.
   await expect(sprechgruppenSicht(page).locator('tr.ant-table-row').first()).toContainText(SG_LANG);

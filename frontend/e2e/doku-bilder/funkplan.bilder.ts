@@ -127,11 +127,11 @@ test.describe(KAPITEL, () => {
     const plan = `${e}/staff/comms-plan`;
     const stellen = (await (await api.get(plan)).json()) as { bezeichnung?: string }[];
     if (!stellen.some((s) => s.bezeichnung === 'ILS Musterstadt')) {
-      const neu = (await fuelle(api, 'post', `${plan}/stellen?antwort=stelle`, {
+      const neu = (await fuelle(api, 'post', `${plan}/positions?antwort=stelle`, {
         stellenart: 'leitstelle',
         bezeichnung: 'ILS Musterstadt',
       })) as { id: number };
-      await fuelle(api, 'post', `${plan}/stellen/${neu.id}/verbindungen`, {
+      await fuelle(api, 'post', `${plan}/positions/${neu.id}/connections`, {
         mittel: 'festnetz',
         wert: '0561 7000 112',
         hinweis: 'Lagedienst',
@@ -139,17 +139,17 @@ test.describe(KAPITEL, () => {
     }
     const mitFunktion = stellen as { funktion?: string }[];
     if (!mitFunktion.some((s) => s.funktion === 's5')) {
-      const neu = (await fuelle(api, 'post', `${plan}/stellen?antwort=stelle`, {
+      const neu = (await fuelle(api, 'post', `${plan}/positions?antwort=stelle`, {
         stellenart: 'funktion',
         funktion: 's5',
       })) as { id: number };
-      await fuelle(api, 'post', `${plan}/stellen/${neu.id}/verbindungen`, {
+      await fuelle(api, 'post', `${plan}/positions/${neu.id}/connections`, {
         mittel: 'email',
         wert: 'presse@musterstadt.example',
       });
     }
     if (!stellen.some((s) => s.bezeichnung === 'Ordnungsamt Musterstadt')) {
-      await fuelle(api, 'post', `${plan}/stellen?antwort=stelle`, {
+      await fuelle(api, 'post', `${plan}/positions?antwort=stelle`, {
         stellenart: 'behoerde',
         bezeichnung: 'Ordnungsamt Musterstadt',
       });

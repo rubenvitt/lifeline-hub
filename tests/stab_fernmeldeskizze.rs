@@ -1262,9 +1262,7 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
         &app,
         &admin,
         "PUT",
-        &format!(
-            "/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}/talk-groups/{sg}"
-        ),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}/talk-groups/{sg}"),
         Some(json!({"status": "geplant"})),
     )
     .await;

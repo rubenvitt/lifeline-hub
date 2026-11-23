@@ -1318,11 +1318,7 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
             format!("bereitstellungsraeume/{br}/belegung"),
             Some(belegung),
         ),
-        (
-            "PATCH",
-            "fuehrungsstelle".to_string(),
-            Some(fuehrungsstelle),
-        ),
+        ("PATCH", "command-post".to_string(), Some(fuehrungsstelle)),
         ("POST", "auftraege".to_string(), Some(auftrag)),
     ] {
         let (s, json) = anfrage(

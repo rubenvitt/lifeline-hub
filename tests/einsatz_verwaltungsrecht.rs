@@ -104,14 +104,7 @@ async fn stand(app: &axum::Router, cookie: &str, einsatz: i64) -> (Value, Value,
     let basis = format!("/api/einsaetze/{einsatz}");
     let (s1, kopf) = anfrage(app, "GET", &basis, cookie, None).await;
     let (s2, einst) = anfrage(app, "GET", &format!("{basis}/einstellungen"), cookie, None).await;
-    let (s3, fs) = anfrage(
-        app,
-        "GET",
-        &format!("{basis}/command-post"),
-        cookie,
-        None,
-    )
-    .await;
+    let (s3, fs) = anfrage(app, "GET", &format!("{basis}/command-post"), cookie, None).await;
     assert_eq!(
         (s1, s2, s3),
         (StatusCode::OK, StatusCode::OK, StatusCode::OK)

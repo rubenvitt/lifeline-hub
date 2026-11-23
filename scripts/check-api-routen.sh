@@ -160,13 +160,14 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
     if [ -n "$neu_zeilen" ]; then
       neu_zeilen="$(printf '%s\n' "$unbekannt" | awk -F'\t' '
         NR == FNR { neu[$0] = 1; next }
-        ($1 in neu) && $2 != "einsaetze" { print $1 }
+        ($1 in neu) && ($2 != "einsaetze" || $1 !~ /^\/api\/einsaetze\//) { print $1 }
       ' <(printf '%s\n' "$neu_zeilen") - | sort -u)"
       # Eine neue Zeile, die gar nicht registriert ist, meldet schon Prüfpunkt 2 als veraltet.
     fi
     if [ -n "$neu_zeilen" ]; then
       while IFS= read -r pfad; do
-        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand darf nur schrumpfen" \
+        melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base); der Bestand wächst nur um Pfade," \
+          "die allein noch das Präfix einsaetze tragen" \
           "(ADR-0093). Die Route englisch benennen."
       done <<< "$neu_zeilen"
     fi

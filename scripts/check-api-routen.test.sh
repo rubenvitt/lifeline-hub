@@ -160,6 +160,9 @@ fall "neue Bestandszeile, einziges deutsches Segment einsaetze" gruen \
 fall "neue Bestandszeile mit einsaetze und einem weiteren deutschen Segment" rot \
   "route_dazu '/api/einsaetze/{id}/neu-deutsch' && printf '%s\n' '/api/einsaetze/{id}' '/api/einsaetze/{id}/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "/api/einsaetze/{id}/neu-deutsch" "origin/alpha"
+fall "neue Bestandszeile mit einsaetze nicht als Präfix" rot \
+  "route_dazu '/api/health/einsaetze' && printf '%s\n' '/api/einsaetze/{id}' '/api/health/einsaetze' > scripts/api-routen-bestand.txt" \
+  "/api/health/einsaetze" "origin/alpha"
 fall "Bestand wächst, origin/alpha fehlt" gruen \
   "git update-ref -d refs/remotes/origin/alpha && route_dazu /api/neu-deutsch && printf '%s\n' '/api/einsaetze/{id}' '/api/neu-deutsch' > scripts/api-routen-bestand.txt" \
   "übersprungen"

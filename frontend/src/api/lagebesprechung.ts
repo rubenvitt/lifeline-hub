@@ -29,11 +29,7 @@ export function lagebesprechungAbschliessen(
   einsatzId: number,
   daten: LagebesprechungAbschlussBody,
 ): Promise<LagebesprechungStand> {
-  return apiSend<LagebesprechungStand>(
-    `/api/einsaetze/${einsatzId}/briefings`,
-    'POST',
-    daten,
-  );
+  return apiSend<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/briefings`, 'POST', daten);
 }
 
 /** Termin ohne Abschluss setzen (`null` = kein Termin); kein ETB-Eintrag (design.md D3). */

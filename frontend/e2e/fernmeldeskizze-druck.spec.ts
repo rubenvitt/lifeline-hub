@@ -48,10 +48,10 @@ async function seedeDruck(page: Page, einsatzId: string): Promise<Druckseed> {
   const a = api(page, einsatzId);
   const slAs = (await a.post('talk-groups', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
   const stelle = async (stellenart: string, bezeichnung: string) => {
-    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'staff/comms-plan/positions',
-      { stellenart, bezeichnung },
-    );
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>('staff/comms-plan/positions', {
+      stellenart,
+      bezeichnung,
+    });
     return plan.find((s) => s.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');

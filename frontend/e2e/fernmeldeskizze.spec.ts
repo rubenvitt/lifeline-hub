@@ -99,10 +99,10 @@ async function seedeGross(page: Page, einsatzId: string) {
     }
   }
   const stelle = async (stellenart: string, bezeichnung: string) => {
-    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'staff/comms-plan/positions',
-      { stellenart, bezeichnung },
-    );
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>('staff/comms-plan/positions', {
+      stellenart,
+      bezeichnung,
+    });
     return plan.find((x) => x.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');
@@ -457,7 +457,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   await flaecheInsBild(page);
   const b = (await bereich.locator('[data-teil="grenze"]').boundingBox())!;
   const verschoben = page.waitForResponse(
-    (r) => r.url().includes(`/lage/${ksKey}`) && r.request().method() === 'PUT',
+    (r) => r.url().includes(`/layout/${ksKey}`) && r.request().method() === 'PUT',
   );
   const platz = leitstelle.locator(':scope > rect').first();
   const p = (await platz.boundingBox())!;
@@ -522,10 +522,10 @@ test('Geplant: Verbindung und Stichleitung gestrichelt mit dem Wort „geplant�
   const a = api(page, einsatzId);
   const slAs = (await a.post('talk-groups', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
   const stelle = async (stellenart: string, bezeichnung: string) => {
-    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'staff/comms-plan/positions',
-      { stellenart, bezeichnung },
-    );
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>('staff/comms-plan/positions', {
+      stellenart,
+      bezeichnung,
+    });
     return plan.find((s) => s.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');
@@ -632,10 +632,10 @@ async function seedeLuecken(page: Page, einsatzId: string) {
   const mit = await einheit('1. Zug', 'Florian 1/1', [bnBos]);
   const ohne = await einheit('2. Zug', null, []);
   const fremd = await einheit('3. Zug', 'Florian 1/3', [d505]);
-  const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-    'staff/comms-plan/positions',
-    { stellenart: 'leitstelle', bezeichnung: 'ILS Musterhausen' },
-  );
+  const plan = await a.post<{ id: number; bezeichnung: string }[]>('staff/comms-plan/positions', {
+    stellenart: 'leitstelle',
+    bezeichnung: 'ILS Musterhausen',
+  });
   const ils = plan.find((s) => s.bezeichnung === 'ILS Musterhausen')!.id;
   return { bnBos, d505, ea, mit, ohne, fremd, ils };
 }
@@ -752,7 +752,7 @@ test('Lage: zweimal Pfeil rechts bleibt über Neuladen; „Neu anordnen“ stell
   await ea1.focus();
   for (let i = 0; i < 2; i++) {
     const gespeichert = page.waitForResponse(
-      (r) => r.url().includes(`/lage/ab-${n.ea[0]}`) && r.request().method() === 'PUT',
+      (r) => r.url().includes(`/layout/ab-${n.ea[0]}`) && r.request().method() === 'PUT',
     );
     await page.keyboard.press('ArrowRight');
     expect((await gespeichert).ok()).toBe(true);
@@ -823,7 +823,7 @@ test('Gleichzeitig: zwei Kontexte verschieben dieselbe Einheit — B bekommt ein
     // A verschiebt zuerst und speichert.
     await element(page, key).focus();
     const aGespeichert = page.waitForResponse(
-      (r) => r.url().includes(`/lage/${key}`) && r.request().method() === 'PUT',
+      (r) => r.url().includes(`/layout/${key}`) && r.request().method() === 'PUT',
     );
     await page.keyboard.press('ArrowDown');
     expect((await aGespeichert).ok()).toBe(true);
@@ -835,7 +835,7 @@ test('Gleichzeitig: zwei Kontexte verschieben dieselbe Einheit — B bekommt ein
     // B verschiebt vom alten Stand aus.
     await element(b, key).focus();
     const bAntwort = b.waitForResponse(
-      (r) => r.url().includes(`/lage/${key}`) && r.request().method() === 'PUT',
+      (r) => r.url().includes(`/layout/${key}`) && r.request().method() === 'PUT',
     );
     await b.keyboard.press('ArrowRight');
     expect((await bAntwort).status(), 'B’s Stand ist veraltet').toBe(409);

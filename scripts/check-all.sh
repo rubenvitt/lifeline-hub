@@ -464,9 +464,9 @@ schritt_14() {
   # irrt in beide Richtungen still.
   "$ROOT/scripts/check-schreibweisen.test.sh"
   "$ROOT/scripts/check-schreibweisen.sh"
-  # API-Routen englisch nach Glossar, deutscher Bestand schrumpft nur (LLH-1979, ADR-0093). Wie
-  # oben: erst der Selbsttest, dann die Prüfung; ohne origin/alpha fällt nur der Vergleich des
-  # Bestands laut aus.
+  # API-Routen englisch nach Glossar; der deutsche Bestand wächst nur um Pfade, die allein noch
+  # das Präfix `einsaetze` tragen (LLH-1979, ADR-0093). Wie oben: erst der Selbsttest, dann
+  # die Prüfung; ohne origin/alpha fällt nur der Vergleich des Bestands laut aus.
   "$ROOT/scripts/check-api-routen.test.sh"
   "$ROOT/scripts/check-api-routen.sh"
 }

@@ -718,12 +718,7 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
         StatusCode::OK
     );
     assert_eq!(
-        get_status(
-            &app,
-            &frieda,
-            &format!("/api/einsaetze/{eid}/briefing")
-        )
-        .await,
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/briefing")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: Frieda sieht die Lagebesprechung nicht"
     );

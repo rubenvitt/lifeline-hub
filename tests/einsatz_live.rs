@@ -1070,7 +1070,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
         ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
         (
             "PATCH",
-            "fuehrungsstelle".to_string(),
+            "command-post".to_string(),
             Some(format!(r#"{{"fahrzeug_ids":[{ef}]}}"#)),
         ),
     ] {

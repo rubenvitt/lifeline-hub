@@ -26,7 +26,8 @@ herleitung:
   auch für Fachbegriffe; Form der Segmente: Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
 - MUST: Ein deutscher Begriff hat im Glossar genau ein englisches Segment und umgekehrt.
 - MUST NOT: `scripts/api-routen-bestand.txt` bekommt keine Zeile, die auf `alpha` fehlt, außer
-  einem Pfad, dessen einziges Segment außerhalb des Glossars `einsaetze` ist.
+  einem Pfad unter `/api/einsaetze/`, dessen einziges Segment außerhalb des Glossars dieses
+  Präfix `einsaetze` ist.
 - MUST: Bis 1.0.0 wird ein Pfad ohne Alias umbenannt; Backend, Frontend und Hüllen ziehen im
   selben PR um. Pfade unter `/api/v1/` erst, wenn eine ADR die Zusage von ADR-0022 ersetzt.
 - MUST: Ab 1.0.0 bleibt ein umbenannter Pfad drei Major-Versionen lang als Alias erreichbar.
@@ -55,5 +56,5 @@ zuzulassen, statt nur die Zeilenzahl zu vergleichen.
 
 Die Pakete 9 bis 14 von LLH-1979 und neue Routen unter `/api/einsaetze/{id}/` kommen durch den
 Wächter, solange alles nach dem Präfix englisch ist; jedes andere deutsche Segment bleibt rot.
-Das Präfix-Paket leert den Bestand, danach greift die Ausnahme nicht mehr. Die übrigen Regeln
-von ADR-0085 gelten unverändert weiter.
+Das Präfix-Paket leert den Bestand, danach greift die Ausnahme nicht mehr. Die übrigen Regeln übernimmt
+diese ADR wortgleich aus ADR-0085.
