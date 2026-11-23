@@ -2023,7 +2023,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::anbindungen_webhook::test),
         )
         .route(
-            "/api/admin/anbindungen/{id}/webhook/zertifikat-abrufen",
+            "/api/admin/integrations/{id}/webhook/fetch-certificate",
             post(routes::anbindungen_webhook::zertifikat_abrufen),
         )
         .route(

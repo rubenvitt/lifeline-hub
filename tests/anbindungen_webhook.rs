@@ -27,6 +27,11 @@ fn pfad(id: &str) -> String {
     format!("{LISTE}/{id}/webhook")
 }
 
+/// Neue Routen sind englisch (ADR-0085), die übrigen Webhook-Routen stehen noch im Bestand.
+fn abruf_pfad(id: &str) -> String {
+    format!("/api/admin/integrations/{id}/webhook/fetch-certificate")
+}
+
 async fn einrichten(app: &axum::Router, admin: &str, id: &str, body: Value) -> (StatusCode, Value) {
     anfrage_json(app, "POST", &pfad(id), admin, Some(&body)).await
 }
@@ -667,7 +672,7 @@ async fn pin_sieht_auch_wer_nur_liest() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/zertifikat-abrufen", pfad(&id)),
+        &abruf_pfad(&id),
         &fk,
         Some(&json!({ "url": "https://empfaenger.example/", "lan_erlaubt": false })),
     )
@@ -680,7 +685,7 @@ async fn abruf_prueft_die_url_und_schreibt_die_spur() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = anbindung(&app, &admin).await;
-    let abruf = format!("{}/zertifikat-abrufen", pfad(&id));
+    let abruf = abruf_pfad(&id);
     let vorher = spur(&pool).await.len();
 
     // Ungültige oder interne Ziele: 400, kein Eintrag (auch ohne eingerichteten Webhook).
