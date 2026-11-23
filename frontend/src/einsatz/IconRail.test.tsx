@@ -123,7 +123,7 @@ describe('IconRail', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: Element,
     ) {
-      if (this.getAttribute('aria-label') === 'Kategorien') return new DOMRect(0, 37, 60, 700);
+      if (this.getAttribute('aria-label') === 'Kategorien') return new DOMRect(0, 37, 64, 700);
       return echt.call(this);
     });
     try {
@@ -245,7 +245,7 @@ describe('IconRail · Dichte', () => {
 
   it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
     // Konkreter Wert als LITERAL: `paddingXS` der Stufe (8) senkrecht, waagerecht 2 px —
-    // die 60-px-Rail hat für eine mitwachsende Seitenpolsterung keinen Platz.
+    // die 64-px-Rail hat für eine mitwachsende Seitenpolsterung keinen Platz.
     const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
     expect(stil.minHeight).toBe(72);
     expect(stil.padding).toBe('8px 2px');
