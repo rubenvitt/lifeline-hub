@@ -690,7 +690,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
     setup(false, passwortProvider);
     let body: unknown = null;
     server.use(
-      http.post('/api/auth/passwort', async ({ request }) => {
+      http.post('/api/auth/password', async ({ request }) => {
         body = await request.json();
         return new HttpResponse(null, { status: 204 });
       }),
@@ -713,7 +713,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
   it('zeigt die Ablehnung im Dialog, nicht als Toast, und lässt die Felder stehen', async () => {
     setup(false, passwortProvider);
     server.use(
-      http.post('/api/auth/passwort', () =>
+      http.post('/api/auth/password', () =>
         HttpResponse.json({ error: 'Das bisherige Passwort stimmt nicht.' }, { status: 422 }),
       ),
     );
@@ -731,7 +731,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
     setup(false, passwortProvider);
     const aufruf = vi.fn();
     server.use(
-      http.post('/api/auth/passwort', () => {
+      http.post('/api/auth/password', () => {
         aufruf();
         return new HttpResponse(null, { status: 204 });
       }),
@@ -751,7 +751,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
     setup(false, passwortProvider);
     const aufruf = vi.fn();
     server.use(
-      http.post('/api/auth/passwort', () => {
+      http.post('/api/auth/password', () => {
         aufruf();
         return new HttpResponse(null, { status: 204 });
       }),

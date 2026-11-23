@@ -8,9 +8,20 @@ import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { offenesMenue } from '../../test/menue';
 import Anbindungen from './Anbindungen';
 import AnbindungAnsicht from './AnbindungAnsicht';
-import { LAN_WARNUNG, versuchText, webhookPatch } from './AnbindungWebhook';
+import {
+  LAN_WARNUNG,
+  NEUER_SERVER,
+  PIN_HINWEIS,
+  versuchText,
+  webhookPatch,
+} from './AnbindungWebhook';
 import { webhookZustandAnzeige } from './anbindungAnzeige';
-import { artGesperrtGrund, webhookFehlerText } from '../../api/anbindungen';
+import {
+  artGesperrtGrund,
+  fingerabdruckGruppen,
+  pinNormal,
+  webhookFehlerText,
+} from '../../api/anbindungen';
 
 vi.mock('../../auth/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -438,5 +449,217 @@ describe('Webhook · Wortlaut (LLH-1656)', () => {
         { url: ' https://b.example/ ', arten: ['einsatz.closed'], lan_erlaubt: true },
       ),
     ).toEqual({ url: 'https://b.example/', arten: ['einsatz.closed'], lan_erlaubt: true });
+  });
+});
+
+/** Fingerabdruck am Webhook (LLH-1872, Design-Doc 2026-11-22-wx6bfsmc). */
+
+const PIN = 'ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12';
+const PIN_GRUPPEN =
+  'AB:12:CD:34:EF:56:AB:12:CD:34:EF:56:AB:12:CD:34:EF:56:AB:12:CD:34:EF:56:AB:12:CD:34:EF:56:AB:12';
+
+function abrufBereit(antwort: Record<string, unknown>) {
+  const abrufe: unknown[] = [];
+  server.use(
+    http.post('/api/admin/anbindungen/a/webhook/zertifikat-abrufen', async ({ request }) => {
+      abrufe.push(await request.json());
+      return HttpResponse.json(antwort);
+    }),
+  );
+  return abrufe;
+}
+
+describe('Webhook · Fingerabdruck (LLH-1872)', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
+  });
+
+  it('zeigt den Fingerabdruck gruppiert, ohne ihn die Vertrauensanker', async () => {
+    stelleBereit(zugang({ webhook: webhook({ zertifikat_pin: PIN }) }));
+    renderAnsicht();
+    expect(await screen.findByText(PIN_GRUPPEN)).toBeInTheDocument();
+  });
+
+  it('ohne Fingerabdruck nennt die Ansicht die Vertrauensanker', async () => {
+    stelleBereit(zugang({ webhook: webhook() }));
+    renderAnsicht();
+    expect(
+      await screen.findByText('kein Fingerabdruck – es gelten die Vertrauensanker des Servers'),
+    ).toBeInTheDocument();
+  });
+
+  it('holt den Fingerabdruck vom Ziel und übernimmt ihn erst nach Bestätigung', async () => {
+    const aufrufe = stelleBereit(zugang());
+    const abrufe = abrufBereit({ fingerabdruck: PIN });
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Webhook einrichten' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Webhook einrichten' });
+    expect(dialog.textContent).toContain(PIN_HINWEIS);
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Ziel-URL' }),
+      'https://10.0.0.5/hook',
+    );
+    await user.click(within(dialog).getByRole('checkbox', { name: /lokalen Netz/ }));
+    await user.click(within(dialog).getByRole('checkbox', { name: /Einsatz lesbar geworden/ }));
+
+    // Abbrechen: das Feld bleibt leer.
+    await user.click(within(dialog).getByRole('button', { name: 'Vom Ziel holen' }));
+    let bestaetigung = await screen.findByRole('dialog', { name: 'Zertifikat des Ziels' });
+    expect(bestaetigung.textContent).toContain(PIN_GRUPPEN);
+    await user.click(within(bestaetigung).getByRole('button', { name: 'Abbrechen' }));
+    expect(within(dialog).getByRole('textbox', { name: 'Zertifikat' })).toHaveValue('');
+    expect(abrufe).toEqual([{ url: 'https://10.0.0.5/hook', lan_erlaubt: true }]);
+
+    // Übernehmen: das Feld trägt ihn, gespeichert wird er erst mit „Einrichten“.
+    await user.click(within(dialog).getByRole('button', { name: 'Vom Ziel holen' }));
+    bestaetigung = await screen.findByRole('dialog', { name: 'Zertifikat des Ziels' });
+    await user.click(within(bestaetigung).getByRole('button', { name: 'Übernehmen' }));
+    expect(within(dialog).getByRole('textbox', { name: 'Zertifikat' })).toHaveValue(PIN_GRUPPEN);
+    expect(aufrufe).toEqual([]);
+    await user.click(within(dialog).getByRole('button', { name: 'Einrichten' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          pfad: 'einrichten',
+          body: {
+            url: 'https://10.0.0.5/hook',
+            arten: ['einsatz.created'],
+            lan_erlaubt: true,
+            zertifikat_pin: PIN,
+          },
+        },
+      ]),
+    );
+  });
+
+  it('ein gescheiterter Abruf nennt die Fehlerart', async () => {
+    stelleBereit(zugang());
+    abrufBereit({ fehler_art: 'dns' });
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Webhook einrichten' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Webhook einrichten' });
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Ziel-URL' }),
+      'https://ziel.example/',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Vom Ziel holen' }));
+    expect(await within(dialog).findByText(/Name des Ziels nicht auflösbar/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Zertifikat des Ziels' })).toBeNull();
+  });
+
+  it('ein neuer Server lässt den Fingerabdruck sichtbar wegfallen, ein neuer Pfad nicht', async () => {
+    const aufrufe = stelleBereit(zugang({ webhook: webhook({ zertifikat_pin: PIN }) }));
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Webhook bearbeiten' }));
+    const url = screen.getByRole('textbox', { name: 'Ziel-URL' });
+    await user.clear(url);
+    await user.type(url, 'https://empfaenger.example/anders');
+    expect(screen.queryByText(NEUER_SERVER)).toBeNull();
+    await user.clear(url);
+    await user.type(url, 'https://neu.example/hook');
+    expect(await screen.findByText(NEUER_SERVER)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aufrufe).toContainEqual({
+        pfad: 'aendern',
+        body: {
+          url: 'https://neu.example/hook',
+          zertifikat_pin: null,
+          basis_geaendert_at: '2026-11-13 09:00:00',
+        },
+      }),
+    );
+  });
+
+  it('neuer Server mit bestätigtem gleichem Fingerabdruck: er bleibt (Review #1)', async () => {
+    const aufrufe = stelleBereit(zugang({ webhook: webhook({ zertifikat_pin: PIN }) }));
+    abrufBereit({ fingerabdruck: PIN });
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Webhook bearbeiten' }));
+    const url = screen.getByRole('textbox', { name: 'Ziel-URL' });
+    await user.clear(url);
+    await user.type(url, 'https://neu.example/hook');
+    expect(await screen.findByText(NEUER_SERVER)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Vom Ziel holen' }));
+    const bestaetigung = await screen.findByRole('dialog', { name: 'Zertifikat des Ziels' });
+    expect(bestaetigung.textContent).toContain('Fingerabdruck mit dem am Zielgerät vergleichen.');
+    await user.click(within(bestaetigung).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(screen.queryByText(NEUER_SERVER)).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aufrufe).toContainEqual({
+        pfad: 'aendern',
+        body: {
+          url: 'https://neu.example/hook',
+          zertifikat_pin: PIN,
+          basis_geaendert_at: '2026-11-13 09:00:00',
+        },
+      }),
+    );
+  });
+
+  it('angehalten mit tls von vor dem Fingerabdruck: kein Hinweis (Review #2)', async () => {
+    const fehler = { at: '2026-11-13 08:00:00', art: 'tls' };
+    stelleBereit(
+      zugang({
+        webhook: webhook({ zustand: 'angehalten', letzter_fehler: fehler, zertifikat_pin: PIN }),
+      }),
+    );
+    renderAnsicht();
+    await screen.findByText(/Zertifikat des Ziels nicht anerkannt/);
+    expect(screen.queryByText(/Zertifikat gewechselt/)).toBeNull();
+  });
+
+  it('gestört mit tls und Fingerabdruck: Hinweis auf einen Zertifikatswechsel', async () => {
+    const fehler = { at: '2026-11-13 10:00:00', art: 'tls' };
+    stelleBereit(
+      zugang({
+        webhook: webhook({ zustand: 'fehler', letzter_fehler: fehler, zertifikat_pin: PIN }),
+      }),
+    );
+    renderAnsicht();
+    expect(
+      await screen.findByText('Hat das Ziel sein Zertifikat gewechselt? Fingerabdruck neu holen.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Zertifikat des Ziels nicht anerkannt/)).toBeInTheDocument();
+  });
+
+  it('gestört mit tls ohne Fingerabdruck: kein Hinweis', async () => {
+    const fehler = { at: '2026-11-13 10:00:00', art: 'tls' };
+    stelleBereit(zugang({ webhook: webhook({ zustand: 'fehler', letzter_fehler: fehler }) }));
+    renderAnsicht();
+    await screen.findByText(/Zertifikat des Ziels nicht anerkannt/);
+    expect(screen.queryByText(/Zertifikat gewechselt/)).toBeNull();
+  });
+
+  it('Wortlaut: Gruppen, Normalform und Patch', () => {
+    expect(fingerabdruckGruppen(PIN)).toBe(PIN_GRUPPEN);
+    expect(pinNormal(` ${PIN_GRUPPEN} `)).toBe(PIN);
+    expect(pinNormal('AB-12 cd')).toBe('ab12cd');
+    const vorher = {
+      url: 'https://a.example/',
+      arten: ['einsatz.created'] as ('einsatz.created' | 'einsatz.closed')[],
+      lan_erlaubt: false,
+      zertifikat_pin: PIN,
+    };
+    expect(webhookPatch(vorher, { ...vorher, zertifikat_pin: PIN_GRUPPEN })).toEqual({});
+    expect(webhookPatch(vorher, { ...vorher, zertifikat_pin: '' })).toEqual({
+      zertifikat_pin: null,
+    });
+    expect(
+      webhookPatch({ ...vorher, zertifikat_pin: '' }, { ...vorher, zertifikat_pin: PIN_GRUPPEN }),
+    ).toEqual({ zertifikat_pin: PIN });
+    // Neuer Server, Fingerabdruck unverändert: er fällt weg. Neuer Pfad: er bleibt.
+    expect(webhookPatch(vorher, { ...vorher, url: 'https://b.example/' })).toEqual({
+      url: 'https://b.example/',
+      zertifikat_pin: null,
+    });
+    expect(webhookPatch(vorher, { ...vorher, url: 'https://a.example/x' })).toEqual({
+      url: 'https://a.example/x',
+    });
   });
 });

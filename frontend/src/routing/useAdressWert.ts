@@ -169,7 +169,7 @@ export function useAdressSuche(schluessel = 'q'): [string, (text: string) => voi
     geschrieben.current = adresse;
     setText(adresse);
     // Getaktet über den Eintrag; Adresse und Art gelten zu diesem Zeitpunkt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
 
   const setze = useCallback(
@@ -222,7 +222,7 @@ export function useAdressWertNachRueckfrage<T extends string>(
       setzeAdresse(adresse);
     });
     // Getaktet nur über den Adresswert; die übrigen Werte gelten zum Zeitpunkt der Änderung.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [adresse]);
 
   const setzeSofort = useCallback(

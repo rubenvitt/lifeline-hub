@@ -324,7 +324,7 @@ export function CommandPalette({
     (el: HTMLDivElement | null) => {
       if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- die Abhängigkeiten sind der Auslöser
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- die Abhängigkeiten sind der Auslöser
     [aktiv, vorschau],
   );
 

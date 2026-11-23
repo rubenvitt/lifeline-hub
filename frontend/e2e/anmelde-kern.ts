@@ -7,7 +7,7 @@ import { expect, type Page } from '@playwright/test';
  * Einsatzliste), bevor der Fall seine Seite überhaupt lud: bei rund 1.300 Anmeldungen je Lauf
  * ein spürbarer Teil der e2e-Zeit. `page.request` teilt die Cookies mit dem Browserkontext, die
  * Sitzung gilt also für die nächste Navigation. Das Formular prüfen nur noch die Specs, die die
- * Anmeldung selbst prüfen; der Riegel in `frontend/eslint.config.js` nennt sie.
+ * Anmeldung selbst prüfen; die Ausnahmeliste des Riegels in `frontend/.oxlintrc.json` nennt sie.
  *
  * - `startseite: true` (Vorgabe) lädt danach die Einsatzliste und wartet auf ihre URL: dieselbe
  *   Nachbedingung wie der frühere Formularweg, jeder Aufrufer bleibt gültig.

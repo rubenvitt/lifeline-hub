@@ -382,7 +382,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
   nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein rohes antds `Tag`**
-  (ESLint `no-restricted-imports`; Ausnahme nur
+  (Lint `no-restricted-imports`; Ausnahme nur
   `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
   Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
