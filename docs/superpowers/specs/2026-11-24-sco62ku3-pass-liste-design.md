@@ -134,7 +134,7 @@ Listenzugriffen (`liste_listenweit`) und im Erfassungsfenster je Person, wie dor
   formatierte Daten, Verbleibtext. Die Druckseite zeigt sie nur an und ordnet nichts zu. So steht
   die Zuordnung allein in Rust (Anti-Ziel). `PassBetroffenheit` bleibt ein Enum im Server und
   geht nicht auf den Draht.
-- **Zeiten** formatiert der Server in der Zeitzone des Einsatzes (`zone_oder_vorgabe`, wie die
+- **Zeiten** formatiert der Server in der Zeitzone des Einsatzes (`zeitdarstellung::zeitstil_laden`, wie die
   übrigen serverseitig formatierten Zeiten).
 - **UHS-Name:** `PersonAnzeige` trägt nur `aktuelle_uhs_id`. Der Handler lädt die Bezeichnungen
   der UHS des Einsatzes in einer Abfrage dazu.
