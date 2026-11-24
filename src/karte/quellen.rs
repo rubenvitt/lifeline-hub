@@ -12,9 +12,9 @@ use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
     energie_attribution, energie_beitraege, fuehre_energie_zusammen, kombiniere_nina,
-    normalisiere_autobahn, normalisiere_energie_mastr, normalisiere_energie_osm,
-    normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline, ENERGIE_MASTR_ATTRIB,
-    ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
+    normalisiere_autobahn, normalisiere_autobahn_parken, normalisiere_energie_mastr,
+    normalisiere_energie_osm, normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline,
+    ENERGIE_MASTR_ATTRIB, ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
 };
 use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort, FachebeneStatus};
@@ -718,6 +718,28 @@ pub(crate) fn autobahn_antwort(
         AUTOBAHN_ATTRIB,
         None,
         normalisiere_autobahn(roh),
+    ))
+}
+
+/// Ergebnis eines Parken-Laufs → speicherbare Antwort, oder `None` unter 90 % beantworteter
+/// Strecken (LLH-1637). Strenger als [`autobahn_antwort`]: der Stand hält 24 h, und eine Lücke
+/// verdeckte Hunderte Rastanlagen einen ganzen Tag lang, ohne dass die Oberfläche es zeigt.
+pub(crate) fn autobahn_parken_antwort(
+    gesamt: usize,
+    roh: &[(String, Value)],
+) -> Option<FachebeneAntwort> {
+    let brauchbar = roh
+        .iter()
+        .filter(|(_, a)| a.get("parking_lorry").is_some_and(Value::is_array))
+        .count();
+    if brauchbar == 0 || brauchbar * 10 < gesamt * 9 {
+        return None;
+    }
+    Some(FachebeneAntwort::ok(
+        "autobahn_parken",
+        AUTOBAHN_ATTRIB,
+        None,
+        normalisiere_autobahn_parken(roh),
     ))
 }
 
@@ -2946,5 +2968,31 @@ mod deckel_tests {
             .await
             .unwrap();
         assert_eq!(v["type"], "FeatureCollection");
+    }
+}
+
+#[cfg(test)]
+mod autobahn_parken_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn treffer(strasse: &str) -> (String, Value) {
+        (strasse.to_string(), json!({ "parking_lorry": [] }))
+    }
+
+    /// Ein Stand hält 24 h; ein löchriger Lauf verdeckte Hunderte Anlagen einen Tag lang
+    /// (Entwurf LLH-1637). Deshalb 90 % statt der Hälfte wie beim Autobahn-Lauf.
+    #[test]
+    fn parken_antwort_braucht_neunzig_prozent() {
+        let neun: Vec<_> = (0..9).map(|i| treffer(&format!("A{i}"))).collect();
+        let a = autobahn_parken_antwort(10, &neun).expect("9 von 10 reicht");
+        assert_eq!(a.quelle, "autobahn_parken");
+        assert_eq!(a.attribution, AUTOBAHN_ATTRIB);
+        assert!(autobahn_parken_antwort(10, &neun[..8]).is_none());
+        assert!(autobahn_parken_antwort(10, &[]).is_none());
+        // Ein Umschlag ohne Liste zählt nicht.
+        let mut kaputt = neun[..8].to_vec();
+        kaputt.push(("A9".to_string(), json!({ "fehler": "x" })));
+        assert!(autobahn_parken_antwort(10, &kaputt).is_none());
     }
 }
