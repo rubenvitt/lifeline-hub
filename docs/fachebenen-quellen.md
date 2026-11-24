@@ -52,7 +52,7 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | PEGELONLINE | 300 s | 100 s | 60 min | Messwerte ~15 min, vier verpasst |
 | Hochwasser | 300 s | 60 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
 | Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst; gilt auch für Verkehrsmeldungen (LLH-1637), ein Stau verschwindet aus der Antwort, sobald die Quelle ihn beendet |
-| Lkw-Parkplätze (BAB) | 24 h | 30 min | 48 h | Zwei verpasste Tagesläufe; Rastanlagen ändern sich selten |
+| Lkw-Parkplätze (BAB) | 24 h | 30 min | 36 h | 1,5 × TTL wie Energie, unter dem Cache-Deckel von 48 h; Rastanlagen ändern sich selten |
 | ODL | 600 s | 300 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
 | Luftqualität | 900 s | 300 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |

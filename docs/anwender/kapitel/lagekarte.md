@@ -206,7 +206,7 @@ Verkehrsmeldung nennt oben, was los ist, etwa „Stau · +17 min Reisezeitverlus
 (BAB)“ zeigt die Rastanlagen mit ihren Pkw- und Lkw-Stellplätzen und der Ausstattung, nützlich bei
 der Suche nach einem Bereitstellungsraum an der Autobahn. Wie voll eine Anlage gerade ist, weiß die
 Quelle nicht. Beide Ebenen holen ihre Daten nach dem Einschalten erst im Hintergrund und zeigen bis
-dahin, etwa eine halbe Minute lang, „offline“.
+dahin „offline“, meist eine halbe Minute, sind beide zugleich an, bis zu einer Minute.
 
 „Satellitenauswertung (Copernicus EMS)“ zeigt die Karten des europäischen Notfalldienstes, wo er
 für eine Großschadenslage aktiviert wurde: betroffene Flächen, Wassertiefe und Schäden an Gebäuden

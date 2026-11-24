@@ -531,7 +531,7 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
-      autobahn_parken: 48 * 60,
+      autobahn_parken: 36 * 60,
       copernicus: 120,
     });
   });

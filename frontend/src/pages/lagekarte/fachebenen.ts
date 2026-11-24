@@ -276,8 +276,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // Der erste Lauf hängt wie bei `autobahn` an keinem Request (`fetch_autobahn_parken`).
     aufwaermPollMs: 20_000,
     geltung: 'nur Rastanlagen an Bundesautobahnen, ohne Belegung',
-    // Zwei verpasste Tagesläufe.
-    veraltetNachMin: 48 * 60,
+    // 1,5 × TTL wie Energie, unter dem Cache-Deckel von 48 h (`cache::MAX_ALTER_SEKUNDEN`): auf
+    // dem Deckel verschwände der Stand genau dann, wenn er als veraltet gälte.
+    veraltetNachMin: 36 * 60,
   },
   kritis: {
     key: 'kritis',
