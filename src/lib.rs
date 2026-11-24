@@ -77,6 +77,7 @@ pub mod schaden;
 pub mod schichtmodell;
 pub mod sprechgruppe;
 pub mod staerke;
+pub mod stammdaten_eingang;
 pub mod static_files;
 pub mod status_ruecknahme;
 pub mod stichwort;
