@@ -170,6 +170,8 @@ Divera (abrufen, Webhook nur als Auslöser), HiOrg-EFS (Veranstaltungen), späte
 - **Drohne (LLH-1202):**
   - Vorher muss der EXIF-Fehler bei Kartenhintergründen behoben sein.
   - Standbild an der Position aus EXIF/XMP; Video als WHEP/HLS-Quelle.
+  - Ausgearbeitet am 24.11.2026 über Suchlage:
+    [`2026-11-24-drohnenbild-ueber-suchlage.md`](2026-11-24-drohnenbild-ueber-suchlage.md).
 - **Lizenzen (LLH-1203):**
   - NINA: Die Klausel steht im RSS-Feed, nicht im JSON; das Impressum nimmt amtliche
     Warnmeldungen aus. Beim BBK nachfragen.
