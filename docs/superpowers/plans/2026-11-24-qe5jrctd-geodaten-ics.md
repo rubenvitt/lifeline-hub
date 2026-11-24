@@ -146,17 +146,17 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 - Produces: `pub async fn export_termin(State(state): State<AppState>, ctx: EinsatzLesezugriff<Lagebesprechung>) -> Result<Response, AppError>`.
   - Fehlt die Kennung, nimmt die UID `org-<org_id>`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `ics_export_liefert_kalenderdatei`: 200; `content-type` = `text/calendar; charset=utf-8; method=PUBLISH`; `cache-control` = `no-store`; `content-disposition` enthält `lagebesprechung-einsatz-`; der Body beginnt mit `BEGIN:VCALENDAR\r\n`.
   - `ics_export_ohne_termin_ist_404`.
   - `ics_export_ohne_mitgliedschaft_verweigert` (gleiches Gate-Verhalten wie `GET /briefing`).
   - `ics_export_bei_ueberfaelligem_termin_200`.
-- [ ] **Step 2:** `cargo test --test lagebesprechung_ics` → FAIL.
-- [ ] **Step 3:** Handler wie `src/routes/einsatzakte.rs:177-191`, mit dem Body als `String`.
-- [ ] **Step 4:** Prüfen:
+- [x] **Step 2:** `cargo test --test lagebesprechung_ics` → FAIL.
+- [x] **Step 3:** Handler wie `src/routes/einsatzakte.rs:177-191`, mit dem Body als `String`.
+- [x] **Step 4:** Prüfen:
   - `cargo test --test lagebesprechung_ics --test einsatz_kontext_guard --test zulassung_guard` → PASS;
   - `scripts/check-api-routen.sh` → grün.
-- [ ] **Step 5:** Commit `feat: Route für den ICS-Export der Lagebesprechung` (Zunder D).
+- [x] **Step 5:** Commit `feat: Route für den ICS-Export der Lagebesprechung` (Zunder D).
 
 ### Task 5: Knopf „In Kalender übernehmen“ und Dateiname
 

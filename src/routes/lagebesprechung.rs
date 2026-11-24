@@ -7,7 +7,8 @@
 //! nicht (Spec `lagebesprechung`, „Eigenes Modul mit eigener Freigabe“).
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
@@ -16,6 +17,7 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Lagebesprechung;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::lagebesprechung::ics;
 use crate::lagebesprechung::repo::{self, AbschlussEingabe};
 use crate::lagebesprechung::{LagebesprechungAnzeige, LagebesprechungStand, ENTSCHLUSS_MAX};
 use crate::live::LiveEvent;
@@ -34,6 +36,51 @@ pub async fn load(
     ctx: EinsatzLesezugriff<Lagebesprechung>,
 ) -> Result<Json<LagebesprechungStand>, AppError> {
     Ok(Json(repo::load_stand(&state.pool, ctx.einsatz.id).await?))
+}
+
+/// GET /api/incidents/{id}/briefing/schedule/export — der Termin als ICS-Datei (nur lesend).
+///
+/// Ohne Termin 404. Ein überfälliger Termin wird trotzdem geliefert. Die UID trägt die
+/// Instanzkennung; fehlt sie (Identität nie angelegt, dort wird nichts angelegt), steht
+/// `org-<org_id>` an ihrer Stelle.
+pub async fn export_termin(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Lagebesprechung>,
+) -> Result<Response, AppError> {
+    let stand = repo::load_stand(&state.pool, ctx.einsatz.id).await?;
+    let termin = stand
+        .naechste_lagebesprechung_at
+        .as_deref()
+        .and_then(crate::zeit::parse_utc)
+        .ok_or(AppError::NotFound)?;
+    let kennung = crate::instanz::fuehrung::repo::load_kennung(&state.pool)
+        .await?
+        .unwrap_or_else(|| format!("org-{}", ctx.einsatz.org_id));
+    let datei = ics::build_ics(
+        &ics::IcsEingabe {
+            einsatz_id: ctx.einsatz.id,
+            bezeichnung: &ctx.einsatz.bezeichnung,
+            termin,
+            instanz_kennung: &kennung,
+        },
+        chrono::Utc::now(),
+    );
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/calendar; charset=utf-8; method=PUBLISH"),
+    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&crate::anhang::content_disposition(&ics::build_dateiname(
+            ctx.einsatz.id,
+            termin,
+        )))
+        .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
+    );
+    Ok((headers, datei).into_response())
 }
 
 /// GET /api/einsaetze/{id}/briefings — Verlauf, absteigend.

@@ -881,6 +881,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::lagebesprechung::set_termin),
         )
         .route(
+            "/api/incidents/{id}/briefing/schedule/export",
+            get(routes::lagebesprechung::export_termin),
+        )
+        .route(
             "/api/einsaetze/{id}/briefings",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
