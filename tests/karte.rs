@@ -2911,10 +2911,7 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
 
 /// Attrappe von warnung.bund.de: zählt jede Anfrage und liefert eine leere Warnliste. Gibt die
 /// Basis-URL (wie `NINA_BASIS_URL`, ohne `/` am Ende) und den Zähler zurück.
-async fn nina_attrappe() -> (
-    String,
-    std::sync::Arc<std::sync::atomic::AtomicUsize>,
-) {
+async fn nina_attrappe() -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     let zaehler = Arc::new(AtomicUsize::new(0));
@@ -2948,7 +2945,8 @@ async fn nina_app(fachebenen: lifeline_hub::karte::FachebenenState) -> axum::Rou
 #[tokio::test]
 async fn nina_eingeschaltet_fragt_die_quelle_ab() {
     let (basis, zaehler) = nina_attrappe().await;
-    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_nina_basis_url(&basis)).await;
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_nina_basis_url(&basis)).await;
     let res = anfrage(&app, "GET", "/api/map/overlays/nina", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     assert!(zaehler.load(std::sync::atomic::Ordering::SeqCst) >= 1);
@@ -2988,14 +2986,16 @@ async fn abgeschaltete_nina_ist_auch_bedingt_404() {
 /// Die Abschaltung betrifft nur die genannte Ebene; eine unbekannte Quelle bleibt 400.
 #[tokio::test]
 async fn abschaltung_laesst_unbekannte_quelle_bei_400() {
-    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
     let res = anfrage(&app, "GET", "/api/map/overlays/gibtsnicht", None, None).await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn config_meldet_abgeschaltete_fachebenen() {
-    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
     let v = json(anfrage(&app, "GET", "/api/map/config", None, None).await).await;
     assert_eq!(v["fachebenen_abgeschaltet"], serde_json::json!(["nina"]));
 

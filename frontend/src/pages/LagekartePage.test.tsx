@@ -2141,6 +2141,71 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
   });
 });
 
+describe('LagekartePage · vom Betreiber abgeschaltete Fachebene (LLH-2104)', () => {
+  const leer = (quelle: string) =>
+    HttpResponse.json({
+      quelle,
+      status: 'leer',
+      attribution: 'Quelle',
+      features: { type: 'FeatureCollection', features: [] },
+    });
+
+  // Gespeicherte Ansicht mit NINA und DWD an; DWD ist der Taktgeber, an dem der Test erkennt,
+  // dass die Fachebenen abgefragt wurden.
+  function mitAnsicht(abgeschaltet: string[], angefragt: string[]) {
+    basisHandler(
+      [
+        http.get('/api/map/overlays/nina', () => {
+          angefragt.push('nina');
+          return leer('nina');
+        }),
+        http.get('/api/map/overlays/dwd', () => {
+          angefragt.push('dwd');
+          return leer('dwd');
+        }),
+        http.get('/api/einsaetze/1/map-views', () =>
+          HttpResponse.json([
+            {
+              id: 1,
+              einsatz_id: 1,
+              name: 'Standard',
+              reihenfolge: 0,
+              ist_standard: true,
+              erstellt_at: '',
+              geaendert_at: '',
+              fachebenen_sichtbar: { nina: true, dwd: true },
+            },
+          ]),
+        ),
+      ],
+      {
+        online_styles: [],
+        offline_verfuegbar: false,
+        offline_tiles_url: null,
+        offline_attribution: null,
+        offline_regionen: [],
+        karten_bau_verfuegbar: false,
+        fachebenen_abgeschaltet: abgeschaltet,
+      },
+    );
+  }
+
+  it('Gegenprobe: eingeschaltet fragt die Seite NINA aus der gespeicherten Ansicht ab', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht([], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('nina'));
+  });
+
+  it('abgeschaltet fragt die Seite NINA nie ab, obwohl die Ansicht sie gespeichert hat', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht(['nina'], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('dwd'));
+    expect(angefragt).not.toContain('nina');
+  });
+});
+
 describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
   beforeEach(objekteVorn);
 

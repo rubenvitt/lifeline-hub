@@ -438,7 +438,10 @@ fn nina_geojson_url(basis: &str, id: &str) -> String {
 
 pub async fn fetch_nina(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2, basis) = (s.client.clone(), pool.clone(), s.nina_basis_url.clone());
-    liefere_nina(pool, &s.inflight, move || erneuere_nina(client, pool2, basis)).await
+    liefere_nina(pool, &s.inflight, move || {
+        erneuere_nina(client, pool2, basis)
+    })
+    .await
 }
 
 /// Kern von [`fetch_nina`], ohne HTTP prüfbar. NINA trägt kein Ende (`mapData` liefert nur

@@ -380,8 +380,10 @@ export default function Ebenenbaum(props: SidebarProps) {
   const zeigeSichtungslegende =
     (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
 
-  const fachAn = fachebeneKeys().filter((k) => props.fachebenenSichtbar[k]).length;
   const abgeschaltet = props.fachebenenAbgeschaltet ?? [];
+  const fachAn = fachebeneKeys().filter(
+    (k) => props.fachebenenSichtbar[k] && !abgeschaltet.includes(k),
+  ).length;
   const fach = FACHEBENEN_GRUPPEN.map((g) => {
     const z = g.ebenen
       .filter((key) => !abgeschaltet.includes(key))

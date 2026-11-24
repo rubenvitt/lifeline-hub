@@ -520,6 +520,8 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.queryByText(FACHEBENEN.nina.label)).toBeNull();
     // Die Gruppe „Warnungen“ bleibt mit DWD stehen.
     expect(document.querySelector('[data-fachebene="dwd"]')).not.toBeNull();
+    // Der Zähler „N an“ der Fachebenen zählt die abgeschaltete NINA nicht mit.
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).not.toHaveTextContent(/\d+ an/);
   });
 
   it('ohne Abschaltung bleibt NINA im Ebenenbaum (LLH-2104)', () => {
