@@ -473,7 +473,11 @@ describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
     renderMitZone(7);
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
-    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
+    // Die DTG steht in Mono, „Zeitstand:“ in der Textschrift (ADR-0094): zwei Knoten.
+    const dtg = await screen.findAllByText('251400jul26');
+    expect(dtg.some((d) => d.parentElement?.textContent?.includes('Zeitstand: 251400jul26'))).toBe(
+      true,
+    );
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
@@ -1195,9 +1199,7 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
   const ABSCHNITT = { id: 3, name: 'EA Süd' };
 
   beforeEach(() => {
-    server.use(
-      http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([ABSCHNITT])),
-    );
+    server.use(http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])));
     vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
   });

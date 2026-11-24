@@ -122,12 +122,12 @@ test.describe(KAPITEL, () => {
       const weg = await fuelle<Person>(api, 'post', `/api/einsaetze/${demo.id}/personnel`, {
         adhoc: { name: 'Paul Muster', funktion: 'Sanitäter' },
       });
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personnel/${weg.id}/release`);
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personnel/${weg.id}/stand-down`);
       await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personnel`, {
         adhoc: { name: OHNE_EINHEIT, funktion: 'Helfer' },
       });
 
-      for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personal', kraft);
+      for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personnel', kraft);
     } finally {
       await api.dispose();
     }

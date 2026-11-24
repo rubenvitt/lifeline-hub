@@ -16,7 +16,7 @@
     {
       "beschreibung": "eine Dateiroute der eigenen Origin wird heruntergeladen",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/attachments/7",
       "erwartet": "download"
     },
     {
@@ -76,7 +76,7 @@
     {
       "beschreibung": "eine Dateiroute einer fremden Origin geht ans System",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local/api/einsaetze/1/attachments/7",
       "erwartet": "system"
     },
     {
@@ -130,7 +130,7 @@
     {
       "beschreibung": "ohne Server gibt es keine eigene Origin: die Dateiroute geht ans System",
       "server": null,
-      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/attachments/7",
       "erwartet": "system"
     }
   ],
@@ -138,13 +138,13 @@
     {
       "beschreibung": "eine Dateiroute der eigenen Origin wird heruntergeladen",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/attachments/7",
       "erwartet": "download"
     },
     {
       "beschreibung": "eine tiefe Dateiroute der eigenen Origin wird heruntergeladen",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local:8443/api/einsaetze/1/schaeden/3/anhaenge/2/datei",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/damages/3/attachments/2/file",
       "erwartet": "download"
     },
     {
@@ -174,7 +174,7 @@
     {
       "beschreibung": "eine Dateiroute einer fremden Origin bleibt im Fenster",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local/api/einsaetze/1/attachments/7",
       "erwartet": "huelle"
     },
     {
@@ -228,7 +228,7 @@
     {
       "beschreibung": "ohne Server gibt es keine eigene Origin: die Dateiroute bleibt im Fenster",
       "server": null,
-      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/attachments/7",
       "erwartet": "huelle"
     },
     {

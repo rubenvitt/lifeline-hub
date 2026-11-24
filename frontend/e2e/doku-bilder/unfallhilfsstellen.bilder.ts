@@ -44,7 +44,7 @@ async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetai
     await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
   ).json()) as UhsDetail;
   const personen = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
   ).json()) as Person[];
   for (const [name, platzName] of [
     ['Mustermann', 'Behandlungsplatz 1'],
@@ -55,7 +55,7 @@ async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetai
     if (personen.some((p) => p.aktueller_platz_id === platz.id)) continue;
     const person = personen.find((p) => p.name === name && p.aktuelle_uhs_id === uhs.id);
     expect(person, `Demo-Person ${name} in der UHS`).toBeDefined();
-    await fuelle(page, 'post', `/api/einsaetze/${einsatzId}/personen/${person!.id}/uhs-belegung`, {
+    await fuelle(page, 'post', `/api/einsaetze/${einsatzId}/persons/${person!.id}/uhs-occupancy`, {
       art: 'wechsel',
       uhs_id: uhs.id,
       platz_id: platz.id,
@@ -99,7 +99,7 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     const uhs = await grundrissBelegen(page, demo.id);
     const personen = (await (
-      await page.request.get(`/api/einsaetze/${demo.id}/personen`)
+      await page.request.get(`/api/einsaetze/${demo.id}/persons`)
     ).json()) as Person[];
     const wartend = personen.find((p) => p.name === 'Musterfrau')!;
     await uhrAnhalten(page);

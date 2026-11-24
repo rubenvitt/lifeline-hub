@@ -315,7 +315,7 @@ async fn entfernen_schreibt_etb() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/release"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down"),
         &admin,
         None,
     )
@@ -339,7 +339,7 @@ async fn stamm_material_ausser_dienst_ist_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/material/{mid}/ausser-dienst"),
+        &format!("/api/material/{mid}/out-of-service"),
         &admin,
         None,
     )
@@ -394,7 +394,7 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/999999/release"),
+        &format!("/api/einsaetze/{einsatz}/material/999999/stand-down"),
         &admin,
         None,
     )
@@ -814,7 +814,7 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/release"),
+                &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down"),
                 &admin,
                 None,
             )
@@ -1129,7 +1129,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1160,7 +1160,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1171,7 +1171,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&zwei_orte.to_string()),
     )
@@ -1210,7 +1210,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
+                &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
                 &cookie,
                 Some(&vorzustand),
             )
@@ -1222,7 +1222,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/release"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -2491,7 +2491,7 @@ async fn nachforderung_bis(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         Some(
             &serde_json::json!({
@@ -2524,7 +2524,7 @@ async fn nachforderung_status(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/status"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -2536,7 +2536,7 @@ async fn load_nachforderung(app: &axum::Router, cookie: &str, einsatz: i64, id: 
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         None,
     )
@@ -4288,7 +4288,7 @@ async fn material_etb_eintraege_gehen_live_hinaus() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/release/undo"),
+        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&json["vorzustand"].to_string()),
     )

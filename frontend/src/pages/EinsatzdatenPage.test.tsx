@@ -208,13 +208,13 @@ function setup(opts: SetupOpts = {}) {
     meHandler(benutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/members', () => HttpResponse.json(mitglieder)),
-    http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-    http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
+    http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
+    http.get('/api/external-agencies', () => HttpResponse.json(externeStellen)),
     http.get('/api/einsaetze/:id/place-preview', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
-    http.get('/api/einsaetze/7/fuehrungsstelle', () =>
+    http.get('/api/einsaetze/7/command-post', () =>
       HttpResponse.json({
         art: 'mobil',
         sprechgruppen: [],
@@ -222,10 +222,10 @@ function setup(opts: SetupOpts = {}) {
         fahrzeug_ids: [],
       } satisfies Fuehrungsstelle),
     ),
-    http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
+    http.get('/api/einsaetze/7/talk-groups', () => HttpResponse.json(sprechgruppenListe)),
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeugListe)),
     http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personalListe)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(stammFahrzeuge)),
+    http.get('/api/vehicles', () => HttpResponse.json(stammFahrzeuge)),
   );
   const routen = (
     <Routes>
@@ -300,7 +300,7 @@ function serverStand(einsatz: Partial<EinsatzAnzeige> = {}) {
 
 describe('EinsatzdatenPage', () => {
   // LLH-1111: den Termin der Lagebesprechung pflegt nur noch die Seite Lagebesprechung
-  // (`PUT …/lagebesprechung/termin`); der Kopf-PATCH lehnt das Feld ab.
+  // (`PUT …/briefing/schedule`); der Kopf-PATCH lehnt das Feld ab.
   it('zeigt keinen Besprechungstermin mehr, auch wenn der Einsatzkopf einen trägt (LLH-1111)', async () => {
     setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
     // Positiv zuerst: das Paneel steht mit seinen Angaben — sonst wäre die Abwesenheit trivial.
@@ -1055,7 +1055,7 @@ describe('EinsatzdatenPage — Nebenweg „Zugriff verwalten“ (LFH-1170)', () 
 
 /**
  * Eigene Führungsstelle (LFH-849, Spec `einsatz-fuehrungsstelle`): ein Paneel mit Art und sieben
- * Angaben (LFH-1181), jede schickt nur ihr Feld an `…/fuehrungsstelle`.
+ * Angaben (LFH-1181), jede schickt nur ihr Feld an `…/command-post`.
  */
 describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   // Die Sprechgruppen gehen über die Einzelwege (LLH-1456, D1): je Anfrage „PUT 1“ / „DELETE 2“.
@@ -1081,10 +1081,10 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       return new HttpResponse(null, { status: 204 });
     };
     server.use(
-      http.get('/api/einsaetze/7/fuehrungsstelle', () => HttpResponse.json(stand)),
-      http.put('/api/einsaetze/7/fuehrungsstelle/sprechgruppen/:sg', einzelweg),
-      http.delete('/api/einsaetze/7/fuehrungsstelle/sprechgruppen/:sg', einzelweg),
-      http.patch('/api/einsaetze/7/fuehrungsstelle', async ({ request }) => {
+      http.get('/api/einsaetze/7/command-post', () => HttpResponse.json(stand)),
+      http.put('/api/einsaetze/7/command-post/talk-groups/:sg', einzelweg),
+      http.delete('/api/einsaetze/7/command-post/talk-groups/:sg', einzelweg),
+      http.patch('/api/einsaetze/7/command-post', async ({ request }) => {
         const body = (await request.json()) as FuehrungsstellePatch;
         bodies.push(ohneErwartet(body));
         const { fahrzeug_ids, einsatzleiter, ...felder } = body;
@@ -1450,7 +1450,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       benutzer: { ...admin, system_rolle: 'keiner' },
     });
     server.use(
-      http.get('/api/fahrzeuge', () => {
+      http.get('/api/vehicles', () => {
         abrufe += 1;
         return HttpResponse.json(stammFahrzeuge);
       }),
@@ -1500,7 +1500,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Rufname: ohne Stammdaten bleiben die disponierten Vorschläge (LFH-1187)', async () => {
     setup();
     server.use(
-      http.get('/api/fahrzeuge', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/vehicles', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     );
     fuehrungsstelleMitschnitt();
     const user = userEvent.setup();
@@ -1675,7 +1675,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       einsatzleiter: { ...anna, personal_id: undefined, personal_noch_disponiert: false },
     });
     server.use(
-      http.patch('/api/einsaetze/7/fuehrungsstelle', () =>
+      http.patch('/api/einsaetze/7/command-post', () =>
         HttpResponse.json({ error: 'Person ist nicht disponiert' }, { status: 422 }),
       ),
     );
@@ -1809,7 +1809,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen', async () => {
     setup();
     server.use(
-      http.patch('/api/einsaetze/7/fuehrungsstelle', () =>
+      http.patch('/api/einsaetze/7/command-post', () =>
         HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
       ),
     );
@@ -2040,13 +2040,13 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
         HttpResponse.json({ ...leitungEinsatz, id: Number(params.id) }),
       ),
       http.get('/api/einsaetze/:id/members', () => HttpResponse.json(mitglieder)),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-      http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/external-agencies', () => HttpResponse.json(externeStellen)),
       http.get('/api/einsaetze/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
-      http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
+      http.get('/api/einsaetze/:id/command-post', () =>
         HttpResponse.json({
           art: 'mobil',
           sprechgruppen: [],
@@ -2054,7 +2054,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
           fahrzeug_ids: [],
         } satisfies Fuehrungsstelle),
       ),
-      http.get('/api/einsaetze/:id/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
+      http.get('/api/einsaetze/:id/talk-groups', () => HttpResponse.json(sprechgruppenListe)),
       http.get('/api/einsaetze/:id/closure/check', () => HttpResponse.json(nichtsOffen)),
       http.post(
         '/api/einsaetze/7/close',
@@ -2524,7 +2524,7 @@ describe('Sprung zu „Einsatzort“ und „Eigene Führungsstelle“ (LLH-1815)
     try {
       setup({ route: '/einsaetze/7/einsatzdaten?paneel=fuehrungsstelle' });
       server.use(
-        http.get('/api/einsaetze/7/fuehrungsstelle', async () => {
+        http.get('/api/einsaetze/7/command-post', async () => {
           await tor;
           return HttpResponse.json({
             art: 'mobil',

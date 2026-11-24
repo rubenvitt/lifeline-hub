@@ -176,7 +176,7 @@ pub async fn liste_abgeschlossen(
         .map_err(Into::into)
 }
 
-/// Zahl der offenen und der abgeschlossenen Erinnerungen (LFH-940, `…/erinnerungen/kennzahlen`),
+/// Zahl der offenen und der abgeschlossenen Erinnerungen (LFH-940, `…/reminders/metrics`),
 /// in einer Abfrage über `idx_erinnerung_einsatz_status`.
 pub async fn kennzahlen(
     pool: &SqlitePool,

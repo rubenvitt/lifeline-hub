@@ -37,7 +37,7 @@ fn anzahl(nachrichten: &[LiveNachricht], event: LiveEvent) -> usize {
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagebesprechungen")
+    format!("/api/einsaetze/{einsatz}/briefings")
 }
 
 /// Schliesst eine Lagebesprechung mit dem gegebenen Rumpf ab (Vorbedingung: 201).
@@ -441,7 +441,7 @@ async fn termin_setzen_feuert_einsatz_nur_bei_aenderung() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/lagebesprechung/termin");
+    let pfad = format!("/api/einsaetze/{einsatz}/briefing/schedule");
     let mut rx = live.abonniere(einsatz);
 
     let (status, _) = anfrage(
@@ -804,7 +804,7 @@ async fn pegel_anfuegen(app: &axum::Router, cookie: &str, einsatz: i64, uuid: &s
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         cookie,
         Some(&pegel_station(uuid)),
     )
@@ -816,7 +816,7 @@ async fn pegel_ersetzen(app: &axum::Router, cookie: &str, einsatz: i64, uuids: &
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         cookie,
         Some(&pegel_liste(uuids)),
     )
@@ -877,7 +877,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         &admin,
         None,
     )
@@ -888,7 +888,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/prognose"),
+        &format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/forecast"),
         &admin,
         Some(r#"{"hoechststand_cm":420,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#),
     )
@@ -898,14 +898,14 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
 }
 
 fn evakuierung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evakuierung")
+    format!("/api/einsaetze/{einsatz}/evacuation")
 }
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke", evakuierung_pfad(einsatz)),
+        &format!("{}/districts", evakuierung_pfad(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","plan_personen":640,"plan_erhebung":"geschaetzt"}}"#
@@ -920,7 +920,7 @@ async fn bezirk_aendern(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64
     let (status, json) = anfrage(
         app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{bid}", evakuierung_pfad(einsatz)),
         cookie,
         Some(rumpf),
     )
@@ -932,7 +932,7 @@ async fn bezirk_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, bid: 
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke/{bid}/stornieren", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{bid}/annul", evakuierung_pfad(einsatz)),
         cookie,
         None,
     )
@@ -963,7 +963,7 @@ async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{erster}/staende", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{erster}/progress", evakuierung_pfad(einsatz)),
         &admin,
         Some(r#"{"evakuiert":120,"erhebung":"gezaehlt"}"#),
     )
@@ -1070,7 +1070,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
         ("PUT", format!("units/{einheit}/vehicles/{ef}"), None),
         (
             "PATCH",
-            "fuehrungsstelle".to_string(),
+            "command-post".to_string(),
             Some(format!(r#"{{"fahrzeug_ids":[{ef}]}}"#)),
         ),
     ] {

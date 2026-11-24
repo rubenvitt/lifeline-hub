@@ -320,7 +320,7 @@ async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &cookie,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )
@@ -336,7 +336,7 @@ async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &cookie,
         None,
     )
@@ -354,7 +354,7 @@ async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
     let (s, dok) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &format!("/api/einsaetze/{e}/situation-snapshots/{sid}"),
         &cookie,
         None,
     )
@@ -372,7 +372,7 @@ async fn patch_ist_immutabel_fuer_daten_und_stand_at() {
     let (_, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &cookie,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )
@@ -385,7 +385,7 @@ async fn patch_ist_immutabel_fuer_daten_und_stand_at() {
     let (s, patched) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &format!("/api/einsaetze/{e}/situation-snapshots/{sid}"),
         &cookie,
         Some(r#"{"bezeichnung":"Neu","daten":{"hacked":true},"stand_at":"1999"}"#),
     )
@@ -411,7 +411,7 @@ async fn delete_nur_einsatzleitung() {
     let (_, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"S"}"#),
     )
@@ -427,7 +427,7 @@ async fn delete_nur_einsatzleitung() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &fuehr,
         Some(r#"{"bezeichnung":"vom Fuehrer"}"#),
     )
@@ -438,7 +438,7 @@ async fn delete_nur_einsatzleitung() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &format!("/api/einsaetze/{e}/situation-snapshots/{sid}"),
         &fuehr,
         None,
     )
@@ -449,7 +449,7 @@ async fn delete_nur_einsatzleitung() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &format!("/api/einsaetze/{e}/situation-snapshots/{sid}"),
         &admin,
         None,
     )
@@ -463,7 +463,7 @@ async fn fremder_einsatz_ist_404() {
     let (_, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &cookie,
         Some(r#"{}"#),
     )
@@ -473,7 +473,7 @@ async fn fremder_einsatz_ist_404() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{}/lage-snapshots/{sid}", e + 999),
+        &format!("/api/einsaetze/{}/situation-snapshots/{sid}", e + 999),
         &cookie,
         None,
     )
@@ -509,7 +509,7 @@ async fn snapshot_dokument_redigiert_gesperrtes_modul_fuer_den_leser() {
     rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
     let leser = login_cookie(&app, "leser1", "leser1pw1").await;
 
-    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let pfad = format!("/api/einsaetze/{e}/situation-snapshots/{}", snap.id);
 
     // Vor der Sperre: der Leser sieht die Einheit im eingefrorenen Dokument.
     let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
@@ -559,7 +559,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, stelle) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/betreuung/stellen"),
+        &format!("/api/einsaetze/{e}/care/positions"),
         &admin,
         Some(r#"{"bezeichnung":"NU Turnhalle Nord","art":"notunterkunft"}"#),
     )
@@ -569,7 +569,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/betreuung/stellen/{sid}"),
+        &format!("/api/einsaetze/{e}/care/positions/{sid}"),
         &admin,
         Some(r#"{"lat":51.93,"lon":8.87}"#),
     )
@@ -578,7 +578,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{e}/evacuation/districts"),
         &admin,
         Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt"}"#),
     )
@@ -607,7 +607,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let pfad = format!("/api/einsaetze/{e}/situation-snapshots/{}", snap.id);
     let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
     assert_eq!(s, StatusCode::OK, "{dok:?}");
     assert!(
@@ -725,7 +725,7 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let pfad = format!("/api/einsaetze/{e}/situation-snapshots/{}", snap.id);
     let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
     assert_eq!(s, StatusCode::OK, "{dok:?}");
     assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
@@ -769,7 +769,7 @@ async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
     let (s, dok) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &fuehr,
         Some(r#"{"bezeichnung":"vom Fuehrer"}"#),
     )
@@ -779,7 +779,7 @@ async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
     assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
     let sid = dok["id"].as_i64().unwrap();
 
-    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{sid}");
+    let pfad = format!("/api/einsaetze/{e}/situation-snapshots/{sid}");
     let (s, dok) = anfrage(&app, "PATCH", &pfad, &fuehr, Some(r#"{"notiz":"n"}"#)).await;
     assert_eq!(s, StatusCode::OK, "{dok:?}");
     assert_eq!(dok["notiz"], "n");
@@ -812,7 +812,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, tier) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tiere"),
+        &format!("/api/einsaetze/{e}/animals"),
         &admin,
         Some(
             r#"{"spezies":"hund","rufname":"Bello","antreff_ort":"Garten","antreff_lat":51.93,
@@ -824,7 +824,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tiere"),
+        &format!("/api/einsaetze/{e}/animals"),
         &admin,
         Some(r#"{"spezies":"katze","status":"vermisst"}"#),
     )
@@ -861,7 +861,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let pfad = format!("/api/einsaetze/{e}/situation-snapshots/{}", snap.id);
     let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
     assert_eq!(s, StatusCode::OK, "{dok:?}");
     assert_eq!(dok["daten"]["tiere"], json!([]), "{dok}");
@@ -892,7 +892,7 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/freie-zeichen"),
+        &format!("/api/einsaetze/{e}/free-symbols"),
         &admin,
         Some(
             &json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": DREHLEITER, "label": "DLK"})
@@ -916,7 +916,7 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     let (s, neu) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Neu"}"#),
     )
@@ -954,7 +954,7 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     let (s, dok) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &format!("/api/einsaetze/{e}/situation-snapshots/{sid}"),
         &admin,
         None,
     )
@@ -991,7 +991,7 @@ async fn snapshot_friert_die_eigene_funktion_nicht_ein() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &format!("/api/einsaetze/{e}/situation-snapshots"),
         &cookie,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

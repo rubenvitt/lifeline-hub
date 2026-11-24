@@ -38,7 +38,7 @@ let bodies: unknown[];
 
 function handler(typen = TYPEN) {
   server.use(
-    http.get('/api/einheit-typen', () => HttpResponse.json(typen)),
+    http.get('/api/unit-types', () => HttpResponse.json(typen)),
     http.post('/api/einsaetze/1/units', async ({ request }) => {
       const body = (await request.json()) as { name: string };
       bodies.push(body);

@@ -32,19 +32,19 @@ async function einsatzMitVollzogenen(
   });
   const ids: number[] = [];
   for (let i = 0; i < VOLLZOGEN; i += 1) {
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
       data: auftrag(`Vollzogen ${i}`),
     });
     expect(angelegt.ok(), `Auftrag ${i}: ${angelegt.status()}`).toBe(true);
     const { id } = (await angelegt.json()) as { id: number };
-    const vollzug = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege/${id}/vollzug`, {
+    const vollzug = await page.request.post(`/api/einsaetze/${einsatzId}/tasks/${id}/execution`, {
       data: { status: 'vollzogen', vollzugsmeldung: 'Erledigt' },
     });
     expect(vollzug.ok(), `Vollzug ${i}: ${vollzug.status()}`).toBe(true);
     ids.push(id);
   }
   // Ein offener daneben: die Vorgabeansicht hat Inhalt.
-  const offen = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const offen = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: auftrag('Noch offen'),
   });
   expect(offen.ok()).toBe(true);

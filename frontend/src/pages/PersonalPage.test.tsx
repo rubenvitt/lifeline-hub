@@ -86,14 +86,14 @@ function render(
     ),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheitenDaten)),
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/personal-status', () =>
+    http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
         { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
       ]),
     ),
-    http.get('/api/personal', () => HttpResponse.json([])), // Pool (nur_im_dienst)
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/personnel', () => HttpResponse.json([])), // Pool (nur_im_dienst)
+    http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 1, label: 'Notfallsanitäter', sortier: 30 }]),
     ),
   );
@@ -390,12 +390,12 @@ describe('PersonalPage', () => {
       http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
       http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-      http.get('/api/personal-status', () =>
+      http.get('/api/personnel-statuses', () =>
         HttpResponse.json([
           { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
         ]),
       ),
-      http.get('/api/personal', () => HttpResponse.json([])),
+      http.get('/api/personnel', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
       <Routes>
@@ -417,8 +417,8 @@ describe('PersonalPage', () => {
       http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
       http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-      http.get('/api/personal-status', () => HttpResponse.json([])),
-      http.get('/api/personal', () => HttpResponse.json([])),
+      http.get('/api/personnel-statuses', () => HttpResponse.json([])),
+      http.get('/api/personnel', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
       <Routes>
@@ -503,12 +503,12 @@ describe('PersonalPage', () => {
         http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
         http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
         http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-        http.get('/api/personal-status', () =>
+        http.get('/api/personnel-statuses', () =>
           HttpResponse.json([
             { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
           ]),
         ),
-        http.get('/api/personal', () => HttpResponse.json([])),
+        http.get('/api/personnel', () => HttpResponse.json([])),
       );
       const { container } = renderMitProviders(
         <Routes>
@@ -1104,12 +1104,12 @@ describe('PersonalPage · Datenzustände', () => {
     http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/personal-status', () =>
+    http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
       ]),
     ),
-    http.get('/api/personal', () => HttpResponse.json([])),
+    http.get('/api/personnel', () => HttpResponse.json([])),
   ];
 
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
@@ -1163,7 +1163,7 @@ describe('PersonalPage · Datenzustände', () => {
   });
 
   it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
-    zeige(http.get('/api/personal-status', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/personnel-statuses', () => new HttpResponse(null, { status: 500 })));
     expect(
       await screen.findByText(
         'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
@@ -1182,7 +1182,7 @@ describe('PersonalPage · Datenzustände', () => {
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Personen"', async () => {
-    zeige(http.get('/api/personal', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/personnel', () => new HttpResponse(null, { status: 500 })));
     await screen.findByText('Noch kein Personal disponiert');
     await oeffnePersonalAuswahl();
     expect(
@@ -1473,12 +1473,12 @@ describe('PersonalPage · Demo-Marke', () => {
       http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(eps)),
       http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
-      http.get('/api/personal-status', () =>
+      http.get('/api/personnel-statuses', () =>
         HttpResponse.json([
           { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
         ]),
       ),
-      http.get('/api/personal', () => HttpResponse.json(pool)),
+      http.get('/api/personnel', () => HttpResponse.json(pool)),
     );
     return renderMitProviders(
       <Routes>

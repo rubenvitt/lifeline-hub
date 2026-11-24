@@ -124,7 +124,7 @@ function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[], route = '/einsae
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/tiere', () => HttpResponse.json(tiere)),
+    http.get('/api/einsaetze/1/animals', () => HttpResponse.json(tiere)),
   );
   return renderMitProviders(
     <>
@@ -287,7 +287,7 @@ describe('TierePage', () => {
       const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
       server.use(
         http.get(
-          '/api/einsaetze/1/tiere/export',
+          '/api/einsaetze/1/animals/export',
           () => new HttpResponse('registrier_nr;status\nT-001;"aktiv"\n'),
         ),
       );
@@ -311,7 +311,7 @@ describe('TierePage', () => {
     it('zeigt einen Fehler an der Seite, nicht im Toast, und speichert nichts', async () => {
       const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
       server.use(
-        http.get('/api/einsaetze/1/tiere/export', () =>
+        http.get('/api/einsaetze/1/animals/export', () =>
           HttpResponse.json({ error: 'Kein Zugriff auf das Modul Tiere' }, { status: 403 }),
         ),
       );
@@ -329,7 +329,7 @@ describe('TierePage', () => {
       vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
       let anfragen = 0;
       server.use(
-        http.get('/api/einsaetze/1/tiere/export', () => {
+        http.get('/api/einsaetze/1/animals/export', () => {
           anfragen += 1;
           return anfragen === 1
             ? HttpResponse.json({ error: 'Serverfehler beim Export' }, { status: 500 })
@@ -349,7 +349,7 @@ describe('TierePage', () => {
 
     it('scheitert ohne Netz sofort an der Seite, statt still zu pausieren', async () => {
       const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
-      server.use(http.get('/api/einsaetze/1/tiere/export', () => HttpResponse.error()));
+      server.use(http.get('/api/einsaetze/1/animals/export', () => HttpResponse.error()));
       render(einsatzAktiv, [tierBasis]);
       const knopf = await screen.findByRole('button', { name: 'CSV exportieren' });
       onlineManager.setOnline(false);
@@ -365,12 +365,12 @@ describe('TierePage', () => {
 
     it('zeigt einen laufenden Export aus Einsatz A nicht als Ladezustand in B', async () => {
       server.use(
-        http.get('/api/einsaetze/1/tiere/export', () => new Promise<Response>(() => {})),
+        http.get('/api/einsaetze/1/animals/export', () => new Promise<Response>(() => {})),
         http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
-        http.get('/api/einsaetze/2/tiere', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/2/animals', () => HttpResponse.json([])),
         meHandler(nutzer),
         http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-        http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([tierBasis])),
+        http.get('/api/einsaetze/1/animals', () => HttpResponse.json([tierBasis])),
       );
       renderMitProviders(
         <>
@@ -397,16 +397,16 @@ describe('TierePage', () => {
 
     it('zeigt den Fehler aus Einsatz A nicht über der Liste von Einsatz B', async () => {
       server.use(
-        http.get('/api/einsaetze/1/tiere/export', () =>
+        http.get('/api/einsaetze/1/animals/export', () =>
           HttpResponse.json({ error: 'Export A gescheitert' }, { status: 500 }),
         ),
         http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
-        http.get('/api/einsaetze/2/tiere', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/2/animals', () => HttpResponse.json([])),
       );
       server.use(
         meHandler(nutzer),
         http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-        http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([tierBasis])),
+        http.get('/api/einsaetze/1/animals', () => HttpResponse.json([tierBasis])),
       );
       renderMitProviders(
         <>
@@ -494,7 +494,7 @@ describe('TierePage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -523,7 +523,7 @@ describe('TierePage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -548,7 +548,7 @@ describe('TierePage', () => {
   it('„Tier erfassen" schickt status=aktiv + spezies', async () => {
     let body: { spezies?: string; status?: string } = {};
     server.use(
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         body = (await request.json()) as { spezies?: string; status?: string };
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -569,7 +569,7 @@ describe('TierePage', () => {
   it('ohne gewählte Spezies entsteht kein Tier — keine Vorgabe „Hund“ (LLH-1765)', async () => {
     let posts = 0;
     server.use(
-      http.post('/api/einsaetze/1/tiere', () => {
+      http.post('/api/einsaetze/1/animals', () => {
         posts += 1;
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -586,7 +586,7 @@ describe('TierePage', () => {
   it('Vermisst-Meldung schickt status=vermisst', async () => {
     let body: { status?: string } = {};
     server.use(
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         body = (await request.json()) as { status?: string };
         return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
       }),
@@ -606,14 +606,16 @@ describe('TierePage', () => {
       status: 'vermisst' as const,
       rufname: 'Fundtier Neu',
     };
-    server.use(http.post('/api/einsaetze/1/tiere', () => HttpResponse.json(neu, { status: 201 })));
+    server.use(
+      http.post('/api/einsaetze/1/animals', () => HttpResponse.json(neu, { status: 201 })),
+    );
     const { container, client } = render(einsatzAktiv, []);
     await waitFor(() => expect(client.getQueryState(einsatzKeys.tiere(1))?.status).toBe('success'));
     let veralteteRefetches = 0;
     // Replikations-/Refetch-Lücke: direkt nach dem POST kennt der GET das neue Tier noch nicht. Die
     // Antwortzeile muss trotzdem stehen bleiben.
     server.use(
-      http.get('/api/einsaetze/1/tiere', () => {
+      http.get('/api/einsaetze/1/animals', () => {
         veralteteRefetches += 1;
         return HttpResponse.json([]);
       }),
@@ -660,10 +662,10 @@ describe('TierePage', () => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/tiere', ({ params }) =>
+      http.get('/api/einsaetze/:einsatzId/animals', ({ params }) =>
         HttpResponse.json(params.einsatzId === '2' ? [tierB] : []),
       ),
-      http.post('/api/einsaetze/1/tiere', async () => {
+      http.post('/api/einsaetze/1/animals', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(tierA, { status: 201 });
@@ -717,7 +719,7 @@ describe('TierePage', () => {
   it('Enter im Rufnamen sendet ab — mit dem Status aus dem Modus', async () => {
     let body: { rufname?: string | null; status?: string } = {};
     server.use(
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         body = (await request.json()) as { rufname?: string | null; status?: string };
         return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
       }),
@@ -747,7 +749,7 @@ describe('TierePage', () => {
     };
     const wortlaute: Wortlaut[] = [];
     server.use(
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         wortlaute.push((await request.json()) as Wortlaut);
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -803,7 +805,7 @@ describe('TierePage', () => {
       http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -827,7 +829,7 @@ describe('TierePage', () => {
   it('merkt einen erfolgreichen Fundort für das Wiederöffnen dieser Tiermaske', async () => {
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/tiere', () => {
+      http.post('/api/einsaetze/1/animals', () => {
         versuche += 1;
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -849,7 +851,7 @@ describe('TierePage', () => {
   it('speichert den Fundort bei einem fehlgeschlagenen Tier nicht', async () => {
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/tiere', () => {
+      http.post('/api/einsaetze/1/animals', () => {
         versuche += 1;
         return HttpResponse.json({ error: 'Tier abgelehnt' }, { status: 500 });
       }),
@@ -880,7 +882,7 @@ describe('TierePage', () => {
       antwortFreigeben = resolve;
     });
     server.use(
-      http.post('/api/einsaetze/1/tiere', async () => {
+      http.post('/api/einsaetze/1/animals', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(
@@ -918,7 +920,7 @@ describe('TierePage', () => {
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager Nord');
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/tiere', () => {
+      http.post('/api/einsaetze/1/animals', () => {
         versuche += 1;
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -945,7 +947,7 @@ describe('TierePage', () => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:einsatzId/animals', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -1104,7 +1106,7 @@ describe('TierePage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/animals', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
       <Routes>
@@ -1135,7 +1137,7 @@ describe('TierePage', () => {
     const { client } = render(einsatzAktiv, [tierBasis]);
     await screen.findByText('T-001');
 
-    server.use(http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/einsaetze/1/animals', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.tiere(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
@@ -1213,7 +1215,7 @@ describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
   it('nimmt eingeklappte Angaben mit ins Anlegen', async () => {
     let body: { rasse_beschreibung?: string | null } = {};
     server.use(
-      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals', async ({ request }) => {
         body = (await request.json()) as { rasse_beschreibung?: string | null };
         return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
       }),
@@ -1311,7 +1313,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
   }
 
   it('nennt den Grund im Dialog, behält den Wortlaut und zeigt keinen Toast', async () => {
-    server.use(http.post('/api/einsaetze/1/tiere', ablehnen));
+    server.use(http.post('/api/einsaetze/1/animals', ablehnen));
     render(einsatzAktiv, []);
     const dialog = await erfasse('Rex');
 
@@ -1323,7 +1325,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
   it('das nächste Absenden räumt den Grund; solange es läuft, ist Abbrechen gesperrt', async () => {
     let erster = true;
     server.use(
-      http.post('/api/einsaetze/1/tiere', async () => {
+      http.post('/api/einsaetze/1/animals', async () => {
         if (erster) {
           erster = false;
           return ablehnen();
@@ -1342,7 +1344,7 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
   });
 
   it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
-    server.use(http.post('/api/einsaetze/1/tiere', ablehnen));
+    server.use(http.post('/api/einsaetze/1/animals', ablehnen));
     render(einsatzAktiv, []);
     const dialog = await erfasse('Rex');
     await within(dialog).findByRole('alert');
@@ -1372,8 +1374,8 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/tiere', async () => {
+      http.get('/api/einsaetze/:einsatzId/animals', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/animals', async () => {
         postGestartet();
         await antwortGate;
         return ablehnen();

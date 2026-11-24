@@ -613,7 +613,7 @@ pub struct BrVorlage {
     pub standort: &'static str,
 }
 
-/// Betroffene Person, angelegt wie über `POST …/personen`: Status `erfasst`, optional mit
+/// Betroffene Person, angelegt wie über `POST …/persons`: Status `erfasst`, optional mit
 /// Erst-Sichtung (hebt auf `betroffen`) und UHS-Eintritt (Inbox).
 #[derive(Debug, Clone, Copy)]
 pub struct PersonVorlage {
@@ -638,7 +638,7 @@ pub struct PersonVorlage {
     pub platz: Option<&'static str>,
 }
 
-/// Verbleib einer früher erfassten Person wie über `POST …/personen/{pid}/verbleib`
+/// Verbleib einer früher erfassten Person wie über `POST …/persons/{pid}/whereabouts`
 /// (LLH-1576): Erfassungszeit = Schrittzeit, Auto-Austritt aus der UHS wie in der Route. Die
 /// Paarung von Art, Fahrer-Angabe und Angaben aus LLH-1568 prüft der Import mit den Regeln der
 /// Route.
@@ -683,7 +683,7 @@ pub struct StelleVorlage {
     pub standort: &'static str,
 }
 
-/// Meldung wie über `POST …/meldungen`; `ereigniszeit` und `eingang_at` sind die Schrittzeit.
+/// Meldung wie über `POST …/reports`; `ereigniszeit` und `eingang_at` sind die Schrittzeit.
 /// Eine Sofortmeldung trägt wie im Handler Bestätigungspflicht und Frist und muss `bestaetigt`
 /// sein (Alarmbudget).
 #[derive(Debug, Clone, Copy)]
@@ -840,7 +840,7 @@ pub enum Vorgang {
     Erinnerung(ErinnerungVorlage),
     /// Früher angelegte Erinnerung erledigen (Status und Vollzug wie im Handler). Kein ETB.
     ErinnerungErledigt { erinnerung: &'static str },
-    /// Termin der nächsten Lagebesprechung setzen, wie `PUT …/lagebesprechung/termin` (LLH-1752):
+    /// Termin der nächsten Lagebesprechung setzen, wie `PUT …/briefing/schedule` (LLH-1752):
     /// `termin_vor_min` Minuten vor dem Import, negativ = in der Zukunft. Kein ETB.
     LagebesprechungTermin { termin_vor_min: i64 },
     /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit. Ein Vermerk der Einsatzleitung:

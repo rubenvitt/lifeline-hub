@@ -45,7 +45,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
 
 function meldungenHandler(antwort: Meldung[], zaehler?: { n: number }) {
   server.use(
-    http.get('/api/einsaetze/5/meldungen', () => {
+    http.get('/api/einsaetze/5/reports', () => {
       if (zaehler) zaehler.n += 1;
       return HttpResponse.json(antwort);
     }),

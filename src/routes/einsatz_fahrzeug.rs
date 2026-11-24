@@ -618,7 +618,7 @@ pub async fn status_zuruecknehmen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/release — aus dem Einsatz entlassen (LLH-1079,
+/// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Besatzung, Einheit, Bereitstellungsraum und
 /// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1722), der Block „Entlassen“
@@ -691,7 +691,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/release/undo — „Rückgängig“ nach dem
+/// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
 /// Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses Entlassen, höchstens
 /// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders

@@ -126,7 +126,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            "/api/fahrzeug-status",
+            "/api/vehicle-statuses",
             &self.admin,
             Some(
                 &json!({ "label": label, "kategorie": "gebunden", "zeitachse_marke": marke })
@@ -773,7 +773,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("units/{einheit}/timeline/{zid}/void")),
+            &self.pfad(&format!("units/{einheit}/timeline/{zid}/strike")),
             cookie,
             Some(r#"{"grund":"falsche Einheit erfasst"}"#),
         )

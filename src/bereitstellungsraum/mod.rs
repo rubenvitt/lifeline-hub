@@ -195,7 +195,7 @@ pub struct BrAbrufEingabe {
     pub ausgerueckt: bool,
 }
 
-/// Body von `POST …/staging-areas/{bid}/dispatch/withdraw` (handgepflegt).
+/// Body von `POST …/staging-areas/{bid}/dispatch/void` (handgepflegt).
 #[derive(Debug, Deserialize)]
 pub struct BrAbrufAufhebenEingabe {
     pub objekt_typ: String,

@@ -145,7 +145,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("units/{einheit}/timeline/{zid}/void")),
+            &self.pfad(&format!("units/{einheit}/timeline/{zid}/strike")),
             &anna,
             Some(r#"{"grund":"falsche Einheit erfasst"}"#),
         )

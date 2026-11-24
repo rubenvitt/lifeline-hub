@@ -9,7 +9,7 @@ use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 async fn seed_liefert_fuenf_aktive_bausteine() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/etb-bausteine", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/etb-snippets", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 5);
     assert_eq!(json[0]["label"], "Lage unverändert");
@@ -24,7 +24,7 @@ async fn admin_crud_und_typ_validierung() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     assert_eq!(
-        anfrage(&app, "GET", "/api/etb-bausteine", &erika, None)
+        anfrage(&app, "GET", "/api/etb-snippets", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -33,7 +33,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &erika,
             Some(r#"{"typ":"meldung","label":"X","inhalt":"x"}"#)
         )
@@ -45,7 +45,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"system","label":"S","inhalt":"x"}"#)
         )
@@ -57,7 +57,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"berichtigung","label":"B","inhalt":"x"}"#)
         )
@@ -69,7 +69,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"meldung","label":"M","inhalt":"x","meldeweg":"brieftaube"}"#)
         )
@@ -81,7 +81,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"meldung","label":"   ","inhalt":"x"}"#)
         )
@@ -90,14 +90,14 @@ async fn admin_crud_und_typ_validierung() {
         StatusCode::BAD_REQUEST
     );
 
-    let (status, json) = anfrage(&app, "POST", "/api/etb-bausteine", &admin,
+    let (status, json) = anfrage(&app, "POST", "/api/etb-snippets", &admin,
         Some(r#"{"typ":"anordnung","label":"Räumung anordnen","inhalt":"Räumung {abschnitt} anordnen.","meldeweg":"funk","sortier":60}"#)).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["label"], "Räumung anordnen");
     assert_eq!(json["meldeweg"], "funk");
     let id = json["id"].as_i64().unwrap();
 
-    let (status, json) = anfrage(&app, "PATCH", &format!("/api/etb-bausteine/{id}"), &admin,
+    let (status, json) = anfrage(&app, "PATCH", &format!("/api/etb-snippets/{id}"), &admin,
         Some(r#"{"typ":"anordnung","label":"Räumung anordnen","inhalt":"Sofort räumen.","sortier":60}"#)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["inhalt"], "Sofort räumen.");
@@ -112,7 +112,7 @@ async fn admin_crud_und_typ_validierung() {
         anfrage(
             &app,
             "PATCH",
-            "/api/etb-bausteine/9999",
+            "/api/etb-snippets/9999",
             &admin,
             Some(r#"{"typ":"meldung","label":"Z","inhalt":"z"}"#)
         )
@@ -130,7 +130,7 @@ async fn label_konflikt_auch_gegen_deaktivierten_ist_409() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/etb-bausteine",
+        "/api/etb-snippets",
         &admin,
         Some(r#"{"typ":"lage","label":"Eigenlabel","inhalt":"a"}"#),
     )
@@ -141,7 +141,7 @@ async fn label_konflikt_auch_gegen_deaktivierten_ist_409() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"meldung","label":"Eigenlabel","inhalt":"b"}"#)
         )
@@ -154,7 +154,7 @@ async fn label_konflikt_auch_gegen_deaktivierten_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/etb-bausteine/{id}/deaktivieren"),
+            &format!("/api/etb-snippets/{id}/deactivate"),
             &admin,
             None
         )
@@ -162,7 +162,7 @@ async fn label_konflikt_auch_gegen_deaktivierten_ist_409() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/etb-bausteine", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/etb-snippets", &admin, None).await;
     assert!(!liste
         .as_array()
         .unwrap()
@@ -173,7 +173,7 @@ async fn label_konflikt_auch_gegen_deaktivierten_ist_409() {
         anfrage(
             &app,
             "POST",
-            "/api/etb-bausteine",
+            "/api/etb-snippets",
             &admin,
             Some(r#"{"typ":"meldung","label":"Eigenlabel","inhalt":"c"}"#)
         )
@@ -232,7 +232,7 @@ async fn baustein_voll(app: &axum::Router, admin: &str, label: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/etb-bausteine",
+        "/api/etb-snippets",
         admin,
         Some(&format!(
             r#"{{"typ":"meldung","label":"{label}","inhalt":"Erstmeldung {{abschnitt}}.",
@@ -262,7 +262,7 @@ async fn patch_ohne_meldeweg_laesst_meldeweg_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/etb-bausteine/{id}"),
+        &format!("/api/etb-snippets/{id}"),
         &admin,
         Some(r#"{"typ":"meldung","label":"Erstmeldung","inhalt":"Neue Fassung.","sortier":55}"#),
     )
@@ -287,7 +287,7 @@ async fn patch_meldeweg_null_loescht_meldeweg() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/etb-bausteine/{id}"),
+        &format!("/api/etb-snippets/{id}"),
         &admin,
         Some(r#"{"meldeweg":null,"veranlassung":""}"#),
     )
@@ -313,7 +313,7 @@ async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/etb-bausteine/{id}"),
+        &format!("/api/etb-snippets/{id}"),
         &admin,
         Some(
             r#"{"typ":"meldung","label":"Umbenannt","inhalt":"Erstmeldung.",
@@ -338,7 +338,7 @@ async fn patch_meldeweg_ungueltig_ist_400_nur_bei_vorhandenem_feld() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/etb-bausteine/{id}"),
+            &format!("/api/etb-snippets/{id}"),
             &admin,
             Some(r#"{"meldeweg":"brieftaube"}"#)
         )
@@ -351,7 +351,7 @@ async fn patch_meldeweg_ungueltig_ist_400_nur_bei_vorhandenem_feld() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/etb-bausteine/{id}"),
+            &format!("/api/etb-snippets/{id}"),
             &admin,
             Some(r#"{"inhalt":"ok"}"#)
         )
@@ -364,7 +364,7 @@ async fn patch_meldeweg_ungueltig_ist_400_nur_bei_vorhandenem_feld() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/etb-bausteine/{id}"),
+            &format!("/api/etb-snippets/{id}"),
             &admin,
             Some(r#"{"meldeweg":null}"#)
         )
@@ -381,7 +381,7 @@ async fn patch_leere_pflichtfelder_sind_400_absente_gehen_durch() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = baustein_voll(&app, &admin, "Erstmeldung").await;
-    let u = format!("/api/etb-bausteine/{id}");
+    let u = format!("/api/etb-snippets/{id}");
 
     for body in [
         r#"{"label":"   "}"#,

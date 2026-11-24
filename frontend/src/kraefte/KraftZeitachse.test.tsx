@@ -214,7 +214,7 @@ describe('KraftZeitachse (LFH-552)', () => {
   it('Streichen verlangt einen Grund und schickt ihn', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.post(`${PFAD}/1/void`, async ({ request }) => {
+      http.post(`${PFAD}/1/strike`, async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(ZEITACHSE);
       }),

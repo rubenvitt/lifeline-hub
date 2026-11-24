@@ -887,7 +887,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -1517,7 +1517,7 @@ async fn weitere_wege_melden_den_raum_der_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/vehicles/{fz2}/release"),
+        &format!("/api/einsaetze/{eid}/vehicles/{fz2}/stand-down"),
         &cookie,
         None,
     )
@@ -1621,7 +1621,7 @@ async fn sammel_disposition_an_einheit_meldet_den_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &cookie,
         Some(&json!({"funkrufname": "RTW 1"})),
     )
@@ -2112,7 +2112,7 @@ async fn eintreffen_unangemeldet_benachrichtigt_einsatzleitung_einmal() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(&json!({"name": "Elke Leiter", "benutzer_id": elke})),
     )
@@ -2595,7 +2595,7 @@ async fn uebernehmen_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         &cookie,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
     )
@@ -2689,7 +2689,7 @@ async fn uebernehmen_bezuege_und_zustaende() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/meldungen/{meldung}/bestaetigen"),
+        &format!("/api/einsaetze/{eid}/reports/{meldung}/confirm"),
         &cookie,
         None,
     )
@@ -2884,7 +2884,7 @@ async fn hebe_auf(
     br: i64,
     body: serde_json::Value,
 ) -> (StatusCode, serde_json::Value) {
-    let pfad = format!("{}/withdraw", abruf_pfad(einsatz, br));
+    let pfad = format!("{}/void", abruf_pfad(einsatz, br));
     anfrage_json(app, "POST", &pfad, cookie, Some(&body)).await
 }
 
@@ -3039,7 +3039,7 @@ async fn abruf_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/personen", l.eid),
+        &format!("/api/einsaetze/{}/persons", l.eid),
         &l.admin,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": l.hlf})),
     )
@@ -3199,7 +3199,7 @@ async fn abruf_mit_auftrag_legt_auftrag_an_einheit_an() {
         let a = fetch_json(
             &l.app,
             &l.admin,
-            &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+            &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
         )
         .await;
         assert_eq!(a["auftrag_text"], "Sandsackverbau");
@@ -3400,7 +3400,7 @@ async fn abruf_fahrzeug_ohne_einheit_mit_auftrag_an_fahrzeug() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["empfaenger"][0]["empfaenger_typ"], "fahrzeug");
@@ -3661,7 +3661,7 @@ async fn abruf_zuruecknehmen_laesst_unterstellung_und_auftrag() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/auftraege/{auftrag}", l.eid),
+        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["vollzug_status"], "offen", "Auftrag bleibt: {a}");
@@ -4590,7 +4590,7 @@ async fn raum_im_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, br: i
 }
 
 fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abschnitte/{ab}")
+    format!("/api/einsaetze/{einsatz}/sectors/{ab}")
 }
 
 /// `abschnitt_name` des Raums `br` in der Liste (das Detail trägt ihn nicht).
@@ -4733,7 +4733,7 @@ async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/abschnitte"),
+        &format!("/api/einsaetze/{eid}/sectors"),
         &frieda,
         None,
     )
@@ -4782,7 +4782,7 @@ async fn stamm_fahrzeug(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         cookie,
         Some(&json!({"funkrufname": funkrufname})),
     )
@@ -4833,7 +4833,7 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/fahrzeuge/{fz}"),
+            &format!("/api/vehicles/{fz}"),
             &cookie,
             Some(&json!({"funkrufname": neu})),
         )
@@ -4880,7 +4880,7 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/fahrzeuge/{einzeln_fz}/ausser-dienst"),
+        &format!("/api/vehicles/{einzeln_fz}/out-of-service"),
         &cookie,
         None,
     )

@@ -37,10 +37,10 @@ function aufzeichnen(ablehnen?: { methode: string; pfad: string }) {
     return HttpResponse.json(request.method === 'GET' ? [] : {});
   };
   server.use(
-    http.get('/api/schichtmodelle', record),
-    http.post('/api/schichtmodelle', record),
-    http.put('/api/schichtmodelle/:id', record),
-    http.delete('/api/schichtmodelle/:id', record),
+    http.get('/api/shift-models', record),
+    http.post('/api/shift-models', record),
+    http.put('/api/shift-models/:id', record),
+    http.delete('/api/shift-models/:id', record),
     http.get('/api/einsaetze/:id/reliefs/shift-model', record),
     http.put('/api/einsaetze/:id/reliefs/shift-model', record),
   );
@@ -70,10 +70,10 @@ describe('api/schichtmodelle (LLH-1122)', () => {
     // `null` heißt „entfernen“ und muss auf dem Draht stehen bleiben.
     await setEinsatzSchichtmodell(7, { schichtmodell: null });
     expect(seen).toEqual([
-      'GET /api/schichtmodelle',
-      'POST /api/schichtmodelle {"bezeichnung":"Hochwasser","typ":"wechselzeiten","wechselzeiten":["06:00","18:00"],"mindestdauer_minuten":240,"ist_vorgabe":false}',
-      'PUT /api/schichtmodelle/3 {"bezeichnung":"SanD","typ":"rhythmus","rhythmus_minuten":360,"ist_vorgabe":true}',
-      'DELETE /api/schichtmodelle/3',
+      'GET /api/shift-models',
+      'POST /api/shift-models {"bezeichnung":"Hochwasser","typ":"wechselzeiten","wechselzeiten":["06:00","18:00"],"mindestdauer_minuten":240,"ist_vorgabe":false}',
+      'PUT /api/shift-models/3 {"bezeichnung":"SanD","typ":"rhythmus","rhythmus_minuten":360,"ist_vorgabe":true}',
+      'DELETE /api/shift-models/3',
       'GET /api/einsaetze/7/reliefs/shift-model',
       'PUT /api/einsaetze/7/reliefs/shift-model {"schichtmodell_id":3}',
       'PUT /api/einsaetze/7/reliefs/shift-model {"schichtmodell":null}',
@@ -111,8 +111,8 @@ describe('setOrgVorgabe — Wechsel in zwei Schritten (LLH-1122)', () => {
     const seen = aufzeichnen();
     await setOrgVorgabe(ziel, true, bisherige);
     expect(seen.map((z) => z.replace(/ \{.*"ist_vorgabe":(\w+)\}$/, ' $1'))).toEqual([
-      'PUT /api/schichtmodelle/1 false',
-      'PUT /api/schichtmodelle/2 true',
+      'PUT /api/shift-models/1 false',
+      'PUT /api/shift-models/2 true',
     ]);
   });
 
@@ -120,23 +120,23 @@ describe('setOrgVorgabe — Wechsel in zwei Schritten (LLH-1122)', () => {
     const seen = aufzeichnen();
     await setOrgVorgabe(ziel, true, undefined);
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatch(/^PUT \/api\/schichtmodelle\/2 .*"ist_vorgabe":true/);
+    expect(seen[0]).toMatch(/^PUT \/api\/shift-models\/2 .*"ist_vorgabe":true/);
   });
 
   it('hebt die eigene Vorgabe in einem Schritt auf', async () => {
     const seen = aufzeichnen();
     await setOrgVorgabe(bisherige, false, bisherige);
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatch(/^PUT \/api\/schichtmodelle\/1 .*"ist_vorgabe":false/);
+    expect(seen[0]).toMatch(/^PUT \/api\/shift-models\/1 .*"ist_vorgabe":false/);
   });
 
   it('stellt die bisherige Vorgabe wieder her, wenn der zweite Schritt scheitert', async () => {
-    const seen = aufzeichnen({ methode: 'PUT', pfad: '/api/schichtmodelle/2' });
+    const seen = aufzeichnen({ methode: 'PUT', pfad: '/api/shift-models/2' });
     await expect(setOrgVorgabe(ziel, true, bisherige)).rejects.toThrow();
     expect(seen.map((z) => z.replace(/ \{.*"ist_vorgabe":(\w+)\}$/, ' $1'))).toEqual([
-      'PUT /api/schichtmodelle/1 false',
-      'PUT /api/schichtmodelle/2 true',
-      'PUT /api/schichtmodelle/1 true',
+      'PUT /api/shift-models/1 false',
+      'PUT /api/shift-models/2 true',
+      'PUT /api/shift-models/1 true',
     ]);
   });
 });

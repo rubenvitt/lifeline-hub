@@ -28,14 +28,14 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
     bezeichnung: `E2E Lagemeldung ${Date.now()}`,
   });
   // Eine übernommene Rückmeldung daneben: dieselbe Achse, ihr eigenes Wort.
-  const rueck = await post(page, `/api/einsaetze/${id}/meldungen`, {
+  const rueck = await post(page, `/api/einsaetze/${id}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     meldungsart: 'rueckmeldung',
     inhalt: 'Wir sind vor Ort',
     ereigniszeit: new Date(Date.now() - 10 * 60_000).toISOString(),
   });
-  await post(page, `/api/einsaetze/${id}/meldungen/${rueck.id}/lagerelevant`, {
+  await post(page, `/api/einsaetze/${id}/reports/${rueck.id}/situation-relevant`, {
     text: 'Einheit Nord am Deich eingetroffen',
   });
 
@@ -68,7 +68,7 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   await expect(zeilen).toHaveCount(1);
   await waehleIn(page.getByRole('combobox', { name: 'Herkunft' }), 'Alle Herkünfte');
 
-  const meldungen = await page.request.get(`/api/einsaetze/${id}/meldungen`);
+  const meldungen = await page.request.get(`/api/einsaetze/${id}/reports`);
   const lage = ((await meldungen.json()) as { id: number; lfd_nr: number; inhalt: string }[]).find(
     (m) => m.inhalt === 'Pegel Mühlbach steigt, Deich hält',
   )!;
@@ -86,7 +86,7 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
   const { id } = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Korrektur ${Date.now()}`,
   });
-  const m = await post<{ id: number; lfd_nr: number }>(page, `/api/einsaetze/${id}/meldungen`, {
+  const m = await post<{ id: number; lfd_nr: number }>(page, `/api/einsaetze/${id}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Nord gesperrt',
@@ -104,7 +104,7 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
   await expect(page.getByText(`Meldung #${m.lfd_nr} korrigiert`)).toBeVisible();
   await expect(formular).toBeHidden();
   await expect(karte).toContainText('Rückmeldung');
-  await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+  await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
 
   // In der Lage: Lage-Text und Ort nachtragen.
   await page.goto(`/einsaetze/${id}/lagemeldungen`);
@@ -157,14 +157,14 @@ test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-132
     bezeichnung: `E2E Lage-Zeitraum ${Date.now()}`,
   });
   const inDieLage = async (inhalt: string, vorMinuten: number) => {
-    const m = await post(page, `/api/einsaetze/${id}/meldungen`, {
+    const m = await post(page, `/api/einsaetze/${id}/reports`, {
       absender: 'Florian Nord 1',
       meldeweg: 'funk',
       meldungsart: 'rueckmeldung',
       inhalt,
       ereigniszeit: new Date(Date.now() - vorMinuten * 60_000).toISOString(),
     });
-    await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+    await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
   };
   await inDieLage('Pegel Mühlbach steigt', 10);
   // Eben übergeben, aber vor drei Stunden geschehen: zählt nach der Ereigniszeit.
@@ -219,19 +219,19 @@ test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen a
   expect(freigaben.lagebesprechung?.zugriff, 'Vorbedingung: Lagebesprechung frei').toBe(true);
   // Die Besprechung vor fünf Minuten; beide Meldungen gehen erst danach in die Lage.
   const vorMinuten = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
-  const lb = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+  const lb = await page.request.post(`/api/einsaetze/${id}/briefings`, {
     data: { entschluss: 'Lage unverändert', abgehalten_at: vorMinuten(5) },
   });
   expect(lb.status(), `Abschluss: ${await lb.text()}`).toBe(201);
   const inDieLage = async (inhalt: string, geschehenVorMinuten: number) => {
-    const m = await post(page, `/api/einsaetze/${id}/meldungen`, {
+    const m = await post(page, `/api/einsaetze/${id}/reports`, {
       absender: 'Florian Nord 1',
       meldeweg: 'funk',
       meldungsart: 'rueckmeldung',
       inhalt,
       ereigniszeit: vorMinuten(geschehenVorMinuten),
     });
-    await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+    await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
   };
   await inDieLage('Pegel Mühlbach steigt', 2);
   // Vor der Besprechung geschehen, nach ihr übernommen: der Nachtrag.

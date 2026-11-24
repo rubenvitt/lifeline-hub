@@ -151,7 +151,7 @@ test.describe(KAPITEL, () => {
       const kraft = raum.einheiten.find((x) => x.name !== UNANGEMELDET);
       expect(kraft, 'eine eingebuchte Einheit').toBeDefined();
       const abschnitte = (await (
-        await page.request.get(`/api/einsaetze/${einsatzId}/abschnitte`)
+        await page.request.get(`/api/einsaetze/${einsatzId}/sectors`)
       ).json()) as { id: number; name: string }[];
       const ziel = abschnitte.find((a) => a.name === 'Sanitätsdienst');
       expect(ziel, 'Abschnitt „Sanitätsdienst“').toBeDefined();

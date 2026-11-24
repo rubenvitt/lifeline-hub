@@ -29,6 +29,7 @@ import {
   monoStil,
   useRollen,
   zielEinzug,
+  Kennung,
 } from '../components/instrument';
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -464,7 +465,12 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && <span style={monoStil('monoKlein')}> · {k.funkrufname}</span>}
+                {k.funkrufname && (
+                  <>
+                    {' · '}
+                    <Kennung stufe="monoKlein">{k.funkrufname}</Kennung>
+                  </>
+                )}
               </span>
             }
             koerperPolster
@@ -486,7 +492,7 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span style={monoStil('monoGross')}>{f.funkrufname}</span>
+                      <Kennung stufe="monoGross">{f.funkrufname}</Kennung>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}

@@ -6,7 +6,7 @@
 //! wird nichts. Name, Rückrufnummer und Notiz sind personenbezogen (Schwärzungs-Registry) und
 //! fehlen in jeder Ableitung (Medienlage, Lagebericht).
 //!
-//! Die Routen liegen unter `/api/einsaetze/{id}/stab/infotelefon` und erben die Stab-Sperre.
+//! Die Routen liegen unter `/api/einsaetze/{id}/staff/info-line` und erben die Stab-Sperre.
 //!
 //! Spec: `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/specs/stab-infotelefon/`
 

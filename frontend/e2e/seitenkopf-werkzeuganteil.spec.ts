@@ -31,7 +31,7 @@ async function einsatzMitListen(page: Page): Promise<string> {
   await anlegen(
     page,
     einsatzId,
-    'personen',
+    'persons',
     { name: 'Werkzeug', vorname: 'Wilma', antreff_ort: 'Halle' },
     'Person',
   );
@@ -47,7 +47,7 @@ async function einsatzMitListen(page: Page): Promise<string> {
   await anlegen(
     page,
     einsatzId,
-    'betreuung/stellen',
+    'care/positions',
     { bezeichnung: STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
     'Betreuungsstelle',
   );

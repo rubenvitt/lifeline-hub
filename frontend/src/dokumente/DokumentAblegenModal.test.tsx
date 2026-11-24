@@ -65,7 +65,7 @@ beforeEach(() => {
   scheitertBei = [];
   legeAb.mockReset();
   server.use(
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(abschnitte)),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(abschnitte)),
     http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),

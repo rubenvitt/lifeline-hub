@@ -49,7 +49,7 @@ describe('MitgliederAbschnitt', () => {
       http.get('/api/einsaetze/7/members', () =>
         HttpResponse.json([mitglied({ fuehrungsstelle: 'Gespeicherte Stelle' })]),
       ),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -84,7 +84,7 @@ describe('MitgliederAbschnitt', () => {
     });
     server.use(
       http.get('/api/einsaetze/:id/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async () => {
         angefragt();
         await antwort;
@@ -127,7 +127,7 @@ describe('MitgliederAbschnitt', () => {
   it('LFH-461: ein offener Dialog wird beim Einsatzwechsel geschlossen', async () => {
     server.use(
       http.get('/api/einsaetze/:id/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     const ansicht = (id: number) => (
       <ConfigProvider theme={{ token: { motion: false } }}>
@@ -146,7 +146,7 @@ describe('MitgliederAbschnitt', () => {
   it('LFH-964: der umbrechende Führungsstellen-Knopf hält die Steuerhöhe der Dichte-Staffel', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <ConfigProvider theme={{ token: { controlHeight: 61 } }}>
@@ -167,7 +167,7 @@ describe('MitgliederAbschnitt', () => {
       http.get('/api/einsaetze/7/members', () =>
         HttpResponse.json([mitglied({ fuehrungsstelle: stelle })]),
       ),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async ({ request }) => {
         const body = (await request.json()) as { fuehrungsstelle: string | null };
         gespeichert.push(body);
@@ -234,7 +234,7 @@ describe('MitgliederAbschnitt', () => {
   it('LFH-461: fehlgeschlagenes Speichern hält Eingabe und Fehler im Dialog', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', () =>
         HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 }),
       ),
@@ -256,7 +256,7 @@ describe('MitgliederAbschnitt', () => {
     const gespeichert: unknown[] = [];
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([zeile])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async ({ request }) => {
         gespeichert.push(await request.json());
         zeile = mitglied({ fuehrungsfunktion: 's2', fuehrungsstelle_anzeige: 'S2 Lage' });
@@ -293,7 +293,7 @@ describe('MitgliederAbschnitt', () => {
   it('zeigt vorhandene Mitglieder', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -304,7 +304,7 @@ describe('MitgliederAbschnitt', () => {
   it('bietet die Rolle Mitarbeit mit ihrer Darf-Zeile in der Rollenwahl an (LLH-1817)', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -325,7 +325,7 @@ describe('MitgliederAbschnitt', () => {
   it('zählt im Kopf „1 Mitglied“ in der Einzahl und ab zwei in der Mehrzahl', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     const { unmount } = renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -351,7 +351,7 @@ describe('MitgliederAbschnitt', () => {
     let entfernt = false;
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json(entfernt ? [] : [mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.delete('/api/einsaetze/7/members/2', () => {
         entfernt = true;
         return HttpResponse.json([]);
@@ -375,7 +375,7 @@ describe('MitgliederAbschnitt', () => {
      */
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -393,7 +393,7 @@ describe('MitgliederAbschnitt', () => {
   it('blendet Edit-Aktionen aus, wenn nicht verwaltet werden darf', async () => {
     server.use(
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt
@@ -434,7 +434,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
         http.delete('/api/einsaetze/7/members/2', () =>
           HttpResponse.json({ error: 'Entfernen abgelehnt' }, { status: 409 }),
         ),
@@ -460,7 +460,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
         http.put('/api/einsaetze/7/members/2', () => {
           versuch += 1;
           return versuch === 1
@@ -485,7 +485,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       );
       renderMitProviders(
         <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -511,7 +511,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       );
       renderMitProviders(
         <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -529,7 +529,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
         http.put('/api/einsaetze/7/members/1', async ({ request }) => {
           gesendet.push(await request.json());
           return HttpResponse.json([
@@ -563,7 +563,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       );
       renderMitProviders(
         <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -580,7 +580,7 @@ describe('MitgliederAbschnitt', () => {
         http.get('/api/einsaetze/7/members', () =>
           HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
         ),
-        http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
         http.put('/api/einsaetze/7/members/:id', ({ params }) => {
           gesendet.push(String(params.id));
           return new Promise<never>(() => {});
@@ -636,7 +636,7 @@ describe('MitgliederAbschnitt', () => {
               : [mitglied()],
           ),
         ),
-        http.get('/api/einsaetze/7/members/candidates', () => {
+        http.get('/api/einsaetze/7/members/selection', () => {
           auswahlAbrufe += 1;
           return HttpResponse.json(aufgenommen ? [] : [{ benutzer_id: 5, anzeigename: 'Zoe Zug' }]);
         }),
@@ -680,7 +680,7 @@ describe('MitgliederAbschnitt', () => {
       let entfernt = false;
       server.use(
         http.get('/api/einsaetze/7/members', () => HttpResponse.json(entfernt ? [] : [mitglied()])),
-        http.get('/api/einsaetze/7/members/candidates', () =>
+        http.get('/api/einsaetze/7/members/selection', () =>
           HttpResponse.json(entfernt ? [{ benutzer_id: 2, anzeigename: 'Eva Einsatz' }] : []),
         ),
         http.delete('/api/einsaetze/7/members/2', () => {
@@ -703,7 +703,7 @@ describe('MitgliederAbschnitt', () => {
     it('eine Suche ohne Treffer behauptet nicht, die Organisation sei aufgenommen', async () => {
       server.use(
         http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-        http.get('/api/einsaetze/7/members/candidates', () =>
+        http.get('/api/einsaetze/7/members/selection', () =>
           HttpResponse.json([{ benutzer_id: 5, anzeigename: 'Zoe Zug' }]),
         ),
       );
@@ -728,7 +728,7 @@ describe('MitgliederAbschnitt', () => {
             mitglied({ benutzer_id: 3, anzeigename: 'Leo', einsatz_rolle: 'einsatzleitung' }),
           ]),
         ),
-        http.get('/api/einsaetze/7/members/candidates', () => {
+        http.get('/api/einsaetze/7/members/selection', () => {
           auswahlAbrufe += 1;
           return HttpResponse.json([]);
         }),
@@ -764,7 +764,7 @@ describe('MitgliederAbschnitt', () => {
     it('leere Auswahl sagt, dass niemand mehr aufzunehmen ist', async () => {
       server.use(
         http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-        http.get('/api/einsaetze/7/members/candidates', () => HttpResponse.json([])),
+        http.get('/api/einsaetze/7/members/selection', () => HttpResponse.json([])),
       );
       renderMitProviders(
         <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
@@ -779,7 +779,7 @@ describe('MitgliederAbschnitt', () => {
     it('ein Fehler der Auswahl sagt „Personenauswahl nicht verfügbar“', async () => {
       server.use(
         http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-        http.get('/api/einsaetze/7/members/candidates', () =>
+        http.get('/api/einsaetze/7/members/selection', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       );
@@ -795,7 +795,7 @@ describe('MitgliederAbschnitt', () => {
       let gefragt = false;
       server.use(
         http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied()])),
-        http.get('/api/einsaetze/7/members/candidates', () => {
+        http.get('/api/einsaetze/7/members/selection', () => {
           gefragt = true;
           return HttpResponse.json([]);
         }),
@@ -837,7 +837,7 @@ describe('MitgliederAbschnitt · Sortieren und Filtern (LLH-1096)', () => {
     server.use(
       meHandler(benutzerFixture({ id: 9 })),
       http.get('/api/einsaetze/7/members', () => HttpResponse.json(zwei)),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -899,7 +899,7 @@ describe('MitgliederAbschnitt · Funktion nur für die Führung (LLH-2064)', () 
       http.get('/api/einsaetze/7/members', () =>
         HttpResponse.json([mitglied({ einsatz_rolle: 'mitarbeit' })]),
       ),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async ({ request }) => {
         gespeichert.push(await request.json());
         return HttpResponse.json([
@@ -935,7 +935,7 @@ describe('MitgliederAbschnitt · Funktion nur für die Führung (LLH-2064)', () 
     server.use(
       meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
       http.get('/api/einsaetze/7/members', () => HttpResponse.json([mitglied(S4)])),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([mitglied({ einsatz_rolle: 'mitarbeit', fuehrungsstelle: 'S4' })]);
@@ -964,7 +964,7 @@ describe('MitgliederAbschnitt · Funktion nur für die Führung (LLH-2064)', () 
       http.get('/api/einsaetze/7/members', () =>
         HttpResponse.json([mitglied({ fuehrungsstelle: 'Funk ELW 2' })]),
       ),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
       http.put('/api/einsaetze/7/members/2', async ({ request }) => {
         gesendet.push(await request.json());
         return new Promise<never>(() => {});
@@ -995,7 +995,7 @@ describe('MitgliederAbschnitt · Funktion nur für die Führung (LLH-2064)', () 
           mitglied({ benutzer_id: 3, anzeigename: 'Leo', einsatz_rolle: 'einsatzleitung' }),
         ]),
       ),
-      http.get('/api/einsaetze/:id/members/candidates', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/members/selection', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,

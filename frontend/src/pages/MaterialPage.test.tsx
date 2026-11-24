@@ -439,7 +439,7 @@ describe('MaterialPage', () => {
   it('Einheiten stehen in der Folge des Kräftebaums: der Rang der Abschnitte, nicht die Anlage (D3/D4)', async () => {
     // Staffel B (Abschnitt B) ist zuerst angelegt; Abschnitt A steht im Baum vor B.
     server.use(
-      http.get('/api/einsaetze/1/abschnitte', () =>
+      http.get('/api/einsaetze/1/sectors', () =>
         HttpResponse.json([
           { id: 32, name: 'Abschnitt A', ueber_abschnitt_id: null },
           { id: 31, name: 'Abschnitt B', ueber_abschnitt_id: null },
@@ -687,11 +687,11 @@ describe('MaterialPage', () => {
     const aufrufe: string[] = [];
     let body: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/material/10/release', () => {
+      http.post('/api/einsaetze/1/material/10/stand-down', () => {
         aufrufe.push('entlassen');
         return herausnehmenAntwort();
       }),
-      http.post('/api/einsaetze/1/material/10/release/undo', async ({ request }) => {
+      http.post('/api/einsaetze/1/material/10/stand-down/undo', async ({ request }) => {
         aufrufe.push('zuruecknehmen');
         body = await request.json();
         return HttpResponse.json({ material: em, ausgelassen: [] });
@@ -715,8 +715,8 @@ describe('MaterialPage', () => {
 
   it('nennt im Seitenhinweis den Ort, den die Rücknahme ausgelassen hat (LLH-1923)', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/release', () => herausnehmenAntwort()),
-      http.post('/api/einsaetze/1/material/10/release/undo', () =>
+      http.post('/api/einsaetze/1/material/10/stand-down', () => herausnehmenAntwort()),
+      http.post('/api/einsaetze/1/material/10/stand-down/undo', () =>
         HttpResponse.json({
           material: em,
           ausgelassen: [{ bezeichnung: 'Einheit «Staffel A»', grund: 'inzwischen aufgelöst' }],
@@ -737,8 +737,8 @@ describe('MaterialPage', () => {
   /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
   it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/release', () => herausnehmenAntwort()),
-      http.post('/api/einsaetze/1/material/10/release/undo', () =>
+      http.post('/api/einsaetze/1/material/10/stand-down', () => herausnehmenAntwort()),
+      http.post('/api/einsaetze/1/material/10/stand-down/undo', () =>
         HttpResponse.json(
           { error: 'Die Herausnahme lässt sich nicht mehr zurücknehmen' },
           { status: 409 },
@@ -1613,7 +1613,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(ort(12)).toHaveTextContent(/^ohne Ort$/);
     // Gesperrte Ortsarten erzeugen keinen Abruf (D3), die freien je einen.
     expect(abrufe('/api/einsaetze/1/units')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
     expect(abrufe('/api/einsaetze/1/uhs')).toBe(0);
     expect(abrufe('/api/einsaetze/1/vehicles')).toBeGreaterThan(0);
     expect(abrufe('/api/einsaetze/1/staging-areas')).toBeGreaterThan(0);
@@ -1750,7 +1750,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(knopf).toHaveTextContent(/^zugeordnet$/));
     await waitFor(() => expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0));
     expect(abrufe('/api/einsaetze/1/units')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
     await userEvent.click(knopf);
     await oeffne('Ort zu Wolldecke');
     const gruppen = [
@@ -1908,7 +1908,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     ];
     const decke = { ...em, id: 12, material_id: 5, is_bestandsdoppel: false };
     server.use(
-      http.post('/api/einsaetze/1/material/11/release', () => {
+      http.post('/api/einsaetze/1/material/11/stand-down', () => {
         server.use(
           http.get('/api/einsaetze/1/material', ({ request }) =>
             HttpResponse.json(
@@ -2265,7 +2265,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
   function nachforderungen(antwort: () => Response): () => number {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/nachforderungen', () => {
+      http.get('/api/einsaetze/1/resource-requests', () => {
         abrufe += 1;
         return antwort();
       }),

@@ -172,7 +172,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`; **Mono trägt nur
   Zahl, Zeit, Kennung und Funkrufname**, ein Wort oder ein gemischter Knoten („seit 14:32“, „3
-  offen“) steht in der Textschrift. Die Dichte-Staffel
+  offen“) steht in der Textschrift, ein Wort aus `mono` in `text`, aus
+  `monoKlein` in `textKlein`. Ein Funkrufname setzt `Kennung`; technische Werte (URL, E-Mail,
+  Kommando, Sprechgruppe, getippte Eingabesyntax) tragen `data-schrift="kennung"`. Wächter:
+  `e2e/mono-ohne-worte.spec.ts` (kein Wort aus vier Kleinbuchstaben in Mono außerhalb einer
+  Kennung). Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
   Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
   Mono-Stufe `mono`. `meta` (11) steht in der Textschrift mit gleich breiten Ziffern

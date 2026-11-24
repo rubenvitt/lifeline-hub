@@ -163,7 +163,7 @@ export function useOfflineSync(benutzerId?: number): void {
           } else if (aktion.art === 'stand' || aktion.art === 'belegung') {
             // Stand- und Belegungsmeldungen: die Seite lädt über dieselben Keys nach wie online.
             // Der Eintrag trägt keine URL, nur die Kennung: ein vor LLH-1034 eingereihter Stand
-            // geht deshalb ebenfalls an `…/evakuierung/bezirke/{id}/staende`.
+            // geht deshalb ebenfalls an `…/evacuation/districts/{id}/progress`.
             const optionen = { offlineQueueBenutzerId: aktuellerBenutzerId };
             if (aktion.art === 'stand') {
               await meldeStand(element.wert.einsatz_id, aktion.bezirk_id, aktion.daten, optionen);

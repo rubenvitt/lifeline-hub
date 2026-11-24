@@ -57,8 +57,8 @@ function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] }
   server.use(
     http.get(`${BASIS}/module-access`, () => HttpResponse.json(freigabenFixture())),
     http.get(`${BASIS}/module-counts`, () => HttpResponse.json(zaehler)),
-    http.get(`${BASIS}/personen`, () => HttpResponse.json(over.personen ?? [])),
-    http.get(`${BASIS}/abschnitte`, () =>
+    http.get(`${BASIS}/persons`, () => HttpResponse.json(over.personen ?? [])),
+    http.get(`${BASIS}/sectors`, () =>
       HttpResponse.json([
         {
           id: 5,
@@ -76,7 +76,7 @@ function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] }
     http.get(`${BASIS}/vehicles`, () => HttpResponse.json([])),
     http.get(`${BASIS}/material`, () => HttpResponse.json([])),
     http.get(
-      `${BASIS}/meldungen/rueckmeldungen`,
+      `${BASIS}/reports/check-ins`,
       over.rueckmeldungen ?? (() => HttpResponse.json(rueckmeldung('2026-11-16 13:13:00'))),
     ),
   );

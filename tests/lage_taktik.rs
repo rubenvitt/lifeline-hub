@@ -191,7 +191,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
     let (s, fk) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/fuehrungskraefte"),
+        &format!("/api/einsaetze/{einsatz}/map/commanders"),
         &admin,
         None,
     )
@@ -438,14 +438,14 @@ async fn abschnittsflaeche_und_zeichen_pruefen_auf_zwischenzeitliche_aenderung()
     let (s, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"Nord"}"#),
     )
     .await;
     assert!(s.is_success(), "{a}");
     let aid = a["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{einsatz}/abschnitte/{aid}/flaeche");
+    let uri = format!("/api/einsaetze/{einsatz}/sectors/{aid}/area");
     let poly = |x: f64| {
         format!(r#"{{"type":"Polygon","coordinates":[[[{x},50],[{x},51],[9,51],[{x},50]]]}}"#)
     };

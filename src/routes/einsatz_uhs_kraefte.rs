@@ -50,7 +50,7 @@ async fn offene_uhs(
     Ok(uhs)
 }
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/kraefte/verfuegbar — Einsatzkräfte ohne UHS (Auswahl
+/// GET /api/einsaetze/{id}/uhs/{uid}/forces/available — Einsatzkräfte ohne UHS (Auswahl
 /// beim Zuordnen). Nur Name, Funktion, Position und Einheit (design.md D4).
 pub async fn verfuegbar(
     State(state): State<AppState>,
@@ -72,7 +72,7 @@ pub struct ZuruecknahmeParams {
     nur_wenn_frei: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/uhs/{uid}/kraefte/{epid} — eine Einsatzkraft der UHS zuordnen.
+/// PUT /api/einsaetze/{id}/uhs/{uid}/forces/{epid} — eine Einsatzkraft der UHS zuordnen.
 /// Steht sie an einer anderen UHS, wechselt sie für die Leitung; ein Gerät holt sie nicht zu
 /// sich (403), das Rückgängig nach „Abziehen“ (`nur_wenn_frei=1`) auch nicht (409 mit der UHS,
 /// LLH-1924). Schon an dieser UHS: unverändert, ohne ETB.
@@ -132,7 +132,7 @@ pub struct AdhocKraftBody {
     pub staerke_position: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/kraefte — Ad-hoc-Kraft disponieren und der UHS zuordnen,
+/// POST /api/einsaetze/{id}/uhs/{uid}/forces — Ad-hoc-Kraft disponieren und der UHS zuordnen,
 /// in einer Transaktion samt Zeitachse des Initialstatus und ETB.
 pub async fn adhoc(
     State(state): State<AppState>,
@@ -204,7 +204,7 @@ pub async fn adhoc(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/uhs/{uid}/kraefte/{epid} — Kraft von der UHS lösen; sie bleibt im
+/// DELETE /api/einsaetze/{id}/uhs/{uid}/forces/{epid} — Kraft von der UHS lösen; sie bleibt im
 /// Einsatz. Steht sie nicht an dieser UHS: 404.
 pub async fn loesen(
     State(state): State<AppState>,
@@ -233,7 +233,7 @@ pub async fn loesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/einsaetze/{id}/uhs/{uid}/kraefte/einheit/{eid} — alle Kräfte einer Einheit, die an
+/// PUT /api/einsaetze/{id}/uhs/{uid}/forces/unit/{eid} — alle Kräfte einer Einheit, die an
 /// keiner UHS stehen, der UHS zuordnen (design.md F3). Nur für die Leitung: kein Gerätekatalog
 /// nennt die Route. Ohne eine solche Kraft: 422.
 pub async fn einheit_zuordnen(

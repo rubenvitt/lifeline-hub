@@ -47,7 +47,10 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personen/{person}/verbleib", self.einsatz),
+            &format!(
+                "/api/einsaetze/{}/persons/{person}/whereabouts",
+                self.einsatz
+            ),
             &self.admin,
             Some(&body.to_string()),
         )
@@ -58,7 +61,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/personen/{person}", self.einsatz),
+            &format!("/api/einsaetze/{}/persons/{person}", self.einsatz),
             &self.admin,
             None,
         )

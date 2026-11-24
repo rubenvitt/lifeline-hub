@@ -11,7 +11,7 @@ dayjs.extend(utc);
 
 /**
  * Ableitungen der Betroffenen-Seitenleiste („Sichtungsbild", „Verbleib", „Offene Felder") und
- * der Lücken-Markierung der Zeilen. Rein. Stornierte Personen liefert `GET …/personen` nicht.
+ * der Lücken-Markierung der Zeilen. Rein. Stornierte Personen liefert `GET …/persons` nicht.
  *
  * ── WAS EINE LÜCKE IST ──────────────────────────────────────────────────────────────────
  * Offen ist ein Feld nur bei einer ANGETROFFENEN Person (erfasst, betroffen, verstorben). Eine

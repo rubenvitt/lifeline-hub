@@ -230,7 +230,7 @@ export function nimmAusDemEinsatz(
   emId: number,
 ): Promise<MaterialEntlassungAntwort> {
   return apiSend<MaterialEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/release`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down`,
     'POST',
   );
 }
@@ -247,7 +247,7 @@ export function nimmHerausnahmeZurueck(
   vorzustand: MaterialEntlassungVorzustand,
 ): Promise<MaterialRuecknahmeAntwort> {
   return apiSend<MaterialRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/release/undo`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down/undo`,
     'POST',
     vorzustand,
   );

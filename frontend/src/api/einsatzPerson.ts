@@ -154,7 +154,7 @@ export function listePersonen(
     q.set('betreuungsstelle_id', String(filter.betreuungsstelleId));
   }
   const qs = q.toString();
-  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${qs ? `?${qs}` : ''}`);
+  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/persons${qs ? `?${qs}` : ''}`);
 }
 
 /**
@@ -163,7 +163,7 @@ export function listePersonen(
  * demselben Recht wie die Liste, ohne Zugriffsprotokoll.
  */
 export function listePersonenAuswahl(einsatzId: number): Promise<PersonAuswahl[]> {
-  return apiGet<PersonAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/auswahl`);
+  return apiGet<PersonAuswahl[]>(`/api/einsaetze/${einsatzId}/persons/selection`);
 }
 
 /**
@@ -196,7 +196,7 @@ export function toPersonAuswahl(p: Person): PersonAuswahl | null {
  * ist deshalb keine Zeilenquelle.
  */
 export function loadPersonZeile(einsatzId: number, personId: number): Promise<Person> {
-  return apiGet<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}/zeile`);
+  return apiGet<Person>(`/api/einsaetze/${einsatzId}/persons/${personId}/row`);
 }
 
 /**
@@ -205,18 +205,18 @@ export function loadPersonZeile(einsatzId: number, personId: number): Promise<Pe
  * wiederholen und nie aus dem Cache der Liste ersetzen (`frontend/src/druck/AGENTS.md`).
  */
 export function ladePersonenDruck(einsatzId: number): Promise<Person[]> {
-  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen/druck`);
+  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/persons/print`);
 }
 
 /** CSV aller nicht stornierten Personen des Einsatzes (`routes/einsatz_person.rs`, `export`).
  *  Schreibt serverseitig JE ABRUF einen `export`-Audit-Eintrag. */
 export function ladePersonenExport(einsatzId: number): Promise<Blob> {
-  return apiDatei(`/api/einsaetze/${einsatzId}/personen/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
+  return apiDatei(`/api/einsaetze/${einsatzId}/persons/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
   // Schreibt serverseitig EINEN detail-Audit-Eintrag.
-  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
+  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/persons/${personId}`);
 }
 
 /**
@@ -225,7 +225,7 @@ export function ladePerson(einsatzId: number, personId: number): Promise<PersonD
  * der Live-Abgleich bei jedem `person`-Ereignis abrufen; das Detail nicht.
  */
 export function loadPersonStand(einsatzId: number, personId: number): Promise<StornoStand> {
-  return apiGet<StornoStand>(`/api/einsaetze/${einsatzId}/personen/${personId}/stand`);
+  return apiGet<StornoStand>(`/api/einsaetze/${einsatzId}/persons/${personId}/state`);
 }
 
 /**
@@ -234,7 +234,7 @@ export function loadPersonStand(einsatzId: number, personId: number): Promise<St
  * aus dem Cache des Details ersetzen (`frontend/src/druck/AGENTS.md`, Personendruck).
  */
 export function loadPersonDruck(einsatzId: number, personId: number): Promise<PersonDetail> {
-  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}/druck`);
+  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/persons/${personId}/print`);
 }
 
 export function legePersonAn(
@@ -242,7 +242,7 @@ export function legePersonAn(
   daten: PersonAnlegenEingabe,
   optionen?: ApiSendOptionen,
 ): Promise<Person> {
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen`, 'POST', daten, optionen);
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/persons`, 'POST', daten, optionen);
 }
 
 /** Bearbeitet die Identitäts-/Kontextfelder. `basisGeaendertAt` aktiviert das optimistische
@@ -259,7 +259,7 @@ export function aktualisierePerson(
   basisGeaendertAt?: string,
 ): Promise<Person> {
   const body = patchBody(daten, basisGeaendertAt);
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/persons/${personId}`, 'PATCH', body);
 }
 
 /**
@@ -313,7 +313,7 @@ export function savePersonFeld<K extends PersonFeld>(
 ): Promise<Person> {
   const body: PersonEingabe & { erwartet?: PersonErwartet } = feldAufWire(feld, wert);
   if (erwartet !== undefined) body.erwartet = feldAufWire(feld, erwartet);
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/persons/${personId}`, 'PATCH', body);
 }
 
 export function setzePersonStatus(
@@ -321,17 +321,17 @@ export function setzePersonStatus(
   personId: number,
   status: PersonStatus,
 ): Promise<Person> {
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}/status`, 'POST', {
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/persons/${personId}/status`, 'POST', {
     status,
   });
 }
 
 export function stornierePerson(einsatzId: number, personId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/persons/${personId}`, 'DELETE');
 }
 
 export function ladePersonAudit(einsatzId: number, personId: number): Promise<PersonZugriff[]> {
-  return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/personen/${personId}/audit`);
+  return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/persons/${personId}/audit`);
 }
 
 /**
@@ -339,7 +339,7 @@ export function ladePersonAudit(einsatzId: number, personId: number): Promise<Pe
  * Einsatzleitung (sonst 403); der Abruf wird selbst nicht protokolliert.
  */
 export function ladePersonenListenzugriffe(einsatzId: number): Promise<PersonZugriff[]> {
-  return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/personen/listenzugriffe`);
+  return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/persons/list-accesses`);
 }
 
 /** Registriernummer-Anzeige wie im Backend (R-042). */
@@ -374,7 +374,7 @@ export function erfasseSichtung(
 ): Promise<Sichtung> {
   const { bestaetigt_personal_id, notiz, ...rest } = eingabe;
   return apiSend<Sichtung>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/triage`,
     'POST',
     {
       ...rest,
@@ -388,7 +388,7 @@ export function erfasseSichtung(
 /** Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): das Personal des Einsatzes. Eine Person und
  * der Lagemonitor bekommen 403. */
 export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
-  return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
+  return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/persons/confirmers`);
 }
 
 /**
@@ -397,11 +397,11 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
  */
 /** Aktive UHS als Ziel „Zur UHS“ am Einheitengerät (LLH-1580, K3): nur Kennung und Bezeichnung. */
 export function ladeUhsZiele(einsatzId: number): Promise<UhsZielAuswahl[]> {
-  return apiGet<UhsZielAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/uhs`);
+  return apiGet<UhsZielAuswahl[]>(`/api/einsaetze/${einsatzId}/persons/uhs`);
 }
 
 export function ladeVersorgendeEinheiten(einsatzId: number): Promise<VersorgendeEinheitAuswahl[]> {
-  return apiGet<VersorgendeEinheitAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/einheiten`);
+  return apiGet<VersorgendeEinheitAuswahl[]>(`/api/einsaetze/${einsatzId}/persons/units`);
 }
 
 /**
@@ -414,7 +414,7 @@ export function savePersonEinheit(
   einheitId: number | null,
   erwartet: number | null,
 ): Promise<Person> {
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', {
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/persons/${personId}`, 'PATCH', {
     versorgende_einheit_id: einheitId,
     erwartet: { versorgende_einheit_id: erwartet },
   });
@@ -422,7 +422,7 @@ export function savePersonEinheit(
 
 /** Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332, Spec `patienten-uebergabe`). */
 export function ladeTransportmittel(einsatzId: number): Promise<TransportmittelAuswahl> {
-  return apiGet<TransportmittelAuswahl>(`/api/einsaetze/${einsatzId}/personen/transportmittel`);
+  return apiGet<TransportmittelAuswahl>(`/api/einsaetze/${einsatzId}/persons/transport-means`);
 }
 
 /**
@@ -430,7 +430,7 @@ export function ladeTransportmittel(einsatzId: number): Promise<TransportmittelA
  * Rettungsmittel, „Entlassen an“, „gegen Rat“, Unterschrift. Nur Personen mit Angabe.
  */
 export function ladeVerbleibAngaben(einsatzId: number): Promise<VerbleibAngaben[]> {
-  return apiGet<VerbleibAngaben[]>(`/api/einsaetze/${einsatzId}/personen/verbleib-angaben`);
+  return apiGet<VerbleibAngaben[]>(`/api/einsaetze/${einsatzId}/persons/whereabouts-details`);
 }
 
 export interface VerbleibEingabe extends OfflineEintragEingabe {
@@ -466,7 +466,7 @@ export function erfasseVerbleib(
   optionen?: ApiSendOptionen,
 ): Promise<Verbleib> {
   return apiSend<Verbleib>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/verbleib`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/whereabouts`,
     'POST',
     daten,
     optionen,
@@ -486,7 +486,7 @@ export function legeNotizAn(
   optionen?: ApiSendOptionen,
 ): Promise<Verlaufsnotiz> {
   return apiSend<Verlaufsnotiz>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/notizen`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/notes`,
     'POST',
     eingabe,
     optionen,
@@ -512,7 +512,7 @@ export function saveAnlass(
   optionen?: ApiSendOptionen,
 ): Promise<Anlass> {
   return apiSend<Anlass>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/anlass`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/reason`,
     'POST',
     eingabe,
     optionen,
@@ -536,7 +536,7 @@ export function saveTransport(
   optionen?: ApiSendOptionen,
 ): Promise<Transport> {
   return apiSend<Transport>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/transport`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/transport`,
     'POST',
     eingabe,
     optionen,
@@ -557,7 +557,7 @@ export function createMassnahme(
   optionen?: ApiSendOptionen,
 ): Promise<Massnahme> {
   return apiSend<Massnahme>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/interventions`,
     'POST',
     eingabe,
     optionen,
@@ -571,7 +571,7 @@ export function revokeMassnahme(
   massnahmeId: number,
 ): Promise<Massnahme> {
   return apiSend<Massnahme>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen/${massnahmeId}/aufheben`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/interventions/${massnahmeId}/void`,
     'POST',
   );
 }
@@ -596,7 +596,7 @@ export function createVerletzung(
   optionen?: ApiSendOptionen,
 ): Promise<Verletzung> {
   return apiSend<Verletzung>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/injuries`,
     'POST',
     eingabe,
     optionen,
@@ -610,7 +610,7 @@ export function revokeVerletzung(
   verletzungId: number,
 ): Promise<Verletzung> {
   return apiSend<Verletzung>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen/${verletzungId}/aufheben`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/injuries/${verletzungId}/void`,
     'POST',
   );
 }
@@ -622,7 +622,7 @@ export function schlageAbgleichVor(
   gefundenPersonId: number,
 ): Promise<Abgleich> {
   return apiSend<Abgleich>(
-    `/api/einsaetze/${einsatzId}/personen/${vermisstPersonId}/abgleich`,
+    `/api/einsaetze/${einsatzId}/persons/${vermisstPersonId}/matches`,
     'POST',
     { gefunden_person_id: gefundenPersonId },
   );
@@ -636,7 +636,7 @@ export function entscheideAbgleich(
   entscheidung: 'bestaetigt' | 'verworfen',
 ): Promise<Abgleich> {
   return apiSend<Abgleich>(
-    `/api/einsaetze/${einsatzId}/personen/${vermisstPersonId}/abgleich/${abgleichId}/entscheidung`,
+    `/api/einsaetze/${einsatzId}/persons/${vermisstPersonId}/matches/${abgleichId}/decision`,
     'POST',
     { entscheidung },
   );
@@ -645,7 +645,7 @@ export function entscheideAbgleich(
 // ---------- Fotos und Dateien (LFH-757) ----------
 
 const anhangBasis = (einsatzId: number, personId: number) =>
-  `/api/einsaetze/${einsatzId}/personen/${personId}/anhaenge`;
+  `/api/einsaetze/${einsatzId}/persons/${personId}/attachments`;
 
 /** Lebende Anhänge einer Person, neueste zuerst. Die Liste schreibt serverseitig KEIN Audit. */
 export function listePersonAnhaenge(einsatzId: number, personId: number): Promise<PersonAnhang[]> {
@@ -677,7 +677,7 @@ export function entfernePersonAnhang(
 }
 
 /**
- * Download über die Personenroute, nie über `/anhaenge/{aid}` des Einsatzes (dort 404). Jeder
+ * Download über die Personenroute, nie über `/attachments/{aid}` des Einsatzes (dort 404). Jeder
  * Abruf — auch die Revalidierung mit 304 — schreibt serverseitig eine Zeile ins Zugriffsprotokoll
  * der Person; deshalb nur als Verweis, den eine Person bewusst auslöst, nie als Vorschau.
  */
@@ -686,5 +686,5 @@ export function personAnhangDownloadPfad(
   personId: number,
   anhangId: number,
 ): string {
-  return `${anhangBasis(einsatzId, personId)}/${anhangId}/datei`;
+  return `${anhangBasis(einsatzId, personId)}/${anhangId}/file`;
 }

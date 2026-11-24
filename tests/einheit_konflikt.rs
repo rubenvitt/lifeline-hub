@@ -271,7 +271,7 @@ async fn geerbte_soll_staerke_als_altwert_ist_kein_konflikt() {
     let (s, typ) = anfrage_json(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(&json!({"label": "Prüftrupp LLH-1831", "soll_fuehrer": 1, "soll_unterfuehrer": 1, "soll_mannschaft": 4})),
     )

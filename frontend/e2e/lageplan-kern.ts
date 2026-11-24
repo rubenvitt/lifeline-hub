@@ -97,7 +97,7 @@ export async function logoSetzen(page: Page) {
 export async function zonenAnlegen(page: Page, einsatzId: string, anzahl: number) {
   const a = api(page, einsatzId);
   for (let i = 1; i <= anzahl; i++) {
-    await a.post('zonen', {
+    await a.post('zones', {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
       geometrie: JSON.stringify(rechteck(0.0004, 0.0003, -0.004 + (i % 8) * 0.001)),
@@ -116,21 +116,21 @@ export async function einsatzMitLage(page: Page, bezeichnung: string): Promise<s
   const a = api(page, einsatzId);
   const { id: einheit } = await a.post('units', { name: 'LF Lageplan' });
   await a.patch(`units/${einheit}/position`, { lat: ORT.lat, lon: ORT.lon + 0.001 });
-  await a.post('zonen', {
+  await a.post('zones', {
     typ: 'gefahrengebiet',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify(rechteck(0.002, 0.001, -0.002)),
     label: 'Brandstelle',
   });
-  const gebiete = await a.get<{ id: number; label: string }[]>('gefahrengebiete');
+  const gebiete = await a.get<{ id: number; label: string }[]>('hazard-areas');
   const gid = gebiete.find((g) => g.label === 'Brandstelle')!.id;
-  await a.put(`gefahrengebiete/${gid}/matrix/bewertung`, {
+  await a.put(`hazard-areas/${gid}/matrix/rating`, {
     gefahrentyp: 'atemgifte',
     schutzobjekt: 'menschen',
     warnstufe: 'hoch',
   });
-  const { id: abschnitt } = await a.post('abschnitte', { name: 'Deich Lageplan' });
-  await a.patch(`abschnitte/${abschnitt}/flaeche`, {
+  const { id: abschnitt } = await a.post('sectors', { name: 'Deich Lageplan' });
+  await a.patch(`sectors/${abschnitt}/area`, {
     flaeche_geojson: JSON.stringify(rechteck(0.002, 0.001, 0.003)),
   });
   await a.put('module-overrides/einsatzabschnitte', { sichtbar: false, benoetigte_rolle: null });

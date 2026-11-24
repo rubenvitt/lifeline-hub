@@ -72,13 +72,13 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs,
   const name = `E2E Einsatzabschluss ${Date.now()}`;
   const einsatzId = await einsatzAnlegen(page, name);
   // Ein offener Punkt: ein Auftrag ohne Bearbeitung.
-  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Sandsäcke zum Deich bringen',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
     },
   });
-  expect(auftrag.ok(), `POST …/auftraege: ${auftrag.status()}`).toBe(true);
+  expect(auftrag.ok(), `POST …/tasks: ${auftrag.status()}`).toBe(true);
 
   for (const breite of BREITEN) {
     await page.setViewportSize(breite);

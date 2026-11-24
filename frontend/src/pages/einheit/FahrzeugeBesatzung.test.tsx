@@ -144,7 +144,7 @@ function zeige({
   freigaben = freigabenFixture(),
   listState = 'daten',
 }: Optionen = {}) {
-  server.use(http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)));
+  server.use(http.get('/api/vehicle-statuses', () => HttpResponse.json(KATALOG)));
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
   const onSetFuehrer = vi.fn<(epId: number) => Promise<unknown>>().mockResolvedValue(undefined);
   const onReload = vi.fn();
@@ -684,7 +684,7 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
 
   it('fällt 83-1 aus der Quelle, hält seine Zeile die Stelle, und ein abgelehntes Rückgängig steht einmal', async () => {
     mitschnitt();
-    server.use(http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)));
+    server.use(http.get('/api/vehicle-statuses', () => HttpResponse.json(KATALOG)));
     const reihenfolge = () =>
       screen.getAllByRole('group', { name: /^Fahrzeug / }).map((g) => g.getAttribute('aria-label'));
     const { rerender } = renderMitProviders(<Seite e={einheit()} fahrzeuge={FAHRZEUGE} />);

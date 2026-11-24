@@ -124,7 +124,7 @@ function setup(route: string) {
       gesamt += 1;
       return HttpResponse.json(eintrag(gesamt), { status: 201 });
     }),
-    http.get('/api/einsaetze/7/etb/zaehler', () =>
+    http.get('/api/einsaetze/7/etb/counts', () =>
       HttpResponse.json({
         gesamt,
         je_typ: {
@@ -137,10 +137,10 @@ function setup(route: string) {
         },
       }),
     ),
-    http.get('/api/etb-bausteine', () => HttpResponse.json([])),
+    http.get('/api/etb-snippets', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },

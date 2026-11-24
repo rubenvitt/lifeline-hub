@@ -544,7 +544,7 @@ export const modulRegistry: ModulEintrag[] = [
   },
   {
     // i6k6mzed (design.md D3): eigenes Modul, ohne Modulzähler. Die
-    // API bleibt unter `…/stab/infotelefon`, `PFAD_KEY` ordnet sie `infotelefon` zu.
+    // API liegt unter `…/staff/info-line`, `PFAD_KEY` ordnet sie `infotelefon` zu.
     key: 'infotelefon',
     kategorie: 'kommunikation',
     label: 'Informationstelefon',

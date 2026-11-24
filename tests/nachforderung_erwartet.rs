@@ -52,7 +52,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         Some(&body.to_string()),
     )
@@ -65,7 +65,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/zusage"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/commitment"),
         cookie,
         Some(&zusage.unwrap_or_else(|| json!({})).to_string()),
     )
@@ -91,7 +91,7 @@ async fn status(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/status"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&json!({ "status": stufe }).to_string()),
     )
@@ -132,7 +132,7 @@ async fn lade(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value 
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         None,
     )
@@ -232,7 +232,7 @@ async fn projektion_nennt_nur_zugesagte_und_unterwegs_des_raums_ohne_freitexte()
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{abgelehnt}/ablehnen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{abgelehnt}/decline"),
         &admin,
         Some(r#"{"grund":"keine"}"#),
     )
@@ -242,7 +242,7 @@ async fn projektion_nennt_nur_zugesagte_und_unterwegs_des_raums_ohne_freitexte()
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{zurueck}/zurueckziehen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{zurueck}/withdraw"),
         &admin,
         Some(r#"{"grund":"erledigt"}"#),
     )
@@ -1012,11 +1012,11 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
             .is_some_and(|t| t.contains("Einheiten übernommen")),
         "{j:?}"
     );
-    for (pfad, body) in [("ablehnen", r#"{"grund":"x"}"#), ("zurueckziehen", r#"{}"#)] {
+    for (pfad, body) in [("decline", r#"{"grund":"x"}"#), ("withdraw", r#"{}"#)] {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/nachforderungen/{n}/{pfad}"),
+            &format!("/api/einsaetze/{e}/resource-requests/{n}/{pfad}"),
             &admin,
             Some(body),
         )
@@ -1026,7 +1026,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/nachforderungen/{n}"),
+        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":1}"#),
     )
@@ -1035,7 +1035,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/nachforderungen/{n}"),
+        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":3}"#),
     )
@@ -1055,7 +1055,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/nachforderungen/{n}"),
+        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":1}"#),
     )

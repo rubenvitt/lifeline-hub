@@ -18,12 +18,12 @@ struct Art {
 }
 
 const BEFEHL: Art = Art {
-    praefix: "befehle",
+    praefix: "orders",
     anlegen: r#"{"vorlage":"befehl_lad","titel":"Befehl 1","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"lage","text":"L"},{"schluessel":"auftrag","text":"A"},{"schluessel":"durchfuehrung","text":"D"}]}"#,
 };
 
 const LAGEBERICHT: Art = Art {
-    praefix: "lageberichte",
+    praefix: "situation-reports",
     anlegen: r#"{"vorlage":"freitext","titel":"Lage 12:00","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"text","text":"Ruhig"}]}"#,
 };
 
@@ -85,7 +85,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("{}/freigeben", self.dok(art, id)),
+            &format!("{}/release", self.dok(art, id)),
             &self.admin,
             None,
         )
@@ -98,7 +98,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/abschnitte", self.einsatz),
+            &format!("/api/einsaetze/{}/sectors", self.einsatz),
             &self.admin,
             Some(&format!(r#"{{"name":"{name}"}}"#)),
         )
@@ -359,7 +359,7 @@ async fn anzeigename_ueberlebt_das_loeschen_und_nennt_keine_besetzung() {
     let (s, j) = anfrage(
         &u.app,
         "DELETE",
-        &format!("/api/einsaetze/{}/abschnitte/{sued}", u.einsatz),
+        &format!("/api/einsaetze/{}/sectors/{sued}", u.einsatz),
         &u.admin,
         None,
     )
@@ -471,7 +471,7 @@ async fn fortschreiben_uebernimmt_den_verteiler_je_fassung() {
         let (s, v2) = anfrage(
             &u.app,
             "POST",
-            &format!("{}/fortschreiben", u.dok(art, id)),
+            &format!("{}/revise", u.dok(art, id)),
             &u.admin,
             Some("{}"),
         )

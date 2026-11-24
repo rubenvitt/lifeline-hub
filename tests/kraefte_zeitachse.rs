@@ -113,7 +113,7 @@ async fn personalstatus_schreibt_die_zeitachse() {
     let (_, z) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
     assert_eq!(arten(&z), vec![paar("alarmierung", "status")]);
 
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let id_von = |label: &str| {
         katalog
             .as_array()
@@ -173,7 +173,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;
@@ -236,7 +236,7 @@ async fn handstatus_der_einheit_schreibt_die_zeitachse() {
     let alarm = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit alarmiert","kategorie":"gebunden","zeitachse_marke":"alarmierung"}"#,
     )
     .await;
@@ -259,7 +259,7 @@ async fn handstatus_der_einheit_schreibt_die_zeitachse() {
 #[tokio::test]
 async fn katalog_marke_setzen_pruefen_entfernen() {
     let w = welt().await;
-    for katalog in ["personal-status", "fahrzeug-status"] {
+    for katalog in ["personnel-statuses", "vehicle-statuses"] {
         let (s, _) = anfrage(
             &w.app,
             "POST",
@@ -500,7 +500,7 @@ async fn streichung_mit_grund_und_statuscodes() {
         )
         .await;
     let zid = z["ereignisse"][0]["id"].as_i64().unwrap();
-    let streich = format!("{}/timeline/{zid}/void", w.einheit_pfad());
+    let streich = format!("{}/timeline/{zid}/strike", w.einheit_pfad());
     // Spec „Grund fehlt"
     let (s, _) = anfrage(
         &w.app,
@@ -521,7 +521,7 @@ async fn streichung_mit_grund_und_statuscodes() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("{}/timeline/{zid}/void", w.person_pfad()),
+        &format!("{}/timeline/{zid}/strike", w.person_pfad()),
         &w.admin,
         Some(r#"{"grund":"x"}"#),
     )
@@ -760,7 +760,7 @@ async fn schon_eingetroffen_in_einheit(w: &Welt, name: &str) -> i64 {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let im_einsatz = katalog
         .as_array()
         .unwrap()
@@ -795,14 +795,14 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;
     let ohne_marke = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Werkstatt","kategorie":"gebunden","sortier":998}"#,
     )
     .await;
@@ -873,14 +873,14 @@ async fn handstatus_meldet_personal_fuer_den_fan_out() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit am Ort","kategorie":"gebunden","zeitachse_marke":"eintreffen"}"#,
     )
     .await;
     let ohne_marke = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit frei","kategorie":"gebunden"}"#,
     )
     .await;
@@ -949,7 +949,7 @@ async fn abloesung_bereit(w: &Welt) -> (i64, i64, i64) {
     let entlassen = status_anlegen(
         &w.app,
         &w.admin,
-        "personal-status",
+        "personnel-statuses",
         r#"{"label":"entlassen","kategorie":"gebunden","zeitachse_marke":"entlassung"}"#,
     )
     .await;
@@ -1126,7 +1126,14 @@ async fn nachgetragene_entlassung_bleibt_die_einzige() {
         .await;
     assert_eq!(s, StatusCode::CREATED, "{json:?}");
 
-    let (s, json) = anfrage(&w.app, "POST", &format!("{pfad}/release"), &w.admin, None).await;
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/stand-down"),
+        &w.admin,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{json:?}");
     let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
     let entlassungen: Vec<_> = z["ereignisse"]
@@ -1210,7 +1217,7 @@ async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;
@@ -1281,7 +1288,7 @@ async fn entlassene_anna() -> (Welt, sqlx::SqlitePool) {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{}/release", w.person_pfad()),
+        &format!("{}/stand-down", w.person_pfad()),
         &w.admin,
         None,
     )
@@ -1310,7 +1317,7 @@ async fn entlassene_person_berichtigt_ihre_zeitachse() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{pfad}/timeline/{eintreffen}/void"),
+        &format!("{pfad}/timeline/{eintreffen}/strike"),
         &w.admin,
         Some(r#"{"grund":"Zeit verwechselt"}"#),
     )
@@ -1394,7 +1401,7 @@ async fn berichtigung_laesst_keine_offene_periode_zu() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{pfad}/timeline/{entlassung}/void"),
+        &format!("{pfad}/timeline/{entlassung}/strike"),
         &w.admin,
         Some(r#"{"grund":"zu früh"}"#),
     )
@@ -1441,7 +1448,14 @@ async fn fehleintrag_einer_frueheren_periode_streichen() {
             .await;
         assert_eq!(s, StatusCode::CREATED, "{art}: {json:?}");
     }
-    let (s, json) = anfrage(&w.app, "POST", &format!("{pfad}/release"), &w.admin, None).await;
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/stand-down"),
+        &w.admin,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{json:?}");
 
     let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
@@ -1456,7 +1470,7 @@ async fn fehleintrag_einer_frueheren_periode_streichen() {
     let (s, z) = anfrage(
         &w.app,
         "POST",
-        &format!("{pfad}/timeline/{erstes}/void"),
+        &format!("{pfad}/timeline/{erstes}/strike"),
         &w.admin,
         Some(r#"{"grund":"falsche Person"}"#),
     )
@@ -1504,7 +1518,7 @@ async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("{bert_pfad}/timeline/{alarmierung}/void"),
+        &format!("{bert_pfad}/timeline/{alarmierung}/strike"),
         &w.admin,
         Some(r#"{"grund":"x"}"#),
     )
@@ -1529,7 +1543,7 @@ async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("{leer_pfad}/timeline/{eintreffen}/void"),
+        &format!("{leer_pfad}/timeline/{eintreffen}/strike"),
         &w.admin,
         Some(r#"{"grund":"x"}"#),
     )
@@ -1572,7 +1586,7 @@ async fn anna_ueber_die_einheit_entlassen() -> (Welt, sqlx::SqlitePool) {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{}/release", w.person_pfad()),
+        &format!("{}/stand-down", w.person_pfad()),
         &w.admin,
         None,
     )
@@ -1599,7 +1613,7 @@ async fn streichung_an_der_einheit_laesst_die_entlassene_stehen() {
     let (s, z) = anfrage(
         &w.app,
         "POST",
-        &format!("{}/timeline/{entlassung}/void", w.einheit_pfad()),
+        &format!("{}/timeline/{entlassung}/strike", w.einheit_pfad()),
         &w.admin,
         Some(r#"{"grund":"Einheit noch vor Ort"}"#),
     )
@@ -1624,7 +1638,7 @@ async fn streichung_an_der_einheit_laesst_die_entlassene_stehen() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{}/timeline/{eintreffen}/void", w.person_pfad()),
+        &format!("{}/timeline/{eintreffen}/strike", w.person_pfad()),
         &w.admin,
         Some(r#"{"grund":"Zeit verwechselt"}"#),
     )
@@ -1655,7 +1669,7 @@ async fn offene_periode_aus_dem_bestand_nennt_den_nachtrag_der_entlassung() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{pfad}/timeline/{eintreffen}/void"),
+        &format!("{pfad}/timeline/{eintreffen}/strike"),
         &w.admin,
         Some(r#"{"grund":"Zeit verwechselt"}"#),
     )
@@ -1722,7 +1736,7 @@ async fn eintreffen_als_anker_an_der_einheit_berichtigen() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{pfad}/timeline/{eintreffen}/void"),
+        &format!("{pfad}/timeline/{eintreffen}/strike"),
         &w.admin,
         Some(r#"{"grund":"x"}"#),
     )

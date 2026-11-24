@@ -446,7 +446,7 @@ async fn sprechgruppe_anlegen(
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}","sortier":{sortier}}}"#
@@ -1124,7 +1124,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/sprechgruppen/{sg}/deaktivieren"),
+        &format!("/api/talk-groups/{sg}/deactivate"),
         &admin,
         None,
     )
@@ -1133,7 +1133,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#),
     )
@@ -1142,7 +1142,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let (s, abschnitt) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"Nord"}"#),
     )
@@ -1254,7 +1254,7 @@ async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
 // ── LFH-609: Einheitenstatus (abgeleitet aus Fahrzeugen, Handstatus als Rückfall) ────
 
 async fn status_id(app: &axum::Router, cookie: &str, label: &str) -> i64 {
-    let (_, stati) = anfrage(app, "GET", "/api/fahrzeug-status", cookie, None).await;
+    let (_, stati) = anfrage(app, "GET", "/api/vehicle-statuses", cookie, None).await;
     stati
         .as_array()
         .unwrap()
@@ -2264,7 +2264,7 @@ async fn fahrzeug_zuordnen_nennt_den_aufgeloesten_funkrufnamen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &admin,
         Some(r#"{"funkrufname":"Florian 1"}"#),
     )
@@ -2284,7 +2284,7 @@ async fn fahrzeug_zuordnen_nennt_den_aufgeloesten_funkrufnamen() {
     let (s, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/fahrzeuge/{fz}"),
+        &format!("/api/vehicles/{fz}"),
         &admin,
         Some(r#"{"funkrufname":"Florian 1/1"}"#),
     )
@@ -2515,7 +2515,7 @@ async fn zugeordnetes_oder_beendetes_fahrzeug_ist_422_mit_grund_je_fahrzeug() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{weg}/release"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{weg}/stand-down"),
         &admin,
         None,
     )

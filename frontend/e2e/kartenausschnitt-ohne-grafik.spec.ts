@@ -75,7 +75,7 @@ test('Einsatzliste: Anlegedialog mit Treffer ohne Kartengrafik, Anlegen geht', a
     name: 'Bahnhofstraße 1, Musterstadt, Landkreis X, Niedersachsen, 12345, Deutschland',
     kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
   };
-  await page.route(/\/api\/ort-suche\?/, (route) =>
+  await page.route(/\/api\/place-search\?/, (route) =>
     route.fulfill({ json: { zustand: 'ok', treffer: [treffer] } }),
   );
   await page.goto('/einsaetze');
@@ -111,13 +111,13 @@ test('Evakuierung: Gebiet des Bezirks ohne Kartengrafik, Sprung bleibt', async (
   const id = await einsatzAnlegen(page, `E2E Bezirk ohne Grafik ${Date.now()}`);
   const a = api(page, id);
   const bezeichnung = 'Uferstraße 12–40';
-  const { id: bezirk } = await a.post('evakuierung/bezirke', {
+  const { id: bezirk } = await a.post('evacuation/districts', {
     bezeichnung,
     plan_personen: 120,
     plan_erhebung: 'geschaetzt',
   });
   const [w, o, s, n] = [ORT.lon - 0.002, ORT.lon + 0.002, ORT.lat - 0.001, ORT.lat + 0.001];
-  await a.post('zonen', {
+  await a.post('zones', {
     typ: 'evakuierungsbezirk',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify({

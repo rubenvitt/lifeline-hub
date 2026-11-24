@@ -43,7 +43,7 @@ export async function post(
 export async function seedeGross(page: Page, einsatzId: string) {
   const abschnitte: number[] = [];
   for (let i = 1; i <= 8; i++) {
-    const id = await post(page, einsatzId, 'abschnitte', {
+    const id = await post(page, einsatzId, 'sectors', {
       name: i === 1 ? ABSCHNITT : `Einsatzabschnitt ${i}`,
       kurzbezeichnung: `EA-${i}`,
     });
@@ -56,7 +56,7 @@ export async function seedeGross(page: Page, einsatzId: string) {
       });
     }
   }
-  const unter = await post(page, einsatzId, 'abschnitte', {
+  const unter = await post(page, einsatzId, 'sectors', {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: abschnitte[0],
   });

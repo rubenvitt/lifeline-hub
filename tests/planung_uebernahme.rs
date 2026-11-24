@@ -759,7 +759,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, q) = post(
         &app,
         &admin,
-        "/api/qualifikationen",
+        "/api/qualifications",
         json!({"label": "Bootsführer"}),
     )
     .await;
@@ -796,7 +796,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/qualifikationen/{q}/deaktivieren"),
+        &format!("/api/qualifications/{q}/deactivate"),
         &admin,
         None,
     )
@@ -1095,7 +1095,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = post(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         json!({"name": name, "sortier": 0}),
     )
     .await;

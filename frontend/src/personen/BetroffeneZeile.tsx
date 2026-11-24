@@ -15,7 +15,13 @@ import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { Zeichenzaehler } from '../components/zeichenGrenze';
 import SichtungsTag from '../components/SichtungsTag';
 import { useViewport } from '../components/useViewport';
-import { Schnellerfassungszeile, Textstufe, monoStil, useRollen } from '../components/instrument';
+import {
+  Schnellerfassungszeile,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { schrift, schriftskala } from '../theme/tokens';
 import { formatKoordinate } from './koordinate';
 import {
@@ -132,18 +138,22 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return <Textstufe title="Maßnahme">+ {MASSNAHME_WORT[teil.wert]}</Textstufe>;
     case 'entlassen':
       return (
-        <span style={{ ...monoStil('monoKlein'), color: rollen.bedien }} title="Verbleib">
+        <span style={{ ...schriftStil('textKlein'), color: rollen.bedien }} title="Verbleib">
           → entlassen
         </span>
       );
     case 'uhs': {
       const a = loeseUhsAuf(teil.suche, uhsListe);
       return 'uhs' in a ? (
-        <span style={{ ...monoStil('monoKlein'), color: rollen.bedien }}>
+        <span style={{ ...schriftStil('textKlein'), color: rollen.bedien }}>
           → UHS {a.uhs.bezeichnung}
         </span>
       ) : (
-        <span style={{ ...monoStil('monoKlein'), color: rollen.alarmText }} title={a.problem}>
+        <span
+          data-schrift="kennung"
+          style={{ ...monoStil('monoKlein'), color: rollen.alarmText }}
+          title={a.problem}
+        >
           {teil.text} ?
         </span>
       );
@@ -163,6 +173,8 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       if (teil.grund === NICHT_VERSTANDEN) {
         return (
           <span
+            // Echo der Eingabe: Eingabesyntax wie die Kürzel-Legende, bleibt Mono (ADR-0094).
+            data-schrift="kennung"
             style={{
               ...monoStil('monoKlein'),
               color: rollen.alarmText,
@@ -176,6 +188,7 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       }
       return (
         <span
+          data-schrift="kennung"
           style={{
             ...monoStil('monoKlein'),
             color: rollen.alarmText,
@@ -320,7 +333,10 @@ export default function BetroffeneZeile({
           <dl id={kuerzelId} data-lfh="kuerzel" aria-label="Kürzel" style={legendeStil}>
             {LEGENDE.map((z) => (
               <div key={z.zeichen} style={{ display: 'contents' }}>
-                <dt style={{ ...monoStil('mono'), color: rollen.bedien }}>{z.zeichen}</dt>{' '}
+                {/* Was man tippt, ist Eingabesyntax wie eine Kennung (ADR-0094): Mono bleibt. */}
+                <dt data-schrift="kennung" style={{ ...monoStil('mono'), color: rollen.bedien }}>
+                  {z.zeichen}
+                </dt>{' '}
                 <dd style={{ margin: 0, marginBlockEnd: istSchmal ? token.marginXS : 0 }}>
                   {z.bedeutung}
                 </dd>

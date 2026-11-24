@@ -111,7 +111,7 @@ impl LiveEvent {
             // abgeleiteten Führungsflags liefert. Ein `lagekarte`-Leser sieht diese Daten per
             // GET vollständig; ohne den Key fröre sein Führungskräfte-Layer ein.
             //
-            // Dazu `verpflegung` (LLH-1055, design.md D4): `GET …/verpflegung` legt in der
+            // Dazu `verpflegung` (LLH-1055, design.md D4): `GET …/catering` legt in der
             // Empfängerliste Name, Gliederung, Abschnitt und Stärke derselben Einheiten und
             // Abschnitte selbst offen, auch ohne Modul `einheiten`. Ohne den Key fröre die Liste
             // am Tresen ein. NICHT bei `Personal`: die Verpflegung zeigt keine disponierten
@@ -138,7 +138,7 @@ impl LiveEvent {
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
             // Nur `fernmeldewesen`: Kommunikationsplan und Skizze sind Datenobjekte dieses Moduls,
-            // auch wenn ihre Pfade unter `…/stab` liegen (LLH-1180, design.md D3).
+            // auch wenn ihre Pfade unter `…/staff` liegen (LLH-1180, design.md D3).
             LiveEvent::Fernmeldewesen => &["fernmeldewesen"],
             // Nur `lagebesprechung`: Abschluss und Termin sind Datenobjekte dieses Moduls. NICHT
             // `einsatzdaten`, obwohl beide `einsatz.naechste_lagebesprechung_at` schreiben
@@ -168,7 +168,7 @@ impl LiveEvent {
             // Umbenennen und Auflösen die Stellen selbst mit `betreuung` (LLH-1291,
             // `routes::einsatzabschnitt::sse_namens_traeger`). Der ETB-Nachweis läuft über `etb`.
             //
-            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/verpflegung` legt in der
+            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/catering` legt in der
             // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
             // Modul `betreuung`; ohne den Key fröre die Wahl am Tresen ein, und ein Storno, der
             // den Bezug von Ausgaben löst, bliebe unsichtbar. Die Nutzlast trägt nur Kennungen.
@@ -187,7 +187,7 @@ impl LiveEvent {
             // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Verpflegung => &["verpflegung"],
             // Nur `infotelefon`: Anrufe sind Datenobjekte des eigenen Moduls (i6k6mzed,
-            // design.md D3), auch wenn ihre Pfade unter `…/stab` liegen.
+            // design.md D3), auch wenn ihre Pfade unter `…/staff` liegen.
             LiveEvent::Infotelefon => &["infotelefon"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).

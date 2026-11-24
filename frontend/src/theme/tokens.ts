@@ -861,8 +861,9 @@ export const schriftskala = {
   monoFein: { groesse: 11, gewicht: 400, familie: 'zahl' },
   /** Mono neben `textKlein`: Zähler und Zeiten in dichten Zeilen (LLH-1972). */
   monoKlein: { groesse: 12, gewicht: 400, familie: 'zahl' },
-  /** Mono neben `text`: Funkrufname, PAT, „seit …“. JetBrains Mono 13 steht optisch wie
-   *  Archivo 14 — die einzige 13-px-Stufe (LLH-1972). */
+  /** Mono neben `text`: Funkrufname (über `Kennung`), PAT, die Zeit hinter „seit“ (das Wort
+   *  steht in der Textschrift, ADR-0094). JetBrains Mono 13 steht optisch wie Archivo 14 — die
+   *  einzige 13-px-Stufe (LLH-1972); ein Wort aus `mono` nimmt deshalb `text` (LLH-2084). */
   mono: { groesse: 13, gewicht: 400, familie: 'zahl' },
   /** Große Mono: Kennungen (Schaden-Nr., Registriernummer), Code-Eingaben (LLH-1972). */
   monoGross: { groesse: 14, gewicht: 400, familie: 'zahl' },

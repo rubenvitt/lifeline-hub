@@ -61,7 +61,7 @@ function grundHandler() {
     http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 2, name: 'Staffel A', ueber_einheit_id: null }]),
     ),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
   );
 }

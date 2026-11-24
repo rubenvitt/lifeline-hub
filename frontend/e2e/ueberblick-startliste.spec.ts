@@ -141,11 +141,11 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
     data: { einsatzort: 'Deich West', einsatzort_lat: 52.103, einsatzort_lon: 9.356 },
   });
   expect(ort.ok(), await ort.text()).toBeTruthy();
-  const leiter = await page.request.patch(`${basis}/fuehrungsstelle`, {
+  const leiter = await page.request.patch(`${basis}/command-post`, {
     data: { einsatzleiter: { art: 'extern', name: 'KBM Weber' } },
   });
   expect(leiter.ok(), await leiter.text()).toBeTruthy();
-  await post(page, `${basis}/abschnitte`, { name: 'EA Nord' });
+  await post(page, `${basis}/sectors`, { name: 'EA Nord' });
   await post(page, `${basis}/units`, { name: 'Florian Nord 1' });
 
   // Erst mit dem Abo des Stroms schreiben (`e2e/AGENTS.md`, Live-Strom).

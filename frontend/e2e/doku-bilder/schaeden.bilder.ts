@@ -24,7 +24,7 @@ interface Schaden {
 
 /** Legt die Schäden einmal je Lauf an (die Datenbank gilt für alle Tests eines Laufs). */
 async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]> {
-  const basis = `/api/einsaetze/${einsatzId}/schaeden`;
+  const basis = `/api/einsaetze/${einsatzId}/damages`;
   const vorhanden = (await (await page.request.get(basis)).json()) as Schaden[];
   if (vorhanden.length > 0) return vorhanden;
   await fuelle(page, 'post', basis, {
@@ -42,7 +42,7 @@ async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]
     ort: 'L 235 km 12,5',
     beschreibung: 'Baum auf der Fahrbahn, halbseitig gesperrt',
   });
-  await fuelle(page, 'post', `${basis}/${baum.id}/uebergeben`, {
+  await fuelle(page, 'post', `${basis}/${baum.id}/hand-over`, {
     uebergeben_an: 'Straßenmeisterei',
   });
   const mauer = await fuelle<Schaden>(page, 'post', basis, {
@@ -51,7 +51,7 @@ async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]
     ort: 'Uferstraße 6',
     beschreibung: 'Gartenmauer teilweise eingestürzt, keine Gefahr für Passanten',
   });
-  await fuelle(page, 'post', `${basis}/${mauer.id}/abschliessen`, {
+  await fuelle(page, 'post', `${basis}/${mauer.id}/close`, {
     abschluss_grund: 'kein_handlungsbedarf',
   });
   await fuelle(page, 'post', basis, {

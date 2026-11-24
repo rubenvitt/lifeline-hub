@@ -42,8 +42,8 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
     bezeichnung: `E2E Uhrversatz ${Date.now()}`,
   });
   // Bezirke gehören seit LLH-1034 zum Modul Evakuierung.
-  const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
-  await senden(page, `${basis}/bezirke`, {
+  const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+  await senden(page, `${basis}/districts`, {
     bezeichnung: BEZIRK,
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',

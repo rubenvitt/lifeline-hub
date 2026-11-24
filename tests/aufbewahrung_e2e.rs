@@ -986,9 +986,9 @@ async fn pruefe_skelett(
     for uri in [
         format!("/api/einsaetze/{e}"),
         format!("/api/einsaetze/{e}/etb"),
-        format!("/api/einsaetze/{e}/personen"),
-        format!("/api/einsaetze/{e}/tiere"),
-        format!("/api/einsaetze/{e}/schaeden"),
+        format!("/api/einsaetze/{e}/persons"),
+        format!("/api/einsaetze/{e}/animals"),
+        format!("/api/einsaetze/{e}/damages"),
         format!("/api/einsaetze/{e}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;
@@ -1060,7 +1060,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         json!({
             "name": "Mustermann", "vorname": "Erika", "geburtsdatum": "1961-02-03",
             "herkunft_adresse": "Lindenweg-7", "antreff_ort": "Kellerraum-Nord",
@@ -1075,7 +1075,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/personen/{p}/sichtung"),
+        &format!("{basis}/persons/{p}/triage"),
         json!({ "kategorie": "sk2", "notiz": "Sichtungsnotiz-XYZ" }),
     )
     .await;
@@ -1083,7 +1083,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/personen/{p}/verbleib"),
+        &format!("{basis}/persons/{p}/whereabouts"),
         json!({ "art": "transport", "ziel": "Klinikum-Nordstadt", "transportmittel": "RTW-Florian-83", "notiz": "Verbleibnotiz-QRS" }),
     )
     .await;
@@ -1091,7 +1091,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/personen/{p}/status"),
+        &format!("{basis}/persons/{p}/status"),
         json!({ "status": "abgemeldet" }),
     )
     .await;
@@ -1101,7 +1101,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/tiere"),
+        &format!("{basis}/animals"),
         json!({
             "spezies": "hund", "halter_kontakt": "Halterin-0172-9999",
             "kennzeichnung": "CHIP-276098106012345", "antreff_ort": "Scheune-Hof-Brandt",
@@ -1115,7 +1115,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/tiere/{t}/status"),
+        &format!("{basis}/animals/{t}/status"),
         json!({ "status": "abgeschlossen", "abschluss_grund": "uebergabe_tierheim", "abschluss_ziel": "Tierheim-Sued-ABC" }),
     )
     .await;
@@ -1125,7 +1125,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden"),
+        &format!("{basis}/damages"),
         json!({
             "typ": "sachschaden", "ausmass": "mittel", "ort": "Birkenallee-9",
             "gefahrenart": "elektrizitaet", "schadensgrad": "teilzerstoert",
@@ -1139,7 +1139,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden/{sid}/uebergeben"),
+        &format!("{basis}/damages/{sid}/hand-over"),
         json!({ "uebergeben_an": "Dachdecker-Ruehl" }),
     )
     .await;
@@ -1147,7 +1147,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/schaeden/{sid}/abschliessen"),
+        &format!("{basis}/damages/{sid}/close"),
         json!({ "abschluss_grund": "behoben" }),
     )
     .await;
@@ -1157,7 +1157,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/zonen"),
+        &format!("{basis}/zones"),
         json!({
             "typ": "absperrbereich", "geometrie_typ": "Polygon", "label": "Sperrzone-Lindenplatz",
             "geometrie": r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#
@@ -1192,7 +1192,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "POST",
-        &format!("{basis}/befehle"),
+        &format!("{basis}/orders"),
         json!({ "vorlage": "befehl_lad", "titel": "Befehl Verteiler" }),
     )
     .await["id"]
@@ -1202,7 +1202,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PATCH",
-        &format!("{basis}/befehle/{befehl}"),
+        &format!("{basis}/orders/{befehl}"),
         json!({ "verteiler": [
             { "empfaenger_typ": "extern", "extern_kategorie": "leitstelle",
               "extern_bezeichnung": "ILS-Geheimstadt-5" },

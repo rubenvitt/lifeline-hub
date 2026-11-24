@@ -54,7 +54,7 @@ export const server = setupServer(
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
+  http.get('/api/einsaetze/:id/command-post', () =>
     HttpResponse.json({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] }),
   ),
   /**
@@ -66,7 +66,7 @@ export const server = setupServer(
    * Katalog-Sprechgruppen mit gleichnamiger Einsatz-Sprechgruppe (LLH-1645) — keine als Default.
    * Der Sprechgruppen-Tab fragt sie für Admins mit ab; Tests mit Paaren überschreiben.
    */
-  http.get('/api/sprechgruppen/auch-lokal', () => HttpResponse.json([])),
+  http.get('/api/talk-groups/also-local', () => HttpResponse.json([])),
   /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
@@ -96,7 +96,9 @@ export const server = setupServer(
    * Eigene ETB-Lesemarke — „nichts Neues" als Default (echter Serverzustand); die ETB-Seite
    * fragt sie beim Mount ab. Tests des Banners überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/etb/lesemarke', () => HttpResponse.json({ neue_anzahl: 0 })),
+  http.get('/api/einsaetze/:einsatzId/etb/read-marker', () =>
+    HttpResponse.json({ neue_anzahl: 0 }),
+  ),
   /**
    * Modulzähler des Navigationsrahmens — `{}` als Default („kein gezähltes Modul erlaubt", ein
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
@@ -113,7 +115,7 @@ export const server = setupServer(
    * Dienst und externe Stellen für Von/An bzw. Absender/Empfänger ab; Tests mit Vorschlägen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+  http.get('/api/vehicles', () => HttpResponse.json([])),
   /**
    * Fahrzeuge im Einsatz — keine als Default. Das ETB fragt sie für Von/An ab und lädt sie nach
    * einem eigenen Eintrag neu; kam die Antwort erst nach dem Test, lief sie ohne Handler in den
@@ -121,7 +123,7 @@ export const server = setupServer(
    * `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/vehicles', () => HttpResponse.json([])),
-  http.get('/api/externe-stellen', () => HttpResponse.json([])),
+  http.get('/api/external-agencies', () => HttpResponse.json([])),
   /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
    * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das
@@ -146,25 +148,25 @@ export const server = setupServer(
    * ist ein echter Serverzustand (kein Gebiet, keine Warnung). Tests mit Gebieten
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/hazard-areas', () => HttpResponse.json([])),
   /**
    * Schichtmodelle der Organisation (LLH-1122) — keine als Default, der echte Zustand einer
    * Organisation ohne Stammdaten dazu. Die Einsatzanlage fragt sie für die Zeile „Schichtmodell“
    * ab; Tests mit Modellen überschreiben per `server.use()`.
    */
-  http.get('/api/schichtmodelle', () => HttpResponse.json([])),
+  http.get('/api/shift-models', () => HttpResponse.json([])),
   /**
    * Einsatz-Vorlagen der Organisation (LLH-1375) — keine als Default. Anlegedialog und
    * Stichwort-Katalog fragen sie ab; Tests mit Vorlagen überschreiben per `server.use()`.
    */
-  http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+  http.get('/api/incident-templates', () => HttpResponse.json([])),
   /**
    * Stand der Lagebesprechung (LLH-1111) — noch keine abgehalten als Default, der echte Zustand
    * eines neuen Einsatzes. ETB und Lagemeldungen fragen ihn für „Seit letzter Lagebesprechung“
    * beim Mount ab; ohne Handler scheiterte der Abruf an der Leitung und die Seite stünde kurz auf
    * „offline“ (LLH-1412). Tests mit Besprechung überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/lagebesprechung', () =>
+  http.get('/api/einsaetze/:einsatzId/briefing', () =>
     HttpResponse.json({ anzahl_lagebesprechungen: 0 }),
   ),
   /**
@@ -172,14 +174,14 @@ export const server = setupServer(
    * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein
    * echter Serverzustand. Tests mit Dokumenten überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/dokumente', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/documents', () => HttpResponse.json([])),
   /**
    * Wetter — „kein Ort" als Default (LFH-663). Der Rahmen fragt es für Modulzähler und
    * Unwetterhinweis ab (`einsatz/useModulZaehler.ts`, `wetter/useUnwetterHinweis.ts`); „kein
    * Ort" ist ein echter Serverzustand ohne Zahl und ohne Hinweis. Tests mit Warnungen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/wetter', () =>
+  http.get('/api/einsaetze/:einsatzId/weather', () =>
     HttpResponse.json({
       warnungen: { zustand: 'kein_ort' },
       vorhersage: { zustand: 'kein_ort' },
@@ -255,7 +257,7 @@ export const server = setupServer(
    * Funktionskatalog (LFH-549) — leer als Default; Empfängerfelder und ETB-Vorschläge fragen ihn
    * beim Mount ab. Tests mit Katalog überschreiben per `server.use()` oder ersetzen den Hook.
    */
-  http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
+  http.get('/api/command-roles', () => HttpResponse.json([])),
   /**
    * Mitglieder eines Einsatzes — leer als Default. Die Erwähnungsvorschläge im Chat-Eingabefeld
    * fragen sie beim Mount ab; ohne Handler scheitert der Abruf an der Leitung, und die Seite
@@ -274,7 +276,7 @@ export const server = setupServer(
    * Befehl und Lagebericht (LLH-1172) fragt sie als Optionen ab; Tests mit Optionen überschreiben
    * per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([])),
   http.get('/api/einsaetze/:einsatzId/units', () => HttpResponse.json([])),
   /**
    * Bereitstellungsräume — leer als Default, ein echter Serverzustand. Die Lagekarte fragt sie mit
@@ -299,6 +301,6 @@ export const server = setupServer(
    * Tiere — leer als Default. Die Lagekarte fragt sie mit Freigabe `tiere` ab (Ebene „Tiere",
    * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
-  http.get('/api/externe-stellen', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/animals', () => HttpResponse.json([])),
+  http.get('/api/external-agencies', () => HttpResponse.json([])),
 );

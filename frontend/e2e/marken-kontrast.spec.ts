@@ -73,11 +73,11 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 1022 ${modus} ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/personen`;
+    const basis = `/api/einsaetze/${einsatzId}/persons`;
     const gefunden = await post(page, basis, { name: 'Gefunden, Greta', sichtung: 'sk1' });
     const vermisst = await post(page, basis, { name: 'Vermisst, Volker', status: 'vermisst' });
-    await post(page, `${basis}/${vermisst.id}/abgleich`, { gefunden_person_id: gefunden.id });
-    await post(page, `${basis}/${gefunden.id}/notizen`, { text: 'Wärmeerhalt' });
+    await post(page, `${basis}/${vermisst.id}/matches`, { gefunden_person_id: gefunden.id });
+    await post(page, `${basis}/${gefunden.id}/notes`, { text: 'Wärmeerhalt' });
 
     // Kennzeichnung ohne Status: „Patient“ war `geekblue` (Nacht 4,16). Die Marke selbst entfiel
     // mit dem Patientenkopf (LLH-1094, die Sichtungsfläche trägt die Frage); gemessen wird

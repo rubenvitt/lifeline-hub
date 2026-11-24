@@ -48,7 +48,7 @@ test.describe(KAPITEL, () => {
 
     // Der erste Abruf legt „Allgemein“ an.
     const kanalNamens = async (name: string) => {
-      const antwort = await page.request.get(`${basis}/chat/kanaele`);
+      const antwort = await page.request.get(`${basis}/chat/channels`);
       expect(antwort.ok(), `Kanäle: ${antwort.status()}`).toBe(true);
       const kanal = ((await antwort.json()) as { id: number; name: string }[]).find(
         (k) => k.name === name,
@@ -58,7 +58,7 @@ test.describe(KAPITEL, () => {
     };
     const allgemein = await kanalNamens('Allgemein');
     const evaSchreibt = async (kanalId: number, inhalt: string) => {
-      const antwort = await evaApi.post(`${basis}/chat/kanaele/${kanalId}/nachrichten`, {
+      const antwort = await evaApi.post(`${basis}/chat/channels/${kanalId}/messages`, {
         data: { inhalt, anhang_ids: [] },
       });
       expect(antwort.ok(), `Nachricht: ${antwort.status()} ${await antwort.text()}`).toBe(true);

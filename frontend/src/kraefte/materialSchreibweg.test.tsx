@@ -170,7 +170,7 @@ function mitschnitt(hier: EinsatzMaterial) {
     http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 10, name: '1. Zug', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/vehicles', () =>
       HttpResponse.json([{ id: 20, funkrufname: 'Florian 1', beendet_at: null }]),
     ),

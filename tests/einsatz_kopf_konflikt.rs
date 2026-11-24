@@ -282,7 +282,7 @@ async fn geraet_bekommt_keine_vermerke() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+        &format!("/api/einsaetze/{einsatz}/command-post"),
         &admin,
         Some(&json!({"rufname": "Florian 10"})),
     )
@@ -300,7 +300,7 @@ async fn geraet_bekommt_keine_vermerke() {
         let cookie = geraet(&app, &admin, einsatz, body).await;
         for pfad in [
             format!("/api/einsaetze/{einsatz}"),
-            format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+            format!("/api/einsaetze/{einsatz}/command-post"),
             format!("/api/einsaetze/{einsatz}/units"),
         ] {
             let (s, j) = anfrage(&app, "GET", &pfad, &cookie, None).await;

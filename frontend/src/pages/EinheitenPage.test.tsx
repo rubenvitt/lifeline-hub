@@ -75,8 +75,8 @@ function handlers(
     http.get('/api/einsaetze/1/units', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('aufgeloeste') ? [] : einheiten),
     ),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einheit-typen', () =>
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/unit-types', () =>
       HttpResponse.json([
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
       ]),
@@ -84,9 +84,9 @@ function handlers(
     http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
+    http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
     // Ohne aktive Vorlagen zeigt der Dialog „Einheit bilden“ kein Feld „Vorlage“ (LLH-1049).
-    http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
+    http.get('/api/unit-templates', () => HttpResponse.json([])),
   ];
 }
 
@@ -412,7 +412,7 @@ describe('EinheitenPage', () => {
       server.use(
         ...abweichungen,
         http.get('/api/einsaetze/1/units', () => HttpResponse.json([gruppe, zug])),
-        http.get('/api/einsaetze/1/abschnitte', () =>
+        http.get('/api/einsaetze/1/sectors', () =>
           HttpResponse.json([
             { id: 5, einsatz_id: 1, name: 'Nord', ueber_abschnitt_id: null, sortier: 0 },
           ]),
@@ -474,7 +474,7 @@ describe('EinheitenPage', () => {
     it('wartet auf die Abschnitte, statt die Folge nach dem Laden umzustellen', async () => {
       // Die Folge hängt am Abschnittsrang: eine Tabelle vorab in Serverfolge spränge danach um.
       zeige(
-        http.get('/api/einsaetze/1/abschnitte', async () => {
+        http.get('/api/einsaetze/1/sectors', async () => {
           await delay(300);
           return HttpResponse.json([]);
         }),
@@ -485,7 +485,7 @@ describe('EinheitenPage', () => {
     });
 
     it('scheitern die Abschnitte, steht die Gliederung trotzdem, mit Abschnitt aus der Einheit', async () => {
-      zeige(http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 403 })));
+      zeige(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 403 })));
       const unten = await zeileVon('Gruppe Deich');
       expect(within(unten).getByText('Nord')).toBeInTheDocument();
     });
@@ -795,7 +795,7 @@ describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
   function seite() {
     const angelegt: unknown[] = [];
     server.use(
-      http.get('/api/einheit-vorlagen', () => HttpResponse.json(vorlagen)),
+      http.get('/api/unit-templates', () => HttpResponse.json(vorlagen)),
       ...handlers(),
       http.post('/api/einsaetze/1/units', async ({ request }) => {
         angelegt.push(await request.json());

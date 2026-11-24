@@ -15,8 +15,8 @@ describe('EinheitVorlageFormModal', () => {
     let body: unknown = null;
     server.use(
       meHandler(adminFixture()),
-      http.get('/api/einheit-typen', () => HttpResponse.json(EINHEIT_TYPEN)),
-      http.post('/api/einheit-vorlagen', async ({ request }) => {
+      http.get('/api/unit-types', () => HttpResponse.json(EINHEIT_TYPEN)),
+      http.post('/api/unit-templates', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(einheitVorlageFixture({ id: 22, name: 'Behandlungsgruppe' }), {
           status: 201,

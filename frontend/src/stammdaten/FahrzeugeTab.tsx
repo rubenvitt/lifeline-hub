@@ -99,6 +99,7 @@ export default function FahrzeugeTab() {
         <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <KennungsLink
             to={fahrzeugDetailPfad(f.id)}
+            data-schrift="kennung"
             style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}
           >
             {f.funkrufname}

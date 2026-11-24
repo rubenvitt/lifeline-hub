@@ -124,15 +124,15 @@ function rendere({
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/lagebesprechung', () => {
+    http.get('/api/einsaetze/1/briefing', () => {
       if (standStatus === 'haengt') return new Promise<Response>(() => {});
       return standStatus === 200
         ? HttpResponse.json(stand)
         : HttpResponse.json({ error: 'kaputt' }, { status: standStatus });
     }),
-    http.get('/api/einsaetze/1/lagebesprechungen', () => HttpResponse.json(verlauf)),
-    http.post('/api/einsaetze/1/lagebesprechungen', () => post()),
-    http.put('/api/einsaetze/1/lagebesprechung/termin', async ({ request }) => {
+    http.get('/api/einsaetze/1/briefings', () => HttpResponse.json(verlauf)),
+    http.post('/api/einsaetze/1/briefings', () => post()),
+    http.put('/api/einsaetze/1/briefing/schedule', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       termine.push(body);
       return HttpResponse.json({ ...stand, naechste_lagebesprechung_at: body.naechste_at });
@@ -146,7 +146,7 @@ function rendere({
       zaehle('personal');
       return HttpResponse.json(lage.personal ?? []);
     }),
-    http.get('/api/einsaetze/1/personen', () => {
+    http.get('/api/einsaetze/1/persons', () => {
       zaehle('personen');
       return lage.personenStatus
         ? HttpResponse.json({ error: 'gesperrt' }, { status: lage.personenStatus })
@@ -273,7 +273,7 @@ describe('LagebesprechungPage · Aufbau', () => {
     const knopf = screen.getByRole('button', { name: 'Erneut abrufen' });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
-    server.use(http.get('/api/einsaetze/1/lagebesprechung', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/einsaetze/1/briefing', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
@@ -389,7 +389,7 @@ describe('LagebesprechungPage · Kopfaktion „Lagebesprechung abschließen"', (
     await waitFor(() => expect(screen.queryByText('Nur Ansicht')).toBeNull());
     expect(await kopfaktion()).toBeDisabled();
 
-    server.use(http.get('/api/einsaetze/1/lagebesprechung', () => HttpResponse.json(leererStand)));
+    server.use(http.get('/api/einsaetze/1/briefing', () => HttpResponse.json(leererStand)));
     await userEvent.click(screen.getByRole('button', { name: /Wiederholen|Erneut/ }));
     await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
   });
@@ -700,7 +700,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const anfragen: Array<Record<string, unknown>> = [];
     rendere({ lage: { personen: [person(1)] } });
     server.use(
-      http.post('/api/einsaetze/1/lageberichte', async ({ request }) => {
+      http.post('/api/einsaetze/1/situation-reports', async ({ request }) => {
         anfragen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ id: 77 }, { status: 201 });
       }),
@@ -727,7 +727,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
   it('scheitert die Übernahme, steht der Fehler an der Seite, und es geht nicht weiter', async () => {
     rendere({});
     server.use(
-      http.post('/api/einsaetze/1/lageberichte', () =>
+      http.post('/api/einsaetze/1/situation-reports', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

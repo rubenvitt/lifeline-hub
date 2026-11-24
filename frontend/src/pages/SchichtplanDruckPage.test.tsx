@@ -52,7 +52,7 @@ function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClien
     http.get('/api/einsaetze/5/reliefs/defaults', () => HttpResponse.json([])),
     http.get('/api/einsaetze/5/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/5/uhs', () => HttpResponse.json([])),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
   );
   // Eigener Aufruf: innerhalb eines `server.use` gewinnt der erste passende Handler.
   server.use(...handler);
@@ -120,7 +120,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Katalog scheitert: Ladefehler, Druck gesperrt', async () => {
     zeigen([
-      http.get('/api/qualifikationen', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
+      http.get('/api/qualifications', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
     ]);
     expect(await screen.findByText('Der Schichtplan konnte nicht geladen werden')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Erneut laden' })).toBeInTheDocument();

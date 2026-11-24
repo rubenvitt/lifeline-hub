@@ -230,7 +230,7 @@ pub struct ListeQuery {
 // Handler: Katalog
 // ---------------------------------------------------------------------------
 
-/// GET /api/sprechgruppen — aktive Katalog-Einträge der eigenen Org.
+/// GET /api/talk-groups — aktive Katalog-Einträge der eigenen Org.
 /// Query-Param `nur_aktive` (default: true). Alle eingeloggten Nutzer.
 pub async fn liste_katalog(
     State(state): State<AppState>,
@@ -242,7 +242,7 @@ pub async fn liste_katalog(
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
-/// GET /api/sprechgruppen/auch-lokal — Admin. Katalog-Sprechgruppen, deren Name ein Einsatz
+/// GET /api/talk-groups/also-local — Admin. Katalog-Sprechgruppen, deren Name ein Einsatz
 /// zugleich als Einsatz-Sprechgruppe trägt (LLH-1645, Altbestand).
 pub async fn liste_auch_lokal(
     State(state): State<AppState>,
@@ -253,7 +253,7 @@ pub async fn liste_auch_lokal(
     ))
 }
 
-/// POST /api/sprechgruppen — Admin. Dublette → Conflict; Name einer Einsatz-Sprechgruppe in einem
+/// POST /api/talk-groups — Admin. Dublette → Conflict; Name einer Einsatz-Sprechgruppe in einem
 /// Einsatz → Conflict (LLH-1645).
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -265,7 +265,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(sg.anzeige())))
 }
 
-/// PATCH /api/sprechgruppen/{id} — Admin, echter Teil-Patch (LFH-306):
+/// PATCH /api/talk-groups/{id} — Admin, echter Teil-Patch (LFH-306):
 /// Feld absent = unverändert, `null`/`""` bei `hinweis` = leeren. Konflikte wie beim Anlegen.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -278,7 +278,7 @@ pub async fn aktualisieren(
     Ok(Json(sg.anzeige()))
 }
 
-/// POST /api/sprechgruppen/{id}/deaktivieren — Admin (Soft-Delete).
+/// POST /api/talk-groups/{id}/deactivate — Admin (Soft-Delete).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -292,7 +292,7 @@ pub async fn deaktivieren(
 // Handler: Einsatz-scoped
 // ---------------------------------------------------------------------------
 
-/// GET /api/einsaetze/{einsatz_id}/sprechgruppen — aktiver Katalog + einsatz-lokal.
+/// GET /api/einsaetze/{einsatz_id}/talk-groups — aktiver Katalog + einsatz-lokal.
 /// Lesezugriff erforderlich; kein Modul-Key (Sprechgruppen sind modulübergreifend).
 pub async fn liste_fuer_einsatz(
     State(state): State<AppState>,
@@ -304,7 +304,7 @@ pub async fn liste_fuer_einsatz(
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
-/// POST /api/einsaetze/{einsatz_id}/sprechgruppen — einsatz-lokale Sprechgruppe anlegen.
+/// POST /api/einsaetze/{einsatz_id}/talk-groups — einsatz-lokale Sprechgruppe anlegen.
 /// Schreibrecht + aktiver Einsatz; kein Modul-Key. Name einer Katalog-Sprechgruppe → Conflict
 /// (LLH-1645).
 pub async fn anlegen_einsatz_lokal(

@@ -139,7 +139,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     for (const fahrzeug of NEUE_STAMMFAHRZEUGE)
-      await fuelle(page, 'post', '/api/fahrzeuge', fahrzeug);
+      await fuelle(page, 'post', '/api/vehicles', fahrzeug);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     await page.getByRole('button', { name: 'Fahrzeuge disponieren' }).click();
@@ -172,7 +172,7 @@ test.describe(KAPITEL, () => {
         traegerorganisation: 'DRK Musterstadt',
       },
     });
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/vehicles/${weg.id}/release`);
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/vehicles/${weg.id}/stand-down`);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     const block = page.locator('[data-lfh="entlassen-block"]');

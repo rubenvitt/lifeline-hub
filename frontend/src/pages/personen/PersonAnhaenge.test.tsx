@@ -5,7 +5,7 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import PersonAnhaenge from './PersonAnhaenge';
 
-const PFAD = '/api/einsaetze/1/personen/10/anhaenge';
+const PFAD = '/api/einsaetze/1/persons/10/attachments';
 const PERSON = { id: 10, registrier_nr: 7, storniert_at: null };
 
 // Die Paneel-Form deckt `pages/schaeden/SchadenAnhaenge.test.tsx` ab; hier die Hülle
@@ -58,7 +58,7 @@ describe('PersonAnhaenge (LFH-757)', () => {
           },
         ]),
       ),
-      http.get(`${PFAD}/5/datei`, ({ request }) => {
+      http.get(`${PFAD}/5/file`, ({ request }) => {
         abrufe.push(request.url);
         return new HttpResponse(null, { status: 200 });
       }),

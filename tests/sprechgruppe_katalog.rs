@@ -1,4 +1,4 @@
-//! Integrationstests des **Sprechgruppen-Katalogs** (`/api/sprechgruppen`) — Schwerpunkt
+//! Integrationstests des **Sprechgruppen-Katalogs** (`/api/talk-groups`) — Schwerpunkt
 //! LFH-306: echter Teil-PATCH statt Vollersatz.
 //!
 //! Eigene Datei, damit die Katalog-Zusagen per `cargo test --test sprechgruppe_katalog`
@@ -21,7 +21,7 @@ async fn katalog_anlegen(
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         admin,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"TMO","hinweis":"{hinweis}","sortier":{sortier}}}"#
@@ -42,7 +42,7 @@ async fn alle_lesen_admin_legt_an() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     assert_eq!(
-        anfrage(&app, "GET", "/api/sprechgruppen", &erika, None)
+        anfrage(&app, "GET", "/api/talk-groups", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -51,7 +51,7 @@ async fn alle_lesen_admin_legt_an() {
         anfrage(
             &app,
             "POST",
-            "/api/sprechgruppen",
+            "/api/talk-groups",
             &erika,
             Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#)
         )
@@ -66,7 +66,7 @@ async fn alle_lesen_admin_legt_an() {
         anfrage(
             &app,
             "POST",
-            "/api/sprechgruppen",
+            "/api/talk-groups",
             &admin,
             Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#)
         )
@@ -79,7 +79,7 @@ async fn alle_lesen_admin_legt_an() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/sprechgruppen/{id}/deaktivieren"),
+            &format!("/api/talk-groups/{id}/deactivate"),
             &admin,
             None
         )
@@ -87,7 +87,7 @@ async fn alle_lesen_admin_legt_an() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/sprechgruppen", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/talk-groups", &admin, None).await;
     assert!(liste.as_array().unwrap().is_empty());
 }
 
@@ -99,7 +99,7 @@ async fn unbekannte_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            "/api/sprechgruppen/9999",
+            "/api/talk-groups/9999",
             &admin,
             Some(r#"{"bezeichnung":"X"}"#)
         )
@@ -125,7 +125,7 @@ async fn patch_ohne_sortier_behaelt_sortier() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{id}"),
+        &format!("/api/talk-groups/{id}"),
         &admin,
         // Exakt der Body, den das Formular schickt: kein `sortier`.
         Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO","hinweis":"Neuer Hinweis"}"#),
@@ -156,7 +156,7 @@ async fn patch_ohne_hinweis_laesst_hinweis_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{id}"),
+        &format!("/api/talk-groups/{id}"),
         &admin,
         Some(r#"{"bezeichnung":"490_F_DRK","betriebsart":"TMO","sortier":30}"#),
     )
@@ -180,7 +180,7 @@ async fn patch_hinweis_null_loescht_hinweis() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{id}"),
+        &format!("/api/talk-groups/{id}"),
         &admin,
         Some(r#"{"hinweis":null}"#),
     )
@@ -205,7 +205,7 @@ async fn patch_hinweis_leerstring_loescht_hinweis() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{id}"),
+        &format!("/api/talk-groups/{id}"),
         &admin,
         Some(r#"{"hinweis":"   "}"#),
     )
@@ -221,7 +221,7 @@ async fn patch_leere_bezeichnung_und_falsche_betriebsart_sind_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = katalog_anlegen(&app, &admin, "412_F_DRK", "Marschkanal", 30).await;
-    let u = format!("/api/sprechgruppen/{id}");
+    let u = format!("/api/talk-groups/{id}");
 
     assert_eq!(
         anfrage(&app, "PATCH", &u, &admin, Some(r#"{"bezeichnung":"  "}"#))
@@ -255,7 +255,7 @@ async fn patch_auf_geschwister_ist_409() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/sprechgruppen/{zweite}"),
+            &format!("/api/talk-groups/{zweite}"),
             &admin,
             Some(r#"{"bezeichnung":"412_F_DRK"}"#)
         )
@@ -278,7 +278,7 @@ async fn patch_nicht_admin_ist_403() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/sprechgruppen/{id}"),
+            &format!("/api/talk-groups/{id}"),
             &erika,
             Some(r#"{"bezeichnung":"X"}"#)
         )
@@ -297,7 +297,7 @@ async fn netz_und_sicherheit_anlegen_patchen_leeren() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         &admin,
         Some(
             r#"{"bezeichnung":"314_F","betriebsart":"DMO","netz":" Gateway ","sicherheit":"E2E"}"#,
@@ -307,7 +307,7 @@ async fn netz_und_sicherheit_anlegen_patchen_leeren() {
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
     assert_eq!(json["netz"], "Gateway", "getrimmt");
     assert_eq!(json["sicherheit"], "E2E");
-    let u = format!("/api/sprechgruppen/{}", json["id"]);
+    let u = format!("/api/talk-groups/{}", json["id"]);
 
     // Hinweis bearbeiten lässt Netz und Sicherheit stehen.
     let (status, json) = anfrage(
@@ -347,7 +347,7 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"1","betriebsart":"TMO","netz":"{lang}"}}"#
@@ -361,7 +361,7 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"2","betriebsart":"TMO","sicherheit":"{genau}"}}"#
@@ -369,7 +369,7 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
-    let u = format!("/api/sprechgruppen/{}", json["id"]);
+    let u = format!("/api/talk-groups/{}", json["id"]);
 
     let (status, json) = anfrage(
         &app,
@@ -389,7 +389,7 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"9","betriebsart":"DMO","netz":"{lang}"}}"#
@@ -407,7 +407,7 @@ async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"  "}"#),
     )
@@ -422,7 +422,7 @@ async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         None,
     )
@@ -447,7 +447,7 @@ async fn schwaerzung_behaelt_netz_und_sicherheit_und_nimmt_den_hinweis() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"E2E","hinweis":"Hof Müller"}"#),
     )

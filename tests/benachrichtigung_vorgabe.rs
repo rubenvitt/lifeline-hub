@@ -50,7 +50,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage_json(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/fuehrungsstelle", w.einsatz),
+        &format!("/api/einsaetze/{}/command-post", w.einsatz),
         &w.admin,
         Some(&json!({ "einsatzleiter": { "art": "personal", "personal_id": ep } })),
     )
@@ -90,7 +90,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &self.admin,
             Some(&json!({ "name": name, "benutzer_id": benutzer_id })),
         )
@@ -123,7 +123,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/auftraege", self.einsatz),
+            &format!("/api/einsaetze/{}/tasks", self.einsatz),
             &self.admin,
             Some(&json!({ "auftrag_text": "Sandsäcke zum Deich", "empfaenger": empfaenger })),
         )

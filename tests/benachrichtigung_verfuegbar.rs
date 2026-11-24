@@ -67,7 +67,8 @@ async fn welt() -> Welt {
 
 impl Welt {
     async fn status(&self, label: &str) -> i64 {
-        let (_, stati) = anfrage(&self.app, "GET", "/api/fahrzeug-status", &self.admin, None).await;
+        let (_, stati) =
+            anfrage(&self.app, "GET", "/api/vehicle-statuses", &self.admin, None).await;
         stati
             .as_array()
             .unwrap()

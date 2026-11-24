@@ -48,11 +48,11 @@ beforeEach(() => {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/:id/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/:id/personen/auswahl', () => HttpResponse.json([PERSON])),
-    http.get('/api/einsaetze/:id/schaeden/auswahl', () => HttpResponse.json([SCHADEN])),
+    http.get('/api/einsaetze/:id/persons/selection', () => HttpResponse.json([PERSON])),
+    http.get('/api/einsaetze/:id/damages/selection', () => HttpResponse.json([SCHADEN])),
     http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/meldungen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/auftraege', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/reports', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/tasks', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([FAHRZEUG])),
     http.get('/api/einsaetze/:id/personnel', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
@@ -175,7 +175,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     freigaben = freigabenFixture({ schaeden: { zugriff: false } });
     let schadenAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/:id/schaeden/auswahl', () => {
+      http.get('/api/einsaetze/:id/damages/selection', () => {
         schadenAbrufe += 1;
         return HttpResponse.json([SCHADEN]);
       }),

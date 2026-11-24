@@ -20,8 +20,8 @@ import { freigabenFixture } from '../test/fixtures';
  * aus `test/server.ts`.
  */
 
-const PFAD_EVAK = '/api/einsaetze/7/evakuierung';
-const PFAD_BETREUUNG = '/api/einsaetze/7/betreuung';
+const PFAD_EVAK = '/api/einsaetze/7/evacuation';
+const PFAD_BETREUUNG = '/api/einsaetze/7/care';
 
 const ANDERE = ['meldungen', 'auftraege', 'erinnerungen', 'chat', 'dokumente', 'abloesung'];
 
@@ -157,7 +157,7 @@ describe.each([
 );
 
 describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
-  const WETTER = '/api/einsaetze/7/wetter';
+  const WETTER = '/api/einsaetze/7/weather';
   const JETZT = Date.now();
   const um = (ms: number) => new Date(JETZT + ms).toISOString();
   const ALLE_ANDEREN = [...ANDERE, 'betreuung', 'evakuierung'];
@@ -196,7 +196,7 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
     return zaehler;
   }
 
-  it('Modul ausgeblendet → keine Anfrage an …/wetter, kein Zähler', async () => {
+  it('Modul ausgeblendet → keine Anfrage an …/weather, kein Zähler', async () => {
     const abrufe = zaehleWetterAbrufe();
     const { result } = renderHook(
       () =>
@@ -225,7 +225,7 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
     expect(abrufe.anzahl).toBe(1);
   });
 
-  it('solange die Freigaben laden → keine Anfrage an …/wetter (kein 403 bei ausgeblendetem Modul)', async () => {
+  it('solange die Freigaben laden → keine Anfrage an …/weather (kein 403 bei ausgeblendetem Modul)', async () => {
     const abrufe = zaehleWetterAbrufe();
     renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
       wrapper: wrapper(neuerQueryClient()),

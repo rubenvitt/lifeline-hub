@@ -61,18 +61,18 @@ beforeEach(() => {
       zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/personen/auswahl', json('personen', [PERSON])),
-    http.get('/api/einsaetze/:id/schaeden/auswahl', json('schaeden', [])),
+    http.get('/api/einsaetze/:id/persons/selection', json('personen', [PERSON])),
+    http.get('/api/einsaetze/:id/damages/selection', json('schaeden', [])),
     http.get('/api/einsaetze/:id/uhs', json('uhs', [])),
-    http.get('/api/einsaetze/:id/meldungen', json('meldungen', [])),
-    http.get('/api/einsaetze/:id/auftraege', json('auftraege', [])),
+    http.get('/api/einsaetze/:id/reports', json('meldungen', [])),
+    http.get('/api/einsaetze/:id/tasks', json('auftraege', [])),
     http.get('/api/einsaetze/:id/vehicles', json('fahrzeuge', [FAHRZEUG])),
     http.get('/api/einsaetze/:id/personnel', json('personal', [])),
     http.get('/api/einsaetze/:id/units', json('einheiten', [])),
-    http.get('/api/einsaetze/:id/lageberichte', json('lageberichte', [])),
-    http.get('/api/einsaetze/:id/gefahrengebiete', json('gefahrengebiete', [])),
-    http.get('/api/einsaetze/:id/abschnitte', json('abschnitte', [])),
-    http.get('/api/einsaetze/:id/etb/anzahl', ({ request }) => {
+    http.get('/api/einsaetze/:id/situation-reports', json('lageberichte', [])),
+    http.get('/api/einsaetze/:id/hazard-areas', json('gefahrengebiete', [])),
+    http.get('/api/einsaetze/:id/sectors', json('abschnitte', [])),
+    http.get('/api/einsaetze/:id/etb/count', ({ request }) => {
       zaehler['etb-anzahl'] = (zaehler['etb-anzahl'] ?? 0) + 1;
       anzahlAdressen.push(new URL(request.url));
       return HttpResponse.json({ anzahl: 31 });
@@ -217,7 +217,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
         reihenfolge.push('modul-freigaben');
         return HttpResponse.json(freigabenFixture());
       }),
-      http.get('/api/einsaetze/:id/personen/auswahl', () => {
+      http.get('/api/einsaetze/:id/persons/selection', () => {
         zaehler.personen = (zaehler.personen ?? 0) + 1;
         reihenfolge.push('personen');
         return HttpResponse.json([PERSON]);

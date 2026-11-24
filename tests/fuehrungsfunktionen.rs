@@ -8,7 +8,7 @@ use serde_json::Value;
 mod common;
 use common::*;
 
-const KATALOG: &str = "/api/fuehrungsfunktionen";
+const KATALOG: &str = "/api/command-roles";
 
 fn setzen_pfad(funktion: &str) -> String {
     format!("/api/org-command-roles/{funktion}")
@@ -205,11 +205,11 @@ async fn unbekannter_code_und_zu_langes_label_sind_400() {
 // ---------- Empfänger: Auftrag, Erinnerung, Führungsstelle ----------
 
 fn auftrag_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/auftraege")
+    format!("/api/einsaetze/{einsatz}/tasks")
 }
 
 fn erinnerung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/erinnerungen")
+    format!("/api/einsaetze/{einsatz}/reminders")
 }
 
 async fn auftrag_an(

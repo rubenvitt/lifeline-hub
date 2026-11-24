@@ -111,7 +111,7 @@ describe('ladeMeldungInhalt', () => {
 
   it('holt die Meldung einzeln und bildet den Inhalt', async () => {
     server.use(
-      http.get('/api/einsaetze/3/meldungen/7', () =>
+      http.get('/api/einsaetze/3/reports/7', () =>
         HttpResponse.json({ id: 7, absender: 'Rettungsstaffel', inhalt: KELLER }),
       ),
     );
@@ -132,7 +132,7 @@ describe('ladeMeldungInhalt', () => {
 
   it('ein Fehler des Servers ergibt keinen Inhalt', async () => {
     server.use(
-      http.get('/api/einsaetze/3/meldungen/7', () =>
+      http.get('/api/einsaetze/3/reports/7', () =>
         HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 }),
       ),
     );
@@ -142,7 +142,7 @@ describe('ladeMeldungInhalt', () => {
   it('wartet höchstens die Frist: ein hängender Abruf hält den Alarm nicht auf', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     server.use(
-      http.get('/api/einsaetze/3/meldungen/7', async () => {
+      http.get('/api/einsaetze/3/reports/7', async () => {
         await delay('infinite');
         return HttpResponse.json({});
       }),

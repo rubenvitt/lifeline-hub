@@ -176,8 +176,8 @@ for (const dichte of DICHTEN) {
       const einheitId = await createEinheit(page, einsatzId, '4. Zug');
       const person = `Stamm ${LAUF} ${dichte} Anna`;
       const fahrzeug = `Stamm ${LAUF} ${dichte} 83-1`;
-      const personalId = await post(page, '/api/personal', { name: person });
-      const fahrzeugId = await post(page, '/api/fahrzeuge', {
+      const personalId = await post(page, '/api/personnel', { name: person });
+      const fahrzeugId = await post(page, '/api/vehicles', {
         funkrufname: fahrzeug,
         fahrzeugtyp: 'RTW',
       });

@@ -73,14 +73,14 @@ function render(liste = [ep, zweite]) {
     http.get('/api/einsaetze/7/personnel/timeline', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
-    http.get('/api/personal-status', () =>
+    http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
         { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
       ]),
     ),
-    http.get('/api/personal', () => HttpResponse.json([stamm])),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/personnel', () => HttpResponse.json([stamm])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>

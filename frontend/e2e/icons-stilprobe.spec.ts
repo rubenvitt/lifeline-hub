@@ -49,7 +49,7 @@ async function einsatzMitMeldungen(page: Page): Promise<string> {
     'Brücke Nord gesperrt, Umleitung über die B12 eingerichtet',
     'Pegel Mühlbach steigt, Sandsäcke an der Schule angefordert',
   ]) {
-    const m = await page.request.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+    const m = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
       data: {
         absender: 'Florian Nord 1',
         meldeweg: 'funk',

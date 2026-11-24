@@ -365,7 +365,7 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
     data: { einheit_id: einheitId },
   });
   expect(zuordnung.ok(), `Material zuordnen: ${zuordnung.status()}`).toBeTruthy();
-  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text:
         'Verletztenablage am Deich Süd einrichten und Betroffene aus dem Pegelbereich Altstadt ' +

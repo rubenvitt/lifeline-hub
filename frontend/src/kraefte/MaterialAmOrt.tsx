@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
-import { FELD_KLASSE, Stapel, monoStil, useRollen } from '../components/instrument';
+import { FELD_KLASSE, Stapel, monoStil, schriftStil, useRollen } from '../components/instrument';
 import type { WeitereAktionen } from '../components/Datensicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
@@ -331,7 +331,12 @@ export default function MaterialAmOrt({
           {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
-              style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}
+              // „5 Posten · 1 Ausfall“ trägt Wörter: Textschrift (ADR-0094).
+              style={{
+                ...schriftStil('textKlein'),
+                fontVariantNumeric: 'tabular-nums',
+                color: rollen.gedaempft,
+              }}
             >
               {materialKopfzahl(posten)}
             </span>
@@ -395,8 +400,18 @@ export default function MaterialAmOrt({
               {/* Die Zeile hat einen Regler: das Kontextmenü nur am Namen (LLH-1599). */}
               <span {...(isGeloest ? {} : kontext.ausloeser(p))}>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
-              {/* Eine Zahl bricht nicht um. */}
-              <span style={{ ...monoStil('mono'), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
+              {/* Eine Zahl bricht nicht um. Mit Ausgabe steht „30 von 50 übrig“ (`mengeText`), das
+                  Wörter trägt: dann Textschrift (ADR-0094). */}
+              <span
+                style={{
+                  ...(p.art !== 'geraet' && p.ausgegeben > 0
+                    ? { ...schriftStil('text'), fontVariantNumeric: 'tabular-nums' }
+                    : monoStil('mono')),
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mengeText(p)}
+              </span>
               {/* Statuswahl und „Rückgängig“ teilen ein Gitterfeld (LLH-1722, Spec `material-am-ort`):
                   der Rückweg steht in der gehaltenen Zeile, aber nie an der Stelle des Lösen-Knopfs,
                   den ein zweiter Tipp träfe. */}

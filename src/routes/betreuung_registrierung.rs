@@ -1,11 +1,11 @@
 //! Routen der Registrierstelle (LLH-1612, Change `hitr91ob-registrierstelle-betreuung`,
 //! Spec `betreuung-registrierung`).
 //!
-//! - `POST …/betreuung/stellen/{sid}/registrierungen` — Haushalt registrieren (design.md D2).
+//! - `POST …/care/positions/{sid}/registrations` — Haushalt registrieren (design.md D2).
 //! - `GET  …/betreuung/stellen/{sid}/registrierungen` — Registrierliste der Stelle.
 //! - `GET  …/betreuung/stellen/{sid}/registrierungen/druck` — dieselbe Liste für den Druck, je
 //!   Person protokolliert (LLH-1616, Change `iw8hjb93-registrierliste-drucken`).
-//! - `POST …/betreuung/stellen/{sid}/abmeldungen` — Personen oder Haushalt abmelden (D6).
+//! - `POST …/care/positions/{sid}/departures` — Personen oder Haushalt abmelden (D6).
 //! - `PUT  …/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson` — Bezugsperson wechseln
 //!   (LLH-1615, Change `lm62ud0b-haushalt-umbauen`, design.md D1).
 //! - `PUT  …/betreuung/stellen/{sid}/personen/{pid}/haushalt` — Person in einen anderen oder
@@ -171,7 +171,7 @@ async fn haushalt_antwort(
     .await
 }
 
-/// POST /api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen
+/// POST /api/einsaetze/{id}/care/positions/{sid}/registrations
 pub async fn registrieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Betreuung>,
@@ -256,7 +256,7 @@ pub async fn registrieren(
     ))
 }
 
-/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen
+/// GET /api/einsaetze/{id}/care/positions/{sid}/registrations
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Betreuung>,
@@ -277,7 +277,7 @@ pub struct DruckQuery {
     unvertraeglichkeiten: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck — die Registrierliste
+/// GET /api/einsaetze/{id}/care/positions/{sid}/registrations/print — die Registrierliste
 /// für die Druckansicht (LLH-1616, Spec `betreuung-registrierung`, „Druck der Registrierliste
 /// wird je Person protokolliert“). Prüfkette wie [`liste`]: Gerät nur eigene Stelle (403) →
 /// Modul Personen (403) → Stelle unbekannt oder fremd (404), dann lesen und je Person ein Eintrag
@@ -322,7 +322,7 @@ pub struct AbmeldeBody {
     client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen
+/// POST /api/einsaetze/{id}/care/positions/{sid}/departures
 pub async fn abmelden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Betreuung>,
@@ -395,7 +395,7 @@ pub struct BezugspersonBody {
     person_id: i64,
 }
 
-/// PUT /api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson
+/// PUT /api/einsaetze/{id}/care/positions/{sid}/households/{hid}/contact-person
 pub async fn bezugsperson_setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Betreuung>,
@@ -437,7 +437,7 @@ pub struct HaushaltBody {
     neuer_haushalt: bool,
 }
 
-/// PUT /api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt
+/// PUT /api/einsaetze/{id}/care/positions/{sid}/persons/{pid}/household
 pub async fn haushalt_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Betreuung>,
@@ -483,7 +483,7 @@ pub async fn haushalt_aendern(
 
 // ── Kostformen ──────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/betreuung/kostformen — ohne Personenbezug, nur Modul Betreuung.
+/// GET /api/einsaetze/{id}/care/diets — ohne Personenbezug, nur Modul Betreuung.
 pub async fn kostformen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Betreuung>,

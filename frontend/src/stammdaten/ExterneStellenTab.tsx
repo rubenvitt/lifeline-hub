@@ -1,6 +1,6 @@
 import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Status, monoStil } from '../components/instrument';
+import { Kennung, Status, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -144,7 +144,14 @@ export default function ExterneStellenTab() {
       key: 'funkrufname',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.funkrufname),
-      render: (f?: string) => (f ? <span style={monoStil('monoKlein', 500)}>{f}</span> : '—'),
+      render: (f?: string) =>
+        f ? (
+          <Kennung stufe="monoKlein" gewicht={500}>
+            {f}
+          </Kennung>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Aktiv',

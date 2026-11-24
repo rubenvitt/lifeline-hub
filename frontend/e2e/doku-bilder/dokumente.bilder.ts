@@ -81,7 +81,7 @@ async function ablegen(
   bezug?: { typ: string; id: number },
 ): Promise<void> {
   if (vorhanden.includes(felder.titel)) return;
-  const antwort = await api.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+  const antwort = await api.post(`/api/einsaetze/${einsatzId}/documents`, {
     multipart: {
       datei: { name: felder.dateiname, mimeType: felder.mime, buffer: felder.inhalt },
       titel: felder.titel,
@@ -99,9 +99,9 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     const { id } = await demoEinsatz(api);
     const vorhanden = (
-      (await (await api.get(`/api/einsaetze/${id}/dokumente`)).json()) as { titel: string }[]
+      (await (await api.get(`/api/einsaetze/${id}/documents`)).json()) as { titel: string }[]
     ).map((d) => d.titel);
-    const abschnitte = (await (await api.get(`/api/einsaetze/${id}/abschnitte`)).json()) as {
+    const abschnitte = (await (await api.get(`/api/einsaetze/${id}/sectors`)).json()) as {
       id: number;
       name: string;
     }[];

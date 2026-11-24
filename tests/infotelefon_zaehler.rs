@@ -12,7 +12,7 @@ mod common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, setup_mit_pool};
 
 fn pfad(e: i64) -> String {
-    format!("/api/einsaetze/{e}/stab/infotelefon")
+    format!("/api/einsaetze/{e}/staff/info-line")
 }
 
 async fn erfassen(app: &axum::Router, cookie: &str, e: i64, body: &str) {
@@ -24,7 +24,7 @@ async fn fetch_zaehler(app: &axum::Router, cookie: &str, e: i64, query: &str) ->
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("{}/zaehler{query}", pfad(e)),
+        &format!("{}/counts{query}", pfad(e)),
         cookie,
         None,
     )
@@ -172,7 +172,7 @@ async fn unbekannter_status_ist_400_an_liste_und_zaehlung() {
     let e = einsatz_anlegen(&app, &admin).await;
     for uri in [
         format!("{}?status=unsinn", pfad(e)),
-        format!("{}/zaehler?status=unsinn", pfad(e)),
+        format!("{}/counts?status=unsinn", pfad(e)),
     ] {
         let (s, _) = anfrage(&app, "GET", &uri, &admin, None).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{uri}");

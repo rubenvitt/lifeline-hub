@@ -89,7 +89,7 @@ test.describe('Titel-Link und Tastatur (Personen, Tabelle)', () => {
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Kontextmenü Personen ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
       name: 'Kontext',
       vorname: 'Karla',
       antreff_ort: 'Sammelstelle Nord',
@@ -173,7 +173,7 @@ test.describe('Verwaltungstabelle mit Knopfreihe (LLH-1599)', () => {
 
   test('Rechtsklick und Umschalt+F10 zeigen die Handlungen der Knöpfe', async ({ page }) => {
     const name = `PI Kontextprobe ${Date.now()}`;
-    const angelegt = await page.request.post('/api/externe-stellen', {
+    const angelegt = await page.request.post('/api/external-agencies', {
       data: { bezeichnung: name, art: 'polizei' },
     });
     expect(angelegt.status(), await angelegt.text()).toBe(201);
@@ -202,7 +202,7 @@ test.describe('Verwaltungstabelle mit Knopfreihe (LLH-1599)', () => {
       await page.keyboard.press('Escape');
       await expect(zeile.getByRole('button', { name: 'Bearbeiten' })).toBeFocused();
     } finally {
-      await page.request.patch(`/api/externe-stellen/${id}`, { data: { aktiv: false } });
+      await page.request.patch(`/api/external-agencies/${id}`, { data: { aktiv: false } });
     }
   });
 });

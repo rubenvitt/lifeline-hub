@@ -151,14 +151,14 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Herausnehmen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
     const ersteAntwort = tor();
     server.use(
-      http.post('/api/einsaetze/1/material/10/release', async () => {
+      http.post('/api/einsaetze/1/material/10/stand-down', async () => {
         await ersteAntwort.offen;
         return HttpResponse.json(
           { error: 'Das Material ist bereits aus dem Einsatz genommen' },
           { status: 409 },
         );
       }),
-      http.post('/api/einsaetze/1/material/11/release', () =>
+      http.post('/api/einsaetze/1/material/11/stand-down', () =>
         HttpResponse.json({
           material: { ...zweites, beendet_als: 'entlassen' },
           vorzustand: { entlassen_at: '2026-11-17 10:00:00' },

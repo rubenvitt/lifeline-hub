@@ -70,12 +70,12 @@ test('Chat: der Hinweis ersetzt die Eingabe und bleibt bei langem Strom sichtbar
   const einsatzId = await einsatzAnlegen(page, `E2E Chat lesend ${Date.now()}`);
 
   // Standardkanal „Allgemein" — derselbe, den die Seite beim Öffnen wählt.
-  const kanaele = await page.request.get(`/api/einsaetze/${einsatzId}/chat/kanaele`);
+  const kanaele = await page.request.get(`/api/einsaetze/${einsatzId}/chat/channels`);
   expect(kanaele.ok(), `Kanäle: ${kanaele.status()}`).toBe(true);
   const kanalId = ((await kanaele.json()) as { id: number }[])[0].id;
   for (let i = 1; i <= 12; i += 1) {
     const antwort = await page.request.post(
-      `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten`,
+      `/api/einsaetze/${einsatzId}/chat/channels/${kanalId}/messages`,
       {
         data: {
           inhalt: `Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`,
@@ -144,10 +144,10 @@ test('Chat: unter md trägt eine Segmentleiste die Kanäle, nicht die Seitenspal
 async function vieleKanaeleSaeen(page: Page, einsatzId: string) {
   // Erst die Liste abrufen: der Server legt „Allgemein" beim ersten Abruf an, danach sind es
   // fest neun Kanäle.
-  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/chat/kanaele`);
+  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/chat/channels`);
   expect(liste.ok(), `Kanäle: ${liste.status()}`).toBe(true);
   for (let i = 1; i <= 8; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/chat/channels`, {
       data: { name: `Einsatzabschnitt Nord ${i} Deichverteidigung` },
     });
     expect(antwort.status(), `Seeding Kanal ${i}: ${await antwort.text()}`).toBe(201);

@@ -36,8 +36,8 @@ interface Anfrage {
   body: unknown;
 }
 
-const B = '/api/einsaetze/7/betreuung';
-const E = '/api/einsaetze/7/evakuierung';
+const B = '/api/einsaetze/7/care';
+const E = '/api/einsaetze/7/evacuation';
 
 /** Fängt jede Anfrage unter beiden Modulpfaden und antwortet mit `{ ok: true }`. */
 function faengeAnfragen(): Anfrage[] {
@@ -70,7 +70,7 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     await ladeEvakuierung(7);
     expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
       ['GET', B, ''],
-      ['GET', `${B}/belegung`, ''],
+      ['GET', `${B}/occupancy`, ''],
       ['GET', E, ''],
     ]);
   });
@@ -80,8 +80,8 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     await ladeStandVerlauf(7, 5);
     await ladeBelegungVerlauf(7, 9);
     expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
-      ['GET', `${E}/bezirke/5/staende`, ''],
-      ['GET', `${B}/stellen/9/belegungen`, ''],
+      ['GET', `${E}/districts/5/progress`, ''],
+      ['GET', `${B}/positions/9/occupancies`, ''],
     ]);
   });
 
@@ -111,11 +111,11 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     await meldeStand(7, 3, { evakuiert: 212, erhebung: 'gezaehlt' });
     await nimmStandZurueck(7, 11);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${E}/bezirke`],
-      ['PATCH', `${E}/bezirke/3`],
-      ['POST', `${E}/bezirke/3/stornieren`],
-      ['POST', `${E}/bezirke/3/staende`],
-      ['POST', `${E}/staende/11/zuruecknehmen`],
+      ['POST', `${E}/districts`],
+      ['PATCH', `${E}/districts/3`],
+      ['POST', `${E}/districts/3/annul`],
+      ['POST', `${E}/districts/3/progress`],
+      ['POST', `${E}/progress/11/undo`],
     ]);
     expect(a[0].body).toEqual({
       bezeichnung: 'Uferstraße 12–40',
@@ -137,11 +137,11 @@ describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte
     await meldeBelegung(7, 4, { belegt: 89, zeitpunkt_at: '2026-09-23 12:00:00' });
     await nimmBelegungZurueck(7, 21);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${B}/stellen`],
-      ['PATCH', `${B}/stellen/4`],
-      ['POST', `${B}/stellen/4/stornieren`],
-      ['POST', `${B}/stellen/4/belegungen`],
-      ['POST', `${B}/belegungen/21/zuruecknehmen`],
+      ['POST', `${B}/positions`],
+      ['PATCH', `${B}/positions/4`],
+      ['POST', `${B}/positions/4/annul`],
+      ['POST', `${B}/positions/4/occupancies`],
+      ['POST', `${B}/occupancies/21/undo`],
     ]);
     expect(a[3].body).toEqual({ belegt: 89, zeitpunkt_at: '2026-09-23 12:00:00' });
   });

@@ -12,7 +12,7 @@ async fn katalog(app: &axum::Router, admin: &str, bezeichnung: &str, betriebsart
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         admin,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}"}}"#
@@ -33,7 +33,7 @@ async fn lokal(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}"}}"#
@@ -46,7 +46,7 @@ async fn deaktivieren(app: &axum::Router, admin: &str, id: i64) {
     let (status, _) = anfrage(
         app,
         "POST",
-        &format!("/api/sprechgruppen/{id}/deaktivieren"),
+        &format!("/api/talk-groups/{id}/deactivate"),
         admin,
         None,
     )
@@ -58,7 +58,7 @@ async fn fuehrungsstelle_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
         cookie,
         None,
     )
@@ -79,7 +79,7 @@ async fn abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
 }
 
 async fn auch_lokal(app: &axum::Router, admin: &str) -> Vec<(i64, i64, String)> {
-    let (status, json) = anfrage(app, "GET", "/api/sprechgruppen/auch-lokal", admin, None).await;
+    let (status, json) = anfrage(app, "GET", "/api/talk-groups/also-local", admin, None).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     json.as_array()
         .unwrap()
@@ -146,7 +146,7 @@ async fn katalog_sprechgruppe_mit_namen_einer_einsatz_sprechgruppe_im_laufenden_
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         &admin,
         Some(r#"{"bezeichnung":"Sonder 1","betriebsart":"DMO"}"#),
     )
@@ -156,7 +156,7 @@ async fn katalog_sprechgruppe_mit_namen_einer_einsatz_sprechgruppe_im_laufenden_
         json["error"],
         "„Sonder 1“ (DMO) ist im Einsatz „Hochwasser Elbe“ als Einsatz-Sprechgruppe angelegt"
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/sprechgruppen", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/talk-groups", &admin, None).await;
     assert!(
         liste.as_array().unwrap().is_empty(),
         "abgelehnt heißt nicht angelegt: {liste:?}"
@@ -167,13 +167,13 @@ async fn katalog_sprechgruppe_mit_namen_einer_einsatz_sprechgruppe_im_laufenden_
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{sg}"),
+        &format!("/api/talk-groups/{sg}"),
         &admin,
         Some(r#"{"bezeichnung":"Sonder 1"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
-    let (_, liste) = anfrage(&app, "GET", "/api/sprechgruppen", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/talk-groups", &admin, None).await;
     assert_eq!(liste[0]["bezeichnung"], "Sonder 2");
 
     // Die andere Betriebsart ist frei.
@@ -209,7 +209,7 @@ async fn umbenennen_auf_einen_namen_im_nutzenden_abgeschlossenen_einsatz_ist_409
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{sg}"),
+        &format!("/api/talk-groups/{sg}"),
         &admin,
         Some(r#"{"bezeichnung":"Sonder 1"}"#),
     )
@@ -233,7 +233,7 @@ async fn meldung_nennt_hoechstens_drei_einsaetze() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         &admin,
         Some(r#"{"bezeichnung":"Sonder 1","betriebsart":"DMO"}"#),
     )
@@ -271,14 +271,14 @@ async fn altbestand_wird_erkannt_und_nur_fuer_admins_gezeigt() {
 
     common::benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    let (status, _) = anfrage(&app, "GET", "/api/sprechgruppen/auch-lokal", &erika, None).await;
+    let (status, _) = anfrage(&app, "GET", "/api/talk-groups/also-local", &erika, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     // Hinweis, Netz und Sicherheit bleiben pflegbar: der Name ändert sich nicht.
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/sprechgruppen/{sg}"),
+        &format!("/api/talk-groups/{sg}"),
         &admin,
         Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO","hinweis":"Führungskanal"}"#),
     )
@@ -289,7 +289,7 @@ async fn altbestand_wird_erkannt_und_nur_fuer_admins_gezeigt() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
         &admin,
         None,
     )
@@ -318,7 +318,7 @@ async fn deaktivierte_katalog_sprechgruppe_neben_gleichnamiger_lokaler_ist_nicht
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
         &admin,
         None,
     )
@@ -344,7 +344,7 @@ async fn erste_skizzenlage_einer_katalog_sprechgruppe_neben_gleichnamiger_lokale
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/stab/fernmeldeskizze/lage/sg-{sg}"),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-sketch/layout/sg-{sg}"),
         &admin,
         Some(lage),
     )
@@ -365,7 +365,7 @@ async fn erste_skizzenlage_einer_katalog_sprechgruppe_neben_gleichnamiger_lokale
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{alt}/stab/fernmeldeskizze/lage/sg-{sg}"),
+        &format!("/api/einsaetze/{alt}/staff/comms-sketch/layout/sg-{sg}"),
         &admin,
         Some(lage),
     )

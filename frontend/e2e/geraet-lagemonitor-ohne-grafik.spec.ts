@@ -45,7 +45,7 @@ test('ohne WebGL2: Kachel Lagekarte zeigt den Zustand, die übrigen Kacheln blei
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
-    await anlegen(page, `/api/einsaetze/${e}/personen`, { name, uhs_id: nord.id });
+    await anlegen(page, `/api/einsaetze/${e}/persons`, { name, uhs_id: nord.id });
   }
   const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'lagemonitor',

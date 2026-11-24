@@ -9,7 +9,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/dokumente")
+    format!("/api/einsaetze/{einsatz}/documents")
 }
 
 /// Multipart mit Datei + beliebigen Textfeldern. `datei = None` lässt das Dateifeld weg.
@@ -33,7 +33,7 @@ async fn datei_laden(
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -77,7 +77,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -129,7 +129,7 @@ async fn download_revalidiert_mit_304() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, &admin)
                 .header(header::IF_NONE_MATCH, &etag)
                 .body(Body::empty())
@@ -356,7 +356,7 @@ async fn chat_allowlist_bleibt_ohne_heic() {
     let (app, admin, einsatz) = start().await;
     let (status, json) = multipart_post(
         &app,
-        &format!("/api/einsaetze/{einsatz}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/attachments"),
         &admin,
         Some(("foto.heic", b"x")),
         &[],
@@ -444,7 +444,7 @@ async fn entfernen_ist_soft_delete() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )
@@ -986,13 +986,13 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let schaden_pfad = format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge");
+    let schaden_pfad = format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments");
     let (s, _) = anfrage(&app, "GET", &schaden_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Schadensroute");
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{schaden_pfad}/{lid}/datei"),
+        &format!("{schaden_pfad}/{lid}/file"),
         &frieda,
         None,
     )
@@ -1001,7 +1001,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )
@@ -1043,7 +1043,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
         assert_eq!(s, StatusCode::OK, "{art:?}: Dokumente sieht sie");
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments",
             art.segment()
         );
         let (s, _) = anfrage(&app, "GET", &modul_pfad, &frieda, None).await;
@@ -1051,7 +1051,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("{modul_pfad}/{lid}/datei"),
+            &format!("{modul_pfad}/{lid}/file"),
             &frieda,
             None,
         )
@@ -1106,13 +1106,13 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let person_pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/anhaenge");
+    let person_pfad = format!("/api/einsaetze/{einsatz}/persons/{pid}/attachments");
     let (s, _) = anfrage(&app, "GET", &person_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Personenroute");
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{person_pfad}/{lid}/datei"),
+        &format!("{person_pfad}/{lid}/file"),
         &frieda,
         None,
     )
@@ -1121,7 +1121,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )

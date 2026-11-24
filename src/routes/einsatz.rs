@@ -1140,7 +1140,7 @@ pub async fn mitglieder(
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
-/// GET /api/einsaetze/{id}/members/candidates — die Personen, die die Einsatzleitung aufnehmen
+/// GET /api/einsaetze/{id}/members/selection — die Personen, die die Einsatzleitung aufnehmen
 /// kann (LFH-1141, Spec `einsatz-zugriff`). Dieselbe Tür wie [`mitglied_setzen`]: wer die Liste
 /// sieht, kann aus ihr aufnehmen, auch ohne Systemrolle; die Benutzerverwaltung bleibt admin-only.
 /// Gekoppelte Geräte erreichen die Route nicht (Positivliste in `src/geraet/mod.rs`).

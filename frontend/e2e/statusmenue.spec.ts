@@ -49,7 +49,7 @@ const menue = (page: Page) => page.getByRole('menu', { name: `Status von ${RUFNA
  * selben Backend angelegt haben (siehe Kopf).
  */
 async function nurFmsStatus(page: Page) {
-  await page.route('**/api/fahrzeug-status', async (route) => {
+  await page.route('**/api/vehicle-statuses', async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const antwort = await route.fetch();
     const katalog = (await antwort.json()) as { fms_anker: number | null }[];

@@ -121,16 +121,16 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
       requests.push(`GET ${new URL(request.url).pathname}`);
       return HttpResponse.json(FAHRZEUGE);
     }),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/uhs', ({ request }) => {
       requests.push(`GET ${new URL(request.url).pathname}`);
       return HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]);
     }),
-    http.put('/api/einsaetze/7/uhs/:uid/kraefte/:ep', async (info) => {
+    http.put('/api/einsaetze/7/uhs/:uid/forces/:ep', async (info) => {
       await rememberRequest(info);
       return HttpResponse.json({ id: 10 });
     }),
-    http.get('/api/personal-status', () => {
+    http.get('/api/personnel-statuses', () => {
       if (a.statusFehler) {
         a.statusFehler.abgerufen = true;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
@@ -140,7 +140,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
       ]);
     }),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
     http.put('/api/einsaetze/7/units/:eid/personnel/:ep', async (info) => {
       await rememberRequest(info);
       return new HttpResponse(null, { status: 204 });
@@ -409,7 +409,7 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
     );
     await waehle('Unfallhilfsstelle', 'UHS Nord');
     await userEvent.click(screen.getByRole('button', { name: 'Unfallhilfsstelle speichern' }));
-    await waitFor(() => expect(requests).toContain('PUT /api/einsaetze/7/uhs/21/kraefte/10'));
+    await waitFor(() => expect(requests).toContain('PUT /api/einsaetze/7/uhs/21/forces/10'));
     expect(await screen.findByText('Gespeichert: Unfallhilfsstelle')).toBeInTheDocument();
   });
 
@@ -550,7 +550,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
   function entlassenAntwortet() {
     const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release', () => {
+      http.post('/api/einsaetze/7/personnel/10/stand-down', () => {
         serverState = { aktiv: [], entlassene: [entlassen] };
         return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
       }),
@@ -576,7 +576,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
         reaktiviert = true;
         return HttpResponse.json(kraft());
       }),
-      http.post('/api/einsaetze/7/personnel/10/release/undo', async ({ request }) => {
+      http.post('/api/einsaetze/7/personnel/10/stand-down/undo', async ({ request }) => {
         requests.push(`POST ${new URL(request.url).pathname}`);
         bodies.push(await request.json());
         serverState = { aktiv: [kraft()], entlassene: [] };
@@ -586,7 +586,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     await waitFor(() =>
-      expect(requests).toContain('POST /api/einsaetze/7/personnel/10/release/undo'),
+      expect(requests).toContain('POST /api/einsaetze/7/personnel/10/stand-down/undo'),
     );
     expect(bodies).toContainEqual(VORZUSTAND);
     const kopf = screen.getByRole('heading', { level: 1 });
@@ -599,7 +599,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     renderAnsicht();
     entlassenAntwortet();
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release/undo', () => {
+      http.post('/api/einsaetze/7/personnel/10/stand-down/undo', () => {
         serverState = { aktiv: [kraft()], entlassene: [] };
         return HttpResponse.json({
           personal: kraft(),
@@ -624,11 +624,11 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     });
     const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release', () => {
+      http.post('/api/einsaetze/7/personnel/10/stand-down', () => {
         serverState = { aktiv: [zweite], entlassene: [entlassen] };
         return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
       }),
-      http.post('/api/einsaetze/7/personnel/:ep/release/undo', ({ request }) => {
+      http.post('/api/einsaetze/7/personnel/:ep/stand-down/undo', ({ request }) => {
         requests.push(`POST ${new URL(request.url).pathname}`);
         return HttpResponse.json(
           { error: 'Die Entlassung lässt sich nicht mehr zurücknehmen' },
@@ -642,7 +642,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Ben Zweit');
     await userEvent.click(rueckgaengig);
     await waitFor(() =>
-      expect(requests).toContain('POST /api/einsaetze/7/personnel/10/release/undo'),
+      expect(requests).toContain('POST /api/einsaetze/7/personnel/10/stand-down/undo'),
     );
     // Die Ablehnung gehört zu Lena Beispiel und steht nicht über Ben Zweit.
     await new Promise((r) => setTimeout(r, 50));
@@ -657,11 +657,11 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     });
     const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release', () => {
+      http.post('/api/einsaetze/7/personnel/10/stand-down', () => {
         serverState = { aktiv: [zweite], entlassene: [entlassen] };
         return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
       }),
-      http.post('/api/einsaetze/7/personnel/10/release/undo', () =>
+      http.post('/api/einsaetze/7/personnel/10/stand-down/undo', () =>
         HttpResponse.json({ error: 'Zeitachse berichtigt' }, { status: 409 }),
       ),
     );
@@ -679,7 +679,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     renderAnsicht();
     entlassenAntwortet();
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release/undo', () =>
+      http.post('/api/einsaetze/7/personnel/10/stand-down/undo', () =>
         HttpResponse.json({ error: 'Zeitachse berichtigt' }, { status: 409 }),
       ),
       http.post('/api/einsaetze/7/personnel/10/reactivate', () => {
@@ -698,7 +698,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     renderAnsicht();
     entlassenAntwortet();
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release/undo', () =>
+      http.post('/api/einsaetze/7/personnel/10/stand-down/undo', () =>
         HttpResponse.json(
           {
             error:
@@ -718,7 +718,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
   it('zeigt eine Ablehnung des Entlassens im Abschnitt „Aus dem Einsatz“, die Person bleibt', async () => {
     renderAnsicht();
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/release', () =>
+      http.post('/api/einsaetze/7/personnel/10/stand-down', () =>
         HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 422 }),
       ),
     );

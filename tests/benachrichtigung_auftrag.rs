@@ -83,7 +83,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &self.admin,
             Some(&body.to_string()),
         )
@@ -122,7 +122,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/auftraege", self.einsatz),
+            &format!("/api/einsaetze/{}/tasks", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -160,7 +160,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/auftraege/{auftrag}/empfaenger/{empfaenger}/quittieren",
+                "/api/einsaetze/{}/tasks/{auftrag}/recipients/{empfaenger}/acknowledge",
                 self.einsatz
             ),
             cookie,
@@ -174,10 +174,7 @@ impl Welt {
         let (s, _) = anfrage(
             &self.app,
             "POST",
-            &format!(
-                "/api/einsaetze/{}/auftraege/{auftrag}/vollzug",
-                self.einsatz
-            ),
+            &format!("/api/einsaetze/{}/tasks/{auftrag}/execution", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -304,18 +301,18 @@ async fn erteilen_aus_etb_meldung_und_chat_meldet_ebenso() {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/etb/{}/auftrag", etb["id"]),
+        format!("/api/einsaetze/{e}/etb/{}/task", etb["id"]),
         body.clone(),
     )
     .await;
 
     let meldung = post(
-        format!("/api/einsaetze/{e}/meldungen"),
+        format!("/api/einsaetze/{e}/reports"),
         r#"{"absender":"Florian Nord 1","empfaenger":"ELW 1","meldeweg":"funk","inhalt":"Deich km12","ereigniszeit":"2026-06-12 09:00:00"}"#.into(),
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/meldungen/{}/auftrag", meldung["id"]),
+        format!("/api/einsaetze/{e}/reports/{}/task", meldung["id"]),
         body.clone(),
     )
     .await;
@@ -323,14 +320,14 @@ async fn erteilen_aus_etb_meldung_und_chat_meldet_ebenso() {
     let (_, kanaele) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{e}/chat/kanaele"),
+        &format!("/api/einsaetze/{e}/chat/channels"),
         &w.admin,
         None,
     )
     .await;
     let nachricht = post(
         format!(
-            "/api/einsaetze/{e}/chat/kanaele/{}/nachrichten",
+            "/api/einsaetze/{e}/chat/channels/{}/messages",
             kanaele[0]["id"]
         ),
         r#"{"inhalt":"Deich sichern"}"#.into(),
@@ -338,7 +335,7 @@ async fn erteilen_aus_etb_meldung_und_chat_meldet_ebenso() {
     .await;
     post(
         format!(
-            "/api/einsaetze/{e}/chat/nachrichten/{}/heraufstufen-auftrag",
+            "/api/einsaetze/{e}/chat/messages/{}/promote-to-task",
             nachricht["id"]
         ),
         body,
@@ -367,7 +364,7 @@ async fn berichtigung_meldet_nur_hinzugekommene_empfaenger() {
             let (s, v) = anfrage(
                 &w.app,
                 "PATCH",
-                &format!("/api/einsaetze/{}/auftraege/{auftrag}", w.einsatz),
+                &format!("/api/einsaetze/{}/tasks/{auftrag}", w.einsatz),
                 &w.admin,
                 Some(&body.to_string()),
             )

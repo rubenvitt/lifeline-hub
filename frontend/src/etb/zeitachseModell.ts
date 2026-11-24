@@ -507,7 +507,7 @@ export function hatVerknuepfung(
 
 /**
  * Dokumente der Ablage nach dem ETB-Eintrag, auf den sie sich beziehen (LFH-743). Eine
- * Sammelabfrage (`GET …/dokumente`) statt eines Abrufs je Eintrag; Dokumente ohne ETB-Bezug
+ * Sammelabfrage (`GET …/documents`) statt eines Abrufs je Eintrag; Dokumente ohne ETB-Bezug
  * fallen heraus. Die Reihenfolge innerhalb eines Eintrags ist die der Liste.
  */
 export function dokumenteJeEintrag<D extends { bezug_etb_eintrag_id?: number | null }>(

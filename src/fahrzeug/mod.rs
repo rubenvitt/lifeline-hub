@@ -250,7 +250,7 @@ pub struct EntlassungVorzustand {
 /// Besatzung oder Beladung trägt kein Fahrzeug.
 pub const RUECKNAHME_LISTE_MAX: usize = 200;
 
-/// Antwort von `POST …/vehicles/{ef_id}/release` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,
@@ -259,7 +259,7 @@ pub struct EntlassungAntwort {
 
 pub use crate::entlassung::RuecknahmeAusgelassen;
 
-/// Antwort von `POST …/vehicles/{ef_id}/release/undo` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungRuecknahmeAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,

@@ -108,9 +108,9 @@ async fn ohne_netz_an_allen_einstiegen_mit_netz_lokal_vorn() {
     let q = kodiert("Hauptstraße 12, Musterstadt");
 
     for pfad in [
-        format!("/api/einsaetze/{einsatz}/karte/ort-suche?q={q}"),
+        format!("/api/einsaetze/{einsatz}/map/place-search?q={q}"),
         format!("/api/einsaetze/{einsatz}/place-search?q={q}"),
-        format!("/api/ort-suche?q={q}"),
+        format!("/api/place-search?q={q}"),
     ] {
         let (status, json) = anfrage(&app, "GET", &pfad, &admin, None).await;
         assert_eq!(status, StatusCode::OK, "{pfad}: {json:?}");
@@ -133,7 +133,7 @@ async fn ohne_netz_an_allen_einstiegen_mit_netz_lokal_vorn() {
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/ort-suche?q={}", kodiert("Marktplatz 3, Anderswo")),
+        &format!("/api/place-search?q={}", kodiert("Marktplatz 3, Anderswo")),
         &admin,
         None,
     )
@@ -157,7 +157,14 @@ async fn ohne_netz_an_allen_einstiegen_mit_netz_lokal_vorn() {
     ]))
     .await;
     geocoder_setzen(&pool, &base).await;
-    let (status, json) = anfrage(&app, "GET", &format!("/api/ort-suche?q={q}"), &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/place-search?q={q}"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(json["zustand"], "ok");
     assert_eq!(
@@ -183,7 +190,8 @@ async fn volle_lokale_treffer_fragen_den_geocoder_nicht() {
     let (base, aufrufe) = such_stub(serde_json::json!([])).await;
     geocoder_setzen(&pool, &base).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/ort-suche?q=Musterstadt", &admin, None).await;
+    let (status, json) =
+        anfrage(&app, "GET", "/api/place-search?q=Musterstadt", &admin, None).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     let t = namen_und_quellen(&json);
     assert_eq!(t.len(), 5, "{t:?}");

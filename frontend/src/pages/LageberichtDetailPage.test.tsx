@@ -234,7 +234,11 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
     renderMitZone('/einsaetze/1/lageberichte/9');
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin → DDHHmm + Monatskürzel + Jahr.
-    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
+    // Die DTG steht in Mono, „Zeitstand:“ in der Textschrift (ADR-0094): zwei Knoten.
+    const dtg = await screen.findAllByText('251400jul26');
+    expect(dtg.some((d) => d.parentElement?.textContent?.includes('Zeitstand: 251400jul26'))).toBe(
+      true,
+    );
     // Gegenaussage: der Wirestring ist nirgends sichtbar.
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
@@ -294,7 +298,11 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     } as never);
     renderMitZone('/einsaetze/1/lageberichte/9');
 
-    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
+    // Die DTG steht in Mono, „Zeitstand:“ in der Textschrift (ADR-0094): zwei Knoten.
+    const dtg = await screen.findAllByText('251400jul26');
+    expect(dtg.some((d) => d.parentElement?.textContent?.includes('Zeitstand: 251400jul26'))).toBe(
+      true,
+    );
     expect(screen.queryByLabelText('Zeitstand')).toBeNull();
   });
 });
@@ -691,7 +699,7 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
       bezeichnung: 'Übung',
     } as never);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/abschnitte', () =>
+      http.get('/api/einsaetze/:einsatzId/sectors', () =>
         HttpResponse.json([{ id: 3, name: 'EA Süd' }]),
       ),
     );

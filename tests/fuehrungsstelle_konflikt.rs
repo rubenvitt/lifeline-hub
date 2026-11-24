@@ -10,7 +10,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/fuehrungsstelle")
+    format!("/api/einsaetze/{einsatz}/command-post")
 }
 
 async fn patchen(

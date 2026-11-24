@@ -1,5 +1,5 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): `GET`/`PATCH
-//! /api/einsaetze/{id}/fuehrungsstelle`. Spec `einsatz-fuehrungsstelle`, Herleitung
+//! /api/einsaetze/{id}/command-post`. Spec `einsatz-fuehrungsstelle`, Herleitung
 //! `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3, D6).
 //!
 //! Nicht verwechseln mit `tests/fuehrungsstelle.rs`: dort die Führungsstelle je Person
@@ -14,7 +14,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/fuehrungsstelle")
+    format!("/api/einsaetze/{einsatz}/command-post")
 }
 
 /// Die Antwort ohne den Änderungsvermerk (LLH-1834, eigene Tests in
@@ -49,7 +49,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -483,7 +483,7 @@ async fn entlassen_loest_die_zuordnung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/release"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -507,7 +507,7 @@ async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/release"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -552,7 +552,7 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/release"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
                 &admin,
                 None,
             )
@@ -1201,7 +1201,7 @@ async fn entlassene_person_bleibt_mit_vermerk() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/release"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )
@@ -1244,7 +1244,7 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/release"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -1610,7 +1610,7 @@ async fn liste_traegt_den_vermerk_einer_entlassenen_person() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/release"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )
@@ -1670,7 +1670,7 @@ async fn lage_snapshot_friert_keinen_einsatzleiter_ein() {
     let (status, snapshot) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/lage-snapshots"),
+        &format!("/api/einsaetze/{einsatz}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

@@ -111,7 +111,7 @@ test.describe(KAPITEL, () => {
       bezeichnung: 'Sturmschaden Waldweg',
     });
     await fuelle(page, 'patch', `/api/einsaetze/${einsatz.id}`, { einsatzort: 'Deich West' });
-    await fuelle(page, 'patch', `/api/einsaetze/${einsatz.id}/fuehrungsstelle`, {
+    await fuelle(page, 'patch', `/api/einsaetze/${einsatz.id}/command-post`, {
       einsatzleiter: { art: 'extern', name: 'KBM Weber' },
     });
     await uhrAnhalten(page);

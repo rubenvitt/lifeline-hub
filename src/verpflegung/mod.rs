@@ -30,7 +30,7 @@
 //! **Empfänger statt Personen** (LLH-1055, LLH-1024 F3): Eine Ausgabe nennt optional höchstens
 //! einen Empfänger, eine Einheit (Abholung, steht für ihren Teilbaum) oder einen Abschnitt
 //! (Zuführung), nie eine Person, und trägt von ihm nur die Kennung. Namen, Gliederung, Stärke und
-//! Eintreffen kommen als Projektion [`VerpflegungEmpfaenger`] mit `GET …/verpflegung`, für jeden
+//! Eintreffen kommen als Projektion [`VerpflegungEmpfaenger`] mit `GET …/catering`, für jeden
 //! Leser der Verpflegung, auch ohne Modul `einheiten`: eine **bewusste Ausnahme** von der Regel
 //! „nichts Hineingejointes aus anderen Modulen“ (LFH-634 D4). Die Feldmenge ist gepinnt; Führer,
 //! Erreichbarkeit, Mitglieder, Fahrzeuge und Material bleiben draußen. Wer noch nicht verpflegt
@@ -327,7 +327,7 @@ pub struct ZeitfensterAnzeige {
     pub geaendert_at: Option<String>,
 }
 
-/// Die eine Lesequelle der Modulseite (`GET …/verpflegung`).
+/// Die eine Lesequelle der Modulseite (`GET …/catering`).
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct VerpflegungAnzeige {
     /// Nach Beginn geordnet.

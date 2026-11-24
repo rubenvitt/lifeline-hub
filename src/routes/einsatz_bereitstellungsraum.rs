@@ -787,7 +787,7 @@ pub async fn abruf(
     ))
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/dispatch/withdraw — einen Abruf
+/// POST /api/einsaetze/{id}/staging-areas/{bid}/dispatch/void — einen Abruf
 /// zurücknehmen, samt der mit abgerufenen Untereinheiten (LLH-1085, design.md D13). Unterstellung
 /// und Auftrag bleiben, darum nur das BR-Schreibrecht (D7). Ereignisse und ETB in EINER
 /// Transaktion.

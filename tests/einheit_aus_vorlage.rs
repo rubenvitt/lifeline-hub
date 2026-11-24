@@ -577,7 +577,7 @@ async fn letzte_person_ausser_dienst_legt_nichts_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/personal/{}/ausser-dienst", v.rettsan2),
+        &format!("/api/personnel/{}/out-of-service", v.rettsan2),
         &admin,
         None,
     )
@@ -635,7 +635,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/release"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
         &admin,
         None,
     )
@@ -678,7 +678,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/release"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -740,7 +740,7 @@ async fn fremde_unbekannte_und_deaktivierte_vorlage() {
     let (s, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einheit-vorlagen/{}", v.zug),
+        &format!("/api/unit-templates/{}", v.zug),
         &admin,
         Some(r#"{"aktiv":false}"#),
     )

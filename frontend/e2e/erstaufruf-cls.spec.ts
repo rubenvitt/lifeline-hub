@@ -37,8 +37,8 @@ async function createEinsatzMitDaten(page: Page): Promise<number> {
       an: 'Leitstelle',
     });
   }
-  await post(page, `/api/einsaetze/${id}/personen`, { name: 'Erstaufruf Eins' });
-  await post(page, `/api/einsaetze/${id}/personen`, { name: 'Erstaufruf Zwei' });
+  await post(page, `/api/einsaetze/${id}/persons`, { name: 'Erstaufruf Eins' });
+  await post(page, `/api/einsaetze/${id}/persons`, { name: 'Erstaufruf Zwei' });
   await post(page, `/api/einsaetze/${id}/personnel`, { adhoc: { name: 'Kraft Erstaufruf' } });
   return id;
 }

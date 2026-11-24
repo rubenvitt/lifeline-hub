@@ -1,3 +1,103 @@
+## [1.0.0-alpha.197](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.196...v1.0.0-alpha.197) (2026-11-24)
+
+### Wichtige Änderungen
+
+- **API-Routen auf Englisch umgestellt:** Fast alle Pfade der Schnittstelle haben neue, englische Namen. Das betrifft die Karte (`/api/karte` → `/api/map`), Planungen (`/api/planungen` → `/api/plans`, Programmpunkte heißen jetzt `agenda-items`), Admin-, Konto-, Organisations- und Systemrouten, die Aufbewahrung, die Instanzkopplung, die Anmeldung (Einlösen jetzt über `/redeem`), iOS-Push, den Versionsstand (`/api/release-notes`) und den Zertifikatsabruf von Webhooks. Eigene Skripte und Integrationen, die diese Pfade direkt aufrufen, müssen angepasst werden.
+- **Öffentliche API v1 mit englischen Pfaden:** Auch die öffentliche API und der Lagebild-Link nutzen jetzt englische Pfade, zum Beispiel `/api/v1/alarm`. Ab Version 1.0.0 gilt eine Stabilitätszusage: v1 ändert sich dann nur noch abwärtskompatibel, inkompatible Änderungen kommen erst mit einer v2.
+- **Apps brauchen Hüllen-Vertrag 2:** Desktop-, iOS- und Android-App akzeptieren nur noch Server mit Hüllen-Vertrag 2. Ältere App-Versionen und dieser Server passen nicht mehr zusammen, App und Server müssen zusammen aktualisiert werden.
+- **Instanzkopplung Protokoll 6:** Gekoppelte Instanzen (Hub und ELW) müssen auf demselben Softwarestand sein. Bei abweichendem Stand erscheint jetzt eine klare Meldung.
+- **Schlüssel des Geheimnisspeichers:** Der Schlüssel für die Geheimnisse der Anbindungen kann jetzt aus einer Datei gelesen werden. Für einen Schlüsselwechsel lässt sich zusätzlich der alte Schlüssel angeben. Beim Start werden dann alle gespeicherten Geheimnisse auf den neuen Schlüssel umgeschlüsselt, Reste meldet das System.
+- **Datenbank-Migrationen:** Neue Migrationen für die Rücknahme von Statuswechseln, Störungsmeldungen von Anbindungen, iOS-Push-Anmeldungen, Fingerabdrücke von Webhook-Zertifikaten und die Funktion in Mitgliedschaften (nur noch für die Führung).
+
+### Einsatztagebuch
+
+- Die Filterleiste bleibt bei 1180 px Breite auch mit dreistelligen Zählern einzeilig.
+- Der Hinweis zum Feld „Zeit“ steht jetzt in der Fußzeile statt im Feld selbst.
+- Mitarbeitende können Einträge, die schon in der Lage stehen, nicht mehr berichtigen. Diese Sperre gilt über die ganze Berichtigungskette.
+
+### Kräfte und Mittel
+
+- **Rücknahme von Statuswechseln:** Wechsel des Personal-, Material- und Einheitsstatus lassen sich zurücknehmen, auch am gekoppelten Gerät.
+- **Quittung nach Statuswechsel:** Nach jedem Statuswechsel erscheint eine Quittung, auch am Gerät.
+- Eine Rücknahme räumt auch Vollzug und Quittung einer automatisch gesetzten Frist auf. Ein „Rückgängig“, das sicher scheitern würde oder einen Stand herstellen würde, den es nie gab, wird nicht mehr angeboten.
+- Das Kräftebild ordnet Mittel an einer unbekannten Einheit genauso ein wie die Kräfteübersicht.
+- In der Fahrzeugliste hat der Funkrufname wieder etwas mehr Platz.
+
+### Führung
+
+- Eine Führungsfunktion kann nur noch Mitgliedern der Führung zugewiesen werden. Die Funktionsangabe ist jetzt Freitext.
+- Benachrichtigungen an eine Funktion erreichen nicht mehr Mitarbeitende und Beobachter.
+- Eine Einsatzleitung ohne Mitgliedschaft im Einsatz gilt für Benachrichtigungen als nicht anwesend.
+
+### Überblick, Fristen und Alarme
+
+- Automatische Fristen stehen nur noch am zugehörigen Vorgang. „Nächste Marken“ zeigt jede Frist genau einmal, und der Zähler „fällig“ zählt keine Fristen doppelt.
+- Hat ein Vorgang einen bereits geschlossenen Bezug, erscheint dessen Frist als Erinnerung.
+- Die Paneelreihen im Überblick verrutschen nach dem ersten Aufbau nicht mehr.
+- Alarmhinweise nennen jetzt auch bei Auftrag, Befehl, Lagebericht, Gefahr, Nachforderung und Chat, worum es geht.
+- Die Alarmzeile des Lagemonitors lässt ausgeblendete Module weg und meldet deren Alarmquellen als gesperrt.
+- Die gebündelte Alarmmarke ist breit genug für „Benachrichtigung blockiert“.
+
+### Kommunikation
+
+- **Informationstelefon:** Das Hinweisband erscheint auch bei Anrufen, die dasselbe Konto auf einem anderen Gerät angenommen hat. Ein älterer Anruf, der in der Liste nachrückt, zählt nicht mehr als neu.
+- **Sprungpalette:** Die Schnellaktionen für Einsatztagebuch und Meldung stehen auch Mitarbeitenden zur Verfügung. Nach dem Schließen springt der Fokus an seine vorige Stelle zurück.
+
+### Bedienung und Darstellung
+
+- **Zoom ist frei:** Die Seite lässt sich wieder vergrößern. Auf Touch-Geräten haben Eingabefelder 16 px Schrift, damit der Browser beim Antippen nicht von selbst zoomt.
+- **Bessere Lesbarkeit:** Keine Schrift ist kleiner als 11 px, Seitentitel haben 16 px, die Seitenleiste ist 64 px breit. Nebenangaben stehen in der normalen Textschrift, Zahlen in einer feinen Festbreitenschrift. Feldbeschriftungen und Abschnittsköpfe sind klarer getrennt.
+- Beim ersten Aufruf zeigt jede Einsatzseite sofort ihren Kopf. In der Kräfteübersicht sind die Spaltenköpfe im Druck 7,5 pt groß.
+- **Ohne Netz:** Schreibvorgänge scheitern sofort mit einer Meldung, statt unbemerkt liegen zu bleiben. Anlegedialoge bleiben dabei bedienbar.
+- Kleinere Korrekturen:
+  - Die Filterzeile der Aufträge bricht nicht mehr um.
+  - Das Statusmenü öffnet, ohne die Seite zu verschieben.
+  - In der Rückfrage hat „Weiter bearbeiten“ zuverlässig den Fokus.
+  - Hinweise im Organigramm verschieben den Baum nicht mehr.
+  - Detailansicht und Vorschau bei Personen laden beim Fensterwechsel nicht mehr neu.
+
+### Anbindungen und Verwaltung
+
+- **Störungen von Anbindungen:** Admins erhalten eine Benachrichtigung, wenn eine Anbindung gestört ist, auch in der iOS-App. Sobald ein Admin eingreift, gilt die Meldung als erledigt.
+- **Zertifikats-Pinning für Webhooks:** In der Webhook-Verwaltung lässt sich der Fingerabdruck des Server-Zertifikats hinterlegen und anzeigen. Danach werden nur noch Verbindungen zu diesem Zertifikat akzeptiert.
+
+### Instanzkopplung
+
+- Unter engen Bedingungen kann die Führung die Mitarbeit nachtragen. Diese Nachträge werden zwischen den gekoppelten Instanzen übertragen, auch nach einem Rollentausch mit einer älteren Instanz.
+- Der ELW zeigt in Einsatz, Kopplung und über ein Hinweisband an, wenn das Push-Relais den Hub für iOS-Push gesperrt hat. Die Instanzverwaltung warnt ebenfalls. Eine Sperre gilt einen Tag, danach versucht das System es erneut.
+- Weitere Korrekturen:
+  - Eine Meldung bleibt bei mehr als 256 Organisationen nicht mehr hängen.
+  - Die Platzprüfung beim Koppeln gilt nur noch in Meldungsrichtung.
+  - Ein Gegenabgleich ordnet keine Zeilen eines anderen Einsatzes mehr zu.
+  - Ein Löschen über eine veraltete Herkunft bleibt im richtigen Einsatz.
+
+### Apps (iOS, Android, Desktop)
+
+- **iOS-Push-Benachrichtigungen:**
+  - Die iOS-App empfängt Alarme über Apple Push mit verschlüsseltem Inhalt und hat dafür einen eigenen Schalter.
+  - Ein Tippen auf eine Meldung öffnet den passenden Server und die passende Seite.
+  - Meldungen ohne Einsatzbezug werden nicht per Push verschickt.
+  - Abmelden, Deaktivieren und „Andere Sitzungen beenden“ entfernen auch die Push-Anmeldungen, auch auf einem verlorenen Gerät.
+  - Sicherungen enthalten keine Geräteanmeldungen und keine Zugangsdaten zum Relais.
+- **iOS ohne Server starten:** Die App startet auch ohne erreichbaren Server mit der zuletzt gespeicherten Oberfläche.
+- **Neue Android-App:**
+  - Jeder Server läuft in einem eigenen Profil, die Anmeldung erfolgt im Browser.
+  - Dateiauswahl und Kamera funktionieren in der Oberfläche.
+  - Ein eingebauter Updater installiert nur, wenn die App gerade nicht im Vordergrund läuft.
+  - Neben dem laufenden Kanal gibt es einen stabilen Update-Kanal, zu jeder Freigabe erscheint eine APK.
+- **Standort in den Apps:** iOS- und Android-App liefern den Gerätestandort an die Oberfläche. Ist der Standort verweigert, nennt der Hinweis in der App die passenden Einstellungen.
+- **Desktop-App:** Die App prüft vor dem Laden, ob der Server zu ihr passt. Sie zeigt „Verbinde…“ und bei Unverträglichkeit eine eigene Seite. Rückmeldungen nennen jetzt die Plattform.
+- **Alle Apps:** Hostnamen mit Umlauten funktionieren. Adressen auf Ports, die der eingebettete Browser sperrt, werden gleich abgelehnt. Gespeicherte Server bleiben erhalten, wenn eine neue Adresse abgelehnt wird.
+
+### Betrieb und Installation
+
+- **Neues Push-Relais:**
+  - Eigener Dienst mit Container-Image und Betriebsdokumentation, der iOS-Push über Apples Dienst zustellt.
+  - Registrierung und Versand sind begrenzt, Nachrichten werden parallel und mit Zeitlimits zugestellt.
+  - Hinter einem Proxy wie Cloudflare liest das Relais die echte Client-Adresse über eine Liste vertrauter Proxys (`PUSH_RELAIS_TRUSTED_PROXIES`) und eine CDN-Liste.
+- Auch der Server ermittelt die Client-Adresse hinter einem CDN über eine solche Liste.
+- Eine Sicherheitslücke in einer Cookie-Bibliothek ist geschlossen.
+
 ## [1.0.0-alpha.196](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.195...v1.0.0-alpha.196) (2026-11-22)
 
 ### Wichtige Änderungen

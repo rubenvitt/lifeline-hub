@@ -2903,7 +2903,7 @@
           },
           "berichtigbar": {
             "type": "boolean",
-            "description": "Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —\nnur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098)."
+            "description": "Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —\nnur dann nimmt `PATCH …/tasks/{aid}` eine Berichtigung an (LLH-1098)."
           },
           "einsatz_id": {
             "type": "integer",
@@ -3206,7 +3206,7 @@
       },
       "AuftragKennzahlen": {
         "type": "object",
-        "description": "Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und\n„Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "description": "Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und\n„Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
         "required": [
           "offen",
           "abgeschlossen"
@@ -4487,7 +4487,7 @@
       },
       "BetreuungUebersicht": {
         "type": "object",
-        "description": "Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen\neines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].",
+        "description": "Die eine Lesequelle des Moduls Betreuung (`GET …/care`): alle nicht stornierten Stellen\neines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].",
         "required": [
           "stellen"
         ],
@@ -7070,7 +7070,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/EinsatzleiterAnzeige",
-                "description": "Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe\nAussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie\n`GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein, Gerätesitzungen bekommen\nihn nicht. Herleitung (D1–D3b):\n`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`."
+                "description": "Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe\nAussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie\n`GET …/command-post`); der Lage-Snapshot friert ihn nicht ein, Gerätesitzungen bekommen\nihn nicht. Herleitung (D1–D3b):\n`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`."
               },
               {
                 "type": "null"
@@ -8902,7 +8902,7 @@
       },
       "EntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/vehicles/{ef_id}/release` (LLH-1722).",
+        "description": "Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722).",
         "required": [
           "fahrzeug",
           "vorzustand"
@@ -8918,7 +8918,7 @@
       },
       "EntlassungRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/vehicles/{ef_id}/release/undo` (LLH-1722).",
+        "description": "Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722).",
         "required": [
           "fahrzeug",
           "ausgelassen"
@@ -9252,7 +9252,7 @@
       },
       "EtbAnzahlAnzeige": {
         "type": "object",
-        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).",
         "required": [
           "anzahl"
         ],
@@ -9339,7 +9339,7 @@
             "items": {
               "$ref": "#/components/schemas/AnhangAnzeige"
             },
-            "description": "Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach\n`id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`."
+            "description": "Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach\n`id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/attachments/{aid}`."
           },
           "auftrag_id": {
             "type": [
@@ -9581,7 +9581,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counts`.",
         "required": [
           "gesamt",
           "je_typ"
@@ -9599,7 +9599,7 @@
       },
       "EvakuierungUebersicht": {
         "type": "object",
-        "description": "Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht\nstornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne\nBruch des Drahts dazukommen.",
+        "description": "Die eine Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): alle nicht\nstornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne\nBruch des Drahts dazukommen.",
         "required": [
           "bezirke"
         ],
@@ -10657,7 +10657,7 @@
       },
       "FuehrungsfunktionAnzeige": {
         "type": "object",
-        "description": "Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert.",
+        "description": "Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert.",
         "required": [
           "funktion",
           "label",
@@ -11703,7 +11703,7 @@
       },
       "InfotelefonZaehler": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.",
         "required": [
           "gesamt",
           "offen",
@@ -12838,7 +12838,7 @@
       },
       "KostformZaehlung": {
         "type": "object",
-        "description": "Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`).",
+        "description": "Kostformen der Registrierten ohne Personenbezug (D7, `GET …/care/diets`).",
         "required": [
           "registriert",
           "sonderkost",
@@ -12886,7 +12886,7 @@
       },
       "LageGesehenAnzeige": {
         "type": "object",
-        "description": "Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.",
+        "description": "Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.",
         "required": [
           "gesehen"
         ],
@@ -14059,6 +14059,13 @@
               }
             ]
           },
+          "ausgeblendet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorKachel"
+            },
+            "description": "Kacheln, deren Modul im Einsatz ausgeblendet ist (LLH-2072), in der Folge von\n[`LagemonitorKachel`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer, und\nder Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es."
+          },
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
           },
@@ -14197,6 +14204,16 @@
             "description": "Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste."
           }
         }
+      },
+      "LagemonitorKachel": {
+        "type": "string",
+        "description": "Eine Kachel des Lagemonitors, die mit ihrem Modul ausgeblendet wird (LLH-2072). Für\n[`LagemonitorAnzeige::ausgeblendet`]; „Ablauf“ hängt an den Einsatzdaten und fehlt nie.",
+        "enum": [
+          "betroffene",
+          "meldungen",
+          "kraefte",
+          "uhs"
+        ]
       },
       "LagemonitorKraefte": {
         "type": "object",
@@ -14802,7 +14819,7 @@
       },
       "MaterialEntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/material/{em_id}/release` (LLH-1923).",
+        "description": "Antwort von `POST …/material/{em_id}/stand-down` (LLH-1923).",
         "required": [
           "material",
           "vorzustand"
@@ -14818,7 +14835,7 @@
       },
       "MaterialEntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/release` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
+        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
         "required": [
           "entlassen_at"
         ],
@@ -14882,7 +14899,7 @@
       },
       "MaterialRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/material/{em_id}/release/undo` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
+        "description": "Antwort von `POST …/material/{em_id}/stand-down/undo` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
         "required": [
           "material",
           "ausgelassen"
@@ -15221,7 +15238,7 @@
       },
       "MeldungKennzahlen": {
         "type": "object",
-        "description": "Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie\ndas Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "description": "Kennzahlen der Meldungsseite (LFH-940, `GET …/reports/metrics`): dieselben Mengen wie\ndas Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
         "required": [
           "unbearbeitet",
           "in_arbeit",
@@ -17733,7 +17750,7 @@
       },
       "PersonalEntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/personnel/{ep_id}/release` (LLH-1922).",
+        "description": "Antwort von `POST …/personnel/{ep_id}/stand-down` (LLH-1922).",
         "required": [
           "personal",
           "vorzustand"
@@ -17749,7 +17766,7 @@
       },
       "PersonalEntlassungRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/personnel/{ep_id}/release/undo` (LLH-1922).",
+        "description": "Antwort von `POST …/personnel/{ep_id}/stand-down/undo` (LLH-1922).",
         "required": [
           "personal",
           "ausgelassen"
@@ -19269,7 +19286,7 @@
       },
       "RegistrierListe": {
         "type": "object",
-        "description": "Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`).",
+        "description": "Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`).",
         "required": [
           "stelle_id",
           "haushalte",
@@ -19487,7 +19504,7 @@
       },
       "RueckmeldungenAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
+        "description": "Antwort von `GET …/reports/check-ins` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
         "required": [
           "frist_min",
           "einheiten",
@@ -22094,7 +22111,7 @@
       },
       "UhsZielAuswahl": {
         "type": "object",
-        "description": "Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS\ndes Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul\nUnfallhilfsstellen wählen kann; keine Belegung, keine Plätze.",
+        "description": "Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/persons/uhs`): je aktiver UHS\ndes Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul\nUnfallhilfsstellen wählen kann; keine Belegung, keine Plätze.",
         "required": [
           "id",
           "bezeichnung"
@@ -22770,7 +22787,7 @@
       },
       "VerpflegungAnzeige": {
         "type": "object",
-        "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
+        "description": "Die eine Lesequelle der Modulseite (`GET …/catering`).",
         "required": [
           "zeitfenster",
           "stellen",
@@ -22906,7 +22923,7 @@
       },
       "VerpflegungsstelleAnzeige": {
         "type": "object",
-        "description": "Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne\nBenutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und\nkeine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.",
+        "description": "Eine Verpflegungsstelle in `GET …/catering` und als Antwort der Schreibrouten. **Ohne\nBenutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und\nkeine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.",
         "required": [
           "id",
           "bezeichnung",
@@ -23019,7 +23036,7 @@
       },
       "VersorgendeEinheitAuswahl": {
         "type": "object",
-        "description": "Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver\nEinheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf\ndie Kräfte geht.",
+        "description": "Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/persons/units`): je aktiver\nEinheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf\ndie Kräfte geht.",
         "required": [
           "id",
           "name"
@@ -24767,7 +24784,7 @@
       },
       "WetterAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/wetter`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/weather`.",
         "required": [
           "warnungen",
           "vorhersage",

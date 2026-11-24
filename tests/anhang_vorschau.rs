@@ -142,7 +142,7 @@ fn mit(pfad: &str, fassung: &str) -> String {
 async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/attachments"),
         cookie,
         Some(("foto.jpg", &foto_mit_gps())),
         &[],
@@ -150,13 +150,13 @@ async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let aid = v[0]["id"].as_i64().unwrap();
-    format!("/api/einsaetze/{einsatz}/anhaenge/{aid}")
+    format!("/api/einsaetze/{einsatz}/attachments/{aid}")
 }
 
 async fn dokument_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/dokumente"),
+        &format!("/api/einsaetze/{einsatz}/documents"),
         cookie,
         Some(("lage.jpg", &foto_mit_gps())),
         &[("titel", "Lagefoto"), ("kategorie", "lagekarte_plan")],
@@ -164,13 +164,13 @@ async fn dokument_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let did = v["id"].as_i64().unwrap();
-    format!("/api/einsaetze/{einsatz}/dokumente/{did}/datei")
+    format!("/api/einsaetze/{einsatz}/documents/{did}/file")
 }
 
 async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/etb/attachments"),
         cookie,
         Some(("Lagefoto Süd.jpg", &foto_mit_gps())),
         &[],
@@ -190,7 +190,7 @@ async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{e}");
     let eintrag = e["id"].as_i64().unwrap();
-    format!("/api/einsaetze/{einsatz}/etb/{eintrag}/anhaenge/{aid}")
+    format!("/api/einsaetze/{einsatz}/etb/{eintrag}/attachments/{aid}")
 }
 
 /// Schaden mit Anhang per SQL, als `admin` abgelegt; liefert den Download-Pfad.
@@ -243,7 +243,7 @@ async fn schaden_datei(
     .fetch_one(pool)
     .await
     .unwrap();
-    format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge/{linker}/datei")
+    format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments/{linker}/file")
 }
 
 fn ist_vorschau(h: &HeaderMap, bytes: &[u8], soll: (u32, u32)) {

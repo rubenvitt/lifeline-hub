@@ -50,7 +50,7 @@ async fn zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64, ep: 
     anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces/{ep}"),
         cookie,
         None,
     )
@@ -255,7 +255,7 @@ async fn loesen_laesst_die_kraft_im_einsatz() {
         zuordnen(&app, &admin, einsatz, nord, ep).await,
         StatusCode::OK
     );
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ep}");
+    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/{ep}");
 
     let (s, _) = anfrage(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
@@ -267,7 +267,7 @@ async fn loesen_laesst_die_kraft_im_einsatz() {
     let (_, frei) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/verfuegbar"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/available"),
         &admin,
         None,
     )
@@ -291,7 +291,7 @@ async fn adhoc_kraft_wird_disponiert_und_zugeordnet() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let nord = uhs_anlegen(&app, &admin, einsatz, "Nord").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte");
+    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces");
 
     let (s, v) = anfrage_json(
         &app,
@@ -421,7 +421,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
         zuordnen(&app, &admin, einsatz, sued, eps[0]).await,
         StatusCode::OK
     );
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/einheit/{seg}");
+    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/unit/{seg}");
 
     let (s, v) = anfrage(&app, "PUT", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -450,7 +450,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/einheit/999999"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/unit/999999"),
         &admin,
         None,
     )
@@ -470,7 +470,7 @@ async fn abziehen_zuruecknehmen_nur_wenn_frei() {
     let turnhalle = uhs_anlegen(&app, &admin, einsatz, "Turnhalle").await;
     let zelt = uhs_anlegen(&app, &admin, einsatz, "Zelt Nord").await;
     let ep = kraft(&app, &admin, einsatz, "Ben", "mannschaft").await;
-    let pfad = |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte/{ep}{q}");
+    let pfad = |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces/{ep}{q}");
 
     // Frei: das Rückgängig gelingt, an derselben UHS noch einmal auch.
     let (s, j) = anfrage(

@@ -53,7 +53,7 @@ test('Personal disponieren: drei Personen in einem Absenden in Einheit und auf F
   expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
   const namen = ['Anna', 'Bernd', 'Carla'].map((v) => `Sammel ${LAUF} ${v}`);
   for (const [i, name] of namen.entries()) {
-    await post(page, '/api/personal', { name, personalnummer: `S${LAUF}-${i}` });
+    await post(page, '/api/personnel', { name, personalnummer: `S${LAUF}-${i}` });
   }
 
   await page.goto(`/einsaetze/${einsatzId}/personal`);
@@ -99,7 +99,7 @@ test('Fahrzeuge disponieren: zwei Fahrzeuge in einem Absenden in eine Einheit', 
   const { einsatzId, einheitId } = await einsatzMitEinheit(page, 'Sanitätszug');
   const funkrufnamen = ['83-1', '83-2'].map((n) => `Sammel ${LAUF} ${n}`);
   for (const funkrufname of funkrufnamen) {
-    await post(page, '/api/fahrzeuge', { funkrufname, fahrzeugtyp: 'KTW' });
+    await post(page, '/api/vehicles', { funkrufname, fahrzeugtyp: 'KTW' });
   }
 
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);

@@ -28,7 +28,7 @@ const KAPITEL = 'geraet-betreuungsstelle';
 
 /** Die Betreuungsstelle des Demo-Einsatzes. */
 async function demoStelle(page: Page, einsatz: number): Promise<{ id: number }> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/betreuung`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/care`);
   expect(antwort.ok(), `Betreuung: ${antwort.status()}`).toBe(true);
   const [stelle] = ((await antwort.json()) as { stellen: { id: number }[] }).stellen;
   expect(stelle, 'der Demo-Einsatz hat eine Betreuungsstelle').toBeDefined();
@@ -38,7 +38,7 @@ async function demoStelle(page: Page, einsatz: number): Promise<{ id: number }> 
 /** Drei Personen mit Verbleib Notunterkunft in der Stelle, einmal je Lauf. */
 async function unterbringen(page: Page, einsatz: number, stelle: number) {
   const vorhanden = (await (
-    await page.request.get(`/api/einsaetze/${einsatz}/personen`)
+    await page.request.get(`/api/einsaetze/${einsatz}/persons`)
   ).json()) as {
     name: string | null;
   }[];
@@ -48,14 +48,14 @@ async function unterbringen(page: Page, einsatz: number, stelle: number) {
     ['Walter', 'Schröder', 82],
     ['Mehmet', 'Yilmaz', 45],
   ] as const) {
-    const p = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${einsatz}/personen`, {
+    const p = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${einsatz}/persons`, {
       vorname,
       name,
       alter_geschaetzt: alter,
       herkunft_adresse: 'Mühlbachweg 20',
       status: 'betroffen',
     });
-    await fuelle(page, 'post', `/api/einsaetze/${einsatz}/personen/${p.id}/verbleib`, {
+    await fuelle(page, 'post', `/api/einsaetze/${einsatz}/persons/${p.id}/whereabouts`, {
       art: 'notunterkunft',
       betreuungsstelle_id: stelle,
     });

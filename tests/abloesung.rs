@@ -17,7 +17,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -358,7 +358,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 
 // ── LLH-1122: Schichtmodelle in den Stammdaten und Vorgabe des Einsatzes ─────────────────────
 
-const MODELLE: &str = "/api/schichtmodelle";
+const MODELLE: &str = "/api/shift-models";
 
 fn vorgabe_pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/reliefs/shift-model")
@@ -983,7 +983,7 @@ async fn status_mit_marke(app: &axum::Router, admin: &str, label: &str, marke: &
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         admin,
         Some(&format!(
             r#"{{"label":"{label}","kategorie":"gebunden","zeitachse_marke":"{marke}"}}"#
@@ -1141,7 +1141,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{f1}/timeline/{entlassung}/void"),
+        &format!("/api/einsaetze/{e}/units/{f1}/timeline/{entlassung}/strike"),
         &admin,
         Some(r#"{"grund":"falscher Knopf"}"#),
     )
@@ -1864,7 +1864,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Muster","versorgende_einheit_id":{f1}}}"#
@@ -1877,7 +1877,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, q) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Ablöser","versorgende_einheit_id":{f2}}}"#

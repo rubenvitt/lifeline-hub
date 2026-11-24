@@ -108,7 +108,10 @@ export function listEntlasseneFahrzeuge(einsatzId: number): Promise<EinsatzFahrz
  * dem {@link nimmEntlassungZurueck} alles zurücknimmt (LLH-1722); deshalb ohne Rückfrage.
  */
 export function entlasseDisposition(einsatzId: number, efId: number): Promise<EntlassungAntwort> {
-  return apiSend<EntlassungAntwort>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/release`, 'POST');
+  return apiSend<EntlassungAntwort>(
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/stand-down`,
+    'POST',
+  );
 }
 
 /**
@@ -122,7 +125,7 @@ export function nimmEntlassungZurueck(
   vorzustand: EntlassungVorzustand,
 ): Promise<EntlassungRuecknahmeAntwort> {
   return apiSend<EntlassungRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/vehicles/${efId}/release/undo`,
+    `/api/einsaetze/${einsatzId}/vehicles/${efId}/stand-down/undo`,
     'POST',
     vorzustand,
   );

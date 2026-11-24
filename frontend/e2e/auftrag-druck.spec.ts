@@ -22,7 +22,7 @@ test.setTimeout(120_000);
 const LANGES_WORT = 'Sammelplatz'.repeat(8);
 
 async function auftragSaeen(page: Page, einsatzId: string): Promise<number> {
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const r = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Wasserversorgung von Hydrant H12 aufbauen',
       mittel: '2× B-Schlauch',

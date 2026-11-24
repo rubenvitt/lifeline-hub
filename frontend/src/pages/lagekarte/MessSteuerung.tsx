@@ -1,5 +1,11 @@
 import { Button, Card, Space } from 'antd';
-import { Segmentleiste, Stapel, monoStil, useRollen } from '../../components/instrument';
+import {
+  Segmentleiste,
+  Stapel,
+  monoStil,
+  useRollen,
+  schriftStil,
+} from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import EscKappe from './EscKappe';
 import { messErgebnis, type MessForm } from './messung';
@@ -58,7 +64,9 @@ export default function MessSteuerung(props: MessSteuerungProps) {
           {ergebnis.neben && (
             <span
               style={{
-                ...monoStil('monoKlein'),
+                // „Umfang 359 m“: Wort und Zahl, also Textschrift mit gleich breiten Ziffern.
+                ...schriftStil('textKlein'),
+                fontVariantNumeric: 'tabular-nums',
                 color: rollen.gedaempft,
                 marginInlineStart: token.marginSM,
               }}

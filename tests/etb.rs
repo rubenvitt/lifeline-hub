@@ -116,7 +116,7 @@ async fn etb_auftrag_beobachter_ist_403() {
     let (status, _) = post_json(
         &app,
         &beob,
-        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/auftrag"),
+        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/task"),
         &auftrag_body("X"),
     )
     .await;
@@ -146,7 +146,7 @@ async fn etb_auftrag_cross_einsatz_ist_404() {
     let (status, _) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{b}/etb/{etb_id_a}/auftrag"),
+        &format!("/api/einsaetze/{b}/etb/{etb_id_a}/task"),
         &auftrag_body("X"),
     )
     .await;
@@ -170,7 +170,7 @@ async fn etb_auftrag_happy_path_setzt_quellbezug() {
     let (status, json) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag"),
+        &format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task"),
         &auftrag_body("Riegelstellung aufbauen"),
     )
     .await;
@@ -207,7 +207,7 @@ async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
     )
     .await;
     let quell_id = etb["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag");
+    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task");
 
     let (s1, _) = post_json(&app, &admin, &uri, &auftrag_body("erster")).await;
     assert_eq!(s1, StatusCode::CREATED);
@@ -248,7 +248,7 @@ async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
     );
     assert_eq!(etb["folgeauftraege"], serde_json::json!([]));
 
-    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag");
+    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task");
     let (_, a1) = post_json(&app, &admin, &uri, &auftrag_body("Betreuung")).await;
     let (_, a2) = post_json(&app, &admin, &uri, &auftrag_body("Transport")).await;
 
@@ -401,7 +401,7 @@ async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (Statu
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/auftraege"))
+                .uri(format!("/api/einsaetze/{einsatz}/tasks"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -1217,7 +1217,7 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
     anlegen_id(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         serde_json::json!({
             "auftrag_text": "Deich sichern",
             "empfaenger": [{ "empfaenger_typ": "einheit", "einheit_id": zug }]
@@ -1442,7 +1442,7 @@ async fn etb_auftrag_traegt_den_weg() {
     let (status, json) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/auftrag"),
+        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/task"),
         r#"{"auftrag_text":"Deich sichern","weg":" über B 3 ","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,
     )
     .await;

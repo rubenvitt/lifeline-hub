@@ -281,14 +281,14 @@ pub struct PersonalPatchAntwort {
     pub status_ruecknahme: Option<crate::status_ruecknahme::HandStatusRuecknahmeBeleg>,
 }
 
-/// Antwort von `POST …/personnel/{ep_id}/release` (LLH-1922).
+/// Antwort von `POST …/personnel/{ep_id}/stand-down` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungAntwort {
     pub personal: EinsatzPersonalAnzeige,
     pub vorzustand: PersonalEntlassungVorzustand,
 }
 
-/// Antwort von `POST …/personnel/{ep_id}/release/undo` (LLH-1922).
+/// Antwort von `POST …/personnel/{ep_id}/stand-down/undo` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungRuecknahmeAntwort {
     pub personal: EinsatzPersonalAnzeige,

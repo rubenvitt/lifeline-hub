@@ -93,11 +93,11 @@ function renderPage(
   const abrufe = { druck: 0, detail: 0 };
   server.use(
     http.get('/api/einsaetze/5', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/5/personen/10', () => {
+    http.get('/api/einsaetze/5/persons/10', () => {
       abrufe.detail += 1;
       return HttpResponse.json(person());
     }),
-    http.get('/api/einsaetze/5/personen/10/druck', () => {
+    http.get('/api/einsaetze/5/persons/10/print', () => {
       abrufe.druck += 1;
       return antwort();
     }),

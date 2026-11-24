@@ -15,7 +15,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagekennzahl-wahl")
+    format!("/api/einsaetze/{einsatz}/situation-metric-selection")
 }
 
 async fn waehle(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> (StatusCode, Value) {
@@ -134,7 +134,7 @@ async fn wahl_steht_neben_der_evakuierung_in_fester_reihenfolge() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
         &admin,
         Some(r#"{"bezeichnung":"Nord","plan_personen":100,"plan_erhebung":"geschaetzt"}"#),
     )

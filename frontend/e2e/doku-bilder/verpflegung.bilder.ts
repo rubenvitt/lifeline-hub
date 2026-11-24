@@ -76,7 +76,7 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     try {
       const demo = await demoEinsatz(api);
-      const basis = `/api/einsaetze/${demo.id}/verpflegung`;
+      const basis = `/api/einsaetze/${demo.id}/catering`;
       const jetzt = new Date();
 
       const stelle = async (
@@ -85,12 +85,13 @@ test.describe(KAPITEL, () => {
         standort: string,
         aktiv: boolean,
       ): Promise<number> => {
-        const { id } = await fuelle<Stelle>(api, 'post', `${basis}/stellen`, {
+        const { id } = await fuelle<Stelle>(api, 'post', `${basis}/positions`, {
           bezeichnung,
           art,
           standort,
         });
-        if (aktiv) await fuelle(api, 'post', `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+        if (aktiv)
+          await fuelle(api, 'post', `${basis}/positions/${id}/status`, { status: 'aktiv' });
         return id;
       };
       // Eintreffen der Demo-Einheiten (LLH-1055), nur wo es fehlt.
@@ -108,20 +109,20 @@ test.describe(KAPITEL, () => {
       const turnhalle = await stelle(TURNHALLE, 'ausgabestelle', 'Turnhalle Nord', true);
       await stelle('Zuführung Deich', 'zufuehrung', 'Deichweg, Höhe Schöpfwerk', false);
 
-      const getraenke = await fuelle<Zeitfenster>(api, 'post', `${basis}/zeitfenster`, {
+      const getraenke = await fuelle<Zeitfenster>(api, 'post', `${basis}/time-slots`, {
         bezeichnung: 'Getränke',
         von_at: um(jetzt, -90),
         bis_at: um(jetzt, 90),
         bedarf_kraefte: 20,
         bedarf_betreute: 0,
       });
-      await fuelle(api, 'post', `${basis}/zeitfenster/${getraenke.id}/ausgaben`, {
+      await fuelle(api, 'post', `${basis}/time-slots/${getraenke.id}/distributions`, {
         menge: 20,
         ort: 'Einsatzleitung, Feuerwehrhaus',
         zeitpunkt_at: um(jetzt, -80),
       });
 
-      const mittag = await fuelle<Zeitfenster>(api, 'post', `${basis}/zeitfenster`, {
+      const mittag = await fuelle<Zeitfenster>(api, 'post', `${basis}/time-slots`, {
         bezeichnung: 'Mittag',
         von_at: um(jetzt, -30),
         bis_at: um(jetzt, 60),
@@ -129,17 +130,17 @@ test.describe(KAPITEL, () => {
         bedarf_betreute: 80,
         sonderkost: { vegetarisch: 14 },
       });
-      await fuelle(api, 'patch', `${basis}/zeitfenster/${mittag.id}`, {
+      await fuelle(api, 'patch', `${basis}/time-slots/${mittag.id}`, {
         stelle_ids: [feldkueche, turnhalle],
         verpflegungsart: 'warm',
       });
-      await fuelle(api, 'post', `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
+      await fuelle(api, 'post', `${basis}/time-slots/${mittag.id}/distributions`, {
         menge: 100,
         verpflegungsstelle_id: feldkueche,
         zeitpunkt_at: um(jetzt, -25),
         sonderkost: { vegetarisch: 10 },
       });
-      await fuelle(api, 'post', `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
+      await fuelle(api, 'post', `${basis}/time-slots/${mittag.id}/distributions`, {
         menge: 80,
         verpflegungsstelle_id: turnhalle,
         zeitpunkt_at: um(jetzt, -20),
@@ -148,12 +149,12 @@ test.describe(KAPITEL, () => {
       const falsch = await fuelle<AusgabeErgebnis>(
         api,
         'post',
-        `${basis}/zeitfenster/${mittag.id}/ausgaben`,
+        `${basis}/time-slots/${mittag.id}/distributions`,
         { menge: 5, verpflegungsstelle_id: turnhalle, zeitpunkt_at: um(jetzt, -15) },
       );
-      await fuelle(api, 'post', `${basis}/ausgaben/${falsch.ausgabe_id}/zuruecknehmen`);
+      await fuelle(api, 'post', `${basis}/distributions/${falsch.ausgabe_id}/undo`);
 
-      await fuelle(api, 'post', `${basis}/zeitfenster`, {
+      await fuelle(api, 'post', `${basis}/time-slots`, {
         bezeichnung: 'Abendessen',
         von_at: um(jetzt, 300),
         bis_at: um(jetzt, 360),
@@ -167,7 +168,7 @@ test.describe(KAPITEL, () => {
         ['Abendessen', '1800', '1930', 'warm'],
         ['Nachtverpflegung', '2300', '0100', 'kalt'],
       ]) {
-        await fuelle(api, 'post', '/api/verpflegung-vorlagen', {
+        await fuelle(api, 'post', '/api/catering-templates', {
           bezeichnung,
           beginn,
           ende,

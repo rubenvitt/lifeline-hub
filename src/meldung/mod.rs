@@ -107,7 +107,7 @@ pub fn richtung_gueltig(r: &str) -> bool {
     Richtung::parse(r).is_some()
 }
 
-/// Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie
+/// Kennzahlen der Meldungsseite (LFH-940, `GET …/reports/metrics`): dieselben Mengen wie
 /// das Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct MeldungKennzahlen {
@@ -273,7 +273,7 @@ pub struct LetzteRueckmeldung {
     pub faellig_at: String,
 }
 
-/// Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+/// Antwort von `GET …/reports/check-ins` (LFH-610). Einheiten ohne Eintrag haben
 /// noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
 /// gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
 #[derive(Debug, Clone, Serialize, ToSchema)]

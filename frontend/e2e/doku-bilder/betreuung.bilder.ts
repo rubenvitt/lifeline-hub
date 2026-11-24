@@ -30,10 +30,10 @@ interface Uebersicht {
 
 /** Ergänzt die Demo-Lage einmal je Lauf (die Datenbank gilt für alle Tests eines Laufs). */
 async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  const basis = `/api/einsaetze/${einsatzId}/care`;
   const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
   if (!lage.stellen.some((s) => s.bezeichnung === 'Sporthalle Nord')) {
-    const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
+    const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/positions`, {
       bezeichnung: 'Sporthalle Nord',
       art: 'notunterkunft',
       kapazitaet_personen: 80,
@@ -41,7 +41,7 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
       leitung: 'Hallenwart Meyer',
       kontaktweg: 'Kanal 3',
     });
-    await fuelle(page, 'patch', `${basis}/stellen/${stelle.id}`, { status: 'in_betrieb' });
+    await fuelle(page, 'patch', `${basis}/positions/${stelle.id}`, { status: 'in_betrieb' });
     // Zwei frühere Meldungen, damit die Seite der Stelle den Belegungsverlauf zeigt (LLH-1347).
     const vor = (min: number) =>
       new Date(Date.now() - min * 60_000).toISOString().slice(0, 19).replace('T', ' ');
@@ -49,12 +49,12 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
       [30, 180],
       [55, 90],
     ] as const) {
-      await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/belegungen`, {
+      await fuelle(page, 'post', `${basis}/positions/${stelle.id}/occupancies`, {
         belegt,
         zeitpunkt_at: vor(min),
       });
     }
-    await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/belegungen`, { belegt: 74 });
+    await fuelle(page, 'post', `${basis}/positions/${stelle.id}/occupancies`, { belegt: 74 });
     return stelle.id;
   }
   return lage.stellen.find((s) => s.bezeichnung === 'Sporthalle Nord')!.id;
@@ -62,17 +62,17 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
 
 /** Namentlich geführte Notunterkunft mit zwei Haushalten (LLH-1612), einmal je Lauf. */
 async function registrierstelle(page: Page, einsatzId: number): Promise<number> {
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  const basis = `/api/einsaetze/${einsatzId}/care`;
   const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
   const da = lage.stellen.find((s) => s.bezeichnung === 'Turnhalle Ost');
   if (da) return da.id;
-  const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
+  const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/positions`, {
     bezeichnung: 'Turnhalle Ost',
     art: 'notunterkunft',
     kapazitaet_personen: 120,
     belegungsart: 'namentlich',
   });
-  await fuelle(page, 'patch', `${basis}/stellen/${stelle.id}`, { status: 'in_betrieb' });
+  await fuelle(page, 'patch', `${basis}/positions/${stelle.id}`, { status: 'in_betrieb' });
   for (const personen of [
     [
       { name: 'Yilmaz', vorname: 'Emre', kostform: 'ohne_schwein' },
@@ -80,7 +80,7 @@ async function registrierstelle(page: Page, einsatzId: number): Promise<number> 
     ],
     [{ name: 'Brandt', vorname: 'Helga', kostform: 'diaet_allergenarm' }],
   ]) {
-    await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/registrierungen`, {
+    await fuelle(page, 'post', `${basis}/positions/${stelle.id}/registrations`, {
       personen: personen.map((p) => ({ ...p, herkunft_adresse: 'Am Deich 7' })),
     });
   }

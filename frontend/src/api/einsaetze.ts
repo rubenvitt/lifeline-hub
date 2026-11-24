@@ -75,7 +75,7 @@ export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
 
 /** Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): nur Kennung und Anzeigename. */
 export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
-  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/members/candidates`);
+  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/members/selection`);
 }
 
 /**
@@ -162,7 +162,7 @@ export function patcheEinsatz(
 
 /** Eigene Führungsstelle (LFH-849); ohne erfasste Angaben nur `sprechgruppen: []`. */
 export function ladeFuehrungsstelle(id: number): Promise<Fuehrungsstelle> {
-  return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`);
+  return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/command-post`);
 }
 
 /**
@@ -176,7 +176,7 @@ export function patcheFuehrungsstelle(
   erwartet?: Record<string, unknown>,
 ): Promise<Fuehrungsstelle> {
   return apiSend<Fuehrungsstelle>(
-    `/api/einsaetze/${id}/fuehrungsstelle`,
+    `/api/einsaetze/${id}/command-post`,
     'PATCH',
     erwartet ? { ...patch, erwartet } : patch,
   );
@@ -191,7 +191,7 @@ export function ordneFuehrungsstelleSprechgruppeZu(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/fuehrungsstelle/sprechgruppen/${sprechgruppeId}`,
+    `/api/einsaetze/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
     'PUT',
   );
 }
@@ -202,7 +202,7 @@ export function loeseFuehrungsstelleSprechgruppe(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/fuehrungsstelle/sprechgruppen/${sprechgruppeId}`,
+    `/api/einsaetze/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
     'DELETE',
   );
 }

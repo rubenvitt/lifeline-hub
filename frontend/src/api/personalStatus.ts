@@ -12,7 +12,7 @@ export interface StatusEingabe {
   pause?: boolean;
 }
 
-const api = katalogApi<PersonalStatus, StatusEingabe>('/api/personal-status');
+const api = katalogApi<PersonalStatus, StatusEingabe>('/api/personnel-statuses');
 
 export const listePersonalStatus = api.liste;
 export const legeStatusAn = api.legeAn;

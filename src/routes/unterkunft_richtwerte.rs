@@ -1,10 +1,10 @@
 //! Richtwerte des Unterkunfts- und Zeltrechners (LLH-1520, design.md D2).
 //!
-//! GET /api/unterkunft-richtwerte — Basis und Org-Werte der eigenen Org, jeder Angemeldete.
+//! GET /api/accommodation-guidelines — Basis und Org-Werte der eigenen Org, jeder Angemeldete.
 //! PUT /api/org-accommodation-guidelines/{schluessel} — Org-Wert setzen, `null` = Vorgabe, nur Admin.
 //!     Live über `stammdaten` (Präfix in `STAMMDATEN_PFADE`).
-//! GET /api/einsaetze/{id}/unterkunft-richtwerte — alle Ebenen im Einsatz, Lesezugriff.
-//! PUT /api/einsaetze/{id}/unterkunft-richtwerte/{schluessel} — Einsatz-Wert setzen, `null` =
+//! GET /api/einsaetze/{id}/accommodation-guidelines — alle Ebenen im Einsatz, Lesezugriff.
+//! PUT /api/einsaetze/{id}/accommodation-guidelines/{schluessel} — Einsatz-Wert setzen, `null` =
 //!     erbt, Verwaltungszugriff (wie die übrigen Einsatz-Einstellungen).
 //!
 //! `org_id` stammt stets aus dem Benutzer bzw. dem Einsatz, nie aus dem Body (Org-Isolation).
@@ -35,7 +35,7 @@ fn pruefe(schluessel: &str, wert: Option<f64>) -> Result<(), AppError> {
     }
 }
 
-/// GET /api/unterkunft-richtwerte
+/// GET /api/accommodation-guidelines
 pub async fn org_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -66,7 +66,7 @@ pub async fn org_setzen(
     Ok(Json(unterkunft::zusammenfuehren(&org, None)))
 }
 
-/// GET /api/einsaetze/{id}/unterkunft-richtwerte
+/// GET /api/einsaetze/{id}/accommodation-guidelines
 pub async fn einsatz_lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -77,7 +77,7 @@ pub async fn einsatz_lesen(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/unterkunft-richtwerte/{schluessel} — liefert alle Ebenen im Einsatz.
+/// PUT /api/einsaetze/{id}/accommodation-guidelines/{schluessel} — liefert alle Ebenen im Einsatz.
 pub async fn einsatz_setzen(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,

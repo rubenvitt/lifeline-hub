@@ -217,7 +217,7 @@ describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
 
   it('meldet keine andere 202 und keine 201', async () => {
     server.use(
-      http.post('/api/einsaetze/7/karte', () => HttpResponse.json({ id: 1 }, { status: 202 })),
+      http.post('/api/einsaetze/7/map', () => HttpResponse.json({ id: 1 }, { status: 202 })),
       http.post('/api/einsaetze/7/etb', () =>
         HttpResponse.json({ antrag: { id: 3, zustand: 'x' } }, { status: 201 }),
       ),
@@ -225,7 +225,7 @@ describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
     const hoerer = vi.fn();
     window.addEventListener(ANTRAG_EREIGNIS, hoerer);
     try {
-      await apiSend('/api/einsaetze/7/karte', 'POST', {});
+      await apiSend('/api/einsaetze/7/map', 'POST', {});
       await apiSend('/api/einsaetze/7/etb', 'POST', {});
     } finally {
       window.removeEventListener(ANTRAG_EREIGNIS, hoerer);

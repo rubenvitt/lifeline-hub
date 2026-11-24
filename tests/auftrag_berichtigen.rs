@@ -21,7 +21,7 @@ async fn erteilen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> Valu
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         cookie,
         Some(&body.to_string()),
     )
@@ -55,7 +55,7 @@ async fn patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -239,7 +239,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{qid}/empfaenger/{empf}/quittieren"),
+        &format!("/api/einsaetze/{e}/tasks/{qid}/recipients/{empf}/acknowledge"),
         &admin,
         None,
     )
@@ -258,7 +258,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"),
+            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
             &admin,
             Some(&body.to_string()),
         )
@@ -271,7 +271,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
         &admin,
         Some(r#"{"grund":"erledigt"}"#),
     )
@@ -282,7 +282,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{qid}"),
+        &format!("/api/einsaetze/{e}/tasks/{qid}"),
         &admin,
         None,
     )
@@ -312,7 +312,7 @@ async fn feldfehler_sind_400() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -409,7 +409,7 @@ async fn liste_traegt_berichtigbar() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         &admin,
         None,
     )
@@ -516,7 +516,7 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     let (_, gelesen) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -617,7 +617,7 @@ async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
     let (_, gelesen) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         &admin,
         None,
     )

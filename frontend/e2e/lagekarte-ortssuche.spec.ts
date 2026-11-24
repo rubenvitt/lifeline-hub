@@ -94,7 +94,7 @@ async function aufSchirm(page: Page, ll: [number, number]) {
 /** Fängt die Adresssuche ab; zählt die Suchtexte mit. */
 async function geocoder(page: Page, treffer: { lat: number; lon: number; name: string }[]) {
   const anfragen: string[] = [];
-  await page.route('**/karte/ort-suche?*', async (route) => {
+  await page.route('**/map/place-search?*', async (route) => {
     anfragen.push(new URL(route.request().url()).searchParams.get('q') ?? '');
     await route.fulfill({ json: { zustand: 'ok', treffer } });
   });

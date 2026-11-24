@@ -291,7 +291,7 @@ export const EINSATZ_STREAM_EVENTS = {
     // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
     EINSATZ_KEYS.einheitAusVorlage,
     // Die Empfängerliste der Verpflegung ist eine Projektion der Einheiten in
-    // `GET …/verpflegung` (LLH-1055 D4); der Server verteilt `einheit` dafür auch an Leser der
+    // `GET …/catering` (LLH-1055 D4); der Server verteilt `einheit` dafür auch an Leser der
     // Verpflegung.
     EINSATZ_KEYS.verpflegung,
     // Wahl der versorgenden Einheit (LLH-1567): Name, Abschnitt, Auflösen.

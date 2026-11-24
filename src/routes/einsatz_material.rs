@@ -876,7 +876,7 @@ pub async fn loesen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/release — aus dem Einsatz nehmen (LLH-1079, Spec
+/// POST /api/einsaetze/{id}/material/{em_id}/stand-down — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
 /// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1923), der Block „Aus dem
@@ -926,7 +926,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/release/undo — „Rückgängig“ nach dem
+/// POST /api/einsaetze/{id}/material/{em_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Herausnehmen (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme von Material zurücknehmen“):
 /// Body ist der Vorzustand aus der Antwort von `…/entlassen`. Nur die herausnehmende Person, nur
 /// dieses Herausnehmen, höchstens zehn Minuten danach, sonst 409; ebenso 409, wenn dasselbe Gerät

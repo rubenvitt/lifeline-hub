@@ -11,7 +11,7 @@ describe('sucheOrt', () => {
   it('schickt den Suchtext kodiert als q an die Route der Lagekarte', async () => {
     let angekommen: URL | null = null;
     server.use(
-      http.get('/api/einsaetze/7/karte/ort-suche', ({ request }) => {
+      http.get('/api/einsaetze/7/map/place-search', ({ request }) => {
         angekommen = new URL(request.url);
         return HttpResponse.json({ zustand: 'ok', treffer: [] });
       }),

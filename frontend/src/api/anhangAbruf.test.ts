@@ -12,7 +12,7 @@ import { ApiError } from './client';
 import { ladeBildBlobUrl } from './kartenbilder';
 import { ladePlanBild } from './uhsPlan';
 
-const PFAD = '/api/einsaetze/7/etb/1/anhaenge/2';
+const PFAD = '/api/einsaetze/7/etb/1/attachments/2';
 
 describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
   it('erkennt „wird geholt“ an der 409 mit dem Text des Servers, nicht an jeder 409', () => {
@@ -47,7 +47,7 @@ describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
 
   it('ein Kartenhintergrund, der geholt wird, ist kein Ladefehler', async () => {
     server.use(
-      http.get('/api/einsaetze/7/karte/hintergrundbilder/3/download', () =>
+      http.get('/api/einsaetze/7/map/background-images/3/download', () =>
         HttpResponse.json({ error: ANHANG_WIRD_GEHOLT_TEXT }, { status: 409 }),
       ),
     );
@@ -56,7 +56,7 @@ describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
 
   it('ein UHS-Plan, der geholt wird, ebenso', async () => {
     server.use(
-      http.get('/api/einsaetze/7/uhs/2/plan/bild', () =>
+      http.get('/api/einsaetze/7/uhs/2/plan/image', () =>
         HttpResponse.json({ error: ANHANG_WIRD_GEHOLT_TEXT }, { status: 409 }),
       ),
     );

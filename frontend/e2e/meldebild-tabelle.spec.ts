@@ -329,7 +329,7 @@ test('Meldebild bei 1440 px: Rückmeldung und Auftrag ohne Querscrollen im Bild,
   await pruefe('Admin', true);
   await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
   await pruefe('Führungspersonal', true);
-  await page.route('**/meldungen/rueckmeldungen', (route) =>
+  await page.route('**/reports/check-ins', (route) =>
     route.fulfill({ status: 403, json: { fehler: 'keine Berechtigung' } }),
   );
   await pruefe('Führungspersonal ohne Leserecht auf Meldungen', false);

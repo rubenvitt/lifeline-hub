@@ -89,9 +89,9 @@ function render({
     ),
     http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personal)),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(pool)),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
+    http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
+    http.get('/api/vehicles', () => HttpResponse.json(pool)),
   );
   return renderMitProviders(
     <Routes>
@@ -215,7 +215,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     setzeViewportBreite(390);
     server.use(
       statusAbgelehnt(),
-      http.post('/api/einsaetze/7/vehicles/11/release', () =>
+      http.post('/api/einsaetze/7/vehicles/11/stand-down', () =>
         HttpResponse.json({ error: 'Das Fahrzeug ist storniert' }, { status: 409 }),
       ),
     );

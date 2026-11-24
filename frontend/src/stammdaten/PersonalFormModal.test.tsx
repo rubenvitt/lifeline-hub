@@ -37,15 +37,15 @@ const person: Personal = {
 
 function handler(onPost: (body: unknown) => void = () => {}) {
   server.use(
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
     ),
     http.get('/api/users', () => HttpResponse.json([])),
-    http.post('/api/personal', async ({ request }) => {
+    http.post('/api/personnel', async ({ request }) => {
       onPost(await request.json());
       return HttpResponse.json({ ...person, id: 9 });
     }),
-    http.patch('/api/personal/5', async ({ request }) => {
+    http.patch('/api/personnel/5', async ({ request }) => {
       onPost(await request.json());
       return HttpResponse.json(person);
     }),
@@ -148,7 +148,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
     handler();
     server.use(
-      http.post('/api/personal', () =>
+      http.post('/api/personnel', () =>
         HttpResponse.json({ error: 'Personalnummer bereits vergeben' }, { status: 422 }),
       ),
     );

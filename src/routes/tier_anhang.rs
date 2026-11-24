@@ -24,7 +24,7 @@ use crate::tier::repo as tier_repo;
 use super::einsatz_tier::sse_tier;
 use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
 
-/// GET /api/einsaetze/{id}/tiere/{tid}/anhaenge — lebende Anhänge, neueste zuerst.
+/// GET /api/einsaetze/{id}/animals/{tid}/attachments — lebende Anhänge, neueste zuerst.
 /// Ein storniertes Tier bleibt lesbar; ein Tier eines anderen Einsatzes ist 404.
 pub async fn liste(
     State(state): State<AppState>,
@@ -36,7 +36,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/tiere/{tid}/anhaenge — eine Datei ablegen (Multipart, Feld
+/// POST /api/einsaetze/{id}/animals/{tid}/attachments — eine Datei ablegen (Multipart, Feld
 /// `datei`). Reihenfolge wie bei Schäden: Gate (403/409) → Tier im Einsatz (404) → storniert
 /// (409) → Datei lesen (400) → Typ, Größe, Scan (400/422/503) → EINE Transaktion aus Anhang,
 /// Linker und ETB-Nachweis (Storno dort erneut geprüft).
@@ -79,7 +79,7 @@ pub async fn ablegen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei — Download (ETag/304). Der
+/// GET /api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file — Download (ETag/304). Der
 /// Linker-Lookup IST die Zugriffsprüfung: fremder Einsatz, anderes Tier, unbekannt oder
 /// entfernt → 404.
 pub async fn datei(
@@ -100,7 +100,7 @@ pub async fn datei(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// DELETE /api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid} — Soft-Delete mit ETB-Nachweis.
+/// DELETE /api/einsaetze/{id}/animals/{tid}/attachments/{aid} — Soft-Delete mit ETB-Nachweis.
 /// Die Datei bleibt bis zur Schwärzung gespeichert.
 pub async fn entfernen(
     State(state): State<AppState>,

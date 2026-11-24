@@ -93,7 +93,7 @@ test.describe(KAPITEL, () => {
   test('Dialog „Code für …“ nach dem Koppeln', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const betreuung = await page.request.get(`/api/einsaetze/${demo.id}/betreuung`);
+    const betreuung = await page.request.get(`/api/einsaetze/${demo.id}/care`);
     const [stelle] = ((await betreuung.json()) as { stellen: { bezeichnung: string }[] }).stellen;
     expect(stelle, 'der Demo-Einsatz hat eine Betreuungsstelle').toBeDefined();
 
@@ -150,7 +150,7 @@ test.describe(KAPITEL, () => {
   test('Maske mit wahlweiser Verpflegungsstelle', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}/verpflegung/stellen`;
+    const basis = `/api/einsaetze/${demo.id}/catering/positions`;
     const { id } = await fuelle<{ id: number }>(page, 'post', basis, {
       bezeichnung: 'Feldküche BR Sportplatz',
       art: 'feldkueche',

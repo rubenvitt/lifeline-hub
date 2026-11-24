@@ -217,7 +217,7 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
   // 16 Zeilen: mit dem Rechtehinweis darüber startet die Tabelle tiefer, und (f) braucht
   // Bildlaufweg unter der Kopfzeile (8 reichten auf 400 px nicht).
   for (let i = 0; i < 16; i += 1) {
-    const antwort = await page.request.post('/api/fahrzeuge', {
+    const antwort = await page.request.post('/api/vehicles', {
       data: {
         // Funkrufnamen sind je Org eindeutig.
         funkrufname: `E2E Katalog Florian Musterstadt-Nordwest ${LAUF}-${i}`,

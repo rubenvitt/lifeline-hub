@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn b(e: i64) -> String {
-    format!("/api/einsaetze/{e}/betreuung")
+    format!("/api/einsaetze/{e}/care")
 }
 
 async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (StatusCode, Value) {
@@ -24,7 +24,7 @@ async fn stelle(app: &axum::Router, cookie: &str, e: i64, name: &str, art: &str)
     let (s, v) = post(
         app,
         cookie,
-        &format!("{}/stellen", b(e)),
+        &format!("{}/positions", b(e)),
         json!({"bezeichnung": name, "art": "notunterkunft", "kapazitaet_personen": 150,
                "belegungsart": art}),
     )
@@ -51,7 +51,7 @@ fn familie(client_id: Option<&str>) -> Value {
 }
 
 fn reg(e: i64, sid: i64) -> String {
-    format!("{}/stellen/{sid}/registrierungen", b(e))
+    format!("{}/positions/{sid}/registrations", b(e))
 }
 
 async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
@@ -105,7 +105,7 @@ async fn durchstich_registrieren_liste_kostformen_abmelden() {
     assert_eq!(liste["haushalte"].as_array().unwrap().len(), 1);
     assert!(liste["ohne_haushalt"].as_array().unwrap().is_empty());
 
-    let (s, k) = anfrage(&app, "GET", &format!("{}/kostformen", b(e)), &admin, None).await;
+    let (s, k) = anfrage(&app, "GET", &format!("{}/diets", b(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k}");
     assert_eq!(
         k,
@@ -120,7 +120,7 @@ async fn durchstich_registrieren_liste_kostformen_abmelden() {
     let (_, verlauf) = anfrage(
         &app,
         "GET",
-        &format!("{}/stellen/{sid}/belegungen", b(e)),
+        &format!("{}/positions/{sid}/occupancies", b(e)),
         &admin,
         None,
     )
@@ -141,7 +141,7 @@ async fn durchstich_registrieren_liste_kostformen_abmelden() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/belegungen", b(e)),
+        &format!("{}/positions/{sid}/occupancies", b(e)),
         json!({"belegt": 40}),
     )
     .await;
@@ -151,7 +151,7 @@ async fn durchstich_registrieren_liste_kostformen_abmelden() {
     let (s, ab) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": hid, "ziel": "zu Verwandten"}),
     )
     .await;
@@ -213,7 +213,7 @@ async fn felder_400_und_zusammenhang_422() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": 1, "person_ids": [1]}),
     )
     .await;
@@ -251,12 +251,12 @@ async fn ohne_personen_nur_die_zaehlung() {
     let (s, _) = post(
         &app,
         &frieda,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": 1}),
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, k) = anfrage(&app, "GET", &format!("{}/kostformen", b(e)), &frieda, None).await;
+    let (s, k) = anfrage(&app, "GET", &format!("{}/diets", b(e)), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "{k}");
 }
 
@@ -287,7 +287,7 @@ async fn geraet_nur_an_der_eigenen_stelle() {
     let (s, _) = post(
         &app,
         &tablet,
-        &format!("{}/stellen/{west}/abmeldungen", b(e)),
+        &format!("{}/positions/{west}/departures", b(e)),
         json!({"haushalt_id": h["id"]}),
     )
     .await;
@@ -295,7 +295,7 @@ async fn geraet_nur_an_der_eigenen_stelle() {
     let (s, _) = post(
         &app,
         &tablet,
-        &format!("{}/stellen/{ost}/abmeldungen", b(e)),
+        &format!("{}/positions/{ost}/departures", b(e)),
         json!({"person_ids": [h["personen"][1]["id"]]}),
     )
     .await;
@@ -319,7 +319,7 @@ async fn replay_nach_einsatzende() {
     let (s, ab) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": erst["id"], "client_id": "a-1"}),
     )
     .await;
@@ -340,7 +340,7 @@ async fn replay_nach_einsatzende() {
     let (s, ab2) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": erst["id"], "client_id": "a-1"}),
     )
     .await;
@@ -360,7 +360,7 @@ async fn kostform_im_personen_patch() {
     let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{e}/personen/{tom}");
+    let pfad = format!("/api/einsaetze/{e}/persons/{tom}");
 
     let (s, p) = anfrage(
         &app,
@@ -405,7 +405,7 @@ async fn kostform_im_personen_patch() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 
-    let (_, k) = anfrage(&app, "GET", &format!("{}/kostformen", b(e)), &admin, None).await;
+    let (_, k) = anfrage(&app, "GET", &format!("{}/diets", b(e)), &admin, None).await;
     assert_eq!(k["sonderkost"]["ohne_schwein"], 1);
     assert_eq!(k["normal"], 0);
 }
@@ -457,7 +457,7 @@ async fn kostform_zaehlung_ist_live_auch_an_gezaehlter_stelle() {
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let anna = h["personen"][0]["id"].as_i64().unwrap();
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let person = |p: i64| format!("/api/einsaetze/{e}/personen/{p}");
+    let person = |p: i64| format!("/api/einsaetze/{e}/persons/{p}");
 
     let feed = live_oeffnen(&app, &admin, e).await;
     let (s, _) = anfrage(
@@ -490,7 +490,7 @@ async fn kostform_zaehlung_ist_live_auch_an_gezaehlter_stelle() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/verbleib", person(tom)),
+        &format!("{}/whereabouts", person(tom)),
         &admin,
         Some(&json!({"art": "transport", "ziel": "KH Mitte"}).to_string()),
     )
@@ -523,7 +523,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &format!("/api/einsaetze/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -535,7 +535,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        &format!("{}/positions/{sid}/departures", b(e)),
         json!({"haushalt_id": h["id"]}),
     )
     .await;
@@ -543,7 +543,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", b(e)),
+        &format!("{}/positions/{sid}", b(e)),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )
@@ -553,7 +553,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{neu}/verbleib"),
+        &format!("/api/einsaetze/{e}/persons/{neu}/whereabouts"),
         json!({"art": "notunterkunft", "betreuungsstelle_id": sid}),
     )
     .await;
@@ -568,7 +568,7 @@ async fn abmeldung_begrenzt_und_entdoppelt_die_personen() {
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
-    let ab = format!("{}/stellen/{sid}/abmeldungen", b(e));
+    let ab = format!("{}/positions/{sid}/departures", b(e));
     let (s, _) = post(&app, &admin, &ab, json!({"person_ids": vec![1; 51]})).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let tom = h["personen"][1]["id"].clone();
@@ -580,7 +580,7 @@ async fn abmeldung_begrenzt_und_entdoppelt_die_personen() {
 // ---------- Registrierliste drucken (LLH-1616, Change `iw8hjb93-registrierliste-drucken`) ----------
 
 fn druck(e: i64, sid: i64) -> String {
-    format!("{}/druck", reg(e, sid))
+    format!("{}/print", reg(e, sid))
 }
 
 /// Einträge `registrierliste` im Zugriffsprotokoll je Person (`None` = listenweit).
@@ -782,11 +782,11 @@ async fn put(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Stat
 }
 
 fn bezugsperson_pfad(e: i64, sid: i64, hid: i64) -> String {
-    format!("{}/stellen/{sid}/haushalte/{hid}/bezugsperson", b(e))
+    format!("{}/positions/{sid}/households/{hid}/contact-person", b(e))
 }
 
 fn haushalt_pfad(e: i64, sid: i64, pid: i64) -> String {
-    format!("{}/stellen/{sid}/personen/{pid}/haushalt", b(e))
+    format!("{}/positions/{sid}/persons/{pid}/household", b(e))
 }
 
 /// Durchstich: Bezugsperson wechseln, Person in einen neuen Haushalt lösen, das Personen-Detail
@@ -815,7 +815,7 @@ async fn bezugsperson_wechseln_und_umhaengen() {
     let (_, p) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &format!("/api/einsaetze/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -982,7 +982,7 @@ async fn storno_der_bezugsperson_rueckt_im_selben_eintrag_nach() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{anna}"),
+        &format!("/api/einsaetze/{e}/persons/{anna}"),
         &admin,
         None,
     )

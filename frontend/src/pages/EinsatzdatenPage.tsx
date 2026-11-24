@@ -14,6 +14,7 @@ import {
   paneelZeileStil,
   schriftStil,
   useRollen,
+  Kennung,
 } from '../components/instrument';
 import { SeitenFehler } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
@@ -814,7 +815,7 @@ function gleicherStandort(a: StandortEntwurf, b: StandortEntwurf): boolean {
  * des Funkplans, seit LFH-1181 ein Ort mit Ausstattung. Zuerst der Einsatzleiter (LFH-1199),
  * dann Art, Bezeichnung und Standort vor den Funkangaben, denn wer die Führungsstelle sucht, braucht
  * den Ort vor dem Funk (LFH-1181, design.md D5). Jede Zeile schickt nur ihr Feld an
- * `…/fuehrungsstelle`, der Standort Adresse und Koordinate zusammen, mit dem Schreibrecht der
+ * `…/command-post`, der Standort Adresse und Koordinate zusammen, mit dem Schreibrecht der
  * Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
@@ -1314,7 +1315,7 @@ function RufnameAngabe({
       praesenz={praesenz}
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={monoStil('mono')}>{rufname}</span>}
+      anzeige={<Kennung>{rufname}</Kennung>}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}

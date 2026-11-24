@@ -372,7 +372,7 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(body),
     )
@@ -381,12 +381,12 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     json["id"].as_i64().unwrap()
 }
 
-/// Legt eine Stamm-Person (`/api/personal`) an; liefert deren id.
+/// Legt eine Stamm-Person (`/api/personnel`) an; liefert deren id.
 pub async fn stammpersonal_anlegen(app: &axum::Router, admin: &str, name: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -435,7 +435,7 @@ pub async fn standard_ansicht_id(app: &axum::Router, cookie: &str, einsatz: i64)
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        &format!("/api/einsaetze/{einsatz}/map-views"),
         cookie,
         None,
     )
@@ -454,7 +454,7 @@ pub async fn karten_ansicht_anlegen(
     let (status, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        &format!("/api/einsaetze/{einsatz}/map-views"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -919,7 +919,7 @@ impl Erfassung {
     /// Pfadsegment unter `/api/einsaetze/{id}/`.
     pub fn segment(self) -> &'static str {
         match self {
-            Erfassung::Tier => "tiere",
+            Erfassung::Tier => "animals",
             Erfassung::Uhs => "uhs",
         }
     }

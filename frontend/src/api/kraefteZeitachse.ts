@@ -76,7 +76,7 @@ export function streicheEreignis(
   ereignisId: number,
   grund: string,
 ): Promise<Zeitachse> {
-  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/void`, 'POST', {
+  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/strike`, 'POST', {
     grund,
   });
 }

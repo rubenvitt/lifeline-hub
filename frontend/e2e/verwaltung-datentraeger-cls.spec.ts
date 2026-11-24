@@ -55,7 +55,7 @@ const LISTEN: Liste[] = [
     pfad: '/admin/stammdaten/fahrzeuge',
     saeen: async (page) => {
       const kennung = `Florian CLS 1/${LAUF}`;
-      await saeen(page, '/api/fahrzeuge', { funkrufname: kennung, fahrzeugtyp: 'HLF 20' });
+      await saeen(page, '/api/vehicles', { funkrufname: kennung, fahrzeugtyp: 'HLF 20' });
       return kennung;
     },
   },
@@ -64,7 +64,7 @@ const LISTEN: Liste[] = [
     pfad: '/admin/stammdaten/einheit-typen',
     saeen: async (page) => {
       const label = `Typ CLS ${LAUF}`;
-      await saeen(page, '/api/einheit-typen', { label, sortier: 990 });
+      await saeen(page, '/api/unit-types', { label, sortier: 990 });
       return label;
     },
   },

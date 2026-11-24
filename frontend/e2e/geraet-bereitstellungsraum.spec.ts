@@ -117,7 +117,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     // Die Einsatzleitung sieht den Raum als Status „aktiv“ und die Meldung mit dem Raum als Absender.
     const raum = await page.request.get(`/api/einsaetze/${e}/staging-areas/${sportplatz.id}`);
     expect(((await raum.json()) as { status: string }).status).toBe('aktiv');
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
+    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(
       liste.find((m) => m.inhalt === 'Raum voll, weitere Kräfte zum BR Schule')?.absender,
@@ -241,7 +241,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
+  await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
   await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Musterstadt' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
@@ -417,7 +417,7 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
   }
 
   expect(await einheitenNamens('Florian Nachbar 7'), 'genau eine Einheit').toBe(1);
-  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/meldungen`)).json()) as {
+  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/reports`)).json()) as {
     inhalt: string;
   }[];
   expect(
@@ -457,7 +457,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
   await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  const deich = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Deich' });
+  const deich = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Deich' });
   const hlf = await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Deich' });
   await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/occupancy`, {
     objekt_typ: 'einheit',

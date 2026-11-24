@@ -13,7 +13,7 @@ import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue
 import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { Stapel, Textstufe, monoStil, useRollen } from '../components/instrument';
+import { Stapel, Textstufe, schriftStil, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { verpflegungsstelleStatus } from '../theme/statusFarben';
 import { laufendeZeitfensterDerStelle } from './stellenKern';
@@ -257,7 +257,14 @@ export default function StellenListe({
               <Stapel key={zf.id} richtung="zeile" abstand="xs" umbruch ausrichten="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                <span style={monoStil('mono', 500)}>{`${ausgegeben} EP ausgegeben`}</span>
+                {/* „100 EP ausgegeben“ trägt ein Wort: Textschrift (ADR-0094). */}
+                <span
+                  style={{
+                    ...schriftStil('text'),
+                    fontWeight: 500,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >{`${ausgegeben} EP ausgegeben`}</span>
               </Stapel>
             ))
           )}

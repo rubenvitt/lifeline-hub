@@ -101,7 +101,7 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
 }) => {
   await anmeldenAlsAdmin(page);
   const funkrufname = `RTW 83-${Date.now() % 100000}`;
-  const stamm = await page.request.post('/api/fahrzeuge', {
+  const stamm = await page.request.post('/api/vehicles', {
     data: { funkrufname, staerke_fuehrer: 0, staerke_unterfuehrer: 1, staerke_mannschaft: 1 },
   });
   expect(stamm.ok(), `Stamm-Fahrzeug: ${stamm.status()} ${await stamm.text()}`).toBeTruthy();

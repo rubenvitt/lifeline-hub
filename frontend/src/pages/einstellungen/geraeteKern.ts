@@ -166,7 +166,7 @@ export function stellenOptionen(
     case 'einsatzabschnitt':
       return (quellen.abschnitte ?? []).map((a) => ({ value: a.id, label: a.name }));
     case 'verpflegungsstelle':
-      // `stellen` aus `GET …/verpflegung` kommt ohne stornierte; aufgelöst lehnt der Server ab.
+      // `stellen` aus `GET …/catering` kommt ohne stornierte; aufgelöst lehnt der Server ab.
       return (quellen.verpflegungsstellen ?? [])
         .filter(benutzbar)
         .map((s) => ({ value: s.id, label: s.bezeichnung }));

@@ -11,7 +11,7 @@ async fn person_post(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -28,7 +28,7 @@ async fn person_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -39,7 +39,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, e: i64, name: &str)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )
@@ -61,7 +61,7 @@ async fn meldung_anlegen(app: &axum::Router, cookie: &str, e: i64, extra: Value)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -74,7 +74,7 @@ async fn meldungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         cookie,
         None,
     )
@@ -321,7 +321,7 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{}", p["id"]),
+        &format!("/api/einsaetze/{e}/persons/{}", p["id"]),
         &admin,
         None,
     )
@@ -364,7 +364,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{pid}"),
+        &format!("/api/einsaetze/{e}/persons/{pid}"),
         &admin,
         None,
     )
@@ -416,7 +416,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/einheiten"),
+        &format!("/api/einsaetze/{e}/persons/units"),
         &admin,
         None,
     )
@@ -455,7 +455,7 @@ async fn patient_aus_meldung_in_beide_richtungen_sichtbar() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{}", storniert["id"]),
+        &format!("/api/einsaetze/{e}/persons/{}", storniert["id"]),
         &admin,
         None,
     )

@@ -244,7 +244,7 @@ export async function fuehrungsstelleOrtFuellen(
   quelle: Page | APIRequestContext,
   einsatzId: number,
 ): Promise<void> {
-  const pfad = `/api/einsaetze/${einsatzId}/fuehrungsstelle`;
+  const pfad = `/api/einsaetze/${einsatzId}/command-post`;
   const fs = (await (await apiVon(quelle).get(pfad)).json()) as { bezeichnung?: string };
   if (fs.bezeichnung) return;
   await fuelle(quelle, 'patch', pfad, {

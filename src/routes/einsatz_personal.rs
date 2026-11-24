@@ -598,7 +598,7 @@ pub async fn status_zuruecknehmen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/personnel/{ep_id}/release — aus dem Einsatz entlassen (LLH-1079,
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Bindungen gehen, Historie bleibt, die
 /// Zeitachse bekommt die Entlassung. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1922), der Block „Entlassen“
@@ -647,7 +647,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/personnel/{ep_id}/release/undo — „Rückgängig“ nach dem
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer Person zurücknehmen“): Body ist
 /// der Vorzustand aus der Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses
 /// Entlassen, höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, und nur, solange
@@ -971,7 +971,7 @@ pub async fn position(
     Ok(Json(nachher))
 }
 
-/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — alle aktiven Personen des Einsatzes
+/// GET /api/einsaetze/{id}/map/commanders — alle aktiven Personen des Einsatzes
 /// (Führung via `ist_einheitsfuehrer`/`ist_abschnittsleiter`-Flags kenntlich, LFH-276).
 pub async fn karte_fuehrungskraefte(
     State(state): State<AppState>,

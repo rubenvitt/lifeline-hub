@@ -298,7 +298,7 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
 for (const { liste, api, daten, pfad } of [
   {
     liste: 'Fahrzeuge',
-    api: '/api/fahrzeuge',
+    api: '/api/vehicles',
     daten: async () => ({
       funkrufname: `E2E Gate3 Pfad Florian ${Date.now()}`,
       fahrzeugtyp: 'LF 20',
@@ -307,15 +307,15 @@ for (const { liste, api, daten, pfad } of [
   },
   {
     liste: 'Personal',
-    api: '/api/personal',
+    api: '/api/personnel',
     daten: async () => ({ name: `E2E Gate3 Pfad Kraft ${Date.now()}` }),
     pfad: (id: number) => `/admin/stammdaten/personal/${id}`,
   },
   {
     liste: 'Einheiten-Vorlagen',
-    api: '/api/einheit-vorlagen',
+    api: '/api/unit-templates',
     daten: async (request: APIRequestContext) => {
-      const typen = (await (await request.get('/api/einheit-typen')).json()) as { id: number }[];
+      const typen = (await (await request.get('/api/unit-types')).json()) as { id: number }[];
       return { name: `E2E Gate3 Pfad Vorlage ${Date.now()}`, typ_id: typen[0].id };
     },
     pfad: (id: number) => `/admin/stammdaten/einheiten/${id}`,
@@ -1478,7 +1478,7 @@ async function lagebesprechungenSaeen(page: Page, einsatzId: string) {
     await anlegen(
       page,
       einsatzId,
-      'lagebesprechungen',
+      'briefings',
       {
         entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})`,
         ...(nr === 2 ? { naechste_at: new Date(Date.now() + 60 * 60_000).toISOString() } : {}),
@@ -1657,7 +1657,7 @@ async function infotelefonSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
-    'stab/infotelefon',
+    'staff/info-line',
     {
       anliegen: 'vermisstensuche',
       notiz: 'sucht Vater',
@@ -1750,7 +1750,7 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const abschnitt = await post('abschnitte', { name: 'Abschnitt Nord' });
+  const abschnitt = await post('sectors', { name: 'Abschnitt Nord' });
   const einheit = await post('units', { name: '1. Zug', abschnitt_id: abschnitt });
   const fahrzeug = await post('vehicles', { adhoc: { funkrufname: 'Florian 1/42-1' } });
   const zuordnung = await page.request.put(
@@ -1968,17 +1968,17 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
 
 async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
   const basis = `/api/einsaetze/${einsatzId}`;
-  const plan = await page.request.post(`${basis}/stab/kommunikationsplan/stellen`, {
+  const plan = await page.request.post(`${basis}/staff/comms-plan/positions`, {
     data: { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' },
   });
   expect(plan.ok(), `Seeding Stelle: ${await plan.text()}`).toBeTruthy();
   const [stelle] = (await plan.json()) as { id: number }[];
   const verbindung = await page.request.post(
-    `${basis}/stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    `${basis}/staff/comms-plan/positions/${stelle.id}/connections`,
     { data: { mittel: 'festnetz', wert: '0421 112' } },
   );
   expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
-  const abschnitt = await page.request.post(`${basis}/abschnitte`, {
+  const abschnitt = await page.request.post(`${basis}/sectors`, {
     data: { name: 'Abschnitt Nord', verbindungen: [{ mittel: 'mobil', wert: '0170 1' }] },
   });
   expect(abschnitt.ok(), `Seeding Abschnitt: ${await abschnitt.text()}`).toBeTruthy();
@@ -2170,7 +2170,7 @@ async function skizzeSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
-    'sprechgruppen',
+    'talk-groups',
     { bezeichnung: 'BN_BOS', betriebsart: 'TMO' },
     'Sprechgruppe',
   );
@@ -2308,8 +2308,8 @@ async function organigrammSaeen(page: Page, einsatzId: string) {
     ).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const nord = await post('abschnitte', { name: 'Abschnitt Nord' });
-  const deich = await post('abschnitte', {
+  const nord = await post('sectors', { name: 'Abschnitt Nord' });
+  const deich = await post('sectors', {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: nord,
   });
@@ -2428,7 +2428,7 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
     const einheit = await post('units', { name, abschnitt_id: abschnitt.id }, name);
     await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
@@ -2486,7 +2486,7 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
     const einheit = await post('units', { name, abschnitt_id: abschnitt.id }, name);
     await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
@@ -2557,7 +2557,7 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung`);
 
   const senden = async (
-    modul: 'evakuierung' | 'betreuung',
+    modul: 'evacuation' | 'care',
     methode: 'post' | 'patch',
     pfad: string,
     data: unknown,
@@ -2575,16 +2575,16 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const BEZIRKE = ['Deichweg 1–9', 'Uferstraße 12–40'];
   for (const bezeichnung of BEZIRKE) {
     const bezirk = await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      'bezirke',
+      'districts',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      `bezirke/${bezirk.id}/staende`,
+      `districts/${bezirk.id}/progress`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
       'Stand',
     );
@@ -2592,30 +2592,24 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const OFFEN = ['Turnhalle Ost', 'Gemeindehaus Süd'];
   for (const bezeichnung of OFFEN) {
     const stelle = await senden(
-      'betreuung',
+      'care',
       'post',
-      'stellen',
+      'positions',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden(
-      'betreuung',
-      'post',
-      `stellen/${stelle.id}/belegungen`,
-      { belegt: 140 },
-      'Belegung',
-    );
+    await senden('care', 'patch', `positions/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('care', 'post', `positions/${stelle.id}/occupancies`, { belegt: 140 }, 'Belegung');
   }
   // Ohne Meldung darf eine Stelle schließen.
   const zu = await senden(
-    'betreuung',
+    'care',
     'post',
-    'stellen',
+    'positions',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('care', 'patch', `positions/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
 
   // Abstand Primäraktion ↔ Dreipunkt an der ersten Zeile: im Handschuh-Betrieb ≥ 16 px
   // (MIL-STD-1472F Fig. 24 [abgeleitet]).
@@ -2713,7 +2707,7 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung Lesend`);
 
   const senden = async (
-    modul: 'evakuierung' | 'betreuung',
+    modul: 'evacuation' | 'care',
     methode: 'post' | 'patch',
     pfad: string,
     data: unknown,
@@ -2732,45 +2726,39 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   // „Zurücknehmen" fehlen KANN; die offenen Stellen tragen Belegungen.
   for (const bezeichnung of ['Deichweg 1–9', 'Uferstraße 12–40']) {
     const bezirk = await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      'bezirke',
+      'districts',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
-      'evakuierung',
+      'evacuation',
       'post',
-      `bezirke/${bezirk.id}/staende`,
+      `districts/${bezirk.id}/progress`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
       'Stand',
     );
   }
   for (const bezeichnung of ['Turnhalle Ost', 'Gemeindehaus Süd']) {
     const stelle = await senden(
-      'betreuung',
+      'care',
       'post',
-      'stellen',
+      'positions',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden(
-      'betreuung',
-      'post',
-      `stellen/${stelle.id}/belegungen`,
-      { belegt: 140 },
-      'Belegung',
-    );
+    await senden('care', 'patch', `positions/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('care', 'post', `positions/${stelle.id}/occupancies`, { belegt: 140 }, 'Belegung');
   }
   const zu = await senden(
-    'betreuung',
+    'care',
     'post',
-    'stellen',
+    'positions',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('care', 'patch', `positions/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
@@ -2853,7 +2841,7 @@ const UNTERKUNFT_GRUNDLAGE_KNOEPFE = 6;
 const UNTERKUNFT_ZAHLENFELDER = 6;
 
 async function unterkunftStelleSaeen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/care/positions`, {
     data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
   });
   expect(antwort.ok(), `Seeding Stelle: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -3546,7 +3534,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3558,7 +3546,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Frühstück Deich',
       von_at: zeit(-30),
@@ -3569,7 +3557,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
     'Zeitfenster Frühstück',
   );
   const mittag = await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3581,7 +3569,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   );
   for (const minuten of [-8, -4]) {
     await post(
-      `zeitfenster/${mittag.id}/ausgaben`,
+      `time-slots/${mittag.id}/distributions`,
       { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
       'Ausgabe',
     );
@@ -3724,7 +3712,7 @@ test('Ausgabeansicht: „+1“ ≥ 72 px in jeder Stufe und unten, übrige Zähl
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Zaehlen`);
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/zeitfenster`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/time-slots`, {
     data: {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3819,7 +3807,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen Lesend`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3833,7 +3821,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   // Dieselbe Saat wie im Admin-Test: die Ausgaben am Mittag geben „Zurücknehmen" eine Stelle,
   // an der es fehlen KANN.
   await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Frühstück Deich',
       von_at: zeit(-30),
@@ -3844,7 +3832,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
     'Zeitfenster Frühstück',
   );
   const mittag = await post(
-    'zeitfenster',
+    'time-slots',
     {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3856,7 +3844,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   );
   for (const minuten of [-8, -4]) {
     await post(
-      `zeitfenster/${mittag.id}/ausgaben`,
+      `time-slots/${mittag.id}/distributions`,
       { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
       'Ausgabe',
     );
@@ -3921,7 +3909,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Stellen`);
-  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+  const basis = `/api/einsaetze/${einsatzId}/catering`;
   const senden = async (pfad: string, data: unknown, methode: 'post' | 'patch' = 'post') => {
     const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
     expect(
@@ -3932,20 +3920,20 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
   };
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  await senden('stellen', { bezeichnung: 'Zuführung Deich', art: 'zufuehrung' });
-  const feldkueche = await senden('stellen', {
+  await senden('positions', { bezeichnung: 'Zuführung Deich', art: 'zufuehrung' });
+  const feldkueche = await senden('positions', {
     bezeichnung: 'Feldküche BR Sportplatz',
     art: 'feldkueche',
   });
-  await senden(`stellen/${feldkueche.id}/status`, { status: 'aktiv' });
-  const zf = await senden('zeitfenster', {
+  await senden(`positions/${feldkueche.id}/status`, { status: 'aktiv' });
+  const zf = await senden('time-slots', {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(-10),
     bis_at: zeit(110),
     bedarf_kraefte: 30,
     bedarf_betreute: 0,
   });
-  await senden(`zeitfenster/${zf.id}`, { stelle_ids: [feldkueche.id] }, 'patch');
+  await senden(`time-slots/${zf.id}`, { stelle_ids: [feldkueche.id] }, 'patch');
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
@@ -4005,7 +3993,7 @@ const personZeile = (page: Page, id: number) =>
   page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
 
 async function personAnlegen(page: Page, einsatzId: string, daten: object): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data: daten });
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data: daten });
   expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }
@@ -4610,7 +4598,7 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrun
     expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
   }
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    await anlegen(page, einsatzId, 'lage-snapshots', { bezeichnung }, `Stand ${bezeichnung}`);
+    await anlegen(page, einsatzId, 'situation-snapshots', { bezeichnung }, `Stand ${bezeichnung}`);
   }
 
   const gemessen: string[] = [];
@@ -5163,7 +5151,7 @@ async function gefahrengebieteSaeen(page: Page, einsatzId: string, gebiete: read
     await anlegen(
       page,
       einsatzId,
-      'zonen',
+      'zones',
       {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',
@@ -5382,7 +5370,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       },
     });
     expect(text.ok(), `Text ${was}: ${text.status()} ${await text.text()}`).toBe(true);
-    const frei = await page.request.post(`${E}/${pfad}/${id}/freigeben`);
+    const frei = await page.request.post(`${E}/${pfad}/${id}/release`);
     expect(frei.ok(), `Freigabe ${was}: ${frei.status()} ${await frei.text()}`).toBe(true);
     return id;
   };
@@ -5391,7 +5379,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
     {
       name: 'Lagebericht',
       pfad: `${R}/lageberichte/${await freigegeben(
-        'lageberichte',
+        'situation-reports',
         { vorlage: 'lagebericht', titel: 'Lage 968' },
         [
           'auftrag',
@@ -5413,7 +5401,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
     {
       name: 'Befehl',
       pfad: `${R}/auftraege/befehle/${await freigegeben(
-        'befehle',
+        'orders',
         { vorlage: 'befehl_lad', titel: 'Befehl 968' },
         ['lage', 'auftrag', 'durchfuehrung'],
         'Befehl',

@@ -337,13 +337,13 @@ test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und sch
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Meldung ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const meldung = await apiPost(page, `${basis}/meldungen`, {
+  const meldung = await apiPost(page, `${basis}/reports`, {
     absender: 'Florian Nordwache',
     meldeweg: 'funk',
     inhalt: 'Deich am Pegel hält, Sickerstelle beobachtet',
     ereigniszeit: new Date().toISOString(),
   });
-  await apiPost(page, `${basis}/meldungen/${meldung.id}/auftrag`, {
+  await apiPost(page, `${basis}/reports/${meldung.id}/task`, {
     auftrag_text: 'Sickerstelle sichern',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
   });

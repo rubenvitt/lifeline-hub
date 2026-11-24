@@ -50,7 +50,7 @@ for (const modus of ['light', 'dark'] as const) {
     });
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-    await post(page, `/api/einsaetze/${einsatzId}/verpflegung/zeitfenster`, {
+    await post(page, `/api/einsaetze/${einsatzId}/catering/time-slots`, {
       bezeichnung: 'Abendessen Gefahr',
       von_at: zeit(180),
       bis_at: zeit(240),
@@ -102,7 +102,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Gefahrknopf ohne Rahmen (LFH-897): der Papierkorb einer Dokumentenzeile.
-    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
       multipart: {
         datei: {
           name: 'Plan Gefahr.pdf',

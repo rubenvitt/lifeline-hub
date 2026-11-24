@@ -111,7 +111,7 @@ pub struct HaushaltAnzeige {
     pub personen: Vec<RegistriertePerson>,
 }
 
-/// Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`).
+/// Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct RegistrierListe {
     pub stelle_id: i64,
@@ -128,7 +128,7 @@ pub struct AbmeldungAnzeige {
     pub person_ids: Vec<i64>,
 }
 
-/// Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`).
+/// Kostformen der Registrierten ohne Personenbezug (D7, `GET …/care/diets`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct KostformZaehlung {
     /// Alle jetzt an einer nicht stornierten Stelle registrierten Personen.

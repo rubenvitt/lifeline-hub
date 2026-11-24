@@ -1726,7 +1726,7 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
       http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => {
         abrufe.push('material');
         return HttpResponse.json(material);
@@ -2526,7 +2526,8 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
 
     const vorgemerkt = await screen.findByTestId('br-vorgemerkt');
     expect(within(vorgemerkt).getByText('Zug Nord')).toBeInTheDocument();
-    expect(within(vorgemerkt).getByText(/^vorgemerkt \d{4}/)).toBeInTheDocument();
+    // Zeit in Mono, Wort in der Textschrift (ADR-0094): zwei Knoten.
+    expect(vorgemerkt).toHaveTextContent(/vorgemerkt \d{4}/);
     // Kennzahlen bleiben die des Servers (Spec `bereitstellungsraum-belegung`).
     expect(kennzahl('Einheiten')).toHaveTextContent('0');
 
@@ -2640,12 +2641,12 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
       http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([DEICH])),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([DEICH])),
       http.post('/api/einsaetze/1/staging-areas/1/dispatch', async ({ request }) => {
         aufrufe.abruf.push(await request.json());
         return abruf();
       }),
-      http.post('/api/einsaetze/1/staging-areas/1/dispatch/withdraw', async ({ request }) => {
+      http.post('/api/einsaetze/1/staging-areas/1/dispatch/void', async ({ request }) => {
         aufrufe.aufheben.push(await request.json());
         return HttpResponse.json({});
       }),

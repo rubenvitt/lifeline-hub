@@ -298,14 +298,14 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     'Personal (Personalseite + Meldebild)',
   );
   await anlegen(
-    'befehle',
+    'orders',
     { vorlage: 'befehl_lad', titel: 'Befehl an den 2. Zug zur Menschenrettung im Abschnitt Nord' },
     'Befehl',
   );
   // Ohne Status setzt das Backend `erfasst`, genau der Standardreiter der Personenseite;
   // mit anderem Status fiele die Person aus der Standardsicht.
   await anlegen(
-    'personen',
+    'persons',
     {
       name: 'Oberacher-Dreiszigmark',
       vorname: 'Wolfgang-Sebastian',
@@ -316,7 +316,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Informationstelefon (LFH-554): lange Notiz als Stoff für seine Zeitachse.
   await anlegen(
-    'stab/infotelefon',
+    'staff/info-line',
     {
       anliegen: 'vermisstensuche',
       notiz: ANRUF_NOTIZ,
@@ -328,7 +328,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite.
   await anlegen(
-    'tiere',
+    'animals',
     {
       spezies: 'grosstier',
       rufname: 'Donnerhall-vom-Wiesengrund',
@@ -339,16 +339,15 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Kommunikationsplan S6 (LFH-848): eine Behörde mit langer Bezeichnung, langer Nummer und
   // langem Hinweis. Die Antwort ist der ganze Plan; die id der Stelle steht darin.
-  const plan = await page.request.post(
-    `/api/einsaetze/${einsatzId}/stab/kommunikationsplan/stellen`,
-    { data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE } },
-  );
+  const plan = await page.request.post(`/api/einsaetze/${einsatzId}/staff/comms-plan/positions`, {
+    data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE },
+  });
   expect(plan.ok(), `Seeding Kommunikationsplan: ${await plan.text()}`).toBeTruthy();
   const stelle = ((await plan.json()) as { id: number; bezeichnung?: string }[]).find(
     (s) => s.bezeichnung === KOMMUNIKATION_STELLE,
   )!;
   await anlegen(
-    `stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    `staff/comms-plan/positions/${stelle.id}/connections`,
     {
       mittel: 'festnetz',
       wert: '+49 421 361-1234567',
@@ -427,7 +426,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       return (await antwort.json()) as { id: number };
     };
     const abschnitt = await post(
-      'abschnitte',
+      'sectors',
       { name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2' },
       'Abschnitt (Ablösung)',
     );
@@ -445,7 +444,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
     // Belegung „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne
     // „Betreuung".
     const bezirk = await post(
-      'evakuierung/bezirke',
+      'evacuation/districts',
       {
         bezeichnung: 'Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest',
         plan_personen: 1210,
@@ -455,17 +454,17 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Bezirk',
     );
     await post(
-      `evakuierung/bezirke/${bezirk.id}/staende`,
+      `evacuation/districts/${bezirk.id}/progress`,
       { evakuiert: 1180, erhebung: 'geschaetzt' },
       'Stand',
     );
     const antwort = await page.request.patch(
-      `/api/einsaetze/${einsatzId}/evakuierung/bezirke/${bezirk.id}`,
+      `/api/einsaetze/${einsatzId}/evacuation/districts/${bezirk.id}`,
       { data: { raeumung: 'laeuft' } },
     );
     expect(antwort.ok(), `Seeding Räumung: ${antwort.status()}`).toBeTruthy();
     const stelle = await post(
-      'betreuung/stellen',
+      'care/positions',
       {
         bezeichnung: 'Notunterkunft Mehrzweckhalle Gesamtschule Musterstadt-Nordwest',
         art: 'notunterkunft',
@@ -474,14 +473,14 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       },
       'Stelle',
     );
-    await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
+    await post(`care/positions/${stelle.id}/occupancies`, { belegt: 1420 }, 'Belegung');
     BETREUUNGSSTELLE.set(einsatzId, stelle.id);
 
     // Ein LAUFENDES Zeitfenster (sonst stünde die Karte unter „vergangen") mit Sonderkost und
     // einer Ausgabe mit langem Ort — die breiteste Zeile der Karte.
     const jetzt = Date.now();
     const zeitfenster = await post(
-      'verpflegung/zeitfenster',
+      'catering/time-slots',
       {
         bezeichnung: 'Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2',
         von_at: new Date(jetzt - 3_600_000).toISOString(),
@@ -494,7 +493,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Zeitfenster',
     );
     await post(
-      `verpflegung/zeitfenster/${zeitfenster.id}/ausgaben`,
+      `catering/time-slots/${zeitfenster.id}/distributions`,
       {
         menge: 120,
         ort: 'Ausgabestelle Mehrzweckhalle Gesamtschule Musterstadt-Nordwest, Eingang Deichweg',
@@ -564,7 +563,7 @@ async function gate1Vorbereiten(
 
 /** Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff. */
 async function wetterStub(page: Page, einsatzId: string) {
-  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
     route.fulfill({
       json: {
         ort: { name: 'Samtgemeinde Sottrum-Hellwege-Horstedt-Reeßum', kreis: 'Rotenburg (Wümme)' },
@@ -1016,7 +1015,7 @@ function gate1RoutenVersorgung(einsatzId: string): Gate1Route[] {
       // die erst nach dem Seeding feststeht; deshalb führt `vorbereiten` von der Modulseite hin.
       pfad: `/einsaetze/${einsatzId}/verpflegung`,
       vorbereiten: async (p: Page) => {
-        const r = await p.request.get(`/api/einsaetze/${einsatzId}/verpflegung`);
+        const r = await p.request.get(`/api/einsaetze/${einsatzId}/catering`);
         const [zf] = ((await r.json()) as { zeitfenster: { id: number }[] }).zeitfenster;
         await p.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
         await expect(p.locator('[data-lfh="zaehltasten"]')).toBeVisible();
@@ -1290,7 +1289,7 @@ test.describe('Gate 1', () => {
     }) => {
       test.slow();
       await anmelden(page);
-      const antwort = await page.request.post('/api/fahrzeuge', {
+      const antwort = await page.request.post('/api/vehicles', {
         data: {
           // Funkrufnamen sind je Org eindeutig: Breite und Zeitstempel trennen parallele Tests
           // und den CI-Retry, der auf derselben DB läuft.
@@ -1348,7 +1347,7 @@ test.describe('Gate 1', () => {
         const jetzt = Date.now();
         const zeitfenster = (bezeichnung: string, vonMin: number, bisMin: number) =>
           post(
-            'verpflegung/zeitfenster',
+            'catering/time-slots',
             {
               bezeichnung,
               von_at: new Date(jetzt + vonMin * 60_000).toISOString(),
@@ -1366,14 +1365,14 @@ test.describe('Gate 1', () => {
         };
         let abschnittId = 0;
         if (modul === 'abloesung') {
-          abschnittId = (await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt')).id;
+          abschnittId = (await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt')).id;
           for (let i = 1; i <= 12; i += 1) await schicht(abschnittId, `Florian Nord ${i}`, 360);
         } else {
           for (let i = 1; i <= 12; i += 1) await zeitfenster(`Mittag ${i}`, -60, 180);
           for (let i = 1; i <= 3; i += 1) await zeitfenster(`Frühstück ${i}`, -300, -240);
           for (let i = 1; i <= 12; i += 1)
             await post(
-              'verpflegung/stellen',
+              'catering/positions',
               { bezeichnung: `Ausgabe Deich ${i}`, art: 'ausgabestelle' },
               `Stelle ${i}`,
             );
@@ -1986,7 +1985,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       });
       expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
       const einsatzId = String(((await neu.json()) as { id: number }).id);
-      const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+      const typen = (await (await page.request.get('/api/unit-types')).json()) as {
         id: number;
         label: string;
       }[];
@@ -2103,7 +2102,7 @@ async function seedeJson(
 /** Ein Stammfahrzeug mit Soll-Stärke und drei Kräften: die Besatzungszelle zeigt Ist UND Soll. */
 async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
   const einsatzId = await neuerEinsatz(page, `E2E Fükw-Fahrzeuge ${Date.now()}`);
-  const stamm = await seedeJson(page, 'post', '/api/fahrzeuge', {
+  const stamm = await seedeJson(page, 'post', '/api/vehicles', {
     funkrufname: `${FAHRZEUG_SOLL}-${Math.random().toString(36).slice(2, 6)}`,
     fahrzeugtyp: 'HLF 20',
     traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
@@ -2130,7 +2129,7 @@ async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
  */
 async function seedeDokumente(page: Page): Promise<string> {
   const einsatzId = await neuerEinsatz(page, `E2E Fükw-Dokumente ${Date.now()}`);
-  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/abschnitte`, {
+  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/sectors`, {
     name: 'Sanitätsdienst',
   });
   for (const [titel, kategorie, dateiname, mimeType, buffer, bezug] of [
@@ -2152,7 +2151,7 @@ async function seedeDokumente(page: Page): Promise<string> {
       false,
     ],
   ] as const) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
       multipart: {
         datei: { name: dateiname, mimeType, buffer },
         titel,
@@ -2377,7 +2376,7 @@ async function seedEigeneEinheit(page: Page): Promise<string> {
       `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
     ).toBeTruthy();
   };
-  await post('abschnitte', {
+  await post('sectors', {
     name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2',
   });
   const ohneEinheit = await post('vehicles', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });

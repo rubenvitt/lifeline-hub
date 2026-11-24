@@ -57,7 +57,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
 
     // Vorbedingung: freie Kartenquellen liefen — sonst wäre „kein Abruf" trivial.
     await expect
-      .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/schaeden/marker`))
+      .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/damages/marker`))
       .toBe(true);
     expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/module-access`);
 
@@ -69,7 +69,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect(eintrag).toBeDisabled();
 
     // Kein Abruf der gesperrten Liste und kein Ausfallhinweis.
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
     await expect(page.getByTestId('lagebild-unvollstaendig')).toHaveCount(0);
 
     // Deeplink in das gesperrte Modul (LFH-888): der Rahmen zeigt den Hinweis statt der Seite,
@@ -81,13 +81,13 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect(page.getByText('Für die eigene Rolle nicht freigegeben')).toBeVisible();
     // Der Beobachter verwaltet keine Freigaben: kein Weg in die Einstellungen (LFH-1078).
     await expect(page.getByRole('button', { name: 'Modulfreigaben öffnen' })).toHaveCount(0);
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
 
     const rueckweg = page.getByRole('button', { name: / öffnen$/ });
     await rueckweg.click();
     await expect(page).not.toHaveURL(/\/lagemeldungen/);
     await expect(hinweis).toHaveCount(0);
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
   } finally {
     // Zurück auf den Admin — nur er darf die Org-Vorgabe setzen.
     await page.request.post('/api/auth/logout');

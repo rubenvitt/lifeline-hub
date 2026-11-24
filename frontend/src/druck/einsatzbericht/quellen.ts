@@ -66,13 +66,13 @@ export const QUELLEN: readonly Quelle[] = [
   // GET /api/einsaetze/{id} — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:113).
   // Kopf, Stand und Abschluss des Einsatzes braucht jeder Block.
   { schluessel: 'einsatz', bloecke: BLOECKE.map((b) => b.schluessel), modul: null },
-  // GET …/fuehrungsstelle — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
+  // GET …/command-post — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
   // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
   { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
   // GET …/mitglieder — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs, `mitglieder`). Sie
   // tragen die Führungsfunktionen EL und S1–S7 (i6k6mzed, D7).
   { schluessel: 'mitglieder', bloecke: nur('fuehrung'), modul: null },
-  // GET …/lagebesprechungen — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
+  // GET …/briefings — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
   // `list`), seit LLH-1111 nicht mehr am Stab.
   { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'lagebesprechung' },
   // GET …/einheiten — `EinsatzLesezugriff<Einheiten>` (src/routes/einsatz_einheit.rs:44).
@@ -96,24 +96,24 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'personalPerioden', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
   // GET …/fahrzeuge — `EinsatzLesezugriff<Fahrzeuge>` (src/routes/einsatz_fahrzeug.rs:30).
   { schluessel: 'fahrzeuge', bloecke: nur('kraefte'), modul: 'fahrzeuge' },
-  // GET …/lageberichte — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
+  // GET …/situation-reports — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
   // (src/routes/lagebericht.rs:20/30, src/routes/vorlagendokument.rs:39).
   { schluessel: 'lageberichte', bloecke: nur('lage'), modul: 'lageberichte' },
-  // GET …/personen — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
+  // GET …/persons — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
   // Die Hilfeleistungen zählen dieselben Personen (LLH-1575).
   { schluessel: 'personen', bloecke: ['bilanz', 'hilfeleistungen'], modul: 'personen' },
-  // GET …/personen/verbleib-angaben — `EinsatzLesezugriff<Personen>`
+  // GET …/persons/whereabouts-details — `EinsatzLesezugriff<Personen>`
   // (src/routes/einsatz_person.rs, `verbleib_angaben`, LLH-1575 D3).
   { schluessel: 'personenVerbleibAngaben', bloecke: nur('hilfeleistungen'), modul: 'personen' },
-  // GET …/schaeden — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
+  // GET …/damages — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
   { schluessel: 'schaeden', bloecke: nur('bilanz'), modul: 'schaeden' },
-  // GET …/evakuierung — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
+  // GET …/evacuation — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
   { schluessel: 'evakuierung', bloecke: nur('bilanz'), modul: 'evakuierung' },
-  // GET …/betreuung — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs).
+  // GET …/care — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs).
   { schluessel: 'betreuung', bloecke: nur('bilanz'), modul: 'betreuung' },
-  // GET …/verpflegung — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
+  // GET …/catering — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
   { schluessel: 'verpflegung', bloecke: nur('bilanz'), modul: 'verpflegung' },
-  // GET …/etb/zaehler — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
+  // GET …/etb/counts — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
   { schluessel: 'etbZaehler', bloecke: nur('etb'), modul: 'etb' },
   // GET …/etb?typ=entscheidung — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:304).
   { schluessel: 'etbEntscheidungen', bloecke: nur('etb'), modul: 'etb' },

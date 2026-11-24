@@ -221,7 +221,7 @@ export function hebtBrAbrufAuf(
   daten: BrAbrufAufhebenEingabe,
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch/withdraw`,
+    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch/void`,
     'POST',
     daten,
   );

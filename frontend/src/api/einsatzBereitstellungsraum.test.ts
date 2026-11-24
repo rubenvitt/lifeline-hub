@@ -37,11 +37,10 @@ describe('Bereitstellungsraum — Abruf und Rücknahme', () => {
   it('nimmt den Abruf eines Fahrzeugs zurück', async () => {
     const send = aufrufe();
     await hebtBrAbrufAuf(4, 9, { objekt_typ: 'fahrzeug', objekt_id: 5 });
-    expect(send).toHaveBeenCalledWith(
-      '/api/einsaetze/4/staging-areas/9/dispatch/withdraw',
-      'POST',
-      { objekt_typ: 'fahrzeug', objekt_id: 5 },
-    );
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9/dispatch/void', 'POST', {
+      objekt_typ: 'fahrzeug',
+      objekt_id: 5,
+    });
   });
 });
 

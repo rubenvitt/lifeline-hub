@@ -5,8 +5,8 @@ import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
- * Neuladen. Seit LLH-1111 setzt ihn nur das Modul Lagebesprechung (`PUT …/lagebesprechung/termin`
- * oder der Abschluss `POST …/lagebesprechungen`); der Kopf-PATCH lehnt das Feld mit 400 ab. Es
+ * Neuladen. Seit LLH-1111 setzt ihn nur das Modul Lagebesprechung (`PUT …/briefing/schedule`
+ * oder der Abschluss `POST …/briefings`); der Kopf-PATCH lehnt das Feld mit 400 ab. Es
  * folgen die Marke im Führungsüberblick und die Seite Lagebesprechung selbst (die Stab-Seite gibt
  * es seit i6k6mzed nicht mehr).
  *
@@ -79,7 +79,7 @@ test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Seite Lagebespre
   });
   expect(patch.status()).toBe(400);
 
-  const termin = await page.request.put(`/api/einsaetze/${id}/lagebesprechung/termin`, {
+  const termin = await page.request.put(`/api/einsaetze/${id}/briefing/schedule`, {
     data: { naechste_at: terminInZweiStunden() },
   });
   expect(termin.ok()).toBeTruthy();
@@ -106,7 +106,7 @@ test('LLH-1111: der Abschluss setzt den Termin, Überblick und Seite Lagebesprec
   await expect(terminKennzahl(seite)).toContainText('kein Termin');
   await expect(seite.getByText('Noch keine Lagebesprechung abgeschlossen')).toBeVisible();
 
-  const abschluss = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+  const abschluss = await page.request.post(`/api/einsaetze/${id}/briefings`, {
     data: { entschluss: 'Lage unverändert', naechste_at: terminInZweiStunden() },
   });
   expect(abschluss.status()).toBe(201);
@@ -169,7 +169,7 @@ test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashb
     .first();
   await expect(platzEins).toContainText('Verbleib offen');
 
-  const festlegen = await page.request.post(`/api/einsaetze/${id}/pegel`, {
+  const festlegen = await page.request.post(`/api/einsaetze/${id}/gauges`, {
     data: { station_uuid: 'a6ee8177-107b-47dd-bcfd-30960ccc6e9c', name: 'Hann. Münden' },
   });
   expect(festlegen.status()).toBe(201);

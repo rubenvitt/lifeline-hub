@@ -123,7 +123,7 @@ export function entlasseDisposition(
   epId: number,
 ): Promise<PersonalEntlassungAntwort> {
   return apiSend<PersonalEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/release`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/stand-down`,
     'POST',
   );
 }
@@ -140,7 +140,7 @@ export function nimmEntlassungZurueck(
   vorzustand: PersonalEntlassungVorzustand,
 ): Promise<PersonalEntlassungRuecknahmeAntwort> {
   return apiSend<PersonalEntlassungRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/release/undo`,
+    `/api/einsaetze/${einsatzId}/personnel/${epId}/stand-down/undo`,
     'POST',
     vorzustand,
   );
@@ -161,7 +161,7 @@ export function reaktiviereDisposition(einsatzId: number, epId: number): Promise
 
 /** L‑2: Lädt die Führungskräfte-Marker für die Lagekarte. */
 export function listeFuehrungskraefte(einsatzId: number): Promise<FuehrungskraftKarte[]> {
-  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/karte/fuehrungskraefte`);
+  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/map/commanders`);
 }
 
 /**

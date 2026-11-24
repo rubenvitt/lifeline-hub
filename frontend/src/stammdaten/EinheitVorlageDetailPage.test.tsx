@@ -94,33 +94,33 @@ function handler(benutzer = admin) {
   const calls: Calls = { list: 0, patch: [], fahrzeuge: [], personal: [], material: [] };
   server.use(
     meHandler(benutzer),
-    http.get('/api/einheit-vorlagen', () => {
+    http.get('/api/unit-templates', () => {
       calls.list += 1;
       return HttpResponse.json(VORLAGEN);
     }),
-    http.get('/api/einheit-typen', () => HttpResponse.json(EINHEIT_TYPEN)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(FAHRZEUGE)),
-    http.get('/api/personal', () => HttpResponse.json(PERSONAL)),
+    http.get('/api/unit-types', () => HttpResponse.json(EINHEIT_TYPEN)),
+    http.get('/api/vehicles', () => HttpResponse.json(FAHRZEUGE)),
+    http.get('/api/personnel', () => HttpResponse.json(PERSONAL)),
     http.get('/api/material', () => HttpResponse.json(MATERIAL)),
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/qualifications', () =>
       HttpResponse.json([
         { id: 1, label: 'Sanitäter', sortier: 10 },
         { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
       ]),
     ),
-    http.patch('/api/einheit-vorlagen/:id', async ({ request }) => {
+    http.patch('/api/unit-templates/:id', async ({ request }) => {
       calls.patch.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
     }),
-    http.put('/api/einheit-vorlagen/:id/fahrzeuge', async ({ request }) => {
+    http.put('/api/unit-templates/:id/vehicles', async ({ request }) => {
       calls.fahrzeuge.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
     }),
-    http.put('/api/einheit-vorlagen/:id/personal', async ({ request }) => {
+    http.put('/api/unit-templates/:id/personnel', async ({ request }) => {
       calls.personal.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
     }),
-    http.put('/api/einheit-vorlagen/:id/material', async ({ request }) => {
+    http.put('/api/unit-templates/:id/material', async ({ request }) => {
       calls.material.push(await request.json());
       return HttpResponse.json(RETTUNGSSTAFFEL);
     }),
@@ -220,7 +220,7 @@ describe('EinheitVorlageDetailPage', () => {
   it('Qualifikationssoll: das des Typs steht als Vorgabe, ein eigenes geht allein hinaus (LLH-1553)', async () => {
     const calls = handler();
     server.use(
-      http.get('/api/einheit-typen', () =>
+      http.get('/api/unit-types', () =>
         HttpResponse.json([
           {
             ...EINHEIT_TYPEN[0],
@@ -327,7 +327,7 @@ describe('EinheitVorlageDetailPage', () => {
   it('eine abgelehnte Zuordnung nennt ihren Grund im Paneel', async () => {
     handler();
     server.use(
-      http.put('/api/einheit-vorlagen/:id/fahrzeuge', () =>
+      http.put('/api/unit-templates/:id/vehicles', () =>
         HttpResponse.json(
           { error: 'Fahrzeug steht schon in diesem Vorlagen-Baum' },
           { status: 422 },
@@ -408,7 +408,7 @@ describe('EinheitVorlageDetailPage', () => {
     const calls = handler();
     const user = userEvent.setup();
     server.use(
-      http.get('/api/einheit-vorlagen', () =>
+      http.get('/api/unit-templates', () =>
         HttpResponse.json(
           VORLAGEN.map((v) =>
             v.id === SANITAETSZUG.id
@@ -468,7 +468,7 @@ describe('EinheitVorlageDetailPage', () => {
   it('ein Stück mit alter Menge über 1 geht mit Menge 1, damit die Liste speicherbar bleibt', async () => {
     const calls = handler();
     server.use(
-      http.get('/api/einheit-vorlagen', () =>
+      http.get('/api/unit-templates', () =>
         HttpResponse.json(
           VORLAGEN.map((v) =>
             v.id === RETTUNGSSTAFFEL.id
@@ -514,7 +514,7 @@ describe('EinheitVorlageDetailPage', () => {
   it('ein Stück hat Menge 1 fest; eine Ablehnung steht im Paneel', async () => {
     handler();
     server.use(
-      http.get('/api/einheit-vorlagen', () =>
+      http.get('/api/unit-templates', () =>
         HttpResponse.json(
           VORLAGEN.map((v) =>
             v.id === RETTUNGSSTAFFEL.id
@@ -537,7 +537,7 @@ describe('EinheitVorlageDetailPage', () => {
           ),
         ),
       ),
-      http.put('/api/einheit-vorlagen/:id/material', () =>
+      http.put('/api/unit-templates/:id/material', () =>
         HttpResponse.json(
           { error: 'Gerät «Stromerzeuger» steht schon in «Zug» im selben Vorlagen-Baum' },
           { status: 422 },

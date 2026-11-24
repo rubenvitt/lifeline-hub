@@ -25,7 +25,7 @@ fn sse_snapshot(state: &AppState, einsatz_id: i64, snapshot_id: i64) {
     );
 }
 
-/// GET /api/einsaetze/{id}/lage-snapshots — Metadaten-Liste (neueste zuerst, ohne `daten`).
+/// GET /api/einsaetze/{id}/situation-snapshots — Metadaten-Liste (neueste zuerst, ohne `daten`).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
@@ -34,7 +34,7 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
-/// POST /api/einsaetze/{id}/lage-snapshots — „Stand sichern": friert das volle Lagebild ein.
+/// POST /api/einsaetze/{id}/situation-snapshots — „Stand sichern": friert das volle Lagebild ein.
 /// Die Antwort trägt `daten` und wird wie das GET redigiert (s. [`redigiere_nach_modulrechten`]).
 pub async fn erzeugen(
     State(state): State<AppState>,
@@ -103,7 +103,7 @@ async fn redigiere_nach_modulrechten(
     Ok(())
 }
 
-/// GET /api/einsaetze/{id}/lage-snapshots/{sid} — Volldokument eines Standes (inkl. `daten`).
+/// GET /api/einsaetze/{id}/situation-snapshots/{sid} — Volldokument eines Standes (inkl. `daten`).
 /// Das Dokument wird vor der Rückgabe auf die Modul-Rechte des Lesers redigiert (s.
 /// [`redigiere_nach_modulrechten`]).
 pub async fn einzeln(
@@ -118,7 +118,7 @@ pub async fn einzeln(
     Ok(Json(dok))
 }
 
-/// PATCH /api/einsaetze/{id}/lage-snapshots/{sid} — NUR `bezeichnung`/`notiz` (unveränderliches
+/// PATCH /api/einsaetze/{id}/situation-snapshots/{sid} — NUR `bezeichnung`/`notiz` (unveränderliches
 /// Dokument; `daten`/`stand_at`/`erstellt_*` sind im DTO strukturell nicht enthalten). Die
 /// Antwort trägt `daten` und wird wie das GET redigiert.
 pub async fn patch(
@@ -144,7 +144,7 @@ pub async fn patch(
     Ok(Json(dok))
 }
 
-/// DELETE /api/einsaetze/{id}/lage-snapshots/{sid} — Dokumenten-Vernichtung. Nur Einsatzleitung
+/// DELETE /api/einsaetze/{id}/situation-snapshots/{sid} — Dokumenten-Vernichtung. Nur Einsatzleitung
 /// (`fordere_einsatzleitung`, über das Schreib-Gate hinaus). Unbekannte id → 404.
 pub async fn loeschen(
     State(state): State<AppState>,

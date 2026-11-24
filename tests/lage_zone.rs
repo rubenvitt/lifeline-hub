@@ -42,7 +42,7 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
     let (status, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -54,7 +54,7 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         None,
     )
@@ -79,7 +79,7 @@ async fn zu_lange_bezeichnung_ist_400_beim_anlegen_und_aendern() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let u = format!("/api/einsaetze/{einsatz}/zonen");
+    let u = format!("/api/einsaetze/{einsatz}/zones");
     let fehler = format!("Bezeichnung darf höchstens {LABEL_MAX} Zeichen lang sein");
 
     let genau = "ä".repeat(LABEL_MAX);
@@ -160,7 +160,7 @@ async fn zu_lange_notiz_und_ungueltige_farbe_sind_400_beim_anlegen_und_aendern()
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let u = format!("/api/einsaetze/{einsatz}/zonen");
+    let u = format!("/api/einsaetze/{einsatz}/zones");
     let notiz_fehler = format!("Notiz darf höchstens {NOTIZ_MAX} Zeichen lang sein");
     let farbe_fehler = "Farbe muss die Form #rrggbb haben";
 
@@ -325,7 +325,7 @@ async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &format!("/api/einsaetze/{einsatz}/zones"),
             &admin,
             Some(&b1)
         )
@@ -339,7 +339,7 @@ async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &format!("/api/einsaetze/{einsatz}/zones"),
             &admin,
             Some(&b2)
         )
@@ -353,7 +353,7 @@ async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &format!("/api/einsaetze/{einsatz}/zones"),
             &admin,
             Some(&b3)
         )
@@ -371,7 +371,7 @@ async fn unbekannter_geometrie_typ_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let u = format!("/api/einsaetze/{einsatz}/zonen");
+    let u = format!("/api/einsaetze/{einsatz}/zones");
 
     let schlecht =
         json!({"typ":"gefahrengebiet","geometrie_typ":"Quatsch","geometrie":POLY}).to_string();
@@ -398,13 +398,13 @@ async fn patch_unbekannter_typ_ist_400() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
     .await;
     let zid = z["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/zonen/{zid}");
+    let u = format!("/api/einsaetze/{einsatz}/zones/{zid}");
 
     let (status, antwort) = anfrage(&app, "PATCH", &u, &admin, Some(r#"{"typ":"quatsch"}"#)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{antwort:?}");
@@ -424,7 +424,7 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -435,7 +435,7 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r#"{"notiz":"egal"}"#),
     )
@@ -449,7 +449,7 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r##"{"farbe":"#ff0000"}"##),
     )
@@ -463,7 +463,7 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r#"{"label":"B"}"#),
     )
@@ -492,7 +492,7 @@ async fn patch_typ_weg_von_freie_skizze_nullt_farbe() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -503,7 +503,7 @@ async fn patch_typ_weg_von_freie_skizze_nullt_farbe() {
     let (status, nach) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r#"{"typ":"gefahrengebiet"}"#),
     )
@@ -526,7 +526,7 @@ async fn patch_typ_inkompatibel_zur_geometrie_ist_422() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -535,7 +535,7 @@ async fn patch_typ_inkompatibel_zur_geometrie_ist_422() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r#"{"typ":"gefahrengebiet"}"#),
     )
@@ -554,7 +554,7 @@ async fn delete_schreibt_etb_aufgehoben() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -563,7 +563,7 @@ async fn delete_schreibt_etb_aufgehoben() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         None,
     )
@@ -577,7 +577,7 @@ async fn delete_schreibt_etb_aufgehoben() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         None,
     )
@@ -597,7 +597,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -610,7 +610,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(r#"{"label":"X"}"#),
     )
@@ -620,7 +620,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         None,
     )
@@ -638,7 +638,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -650,7 +650,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let get = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &fremd_c,
         None,
     )
@@ -663,7 +663,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let post = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &fremd_c,
         Some(&body),
     )
@@ -676,7 +676,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let patch = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &fremd_c,
         Some(r#"{"label":"x"}"#),
     )
@@ -689,7 +689,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let del = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &fremd_c,
         None,
     )
@@ -712,7 +712,7 @@ async fn anlegen_gefahrengebiet_erzeugt_gruppe() {
     let (status, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -725,7 +725,7 @@ async fn anlegen_gefahrengebiet_erzeugt_gruppe() {
     let (_, gebiete) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -743,7 +743,7 @@ async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -751,7 +751,7 @@ async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
     let (_, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -763,7 +763,7 @@ async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
     let (status, a2) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{a_id}"),
         &admin,
         Some(&patch),
     )
@@ -774,7 +774,7 @@ async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
     let (_, gebiete) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -794,7 +794,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -802,7 +802,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
     let (_, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -813,7 +813,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
     anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{ziel}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{ziel}/matrix/rating"),
         &admin,
         Some(
             &json!({"gefahrentyp":"brand","schutzobjekt":"menschen","warnstufe":"hoch"})
@@ -825,7 +825,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{a_id}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": ziel}).to_string()),
     )
@@ -833,7 +833,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
     let (_, matrix) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{ziel}/matrix"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{ziel}/matrix"),
         &admin,
         None,
     )
@@ -852,7 +852,7 @@ async fn split_legt_neue_gruppe_an() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -860,7 +860,7 @@ async fn split_legt_neue_gruppe_an() {
     let (_, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -872,7 +872,7 @@ async fn split_legt_neue_gruppe_an() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{a_id}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": ziel}).to_string()),
     )
@@ -881,7 +881,7 @@ async fn split_legt_neue_gruppe_an() {
     let (status, a2) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{a_id}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": null}).to_string()),
     )
@@ -896,7 +896,7 @@ async fn split_legt_neue_gruppe_an() {
     let (_, gebiete) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -914,7 +914,7 @@ async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -924,7 +924,7 @@ async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
     anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas/{gid}/matrix/rating"),
         &admin,
         Some(
             &json!({"gefahrentyp":"brand","schutzobjekt":"menschen","warnstufe":"hoch"})
@@ -935,7 +935,7 @@ async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         None,
     )
@@ -943,7 +943,7 @@ async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
     let (_, gebiete) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &format!("/api/einsaetze/{einsatz}/hazard-areas"),
         &admin,
         None,
     )
@@ -966,7 +966,7 @@ async fn merge_ziel_aus_fremdem_einsatz_ist_notfound() {
     let (_, za) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a}/zonen"),
+        &format!("/api/einsaetze/{a}/zones"),
         &admin,
         Some(&body),
     )
@@ -974,7 +974,7 @@ async fn merge_ziel_aus_fremdem_einsatz_ist_notfound() {
     let (_, zb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b}/zonen"),
+        &format!("/api/einsaetze/{b}/zones"),
         &admin,
         Some(&body),
     )
@@ -985,7 +985,7 @@ async fn merge_ziel_aus_fremdem_einsatz_ist_notfound() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{a}/zonen/{za_id}"),
+        &format!("/api/einsaetze/{a}/zones/{za_id}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": gid_b}).to_string()),
     )
@@ -1003,7 +1003,7 @@ async fn gefahrengebiet_id_an_nicht_gefahrengebiet_zone_ist_422() {
     let (_, g) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&gbody),
     )
@@ -1014,7 +1014,7 @@ async fn gefahrengebiet_id_an_nicht_gefahrengebiet_zone_ist_422() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&abody),
     )
@@ -1023,7 +1023,7 @@ async fn gefahrengebiet_id_an_nicht_gefahrengebiet_zone_ist_422() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{aid}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": gid}).to_string()),
     )
@@ -1041,7 +1041,7 @@ async fn merge_feuert_gefahr_event() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -1049,7 +1049,7 @@ async fn merge_feuert_gefahr_event() {
     let (_, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -1060,7 +1060,7 @@ async fn merge_feuert_gefahr_event() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{a_id}"),
         &admin,
         Some(&json!({"gefahrengebiet_id": ziel}).to_string()),
     )
@@ -1089,7 +1089,7 @@ async fn zone_anlegen(
     let (s, z) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         cookie,
         Some(&body.to_string()),
     )
@@ -1109,7 +1109,7 @@ async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
     let (s, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(
             &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"ansicht_id":aid})
@@ -1140,7 +1140,7 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/zonen?ansicht={x}"),
+        &format!("/api/einsaetze/{einsatz}/zones?ansicht={x}"),
         &admin,
         None,
     )
@@ -1174,7 +1174,7 @@ async fn patch_verschiebt_zwischen_ansichten() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(&json!({"ansicht_id": y}).to_string()),
     )
@@ -1186,7 +1186,7 @@ async fn patch_verschiebt_zwischen_ansichten() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         Some(&json!({"ansicht_id": Value::Null}).to_string()),
     )
@@ -1214,7 +1214,7 @@ async fn fremde_ansicht_id_ist_404() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &format!("/api/einsaetze/{einsatz}/zones"),
             &admin,
             Some(
                 &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"ansicht_id":aid})
@@ -1230,7 +1230,7 @@ async fn fremde_ansicht_id_ist_404() {
         let (s, v) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+            &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
             &admin,
             Some(&json!({"ansicht_id": aid}).to_string()),
         )
@@ -1241,7 +1241,7 @@ async fn fremde_ansicht_id_ist_404() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         None,
     )
@@ -1260,7 +1260,7 @@ async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
         cookie,
         Some(
             &json!({"bezeichnung": bezeichnung, "plan_personen": 640, "plan_erhebung": "geschaetzt"})
@@ -1285,7 +1285,7 @@ async fn bezirksflaeche(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         cookie,
         Some(&body.to_string()),
     )
@@ -1296,7 +1296,7 @@ async fn flaechen(app: &axum::Router, cookie: &str, einsatz: i64, bezirk: i64) -
     let (_, u) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/evakuierung"),
+        &format!("/api/einsaetze/{einsatz}/evacuation"),
         cookie,
         None,
     )
@@ -1331,7 +1331,7 @@ async fn evakuierungsbezirk_ist_flaeche_mit_eigenem_etb_wort() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({"typ":"evakuierungsbezirk","geometrie_typ":"LineString","geometrie":LINE})
@@ -1370,7 +1370,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
     let (s, b) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{b_id}"),
+        &format!("/api/einsaetze/{e}/zones/{b_id}"),
         &admin,
         Some(&json!({"evakuierungsbezirk_id": ufer}).to_string()),
     )
@@ -1383,7 +1383,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
     let (s, b) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{b_id}"),
+        &format!("/api/einsaetze/{e}/zones/{b_id}"),
         &admin,
         Some(&json!({"evakuierungsbezirk_id": null}).to_string()),
     )
@@ -1399,7 +1399,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/zonen/{a_id}"),
+        &format!("/api/einsaetze/{e}/zones/{a_id}"),
         &admin,
         None,
     )
@@ -1423,7 +1423,7 @@ async fn typwechsel_weg_vom_bezirk_loescht_die_zuordnung() {
     let (s, z) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"typ": "absperrbereich"}).to_string()),
     )
@@ -1452,7 +1452,7 @@ async fn zuordnung_statuscodes_422_404_409() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({"typ":"sperrgebiet","geometrie_typ":"Polygon","geometrie":POLY,
@@ -1466,7 +1466,7 @@ async fn zuordnung_statuscodes_422_404_409() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{sperr}"),
+        &format!("/api/einsaetze/{e}/zones/{sperr}"),
         &admin,
         Some(&json!({"evakuierungsbezirk_id": ufer}).to_string()),
     )
@@ -1483,7 +1483,7 @@ async fn zuordnung_statuscodes_422_404_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evacuation/districts/{ufer}/annul"),
         &admin,
         None,
     )
@@ -1532,7 +1532,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evakuierung"),
+        &format!("/api/einsaetze/{e}/evacuation"),
         &frieda,
         None,
     )
@@ -1556,7 +1556,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &frieda,
         None,
     )
@@ -1567,7 +1567,7 @@ async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &frieda,
         Some(&json!({"evakuierungsbezirk_id": null}).to_string()),
     )
@@ -1587,7 +1587,7 @@ async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evacuation/districts/{ufer}/annul"),
         &admin,
         None,
     )
@@ -1620,7 +1620,7 @@ async fn kreis_anlegen_rechnet_polygon_und_schreibt_radius_in_den_etb() {
     let (s, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(&body),
     )
@@ -1646,7 +1646,7 @@ async fn kreis_anlegen_rechnet_polygon_und_schreibt_radius_in_den_etb() {
     let (_, frei) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
@@ -1662,7 +1662,7 @@ async fn kreis_grenzen_sind_400_kombinationen_422() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{e}/zonen");
+    let pfad = format!("/api/einsaetze/{e}/zones");
     let kreis = |r: f64, lat: f64| json!({"mitte_lat": lat, "mitte_lon": 9.5, "radius_m": r});
     let faelle = [
         (
@@ -1715,7 +1715,7 @@ async fn kreiszone(app: &axum::Router, cookie: &str, e: i64, typ: &str, r: f64) 
     let (s, z) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         cookie,
         Some(
             &json!({"typ":typ,"label":"Nord","kreis":{"mitte_lat":54.0,"mitte_lon":9.5,"radius_m":r}})
@@ -1738,7 +1738,7 @@ async fn radius_patch_rechnet_neu_und_schreibt_etb() {
     let (s, neu) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"kreis_radius_m": 500.0}).to_string()),
     )
@@ -1758,7 +1758,7 @@ async fn radius_patch_rechnet_neu_und_schreibt_etb() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"kreis_radius_m": 0}).to_string()),
     )
@@ -1767,7 +1767,7 @@ async fn radius_patch_rechnet_neu_und_schreibt_etb() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"kreis_radius_m": 500.0}).to_string()),
     )
@@ -1789,7 +1789,7 @@ async fn mitte_patch_rechnet_neu_radius_bleibt() {
     let e = einsatz_anlegen(&app, &admin).await;
     let z = kreiszone(&app, &admin, e, "absperrbereich", 300.0).await;
     let zid = z["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{e}/zonen/{zid}");
+    let pfad = format!("/api/einsaetze/{e}/zones/{zid}");
     // 0,001° Breite ≈ 111 m nach Norden.
     let (s, neu) = anfrage(
         &app,
@@ -1874,7 +1874,7 @@ async fn mitte_patch_grenzen_400_und_422() {
     let (_, frei) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
@@ -1918,7 +1918,7 @@ async fn mitte_patch_grenzen_400_und_422() {
         let (s, j) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{e}/zonen/{id}"),
+            &format!("/api/einsaetze/{e}/zones/{id}"),
             &admin,
             Some(&body.to_string()),
         )
@@ -1929,7 +1929,7 @@ async fn mitte_patch_grenzen_400_und_422() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         None,
     )
@@ -1954,7 +1954,7 @@ async fn punktweise_bearbeitung_loescht_den_kreis() {
     let (_, frei) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
@@ -1965,7 +1965,7 @@ async fn punktweise_bearbeitung_loescht_den_kreis() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{frei_id}"),
+        &format!("/api/einsaetze/{e}/zones/{frei_id}"),
         &admin,
         Some(&json!({"kreis_radius_m": 500.0}).to_string()),
     )
@@ -1977,7 +1977,7 @@ async fn punktweise_bearbeitung_loescht_den_kreis() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"kreis_radius_m": 500.0, "geometrie": POLY}).to_string()),
     )
@@ -1986,7 +1986,7 @@ async fn punktweise_bearbeitung_loescht_den_kreis() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"geometrie": LINE}).to_string()),
     )
@@ -1996,7 +1996,7 @@ async fn punktweise_bearbeitung_loescht_den_kreis() {
     let (s, neu) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &format!("/api/einsaetze/{e}/zones/{zid}"),
         &admin,
         Some(&json!({"geometrie": POLY}).to_string()),
     )
@@ -2023,7 +2023,7 @@ async fn kreis_gefahrengebiet_hat_gruppe_und_matrix() {
     let (s, m) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/gefahrengebiete/{gebiet}/matrix"),
+        &format!("/api/einsaetze/{e}/hazard-areas/{gebiet}/matrix"),
         &admin,
         None,
     )
@@ -2044,7 +2044,7 @@ async fn zone_etb_eintraege_gehen_live_hinaus() {
     let (s, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &format!("/api/einsaetze/{einsatz}/zones"),
         &admin,
         Some(&body),
     )
@@ -2055,7 +2055,7 @@ async fn zone_etb_eintraege_gehen_live_hinaus() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/zones/{zid}"),
         &admin,
         None,
     )

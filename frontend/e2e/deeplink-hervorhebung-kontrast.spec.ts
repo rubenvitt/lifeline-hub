@@ -272,7 +272,7 @@ for (const modus of ['light', 'dark'] as const) {
     });
     const auftrag = async (auftrag_text: string, frist_at?: string) =>
       (
-        await post(page, `/api/einsaetze/${einsatzId}/auftraege`, {
+        await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
           auftrag_text,
           empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
           ...(frist_at ? { frist_at } : {}),
@@ -343,8 +343,7 @@ for (const modus of ['light', 'dark'] as const) {
       bezeichnung: `E2E oxgob5gk Befehl ${modus} ${Date.now()}`,
     });
     const befehl = async (titel: string) =>
-      (await post(page, `/api/einsaetze/${einsatzId}/befehle`, { vorlage: 'befehl_lad', titel }))
-        .id;
+      (await post(page, `/api/einsaetze/${einsatzId}/orders`, { vorlage: 'befehl_lad', titel })).id;
     const nachbarId = await befehl('Nachbarbefehl');
     const zielId = await befehl('Angesprungener Befehl');
     const karte = (id: number) => page.locator(`[data-lfh="komm-karte"][data-befehl-id="${id}"]`);
@@ -385,7 +384,7 @@ for (const modus of ['light', 'dark'] as const) {
     for (const auftrag_text of ['Erster Auftrag', 'Gewählter Auftrag', 'Dritter Auftrag']) {
       ids.push(
         (
-          await post(page, `/api/einsaetze/${einsatzId}/auftraege`, {
+          await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
             auftrag_text,
             empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
           })

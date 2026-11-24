@@ -102,12 +102,12 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 634 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+    const basis = `/api/einsaetze/${einsatzId}/catering`;
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
 
     // Unterdeckung: 90 EP Bedarf, 30 gültig ausgegeben, eine zurückgenommene Ausgabe.
-    const fruehstueck = await post(page, `${basis}/zeitfenster`, {
+    const fruehstueck = await post(page, `${basis}/time-slots`, {
       bezeichnung: 'Frühstück Kontrast',
       von_at: zeit(-40),
       bis_at: zeit(80),
@@ -115,7 +115,7 @@ for (const modus of ['light', 'dark'] as const) {
       bedarf_betreute: 30,
       sonderkost: { vegetarisch: 10, vegan: 12 },
     });
-    await post(page, `${basis}/zeitfenster/${fruehstueck.id}/ausgaben`, {
+    await post(page, `${basis}/time-slots/${fruehstueck.id}/distributions`, {
       menge: 30,
       zeitpunkt_at: zeit(-35),
       ort: 'Feldküche Nord',
@@ -124,28 +124,28 @@ for (const modus of ['light', 'dark'] as const) {
     });
     const falsch = await post<{ ausgabe_id: number }>(
       page,
-      `${basis}/zeitfenster/${fruehstueck.id}/ausgaben`,
+      `${basis}/time-slots/${fruehstueck.id}/distributions`,
       { menge: 25, zeitpunkt_at: zeit(-30), ort: 'Deichweg' },
     );
-    await post(page, `${basis}/ausgaben/${falsch.ausgabe_id}/zuruecknehmen`);
+    await post(page, `${basis}/distributions/${falsch.ausgabe_id}/undo`);
     // Stellen: zwei aktive (eine danach aufgelöst), eine geplante.
     const stelle = async (bezeichnung: string, art: string, status?: string) => {
-      const { id } = await post(page, `${basis}/stellen`, { bezeichnung, art });
-      if (status) await post(page, `${basis}/stellen/${id}/status`, { status });
+      const { id } = await post(page, `${basis}/positions`, { bezeichnung, art });
+      if (status) await post(page, `${basis}/positions/${id}/status`, { status });
       return id;
     };
     const feldkueche = await stelle('Feldküche Kontrast', 'feldkueche', 'aktiv');
     const turnhalle = await stelle('Turnhalle Kontrast', 'ausgabestelle', 'aktiv');
     await stelle('Deich Kontrast', 'zufuehrung');
     // Gedeckt: 40 EP Bedarf, 25 an der Feldküche und 15 an der Turnhalle ausgegeben.
-    const mittag = await post(page, `${basis}/zeitfenster`, {
+    const mittag = await post(page, `${basis}/time-slots`, {
       bezeichnung: 'Mittag Kontrast',
       von_at: zeit(-10),
       bis_at: zeit(110),
       bedarf_kraefte: 30,
       bedarf_betreute: 10,
     });
-    const r = await page.request.patch(`${basis}/zeitfenster/${mittag.id}`, {
+    const r = await page.request.patch(`${basis}/time-slots/${mittag.id}`, {
       data: { stelle_ids: [feldkueche, turnhalle], verpflegungsart: 'warm' },
     });
     expect(r.ok(), `Zuordnung: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -153,15 +153,15 @@ for (const modus of ['light', 'dark'] as const) {
       [25, feldkueche],
       [15, turnhalle],
     ] as const) {
-      await post(page, `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
+      await post(page, `${basis}/time-slots/${mittag.id}/distributions`, {
         menge,
         zeitpunkt_at: zeit(-5),
         verpflegungsstelle_id: stelleId,
       });
     }
-    await post(page, `${basis}/stellen/${turnhalle}/status`, { status: 'aufgeloest' });
+    await post(page, `${basis}/positions/${turnhalle}/status`, { status: 'aufgeloest' });
     // Offen: Beginn in drei Stunden, keine Ausgabe, Sonderkost-Fehlmenge ohne Alarm.
-    await post(page, `${basis}/zeitfenster`, {
+    await post(page, `${basis}/time-slots`, {
       bezeichnung: 'Abendessen Kontrast',
       von_at: zeit(180),
       bis_at: zeit(240),
@@ -446,12 +446,12 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 1032 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+    const basis = `/api/einsaetze/${einsatzId}/catering`;
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
     const ids: Record<string, number> = {};
     ids['Frühstück Kontrast'] = (
-      await post(page, `${basis}/zeitfenster`, {
+      await post(page, `${basis}/time-slots`, {
         bezeichnung: 'Frühstück Kontrast',
         von_at: zeit(-40),
         bis_at: zeit(80),
@@ -460,13 +460,13 @@ for (const modus of ['light', 'dark'] as const) {
         sonderkost: { vegetarisch: 10, vegan: 12 },
       })
     ).id;
-    await post(page, `${basis}/zeitfenster/${ids['Frühstück Kontrast']}/ausgaben`, {
+    await post(page, `${basis}/time-slots/${ids['Frühstück Kontrast']}/distributions`, {
       menge: 30,
       zeitpunkt_at: zeit(-35),
       sonderkost: { vegetarisch: 10, vegan: 4 },
     });
     ids['Mittag Kontrast'] = (
-      await post(page, `${basis}/zeitfenster`, {
+      await post(page, `${basis}/time-slots`, {
         bezeichnung: 'Mittag Kontrast',
         von_at: zeit(-10),
         bis_at: zeit(110),
@@ -474,12 +474,12 @@ for (const modus of ['light', 'dark'] as const) {
         bedarf_betreute: 10,
       })
     ).id;
-    await post(page, `${basis}/zeitfenster/${ids['Mittag Kontrast']}/ausgaben`, {
+    await post(page, `${basis}/time-slots/${ids['Mittag Kontrast']}/distributions`, {
       menge: 40,
       zeitpunkt_at: zeit(-5),
     });
     ids['Abendessen Kontrast'] = (
-      await post(page, `${basis}/zeitfenster`, {
+      await post(page, `${basis}/time-slots`, {
         bezeichnung: 'Abendessen Kontrast',
         von_at: zeit(180),
         bis_at: zeit(240),

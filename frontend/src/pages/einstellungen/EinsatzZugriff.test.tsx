@@ -34,7 +34,7 @@ function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = 
         },
       ]),
     ),
-    http.get('/api/einsaetze/1/members/candidates', () =>
+    http.get('/api/einsaetze/1/members/selection', () =>
       HttpResponse.json([{ benutzer_id: 9, anzeigename: 'Paul Probe' }]),
     ),
   );

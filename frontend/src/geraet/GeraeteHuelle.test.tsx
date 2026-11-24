@@ -127,9 +127,9 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
     http.get('/api/einsaetze/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/personen', () => HttpResponse.json([wartend, ausgetreten])),
+    http.get('/api/einsaetze/7/persons', () => HttpResponse.json([wartend, ausgetreten])),
     http.get('/api/einsaetze/7/uhs/2', () => HttpResponse.json(uhs)),
-    http.get('/api/einsaetze/7/personen/10', () =>
+    http.get('/api/einsaetze/7/persons/10', () =>
       HttpResponse.json({
         ...wartend,
         sichtungen: [],
@@ -145,7 +145,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
     // Die Bestätiger-Liste („Bestätigt von“) holt das UHS-Tablet vorab, damit sie ohne Netz da
     // ist; ohne Handler scheiterte der Abruf an der Leitung, und die Personendaten stünden auf
     // „ohne Verbindung“ gesperrt.
-    http.get('/api/einsaetze/7/personen/bestaetiger', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/persons/confirmers', () => HttpResponse.json([])),
   );
 }
 
@@ -259,7 +259,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
       zeitpunkt_at,
     });
     server.use(
-      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([normal, sofort, sk2Sofort])),
+      http.get('/api/einsaetze/7/persons', () => HttpResponse.json([normal, sofort, sk2Sofort])),
       http.get('/api/einsaetze/7/uhs/2', () =>
         HttpResponse.json({
           ...uhs,
@@ -313,7 +313,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
       zeitpunkt_at,
     });
     server.use(
-      http.get('/api/einsaetze/7/personen', () =>
+      http.get('/api/einsaetze/7/persons', () =>
         HttpResponse.json([ausgetreten, sk3, sk1, ohne, sk1Frueh]),
       ),
       http.get('/api/einsaetze/7/uhs/2', () =>
@@ -355,7 +355,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     stelleBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons/10/triage', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(
           { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
@@ -386,7 +386,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     stelleBereit();
     const gesendet: { zeitpunkt_at?: string; client_id?: string }[] = [];
     server.use(
-      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons/10/triage', async ({ request }) => {
         gesendet.push((await request.json()) as (typeof gesendet)[number]);
         return HttpResponse.json(
           { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
@@ -426,7 +426,7 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     stelleBereit();
     const gesendet: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons', async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(
           { id: 30, einsatz_id: 7, registrier_nr: 30, status: 'betroffen' },
@@ -488,11 +488,11 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     let abrufe = 0;
     const gesendet: Record<string, unknown>[] = [];
     server.use(
-      http.get('/api/einsaetze/7/personen/bestaetiger', () => {
+      http.get('/api/einsaetze/7/persons/confirmers', () => {
         abrufe += 1;
         return HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]);
       }),
-      http.post('/api/einsaetze/7/personen/10/massnahmen', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons/10/interventions', async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),
@@ -605,7 +605,7 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
     vi.useRealTimers();
     stelleBereit();
     server.use(
-      http.get('/api/einsaetze/7/personen/10', () =>
+      http.get('/api/einsaetze/7/persons/10', () =>
         HttpResponse.json({
           ...wartend,
           aufenthalt: {
@@ -731,8 +731,8 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
         materialListe();
         return HttpResponse.json([], { status: 403 });
       }),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([eigene])),
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([eigene])),
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...eigene, id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -845,7 +845,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     laptopBereit();
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/7/meldungen', () => {
+      http.post('/api/einsaetze/7/reports', () => {
         versuch += 1;
         // Der zweite Versuch bleibt offen: geräumt wird beim Absenden, nicht erst beim Erfolg.
         return versuch === 1
@@ -950,7 +950,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
         HttpResponse.json([einheit(30, 'LF Nord', null), einheit(31, 'RTW 1', 4)]),
       ),
       http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
       http.post('/api/einsaetze/7/staging-areas/4/occupancy', async ({ request }) => {
         belegt.push(await request.json());
         return HttpResponse.json({}, { status: 201 });
@@ -1024,7 +1024,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     brBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -1057,7 +1057,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     const { raumAbruf } = brBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -1120,17 +1120,17 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
           }),
         ),
       ),
-      http.get('/api/einsaetze/7/verpflegung', () =>
+      http.get('/api/einsaetze/7/catering', () =>
         HttpResponse.json({
           zeitfenster: [zeitfenster({ id: 1, einsatz_id: 7, von_at: wire(-30), bis_at: wire(60) })],
           stellen,
         }),
       ),
-      http.get('/api/einsaetze/7/nachforderungen', () => {
+      http.get('/api/einsaetze/7/resource-requests', () => {
         nachforderungen();
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
     );
     return { nachforderungen };
   }
@@ -1181,7 +1181,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     verpflegungBereit();
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+      http.post('/api/einsaetze/7/reports', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
       }),
@@ -1267,7 +1267,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
 
       // Die Einsatzleitung benennt die Stelle um; `/me` nennt weiter den alten Namen.
       server.use(
-        http.get('/api/einsaetze/7/verpflegung', () =>
+        http.get('/api/einsaetze/7/catering', () =>
           HttpResponse.json({
             zeitfenster: [],
             stellen: [stelle({ id: 21, bezeichnung: 'Feldküche Festwiese' })],

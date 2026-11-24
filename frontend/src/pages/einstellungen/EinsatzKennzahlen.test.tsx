@@ -47,7 +47,7 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.put('/api/einsaetze/1/lagekennzahl-wahl', async ({ request }) => {
+    http.put('/api/einsaetze/1/situation-metric-selection', async ({ request }) => {
       const body = (await request.json()) as { gewaehlt: string[] };
       aufrufe.push(body);
       if (a.putStatus) return HttpResponse.json({ error: 'nein' }, { status: a.putStatus });

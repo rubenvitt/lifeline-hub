@@ -231,6 +231,37 @@ impl AlarmQuelle {
     ];
 }
 
+/// Eine Kachel des Lagemonitors, die mit ihrem Modul ausgeblendet wird (LLH-2072). Für
+/// [`LagemonitorAnzeige::ausgeblendet`]; „Ablauf“ hängt an den Einsatzdaten und fehlt nie.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LagemonitorKachel {
+    /// „Betroffene“ bzw. „Hilfeleistungen“.
+    Betroffene,
+    /// „Meldungen“ (offene Sofortmeldungen).
+    Meldungen,
+    Kraefte,
+    /// „Belegung der Unfallhilfsstellen“ samt Zusatz „an UHS“ und UHS-Marken der Karte.
+    Uhs,
+}
+
+impl LagemonitorKachel {
+    /// Ob die Kachel fehlt, wenn `aus` die im Einsatz ausgeblendeten Module nennt. Kräfte fehlt
+    /// wie die Kennzahl im Lagebild (`kraefteZustand`), sobald Personal oder Einheiten aus ist
+    /// (`frontend/src/geraet/AGENTS.md`, Lagemonitor).
+    fn is_ausgeblendet(self, aus: &std::collections::HashSet<&'static str>) -> bool {
+        let module: &[&str] = match self {
+            Self::Betroffene => &["personen"],
+            Self::Meldungen => &["meldungen"],
+            Self::Kraefte => &["personal", "einheiten"],
+            Self::Uhs => &["unfallhilfsstellen"],
+        };
+        module.iter().any(|m| aus.contains(m))
+    }
+
+    const ALL: [Self; 4] = [Self::Betroffene, Self::Meldungen, Self::Kraefte, Self::Uhs];
+}
+
 /// Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
 /// Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
 /// überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
@@ -285,9 +316,14 @@ pub struct LagemonitorAnzeige {
     /// speist auch das Lagebild für Externe und die API v1, die den Block nicht tragen.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alarm: Option<LagemonitorAlarm>,
+    /// Kacheln, deren Modul im Einsatz ausgeblendet ist (LLH-2072), in der Folge von
+    /// [`LagemonitorKachel`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer, und
+    /// der Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ausgeblendet: Vec<LagemonitorKachel>,
 }
 
-/// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
+/// GET /api/einsaetze/{id}/situation-monitor — nur für einen gekoppelten Lagemonitor; eine Person und
 /// jede andere Ansicht bekommen 403 (die Zahlen umgingen sonst das Modul `personen`).
 pub async fn lagebild(
     State(state): State<AppState>,
@@ -296,22 +332,28 @@ pub async fn lagebild(
     if ctx.geraet.as_ref().map(|g| g.ansicht) != Some(Funktionsansicht::Lagemonitor) {
         return Err(AppError::Forbidden);
     }
-    let mut anzeige = verdichte(&state.pool, ctx.einsatz.id).await?;
+    // Module, die im Einsatz ausgeblendet sind, lassen Kacheln und Alarmzeile gleich weg
+    // (LLH-1964, LLH-2072; Regel: `frontend/src/geraet/AGENTS.md`, Lagemonitor).
+    let aus = crate::einsatz::berechtigung::load_ausgeblendete_module(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+    )
+    .await?;
+    let mut anzeige = load_anzeige(&state.pool, ctx.einsatz.id, &aus).await?;
     let alarm = alarm(
         &state.pool,
         ctx.einsatz.id,
         ctx.einsatz.org_id,
+        &aus,
         &anzeige.stand_at,
     )
     .await?;
     // Kachel und Alarmzeile zeigen in einer Antwort dieselbe Zahl (Review LLH-1743): `verdichte`
     // und `alarm` zählen in getrennten Lesevorgängen; dazwischen kann eine Sofortmeldung
-    // eingehen oder bestätigt werden. Es gilt die Zählung des Alarm-Blocks.
-    // Ist Meldungen ausgeblendet, zählt der Alarm-Block nicht; die Kachel behält dann die Zählung
-    // von `verdichte` (LLH-1964, Kacheln eigene Aufgabe).
-    if !alarm.ausgeblendet.contains(&AlarmQuelle::Meldungen) {
-        anzeige.sofortmeldungen_offen = alarm.sofort_offen;
-    }
+    // eingehen oder bestätigt werden. Es gilt die Zählung des Alarm-Blocks. Ist Meldungen
+    // ausgeblendet, stehen beide auf 0, und die Kachel fehlt.
+    anzeige.sofortmeldungen_offen = alarm.sofort_offen;
     anzeige.alarm = Some(alarm);
     Ok(Json(anzeige))
 }
@@ -325,13 +367,12 @@ pub async fn alarm(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
+    aus: &std::collections::HashSet<&'static str>,
     jetzt: &str,
 ) -> Result<LagemonitorAlarm, AppError> {
-    let aus =
-        crate::einsatz::berechtigung::load_ausgeblendete_module(pool, einsatz_id, org_id).await?;
     let ausgeblendet: Vec<AlarmQuelle> = AlarmQuelle::ALL
         .into_iter()
-        .filter(|q| q.is_ausgeblendet(&aus))
+        .filter(|q| q.is_ausgeblendet(aus))
         .collect();
     let sichtbar = |q: AlarmQuelle| !ausgeblendet.contains(&q);
 
@@ -398,7 +439,7 @@ pub async fn alarm(
         crate::einsatz::ausfall::load_einheiten_mit_ausfall(
             pool,
             einsatz_id,
-            crate::einsatz::ausfall::AusfallListen::from_ausgeblendet(&aus),
+            crate::einsatz::ausfall::AusfallListen::from_ausgeblendet(aus),
         )
         .await?
     } else {
@@ -474,6 +515,98 @@ async fn rueckmeldung_ueberfaellig(
 /// (`routes::lagebild_extern`) und die Lage der öffentlichen API (`public_api::lage`), damit alle
 /// dieselben Zahlen zeigen. Prüft keine Rechte: das tun die Aufrufer.
 pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorAnzeige, AppError> {
+    load_anzeige(pool, einsatz_id, &std::collections::HashSet::new()).await
+}
+
+/// [`verdichte`] ohne die Kacheln, deren Modul in `aus` steht (LLH-2072): ihre Abfragen laufen
+/// nicht, ihre Werte stehen auf 0 bzw. leer, und [`LagemonitorAnzeige::ausgeblendet`] nennt sie.
+/// Nur der gekoppelte Lagemonitor übergibt eine nicht leere Menge; Lagebild für Externe und
+/// API v1 bleiben bei [`verdichte`].
+pub async fn load_anzeige(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    aus: &std::collections::HashSet<&'static str>,
+) -> Result<LagemonitorAnzeige, AppError> {
+    let ausgeblendet: Vec<LagemonitorKachel> = LagemonitorKachel::ALL
+        .into_iter()
+        .filter(|k| k.is_ausgeblendet(aus))
+        .collect();
+    let sichtbar = |k: LagemonitorKachel| !ausgeblendet.contains(&k);
+    let (betroffene, sanitaetsdienst) = if sichtbar(LagemonitorKachel::Betroffene) {
+        load_betroffene(pool, einsatz_id).await?
+    } else {
+        (LagemonitorBetroffene::default(), None)
+    };
+    let kraefte = if sichtbar(LagemonitorKachel::Kraefte) {
+        load_kraefte(pool, einsatz_id).await?
+    } else {
+        LagemonitorKraefte {
+            einheiten: 0,
+            personal: 0,
+            staerke: Staerke::neu(0, 0, 0),
+        }
+    };
+    let uhs = if sichtbar(LagemonitorKachel::Uhs) {
+        load_uhs(pool, einsatz_id).await?
+    } else {
+        Vec::new()
+    };
+    let zonen = load_zonen(pool, einsatz_id).await?;
+    let abschnitte = sqlx::query_as::<_, (i64, String, Option<String>, String)>(
+        "SELECT id, name, kurzbezeichnung, flaeche_geojson FROM einsatzabschnitt \
+         WHERE einsatz_id = ? AND flaeche_geojson IS NOT NULL ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(
+        |(id, bezeichnung, kurzbezeichnung, flaeche_geojson)| LagemonitorAbschnitt {
+            id,
+            bezeichnung,
+            kurzbezeichnung,
+            flaeche_geojson,
+        },
+    )
+    .collect();
+
+    let stand_at = crate::zeit::jetzt();
+    // Dieselbe Zählung wie der Modulzähler (`meldungen.sofort_offen`, LLH-1743): eine Regel.
+    let sofortmeldungen_offen = if sichtbar(LagemonitorKachel::Meldungen) {
+        crate::meldung::repo::zaehlen(pool, einsatz_id, &stand_at)
+            .await?
+            .sofort_offen
+    } else {
+        0
+    };
+    let programm = crate::programmpunkt::repo::anstehende(
+        pool,
+        einsatz_id,
+        &stand_at,
+        crate::programmpunkt::MONITOR_ANZAHL,
+    )
+    .await?;
+
+    Ok(LagemonitorAnzeige {
+        stand_at,
+        betroffene,
+        kraefte,
+        uhs,
+        zonen,
+        abschnitte,
+        sofortmeldungen_offen,
+        programm,
+        sanitaetsdienst,
+        alarm: None,
+        ausgeblendet,
+    })
+}
+
+/// Betroffene und, falls am Einsatz gewählt, die Reihe „Sanitätsdienst“ (LLH-1574).
+async fn load_betroffene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<(LagemonitorBetroffene, Option<LagemonitorSanitaetsdienst>), AppError> {
     let mut betroffene = LagemonitorBetroffene::default();
     // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
     // (`person::zaehle_lage_sichtung`, Fixture `regeln.json` Abschnitt `versorgung`).
@@ -534,7 +667,11 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     .bind(einsatz_id)
     .fetch_one(pool)
     .await?;
+    Ok((betroffene, sanitaetsdienst))
+}
 
+/// Kräfte: Einheiten, disponiertes Personal und seine Stärke.
+async fn load_kraefte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorKraefte, AppError> {
     let einheiten: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
     )
@@ -560,7 +697,15 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
         })
         .collect();
     let KraefteZaehler { personal, staerke } = count_kraefte(&merkmale);
+    Ok(LagemonitorKraefte {
+        einheiten,
+        personal,
+        staerke,
+    })
+}
 
+/// Nicht aufgelöste UHS mit Belegung, Plätzen und Kräften als Zahl.
+async fn load_uhs(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LagemonitorUhs>, AppError> {
     let zeilen: Vec<(
         i64,
         String,
@@ -602,7 +747,11 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
             kraefte,
         });
     }
+    Ok(uhs)
+}
 
+/// Gefahrenzonen für die Monitorkarte.
+async fn load_zonen(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LagemonitorZone>, AppError> {
     // Gefahrenzonen wie beim Abschnittsgerät (`routes/lage_zone.rs`, `liste`): einsatzweit, ohne
     // Bezirke und Skizzen. Das Gebiet einer Gefahrengebiet-Zone kommt aus der Gebietsliste (eine
     // Rang-Regel für die Warnstufe); deren Name der bestätigenden Person bleibt hier liegen.
@@ -636,54 +785,7 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
             gebiet,
         });
     }
-
-    let abschnitte = sqlx::query_as::<_, (i64, String, Option<String>, String)>(
-        "SELECT id, name, kurzbezeichnung, flaeche_geojson FROM einsatzabschnitt \
-         WHERE einsatz_id = ? AND flaeche_geojson IS NOT NULL ORDER BY sortier, id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(
-        |(id, bezeichnung, kurzbezeichnung, flaeche_geojson)| LagemonitorAbschnitt {
-            id,
-            bezeichnung,
-            kurzbezeichnung,
-            flaeche_geojson,
-        },
-    )
-    .collect();
-
-    let stand_at = crate::zeit::jetzt();
-    // Dieselbe Zählung wie der Modulzähler (`meldungen.sofort_offen`, LLH-1743): eine Regel.
-    let sofortmeldungen_offen = crate::meldung::repo::zaehlen(pool, einsatz_id, &stand_at)
-        .await?
-        .sofort_offen;
-    let programm = crate::programmpunkt::repo::anstehende(
-        pool,
-        einsatz_id,
-        &stand_at,
-        crate::programmpunkt::MONITOR_ANZAHL,
-    )
-    .await?;
-
-    Ok(LagemonitorAnzeige {
-        stand_at,
-        betroffene,
-        kraefte: LagemonitorKraefte {
-            einheiten,
-            personal,
-            staerke,
-        },
-        uhs,
-        zonen,
-        abschnitte,
-        sofortmeldungen_offen,
-        programm,
-        sanitaetsdienst,
-        alarm: None,
-    })
+    Ok(zonen)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1122,6 +1224,7 @@ mod tests {
             programm: Vec::new(),
             sanitaetsdienst: None,
             alarm: None,
+            ausgeblendet: Vec::new(),
         };
         (pool, kopf, verdichtet)
     }

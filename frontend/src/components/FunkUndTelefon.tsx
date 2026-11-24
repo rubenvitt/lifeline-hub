@@ -1,6 +1,6 @@
 import { Space, theme } from 'antd';
 import type { KommunikationsVerbindung, Sprechgruppe } from '../api/types';
-import { Datenfeld, monoStil } from './instrument';
+import { Datenfeld, Kennung } from './instrument';
 import { mitBetriebsart, teileSprechgruppen } from './kommunikationsmittel';
 import { istTelefon } from './verbindungen';
 import { VerbindungenListe } from './VerbindungenFeld';
@@ -41,7 +41,7 @@ export default function FunkUndTelefon({
         <Datenfeld label="Funk" breit>
           {hatFunk ? (
             <Space size={[token.marginXS, token.marginXS]} wrap>
-              {ruf && <span style={monoStil('mono')}>{ruf}</span>}
+              {ruf && <Kennung>{ruf}</Kennung>}
               {tmo.map((s) => (
                 <Marke key={s.id}>{mitBetriebsart('TMO', s.bezeichnung)}</Marke>
               ))}

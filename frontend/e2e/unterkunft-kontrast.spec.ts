@@ -75,13 +75,13 @@ for (const modus of ['light', 'dark'] as const) {
     });
     const basis = `/api/einsaetze/${einsatzId}`;
     // Kapazität 50 = 200 m² zu 4 m²: „Kapazität übernehmen“ steht gesperrt mit Grund.
-    const { id: stelleId } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
+    const { id: stelleId } = await senden(page, 'post', `${basis}/care/positions`, {
       bezeichnung: STELLE,
       art: 'notunterkunft',
       kapazitaet_personen: 50,
     });
     // Ein Wert des Einsatzes, belegt (kein „Annahme“), ohne Folge für die Posten.
-    await senden(page, 'put', `${basis}/unterkunft-richtwerte/abfall_je_person_l`, { wert: 4 });
+    await senden(page, 'put', `${basis}/accommodation-guidelines/abfall_je_person_l`, { wert: 4 });
 
     const messwerte: Record<string, unknown>[] = [];
     const gemessen: [string, string][] = [];

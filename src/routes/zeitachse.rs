@@ -512,7 +512,7 @@ pub async fn einheit_periode_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/timeline/{zid}/void
+/// POST /api/einsaetze/{id}/units/{eid}/timeline/{zid}/strike
 pub async fn einheit_streichen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -622,7 +622,7 @@ pub async fn person_periode_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
-/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/void
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/strike
 pub async fn person_streichen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,

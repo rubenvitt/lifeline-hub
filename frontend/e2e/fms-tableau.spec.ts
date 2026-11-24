@@ -39,7 +39,7 @@ async function seede(page: Page): Promise<number> {
     bezeichnung: `FMS-Tableau ${Date.now()}`,
   });
   const basis = `/api/einsaetze/${einsatzId}`;
-  const abschnittId = await post(page, `${basis}/abschnitte`, { name: ABSCHNITT });
+  const abschnittId = await post(page, `${basis}/sectors`, { name: ABSCHNITT });
   const einheitId = await post(page, `${basis}/units`, {
     name: EINHEIT,
     abschnitt_id: abschnittId,

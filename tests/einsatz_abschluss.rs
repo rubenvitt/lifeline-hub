@@ -177,7 +177,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -185,7 +185,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Deich instabil", "ereigniszeit": "2026-06-12 09:00:00" }),
     )
@@ -193,7 +193,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )
@@ -215,7 +215,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &lena,
         None,
     )
@@ -286,7 +286,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -294,7 +294,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Frau Muster, Hauptstr. 4, vermisst ihren Sohn",
                 "ereigniszeit": "2026-06-12 09:00:00" }),
@@ -303,7 +303,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )
@@ -312,20 +312,10 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     let helena_id = common::benutzer_anlegen(&app, &admin, "helena", "keine").await;
     common::rolle_setzen(&app, &admin, e, helena_id, "einsatzleitung").await;
     let lena = login_cookie(&app, "helena", "helenapw1").await;
-    // Modul-Key und Pfad gehen auseinander, seit die Routen englisch werden (ADR-0085).
-    for (modul, pfad, regel) in [
+    for (modul, regel) in [
+        ("meldungen", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+        ("einheiten", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
         (
-            "meldungen",
-            "meldungen",
-            r#"{"sichtbar":false,"benoetigte_rolle":null}"#,
-        ),
-        (
-            "einheiten",
-            "units",
-            r#"{"sichtbar":false,"benoetigte_rolle":null}"#,
-        ),
-        (
-            "auftraege",
             "auftraege",
             r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#,
         ),
@@ -342,7 +332,16 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/{pfad}"),
+            // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
+            &format!(
+                "/api/einsaetze/{e}/{}",
+                match modul {
+                    "meldungen" => "reports",
+                    "auftraege" => "tasks",
+                    "einheiten" => "units",
+                    andere => andere,
+                }
+            ),
             &lena,
             None,
         )

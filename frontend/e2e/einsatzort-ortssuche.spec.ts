@@ -37,7 +37,7 @@ async function geocoder(page: Page) {
     await route.fulfill({ json: { zustand: 'ok', treffer: [TREFFER] } });
   };
   await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, antwort);
-  await page.route(/\/api\/ort-suche\?/, antwort);
+  await page.route(/\/api\/place-search\?/, antwort);
   await page.route(/\/api\/einsaetze\/\d+\/place-preview\?/, (route) =>
     route.fulfill({
       json: {
@@ -47,7 +47,7 @@ async function geocoder(page: Page) {
     }),
   );
   // Ohne Einsatz (LLH-1376): nur der Ortsname, keine Peilung.
-  await page.route(/\/api\/ort-vorschau\?/, (route) =>
+  await page.route(/\/api\/place-preview\?/, (route) =>
     route.fulfill({ json: { ortsname: ORTSNAME } }),
   );
   return anfragen;

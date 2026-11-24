@@ -71,7 +71,7 @@ function render(
 ) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/sprechgruppen', () => HttpResponse.json(liste)),
+    http.get('/api/talk-groups', () => HttpResponse.json(liste)),
   );
   return renderMitProviders(
     <>
@@ -203,13 +203,13 @@ describe('SprechgruppenTab', () => {
    * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
    * Zustandsweiche.
    *
-   * Der lokale `render`-Helfer verdrahtet `/api/sprechgruppen` fest auf die Liste, die Handler
+   * Der lokale `render`-Helfer verdrahtet `/api/talk-groups` fest auf die Liste, die Handler
    * stehen deshalb inline.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/sprechgruppen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/talk-groups', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<SprechgruppenTab />);
 
@@ -259,7 +259,7 @@ describe('SprechgruppenTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
   it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/sprechgruppen/:id/deaktivieren', () => {
+      http.post('/api/talk-groups/:id/deactivate', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json(
@@ -394,7 +394,7 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
   describe('Altbestand: Name zugleich Einsatz-Sprechgruppe (LLH-1645)', () => {
     it('markiert die Katalog-Sprechgruppe und nennt die Einsätze in der Marke', async () => {
       server.use(
-        http.get('/api/sprechgruppen/auch-lokal', () =>
+        http.get('/api/talk-groups/also-local', () =>
           HttpResponse.json([
             { sprechgruppe_id: 1, einsatz_id: 4, einsatz: 'Hochwasser Elbe' },
             { sprechgruppe_id: 1, einsatz_id: 9, einsatz: 'Stadtfest' },
@@ -410,7 +410,7 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
     it('fragt ohne Verwaltungsrecht nicht nach', async () => {
       let gefragt = false;
       server.use(
-        http.get('/api/sprechgruppen/auch-lokal', () => {
+        http.get('/api/talk-groups/also-local', () => {
           gefragt = true;
           return HttpResponse.json([]);
         }),

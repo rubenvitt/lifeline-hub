@@ -38,7 +38,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/schaeden"),
+        &format!("/api/einsaetze/{e}/damages"),
         &i.admin,
         Some(&json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 1" })),
     )
@@ -55,12 +55,12 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{e}/schaeden"),
+            format!("/api/einsaetze/{e}/damages"),
             json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 2" }),
         ),
         (
             "PATCH",
-            format!("/api/einsaetze/{e}/schaeden/{schaden}"),
+            format!("/api/einsaetze/{e}/damages/{schaden}"),
             json!({ "ort": "Hauptstr. 3" }),
         ),
     ] {
@@ -84,7 +84,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb/lesemarke"),
+        &format!("/api/einsaetze/{e}/etb/read-marker"),
         &i.admin,
         Some(&format!(r#"{{"bis_lfd_nr":{lfd}}}"#)),
     )
@@ -711,7 +711,7 @@ async fn antraege(i: &Instanz, einsatz: i64, cookie: &str) -> Vec<serde_json::Va
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/antraege"),
+        &format!("/api/einsaetze/{einsatz}/requests"),
         cookie,
         None,
     )
@@ -845,7 +845,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Ansprechbar", "client_id": "n-1" })),
     )
@@ -898,7 +898,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage(
         &elw.app,
         "DELETE",
-        &format!("/api/einsaetze/{s}/antraege/{id}"),
+        &format!("/api/einsaetze/{s}/requests/{id}"),
         &spontan_cookie,
         None,
     )
@@ -918,7 +918,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Später", "client_id": "n-2" })),
     )
@@ -982,7 +982,7 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p}/notes"),
         &erika,
         Some(&json!({ "text": "Notiz", "client_id": "v-1" })),
     )
@@ -1051,7 +1051,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/meldungen"),
+        &format!("/api/einsaetze/{s}/reports"),
         &erika,
         Some(
             &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -1067,7 +1067,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/999999/sichtung"),
+        &format!("/api/einsaetze/{s}/persons/999999/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "weg-2"})),
     )
@@ -1103,7 +1103,7 @@ async fn eine_zeile_die_hier_steht_wartet_auf_ihre_herkunft() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{s}/persons/{p}/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "da-1"})),
     )
@@ -2133,7 +2133,7 @@ async fn mitarbeit_beantragt_keine_person_am_spiegel() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen"),
+        &format!("/api/einsaetze/{s}/persons"),
         &erika,
         Some(&json!({ "name": "Max", "client_id": "m-p-1" })),
     )
@@ -2157,7 +2157,7 @@ async fn beobachter_beantragt_weiter_nichts() {
             json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-e" }),
         ),
         (
-            format!("/api/einsaetze/{s}/meldungen"),
+            format!("/api/einsaetze/{s}/reports"),
             json!({ "inhalt": "X", "client_id": "b-m" }),
         ),
     ] {
@@ -2180,7 +2180,7 @@ async fn der_fuehrer_lehnt_lagemeldung_und_anordnung_der_mitarbeit_ab() {
                     "client_id": "m-anordnung" }),
         ),
         (
-            format!("/api/einsaetze/{s}/meldungen"),
+            format!("/api/einsaetze/{s}/reports"),
             json!({ "inhalt": "Lage", "meldungsart": "lagemeldung",
                     "ereigniszeit": "2026-11-10 08:00:00", "client_id": "m-lage" }),
         ),

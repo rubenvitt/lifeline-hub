@@ -115,7 +115,7 @@ for (const modus of ['light', 'dark'] as const) {
     const basis = `/api/einsaetze/${einsatzId}`;
     const jetzt = Date.now();
     // Ein Abschnitt, damit das Vorgaben-Paneel eine Zeile trägt statt des Leerzustands.
-    const abschnitt_id = await post(page, `${basis}/abschnitte`, { name: 'Deichwache Kontrast' });
+    const abschnitt_id = await post(page, `${basis}/sectors`, { name: 'Deichwache Kontrast' });
     const kartenIds: { einheit: number; schicht: number }[] = [];
     for (const k of KARTEN) {
       const einheit = await post(page, `${basis}/units`, { name: k.einheit, abschnitt_id });

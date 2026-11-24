@@ -6,7 +6,7 @@ import type { ZoneEntwurf } from './useKartenInteraktion';
  * die Regeln ohne Karte prüfbar sind; der Effekt in `LagekartePage` liest die Parameter.
  */
 
-/** Ein Bezirk, wie ihn die Karte aus `GET …/evakuierung` kennt (nur nicht stornierte). */
+/** Ein Bezirk, wie ihn die Karte aus `GET …/evacuation` kennt (nur nicht stornierte). */
 interface BekannterBezirk {
   id: number;
   bezeichnung: string;

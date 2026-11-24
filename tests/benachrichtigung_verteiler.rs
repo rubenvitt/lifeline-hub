@@ -1,7 +1,7 @@
 //! Benachrichtigungen zu Befehl und Lagebericht im Verteiler (LLH-1213, Change
 //! `kcjecn9e-benachrichtigungskonzept`, Spec `benachrichtigungen`, „Befehl oder Lagebericht im
 //! Verteiler“, „Der Server bestimmt die Empfänger“ und „Eigene Aktionen …“): Die Freigabe über
-//! `POST …/{befehle|lageberichte}/{id}/freigeben` meldet `befehl` bzw. `lagebericht` an die
+//! `POST …/{orders|situation-reports}/{id}/release` meldet `befehl` bzw. `lagebericht` an die
 //! Nutzer der Funktionen im Verteiler. Jeder Fall prüft auch, wer nichts bekommt.
 
 use axum::http::StatusCode;
@@ -24,7 +24,7 @@ struct Dok {
 }
 
 const BEFEHL: Dok = Dok {
-    praefix: "befehle",
+    praefix: "orders",
     anlegen: r#"{"vorlage":"befehl_lad","titel":"Räumung Hauptstraße","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"lage","text":"L"},{"schluessel":"auftrag","text":"A"},{"schluessel":"durchfuehrung","text":"D"}]}"#,
     art: "befehl",
     modul: "auftraege",
@@ -32,7 +32,7 @@ const BEFEHL: Dok = Dok {
 };
 
 const LAGEBERICHT: Dok = Dok {
-    praefix: "lageberichte",
+    praefix: "situation-reports",
     anlegen: r#"{"vorlage":"freitext","titel":"Lage Familie Muster","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"text","text":"Ruhig"}]}"#,
     art: "lagebericht",
     modul: "lageberichte",
@@ -152,7 +152,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("{}/freigeben", self.dok(art, id)),
+            &format!("{}/release", self.dok(art, id)),
             cookie,
             None,
         )
@@ -163,7 +163,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("{}/fortschreiben", self.dok(art, id)),
+            &format!("{}/revise", self.dok(art, id)),
             &self.admin,
             Some("{}"),
         )
@@ -283,7 +283,7 @@ async fn einheit_abschnitt_extern_und_freitext_benachrichtigen_niemanden() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/abschnitte", w.einsatz),
+        &format!("/api/einsaetze/{}/sectors", w.einsatz),
         &w.admin,
         Some(&json!({ "name": "Süd" })),
     )

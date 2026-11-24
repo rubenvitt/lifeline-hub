@@ -117,7 +117,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
     den alten Wert. Ein Nachtrag über
     Mitternacht nennt die Erfassung mit Tag (`nachtragText`).
 - **Kopfzahl und Typ-Segmente zählt der Server über DENSELBEN Filter** (LFH-612,
-  `GET …/etb/zaehler`, `etb/repo.rs:filter_bedingung`, Parameter nur über
+  `GET …/etb/counts`, `etb/repo.rs:filter_bedingung`, Parameter nur über
   `routes/etb.rs:filter_merkmale`; Parität `tests/etb_zaehler.rs`). Ein Bilanz-Paneel gibt es
   nicht mehr (kwc2yszv D7, Spec `etb-zaehler`, Herleitung
   `openspec/changes/archive/2026-11-14-kwc2yszv-etb-neuentwurf/design.md`). Kopf (`kopfMeta`): ohne Filter „112

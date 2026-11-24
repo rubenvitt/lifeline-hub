@@ -54,31 +54,31 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
   server.use(
     meHandler(kraft),
     json('', 'einsatz'),
-    json('/fuehrungsstelle', 'fuehrungsstelle'),
+    json('/command-post', 'fuehrungsstelle'),
     json('/members', 'mitglieder'),
-    json('/lagebesprechungen', 'lagebesprechungen'),
+    json('/briefings', 'lagebesprechungen'),
     mitBeendeten('/units', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/units/timeline', 'einheitenPerioden'),
     mitBeendeten('/personnel', 'personal', 'entlassene', 'personalEntlassen'),
     json('/personnel/timeline', 'personalPerioden'),
     json('/vehicles', 'fahrzeuge'),
     // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.
-    http.get(`/api/einsaetze/${E}/lageberichte`, () => {
+    http.get(`/api/einsaetze/${E}/situation-reports`, () => {
       zaehle('/lageberichte');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').liste);
     }),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid`, () => {
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, () => {
       zaehle('/lageberichte/:lid');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
     }),
-    json('/personen', 'personen'),
-    json('/personen/verbleib-angaben', 'personenVerbleibAngaben'),
+    json('/persons', 'personen'),
+    json('/persons/whereabouts-details', 'personenVerbleibAngaben'),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/schaeden', 'schaeden'),
-    json('/evakuierung', 'evakuierung'),
-    json('/betreuung', 'betreuung'),
-    json('/verpflegung', 'verpflegung'),
-    json('/etb/zaehler', 'etbZaehler'),
+    json('/damages', 'schaeden'),
+    json('/evacuation', 'evakuierung'),
+    json('/care', 'betreuung'),
+    json('/catering', 'verpflegung'),
+    json('/etb/counts', 'etbZaehler'),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
@@ -193,7 +193,7 @@ describe('EinsatzberichtDruckPage', () => {
     rendere();
     expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
-    expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
     expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
   });
 
@@ -206,7 +206,7 @@ describe('EinsatzberichtDruckPage', () => {
       '[data-lfh="einsatzbericht-block-bilanz"]',
     ) as HTMLElement;
     expect(within(bilanz).getAllByText('In diesem Einsatz nicht genutzt')).toHaveLength(1);
-    expect(aufrufe.get('/betreuung')).toBeUndefined();
+    expect(aufrufe.get('/care')).toBeUndefined();
     // Ausgeblendet ist nicht gesperrt: die Leiste trägt keinen Zusatz „kein Zugriff“.
     expect(
       within(screen.getByRole('region', { name: 'Blöcke' })).queryByText(/kein Zugriff/),
@@ -217,7 +217,7 @@ describe('EinsatzberichtDruckPage', () => {
     quellen();
     let versuche = 0;
     server.use(
-      http.get(`/api/einsaetze/${E}/lageberichte`, () => {
+      http.get(`/api/einsaetze/${E}/situation-reports`, () => {
         versuche += 1;
         return versuche === 1
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
@@ -237,7 +237,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('ein 403 trotz Freigabe: kein Zugriff, kein Drucken', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/schaeden`, () =>
+      http.get(`/api/einsaetze/${E}/damages`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );
@@ -281,7 +281,7 @@ describe('EinsatzberichtDruckPage', () => {
       http.get(`/api/einsaetze/${E}`, () =>
         HttpResponse.json({ ...wert<object>(roh, 'einsatz'), bezeichnung: 'Umbenannt' }),
       ),
-      http.get(`/api/einsaetze/${E}/etb/zaehler`, () =>
+      http.get(`/api/einsaetze/${E}/etb/counts`, () =>
         HttpResponse.json({
           gesamt: 4,
           je_typ: {
@@ -309,7 +309,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('sperrt das Drucken, solange geladen wird', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/verpflegung`, async () => {
+      http.get(`/api/einsaetze/${E}/catering`, async () => {
         await delay(200);
         return HttpResponse.json({
           zeitfenster: [],
@@ -380,7 +380,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     expect(blockTitel()).toEqual(['Stammdaten']);
     expect(kopf()).toHaveTextContent('Auswahl: Stammdaten');
     expect(kopf()).not.toHaveTextContent('kosten');
-    expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
     expect(aufrufe.get('/lageberichte')).toBeUndefined();
   });
 
@@ -388,7 +388,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     const aufrufe = quellen();
     rendere('', { gcTime: 5 * 60_000 });
     await fertig();
-    expect(aufrufe.get('/personen')).toBe(1);
+    expect(aufrufe.get('/persons')).toBe(1);
     const bilanz = () => within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' });
     await userEvent.click(bilanz());
     await waitFor(() => expect(blockTitel()).not.toContain('Bilanz'));
@@ -397,7 +397,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     await fertig();
     // Je Schnappschuss ein Abruf: die Hilfeleistungen lesen die Personen auch ohne Bilanz
     // (LLH-1575), also auch die Zwischenauswahl.
-    expect(aufrufe.get('/personen')).toBe(3);
+    expect(aufrufe.get('/persons')).toBe(3);
   });
 
   it('der letzte gewählte Block lässt sich nicht abwählen', async () => {
@@ -435,7 +435,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     expect(
       within(auswahlleiste()).getByRole('button', { name: 'Kurzbericht für den Auftraggeber' }),
     ).toBeDisabled();
-    expect(aufrufe.get('/personen/verbleib-angaben')).toBeGreaterThan(0);
+    expect(aufrufe.get('/persons/whereabouts-details')).toBeGreaterThan(0);
   });
 
   it('Anlage Materialverbrauch ruft aktives und herausgenommenes Material ab (LLH-1575)', async () => {
@@ -469,8 +469,8 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     await fertig();
     expect(blockTitel()).not.toContain('Bilanz');
     expect(blockTitel()).not.toContain('Hilfeleistungen');
-    expect(aufrufe.get('/personen')).toBeUndefined();
-    expect(aufrufe.get('/personen/verbleib-angaben')).toBeUndefined();
+    expect(aufrufe.get('/persons')).toBeUndefined();
+    expect(aufrufe.get('/persons/whereabouts-details')).toBeUndefined();
     // Auch abgewählt nennt der Block sein gesperrtes Modul: wer ihn wieder wählt, weiß vorher, warum
     // das Drucken dann sperrt.
     expect(

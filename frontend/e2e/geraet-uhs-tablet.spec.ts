@@ -48,7 +48,7 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
     await anlegen(page, `/api/einsaetze/${e}/uhs/${u.id}/status`, { status: 'aktiv' });
   }
   // Eine Person der anderen UHS: das Tablet darf sie nicht sehen.
-  await anlegen(page, `/api/einsaetze/${e}/personen`, {
+  await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Fremdling',
     sichtung: 'sk3',
     uhs_id: sued.id,
@@ -134,7 +134,7 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
   await anlegen(page, `/api/einsaetze/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
-  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Patient',
     uhs_id: nord.id,
   });
@@ -204,7 +204,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
   await anlegen(page, `/api/einsaetze/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
-  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Patient',
     geschlecht: 'weiblich',
     sichtung: 'sk2',
@@ -251,7 +251,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
   }
 
   const detail = (await (
-    await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+    await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
   ).json()) as {
     verletzungen: { region: string; bestaetigt_name?: string }[];
   };
@@ -293,7 +293,7 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     bezeichnung: 'UHS Nord',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Patient',
     sichtung: 'sk3',
     uhs_id: nord.id,
@@ -312,7 +312,7 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
   const posts: string[] = [];
   tablet.on('request', (r) => {
     const pfad = new URL(r.url()).pathname;
-    if (r.method() === 'POST' && /\/personen\/\d+\/(sichtung|verbleib|notizen)$/.test(pfad)) {
+    if (r.method() === 'POST' && /\/persons\/\d+\/(triage|whereabouts|notes)$/.test(pfad)) {
       posts.push(pfad.split('/').pop()!);
     }
   });
@@ -370,11 +370,11 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     await expect(notizZeile.locator('[data-lfh="notiz-vorgemerkt"]')).toHaveCount(0);
     await expect(kopf.getByRole('button', { name: /^Nachsichten, aktuell SK II/ })).toBeVisible();
     await expect(kopf.locator('[data-lfh="letzte-notiz"]')).toContainText('Infusion läuft');
-    expect([...posts].sort()).toEqual(['notizen', 'sichtung', 'verbleib']);
+    expect([...posts].sort()).toEqual(['notes', 'triage', 'whereabouts']);
 
     // Genau einmal, mit der Erfassungszeit von unterwegs (Sekunden des Servers, daher ± 1 s).
     const detail = (await (
-      await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+      await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
     ).json()) as {
       sichtungen: { kategorie: string; gesichtet_at: string; eingegangen_at?: string | null }[];
       verbleib: {
@@ -427,7 +427,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
     bezeichnung: 'UHS Nord',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Patient',
     sichtung: 'sk3',
     uhs_id: nord.id,
@@ -482,7 +482,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
       .poll(
         async () => {
           const detail = (await (
-            await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+            await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
           ).json()) as { sichtungen: { kategorie: string }[] };
           return detail.sichtungen.filter((s) => s.kategorie === 'sk2').length;
         },
@@ -490,7 +490,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
       )
       .toBe(1);
     const detail = (await (
-      await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+      await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
     ).json()) as { sichtungen: { kategorie: string; gesichtet_at: string }[] };
     const sk2 = detail.sichtungen.find((s) => s.kategorie === 'sk2')!;
     expect(ms(sk2.gesichtet_at)).toBeGreaterThanOrEqual(offlineAb - 1_000);

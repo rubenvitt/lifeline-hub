@@ -54,12 +54,12 @@ const MODULE = [
 ] as const;
 
 async function seedeAlles(page: Page, einsatzId: string) {
-  await seede(page, einsatzId, 'personen', { antreff_ort: 'Sammelstelle Süd' }, 'Person');
-  await seede(page, einsatzId, 'tiere', { spezies: 'hund', rufname: 'Rex' }, 'Tier');
+  await seede(page, einsatzId, 'persons', { antreff_ort: 'Sammelstelle Süd' }, 'Person');
+  await seede(page, einsatzId, 'animals', { spezies: 'hund', rufname: 'Rex' }, 'Tier');
   await seede(
     page,
     einsatzId,
-    'schaeden',
+    'damages',
     { typ: 'sachschaden', ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: 'Dachziegel' },
     'Schaden',
   );

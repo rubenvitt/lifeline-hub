@@ -199,7 +199,7 @@ async fn jede_neue_art_ist_am_elw_nur_lesbar() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/etb-bausteine/{baustein}"),
+        &format!("/api/etb-snippets/{baustein}"),
         &elw.admin,
         Some(&json!({"inhalt": "geändert"})),
     )
@@ -457,7 +457,7 @@ async fn geloeschtes_schichtmodell_einer_vorlage_wird_nachgeholt_geloescht() {
     let (s, v) = common::anfrage(
         &hub.app,
         "DELETE",
-        &format!("/api/schichtmodelle/{id}"),
+        &format!("/api/shift-models/{id}"),
         &hub.admin,
         None,
     )
@@ -617,7 +617,7 @@ async fn schichtmodell_geloescht_und_gleichnamig_neu_angelegt_bleibt_an_der_vorl
     let (s, v) = common::anfrage(
         &hub.app,
         "DELETE",
-        &format!("/api/schichtmodelle/{alt}"),
+        &format!("/api/shift-models/{alt}"),
         &hub.admin,
         None,
     )

@@ -45,7 +45,7 @@ describe('vorschauKachelStil (LFH-759)', () => {
   });
 });
 
-const HREF = '/api/einsaetze/5/schaeden/3/anhaenge/9/datei';
+const HREF = '/api/einsaetze/5/damages/3/attachments/9/file';
 
 describe('AnhangVorschau', () => {
   it('zeigt bei einem Foto das Vorschaubild vom Server', () => {
@@ -205,7 +205,7 @@ describe('AnhangVorschau — HEIC auf dem Gerät (LFH-759)', () => {
     heic.dekodiere.mockReset();
   });
 
-  const ETB = '/api/einsaetze/5/etb/40/anhaenge/9';
+  const ETB = '/api/einsaetze/5/etb/40/attachments/9';
 
   it('dekodiert die bereinigte Fassung und zeigt das Ergebnis', async () => {
     heic.dekodiere.mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
@@ -289,7 +289,7 @@ describe('AnhangVorschau — HEIC auf dem Gerät (LFH-759)', () => {
  * Die Hülle öffnet und schließt sie wie das Zeilenmenü, im selben Query-Cache.
  */
 describe('AnhangGrossansicht — HEIC aus dem Zeilenmenü (LLH-1887)', () => {
-  const ETB = '/api/einsaetze/5/etb/40/anhaenge/9';
+  const ETB = '/api/einsaetze/5/etb/40/attachments/9';
   beforeEach(() => {
     let n = 0;
     vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:gross-${++n}`);

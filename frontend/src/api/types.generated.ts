@@ -1079,7 +1079,7 @@ export interface components {
             bearbeitungsstatus: components["schemas"]["AuftragBearbeitungsstatus"];
             /**
              * @description Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
-             *     nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).
+             *     nur dann nimmt `PATCH …/tasks/{aid}` eine Berichtigung an (LLH-1098).
              */
             berichtigbar: boolean;
             /** Format: int64 */
@@ -1172,7 +1172,7 @@ export interface components {
             snap_anzeige: string;
         };
         /**
-         * @description Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und
+         * @description Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und
          *     „Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
          */
         AuftragKennzahlen: {
@@ -1764,7 +1764,7 @@ export interface components {
             name: string;
         };
         /**
-         * @description Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen
+         * @description Die eine Lesequelle des Moduls Betreuung (`GET …/care`): alle nicht stornierten Stellen
          *     eines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].
          */
         BetreuungUebersicht: {
@@ -3532,12 +3532,12 @@ export interface components {
          * @enum {string}
          */
         EntlassenAn: "selbst" | "begleitung" | "sorgeberechtigte" | "polizei";
-        /** @description Antwort von `POST …/vehicles/{ef_id}/release` (LLH-1722). */
+        /** @description Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722). */
         EntlassungAntwort: {
             fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
             vorzustand: components["schemas"]["EntlassungVorzustand"];
         };
-        /** @description Antwort von `POST …/vehicles/{ef_id}/release/undo` (LLH-1722). */
+        /** @description Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722). */
         EntlassungRuecknahmeAntwort: {
             ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
             fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
@@ -3674,7 +3674,7 @@ export interface components {
             /** @description `zugesagt` oder `unterwegs`. */
             status: components["schemas"]["NachforderungStatus"];
         };
-        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`). */
         EtbAnzahlAnzeige: {
             /**
              * Format: int64
@@ -3705,7 +3705,7 @@ export interface components {
             an?: string | null;
             /**
              * @description Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach
-             *     `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`.
+             *     `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/attachments/{aid}`.
              */
             anhaenge: components["schemas"]["AnhangAnzeige"][];
             /**
@@ -3852,7 +3852,7 @@ export interface components {
             /** Format: int64 */
             system: number;
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/etb/zaehler`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counts`. */
         EtbZaehlerAnzeige: {
             /**
              * Format: int64
@@ -3863,7 +3863,7 @@ export interface components {
             je_typ: components["schemas"]["EtbTypZaehler"];
         };
         /**
-         * @description Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht
+         * @description Die eine Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): alle nicht
          *     stornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne
          *     Bruch des Drahts dazukommen.
          */
@@ -4243,7 +4243,7 @@ export interface components {
          * @enum {string}
          */
         Fuehrungsfunktion: "el" | "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "fuehrungshilfspersonal" | "fachberater";
-        /** @description Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert. */
+        /** @description Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert. */
         FuehrungsfunktionAnzeige: {
             art: components["schemas"]["FunktionsArt"];
             bezeichnung_pflicht: boolean;
@@ -4677,7 +4677,7 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
-        /** @description Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`. */
         InfotelefonZaehler: {
             /**
              * Format: int64
@@ -5127,7 +5127,7 @@ export interface components {
          * @enum {string}
          */
         Kostform: "normal" | "vegetarisch" | "vegan" | "ohne_schwein" | "diaet_allergenarm" | "saeugling_kleinkind";
-        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`). */
+        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/care/diets`). */
         KostformZaehlung: {
             /**
              * Format: int64
@@ -5153,7 +5153,7 @@ export interface components {
             objekt_id: number;
             objekt_typ: string;
         };
-        /** @description Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden. */
+        /** @description Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden. */
         LageGesehenAnzeige: {
             /** Format: int64 */
             gesehen: number;
@@ -5609,6 +5609,12 @@ export interface components {
             /** @description Einsatzabschnitte mit gezeichneter Fläche. */
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             alarm?: components["schemas"]["LagemonitorAlarm"] | null;
+            /**
+             * @description Kacheln, deren Modul im Einsatz ausgeblendet ist (LLH-2072), in der Folge von
+             *     [`LagemonitorKachel`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer, und
+             *     der Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es.
+             */
+            ausgeblendet?: components["schemas"]["LagemonitorKachel"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
@@ -5675,6 +5681,12 @@ export interface components {
             /** @description Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste. */
             warnstufe: components["schemas"]["Warnstufe"];
         };
+        /**
+         * @description Eine Kachel des Lagemonitors, die mit ihrem Modul ausgeblendet wird (LLH-2072). Für
+         *     [`LagemonitorAnzeige::ausgeblendet`]; „Ablauf“ hängt an den Einsatzdaten und fehlt nie.
+         * @enum {string}
+         */
+        LagemonitorKachel: "betroffene" | "meldungen" | "kraefte" | "uhs";
         /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
         LagemonitorKraefte: {
             /** Format: int64 */
@@ -5930,7 +5942,7 @@ export interface components {
          * @enum {string}
          */
         MaterialArt: "geraet" | "verbrauchsgut";
-        /** @description Antwort von `POST …/material/{em_id}/release` (LLH-1923). */
+        /** @description Antwort von `POST …/material/{em_id}/stand-down` (LLH-1923). */
         MaterialEntlassungAntwort: {
             material: components["schemas"]["EinsatzMaterialAnzeige"];
             vorzustand: components["schemas"]["MaterialEntlassungVorzustand"];
@@ -5938,7 +5950,7 @@ export interface components {
         /**
          * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
          *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
-         *     D1). Kommt in der Antwort von `…/material/{em}/release` und geht als Body an
+         *     D1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an
          *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
          *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
          *     Herausnehmen lässt sie an der Zeile stehen.
@@ -5963,7 +5975,7 @@ export interface components {
             status_ruecknahme?: components["schemas"]["MaterialStatusRuecknahmeBeleg"] | null;
         };
         /**
-         * @description Antwort von `POST …/material/{em_id}/release/undo` (LLH-1923): was nicht
+         * @description Antwort von `POST …/material/{em_id}/stand-down/undo` (LLH-1923): was nicht
          *     zurückkam, steht in `ausgelassen`.
          */
         MaterialRuecknahmeAntwort: {
@@ -6114,7 +6126,7 @@ export interface components {
             status: components["schemas"]["MeldungStatus"];
         };
         /**
-         * @description Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie
+         * @description Kennzahlen der Meldungsseite (LFH-940, `GET …/reports/metrics`): dieselben Mengen wie
          *     das Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
          */
         MeldungKennzahlen: {
@@ -7157,12 +7169,12 @@ export interface components {
             telefon?: string | null;
             traegerorganisation?: string | null;
         };
-        /** @description Antwort von `POST …/personnel/{ep_id}/release` (LLH-1922). */
+        /** @description Antwort von `POST …/personnel/{ep_id}/stand-down` (LLH-1922). */
         PersonalEntlassungAntwort: {
             personal: components["schemas"]["EinsatzPersonalAnzeige"];
             vorzustand: components["schemas"]["PersonalEntlassungVorzustand"];
         };
-        /** @description Antwort von `POST …/personnel/{ep_id}/release/undo` (LLH-1922). */
+        /** @description Antwort von `POST …/personnel/{ep_id}/stand-down/undo` (LLH-1922). */
         PersonalEntlassungRuecknahmeAntwort: {
             ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
             personal: components["schemas"]["EinsatzPersonalAnzeige"];
@@ -7757,7 +7769,7 @@ export interface components {
             region: string;
             slug: string;
         };
-        /** @description Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`). */
+        /** @description Die Registrierliste einer Stelle (`GET …/positions/{sid}/registrations`). */
         RegistrierListe: {
             /** @description Haushalte mit mindestens einer hier registrierten Person, nach Nummer. */
             haushalte: components["schemas"]["HaushaltAnzeige"][];
@@ -7836,7 +7848,7 @@ export interface components {
          */
         RichtwertHerkunft: "basis" | "org" | "einsatz";
         /**
-         * @description Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+         * @description Antwort von `GET …/reports/check-ins` (LFH-610). Einheiten ohne Eintrag haben
          *     noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
          *     gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
          */
@@ -8852,7 +8864,7 @@ export interface components {
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
         /**
-         * @description Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS
+         * @description Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/persons/uhs`): je aktiver UHS
          *     des Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul
          *     Unfallhilfsstellen wählen kann; keine Belegung, keine Plätze.
          */
@@ -9107,7 +9119,7 @@ export interface components {
              */
             menge: number;
         };
-        /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
+        /** @description Die eine Lesequelle der Modulseite (`GET …/catering`). */
         VerpflegungAnzeige: {
             /**
              * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und
@@ -9163,7 +9175,7 @@ export interface components {
          */
         Verpflegungsart: "warm" | "kalt" | "getraenke";
         /**
-         * @description Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne
+         * @description Eine Verpflegungsstelle in `GET …/catering` und als Antwort der Schreibrouten. **Ohne
          *     Benutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und
          *     keine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.
          */
@@ -9211,7 +9223,7 @@ export interface components {
             zuletzt_gestartet?: string | null;
         };
         /**
-         * @description Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver
+         * @description Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/persons/units`): je aktiver
          *     Einheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf
          *     die Kräfte geht.
          */
@@ -9827,7 +9839,7 @@ export interface components {
             daten?: components["schemas"]["WetterAktuell"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/weather`. */
         WetterAnzeige: {
             aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;

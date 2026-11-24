@@ -11,14 +11,14 @@ use serde_json::{json, Value};
 mod common;
 use common::*;
 
-const ORG: &str = "/api/unterkunft-richtwerte";
+const ORG: &str = "/api/accommodation-guidelines";
 
 fn org_put(schluessel: &str) -> String {
     format!("/api/org-accommodation-guidelines/{schluessel}")
 }
 
 fn einsatz_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/unterkunft-richtwerte")
+    format!("/api/einsaetze/{einsatz}/accommodation-guidelines")
 }
 
 /// Der Eintrag eines Schlüssels aus der Antwort.
