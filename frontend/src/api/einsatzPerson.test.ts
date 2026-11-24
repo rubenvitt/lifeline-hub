@@ -5,6 +5,8 @@ import {
   createVerletzung,
   entfernePersonAnhang,
   ladePersonenDruck,
+  ladePassListeDruck,
+  ladePassListeExport,
   loadPersonZeile,
   revokeMassnahme,
   revokeVerletzung,
@@ -36,6 +38,27 @@ describe('ladePersonenDruck', () => {
     const [pfad, init] = fetchMock.mock.calls[0];
     expect(pfad).toBe('/api/einsaetze/7/persons/print');
     expect(init?.method ?? 'GET').toBe('GET');
+  });
+});
+
+// LLH-1198: Die PASS-Liste lädt über die protokollierenden Endpunkte mit `profile=pass`.
+describe('PASS-Liste', () => {
+  it('ladePassListeDruck ruft GET …/persons/print?profile=pass', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('[]', { status: 200 }));
+    await expect(ladePassListeDruck(7)).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/persons/print?profile=pass');
+  });
+
+  it('ladePassListeExport ruft GET …/persons/export?profile=pass', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('a;b', { status: 200 }));
+    await expect(ladePassListeExport(7)).resolves.toBeInstanceOf(Blob);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/persons/export?profile=pass');
   });
 });
 

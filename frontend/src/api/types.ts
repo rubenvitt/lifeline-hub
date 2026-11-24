@@ -587,6 +587,8 @@ export type StornoStand = S['StornoStand'];
 export type RettungsmittelStand = S['RettungsmittelStand'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
+/** Eine Zeile der PASS-Liste (LLH-1198, `src/person/pass.rs`): je Spalte fertiger Text. */
+export type PassZeile = S['PassZeile'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
 /** Anlass der Hilfeleistung (LLH-1566): Verlaufseintrag und sein Katalog. */
 export type Anlass = S['AnlassAnzeige'];

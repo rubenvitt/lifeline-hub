@@ -7,6 +7,7 @@ import type {
   KoerperRegion,
   Massnahme,
   MassnahmeArt,
+  PassZeile,
   Person,
   PersonAnhang,
   PersonAnlass,
@@ -206,6 +207,22 @@ export function loadPersonZeile(einsatzId: number, personId: number): Promise<Pe
  */
 export function ladePersonenDruck(einsatzId: number): Promise<Person[]> {
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/persons/print`);
+}
+
+/**
+ * Zeilen der PASS-Liste für ihre Druckansicht (LLH-1198). Nur für die Einsatzleitung; schreibt
+ * serverseitig EINEN `pass_druck`-Eintrag ins Zugriffsprotokoll. Nie still wiederholen.
+ */
+export function ladePassListeDruck(einsatzId: number): Promise<PassZeile[]> {
+  return apiGet<PassZeile[]>(`/api/einsaetze/${einsatzId}/persons/print?profile=pass`);
+}
+
+/** PASS-Liste als CSV für Excel (LLH-1198). Nur für die Einsatzleitung; schreibt serverseitig
+ *  JE ABRUF einen `pass_export`-Eintrag. */
+export function ladePassListeExport(einsatzId: number): Promise<Blob> {
+  return apiDatei(`/api/einsaetze/${einsatzId}/persons/export?profile=pass`, {
+    timeoutMs: EXPORT_TIMEOUT_MS,
+  });
 }
 
 /** CSV aller nicht stornierten Personen des Einsatzes (`routes/einsatz_person.rs`, `export`).

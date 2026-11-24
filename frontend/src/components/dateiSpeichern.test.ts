@@ -10,6 +10,9 @@ describe('exportDateiname', () => {
   it('nennt Inhalt, Einsatz und den lokalen Zeitpunkt auf die Minute', () => {
     const jetzt = new Date(2026, 9, 1, 7, 5, 59);
     expect(exportDateiname('personen', 42, jetzt)).toBe('personen-einsatz-42-2026-10-01-0705.csv');
+    expect(exportDateiname('pass-liste', 7, jetzt)).toBe(
+      'pass-liste-einsatz-7-2026-10-01-0705.csv',
+    );
   });
 
   it('füllt einstellige Monate, Tage und Stunden auf', () => {
