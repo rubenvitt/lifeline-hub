@@ -59,7 +59,11 @@ Fahrzeug direkt nach `einsatz_fahrzeug.lat/lon`“ verworfen und „nur im Einsa
   `tests/enum_wire_kontrakt.rs`. **ADR-0012:** Zeitstempel in UTC `zeit::FORMAT`.
 - **ADR-0097:** Routen englisch (Glossar `scripts/api-routen-woerter.tsv`), neue Request- und
   Response-Typen mit englischen Wire-Feldern; neue Felder in `EinsatzFahrzeugAnzeige` folgen dessen
-  Sprache (deutsch).
+  Sprache (deutsch). Der Routen-Wächter (`scripts/check-api-routen.sh`) lässt keinen neuen Pfad
+  unter `/api/einsaetze/…` zu, weil `einsaetze` nicht im Glossar steht und der Bestand nicht
+  wächst; das Präfix stellt erst LLH-2061 um. Die neuen Routen stehen deshalb gleich unter
+  `/api/incidents/{einsatz_id}/vehicles/{ef_id}/tracking…` (`incidents`, `vehicles` stehen im
+  Glossar, `tracking`, `candidates` kommen dazu).
 - Live-Verteilung nach dem Commit, außerhalb von `write_retry!` (`src/AGENTS.md`).
 - Gespiegelte Einsätze sind schreibgeschützt (Trigger `einsatz_fahrzeug_spiegelschutz_u`); ein an
   einen Hub gekoppeltes ELW nimmt keinen Einwurf an.
@@ -109,14 +113,24 @@ Weitere Entscheidungen am Checkpoint:
     Einsatzfahrzeug, über alle Einsätze.
   - Trennen löscht die Zeile. Es gibt keine Spalte `getrennt_at` und keine Historie; die Spur
     steht im ETB.
-- **`einsatz_fahrzeug`** bekommt `position_quelle TEXT` (`manuell` | `ortung`, NULL ohne Position)
-  und `position_gemessen_at TEXT` (UTC). Bestand: Zeilen mit `lat` bekommen `manuell`, Messzeit
-  NULL.
-- **`org_einstellungen`** bekommt `ortung_hauptamt INTEGER` (NULL/0 = aus, 1 = an). Die Spalte
-  kommt in die Liste der Stammdaten-Synchronisation (`src/instanz/stammdaten/art.rs`, `spalten`).
+- **`einsatz_fahrzeug`** bekommt drei Spalten, alle NULL ohne Position:
+  - `position_quelle TEXT` (`manuell` | `ortung`)
+  - `position_gemessen_at TEXT` (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die
+    Serverzeit des Setzens. Sie trägt die Altersanzeige.
+  - `position_gesetzt_at TEXT` (UTC, immer Serverzeit): bei `ortung` das `empfangen_at` der
+    Ablage, bei `manuell` der Zeitpunkt des PATCH. Sie trägt den Vorrang, damit eine falsch
+    gehende Geräteuhr keine manuelle Platzierung festhält oder überholt.
+  - Bestand: Zeilen mit `lat` bekommen `manuell`, beide Zeiten NULL.
+- **`org_einstellungen`** bekommt `ortung_hauptamt INTEGER` (NULL/0 = aus, 1 = an). Die Spalte geht
+  **nicht** in die Stammdaten-Synchronisation (`src/instanz/stammdaten/art.rs`, `spalten`): ein an
+  einen Hub gekoppeltes ELW nimmt keinen Einwurf an, der Schalter gilt nur auf der Instanz, die
+  einwirft. (Entscheidung beim Bauen, s. „Nach der Gegenlese“.)
+- **Spiegel:** Die Positionsspalten gehen mit `einsatz_fahrzeug` an die Spiegel-Instanzen, wie
+  heute die manuelle Position (Entscheidung Ruben 24.11.2026). Sie kommen nicht in
+  `LOKALE_SPALTEN`. Die Drossel begrenzt die Last.
 - `ortung_kopplung` wird nicht gespiegelt und nicht in die API v1 geliefert; sie bekommt keine
-  Spiegel- und keine Outbox-Trigger (Begründung in ADR-0098: Kopplung ist lokale Betriebsangabe
-  der leitenden Instanz, gespiegelte Einsätze sind ohnehin ausgenommen).
+  Spiegel- und keine Outbox-Trigger. Die Kopplung ist eine lokale Betriebsangabe der führenden
+  Instanz.
 
 ### Übernahme (`src/ortung/`, neues Modul)
 
@@ -128,22 +142,31 @@ Weitere Entscheidungen am Checkpoint:
    - Kopplung zu `(zugang_id, kennung)` laden, verbunden mit `einsatz_fahrzeug`
      (`beendet_at IS NULL`) und `einsatz` (`status = 'aktiv'`, `spiegel = 0`). Keine Zeile: nichts.
    - Position aus `position_letzte` lesen.
-   - **Vorrang:** nur übernehmen, wenn `gemessen_at` jünger ist als
-     `einsatz_fahrzeug.position_gemessen_at` (oder diese NULL ist).
-   - **Drossel:** nicht schreiben, wenn die vorhandene Position aus `ortung` stammt und weniger als
-     15 Sekunden älter ist als die neue Messzeit.
-   - `UPDATE einsatz_fahrzeug SET lat, lon, position_quelle = 'ortung', position_gemessen_at`.
+   - **Vorrang:** nur übernehmen, wenn `empfangen_at` später liegt als
+     `einsatz_fahrzeug.position_gesetzt_at` (oder diese NULL ist). Gegen ältere Messungen schützt
+     schon die Ablage (sie nimmt kein älteres `gemessen_at` an).
+   - **Drossel mit Nachlauf:** liegt das letzte Schreiben aus `ortung` an diesem Fahrzeug weniger
+     als 15 Sekunden zurück, wird nicht geschrieben, sondern genau ein Nachlauf zum Ablauf der
+     15 Sekunden vorgemerkt (je Fahrzeug höchstens einer, im Speicher). Der Nachlauf liest dann
+     `position_letzte` neu und schreibt die jüngste Position. So bleibt kein letzter Fix liegen,
+     wenn das Gerät danach verstummt. Ein Neustart verliert höchstens einen Nachlauf; der nächste
+     Fix holt ihn nach.
+   - `UPDATE einsatz_fahrzeug SET lat, lon, position_quelle = 'ortung', position_gemessen_at,
+     position_gesetzt_at`.
    - Kein ETB-Eintrag.
 3. Nach dem Commit `sse_fahrzeug(state, einsatz_id, ef_id)`. Fehler werden als Sammelzeile
    gezählt, nicht einzeln protokolliert.
 
 Die manuelle Route `PATCH …/vehicles/{ef_id}/position` setzt `position_quelle = 'manuell'` und
-`position_gemessen_at = jetzt`; Löschen der Position setzt beide auf NULL. Sie bleibt für
-gekoppelte Fahrzeuge offen.
+beide Zeiten auf jetzt; Löschen der Position setzt alle drei auf NULL. Sie bleibt für gekoppelte
+Fahrzeuge offen.
 
 ### Koppeln und Trennen (Einsatzrouten)
 
-Unter `/api/einsaetze/{einsatz_id}/vehicles/{ef_id}/tracking` (Segment „tracking“ ins Glossar):
+Unter `/api/incidents/{einsatz_id}/vehicles/{ef_id}/tracking` (s. „Rahmen“, ADR-0097):
+
+- `GET …/tracking`: die aktuelle Kopplung des Fahrzeugs (`access_name`, `device_id`,
+  `coupled_at`, `volunteer_crew_confirmed`) oder 404. Gate: `EinsatzSchreibzugriff<Fahrzeuge>`.
 
 - `GET …/tracking/candidates`: Kennungen der letzten 24 h aus allen nicht widerrufenen Zugängen
   mit `positionen:write` der eigenen Org. Je Eintrag `access_id`, `access_name`, `device_id`,
@@ -163,10 +186,18 @@ Unter `/api/einsaetze/{einsatz_id}/vehicles/{ef_id}/tracking` (Segment „tracki
   als letzter Stand mit Quelle `ortung` stehen und wird mit der Zeit veraltet.
 - **Automatisches Ende**, jeweils mit ETB-Eintrag „Ortung getrennt“ in derselben Transaktion:
   `entlassen_tx`, `stornieren_tx` und `einsatz::repo::abschliessen` (alle Kopplungen des Einsatzes).
-  Reaktivieren und Wiedereröffnen stellen keine Kopplung wieder her.
+- **Abschluss löscht GPS-Positionen** (Entscheidung Ruben 24.11.2026): im selben Vorgang setzt
+  `abschliessen` bei allen Fahrzeugen des Einsatzes mit `position_quelle = 'ortung'` Position,
+  Quelle und Zeiten auf NULL. Die Einsatzakte hält keine GPS-Orte; manuelle Positionen bleiben.
+  Während des Einsatzes bleibt die letzte GPS-Position auch über 24 h stehen.
+- **Rückgängig nach Entlassen** (`…/stand-down/undo`, LLH-1722) stellt den vorigen Stand ganz her,
+  also auch die Kopplung samt Bestätigung, sofern die Kennung inzwischen nicht anderweitig
+  gekoppelt ist; sonst bleibt sie getrennt und der ETB-Eintrag sagt es. Reaktivieren nach
+  Stornieren und Wiedereröffnen stellen keine Kopplung her. (Entscheidung beim Bauen.)
 
-`EinsatzFahrzeugAnzeige` bekommt `position_quelle`, `position_gemessen_at` und `ortung`
-(`{ zugang_name, kennung } | null`). Danach `scripts/check-typ-codegen.sh`.
+`EinsatzFahrzeugAnzeige` bekommt `position_quelle`, `position_gemessen_at` und `ortung_gekoppelt`
+(bool). Zugangsname und Kennung stehen dort **nicht**: sie sieht nur, wer im Modul schreiben darf,
+über `GET …/tracking` und die Kandidaten. Danach `scripts/check-typ-codegen.sh`.
 
 ### Org-Schalter
 
@@ -197,15 +228,17 @@ hauptamtlicher Besatzung“, Zustandszeile „Nur mit Betriebs- oder Dienstverei
 - **ADR-0098** „Die Ortung übernimmt eingeworfene Positionen nur für gekoppelte Fahrzeuge
   laufender Einsätze“. Regeln: eigener Schritt nach dem Einwurf, ohne Wirkung auf die Antwort; nur
   aktive Kopplung, aktives Fahrzeug, aktiver ungespiegelter Einsatz; jüngste Messzeit gewinnt;
-  kein Verlauf; Kopplung endet mit Trennen, Entlassen, Stornieren, Abschluss; ohne Org-Schalter
+  kein Verlauf; Kopplung endet mit Trennen, Entlassen, Stornieren, Abschluss; der Abschluss
+  löscht GPS-Positionen; ohne Org-Schalter
   Bestätigung Ehrenamt; Kandidatenliste nur mit Einsatzschreibrecht und ohne Koordinaten. Prüfung
   per `verbiete`/`verlange`.
 - **Architektur:** Kapitel 5 (Modul `ortung`), 6 (neuer Ablauf neben §6.6e Einwurf), 8
   (Datenschutz der Ortung), 11 (Risiko Hauptamt), 12 (Glossar „Ortung“, „Kopplung“).
 - **Anwender:** `anbindungen.md` (Ortung einrichten, Org-Schalter, **DSFA-Vorlage**: Zweck,
-  Rechtsgrundlage Art. 6 Abs. 1 lit. e bzw. f DSGVO für das Ehrenamt, Betriebsvereinbarung für das
-  Hauptamt, Speicherdauer letzte Position 24 h in der Ablage, Position am Fahrzeug bis zur
-  Löschung des Einsatzes, kein Verlauf, Empfänger, TOM), `lagekarte.md` (Marke GPS, veraltet),
+  Rechtsgrundlage als auszufüllender Platzhalter mit Hinweis auf Art. 6 DSGVO für das Ehrenamt und
+  die Betriebs- oder Dienstvereinbarung für das Hauptamt, Speicherdauer: letzte Position 24 h in
+  der Ablage, am Fahrzeug bis zum Abschluss des Einsatzes, kein Verlauf; Empfänger: Einsatzkräfte
+  mit Zugriff auf den Einsatz und Spiegel-Instanzen; TOM), `lagekarte.md` (Marke GPS, veraltet),
   `fahrzeuge.md` (koppeln, trennen, automatisches Ende). Bilder nach `docs/anwender/AGENTS.md`.
 
 ### Tests (Akzeptanzkriterien)
@@ -213,12 +246,23 @@ hauptamtlicher Besatzung“, Zustandszeile „Nur mit Betriebs- oder Dienstverei
 - Einwurf mit gekoppelter Kennung ändert `lat/lon`, Quelle `ortung`, und sendet `fahrzeug`.
 - Ohne Kopplung, nach Trennen, Entlassen, Stornieren, Abschluss oder in einem gespiegelten Einsatz
   ändert ein Einwurf kein Fahrzeug; die Antwort ist in allen Fällen 204.
-- Manuelle Position nach einem GPS-Fix bleibt, bis ein jüngerer Fix kommt.
-- Drossel: zwei Fixe binnen 15 s schreiben einmal.
+- Manuelle Position nach einem GPS-Fix bleibt, bis ein später empfangener Fix kommt; eine
+  vorgehende Geräteuhr ändert daran nichts.
+- Drossel: zwei Fixe binnen 15 s schreiben sofort einmal und nach Ablauf den zweiten (Nachlauf).
+- Abschluss löscht GPS-Positionen, nicht manuelle; Rückgängig nach Entlassen stellt die Kopplung
+  her; `EinsatzFahrzeugAnzeige` trägt keine Kennung.
 - Koppeln ohne Bestätigung bei ausgeschaltetem Schalter: 422; mit eingeschaltetem: 204.
 - Doppelte Kennung: 409. Kandidatenliste enthält keine Koordinaten, keine fremde Org.
 - Schema-Test: keine Tabelle mit mehreren Positionen je Fahrzeug oder Kennung.
 - Frontend: Marke „veraltet“ strikt über 10 min; Koppeldialog mit und ohne Pflichtbestätigung.
+
+## Nach der Gegenlese
+
+Ein Gegenleser hat den Entwurf als Bauender gelesen. Ruben hat entschieden: Positionen gehen an
+Spiegel mit, GPS-Positionen fallen beim Abschluss weg. Beim Bauen festgelegt und oben eingetragen:
+Routen gleich unter `/api/incidents` (Wächter), Drossel mit Nachlauf, Vorrang über Serverzeit
+(`position_gesetzt_at`), Kennung nur für Schreibrechte, Rückgängig nach Entlassen stellt die
+Kopplung her, `ortung_hauptamt` wird nicht synchronisiert.
 
 ## Dem Bauenden überlassen
 
