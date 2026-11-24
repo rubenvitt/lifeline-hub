@@ -2135,22 +2135,11 @@ pub async fn listenzugriffe(
     ))
 }
 
-/// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
-/// Entschärft zusätzlich Formel-Injektion (Excel/LibreOffice): Felder, die mit
-/// =,+,-,@,Tab oder CR beginnen, werden mit einem führenden Apostroph neutralisiert.
-fn csv_feld(s: &str) -> String {
-    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
-        format!("'{s}")
-    } else {
-        s.to_string()
-    };
-    format!("\"{}\"", s.replace('"', "\"\""))
-}
-
 /// CSV der Personen wie `GET …/persons/export`; geteilt mit dem ZIP der Einsatzakte
 /// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6). Protokolliert nicht: das tut, wer
 /// die Daten ausliefert.
 pub fn personen_csv(personen: &[PersonAnzeige]) -> String {
+    use crate::person::pass::csv_feld;
     let mut csv =
         String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
     for p in personen {

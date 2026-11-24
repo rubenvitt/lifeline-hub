@@ -3,6 +3,7 @@ pub mod anhang;
 pub mod anlass_repo;
 pub mod audit_repo;
 pub mod massnahme_repo;
+pub mod pass;
 pub mod repo;
 pub mod sichtung_repo;
 pub mod transport_repo;
