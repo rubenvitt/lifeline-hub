@@ -428,9 +428,10 @@
   font-family: var(--lfh-schrift-text);
   font-size: var(--lfh-typo-augenbraue-groesse);
   font-weight: var(--lfh-typo-augenbraue-gewicht);
-  /* .12em statt der .14em der Augenbraue: so steht es im Tabellenkopf des Entwurfs
-     (S6/S7); die engere Sperrung spart in schmalen Spalten eine Zeile. */
-  letter-spacing: 0.12em;
+  /* Die Sperrung der Augenbraue (.08em seit LLH-2044). Vorher stand hier eine eigene .12em,
+     „enger als die Augenbraue“ (.14em); seit dem Schriftboden war sie breiter als die Skala, und
+     „AKTIONEN“ brach in der Menüspalte um (LLH-2083, `e2e/aktionen-kopf.spec.ts`). */
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
   text-transform: uppercase;
   border-bottom-color: var(--lfh-linie);
 }
