@@ -10,7 +10,7 @@ async fn bootstrap_seedet_status_katalog() {
     // bootstrap_admin seedet den FMS-Default-Katalog → GET liefert die 10 Stati.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     let labels: Vec<&str> = json
         .as_array()
@@ -32,7 +32,7 @@ async fn alle_lesen_admin_legt_an() {
 
     // Nicht-Admin liest (für Dropdowns), darf aber nicht anlegen.
     assert_eq!(
-        anfrage(&app, "GET", "/api/fahrzeug-status", &erika, None)
+        anfrage(&app, "GET", "/api/vehicle-statuses", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -40,7 +40,7 @@ async fn alle_lesen_admin_legt_an() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &erika,
         Some(r#"{"label":"X","kategorie":"gebunden"}"#),
     )
@@ -50,7 +50,7 @@ async fn alle_lesen_admin_legt_an() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"Reserve","kategorie":"verfuegbar","sortier":90}"#),
     )
@@ -65,7 +65,7 @@ async fn ungueltige_kategorie_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"X","kategorie":"unsinn"}"#),
     )
@@ -80,7 +80,7 @@ async fn fms_anker_ausserhalb_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"X","kategorie":"gebunden","fms_anker":12}"#),
     )
@@ -96,7 +96,7 @@ async fn dublette_label_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"3 – Auf Anfahrt","kategorie":"gebunden"}"#),
     )
@@ -111,7 +111,7 @@ async fn deaktivieren_entfernt_aus_liste() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         &admin,
         Some(r#"{"label":"Reserve","kategorie":"verfuegbar"}"#),
     )
@@ -122,7 +122,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/fahrzeug-status/{id}/deaktivieren"),
+            &format!("/api/vehicle-statuses/{id}/deactivate"),
             &admin,
             None
         )
@@ -130,7 +130,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/vehicle-statuses", &admin, None).await;
     let labels: Vec<&str> = liste
         .as_array()
         .unwrap()
@@ -147,7 +147,7 @@ async fn status_voll(app: &axum::Router, admin: &str, label: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         admin,
         Some(&format!(
             r##"{{"label":"{label}","kategorie":"gebunden","farbe":"#ff0000","fms_anker":3,"sortier":70}}"##
@@ -176,7 +176,7 @@ async fn patch_ohne_farbe_laesst_farbe_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/fahrzeug-status/{id}"),
+        &format!("/api/vehicle-statuses/{id}"),
         &admin,
         Some(r#"{"label":"umbenannt","kategorie":"gebunden","sortier":70}"#),
     )
@@ -200,7 +200,7 @@ async fn patch_farbe_null_loescht_die_farbe() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/fahrzeug-status/{id}"),
+        &format!("/api/vehicle-statuses/{id}"),
         &admin,
         Some(r#"{"farbe":null,"fms_anker":null}"#),
     )
@@ -227,7 +227,7 @@ async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/fahrzeug-status/{id}"),
+        &format!("/api/vehicle-statuses/{id}"),
         &admin,
         Some(r##"{"label":"Reserve","kategorie":"gebunden","farbe":"#00ff00","fms_anker":3}"##),
     )
@@ -249,7 +249,7 @@ async fn patch_fms_anker_0_wird_gesetzt_nicht_geloescht() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/fahrzeug-status/{id}"),
+        &format!("/api/vehicle-statuses/{id}"),
         &admin,
         Some(r#"{"fms_anker":0}"#),
     )
@@ -271,7 +271,7 @@ async fn patch_fms_anker_ausserhalb_ist_400_absent_geht_durch() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/fahrzeug-status/{id}"),
+            &format!("/api/vehicle-statuses/{id}"),
             &admin,
             Some(r#"{"fms_anker":12}"#)
         )
@@ -283,7 +283,7 @@ async fn patch_fms_anker_ausserhalb_ist_400_absent_geht_durch() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/fahrzeug-status/{id}"),
+            &format!("/api/vehicle-statuses/{id}"),
             &admin,
             Some(r#"{"label":"ok"}"#)
         )
@@ -306,7 +306,7 @@ async fn patch_leeres_label_ist_400_absentes_geht_durch() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/fahrzeug-status/{id}"),
+            &format!("/api/vehicle-statuses/{id}"),
             &admin,
             Some(r#"{"label":"   "}"#)
         )
@@ -318,7 +318,7 @@ async fn patch_leeres_label_ist_400_absentes_geht_durch() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/fahrzeug-status/{id}"),
+            &format!("/api/vehicle-statuses/{id}"),
             &admin,
             Some(r#"{"kategorie":"unsinn"}"#)
         )
@@ -331,7 +331,7 @@ async fn patch_leeres_label_ist_400_absentes_geht_durch() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/fahrzeug-status/{id}"),
+            &format!("/api/vehicle-statuses/{id}"),
             &admin,
             Some("{}")
         )

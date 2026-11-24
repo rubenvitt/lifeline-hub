@@ -3,7 +3,7 @@ import DemoMarke from '../components/DemoMarke';
 import { Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
+import { Kennung } from '../components/instrument';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
@@ -55,7 +55,7 @@ interface FormWerte {
  * Felder, ohne die ein Fahrzeug im Einsatz nicht auffindbar ist. Alles Übrige steht hier.
  *
  * **KEIN eigener Backend-Endpunkt.** `FahrzeugAnzeige` trägt bereits jedes Stammdatenfeld —
- * ein `GET /api/fahrzeuge/{id}` läge Byte für Byte auf der Liste. Die Seite liest deshalb
+ * ein `GET /api/vehicles/{id}` läge Byte für Byte auf der Liste. Die Seite liest deshalb
  * DIESELBE Query wie `FahrzeugeTab` und selektiert die Zeile.
  *
  * **Der Schlüssel muss byte-gleich der des Tabs sein.** `globalKeys.fahrzeugeListe('alle')`
@@ -156,7 +156,9 @@ export default function FahrzeugDetailPage() {
         breite="schmal"
         titel={
           <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
-            <span style={monoStil('monoGross', 500)}>{fahrzeug.funkrufname}</span>
+            <Kennung stufe="monoGross" gewicht={500}>
+              {fahrzeug.funkrufname}
+            </Kennung>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Stapel>
         }

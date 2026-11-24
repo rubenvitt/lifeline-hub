@@ -57,7 +57,7 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
 function setup() {
   server.use(
     meHandler(admin),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
   );
   return renderMitProviders(<EinsaetzePage />);
 }
@@ -206,7 +206,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -236,7 +236,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/schichtmodelle', () => {
+      http.get('/api/shift-models', () => {
         beantwortet = true;
         return HttpResponse.json([
           {
@@ -341,7 +341,7 @@ describe('EinsaetzePage', () => {
           einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
         ]),
       ),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -372,7 +372,7 @@ describe('EinsaetzePage', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -474,13 +474,13 @@ describe('EinsaetzePage', () => {
 
 describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () => {
   // Eigene Fixture/Hilfen statt `einsatz()`/`setup()`: die decken weder
-  // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/stichwort-vorschlaege`-Mock ab,
+  // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/keyword-suggestions`-Mock ab,
   // das der Anlegedialog bei jedem Mount abruft (`onUnhandledFrame: 'error'`).
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json(liste)),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   }
   function render() {
@@ -518,7 +518,11 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     // `zeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
     // plus der Funktionswert — die Formatierung prüft `format.test.ts`.
     const erwartet = zeitKurz('2026-06-08 06:12:00', DEFAULT_KONVENTIONEN);
-    expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
+    // Die Zeit steht in Mono, „seit“ in der Textschrift (ADR-0094): zwei Knoten.
+    const zeiten = await screen.findAllByText(erwartet);
+    expect(zeiten.some((z) => z.parentElement?.textContent?.includes(`seit ${erwartet}`))).toBe(
+      true,
+    );
   });
 
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
@@ -1125,7 +1129,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
       </Routes>,
     );
     // Liste: 23.05. 09:00 UTC → 11:00 in Berlin.
-    expect(await screen.findByText('seit 231100')).toBeInTheDocument();
+    const zeiten = await screen.findAllByText('231100');
+    expect(zeiten.some((z) => z.parentElement?.textContent?.includes('seit 231100'))).toBe(true);
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     const dialog = await screen.findByRole('dialog');
     // Das Feld zeigt die volle DTG in der Anzeigezone: 10:00 UTC → 12:00 Berlin.
@@ -1232,7 +1237,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
-      http.get('/api/ort-suche', ({ request }) => {
+      http.get('/api/place-search', ({ request }) => {
         begriffe.push(new URL(request.url).searchParams.get('q')!);
         return HttpResponse.json({
           zustand: 'ok',
@@ -1247,7 +1252,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         });
       }),
       // Ort-Vorschau ohne Einsatz (LLH-1376): nur der Ortsname.
-      http.get('/api/ort-vorschau', () =>
+      http.get('/api/place-preview', () =>
         HttpResponse.json({ ortsname: 'Marktplatz 3, 12345 Musterstadt' }),
       ),
     );
@@ -1364,7 +1369,7 @@ describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json(liste)),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(<EinsaetzePage />);
     const liefere = async (naechste: EinsatzAnzeige[]) => {
@@ -1514,7 +1519,7 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+      http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   });
 

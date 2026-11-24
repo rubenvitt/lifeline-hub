@@ -140,7 +140,7 @@ fn normalisiere_patch(body: PatchBaustein) -> Result<PatchNormalisiert, AppError
     })
 }
 
-/// GET /api/etb-bausteine — aktive Katalog-Einträge (eigene Org), für Schnellbausteine.
+/// GET /api/etb-snippets — aktive Katalog-Einträge (eigene Org), für Schnellbausteine.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -148,7 +148,7 @@ pub async fn liste(
     Ok(Json(repo::liste(&state.pool, benutzer.org_id).await?))
 }
 
-/// POST /api/etb-bausteine — Admin. Neuen Baustein anlegen.
+/// POST /api/etb-snippets — Admin. Neuen Baustein anlegen.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -159,7 +159,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(b)))
 }
 
-/// PATCH /api/etb-bausteine/{id} — Admin, echter Teil-Patch (LFH-306):
+/// PATCH /api/etb-snippets/{id} — Admin, echter Teil-Patch (LFH-306):
 /// Feld absent = unverändert, `null`/`""` bei `meldeweg`/`veranlassung` = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -172,7 +172,7 @@ pub async fn aktualisieren(
     Ok(Json(b))
 }
 
-/// POST /api/etb-bausteine/{id}/deaktivieren — Admin (Soft-Delete statt Löschen).
+/// POST /api/etb-snippets/{id}/deactivate — Admin (Soft-Delete statt Löschen).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

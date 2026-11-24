@@ -136,7 +136,7 @@ function stelleBereit({
       abgerufen.push('befehle');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),
-    http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)),
+    http.get('/api/vehicle-statuses', () => HttpResponse.json(KATALOG)),
     http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json(stand.auftraege)),
     http.post('/api/einsaetze/7/auftraege/:aid/empfaenger/:eid/quittieren', ({ params }) => {
       quittiert.push(`${params.aid}/${params.eid}`);

@@ -5,7 +5,14 @@ import { loadBrVerlauf } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrVerlaufEintrag } from '../../api/types';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { monoStil, NUR_VORLESER, Stapel, Textstufe, useRollen } from '../../components/instrument';
+import {
+  monoStil,
+  NUR_VORLESER,
+  Stapel,
+  Textstufe,
+  useRollen,
+  Kennung,
+} from '../../components/instrument';
 import {
   PANEEL_FEHLER_TEXT,
   PANEEL_FEHLER_TITEL,
@@ -126,9 +133,12 @@ function VerlaufZeile({ eintrag: e }: { eintrag: BrVerlaufEintrag }) {
         <ZeitAnzeige wert={e.zeitpunkt_at} rolle="kurz" />
       </span>
       <span>{verlaufText(e)}</span>
-      <span style={e.objekt_typ === 'fahrzeug' ? monoStil('mono') : undefined}>
-        {e.objekt_name}
-      </span>
+      {/* Ein Fahrzeug steht unter seinem Funkrufnamen da: der in Mono, jeder andere Name nicht. */}
+      {e.objekt_typ === 'fahrzeug' ? (
+        <Kennung>{e.objekt_name}</Kennung>
+      ) : (
+        <span>{e.objekt_name}</span>
+      )}
       {e.notiz && (
         <Textstufe stufe="textKlein" ton="gedaempft">
           {e.notiz}

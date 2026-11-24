@@ -168,7 +168,7 @@ pub struct ListeParams {
     pub nur_im_dienst: bool,
 }
 
-/// GET /api/personal — alle eingeloggten Nutzer (eigene Org), inkl. Qualifikationen.
+/// GET /api/personnel — alle eingeloggten Nutzer (eigene Org), inkl. Qualifikationen.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -179,7 +179,7 @@ pub async fn liste(
     ))
 }
 
-/// GET /api/personal-vorschlaege — abgeleitete Trägerorganisations-Vorschläge (eigene Org).
+/// GET /api/personnel-suggestions — abgeleitete Trägerorganisations-Vorschläge (eigene Org).
 pub async fn vorschlaege(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -187,7 +187,7 @@ pub async fn vorschlaege(
     Ok(Json(repo::vorschlaege(&state.pool, benutzer.org_id).await?))
 }
 
-/// POST /api/personal — Admin. Dublette Personalnummer → Conflict.
+/// POST /api/personnel — Admin. Dublette Personalnummer → Conflict.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -205,7 +205,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(a)))
 }
 
-/// PATCH /api/personal/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
+/// PATCH /api/personnel/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
 /// unverändert, `null`/`""` = leeren. Ein absentes `qualifikation_ids` lässt die
 /// Zuordnung unberührt. NotFound bei fremder/unbek. id.
 pub async fn aktualisieren(
@@ -227,7 +227,7 @@ pub async fn aktualisieren(
     Ok(Json(a))
 }
 
-/// POST /api/personal/{id}/ausser-dienst — Admin (Soft-Delete).
+/// POST /api/personnel/{id}/out-of-service — Admin (Soft-Delete).
 pub async fn ausser_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -239,7 +239,7 @@ pub async fn ausser_dienst(
     ))
 }
 
-/// POST /api/personal/{id}/in-dienst — Admin (Reaktivierung; Conflict bei Nummernkollision).
+/// POST /api/personnel/{id}/in-service — Admin (Reaktivierung; Conflict bei Nummernkollision).
 pub async fn in_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

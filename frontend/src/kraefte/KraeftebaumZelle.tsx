@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
-import { Augenbraue, monoStil, schriftStil, useRollen } from '../components/instrument';
+import { Augenbraue, Kennung, schriftStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
@@ -161,7 +161,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         z.fahrzeugTz ? <FahrzeugZeichen tz={z.fahrzeugTz} /> : null,
         <>
-          <span style={monoStil('monoKlein')}>{name(z.bezeichnung, ziel)}</span>
+          <Kennung stufe="monoKlein">{name(z.bezeichnung, ziel)}</Kennung>
           {nebentext([z.zusatz, z.besatzung ? fremdText(z.besatzung) : null])}
         </>,
       );

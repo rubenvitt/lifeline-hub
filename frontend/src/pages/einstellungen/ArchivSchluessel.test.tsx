@@ -72,7 +72,9 @@ describe('ArchivSchluessel (LLH-1494)', () => {
     stelleBereit([schluessel(1), schluessel(3, { geprueft_at: null })]);
     renderMitProviders(<ArchivSchluessel />);
     expect(await screen.findByText('Tresor 1')).toBeInTheDocument();
-    expect(screen.getByText(/ab12:cd34:ef56:0030 · Probe offen/)).toBeInTheDocument();
+    // Fingerabdruck in Mono, Zustand in der Textschrift (ADR-0094): zwei Knoten.
+    expect(screen.getByText('ab12:cd34:ef56:0030', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/Probe offen/)).toBeInTheDocument();
     expect(screen.getByText('Nur ein geprüfter Schlüssel')).toBeInTheDocument();
   });
 

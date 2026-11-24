@@ -1261,7 +1261,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
         v
     };
     let fz = post(
-        "/api/fahrzeuge".into(),
+        "/api/vehicles".into(),
         r#"{"funkrufname":"Nachbar 44-1","kennzeichen":"XX-NB 1"}"#.into(),
     )
     .await;
@@ -1271,7 +1271,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     let pers = post(
-        "/api/personal".into(),
+        "/api/personnel".into(),
         r#"{"name":"Nachbar Person"}"#.into(),
     )
     .await;
@@ -1303,12 +1303,12 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
 
     // Freie Zeilen mit Demo-Kennung: mitbenutzt statt angelegt.
     post(
-        "/api/fahrzeuge".into(),
+        "/api/vehicles".into(),
         r#"{"funkrufname":"Musterstadt 11-1","kennzeichen":"XX-MS 11"}"#.into(),
     )
     .await;
     post(
-        "/api/personal".into(),
+        "/api/personnel".into(),
         r#"{"name":"Vorhandene Person","personalnummer":"DEMO-P-001"}"#.into(),
     )
     .await;
@@ -1318,11 +1318,8 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
             .into(),
     )
     .await;
-    let (status, typen) = common::anfrage(app, "GET", "/api/einheit-typen", admin, None).await;
-    assert!(
-        status.is_success(),
-        "GET /api/einheit-typen: {status} {typen}"
-    );
+    let (status, typen) = common::anfrage(app, "GET", "/api/unit-types", admin, None).await;
+    assert!(status.is_success(), "GET /api/unit-types: {status} {typen}");
     let zug = typen
         .as_array()
         .unwrap()
@@ -1331,13 +1328,13 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
         .expect("Einheitstyp Zug der Startliste")["id"]
         .clone();
     post(
-        "/api/einheit-vorlagen".into(),
+        "/api/unit-templates".into(),
         format!(r#"{{"name":"Sanitätszug Musterstadt","typ_id":{zug}}}"#),
     )
     .await;
     // LLH-1122: das Szenario-Schichtmodell gibt es schon, der Import benutzt es mit.
     post(
-        "/api/schichtmodelle".into(),
+        "/api/shift-models".into(),
         r#"{"bezeichnung":"12-h-Schicht Hochwasser","typ":"rhythmus","rhythmus_minuten":720}"#
             .into(),
     )

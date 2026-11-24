@@ -123,11 +123,11 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | --- | --- | --- |
 | `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/einsaetze`, `…/{id}/module-counts`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
 | `src/einsatzakte` | Einsatzakte (LLH-1835): ZIP mit allen Anhängen (bereinigt), den Tabellen von Betroffenen, Tieren und Schäden und einem Inhaltsverzeichnis; Sammeln über die Linker, Bausperre je Einsatz und Server. Das Druckstück der Akte baut der Browser | `GET …/{id}/case-file/attachments.zip`; nutzt `routes::support::anhang_fuer_akte`, `routes::backup::chunk_stream` |
-| `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/einsatz-vorlagen`; nutzt `einsatz::repo::anlegen_tx` |
+| `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/incident-templates`; nutzt `einsatz::repo::anlegen_tx` |
 | `src/einsatzabschnitt` | Abschnittsbaum mit Leiter, Fläche und Sprechgruppen; schreibt System-ETB beim Anlegen | `…/{id}/abschnitte`; Live `abschnitt` |
 | `src/etb` | Einsatztagebuch: Eintragstypen, Einfügen als einzige Stelle, Lesemarke, Zähler | `…/{id}/etb`; Live `etb` |
-| `src/etb_baustein` | Org-Katalog der ETB-Textbausteine, Seed für neue Organisationen | `/api/etb-bausteine` |
-| `src/stichwort` | Org-weite Einsatzstichwort-Vorschläge, koppelbar an Einsatz-Vorlagen | `/api/stichwort-vorschlaege` |
+| `src/etb_baustein` | Org-Katalog der ETB-Textbausteine, Seed für neue Organisationen | `/api/etb-snippets` |
+| `src/stichwort` | Org-weite Einsatzstichwort-Vorschläge, koppelbar an Einsatz-Vorlagen | `/api/keyword-suggestions` |
 
 ### Lage & Karte
 
@@ -140,7 +140,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | `src/lage_zone` | Freie Gefahren- und Absperrzonen als GeoJSON | `…/{id}/zonen`; Live `lage_zone` |
 | `src/freies_zeichen` | Taktische Zeichen ohne Fachobjekt (`zeichen_spec`) | `…/{id}/freie-zeichen`; Live `freies_zeichen` |
 | `src/gefahr` | Gefahrengebiete aus Zonen mit Gefahrenmatrix und Beurteilung | `…/{id}/gefahrengebiete`; Live `gefahr` |
-| `src/geocoding` | Peilung (offline), Reverse-Geocoding und Ortssuche über einen Nominatim-kompatiblen Dienst mit Cache und Drossel | `/api/ort-suche`, `/api/ort-vorschau`, `…/{id}/place-search`, `…/{id}/place-preview`, `…/{id}/karte/ort-suche` |
+| `src/geocoding` | Peilung (offline), Reverse-Geocoding und Ortssuche über einen Nominatim-kompatiblen Dienst mit Cache und Drossel | `/api/place-search`, `/api/place-preview`, `…/{id}/place-search`, `…/{id}/place-preview`, `…/{id}/karte/ort-suche` |
 | `src/schaden` | Schadenregister mit Statusmaschine, Kennzahlen, Export und Anhängen | `…/{id}/schaeden`; Live `schaden` |
 | `src/tier` | Tierregister mit Status, Halterbezug und Anhängen | `…/{id}/tiere`; Live `tier` |
 | `src/pegel` | Maßgebliche PEGELONLINE-Pegel mit Trend und Vorhersage-Vorschlag | `…/{id}/pegel`; Cache über `karte::cache` |
@@ -152,10 +152,10 @@ Regeln: [frontend/src/kraefte/AGENTS.md](../../frontend/src/kraefte/AGENTS.md) (
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/einheit` | Einheiten im Einsatz bilden (auch aus Vorlage oder Nachforderung), zuordnen, Status, Stärke, Einheitstypen | `…/{id}/einheiten`, `/api/einheit-typen`; Live `einheit` |
-| `src/einheit_vorlage` | Org-Katalog stehender Einheiten mit Untereinheiten, Fahrzeugen und Stammbesetzung | `/api/einheit-vorlagen` |
-| `src/fahrzeug` | Fahrzeugstamm, Status-Katalog, Disposition und Besatzung im Einsatz | `/api/fahrzeuge`, `/api/fahrzeug-status`, `…/{id}/fahrzeuge`; Live `fahrzeug` |
-| `src/personal` | Personalstamm, Qualifikationen, Status-Katalog und Disposition | `/api/personal`, `/api/qualifikationen`, `/api/personal-status`, `…/{id}/personal`; Live `personal` |
+| `src/einheit` | Einheiten im Einsatz bilden (auch aus Vorlage oder Nachforderung), zuordnen, Status, Stärke, Einheitstypen | `…/{id}/einheiten`, `/api/unit-types`; Live `einheit` |
+| `src/einheit_vorlage` | Org-Katalog stehender Einheiten mit Untereinheiten, Fahrzeugen und Stammbesetzung | `/api/unit-templates` |
+| `src/fahrzeug` | Fahrzeugstamm, Status-Katalog, Disposition und Besatzung im Einsatz | `/api/vehicles`, `/api/vehicle-statuses`, `…/{id}/fahrzeuge`; Live `fahrzeug` |
+| `src/personal` | Personalstamm, Qualifikationen, Status-Katalog und Disposition | `/api/personnel`, `/api/qualifications`, `/api/personnel-statuses`, `…/{id}/personal`; Live `personal` |
 | `src/material` | Materialstamm, Disposition, Aufteilen und Ort im Einsatz | `/api/material`, `…/{id}/material`; Live `material` |
 | `src/kraefte_disposition.rs` | Gemeinsamer Baustein „disponieren und zuordnen in einer Transaktion“, alles oder nichts mit Gründen je Zeile (422) | genutzt u. a. von `src/routes/einsatz_personal.rs`, `einsatz_fahrzeug.rs`, `einsatz_einheit.rs`, `abloesung.rs`, `src/einheit/aus_vorlage.rs`; `AppError::Zeilen` |
 | `src/kraefte_disposition` | Nur die Tests zu `src/kraefte_disposition.rs` (`tests.rs`) | — |
@@ -163,7 +163,7 @@ Regeln: [frontend/src/kraefte/AGENTS.md](../../frontend/src/kraefte/AGENTS.md) (
 | `src/status_ruecknahme.rs` | Gemeinsame Prüfung für die Rücknahme eines Statuswechsels (wer, binnen 10 Minuten, seither unverändert) und das Streichen des zugehörigen Zeitachsen-Ereignisses | genutzt von Fahrzeug, Personal, Material, Einheit (`…/status/zuruecknehmen`) |
 | `src/zeitachse` | Append-only Kräfte-Zeitachse (Alarmierung, Eintreffen, Ablösung, Entlassung), Perioden beim Lesen | `…/{id}/einheiten/zeitachse`, `…/{id}/personal/zeitachse`; feuert `einheit` |
 | `src/abloesung` | Schichten von Einheiten: Fälligkeit beim Lesen berechnet, Vollzug, Vorgaben je Abschnitt; `schichtplan/` der Schichtplan (Soll-Blöcke an Einheit, UHS, Pause, Befunde beim Lesen, LLH-1552) | `…/{id}/abloesungen`, `…/abloesungen/schichtplan`; Live `abloesung` |
-| `src/schichtmodell` | Org-Schichtmodelle (Rhythmus oder Wechselzeiten), Kopie am Einsatz | `/api/schichtmodelle` |
+| `src/schichtmodell` | Org-Schichtmodelle (Rhythmus oder Wechselzeiten), Kopie am Einsatz | `/api/shift-models` |
 | `src/planung` | Vorplanung ohne Einsatz: Planungen der Organisation mit Posten, Blöcken und Helfern, Befunde und Kennzahlen über die Schichtplan-Prüfung, Löschfrist 90 Tage (LLH-1585); Programmpunkte der Planung (LLH-1583); Übernahme in einen neuen oder laufenden Einsatz über den Übernahme-Kern des Schichtplans, danach schreibgeschützt (LLH-1587), mit den Programmpunkten | `/api/plans`; Org-Live `planung`; `abloesung::schichtplan::uebernahme`, `einsatz::repo::anlegen_tx` |
 | `src/bereitstellungsraum` | Bereitstellungsräume mit Statusmaschine, Belegung, Eintreffen und Abruf | `…/{id}/bereitstellungsraeume`; Live `bereitstellungsraum` |
 | `src/staerke.rs` | Taktische Stärke Führer/Unterführer/Mannschaft, Summe berechnet | genutzt u. a. von Fahrzeug, Einheiten-Vorlage, UHS, Verpflegung |
@@ -179,8 +179,8 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/person` | Betroffene: Sichtung, Verbleib, Transport, Maßnahmen, Verletzungen, Vermisstenabgleich, Anhänge | `…/{id}/personen`, `…/personen/{pid}/…`; Live `person` |
 | `src/uhs` | Unfallhilfsstellen mit Plätzen, Belegung, Kräften, Grundriss und Anhängen | `…/{id}/uhs`; Live `uhs` |
 | `src/betreuung` | Evakuierungsbezirke und Betreuungsstellen als Mengen mit append-only Meldereihen; Registrierstelle mit Haushalten und Kostform, namentlich geführte Belegung ([ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md)) | `…/{id}/betreuung`, `…/betreuung/stellen/{sid}/registrierungen`, `…/abmeldungen`, `…/betreuung/kostformen`, `…/{id}/evakuierung`; Live `betreuung`, `evakuierung`, `person` |
-| `src/unterkunft` | Richtwerte des Unterkunftsrechners: Basis aus `richtwerte_basis.json`, Werte je Organisation und Einsatz; Rechenkern `rechner` für die Rechner-API (LLH-1524), der den TS-Kern der Oberfläche nachbildet und mit ihm dieselbe Fallsammlung `tests/fixtures/unterkunft/faelle.json` besteht | `/api/unterkunft-richtwerte`, `/api/org-accommodation-guidelines/{schluessel}`, `…/{id}/unterkunft-richtwerte`; Rechnung für Fremdsysteme über `src/public_api` |
-| `src/verpflegung` | Verpflegungszeitfenster, erfasster Bedarf, Ausgaben, Stellen und Org-Vorlagen | `…/{id}/verpflegung`, `/api/verpflegung-vorlagen`; Live `verpflegung` |
+| `src/unterkunft` | Richtwerte des Unterkunftsrechners: Basis aus `richtwerte_basis.json`, Werte je Organisation und Einsatz; Rechenkern `rechner` für die Rechner-API (LLH-1524), der den TS-Kern der Oberfläche nachbildet und mit ihm dieselbe Fallsammlung `tests/fixtures/unterkunft/faelle.json` besteht | `/api/accommodation-guidelines`, `/api/org-accommodation-guidelines/{schluessel}`, `…/{id}/unterkunft-richtwerte`; Rechnung für Fremdsysteme über `src/public_api` |
+| `src/verpflegung` | Verpflegungszeitfenster, erfasster Bedarf, Ausgaben, Stellen und Org-Vorlagen | `…/{id}/verpflegung`, `/api/catering-templates`; Live `verpflegung` |
 
 ### Kommunikation & Meldungen
 
@@ -196,7 +196,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/benachrichtigung` | Eine Stelle entscheidet Empfänger, schreibt je Empfänger eine Zeile, stellt zu | `/api/notifications`; Live `benachrichtigung`, `org_benachrichtigung` |
 | `src/web_push` | Web Push bei geschlossenem Tab, nur mit `--web-push`, RFC-8291-Verschlüsselung | `/api/web-push`; aus `benachrichtigung::melden` |
 | `src/ios_push` | iOS-Push über das Push-Relais, nur mit `--ios-push`: Anmeldungen je Konto und Gerät, Klartext wie `GET /api/notifications/{id}`, AES-256-GCM je Gerät, Relais-Client mit Selbstanmeldung | `/api/ios-push` (`src/routes/ios_push.rs`); aus `benachrichtigung::melden`; `POST /v1/server`, `/v1/senden` am Relais |
-| `src/externe_stelle` | Org-Katalog externer Stellen als Vorschlagsquelle (Speicherform Text) | `/api/externe-stellen` |
+| `src/externe_stelle` | Org-Katalog externer Stellen als Vorschlagsquelle (Speicherform Text) | `/api/external-agencies` |
 
 ### Führungsorganisation
 
@@ -208,13 +208,13 @@ Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGEN
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
 | `src/fernmeldewesen` | Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen | `…/{id}/staff/comms-plan`, `…/{id}/staff/comms-sketch`; Live `fernmeldewesen` |
-| `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/fuehrungsfunktionen`, `/api/org-command-roles/{funktion}` |
+| `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/command-roles`, `/api/org-command-roles/{funktion}` |
 | `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul | `…/{id}/briefing`, `…/{id}/briefings`; Live `lagebesprechung` |
 | `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/agenda-items`, Feld `programm` von `…/{id}/lagemonitor`; Live `einsatz` |
 | `src/lagebericht` | Lageberichte nach Vorlage (Registry synchron zu `frontend/src/lageberichte/vorlagen.ts`) | `…/{id}/lageberichte`; Live `lagebericht` |
 | `src/vorlagendokument` | Gemeinsamer Kern von Befehl und Lagebericht: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht` genutzt |
 | `src/infotelefon` | Bürgertelefon, eigenes Modul `infotelefon`: Anrufprotokoll mit Rückrufbedarf | `…/{id}/staff/info-line`; Live `infotelefon` |
-| `src/sprechgruppe` | TETRA-Sprechgruppen im Stamm und einsatzlokal, Zuordnung zu Zielen | `/api/sprechgruppen`, `…/{id}/talk-groups` |
+| `src/sprechgruppe` | TETRA-Sprechgruppen im Stamm und einsatzlokal, Zuordnung zu Zielen | `/api/talk-groups`, `…/{id}/talk-groups` |
 
 Die Führungsstelle eines Einsatzes liegt in `src/einsatz` (`fuehrungsstelle.rs`, Routen
 `…/{id}/command-post`).

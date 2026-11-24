@@ -8,11 +8,11 @@ import type { EinsatzVorlage, EinsatzVorlageEingabe } from './types';
 
 /** Die Vorlagen der eigenen Organisation in der Reihenfolge des Servers (`sortier`). */
 export function listeEinsatzVorlagen(): Promise<EinsatzVorlage[]> {
-  return apiGet<EinsatzVorlage[]>('/api/einsatz-vorlagen');
+  return apiGet<EinsatzVorlage[]>('/api/incident-templates');
 }
 
 export function legeEinsatzVorlageAn(daten: EinsatzVorlageEingabe): Promise<EinsatzVorlage> {
-  return apiSend<EinsatzVorlage>('/api/einsatz-vorlagen', 'POST', daten);
+  return apiSend<EinsatzVorlage>('/api/incident-templates', 'POST', daten);
 }
 
 /** Vollersatz: Bezeichnung, Einsatzart, Schichtmodell und die ganze Menge ausgeblendeter Module. */
@@ -20,10 +20,10 @@ export function aktualisiereEinsatzVorlage(
   id: number,
   daten: EinsatzVorlageEingabe,
 ): Promise<EinsatzVorlage> {
-  return apiSend<EinsatzVorlage>(`/api/einsatz-vorlagen/${id}`, 'PUT', daten);
+  return apiSend<EinsatzVorlage>(`/api/incident-templates/${id}`, 'PUT', daten);
 }
 
 /** Gekoppelte Stichworte verlieren die Kopplung, die Stichworte bleiben. */
 export function loescheEinsatzVorlage(id: number): Promise<void> {
-  return apiSend<void>(`/api/einsatz-vorlagen/${id}`, 'DELETE');
+  return apiSend<void>(`/api/incident-templates/${id}`, 'DELETE');
 }

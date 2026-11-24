@@ -11,17 +11,17 @@ export interface BausteinEingabe {
 }
 
 export function listeBausteine(): Promise<EtbBaustein[]> {
-  return apiGet<EtbBaustein[]>('/api/etb-bausteine');
+  return apiGet<EtbBaustein[]>('/api/etb-snippets');
 }
 
 export function legeBausteinAn(daten: BausteinEingabe): Promise<EtbBaustein> {
-  return apiSend<EtbBaustein>('/api/etb-bausteine', 'POST', daten);
+  return apiSend<EtbBaustein>('/api/etb-snippets', 'POST', daten);
 }
 
 export function aktualisiereBaustein(id: number, daten: BausteinEingabe): Promise<EtbBaustein> {
-  return apiSend<EtbBaustein>(`/api/etb-bausteine/${id}`, 'PATCH', daten);
+  return apiSend<EtbBaustein>(`/api/etb-snippets/${id}`, 'PATCH', daten);
 }
 
 export function deaktiviereBaustein(id: number): Promise<void> {
-  return apiSend<void>(`/api/etb-bausteine/${id}/deaktivieren`, 'POST');
+  return apiSend<void>(`/api/etb-snippets/${id}/deactivate`, 'POST');
 }

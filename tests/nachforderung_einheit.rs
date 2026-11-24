@@ -196,7 +196,7 @@ async fn eintreffen_und_uebernahme_mit_ziel_br_nord() {
     let (s, typ) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(&json!({ "label": "RTW" }).to_string()),
     )
@@ -847,7 +847,7 @@ async fn rtw_typ(app: &axum::Router, cookie: &str) -> i64 {
     let (s, typ) = anfrage(
         app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         cookie,
         Some(&json!({ "label": "RTW" }).to_string()),
     )

@@ -14,7 +14,7 @@ async fn admin_legt_person_an_alle_lesen_sie() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Thomas Müller","staerke_position":"fuehrer"}"#),
     )
@@ -25,7 +25,7 @@ async fn admin_legt_person_an_alle_lesen_sie() {
     assert_eq!(json["qualifikationen"].as_array().unwrap().len(), 0);
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    let (status, json) = anfrage(&app, "GET", "/api/personal", &erika, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/personnel", &erika, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 1);
 }
@@ -39,7 +39,7 @@ async fn nicht_admin_darf_nicht_anlegen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &erika,
         Some(r#"{"name":"Verboten"}"#),
     )
@@ -56,7 +56,7 @@ async fn dublette_personalnummer_ist_409_namen_erlaubt() {
         anfrage(
             &app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &admin,
             Some(r#"{"name":"Thomas Müller"}"#)
         )
@@ -68,7 +68,7 @@ async fn dublette_personalnummer_ist_409_namen_erlaubt() {
         anfrage(
             &app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &admin,
             Some(r#"{"name":"Thomas Müller"}"#)
         )
@@ -79,7 +79,7 @@ async fn dublette_personalnummer_ist_409_namen_erlaubt() {
     // Gleiche Nummer → Conflict.
     let mit_nr = r#"{"name":"A","personalnummer":"4711"}"#;
     assert_eq!(
-        anfrage(&app, "POST", "/api/personal", &admin, Some(mit_nr))
+        anfrage(&app, "POST", "/api/personnel", &admin, Some(mit_nr))
             .await
             .0,
         StatusCode::CREATED
@@ -88,7 +88,7 @@ async fn dublette_personalnummer_ist_409_namen_erlaubt() {
         anfrage(
             &app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &admin,
             Some(r#"{"name":"B","personalnummer":"4711"}"#)
         )
@@ -105,7 +105,7 @@ async fn ungueltige_staerke_position_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"X","staerke_position":"chef"}"#),
     )
@@ -120,7 +120,7 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Thomas"}"#),
     )
@@ -130,7 +130,7 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/personal/{id}/ausser-dienst"),
+            &format!("/api/personnel/{id}/out-of-service"),
             &admin,
             None
         )
@@ -141,13 +141,13 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
     let (_, im_dienst) = anfrage(
         &app,
         "GET",
-        "/api/personal?nur_im_dienst=true",
+        "/api/personnel?nur_im_dienst=true",
         &admin,
         None,
     )
     .await;
     assert!(im_dienst.as_array().unwrap().is_empty());
-    let (_, alle) = anfrage(&app, "GET", "/api/personal", &admin, None).await;
+    let (_, alle) = anfrage(&app, "GET", "/api/personnel", &admin, None).await;
     assert_eq!(alle.as_array().unwrap().len(), 1);
 }
 
@@ -156,7 +156,7 @@ async fn qualifikationen_werden_zugeordnet_und_aufgeloest() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     // Aus dem Bootstrap-Seed zwei Qualifikations-IDs holen.
-    let (_, quals) = anfrage(&app, "GET", "/api/qualifikationen", &admin, None).await;
+    let (_, quals) = anfrage(&app, "GET", "/api/qualifications", &admin, None).await;
     let ids: Vec<i64> = quals
         .as_array()
         .unwrap()
@@ -168,7 +168,7 @@ async fn qualifikationen_werden_zugeordnet_und_aufgeloest() {
         r#"{{"name":"Thomas","qualifikation_ids":[{},{}]}}"#,
         ids[0], ids[1]
     );
-    let (status, json) = anfrage(&app, "POST", "/api/personal", &admin, Some(&body)).await;
+    let (status, json) = anfrage(&app, "POST", "/api/personnel", &admin, Some(&body)).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["qualifikationen"].as_array().unwrap().len(), 2);
 }
@@ -180,7 +180,7 @@ async fn qualifikation_anlegen(app: &axum::Router, admin: &str, label: &str, sor
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         admin,
         Some(&format!(r#"{{"label":"{label}","sortier":{sortier}}}"#)),
     )
@@ -202,7 +202,7 @@ async fn person_mit_qualifikationen(app: &axum::Router, admin: &str) -> (i64, i6
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&format!(
             r#"{{"name":"Thomas Müller","personalnummer":"4711",
@@ -233,7 +233,7 @@ async fn patch_ohne_qualifikation_ids_behaelt_qualifikationen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(r#"{"telefon":"0999"}"#),
     )
@@ -265,7 +265,7 @@ async fn patch_qualifikation_ids_leeres_array_leert() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(r#"{"qualifikation_ids":[]}"#),
     )
@@ -286,7 +286,7 @@ async fn patch_qualifikation_ids_ersetzt_die_menge_vollstaendig() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(&format!(r#"{{"qualifikation_ids":[{q1}]}}"#)),
     )
@@ -308,7 +308,7 @@ async fn patch_ohne_telefon_laesst_nachbarfelder_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(r#"{"bemerkung":"Bemerkung neu"}"#),
     )
@@ -332,7 +332,7 @@ async fn patch_telefon_null_loescht() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(r#"{"telefon":null,"traegerorganisation":"   "}"#),
     )
@@ -362,7 +362,7 @@ async fn patch_leerer_name_ist_400_absenter_laesst_ihn_stehen() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/personal/{id}"),
+            &format!("/api/personnel/{id}"),
             &admin,
             Some(r#"{"name":"   "}"#)
         )
@@ -374,7 +374,7 @@ async fn patch_leerer_name_ist_400_absenter_laesst_ihn_stehen() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/personal/{id}"),
+            &format!("/api/personnel/{id}"),
             &admin,
             Some(r#"{"staerke_position":"quatsch"}"#)
         )
@@ -385,7 +385,7 @@ async fn patch_leerer_name_ist_400_absenter_laesst_ihn_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{id}"),
+        &format!("/api/personnel/{id}"),
         &admin,
         Some(r#"{"telefon":"0999"}"#),
     )
@@ -401,7 +401,7 @@ async fn patch_unbekannte_id_ist_404() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/personal/9999",
+        "/api/personnel/9999",
         &admin,
         Some(r#"{"name":"X"}"#),
     )
@@ -417,7 +417,7 @@ async fn in_dienst_auf_vergebene_personalnummer_ist_409() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Alt","personalnummer":"7"}"#),
     )
@@ -427,7 +427,7 @@ async fn in_dienst_auf_vergebene_personalnummer_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/personal/{id}/ausser-dienst"),
+            &format!("/api/personnel/{id}/out-of-service"),
             &admin,
             None
         )
@@ -440,7 +440,7 @@ async fn in_dienst_auf_vergebene_personalnummer_ist_409() {
         anfrage(
             &app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &admin,
             Some(r#"{"name":"Neu","personalnummer":"7"}"#)
         )
@@ -453,7 +453,7 @@ async fn in_dienst_auf_vergebene_personalnummer_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/personal/{id}/in-dienst"),
+            &format!("/api/personnel/{id}/in-service"),
             &admin,
             None
         )
@@ -470,12 +470,19 @@ async fn kein_delete_endpunkt() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Thomas"}"#),
     )
     .await;
     let id = json["id"].as_i64().unwrap();
-    let (status, _) = anfrage(&app, "DELETE", &format!("/api/personal/{id}"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/personnel/{id}"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }

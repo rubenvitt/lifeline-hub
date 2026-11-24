@@ -167,6 +167,7 @@ function AdresseDialog({
             <KopierbarerText text={adresse} bezeichnung="Adresse">
               <span
                 data-lfh="einwurf-adresse-text"
+                data-schrift="kennung"
                 style={{ ...monoStil('mono', 500), wordBreak: 'break-all' }}
               >
                 {adresse}

@@ -50,7 +50,7 @@ beforeEach(() => {
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
     http.get('/api/einsaetze/:eid/place-search', () => HttpResponse.json(TREFFER)),
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 2, label: 'Rettungssanitäter', aktiv: true }]),
     ),
   );

@@ -94,7 +94,7 @@ function renderKopf(
   } = {},
 ) {
   server.use(
-    http.get('/api/fahrzeug-status', () =>
+    http.get('/api/vehicle-statuses', () =>
       HttpResponse.json([
         {
           id: 102,
@@ -330,7 +330,7 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
 
   it('Qualifikationssoll: das des Typs als Vorgabe, Ergänzen schickt die ganze Liste (LLH-1553)', async () => {
     server.use(
-      http.get('/api/qualifikationen', () =>
+      http.get('/api/qualifications', () =>
         HttpResponse.json([
           { id: 1, label: 'Sanitäter', sortier: 10 },
           { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },

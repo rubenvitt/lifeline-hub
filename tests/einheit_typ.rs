@@ -9,7 +9,7 @@ use common::{anfrage, benutzer_anlegen, login_cookie, setup};
 async fn bootstrap_seedet_einheit_typen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/einheit-typen", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/unit-types", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     let labels: Vec<&str> = json
         .as_array()
@@ -44,7 +44,7 @@ async fn alle_lesen_nur_admin_legt_an() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     assert_eq!(
-        anfrage(&app, "GET", "/api/einheit-typen", &erika, None)
+        anfrage(&app, "GET", "/api/unit-types", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -53,7 +53,7 @@ async fn alle_lesen_nur_admin_legt_an() {
         anfrage(
             &app,
             "POST",
-            "/api/einheit-typen",
+            "/api/unit-types",
             &erika,
             Some(r#"{"label":"X"}"#)
         )
@@ -62,7 +62,7 @@ async fn alle_lesen_nur_admin_legt_an() {
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        anfrage(&app, "POST", "/api/einheit-typen", &admin,
+        anfrage(&app, "POST", "/api/unit-types", &admin,
             Some(r#"{"label":"Verband","soll_fuehrer":3,"soll_unterfuehrer":9,"soll_mannschaft":40,"sortier":60}"#)).await.0,
         StatusCode::CREATED
     );
@@ -75,7 +75,7 @@ async fn teilweise_soll_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(r#"{"label":"X","soll_fuehrer":1}"#),
     )
@@ -92,7 +92,7 @@ async fn dublette_label_ist_409() {
         anfrage(
             &app,
             "POST",
-            "/api/einheit-typen",
+            "/api/unit-types",
             &admin,
             Some(r#"{"label":"Zug"}"#)
         )
@@ -109,7 +109,7 @@ async fn typ_mit_trio(app: &axum::Router, admin: &str, label: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         admin,
         Some(&format!(
             r#"{{"label":"{label}","soll_fuehrer":1,"soll_unterfuehrer":3,"soll_mannschaft":18,"sortier":60}}"#
@@ -132,7 +132,7 @@ async fn patch_ohne_soll_felder_laesst_trio_und_sortier_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einheit-typen/{id}"),
+        &format!("/api/unit-types/{id}"),
         &admin,
         Some(r#"{"label":"Verstärkter Verband"}"#),
     )
@@ -160,7 +160,7 @@ async fn patch_nur_ein_soll_feld_prueft_gegen_bestand() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einheit-typen/{id}"),
+        &format!("/api/unit-types/{id}"),
         &admin,
         Some(r#"{"soll_mannschaft":20}"#),
     )
@@ -182,7 +182,7 @@ async fn patch_soll_fuehrer_null_bei_gesetztem_trio_ist_400() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einheit-typen/{id}"),
+            &format!("/api/unit-types/{id}"),
             &admin,
             Some(r#"{"soll_fuehrer":null}"#)
         )
@@ -202,7 +202,7 @@ async fn patch_alle_drei_null_leert_das_trio() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einheit-typen/{id}"),
+        &format!("/api/unit-types/{id}"),
         &admin,
         Some(r#"{"soll_fuehrer":null,"soll_unterfuehrer":null,"soll_mannschaft":null}"#),
     )
@@ -221,7 +221,7 @@ async fn patch_leeres_label_ist_400_unbekannte_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einheit-typen/{id}"),
+            &format!("/api/unit-types/{id}"),
             &admin,
             Some(r#"{"label":"   "}"#)
         )
@@ -233,7 +233,7 @@ async fn patch_leeres_label_ist_400_unbekannte_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            "/api/einheit-typen/9999",
+            "/api/unit-types/9999",
             &admin,
             Some(r#"{"label":"X"}"#)
         )
@@ -250,7 +250,7 @@ async fn deaktivieren_entfernt_aus_liste() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(r#"{"label":"Reserve"}"#),
     )
@@ -260,7 +260,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einheit-typen/{id}/deaktivieren"),
+            &format!("/api/unit-types/{id}/deactivate"),
             &admin,
             None
         )
@@ -268,7 +268,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/einheit-typen", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/unit-types", &admin, None).await;
     let labels: Vec<&str> = liste
         .as_array()
         .unwrap()

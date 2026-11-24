@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 mod common;
 use common::*;
 
-const ORG: &str = "/api/unterkunft-richtwerte";
+const ORG: &str = "/api/accommodation-guidelines";
 
 fn org_put(schluessel: &str) -> String {
     format!("/api/org-accommodation-guidelines/{schluessel}")

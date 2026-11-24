@@ -173,8 +173,8 @@ for (const modus of ['light', 'dark']) {
       faelle.push({ modul: 'material', kennung, rolle });
     }
     for (const [modul, katalog, feld] of [
-      ['fahrzeuge', 'fahrzeug-status', 'funkrufname'],
-      ['personal', 'personal-status', 'name'],
+      ['fahrzeuge', 'vehicle-statuses', 'funkrufname'],
+      ['personal', 'personnel-statuses', 'name'],
     ] as const) {
       const neutral = `Messkraft ${modul} neutral`;
       const neutralId = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: neutral } });
@@ -334,7 +334,7 @@ for (const modus of ['light', 'dark'] as const) {
     // Je Kategorie ein Fahrzeug mit passendem Katalogstatus, sonst blieben zwei Töne
     // ungemessen. Das Band zählt EINHEITEN (Status aus ihren Fahrzeugen abgeleitet), also
     // kommt jedes Fahrzeug in eine eigene Einheit.
-    const katalogAntwort = await page.request.get('/api/fahrzeug-status');
+    const katalogAntwort = await page.request.get('/api/vehicle-statuses');
     expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
     const katalog = (await katalogAntwort.json()) as { id: number; kategorie: string }[];
     for (const [i, { kategorie }] of BAND_KATEGORIEN.entries()) {

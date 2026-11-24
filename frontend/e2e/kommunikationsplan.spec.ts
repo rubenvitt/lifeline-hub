@@ -302,7 +302,7 @@ test('Katalog: Bezeichnung und Rufnummer einer Polizeidienststelle übernehmen',
   const marke = Date.now();
   const name = `PI Katalogprobe ${marke}`;
   const rufnummer = `0421 110 ${marke % 1000}`;
-  const angelegt = await page.request.post('/api/externe-stellen', {
+  const angelegt = await page.request.post('/api/external-agencies', {
     data: { bezeichnung: name, art: 'polizei', rufnummer },
   });
   expect(angelegt.status(), `Katalog: ${await angelegt.text()}`).toBe(201);
@@ -329,7 +329,7 @@ test('Katalog: Bezeichnung und Rufnummer einer Polizeidienststelle übernehmen',
       `tel:${rufnummer.replace(/\D/g, '')}`,
     );
   } finally {
-    const weg = await page.request.patch(`/api/externe-stellen/${katalogId}`, {
+    const weg = await page.request.patch(`/api/external-agencies/${katalogId}`, {
       data: { aktiv: false },
     });
     expect(weg.ok(), `Katalog deaktivieren: ${await weg.text()}`).toBeTruthy();

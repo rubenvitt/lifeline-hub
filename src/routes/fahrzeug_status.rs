@@ -157,7 +157,7 @@ fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> 
     })
 }
 
-/// GET /api/fahrzeug-status — aktive Katalog-Einträge (eigene Org), für Dropdowns.
+/// GET /api/vehicle-statuses — aktive Katalog-Einträge (eigene Org), für Dropdowns.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -167,7 +167,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/fahrzeug-status — Admin. Dublette label → Conflict.
+/// POST /api/vehicle-statuses — Admin. Dublette label → Conflict.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -178,7 +178,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(s)))
 }
 
-/// PATCH /api/fahrzeug-status/{id} — Admin, echter Teil-Patch (LFH-306):
+/// PATCH /api/vehicle-statuses/{id} — Admin, echter Teil-Patch (LFH-306):
 /// Feld absent = unverändert, `null`/`""` bei `farbe` bzw. `null` bei `fms_anker` = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -191,7 +191,7 @@ pub async fn aktualisieren(
     Ok(Json(s))
 }
 
-/// POST /api/fahrzeug-status/{id}/deaktivieren — Admin (Soft-Delete statt Löschen).
+/// POST /api/vehicle-statuses/{id}/deactivate — Admin (Soft-Delete statt Löschen).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

@@ -14,6 +14,7 @@ import {
   paneelZeileStil,
   schriftStil,
   useRollen,
+  Kennung,
 } from '../components/instrument';
 import { SeitenFehler } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
@@ -1314,7 +1315,7 @@ function RufnameAngabe({
       praesenz={praesenz}
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={monoStil('mono')}>{rufname}</span>}
+      anzeige={<Kennung>{rufname}</Kennung>}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}

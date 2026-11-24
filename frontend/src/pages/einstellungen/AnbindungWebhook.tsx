@@ -16,6 +16,7 @@ import {
   Status,
   type BearbeitbaresFeld,
   useRollen,
+  schriftStil,
 } from '../../components/instrument';
 import { SeitenFehler } from '../../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -758,9 +759,13 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
             <div data-lfh="webhook-versuch">
               <Stapel richtung="zeile" umbruch abstand="md" ausrichten="baseline">
                 <span style={monoStil('monoKlein')}>{zeitKurz(v.at, konv)}</span>
-                <span style={monoStil('monoKlein')}>
-                  {v.test ? 'Test' : v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
-                </span>
+                {v.test ? (
+                  <span style={schriftStil('textKlein')}>Test</span>
+                ) : (
+                  <span style={monoStil('monoKlein')}>
+                    {v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
+                  </span>
+                )}
                 <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>
                   {versuchText(v)}
                 </span>

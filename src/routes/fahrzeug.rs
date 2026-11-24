@@ -258,7 +258,7 @@ pub struct ListeParams {
     pub nur_im_dienst: bool,
 }
 
-/// GET /api/fahrzeuge — alle eingeloggten Nutzer (eigene Org).
+/// GET /api/vehicles — alle eingeloggten Nutzer (eigene Org).
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -268,7 +268,7 @@ pub async fn liste(
     Ok(Json(fahrzeuge.iter().map(|f| f.anzeige()).collect()))
 }
 
-/// GET /api/fahrzeug-vorschlaege — abgeleitete AutoComplete-Vorschläge (eigene Org)
+/// GET /api/vehicle-suggestions — abgeleitete AutoComplete-Vorschläge (eigene Org)
 /// für Fahrzeugtyp, Trägerorganisation und Standort.
 pub async fn vorschlaege(
     State(state): State<AppState>,
@@ -277,7 +277,7 @@ pub async fn vorschlaege(
     Ok(Json(repo::vorschlaege(&state.pool, benutzer.org_id).await?))
 }
 
-/// POST /api/fahrzeuge — Admin. Dublette Funkrufname → Conflict.
+/// POST /api/vehicles — Admin. Dublette Funkrufname → Conflict.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -288,7 +288,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(f.anzeige())))
 }
 
-/// PATCH /api/fahrzeuge/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
+/// PATCH /api/vehicles/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
 /// unverändert, `null`/`""` = leeren. Das Stärke-Trio wird gegen den Effektivzustand
 /// geprüft. NotFound bei fremder/unbek. id.
 pub async fn aktualisieren(
@@ -305,7 +305,7 @@ pub async fn aktualisieren(
     Ok(Json(f.anzeige()))
 }
 
-/// POST /api/fahrzeuge/{id}/ausser-dienst — Admin (Soft-Delete).
+/// POST /api/vehicles/{id}/out-of-service — Admin (Soft-Delete).
 pub async fn ausser_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -316,7 +316,7 @@ pub async fn ausser_dienst(
     Ok(Json(f.anzeige()))
 }
 
-/// POST /api/fahrzeuge/{id}/in-dienst — Admin (Reaktivierung; Conflict bei Namenskollision).
+/// POST /api/vehicles/{id}/in-service — Admin (Reaktivierung; Conflict bei Namenskollision).
 pub async fn in_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

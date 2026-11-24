@@ -277,7 +277,7 @@ async fn qualifikationen(app: &axum::Router, admin: &str, n: usize) -> Vec<i64> 
         let (s, j) = anfrage_json(
             app,
             "POST",
-            "/api/qualifikationen",
+            "/api/qualifications",
             admin,
             Some(&json!({ "label": format!("Q {i}"), "sortier": i })),
         )
@@ -306,7 +306,7 @@ async fn qualifikationen_entdoppelt_und_auf_64_begrenzt() {
     let (s, p) = anfrage_json(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(&json!({ "name": "Thomas", "qualifikation_ids": mit_dubletten })),
     )
@@ -318,7 +318,7 @@ async fn qualifikationen_entdoppelt_und_auf_64_begrenzt() {
     let (s, j) = anfrage_json(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(&json!({ "name": "Zu viel", "qualifikation_ids": q })),
     )
@@ -329,7 +329,7 @@ async fn qualifikationen_entdoppelt_und_auf_64_begrenzt() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/personal/{pid}"),
+        &format!("/api/personnel/{pid}"),
         json!({ "qualifikation_ids": q }),
     )
     .await;
@@ -340,7 +340,7 @@ async fn qualifikationen_entdoppelt_und_auf_64_begrenzt() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/personal/{pid}"),
+        &format!("/api/personnel/{pid}"),
         json!({ "qualifikation_ids": [q[0], q[0], 999_999] }),
     )
     .await;

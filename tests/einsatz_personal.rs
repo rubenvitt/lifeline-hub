@@ -74,7 +74,7 @@ async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/personal/{person}/ausser-dienst"),
+        &format!("/api/personnel/{person}/out-of-service"),
         &admin,
         None,
     )
@@ -198,7 +198,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let ep = json["id"].as_i64().unwrap();
 
     // Anderen 'gebunden'-Status aus dem Seed holen ('im Einsatz').
-    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     let im_einsatz = stati
         .as_array()
         .unwrap()
@@ -345,7 +345,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal/{person}"),
+        &format!("/api/personnel/{person}"),
         &admin,
         Some(r#"{"name":"Thomas NEU"}"#),
     )
@@ -853,7 +853,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
     let (s, json) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Stamm Mannschaft","staerke_position":"mannschaft"}"#),
     )
@@ -875,7 +875,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
     );
     let ep = json["id"].as_i64().unwrap();
     let einheit = einheit_mit(&app, &admin, einsatz, ep).await;
-    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     let im_einsatz = stati
         .as_array()
         .unwrap()
@@ -2059,7 +2059,7 @@ async fn position_vergleicht_den_wirksamen_wert() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(r#"{"name":"Thomas","staerke_position":"mannschaft"}"#),
     )
@@ -2162,7 +2162,7 @@ async fn etb_eintraege_des_personals_gehen_live_hinaus() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ep = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
     let fehl = adhoc_kraft(&app, &admin, einsatz, "Fehl").await;
-    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     let im_einsatz = stati
         .as_array()
         .unwrap()
@@ -2220,7 +2220,7 @@ async fn personalstatus_welt() -> (
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ep = adhoc_kraft(&app, &admin, einsatz, "Anna Muster").await;
-    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     let (alarmiert, im_einsatz, pause) = (
         personalstatus(&stati, "alarmiert"),
         personalstatus(&stati, "im Einsatz"),

@@ -30,8 +30,8 @@ const qualifikationen = [
 function render(benutzer: typeof admin, katalog = typen) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/einheit-typen', () => HttpResponse.json(katalog)),
-    http.get('/api/qualifikationen', () => HttpResponse.json(qualifikationen)),
+    http.get('/api/unit-types', () => HttpResponse.json(katalog)),
+    http.get('/api/qualifications', () => HttpResponse.json(qualifikationen)),
   );
   return renderMitProviders(<EinheitTypenTab />);
 }
@@ -112,7 +112,7 @@ describe('EinheitTypenTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/unit-types', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<EinheitTypenTab />);
 
@@ -138,7 +138,7 @@ describe('EinheitTypenTab', () => {
   it('die Schnellerfassung legt mit Label und leerer Soll-Stärke an', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.post('/api/einheit-typen', async ({ request }) => {
+      http.post('/api/unit-types', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({ id: 9, label: 'Gruppe', soll: null, sortier: 0 });
       }),
@@ -211,7 +211,7 @@ describe('EinheitTypenTab', () => {
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
-      http.patch('/api/einheit-typen/1', () =>
+      http.patch('/api/unit-types/1', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -233,7 +233,7 @@ describe('EinheitTypenTab', () => {
   it('Qualifikationssoll: folgt der Soll-Stärke, Bearbeiten ergänzt eine Zeile und schickt alle', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.patch('/api/einheit-typen/1', async ({ request }) => {
+      http.patch('/api/unit-types/1', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json(typen[0]);
       }),

@@ -34,7 +34,15 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { FELD_KLASSE, monoStil, Segmentleiste, Stapel, Knopfreihe } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  monoStil,
+  Segmentleiste,
+  Stapel,
+  Knopfreihe,
+  Kennung,
+  schriftStil,
+} from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   FAHRZEUGE_ANSICHT_ERLAUBT,
@@ -129,16 +137,22 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <Status darstellung={besatzungsUrteil[urteil]} />
-      <span style={monoStil('monoKlein')}>
+      <span style={schriftStil('textKlein')}>
         {urteil !== 'nicht_erfasst' && (
           <>
-            Ist <StaerkeAnzeige wert={ist} />
+            Ist{' '}
+            <span style={monoStil('monoKlein')}>
+              <StaerkeAnzeige wert={ist} />
+            </span>
           </>
         )}
         {urteil !== 'nicht_erfasst' && soll && ' · '}
         {soll && (
           <>
-            Soll <StaerkeAnzeige wert={soll} />
+            Soll{' '}
+            <span style={monoStil('monoKlein')}>
+              <StaerkeAnzeige wert={soll} />
+            </span>
           </>
         )}
       </span>
@@ -1051,7 +1065,7 @@ function FahrzeugeInhalt() {
           kennung={
             <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {/* Funkrufname in Mono. */}
-              <span style={monoStil('mono')}>{ef.funkrufname}</span>
+              <Kennung>{ef.funkrufname}</Kennung>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>
