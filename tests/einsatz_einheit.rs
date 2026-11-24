@@ -1673,7 +1673,7 @@ async fn einheiten_namen(
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten{query}"),
+        &format!("/api/einsaetze/{einsatz}/units{query}"),
         cookie,
         None,
     )

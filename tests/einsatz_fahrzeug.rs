@@ -964,7 +964,7 @@ async fn funkrufnamen(app: &axum::Router, cookie: &str, einsatz: i64, query: &st
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles{query}"),
         cookie,
         None,
     )
@@ -1387,7 +1387,7 @@ async fn fahrzeug_zeile(
         let (s, json) = anfrage(
             app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles{query}"),
             cookie,
             None,
         )

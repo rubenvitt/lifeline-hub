@@ -947,7 +947,7 @@ async fn namen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> V
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal{query}"),
+        &format!("/api/einsaetze/{einsatz}/personnel{query}"),
         cookie,
         None,
     )
