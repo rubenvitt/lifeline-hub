@@ -45,12 +45,12 @@ function render(
   };
   server.use(
     meHandler(benutzer),
-    http.get('/api/verpflegung-vorlagen', ({ request }) => {
+    http.get('/api/catering-templates', ({ request }) => {
       lesen.push(new URL(request.url).search);
       return HttpResponse.json(plan);
     }),
-    http.post('/api/verpflegung-vorlagen', schreib),
-    http.patch('/api/verpflegung-vorlagen/:id', schreib),
+    http.post('/api/catering-templates', schreib),
+    http.patch('/api/catering-templates/:id', schreib),
   );
   const user = userEvent.setup();
   renderMitProviders(<VerpflegungsplanTab />);
@@ -115,7 +115,7 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
       methode: 'POST',
-      pfad: '/api/verpflegung-vorlagen',
+      pfad: '/api/catering-templates',
       body: { bezeichnung: 'Frühstück', beginn: '06:30', ende: '08:00' },
     });
   });
@@ -176,7 +176,7 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
       methode: 'PATCH',
-      pfad: '/api/verpflegung-vorlagen/2',
+      pfad: '/api/catering-templates/2',
       body: { beginn: '11:30', verpflegungsart: null },
     });
   });
@@ -190,8 +190,8 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     await user.click(within(await zeile('Kaffee')).getByRole('button', { name: 'Aktivieren' }));
     await waitFor(() => expect(anfragen).toHaveLength(2));
     expect(anfragen).toEqual([
-      { methode: 'PATCH', pfad: '/api/verpflegung-vorlagen/1', body: { aktiv: false } },
-      { methode: 'PATCH', pfad: '/api/verpflegung-vorlagen/5', body: { aktiv: true } },
+      { methode: 'PATCH', pfad: '/api/catering-templates/1', body: { aktiv: false } },
+      { methode: 'PATCH', pfad: '/api/catering-templates/5', body: { aktiv: true } },
     ]);
   });
 
@@ -239,7 +239,7 @@ describe('VerpflegungsplanTab · Kontextmenü (LLH-1599)', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aktivieren' }));
     await waitFor(() =>
       expect(anfragen).toContainEqual(
-        expect.objectContaining({ methode: 'PATCH', pfad: '/api/verpflegung-vorlagen/5' }),
+        expect.objectContaining({ methode: 'PATCH', pfad: '/api/catering-templates/5' }),
       ),
     );
   });

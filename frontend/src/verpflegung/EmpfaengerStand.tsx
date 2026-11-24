@@ -2,7 +2,7 @@ import { Button } from 'antd';
 import { Fragment, useId, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AusgabeEingabe, VerpflegungEmpfaenger, VerpflegungZeitfenster } from '../api/types';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, monoStil, schriftStil, useRollen, Kennung } from '../components/instrument';
 import {
   betreuungsstellenVon,
   staerkeAnzeige,
@@ -91,7 +91,12 @@ export default function EmpfaengerStand({
     return null;
   const stand = verpflegungsstand(zeitfenster, empfaenger, ausstehend);
   const uhr = (s: string) => uhrzeit(s, konventionen);
-  const nebentext = { ...monoStil('monoKlein'), color: rollen.text2 };
+  // „ausstehend 3 EP“ trägt ein Wort: Textschrift mit gleich breiten Ziffern (ADR-0094).
+  const nebentext = {
+    ...schriftStil('textKlein'),
+    fontVariantNumeric: 'tabular-nums' as const,
+    color: rollen.text2,
+  };
   const listeStil = { listStyle: 'none', margin: 0, padding: 0 } as const;
   const zeileStil = {
     display: 'flex',
@@ -122,7 +127,7 @@ export default function EmpfaengerStand({
           <Teile
             teile={[
               z.name,
-              z.funkrufname && <span style={monoStil('mono')}>{z.funkrufname}</span>,
+              z.funkrufname && <Kennung>{z.funkrufname}</Kennung>,
               staerkeAnzeige(z.einheit) && (
                 <span style={monoStil('mono')}>{staerkeAnzeige(z.einheit)}</span>
               ),
@@ -180,7 +185,7 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     z.name,
-                    z.funkrufname && <span style={monoStil('mono')}>{z.funkrufname}</span>,
+                    z.funkrufname && <Kennung>{z.funkrufname}</Kennung>,
                     z.ausgaben.length > 0 && (
                       <span key="m" style={monoStil('mono', 500)}>
                         {ausgabenText(z.ausgaben, uhr)}

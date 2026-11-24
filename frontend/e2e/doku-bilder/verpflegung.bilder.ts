@@ -168,7 +168,7 @@ test.describe(KAPITEL, () => {
         ['Abendessen', '1800', '1930', 'warm'],
         ['Nachtverpflegung', '2300', '0100', 'kalt'],
       ]) {
-        await fuelle(api, 'post', '/api/verpflegung-vorlagen', {
+        await fuelle(api, 'post', '/api/catering-templates', {
           bezeichnung,
           beginn,
           ende,

@@ -9,21 +9,21 @@ import type { Schichtmodell, SchichtmodellBody, SchichtmodellWerteBody } from '.
 
 /** Die Modelle der eigenen Organisation, die Vorgabe zuerst (Ordnung vom Server). */
 export function fetchSchichtmodelle(): Promise<Schichtmodell[]> {
-  return apiGet<Schichtmodell[]>('/api/schichtmodelle');
+  return apiGet<Schichtmodell[]>('/api/shift-models');
 }
 
 export function createSchichtmodell(body: SchichtmodellBody): Promise<Schichtmodell> {
-  return apiSend<Schichtmodell>('/api/schichtmodelle', 'POST', body);
+  return apiSend<Schichtmodell>('/api/shift-models', 'POST', body);
 }
 
 /** Vollersatz: der ganze Satz samt `ist_vorgabe`. */
 export function updateSchichtmodell(id: number, body: SchichtmodellBody): Promise<Schichtmodell> {
-  return apiSend<Schichtmodell>(`/api/schichtmodelle/${id}`, 'PUT', body);
+  return apiSend<Schichtmodell>(`/api/shift-models/${id}`, 'PUT', body);
 }
 
 /** Einsätze behalten ihre Kopie. */
 export function deleteSchichtmodell(id: number): Promise<void> {
-  return apiSend<void>(`/api/schichtmodelle/${id}`, 'DELETE');
+  return apiSend<void>(`/api/shift-models/${id}`, 'DELETE');
 }
 
 /** Die Werte eines Modells als Body, ohne die Felder des anderen Typs (sonst 422). */

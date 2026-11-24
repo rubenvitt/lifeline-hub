@@ -13,6 +13,7 @@ admin	-
 administration	Verwaltung
 agenda-items	Programmpunkte
 alarm	Alarmmeldung
+also-local	auch lokal
 animals	Tiere
 annul	stornieren
 api	-
@@ -41,6 +42,7 @@ care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+catering-templates	Verpflegungsvorlagen
 certificate	Zertifikat
 chat	-
 check	prüfen
@@ -79,11 +81,13 @@ end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
+etb-snippets	ETB-Bausteine
 evacuation	Evakuierung
 events	-
 existing	vorhandene
 export	-
 external	extern
+external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
 file	Datei
 finish	-
@@ -104,6 +108,8 @@ household	Haushalt
 households	Haushalte
 image	Bild
 import	-
+in-service	in Dienst
+incident-templates	Einsatzvorlagen
 incidents	Einsätze
 info-line	Infotelefon
 injuries	Verletzungen
@@ -116,6 +122,7 @@ inventory	Bestand
 ios-push	-
 jwks.json	-
 key	Schlüssel
+keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
 list-accesses	Listenzugriffe
@@ -130,6 +137,7 @@ marker	-
 master-data	Stammdaten
 matches	Abgleich
 material	Material
+material-categories	Materialkategorien
 matrix	-
 me	-
 member-selection	Mitglied-Auswahl
@@ -159,6 +167,7 @@ org-module-settings	Org-Modul-Einstellungen
 org-settings	Org-Einstellungen
 organization	Organisation
 origin	Herkunft
+out-of-service	außer Dienst
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -166,6 +175,8 @@ password	Passwort
 pause	anhalten
 person-search	Personensuche
 personnel	Personal
+personnel-statuses	Personalstatus
+personnel-suggestions	Personalvorschläge
 persons	Personen
 place-preview	Ortsvorschau
 place-search	Ortssuche
@@ -180,6 +191,7 @@ print	Druck
 progress	Stände
 providers	-
 proxy	-
+qualifications	Qualifikationen
 raster	-
 read	gelesen
 reason	Anlass
@@ -217,6 +229,7 @@ sessions	Sitzungen
 set	festlegen
 settings	Einstellungen
 shell	-
+shift-models	Schichtmodelle
 shift-plan	Schichtplan
 signing-keys	Unterschriftsschlüssel
 situation	Lage
@@ -236,6 +249,7 @@ subscription	Abo
 system	-
 talk-groups	Sprechgruppen
 tasks	Aufträge
+template	Vorlage
 test	-
 tile	-
 tilejson	-
@@ -250,12 +264,16 @@ uhs	UHS
 uhs-occupancy	UHS-Belegung
 undo	zurücknehmen
 unit	Einheit
+unit-templates	Einheitsvorlagen
+unit-types	Einheitstypen
 units	Einheiten
 unregister	-
 update-now	jetzt aktualisieren
 user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
+vehicle-statuses	Fahrzeugstatus
+vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
 void	aufheben
 web-push	-

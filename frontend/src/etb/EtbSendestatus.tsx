@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import { IconHaken } from '../icons';
-import { monoStil, schriftStil, useRollen } from '../components/instrument';
+import { schriftStil, useRollen } from '../components/instrument';
 import { statusFlaeche } from '../components/instrument/statusFlaeche';
 import type { PufferZustand } from './zeitachseModell';
 
@@ -55,7 +55,14 @@ export default function EtbSendestatus({ puffer, onSprung }: Props) {
       data-zustand={puffer.art}
       title="Zu den vorgemerkten Einträgen"
       onClick={onSprung}
-      style={{ background: f.grund, color: f.text, ...monoStil('monoKlein', 500) }}
+      // „2 abgelehnt · 3 ausstehend“: Wörter in der Textschrift (ADR-0094).
+      style={{
+        background: f.grund,
+        color: f.text,
+        ...schriftStil('textKlein'),
+        fontWeight: 500,
+        fontVariantNumeric: 'tabular-nums',
+      }}
     >
       {text}
     </Button>

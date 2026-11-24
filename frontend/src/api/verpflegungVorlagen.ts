@@ -10,7 +10,7 @@ import type {
  * Organisation“): Mahlzeiten mit Uhrzeit ohne Datum, nach Beginn geordnet. Lesen darf jedes
  * Mitglied der Organisation, schreiben nur der Admin; gelöscht wird nie, `aktiv` schaltet.
  */
-const BASE_PATH = '/api/verpflegung-vorlagen';
+const BASE_PATH = '/api/catering-templates';
 
 /** `'aktiv'` ist die Vorgabe des Servers (Tag aus der Vorlage); die Verwaltung liest `'alle'`,
  *  weil sie deaktivierte Mahlzeiten wieder aktivieren können muss. */

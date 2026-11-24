@@ -1,6 +1,6 @@
 //! Richtwerte des Unterkunfts- und Zeltrechners (LLH-1520, design.md D2).
 //!
-//! GET /api/unterkunft-richtwerte — Basis und Org-Werte der eigenen Org, jeder Angemeldete.
+//! GET /api/accommodation-guidelines — Basis und Org-Werte der eigenen Org, jeder Angemeldete.
 //! PUT /api/org-accommodation-guidelines/{schluessel} — Org-Wert setzen, `null` = Vorgabe, nur Admin.
 //!     Live über `stammdaten` (Präfix in `STAMMDATEN_PFADE`).
 //! GET /api/einsaetze/{id}/accommodation-guidelines — alle Ebenen im Einsatz, Lesezugriff.
@@ -35,7 +35,7 @@ fn pruefe(schluessel: &str, wert: Option<f64>) -> Result<(), AppError> {
     }
 }
 
-/// GET /api/unterkunft-richtwerte
+/// GET /api/accommodation-guidelines
 pub async fn org_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

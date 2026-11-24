@@ -1621,7 +1621,7 @@ async fn sammel_disposition_an_einheit_meldet_den_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &cookie,
         Some(&json!({"funkrufname": "RTW 1"})),
     )
@@ -2112,7 +2112,7 @@ async fn eintreffen_unangemeldet_benachrichtigt_einsatzleitung_einmal() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(&json!({"name": "Elke Leiter", "benutzer_id": elke})),
     )
@@ -4782,7 +4782,7 @@ async fn stamm_fahrzeug(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         cookie,
         Some(&json!({"funkrufname": funkrufname})),
     )
@@ -4833,7 +4833,7 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/fahrzeuge/{fz}"),
+            &format!("/api/vehicles/{fz}"),
             &cookie,
             Some(&json!({"funkrufname": neu})),
         )
@@ -4880,7 +4880,7 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/fahrzeuge/{einzeln_fz}/ausser-dienst"),
+        &format!("/api/vehicles/{einzeln_fz}/out-of-service"),
         &cookie,
         None,
     )

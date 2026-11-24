@@ -142,6 +142,7 @@ export default function Schnellerfassungszeile({
       {children}
     </div>
   );
+  const istBefehl = typeof praefix === 'string' && praefix.startsWith('/');
   return (
     <div
       data-lfh="schnellerfassung"
@@ -163,7 +164,13 @@ export default function Schnellerfassungszeile({
       >
         {gestapelt && feldZelle}
         {praefix != null && (
-          <span data-lfh="schnellerfassung-praefix" style={zellen.praefix}>
+          <span
+            data-lfh="schnellerfassung-praefix"
+            // Ein Befehl („/person“) ist Eingabesyntax wie eine Kennung und bleibt Mono; ein Wort
+            // („Notiz“) steht in der Textschrift (ADR-0094, LLH-2084).
+            data-schrift={istBefehl ? 'kennung' : undefined}
+            style={istBefehl ? zellen.praefix : { ...zellen.praefix, ...schriftStil('text') }}
+          >
             {praefix}
           </span>
         )}

@@ -39,6 +39,7 @@ import {
 } from 'react';
 import {
   monoStil,
+  schriftStil,
   Stapel,
   useEingabeSperre,
   useRollen,
@@ -410,12 +411,14 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const hinweisText = onHinweis || grundImFormular ? '' : (hinweis?.text ?? '');
   // Das Suffix steht IMMER im DOM: antds `Input` baut sein Gerüst um, sobald ein Suffix kommt oder
   // geht, und das Feld verlöre mitten im Tippen den Fokus.
+  // Mono nur für die reine Deutung („= 231430nov26“); „gestern“/„morgen“ sind Wörter (ADR-0094).
+  const hinweisInMono = hinweis?.art === 'deutung' && !(deutung?.ok && deutung.hinweis);
   const suffix = (
     <span
       id={hinweisId}
       aria-live="polite"
       style={{
-        ...(grund ? {} : monoStil('monoKlein')),
+        ...(grund ? {} : hinweisInMono ? monoStil('monoKlein') : schriftStil('textKlein')),
         color: grund ? rollen.alarmText : rollen.gedaempft,
       }}
     >

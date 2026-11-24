@@ -120,10 +120,14 @@ Der Monitor zeigt nur Zahlen, die Karte, die Bezeichnungen der nächsten Program
 Zeile „Was brennt“ die Namen von Einheiten und Abschnitten, keine Personendaten und keine Namen von
 Personen, keine Texte von Meldungen, Aufträgen oder Erinnerungen. Ist ein Modul im Einsatz
 ausgeblendet, fehlt seine Angabe in „Was brennt“ wie im Überblick, ohne dass der Monitor „Stand
-unvollständig“ meldet; die Kacheln „Meldungen“ und „Betroffene“ zählen dagegen weiter. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
+unvollständig“ meldet, und mit ihr die Kachel des Moduls: „Betroffene“ bzw. „Hilfeleistungen“
+ohne das Modul Personen, „Meldungen“ ohne Meldungen, „Kräfte“ ohne Personal oder ohne Einheiten,
+„Belegung der Unfallhilfsstellen“ samt „an UHS“ und den UHS auf der Karte ohne
+Unfallhilfsstellen. Die übrigen Kacheln nehmen den Platz; „Ablauf“ bleibt. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
 hervorgehoben. Er schreibt
 nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
-keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
+keine verortete UHS (ist das Modul Unfallhilfsstellen ausgeblendet, zählen seine UHS nicht) und
+keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
 Kann der Browser des Monitors keine Karte zeichnen (Voraussetzung wie bei der
 [Lagekarte](lagekarte.md)), steht in der Kartenkachel „Karte auf diesem Gerät nicht darstellbar“;
 alle übrigen Kacheln und die Statusleiste laufen weiter.

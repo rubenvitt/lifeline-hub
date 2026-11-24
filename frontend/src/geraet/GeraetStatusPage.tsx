@@ -12,7 +12,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { Paneel, Stapel, Status, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, Status, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einheitStatusAnzeige, fmsEtikett } from '../kraefte/meldebildRaster';
 import { useEinheitStatusQuittung } from '../kraefte/useStatusQuittung';
@@ -99,15 +99,18 @@ export default function GeraetStatusPage() {
           <Flex align="center" gap="small" wrap data-lfh="einheit-status-aktuell">
             <Status groesse="klein" ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />
             {einheit.status.seit && (
-              <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>
-                seit {zeitKurz(einheit.status.seit, konventionen)}
+              <span style={{ ...schriftStil('text'), color: rollen.gedaempft }}>
+                seit{' '}
+                <span style={monoStil('mono')}>{zeitKurz(einheit.status.seit, konventionen)}</span>
               </span>
             )}
           </Flex>
           {s.verteilung && (
             <div
               style={{
-                ...monoStil('monoKlein'),
+                // „2× S4 · 1× ohne Status“ trägt Wörter: Textschrift (ADR-0094).
+                ...schriftStil('textKlein'),
+                fontVariantNumeric: 'tabular-nums',
                 color: rollen.gedaempft,
                 marginTop: token.marginXXS,
               }}

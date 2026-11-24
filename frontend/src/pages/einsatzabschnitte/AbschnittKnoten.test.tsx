@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { ConfigProvider } from 'antd';
 import { useRollen } from '../../components/instrument';
 import type { Einsatzabschnitt } from '../../api/types';
+import { schrift } from '../../theme/tokens';
 import AbschnittKnoten from './AbschnittKnoten';
 
 const nord = {
@@ -55,7 +56,11 @@ describe('AbschnittKnoten', () => {
     expect(screen.getByText('Nord')).toBeInTheDocument();
     expect(screen.getByText('1/3/4//8')).toBeInTheDocument();
     // Was gezählt wird, steht dran: nur die direkt zugeordneten (LFH-973).
-    expect(screen.getByText('2 Einheiten direkt')).toBeInTheDocument();
+    // Die Zahl in Mono, die Wörter in der Textschrift (ADR-0094).
+    expect(screen.getByText('2', { selector: 'span' })).toHaveStyle({ fontFamily: schrift.zahl });
+    expect(screen.getByText('Einheiten direkt', { exact: false })).toHaveStyle({
+      fontFamily: schrift.text,
+    });
   });
 
   it('färbt den Leiternamen aus der Rolle „gedämpft“, nicht aus einem Literal', () => {

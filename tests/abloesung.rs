@@ -358,7 +358,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 
 // ── LLH-1122: Schichtmodelle in den Stammdaten und Vorgabe des Einsatzes ─────────────────────
 
-const MODELLE: &str = "/api/schichtmodelle";
+const MODELLE: &str = "/api/shift-models";
 
 fn vorgabe_pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/abloesungen/schichtmodell")
@@ -983,7 +983,7 @@ async fn status_mit_marke(app: &axum::Router, admin: &str, label: &str, marke: &
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/fahrzeug-status",
+        "/api/vehicle-statuses",
         admin,
         Some(&format!(
             r#"{{"label":"{label}","kategorie":"gebunden","zeitachse_marke":"{marke}"}}"#

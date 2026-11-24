@@ -15,6 +15,7 @@ import {
   Stapel,
   Textstufe,
   useRollen,
+  Kennung,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
@@ -105,7 +106,7 @@ export default function EinheitAufgeloestAnsicht({
       </ul>
     );
   const fahrzeug = (f: LetztesFahrzeug) => (
-    <span style={monoStil('mono')}>
+    <Kennung>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.ef_id })}>
           {f.funkrufname}
@@ -113,7 +114,7 @@ export default function EinheitAufgeloestAnsicht({
       ) : (
         f.funkrufname
       )}
-    </span>
+    </Kennung>
   );
 
   let kraefte: ReactNode;

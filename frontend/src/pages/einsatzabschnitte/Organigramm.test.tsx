@@ -187,7 +187,8 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     });
     const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
     expect(within(wurzel).getByText('Anna Schulz')).toBeInTheDocument();
-    expect(within(wurzel).getByText('seit 111430')).toBeInTheDocument();
+    // Die Zeit in Mono, „seit“ in der Textschrift (ADR-0094): zwei Knoten.
+    expect(wurzel).toHaveTextContent('seit 111430');
     expect(within(wurzel).queryByText('Leitung nicht erfasst')).toBeNull();
   });
 

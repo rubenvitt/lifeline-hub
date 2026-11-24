@@ -142,7 +142,7 @@ fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> 
     })
 }
 
-/// GET /api/personal-status — aktive Katalog-Einträge (eigene Org), für Dropdowns.
+/// GET /api/personnel-statuses — aktive Katalog-Einträge (eigene Org), für Dropdowns.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -152,7 +152,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/personal-status — Admin. Dublette label → Conflict.
+/// POST /api/personnel-statuses — Admin. Dublette label → Conflict.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -163,7 +163,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(s)))
 }
 
-/// PATCH /api/personal-status/{id} — Admin, echter Teil-Patch (LFH-306):
+/// PATCH /api/personnel-statuses/{id} — Admin, echter Teil-Patch (LFH-306):
 /// Feld absent = unverändert, `null`/`""` bei `farbe` = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
@@ -176,7 +176,7 @@ pub async fn aktualisieren(
     Ok(Json(s))
 }
 
-/// POST /api/personal-status/{id}/deaktivieren — Admin (Soft-Delete statt Löschen).
+/// POST /api/personnel-statuses/{id}/deactivate — Admin (Soft-Delete statt Löschen).
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

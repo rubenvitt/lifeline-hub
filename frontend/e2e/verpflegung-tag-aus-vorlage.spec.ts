@@ -43,10 +43,10 @@ async function einsatz(page: Page): Promise<number> {
 
 /** Deaktiviert jede Mahlzeit dieses Laufs; der Plan anderer Specs bleibt, wie er ist. */
 async function planRaeumen(page: Page) {
-  const r = await page.request.get('/api/verpflegung-vorlagen');
+  const r = await page.request.get('/api/catering-templates');
   const plan = (await r.json()) as { id: number; bezeichnung: string }[];
   for (const m of plan.filter((x) => x.bezeichnung.endsWith(LAUF))) {
-    await senden(page, 'patch', `/api/verpflegung-vorlagen/${m.id}`, { aktiv: false });
+    await senden(page, 'patch', `/api/catering-templates/${m.id}`, { aktiv: false });
   }
 }
 
@@ -70,7 +70,7 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
     const zeile = page.locator('tr', { hasText: FRUEH });
     await expect(zeile).toContainText('0630–0800');
     // Die Nacht über die API: sie endet am Folgetag.
-    await senden(page, 'post', '/api/verpflegung-vorlagen', {
+    await senden(page, 'post', '/api/catering-templates', {
       bezeichnung: NACHT,
       beginn: '2300',
       ende: '0100',
@@ -129,7 +129,7 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
   test.setTimeout(90_000);
   await anmeldenAlsAdmin(page, { startseite: false });
   try {
-    await senden(page, 'post', '/api/verpflegung-vorlagen', {
+    await senden(page, 'post', '/api/catering-templates', {
       bezeichnung: `Mittagessen mit einem langen Namen ${LAUF}`,
       beginn: '1200',
       ende: '1330',

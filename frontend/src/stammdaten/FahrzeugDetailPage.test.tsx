@@ -56,15 +56,15 @@ function handler(
 ) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/fahrzeug-vorschlaege', () =>
+    http.get('/api/vehicles', () => HttpResponse.json(fahrzeuge)),
+    http.get('/api/vehicle-suggestions', () =>
       HttpResponse.json({
         fahrzeugtyp: ['LF 20'],
         traegerorganisation: ['FF Musterstadt'],
         standort: ['Wache Mitte'],
       }),
     ),
-    http.patch('/api/fahrzeuge/7', async ({ request }) => {
+    http.patch('/api/vehicles/7', async ({ request }) => {
       onPatch(await request.json());
       return HttpResponse.json(fahrzeug);
     }),
@@ -113,7 +113,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     let abrufe = 0;
     handler();
     server.use(
-      http.get('/api/fahrzeuge', () => {
+      http.get('/api/vehicles', () => {
         abrufe += 1;
         return HttpResponse.json([fahrzeug]);
       }),
@@ -219,7 +219,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     let abrufe = 0;
     handler();
     server.use(
-      http.get('/api/fahrzeuge', () => {
+      http.get('/api/vehicles', () => {
         abrufe += 1;
         // Ab dem zweiten Abruf steht dort ein FREMDER Wert.
         return HttpResponse.json([

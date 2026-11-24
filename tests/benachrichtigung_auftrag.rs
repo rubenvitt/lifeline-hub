@@ -83,7 +83,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &self.admin,
             Some(&body.to_string()),
         )

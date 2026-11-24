@@ -10,6 +10,7 @@ import {
   Knopfreihe,
   Paneel,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
@@ -962,7 +963,14 @@ function ImNetzGefunden({
                 <ListenEintragMeta
                   title={<span data-lfh="instanz-im-netz-name">{g.name || g.kennung}</span>}
                   description={
-                    <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
+                    // Gemischt (Fingerabdruck, Adresse, „Protokoll 3“): Textschrift (ADR-0094).
+                    <span
+                      style={{
+                        ...schriftStil('textKlein'),
+                        fontVariantNumeric: 'tabular-nums',
+                        color: rollen.gedaempft,
+                      }}
+                    >
                       {gefundenZeile(g)}
                     </span>
                   }

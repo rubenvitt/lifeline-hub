@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import type { ReactNode } from 'react';
-import { monoStil, useRollen } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Filterhinweis — das Band über einer gefilterten Liste (LLH-1071, Spec `etb-filterleiste`,
@@ -14,9 +14,10 @@ import { monoStil, useRollen } from './rollenwerte';
  * vollständig zu halten. Das Wort „Gefiltert“ ist der zweite Kanal (WCAG 1.4.1). Kein Blinken.
  *
  * ZAHLEN nur von außen, und nur aus einer Serverzählung (`frontend/src/etb/AGENTS.md`, „Kopfzahl
- * und Typ-Segmente zählt der Server“): fehlt eine, steht keine. Merkmale in Mono, wo es Werte sind (der Aufrufer
- * formuliert sie); zu lang endet die Zeile mit „…“, den vollen Text trägt der Titel. Schmal bricht
- * das Band in Zeilen um, nie seitlich über den Schirm.
+ * und Typ-Segmente zählt der Server“): fehlt eine, steht keine. Merkmale tragen Wörter und
+ * stehen in der Textschrift mit gleich breiten Ziffern (ADR-0094; der Aufrufer formuliert sie);
+ * zu lang endet die Zeile mit „…“, den vollen Text trägt der Titel. Schmal bricht das Band in
+ * Zeilen um, nie seitlich über den Schirm.
  *
  * `role="status"`: höflich angesagt, wenn ein Filter greift. Ohne Merkmal steht nichts da und
  * belegt keinen Platz.
@@ -84,7 +85,8 @@ export default function Filterhinweis({
         <span
           title={merkmalText}
           style={{
-            ...monoStil('monoKlein'),
+            ...schriftStil('textKlein'),
+            fontVariantNumeric: 'tabular-nums',
             flex: '1 1 8em',
             minWidth: 0,
             overflow: 'hidden',

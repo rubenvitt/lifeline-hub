@@ -85,7 +85,7 @@ test('LFH-734: eine anderswo angelegte Person erscheint in der offenen Personal-
   const zeile = page.getByRole('row').filter({ hasText: name });
   await expect(zeile).toHaveCount(0);
 
-  const antwort = await page.request.post('/api/personal', { data: { name } });
+  const antwort = await page.request.post('/api/personnel', { data: { name } });
   expect(antwort.ok()).toBeTruthy();
 
   await expect(zeile).toBeVisible();

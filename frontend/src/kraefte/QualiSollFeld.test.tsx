@@ -30,7 +30,7 @@ function Huelle({ start }: { start: QualiSollZeile[] }) {
 
 function render(start: QualiSollZeile[] = []) {
   server.use(
-    http.get('/api/qualifikationen', () =>
+    http.get('/api/qualifications', () =>
       HttpResponse.json([
         { id: 1, label: 'Sanitäter', sortier: 10 },
         { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
@@ -69,7 +69,7 @@ describe('QualiSollFeld', () => {
 
 describe('QualiSollFeld prüft die Anzahl (LLH-1768)', () => {
   it('eine entfernte ungültige Zeile sperrt nicht mehr', async () => {
-    server.use(http.get('/api/qualifikationen', () => HttpResponse.json([])));
+    server.use(http.get('/api/qualifications', () => HttpResponse.json([])));
     const onFinish = vi.fn();
     renderMitProviders(
       <Form

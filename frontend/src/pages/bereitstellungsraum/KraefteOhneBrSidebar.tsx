@@ -154,7 +154,10 @@ export default function KraefteOhneBrSidebar({
         ))}
         {g.fahrzeuge.map((f) => (
           <div key={`fahrzeug-${f.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
-            <span style={{ flex: 1, minWidth: 0, ...monoStil('mono'), color: rollen.text }}>
+            <span
+              data-schrift="kennung"
+              style={{ flex: 1, minWidth: 0, ...monoStil('mono'), color: rollen.text }}
+            >
               {f.funkrufname}
             </span>
             {!schreibgeschuetzt && (

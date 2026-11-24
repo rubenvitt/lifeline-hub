@@ -12,7 +12,7 @@ import { apiGet, apiSend } from './client';
  * Material (LLH-1261); die Detailseite liest dieselbe Liste und braucht keinen Einzel-GET.
  * Fahrzeuge, Stammbesetzung und Material werden je als ganze Liste ersetzt (PUT).
  */
-const BASE_PATH = '/api/einheit-vorlagen';
+const BASE_PATH = '/api/unit-templates';
 
 /** `'aktiv'` ist die Vorgabe des Servers; die Verwaltung liest `'alle'`, weil sie deaktivierte
  *  Vorlagen wieder aktivieren können muss. */
@@ -36,7 +36,7 @@ export function replaceVorlageFahrzeuge(
   id: number,
   fahrzeugIds: number[],
 ): Promise<EinheitVorlage> {
-  return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/fahrzeuge`, 'PUT', {
+  return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/vehicles`, 'PUT', {
     fahrzeug_ids: fahrzeugIds,
   });
 }
@@ -46,7 +46,7 @@ export function replaceVorlagePersonal(
   id: number,
   personal: EinheitVorlagePersonalEingabe[],
 ): Promise<EinheitVorlage> {
-  return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/personal`, 'PUT', { personal });
+  return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/personnel`, 'PUT', { personal });
 }
 
 /** Ersetzt die Material-Positionen (LLH-1261); die Reihenfolge ist die Anzeigereihenfolge. */

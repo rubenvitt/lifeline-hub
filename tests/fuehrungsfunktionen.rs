@@ -8,7 +8,7 @@ use serde_json::Value;
 mod common;
 use common::*;
 
-const KATALOG: &str = "/api/fuehrungsfunktionen";
+const KATALOG: &str = "/api/command-roles";
 
 fn setzen_pfad(funktion: &str) -> String {
     format!("/api/org-command-roles/{funktion}")

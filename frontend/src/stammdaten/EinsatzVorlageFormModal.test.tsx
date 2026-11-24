@@ -42,8 +42,8 @@ function aufzeichnen(status = 200) {
     return HttpResponse.json({ ...MANV, id: 9 }, { status: request.method === 'POST' ? 201 : 200 });
   };
   server.use(
-    http.post('/api/einsatz-vorlagen', antwort),
-    http.put('/api/einsatz-vorlagen/:id', antwort),
+    http.post('/api/incident-templates', antwort),
+    http.put('/api/incident-templates/:id', antwort),
   );
   return anfragen;
 }
@@ -64,7 +64,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
   it('ohne Schichtmodelle der Organisation keine sichtbare Auswahl „Schichtmodell“', async () => {
     let beantwortet = false;
     server.use(
-      http.get('/api/schichtmodelle', () => {
+      http.get('/api/shift-models', () => {
         beantwortet = true;
         return HttpResponse.json([]);
       }),
@@ -127,7 +127,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
       methode: 'POST',
-      pfad: '/api/einsatz-vorlagen',
+      pfad: '/api/incident-templates',
       rumpf: {
         bezeichnung: 'Großbrand',
         einsatzart: null,
@@ -155,7 +155,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
       methode: 'PUT',
-      pfad: '/api/einsatz-vorlagen/3',
+      pfad: '/api/incident-templates/3',
       rumpf: {
         bezeichnung: 'MANV',
         einsatzart: 'sanitaetsdienst',
@@ -210,7 +210,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     ];
 
     it('steht in der Zeile der Einsatzart, leer mit der Vorgabe der Organisation', async () => {
-      server.use(http.get('/api/schichtmodelle', () => HttpResponse.json(modelle)));
+      server.use(http.get('/api/shift-models', () => HttpResponse.json(modelle)));
       const anfragen = aufzeichnen();
       renderMitProviders(<Harness />);
       const dialog = await screen.findByRole('dialog');
@@ -229,7 +229,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     });
 
     it('Bearbeiten belegt das Modell vor; Leeren schickt `null`', async () => {
-      server.use(http.get('/api/schichtmodelle', () => HttpResponse.json(modelle)));
+      server.use(http.get('/api/shift-models', () => HttpResponse.json(modelle)));
       const anfragen = aufzeichnen();
       renderMitProviders(<Harness vorlage={{ ...MANV, schichtmodell_id: 9 }} />);
       const dialog = await screen.findByRole('dialog', { name: 'Einsatz-Vorlage bearbeiten' });
@@ -247,7 +247,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
 
     it('lädt die Modellliste nicht, bleibt das gespeicherte Modell im Vollersatz', async () => {
       server.use(
-        http.get('/api/schichtmodelle', () =>
+        http.get('/api/shift-models', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       );

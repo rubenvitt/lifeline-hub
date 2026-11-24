@@ -16,7 +16,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// GET /api/einsatz-vorlagen — Vorlagen der eigenen Organisation, geordnet nach `sortier`.
+/// GET /api/incident-templates — Vorlagen der eigenen Organisation, geordnet nach `sortier`.
 pub async fn list(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -59,7 +59,7 @@ fn check_eingabe(
     Ok((bezeichnung, einsatzart, ausgeblendet))
 }
 
-/// POST /api/einsatz-vorlagen — Admin. Legt eine Vorlage am Ende der Liste an (201). Feldfehler
+/// POST /api/incident-templates — Admin. Legt eine Vorlage am Ende der Liste an (201). Feldfehler
 /// 400 (auch ein fremdes oder unbekanntes Schichtmodell), Bezeichnung in der Organisation doppelt
 /// 409 (wie Stichworte und Einheiten-Vorlagen).
 pub async fn create(
@@ -82,7 +82,7 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(vorlage)))
 }
 
-/// PUT /api/einsatz-vorlagen/{id} — Admin, Vollersatz von Bezeichnung, Einsatzart,
+/// PUT /api/incident-templates/{id} — Admin, Vollersatz von Bezeichnung, Einsatzart,
 /// Schichtmodell und Modulmenge; `sortier` bleibt. Fremde oder unbekannte id 404, Feldfehler 400,
 /// Bezeichnung doppelt 409. Wirkt nur auf neue Einsätze.
 pub async fn update(
@@ -107,7 +107,7 @@ pub async fn update(
     Ok(Json(vorlage))
 }
 
-/// DELETE /api/einsatz-vorlagen/{id} — Admin (204). Gekoppelte Stichwort-Vorschläge bleiben,
+/// DELETE /api/incident-templates/{id} — Admin (204). Gekoppelte Stichwort-Vorschläge bleiben,
 /// ohne Vorlage. Fremde oder unbekannte id 404.
 pub async fn delete(
     State(state): State<AppState>,

@@ -381,12 +381,12 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     json["id"].as_i64().unwrap()
 }
 
-/// Legt eine Stamm-Person (`/api/personal`) an; liefert deren id.
+/// Legt eine Stamm-Person (`/api/personnel`) an; liefert deren id.
 pub async fn stammpersonal_anlegen(app: &axum::Router, admin: &str, name: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         admin,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )

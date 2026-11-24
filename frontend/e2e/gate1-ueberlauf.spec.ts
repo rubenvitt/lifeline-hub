@@ -1290,7 +1290,7 @@ test.describe('Gate 1', () => {
     }) => {
       test.slow();
       await anmelden(page);
-      const antwort = await page.request.post('/api/fahrzeuge', {
+      const antwort = await page.request.post('/api/vehicles', {
         data: {
           // Funkrufnamen sind je Org eindeutig: Breite und Zeitstempel trennen parallele Tests
           // und den CI-Retry, der auf derselben DB läuft.
@@ -1986,7 +1986,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       });
       expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
       const einsatzId = String(((await neu.json()) as { id: number }).id);
-      const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+      const typen = (await (await page.request.get('/api/unit-types')).json()) as {
         id: number;
         label: string;
       }[];
@@ -2103,7 +2103,7 @@ async function seedeJson(
 /** Ein Stammfahrzeug mit Soll-Stärke und drei Kräften: die Besatzungszelle zeigt Ist UND Soll. */
 async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
   const einsatzId = await neuerEinsatz(page, `E2E Fükw-Fahrzeuge ${Date.now()}`);
-  const stamm = await seedeJson(page, 'post', '/api/fahrzeuge', {
+  const stamm = await seedeJson(page, 'post', '/api/vehicles', {
     funkrufname: `${FAHRZEUG_SOLL}-${Math.random().toString(36).slice(2, 6)}`,
     fahrzeugtyp: 'HLF 20',
     traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',

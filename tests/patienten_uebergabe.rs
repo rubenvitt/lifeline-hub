@@ -281,7 +281,7 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &w.admin,
         Some(r#"{"funkrufname":"Rotkreuz Musterstadt 83-1"}"#),
     )
@@ -291,7 +291,7 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &w.admin,
         Some(r#"{"funkrufname":"Ausgemustert 83-9"}"#),
     )

@@ -153,7 +153,8 @@ export default function BetroffenenSeitenleiste({
             {SICHTUNGSBILD_REIHE.map((k) => (
               <li key={k} data-sichtung-zeile={k} style={zeile}>
                 <Farbfeld k={k} groesse={8} />
-                <span style={{ ...monoStil('monoKlein'), color: rollen.text2, width: 72 }}>
+                {/* Das Etikett („SK I“, „unverletzt“) trägt Wörter: Textschrift (ADR-0094). */}
+                <span style={{ ...schriftStil('textKlein'), color: rollen.text2, width: 72 }}>
                   {kuerzel(k)}
                 </span>
                 <span style={{ flex: 1, ...schriftStil('textKlein'), color: rollen.schwach }}>

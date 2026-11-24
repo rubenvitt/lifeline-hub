@@ -25,8 +25,8 @@ const baustein: EtbBaustein = {
 
 function handler() {
   server.use(
-    http.post('/api/etb-bausteine', () => HttpResponse.json({ ...baustein, id: 9 })),
-    http.patch('/api/etb-bausteine/2', () => HttpResponse.json(baustein)),
+    http.post('/api/etb-snippets', () => HttpResponse.json({ ...baustein, id: 9 })),
+    http.patch('/api/etb-snippets/2', () => HttpResponse.json(baustein)),
   );
 }
 
@@ -87,7 +87,7 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
    */
   it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
     server.use(
-      http.patch('/api/etb-bausteine/2', () =>
+      http.patch('/api/etb-snippets/2', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -147,7 +147,7 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   it('behält Meldeweg, Veranlassung und Sortierung, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/etb-bausteine/2', async ({ request }) => {
+      http.patch('/api/etb-snippets/2', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(baustein);
       }),
@@ -179,7 +179,7 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   it('eine aufgeklappt geleerte Veranlassung kommt geleert an', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/etb-bausteine/2', async ({ request }) => {
+      http.patch('/api/etb-snippets/2', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(baustein);
       }),

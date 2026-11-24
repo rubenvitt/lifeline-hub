@@ -49,13 +49,13 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/stichwort-vorschlaege', () =>
+      http.get('/api/keyword-suggestions', () =>
         HttpResponse.json([
           { id: 1, text: 'H1', vorlage_id: 5 },
           { id: 2, text: 'B2', vorlage_id: null },
         ]),
       ),
-      http.get('/api/einsatz-vorlagen', () =>
+      http.get('/api/incident-templates', () =>
         HttpResponse.json([{ id: 5, bezeichnung: 'Kleinlage', ausgeblendet: [], sortier: 1 }]),
       ),
     );
@@ -70,7 +70,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/einsatz-vorlagen', () =>
+      http.get('/api/incident-templates', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -95,7 +95,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/etb-bausteine', () =>
+      http.get('/api/etb-snippets', () =>
         HttpResponse.json([
           { id: 1, label: 'B', typ: 'lage', inhalt: 'b', sortier: 20 },
           { id: 2, label: 'A', typ: 'lage', inhalt: 'a', sortier: 10 },
@@ -123,7 +123,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     };
     server.use(
       meHandler(leser),
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           { ...basis, id: 1, bezeichnung: 'Lang', vorwarnung_minuten: 45 },
           {
@@ -156,7 +156,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/verpflegung-vorlagen', () => HttpResponse.json(verpflegungsplan())),
+      http.get('/api/catering-templates', () => HttpResponse.json(verpflegungsplan())),
     );
     zeige(<VerpflegungsplanTab />, '/admin/stammdaten/verpflegungsplan');
     await screen.findByText('Mittag');
@@ -175,7 +175,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/fahrzeug-status', () =>
+      http.get('/api/vehicle-statuses', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -208,7 +208,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/einheit-typen', () =>
+      http.get('/api/unit-types', () =>
         HttpResponse.json([
           { id: 1, label: 'Sonstige', soll: null, sortier: 10 },
           {
@@ -238,8 +238,8 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     setzeViewportBreite(1600);
     server.use(
       meHandler(leser),
-      http.get('/api/einheit-vorlagen', () => HttpResponse.json(EINHEIT_VORLAGEN)),
-      http.get('/api/einheit-typen', () => HttpResponse.json(EINHEIT_TYPEN)),
+      http.get('/api/unit-templates', () => HttpResponse.json(EINHEIT_VORLAGEN)),
+      http.get('/api/unit-types', () => HttpResponse.json(EINHEIT_TYPEN)),
     );
     zeige(<EinheitVorlagenTab />, '/admin/stammdaten/einheiten?f.aktiv=false');
     await screen.findByText('SEG Behandlung');

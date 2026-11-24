@@ -57,6 +57,7 @@ import {
   Textstufe,
   monoStil,
   useRollen,
+  schriftStil,
 } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -501,7 +502,10 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={monoStil('monoKlein')}>
+          <span
+            className="lfh-personenkopf-meta"
+            style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}
+          >
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}

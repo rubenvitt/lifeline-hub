@@ -759,7 +759,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, q) = post(
         &app,
         &admin,
-        "/api/qualifikationen",
+        "/api/qualifications",
         json!({"label": "Bootsführer"}),
     )
     .await;
@@ -796,7 +796,7 @@ async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/qualifikationen/{q}/deaktivieren"),
+        &format!("/api/qualifications/{q}/deactivate"),
         &admin,
         None,
     )
