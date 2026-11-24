@@ -2714,14 +2714,7 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
         StatusCode::CREATED,
         "ohne Bezug braucht es die Freigabe nicht: {json}"
     );
-    aktion(
-        &app,
-        &admin,
-        einsatz,
-        json["id"].as_i64().unwrap(),
-        "annul",
-    )
-    .await;
+    aktion(&app, &admin, einsatz, json["id"].as_i64().unwrap(), "annul").await;
 
     assert_eq!(posten_count(&app, &admin, einsatz).await, 0);
     assert_eq!(
@@ -3586,9 +3579,7 @@ async fn verknuepfen_prueft_den_posten() {
     let fremd = adhoc_disponieren(&app, &admin, anderer, "Trage", 1).await;
     let storniert = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, storniert, "annul")
-            .await
-            .0,
+        aktion(&app, &admin, einsatz, storniert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     let entlassen = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
@@ -3871,9 +3862,7 @@ async fn loesen_prueft_den_posten() {
     let (_, json) = disponieren_roh(&app, &admin, einsatz, &uebernahme("Trage", 1, nid, "")).await;
     let storniert = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, storniert, "annul")
-            .await
-            .0,
+        aktion(&app, &admin, einsatz, storniert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     let (_, json) = disponieren_roh(
