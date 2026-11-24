@@ -76,10 +76,21 @@ pub struct FachebenenState {
     /// Letzter gescheiterter Wetterabruf je Cache-Schlüssel, getrennt von
     /// [`Self::pegel_fehlschlag`]: ein Ausfall von Bright Sky sperrt keine Pegelstation.
     pub wetter_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
+    /// Basis-URL der NINA-API (warnung.bund.de, `mowas/mapData.json` und
+    /// `warnings/{id}.geojson`). Tests lenken sie über [`FachebenenState::mit_nina_basis_url`] auf
+    /// eine Attrappe (LLH-2104).
+    pub nina_basis_url: Arc<str>,
+    /// Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, heute nur `nina` über
+    /// `--nina false`). Die Route antwortet für sie 404, bevor ein Cache oder eine Quelle
+    /// gefragt wird; `GET /api/map/config` meldet sie, damit die Lagekarte sie ausblendet.
+    pub abgeschaltet: Arc<[&'static str]>,
 }
 
 /// Produktive Basis-URL der PEGELONLINE-REST-API v2.
 pub const PEGELONLINE_BASIS_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
+
+/// Produktive Basis-URL der NINA-API des BBK (MoWaS-Warnungen).
+pub const NINA_BASIS_URL: &str = "https://warnung.bund.de/api31";
 
 /// Produktive Basis-URL von Bright Sky (freie JSON-API auf DWD-Open-Data, ohne Schlüssel).
 pub const BRIGHTSKY_BASIS_URL: &str = "https://api.brightsky.dev";
@@ -100,6 +111,8 @@ impl FachebenenState {
             pegel_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
             wetter_basis_url: Arc::from(BRIGHTSKY_BASIS_URL),
             wetter_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
+            nina_basis_url: Arc::from(NINA_BASIS_URL),
+            abgeschaltet: Arc::from([]),
         }
     }
 
@@ -112,6 +125,23 @@ impl FachebenenState {
     /// Lenkt die Wetterabrufe (Bright Sky) auf eine andere Basis-URL (Tests).
     pub fn mit_wetter_basis_url(mut self, url: &str) -> Self {
         self.wetter_basis_url = Arc::from(url.trim_end_matches('/'));
+        self
+    }
+
+    /// Schaltet die genannten Fachebenen ab (LLH-2104).
+    pub fn mit_abgeschaltet(mut self, quellen: &[&'static str]) -> Self {
+        self.abgeschaltet = Arc::from(quellen);
+        self
+    }
+
+    /// Hat der Betreiber diese Fachebene abgeschaltet?
+    pub fn is_abgeschaltet(&self, quelle: &str) -> bool {
+        self.abgeschaltet.contains(&quelle)
+    }
+
+    /// Lenkt die NINA-Abrufe auf eine andere Basis-URL (Tests).
+    pub fn mit_nina_basis_url(mut self, url: &str) -> Self {
+        self.nina_basis_url = Arc::from(url.trim_end_matches('/'));
         self
     }
 }

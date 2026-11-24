@@ -53,6 +53,10 @@ pub struct KarteConfigAntwort {
     /// True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
     /// anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
     pub karten_bau_verfuegbar: bool,
+    /// Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit
+    /// `--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet
+    /// 404. Leer, wenn alle Ebenen an sind.
+    pub fachebenen_abgeschaltet: Vec<String>,
 }
 
 /// Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
@@ -163,6 +167,12 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         offline_format,
         offline_regionen,
         karten_bau_verfuegbar,
+        fachebenen_abgeschaltet: state
+            .fachebenen
+            .abgeschaltet
+            .iter()
+            .map(|q| q.to_string())
+            .collect(),
     }))
 }
 
@@ -575,6 +585,11 @@ pub async fn fachebenen(
     PfadParam(quelle): PfadParam<String>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Response, AppError> {
+    // LLH-2104: eine abgeschaltete Ebene fragt weder Cache noch Quelle (MoWaS-Auflage
+    // „nicht gewerblich“ bei `nina`); vor jedem anderen Schritt, auch vor dem ETag-Vergleich.
+    if state.fachebenen.is_abgeschaltet(&quelle) {
+        return Err(AppError::NotFound);
+    }
     let bbox = params.get("bbox").map(|s| s.as_str());
     // Fachebenen-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um den
     // operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.

@@ -2906,3 +2906,100 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
         "EMSR728"
     );
 }
+
+// ===== NINA abschaltbar (LLH-2104) =====
+
+/// Attrappe von warnung.bund.de: zählt jede Anfrage und liefert eine leere Warnliste. Gibt die
+/// Basis-URL (wie `NINA_BASIS_URL`, ohne `/` am Ende) und den Zähler zurück.
+async fn nina_attrappe() -> (
+    String,
+    std::sync::Arc<std::sync::atomic::AtomicUsize>,
+) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let zaehler = Arc::new(AtomicUsize::new(0));
+    let z = zaehler.clone();
+    let stub = axum::Router::new().fallback(move || {
+        let z = z.clone();
+        async move {
+            z.fetch_add(1, Ordering::SeqCst);
+            axum::Json(serde_json::json!([]))
+        }
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let basis = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, stub).await.unwrap() });
+    (basis, zaehler)
+}
+
+/// Router mit eigenem Karten-Verzeichnis und einem `FachebenenState` nach Wahl.
+async fn nina_app(fachebenen: lifeline_hub::karte::FachebenenState) -> axum::Router {
+    katalog_ohne_netz();
+    let pool = pool().await;
+    build_router(AppState {
+        karten_dir: lifeline_hub::db::test_karten_dir(),
+        fachebenen,
+        ..common::test_state(&pool, &LiveHub::new())
+    })
+}
+
+/// Gegenprobe zu den Abschalt-Tests: eingeschaltet fragt die Ebene die Quelle wirklich ab,
+/// sonst bewiese ein Zähler von 0 dort nichts.
+#[tokio::test]
+async fn nina_eingeschaltet_fragt_die_quelle_ab() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_nina_basis_url(&basis)).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/nina", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(zaehler.load(std::sync::atomic::Ordering::SeqCst) >= 1);
+}
+
+/// Akzeptanzkriterium LLH-2104: abgeschaltet geht kein Request an die Quelle, und die Route
+/// antwortet 404 statt einer Offline-Ebene.
+#[tokio::test]
+async fn abgeschaltete_nina_ist_404_ohne_abruf() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app = nina_app(
+        lifeline_hub::karte::FachebenenState::neu()
+            .mit_nina_basis_url(&basis)
+            .mit_abgeschaltet(&["nina"]),
+    )
+    .await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/nina", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+/// Eine bedingte Anfrage mit altem ETag bekommt kein 304, sondern ebenfalls 404.
+#[tokio::test]
+async fn abgeschaltete_nina_ist_auch_bedingt_404() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app = nina_app(
+        lifeline_hub::karte::FachebenenState::neu()
+            .mit_nina_basis_url(&basis)
+            .mit_abgeschaltet(&["nina"]),
+    )
+    .await;
+    let res = anfrage_bedingt(&app, "/api/map/overlays/nina", "\"x\"").await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+/// Die Abschaltung betrifft nur die genannte Ebene; eine unbekannte Quelle bleibt 400.
+#[tokio::test]
+async fn abschaltung_laesst_unbekannte_quelle_bei_400() {
+    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/gibtsnicht", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn config_meldet_abgeschaltete_fachebenen() {
+    let app = nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let v = json(anfrage(&app, "GET", "/api/map/config", None, None).await).await;
+    assert_eq!(v["fachebenen_abgeschaltet"], serde_json::json!(["nina"]));
+
+    let app = nina_app(lifeline_hub::karte::FachebenenState::neu()).await;
+    let v = json(anfrage(&app, "GET", "/api/map/config", None, None).await).await;
+    assert_eq!(v["fachebenen_abgeschaltet"], serde_json::json!([]));
+}

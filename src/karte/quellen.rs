@@ -429,14 +429,16 @@ pub(crate) fn odl_antwort(roh: &Value) -> Option<FachebeneAntwort> {
 const NINA_ATTRIB: &str =
     "Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS";
 const NINA_TTL: Duration = Duration::from_secs(90);
-const NINA_MAPDATA: &str = "https://warnung.bund.de/api31/mowas/mapData.json";
-fn nina_geojson_url(id: &str) -> String {
-    format!("https://warnung.bund.de/api31/warnings/{id}.geojson")
+fn nina_mapdata_url(basis: &str) -> String {
+    format!("{basis}/mowas/mapData.json")
+}
+fn nina_geojson_url(basis: &str, id: &str) -> String {
+    format!("{basis}/warnings/{id}.geojson")
 }
 
 pub async fn fetch_nina(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
-    let (client, pool2) = (s.client.clone(), pool.clone());
-    liefere_nina(pool, &s.inflight, move || erneuere_nina(client, pool2)).await
+    let (client, pool2, basis) = (s.client.clone(), pool.clone(), s.nina_basis_url.clone());
+    liefere_nina(pool, &s.inflight, move || erneuere_nina(client, pool2, basis)).await
 }
 
 /// Kern von [`fetch_nina`], ohne HTTP prüfbar. NINA trägt kein Ende (`mapData` liefert nur
@@ -461,8 +463,12 @@ where
     .await
 }
 
-async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
-    let map_data = match hole_json(&client, NINA_MAPDATA).await {
+async fn erneuere_nina(
+    client: reqwest::Client,
+    pool: SqlitePool,
+    basis: std::sync::Arc<str>,
+) -> Option<FachebeneAntwort> {
+    let map_data = match hole_json(&client, &nina_mapdata_url(&basis)).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("NINA-mapData-Fetch fehlgeschlagen: {e}");
@@ -481,7 +487,7 @@ async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<Fach
     let geometrien: Vec<(String, serde_json::Value)> = stream::iter(ids)
         .map(|id| {
             let client = client.clone();
-            let url = nina_geojson_url(&id);
+            let url = nina_geojson_url(&basis, &id);
             async move {
                 match hole_json(&client, &url).await {
                     Ok(v) => Some((id, v)),

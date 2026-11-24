@@ -610,7 +610,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         "Offline-Karten: Vorgabe der automatischen Aktualisierung (gilt, solange in der \
          Verwaltung nichts gespeichert ist)"
     );
-    let fachebenen = lifeline_hub::karte::FachebenenState::neu();
+    let mut fachebenen = lifeline_hub::karte::FachebenenState::neu();
+    if !config.nina {
+        // LLH-2104: MoWaS-Auflage „nicht gewerblich“; der Betreiber hat die Ebene abgeschaltet.
+        fachebenen = fachebenen.mit_abgeschaltet(&["nina"]);
+        tracing::info!("Fachebene NINA abgeschaltet (--nina false): kein Abruf bei warnung.bund.de");
+    }
     // Der kurz getimeboxte Fachebenen-Client holt auch das Katalog-Manifest (wie `offline_katalog`).
     let auto_aktualisierung = lifeline_hub::karte::auto_aktualisierung::AutoAktualisierung::neu(
         auto_vorgabe,
