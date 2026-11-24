@@ -15005,8 +15005,8 @@ async fn migration_0366_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruest
 /// beantragbaren Erfassungen und lehnte den Antrag als unbekannte Art ab; die Migration zieht
 /// die gespeicherte Vorlage auf `/reports` um und lässt alle anderen stehen.
 #[tokio::test]
-async fn migration_0370_zieht_die_pfadvorlage_offener_antraege_auf_reports_um() {
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 369).await;
+async fn migration_0371_zieht_die_pfadvorlage_offener_antraege_auf_reports_um() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 370).await;
     for sql in [
         "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
         "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
@@ -15020,7 +15020,7 @@ async fn migration_0370_zieht_die_pfadvorlage_offener_antraege_auf_reports_um() 
     ] {
         sqlx::query(sql).execute(&pool).await.unwrap();
     }
-    migriere_bis(&pool, 370).await;
+    migriere_bis(&pool, 371).await;
     let vorlagen: Vec<String> =
         sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
             .fetch_all(&pool)
