@@ -171,19 +171,19 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `export function exportDateiname(inhalt: ExportInhalt, einsatzId: number, endung = 'csv', jetzt = new Date()): string` (alle bestehenden Aufrufer prüfen, die `jetzt` positionsweise übergeben);
   - `export function fetchLagebesprechungIcs(einsatzId: number): Promise<Blob>` mit `apiDatei(\`/api/incidents/${einsatzId}/briefing/schedule/export\`)`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `exportDateiname('lagekarte', 42, 'kmz', new Date(2026,10,24,14,5))` === `'lagekarte-einsatz-42-2026-11-24-1405.kmz'`; der Aufruf ohne Endung bleibt `.csv`.
   - TerminPaneel:
     - `In Kalender übernehmen` ist gesperrt mit sichtbarem „Kein Termin“, wenn `stand.naechste_lagebesprechung_at` null ist;
     - mit Termin und `darfSchreiben=false` ist er aktiv;
     - ein Klick ruft `fetchLagebesprechungIcs` und `speichereDatei` mit `lagebesprechung-einsatz-…ics`;
     - ein Fehler zeigt „Keine Verbindung zum Server“ bzw. die Fehlermeldung am Paneel.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/components/dateiSpeichern.test.ts src/lagebesprechung/TerminPaneel.test.tsx` → FAIL.
-- [ ] **Step 3:** Umsetzen:
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/components/dateiSpeichern.test.ts src/lagebesprechung/TerminPaneel.test.tsx` → FAIL.
+- [x] **Step 3:** Umsetzen:
   - Knopf unter der Termingruppe, als Mutation mit `networkMode: 'always'` wie `useCsvExport`;
   - ein Fehler erscheint über `SpeicherFehler` mit dem Titel „Nicht übernommen“.
-- [ ] **Step 4:** Tests → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit -p .` → ok.
-- [ ] **Step 5:** Commit `feat: Lagebesprechungstermin in den Kalender übernehmen` (Zunder D).
+- [x] **Step 4:** Tests → PASS; `mise exec -- pnpm -C frontend exec tsc --noEmit -p .` → ok.
+- [x] **Step 5:** Commit `feat: Lagebesprechungstermin in den Kalender übernehmen` (Zunder D).
 
 ### Task 6: Android öffnet Kalenderdateien
 

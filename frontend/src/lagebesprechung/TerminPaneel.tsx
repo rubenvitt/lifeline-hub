@@ -1,13 +1,15 @@
-import { Button, Flex, theme } from 'antd';
+import { useId } from 'react';
+import { Button, Flex, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { useUhr } from '../abloesung/useUhr';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { setLagebesprechungTermin } from '../api/lagebesprechung';
+import { fetchLagebesprechungIcs, setLagebesprechungTermin } from '../api/lagebesprechung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LagebesprechungStand } from '../api/types';
+import { exportDateiname, speichereDatei } from '../components/dateiSpeichern';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import {
   Kennzahl,
@@ -48,6 +50,7 @@ export default function TerminPaneel({
   darfSchreiben,
 }: TerminPaneelProps) {
   const { token } = theme.useToken();
+  const kalenderGrundId = useId();
   const qc = useQueryClient();
   const jetzt = useUhr(30_000);
   const termin = stand?.naechste_lagebesprechung_at;
@@ -60,6 +63,16 @@ export default function TerminPaneel({
       qc.setQueryData(einsatzKeys.lagebesprechung(einsatzId), antwort);
       // Hygiene für den eigenen Schirm: `einsatz` kommt live nur bei echter Änderung.
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+    },
+  });
+  // Nur Lesen: der Export schreibt nichts, deshalb weder `darfSchreiben` noch `isGesperrt`.
+  // `networkMode: 'always'` wie `useCsvExport`: ohne Netz scheitert er sofort sichtbar, statt zu
+  // pausieren und später ungefragt nachzulaufen.
+  const kalender = useMutation({
+    networkMode: 'always',
+    mutationFn: async () => {
+      const datei = await fetchLagebesprechungIcs(einsatzId);
+      speichereDatei(datei, exportDateiname('lagebesprechung', einsatzId, 'ics'));
     },
   });
   const isGesperrt = !darfSchreiben || stand == null || mutation.isPending;
@@ -115,7 +128,27 @@ export default function TerminPaneel({
             }}
           />
         </Flex>
+        <Flex align="center" gap={token.marginXS} wrap>
+          <Button
+            disabled={!termin || kalender.isPending}
+            loading={kalender.isPending}
+            aria-describedby={termin ? undefined : kalenderGrundId}
+            onClick={() => kalender.mutate()}
+          >
+            In Kalender übernehmen
+          </Button>
+          {!termin && (
+            <Typography.Text id={kalenderGrundId} type="secondary">
+              Kein Termin
+            </Typography.Text>
+          )}
+        </Flex>
         <SpeicherFehler fehler={mutation.error} titel="Termin nicht gesetzt" />
+        <SpeicherFehler
+          fehler={kalender.error}
+          titel="Nicht übernommen"
+          fallback="Keine Verbindung zum Server"
+        />
       </Stapel>
     </Paneel>
   );

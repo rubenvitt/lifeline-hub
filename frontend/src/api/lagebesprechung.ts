@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiDatei, apiGet, apiSend } from './client';
 import type {
   Lagebesprechung,
   LagebesprechungAbschlussBody,
@@ -42,4 +42,12 @@ export function setLagebesprechungTermin(
     'PUT',
     daten,
   );
+}
+
+/**
+ * Der nächste Termin als ICS-Datei (nur lesend, Gate: Lesezugriff auf das Modul). 404, wenn kein
+ * Termin gesetzt ist; der Aufrufer zeigt den Fehler an der Seite.
+ */
+export function fetchLagebesprechungIcs(einsatzId: number): Promise<Blob> {
+  return apiDatei(`/api/incidents/${einsatzId}/briefing/schedule/export`);
 }
