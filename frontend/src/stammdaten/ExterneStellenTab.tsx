@@ -1,6 +1,6 @@
 import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Kennung, Status, monoStil } from '../components/instrument';
+import { Kennung, Status, Textstufe, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -16,7 +16,11 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { updateExterneStelle, fetchExterneStellen } from '../api/externeStellen';
+import {
+  updateExterneStelle,
+  fetchExterneStellen,
+  useKanaeleSammlung,
+} from '../api/externeStellen';
 import type { ExterneStelle, ExterneStelleArt } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -43,6 +47,12 @@ export default function ExterneStellenTab() {
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
+  // Mailadressen je Stelle für den Hinweis in der Liste (LLH-2093); nur aktive Stellen.
+  const kanaeleQuery = useKanaeleSammlung('email');
+  const mailAnzahl = new Map<number, number>();
+  for (const k of kanaeleQuery.data ?? []) {
+    mailAnzahl.set(k.agency_id, (mailAnzahl.get(k.agency_id) ?? 0) + 1);
+  }
   // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
   const zustaendigVomHub = (stellenQuery.data ?? []).some(
     (s) => s.zustaendig && herkunft.istVomHub('externe_stelle', s.id),
@@ -101,6 +111,16 @@ export default function ExterneStellenTab() {
             <>
               {' '}
               <Status groesse="klein" ton="normal" wort="zuständig" />
+            </>
+          )}
+          {(mailAnzahl.get(s.id) ?? 0) > 0 && (
+            <>
+              {' '}
+              <Textstufe stufe="textKlein" ton="gedaempft">
+                {mailAnzahl.get(s.id) === 1
+                  ? '1 Mailadresse'
+                  : `${mailAnzahl.get(s.id)} Mailadressen`}
+              </Textstufe>
             </>
           )}
           {herkunft.quelle && (

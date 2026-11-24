@@ -3945,6 +3945,16 @@ export interface components {
          * @enum {string}
          */
         ExterneStelleArt: "leitstelle" | "polizei" | "behoerde" | "hilfsorganisation" | "sonstige";
+        /** @description Eine Kanaladresse einer externen Stelle. Wire englisch, Rust-Feld = Wire-Feld. */
+        ExterneStelleKanal: {
+            address: string;
+            channel: components["schemas"]["KanalArt"];
+            /** Format: int64 */
+            externe_stelle_id: number;
+            /** Format: int64 */
+            id: number;
+            label?: string | null;
+        };
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             /**
@@ -4917,6 +4927,20 @@ export interface components {
          * @enum {string}
          */
         JetztPhase: "laedt" | "bau_wartet" | "baut" | "aktuell";
+        /**
+         * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
+         *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
+         *     angenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).
+         * @enum {string}
+         */
+        KanalArt: "email" | "fax" | "matrix" | "threema";
+        /** @description Eine Kanaladresse samt ihrer Stelle, für die Auswahl im Senden-Dialog. */
+        KanalMitStelle: {
+            /** Format: int64 */
+            agency_id: number;
+            agency_name: string;
+            channel: components["schemas"]["ExterneStelleKanal"];
+        };
         /** @description Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste. */
         KarteAktualisierung: {
             fehler?: string | null;

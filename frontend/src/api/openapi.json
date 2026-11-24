@@ -9810,6 +9810,38 @@
           "sonstige"
         ]
       },
+      "ExterneStelleKanal": {
+        "type": "object",
+        "description": "Eine Kanaladresse einer externen Stelle. Wire englisch, Rust-Feld = Wire-Feld.",
+        "required": [
+          "id",
+          "externe_stelle_id",
+          "channel",
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/KanalArt"
+          },
+          "externe_stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "FachebeneAntwort": {
         "type": "object",
         "description": "Einheitlicher Umschlag für jede Fachebene.",
@@ -12252,6 +12284,37 @@
           "baut",
           "aktuell"
         ]
+      },
+      "KanalArt": {
+        "type": "string",
+        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).",
+        "enum": [
+          "email",
+          "fax",
+          "matrix",
+          "threema"
+        ]
+      },
+      "KanalMitStelle": {
+        "type": "object",
+        "description": "Eine Kanaladresse samt ihrer Stelle, für die Auswahl im Senden-Dialog.",
+        "required": [
+          "channel",
+          "agency_id",
+          "agency_name"
+        ],
+        "properties": {
+          "agency_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "agency_name": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/ExterneStelleKanal"
+          }
+        }
       },
       "KarteAktualisierung": {
         "type": "object",

@@ -124,6 +124,7 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/vehicles', () => HttpResponse.json([])),
   http.get('/api/external-agencies', () => HttpResponse.json([])),
+  http.get('/api/external-agencies/channels', () => HttpResponse.json([])),
   /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
    * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das

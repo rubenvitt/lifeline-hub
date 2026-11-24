@@ -1355,6 +1355,15 @@ export const globalKeys = {
   externeStellen: () => [GLOBAL_KEYS.externeStellen] as const,
   externeStellenListe: (umfang: 'aktiv' | 'alle') => [GLOBAL_KEYS.externeStellen, umfang] as const,
   /**
+   * Kanaladressen (LLH-2093), unter dem Prefix der Stellen einsortiert: dasselbe Org-Ereignis
+   * (Stammdaten) frischt sie auf, und sie bleiben wie die Stellen aus dem Lagebild draußen.
+   * Je Stelle für das Formular, als Sammlung (`kanal`) für die Auswahl im Senden-Dialog.
+   */
+  externeStelleKanaele: (stelleId: number) =>
+    [GLOBAL_KEYS.externeStellen, 'kanaele', stelleId] as const,
+  externeStellenKanaeleSammlung: (kanal: string) =>
+    [GLOBAL_KEYS.externeStellen, 'kanaele-sammlung', kanal] as const,
+  /**
    * Einheiten-Vorlagen (LLH-1042): `'alle'` für die Verwaltung, `'aktiv'` für das Bilden im
    * Einsatz (LLH-1049). Der argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.
    */

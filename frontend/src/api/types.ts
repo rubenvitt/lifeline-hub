@@ -320,6 +320,11 @@ export type EtbBaustein = S['EtbBaustein'];
 /** Katalog „Externe Stellen“ (LFH-1194). */
 export type ExterneStelle = S['ExterneStelle'];
 export type ExterneStelleArt = S['ExterneStelleArt'];
+/** Mailadresse (und später weitere Kanäle) einer externen Stelle (LLH-2093). */
+export type ExterneStelleKanal = S['ExterneStelleKanal'];
+export type KanalArt = S['KanalArt'];
+/** Adresse samt Stelle, für die Auswahl im Senden-Dialog. */
+export type KanalMitStelle = S['KanalMitStelle'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 /** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */
