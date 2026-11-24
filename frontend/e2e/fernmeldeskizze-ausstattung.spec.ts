@@ -209,8 +209,8 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze Ausstattung Messung ${Date.now()}`);
   const a = api(page, einsatzId);
-  const tmo = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  await a.patch('fuehrungsstelle', {
+  const tmo = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('command-post', {
     rufname: 'Florian Musterstadt 10/1',
     sprechgruppe_ids: [tmo],
   });

@@ -12,23 +12,23 @@ mod common;
 use common::*;
 
 fn plan_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan")
 }
 
 fn stellen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions")
 }
 
 fn stelle_pfad(einsatz: i64, sid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen/{sid}")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{sid}")
 }
 
 fn verbindungen_pfad(einsatz: i64, sid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen/{sid}/verbindungen")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{sid}/connections")
 }
 
 fn verbindung_pfad(einsatz: i64, vid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/verbindungen/{vid}")
+    format!("/api/einsaetze/{einsatz}/staff/comms-plan/connections/{vid}")
 }
 
 async fn laden(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {

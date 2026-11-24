@@ -65,7 +65,7 @@ for (const modus of ['light', 'dark'] as const) {
       await anlegen(
         page,
         einsatzId,
-        'stab/infotelefon',
+        'staff/info-line',
         {
           anliegen: 'vermisstensuche',
           notiz: 'sucht Vater',

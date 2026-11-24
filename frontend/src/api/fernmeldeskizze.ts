@@ -19,7 +19,7 @@ import type {
  * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D5, D14).
  *
  * - **Skizzendaten** (Lage, Schriftfeld, Komponenten, Verbindungen, Bereiche) unter
- *   `…/stab/fernmeldeskizze`, Recht des Fernmeldewesens (LLH-1180), Live über das
+ *   `…/staff/comms-sketch`, Recht des Fernmeldewesens (LLH-1180), Live über das
  *   `fernmeldewesen`-Ereignis.
  * - **Einzel-Zuordnungen** (D5): eine Sprechgruppe an genau EINEN Datensatz setzen oder davon
  *   lösen, idempotent, am Pfad des Datensatzes und mit dessen Recht. Der PATCH mit
@@ -33,7 +33,7 @@ function einsatz(einsatzId: number): string {
 }
 
 function skizze(einsatzId: number): string {
-  return `${einsatz(einsatzId)}/stab/fernmeldeskizze`;
+  return `${einsatz(einsatzId)}/staff/comms-sketch`;
 }
 
 export function ladeFernmeldeskizze(einsatzId: number): Promise<Fernmeldeskizze> {
@@ -58,7 +58,7 @@ export function setzeSkizzenLage(
   eingabe: SkizzenLageEingabe,
 ): Promise<SkizzenLage> {
   return apiSend<SkizzenLage>(
-    `${skizze(einsatzId)}/lage/${encodeURIComponent(element)}`,
+    `${skizze(einsatzId)}/layout/${encodeURIComponent(element)}`,
     'PUT',
     eingabe,
   );
@@ -73,14 +73,14 @@ export function entferneSkizzenLage(
   element: string,
   version: number,
 ): Promise<void> {
-  return apiSend<void>(`${skizze(einsatzId)}/lage/${encodeURIComponent(element)}`, 'DELETE', {
+  return apiSend<void>(`${skizze(einsatzId)}/layout/${encodeURIComponent(element)}`, 'DELETE', {
     version,
   });
 }
 
 /** „Neu anordnen“: alle Lagen des Einsatzes verwerfen, Zuordnungen bleiben. */
 export function verwerfeSkizzenLage(einsatzId: number): Promise<void> {
-  return apiSend<void>(`${skizze(einsatzId)}/lage`, 'DELETE');
+  return apiSend<void>(`${skizze(einsatzId)}/layout`, 'DELETE');
 }
 
 // ── Schriftfeld (D13) ──────────────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export function verwerfeSkizzenLage(einsatzId: number): Promise<void> {
 export type SchriftfeldPatch = Partial<Schriftfeld>;
 
 export function setzeSchriftfeld(einsatzId: number, patch: SchriftfeldPatch): Promise<Schriftfeld> {
-  return apiSend<Schriftfeld>(`${skizze(einsatzId)}/schriftfeld`, 'PUT', patch);
+  return apiSend<Schriftfeld>(`${skizze(einsatzId)}/title-block`, 'PUT', patch);
 }
 
 // ── Komponenten ────────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export function legeKomponenteAn(
   einsatzId: number,
   eingabe: NeueKomponente,
 ): Promise<SkizzenKomponente> {
-  return apiSend<SkizzenKomponente>(`${skizze(einsatzId)}/komponenten`, 'POST', eingabe);
+  return apiSend<SkizzenKomponente>(`${skizze(einsatzId)}/components`, 'POST', eingabe);
 }
 
 export function aendereKomponente(
@@ -118,7 +118,7 @@ export function aendereKomponente(
   patch: KomponentePatch,
 ): Promise<SkizzenKomponente> {
   return apiSend<SkizzenKomponente>(
-    `${skizze(einsatzId)}/komponenten/${komponenteId}`,
+    `${skizze(einsatzId)}/components/${komponenteId}`,
     'PATCH',
     patch,
   );
@@ -126,7 +126,7 @@ export function aendereKomponente(
 
 /** Samt Kanälen, Lage und Verbindungen der Komponente. */
 export function entferneKomponente(einsatzId: number, komponenteId: number): Promise<void> {
-  return apiSend<void>(`${skizze(einsatzId)}/komponenten/${komponenteId}`, 'DELETE');
+  return apiSend<void>(`${skizze(einsatzId)}/components/${komponenteId}`, 'DELETE');
 }
 
 // ── Punkt-zu-Punkt-Verbindungen (D3) ───────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export function legeSkizzenVerbindungAn(
   einsatzId: number,
   eingabe: NeueSkizzenVerbindung,
 ): Promise<SkizzenVerbindung> {
-  return apiSend<SkizzenVerbindung>(`${skizze(einsatzId)}/verbindungen`, 'POST', eingabe);
+  return apiSend<SkizzenVerbindung>(`${skizze(einsatzId)}/connections`, 'POST', eingabe);
 }
 
 export function aendereSkizzenVerbindung(
@@ -158,14 +158,14 @@ export function aendereSkizzenVerbindung(
   patch: SkizzenVerbindungPatch,
 ): Promise<SkizzenVerbindung> {
   return apiSend<SkizzenVerbindung>(
-    `${skizze(einsatzId)}/verbindungen/${verbindungId}`,
+    `${skizze(einsatzId)}/connections/${verbindungId}`,
     'PATCH',
     patch,
   );
 }
 
 export function entferneSkizzenVerbindung(einsatzId: number, verbindungId: number): Promise<void> {
-  return apiSend<void>(`${skizze(einsatzId)}/verbindungen/${verbindungId}`, 'DELETE');
+  return apiSend<void>(`${skizze(einsatzId)}/connections/${verbindungId}`, 'DELETE');
 }
 
 // ── Bereiche ───────────────────────────────────────────────────────────────────────────────────
@@ -190,7 +190,7 @@ export interface BereichPatch {
 }
 
 export function legeBereichAn(einsatzId: number, eingabe: NeuerBereich): Promise<SkizzenBereich> {
-  return apiSend<SkizzenBereich>(`${skizze(einsatzId)}/bereiche`, 'POST', eingabe);
+  return apiSend<SkizzenBereich>(`${skizze(einsatzId)}/areas`, 'POST', eingabe);
 }
 
 export function aendereBereich(
@@ -198,11 +198,11 @@ export function aendereBereich(
   bereichId: number,
   patch: BereichPatch,
 ): Promise<SkizzenBereich> {
-  return apiSend<SkizzenBereich>(`${skizze(einsatzId)}/bereiche/${bereichId}`, 'PATCH', patch);
+  return apiSend<SkizzenBereich>(`${skizze(einsatzId)}/areas/${bereichId}`, 'PATCH', patch);
 }
 
 export function entferneBereich(einsatzId: number, bereichId: number): Promise<void> {
-  return apiSend<void>(`${skizze(einsatzId)}/bereiche/${bereichId}`, 'DELETE');
+  return apiSend<void>(`${skizze(einsatzId)}/areas/${bereichId}`, 'DELETE');
 }
 
 // ── Einzel-Zuordnungen (D5) ────────────────────────────────────────────────────────────────────
@@ -214,18 +214,20 @@ export type ZuordnungsZiel =
 
 function zuordnungsPfad(einsatzId: number, ziel: ZuordnungsZiel, sprechgruppeId: number): string {
   const e = einsatz(einsatzId);
+  // Abschnitt und Einheit stellen ihre Pakete (LLH-2059, LLH-2056) auf `talk-groups` um.
   const sg = `sprechgruppen/${sprechgruppeId}`;
+  const tg = `talk-groups/${sprechgruppeId}`;
   switch (ziel.art) {
     case 'abschnitt':
       return `${e}/sectors/${ziel.id}/talk-groups/${sprechgruppeId}`;
     case 'einheit':
       return `${e}/einheiten/${ziel.id}/${sg}`;
     case 'fuehrungsstelle':
-      return `${e}/fuehrungsstelle/${sg}`;
+      return `${e}/command-post/${tg}`;
     case 'stelle':
-      return `${e}/stab/kommunikationsplan/stellen/${ziel.id}/${sg}`;
+      return `${e}/staff/comms-plan/positions/${ziel.id}/${tg}`;
     case 'komponente':
-      return `${skizze(einsatzId)}/komponenten/${ziel.id}/${sg}`;
+      return `${skizze(einsatzId)}/components/${ziel.id}/${tg}`;
   }
 }
 

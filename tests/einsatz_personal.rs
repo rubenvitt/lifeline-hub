@@ -1384,7 +1384,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
             None,
         ),
         ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
-        ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
+        ("PATCH", "command-post".to_string(), Some(einsatzleiter)),
         ("POST", "sectors".to_string(), Some(leiter)),
         ("POST", "damages".to_string(), Some(schaden)),
     ] {

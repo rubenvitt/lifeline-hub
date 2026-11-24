@@ -138,7 +138,7 @@ impl LiveEvent {
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
             // Nur `fernmeldewesen`: Kommunikationsplan und Skizze sind Datenobjekte dieses Moduls,
-            // auch wenn ihre Pfade unter `…/stab` liegen (LLH-1180, design.md D3).
+            // auch wenn ihre Pfade unter `…/staff` liegen (LLH-1180, design.md D3).
             LiveEvent::Fernmeldewesen => &["fernmeldewesen"],
             // Nur `lagebesprechung`: Abschluss und Termin sind Datenobjekte dieses Moduls. NICHT
             // `einsatzdaten`, obwohl beide `einsatz.naechste_lagebesprechung_at` schreiben
@@ -187,7 +187,7 @@ impl LiveEvent {
             // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Verpflegung => &["verpflegung"],
             // Nur `infotelefon`: Anrufe sind Datenobjekte des eigenen Moduls (i6k6mzed,
-            // design.md D3), auch wenn ihre Pfade unter `…/stab` liegen.
+            // design.md D3), auch wenn ihre Pfade unter `…/staff` liegen.
             LiveEvent::Infotelefon => &["infotelefon"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).

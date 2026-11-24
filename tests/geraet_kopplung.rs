@@ -3160,7 +3160,7 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+        &format!("/api/einsaetze/{einsatz}/command-post"),
         &admin,
         Some(&json!({"einsatzleiter": {"art": "extern", "name": "KBM Weber"}})),
     )

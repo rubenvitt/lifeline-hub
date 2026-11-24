@@ -25,14 +25,14 @@ const FEHLER = 'Verlauf der Lagebesprechungen konnte nicht geladen werden';
 const VERALTET = /Aktualisierung fehlgeschlagen/;
 
 function zeige(antwort: () => Response | Promise<Response>) {
-  server.use(http.get('/api/einsaetze/1/lagebesprechungen', antwort));
+  server.use(http.get('/api/einsaetze/1/briefings', antwort));
   return renderMitProviders(<LagebesprechungHistorie einsatzId={1} />);
 }
 
 /** Stellt den Handler auf 500 um und lädt über den Client des Renders neu. */
 async function neuladenScheitert(client: QueryClient) {
   server.use(
-    http.get('/api/einsaetze/1/lagebesprechungen', () =>
+    http.get('/api/einsaetze/1/briefings', () =>
       HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
     ),
   );

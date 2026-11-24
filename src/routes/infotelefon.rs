@@ -1,7 +1,7 @@
-//! Routen des Informationstelefons (LFH-554) unter `/api/einsaetze/{id}/stab/infotelefon`.
+//! Routen des Informationstelefons (LFH-554) unter `/api/einsaetze/{id}/staff/info-line`.
 //!
 //! Gates über `EinsatzLesezugriff<Infotelefon>` bzw. `EinsatzSchreibzugriff<Infotelefon>`: seit
-//! i6k6mzed (design.md D3) ein eigenes Modul, der Pfad unter `…/stab` bleibt (Grenzwert-Regel).
+//! i6k6mzed (design.md D3) ein eigenes Modul, der Pfad liegt unter `…/staff` (ADR-0085).
 //! Live: `LiveEvent::Infotelefon` nur mit Kennungen, nie mit Namen, Nummern oder Notizen.
 
 use axum::extract::{Query, State};
@@ -46,7 +46,7 @@ fn parse_filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
     Ok(AnrufFilter { status })
 }
 
-/// GET /api/einsaetze/{id}/stab/infotelefon — immer eine Seite, jüngster Eingang zuerst
+/// GET /api/einsaetze/{id}/staff/info-line — immer eine Seite, jüngster Eingang zuerst
 /// (`status`, Cursor `vor_zeit` + `vor_id` für die Seite darunter oder `nach_zeit` + `nach_id`
 /// für die Seite direkt darüber, `limit`; LLH-732, design.md D2, LLH-1886; Regeln über
 /// [`crate::kommunikation::parse_fenster`]).
@@ -73,7 +73,7 @@ pub struct CountParams {
     status: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/stab/infotelefon/zaehler — dieselbe Menge wie die Liste über alle
+/// GET /api/einsaetze/{id}/staff/info-line/counts — dieselbe Menge wie die Liste über alle
 /// Seiten (LLH-732). Seitenparameter gehören nicht zum Filter und werden nicht gelesen.
 pub async fn zaehler(
     State(state): State<AppState>,
@@ -86,7 +86,7 @@ pub async fn zaehler(
     ))
 }
 
-/// GET /api/einsaetze/{id}/stab/infotelefon/{aid} — ein Anruf, 404 bei fremdem Einsatz. Für den
+/// GET /api/einsaetze/{id}/staff/info-line/{aid} — ein Anruf, 404 bei fremdem Einsatz. Für den
 /// Deeplink auf einen Anruf außerhalb der geladenen Seiten.
 pub async fn detail(
     State(state): State<AppState>,
@@ -113,7 +113,7 @@ pub struct AnrufAnlegen {
     eingang_at: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/stab/infotelefon
+/// POST /api/einsaetze/{id}/staff/info-line
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Infotelefon>,
@@ -155,7 +155,7 @@ pub struct AnrufStatusSetzen {
     status: String,
 }
 
-/// POST /api/einsaetze/{id}/stab/infotelefon/{aid}/status — Rückruf erledigen oder öffnen.
+/// POST /api/einsaetze/{id}/staff/info-line/{aid}/status — Rückruf erledigen oder öffnen.
 pub async fn status_setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Infotelefon>,

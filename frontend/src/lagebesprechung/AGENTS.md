@@ -13,7 +13,7 @@ design.md D8).
 
 **Ein Termin, ein Schreibweg** (LLH-1111, D3): Wahrheit ist die Spalte
 `einsatz.naechste_lagebesprechung_at`; der Einsatzkopf liest sie für alle Mitglieder (LFH-555).
-Geschrieben wird sie nur über `PUT …/lagebesprechung/termin` (Schnellwahl, freie Wahl, „kein
+Geschrieben wird sie nur über `PUT …/briefing/schedule` (Schnellwahl, freie Wahl, „kein
 Termin“, ohne ETB-Eintrag) und den Abschluss. Der Kopf-PATCH der Einsatzdaten lehnt das Feld mit
 400 ab, laut statt still. Das Kopf-Ereignis `einsatz` geht nur bei einer echten Änderung.
 Beide Wege setzen den Termin über `SQL_TERMIN_SETZEN` in `src/lagebesprechung/repo.rs`; die

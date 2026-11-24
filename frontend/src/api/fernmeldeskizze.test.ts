@@ -32,7 +32,7 @@ interface Anfrage {
 }
 
 const E = '/api/einsaetze/7';
-const S = `${E}/stab/fernmeldeskizze`;
+const S = `${E}/staff/comms-sketch`;
 
 function faengeAnfragen(): Anfrage[] {
   const anfragen: Anfrage[] = [];
@@ -62,9 +62,9 @@ describe('api/fernmeldeskizze — Skizzendaten', () => {
     expect(a).toEqual([
       { methode: 'GET', pfad: S, body: undefined },
       // `version: null` heißt „noch keine Zeile erwartet“ und muss ankommen (D14).
-      { methode: 'PUT', pfad: `${S}/lage/ab-3`, body: { x: 16, y: 24, version: null } },
-      { methode: 'PUT', pfad: `${S}/lage/sg-9`, body: { x: 0, y: 8, breite: 320, version: 4 } },
-      { methode: 'DELETE', pfad: `${S}/lage`, body: undefined },
+      { methode: 'PUT', pfad: `${S}/layout/ab-3`, body: { x: 16, y: 24, version: null } },
+      { methode: 'PUT', pfad: `${S}/layout/sg-9`, body: { x: 0, y: 8, breite: 320, version: 4 } },
+      { methode: 'DELETE', pfad: `${S}/layout`, body: undefined },
     ]);
   });
 
@@ -74,7 +74,7 @@ describe('api/fernmeldeskizze — Skizzendaten', () => {
     expect(a).toEqual([
       {
         methode: 'PUT',
-        pfad: `${S}/schriftfeld`,
+        pfad: `${S}/title-block`,
         body: { gueltig_ab: '2026-10-04T08:00:00Z', gez_name: null },
       },
     ]);
@@ -100,14 +100,14 @@ describe('api/fernmeldeskizze — Skizzendaten', () => {
     expect(a).toEqual([
       {
         methode: 'POST',
-        pfad: `${S}/komponenten`,
+        pfad: `${S}/components`,
         body: { art: 'repeater', bezeichnung: 'RPT Nord' },
       },
-      { methode: 'PATCH', pfad: `${S}/komponenten/2`, body: { bezeichnung: null } },
-      { methode: 'DELETE', pfad: `${S}/komponenten/2`, body: undefined },
+      { methode: 'PATCH', pfad: `${S}/components/2`, body: { bezeichnung: null } },
+      { methode: 'DELETE', pfad: `${S}/components/2`, body: undefined },
       {
         methode: 'POST',
-        pfad: `${S}/verbindungen`,
+        pfad: `${S}/connections`,
         body: {
           von: { art: 'fuehrungsstelle', id: null },
           nach: { art: 'stelle', id: 5 },
@@ -118,13 +118,13 @@ describe('api/fernmeldeskizze — Skizzendaten', () => {
       },
       {
         methode: 'PATCH',
-        pfad: `${S}/verbindungen/3`,
+        pfad: `${S}/connections/3`,
         body: { status: 'bestehend', verkehr: null },
       },
-      { methode: 'DELETE', pfad: `${S}/verbindungen/3`, body: undefined },
-      { methode: 'POST', pfad: `${S}/bereiche`, body: { x: 0, y: 0, breite: 400, hoehe: 200 } },
-      { methode: 'PATCH', pfad: `${S}/bereiche/4`, body: { x: 8, version: 2 } },
-      { methode: 'DELETE', pfad: `${S}/bereiche/4`, body: undefined },
+      { methode: 'DELETE', pfad: `${S}/connections/3`, body: undefined },
+      { methode: 'POST', pfad: `${S}/areas`, body: { x: 0, y: 0, breite: 400, hoehe: 200 } },
+      { methode: 'PATCH', pfad: `${S}/areas/4`, body: { x: 8, version: 2 } },
+      { methode: 'DELETE', pfad: `${S}/areas/4`, body: undefined },
     ]);
   });
 });
@@ -147,21 +147,21 @@ describe('api/fernmeldeskizze — Einzel-Zuordnungen (D5)', () => {
       { methode: 'DELETE', pfad: `${E}/sectors/1/talk-groups/31`, body: undefined },
       { methode: 'PUT', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
       { methode: 'DELETE', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
-      { methode: 'PUT', pfad: `${E}/fuehrungsstelle/sprechgruppen/31`, body: undefined },
-      { methode: 'DELETE', pfad: `${E}/fuehrungsstelle/sprechgruppen/31`, body: undefined },
+      { methode: 'PUT', pfad: `${E}/command-post/talk-groups/31`, body: undefined },
+      { methode: 'DELETE', pfad: `${E}/command-post/talk-groups/31`, body: undefined },
       // Nur die externe Stelle trägt einen Status (D7); fehlt er, ist sie bestehend.
       {
         methode: 'PUT',
-        pfad: `${E}/stab/kommunikationsplan/stellen/5/sprechgruppen/31`,
+        pfad: `${E}/staff/comms-plan/positions/5/talk-groups/31`,
         body: { status: 'geplant' },
       },
       {
         methode: 'DELETE',
-        pfad: `${E}/stab/kommunikationsplan/stellen/5/sprechgruppen/31`,
+        pfad: `${E}/staff/comms-plan/positions/5/talk-groups/31`,
         body: undefined,
       },
-      { methode: 'PUT', pfad: `${S}/komponenten/2/sprechgruppen/31`, body: undefined },
-      { methode: 'DELETE', pfad: `${S}/komponenten/2/sprechgruppen/31`, body: undefined },
+      { methode: 'PUT', pfad: `${S}/components/2/talk-groups/31`, body: undefined },
+      { methode: 'DELETE', pfad: `${S}/components/2/talk-groups/31`, body: undefined },
     ]);
   });
 
@@ -173,7 +173,7 @@ describe('api/fernmeldeskizze — Einzel-Zuordnungen (D5)', () => {
 
   it('reicht eine 409 beim Verschieben als ApiError weiter', async () => {
     server.use(
-      http.put(`${S}/lage/:element`, () =>
+      http.put(`${S}/layout/:element`, () =>
         HttpResponse.json(
           { error: 'Von einem anderen Arbeitsplatz verschoben', aktuell: null },
           { status: 409 },

@@ -45,7 +45,7 @@ test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im 
   // (LFH-867) hält die Knoten, lässt den ladenden Kopf aber zu Daten werden (LLH-1166).
   let antworten = () => {};
   const freigabe = new Promise<void>((r) => (antworten = r));
-  const fsPfad = `**/api/einsaetze/${einsatzId}/fuehrungsstelle`;
+  const fsPfad = `**/api/einsaetze/${einsatzId}/command-post`;
   await page.route(fsPfad, async (route) => {
     await freigabe;
     await route.continue();

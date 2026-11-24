@@ -54,7 +54,7 @@ export const server = setupServer(
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
+  http.get('/api/einsaetze/:id/command-post', () =>
     HttpResponse.json({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] }),
   ),
   /**
@@ -164,7 +164,7 @@ export const server = setupServer(
    * beim Mount ab; ohne Handler scheiterte der Abruf an der Leitung und die Seite stünde kurz auf
    * „offline“ (LLH-1412). Tests mit Besprechung überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/lagebesprechung', () =>
+  http.get('/api/einsaetze/:einsatzId/briefing', () =>
     HttpResponse.json({ anzahl_lagebesprechungen: 0 }),
   ),
   /**

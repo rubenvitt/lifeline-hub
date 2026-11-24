@@ -21,7 +21,7 @@ pub struct InfotelefonAnliegenZaehler {
     pub sonstiges: i64,
 }
 
-/// Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.
+/// Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct InfotelefonZaehler {
     /// Zahl aller Anrufe, die zum Filter passen; per Konstruktion die Summe über `je_anliegen`.

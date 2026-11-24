@@ -28,7 +28,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -54,7 +54,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, body: Value) -> 
     let (status, plan) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen"),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions"),
         cookie,
         Some(&body),
     )
@@ -83,9 +83,9 @@ impl Ziel {
         match self {
             Ziel::Abschnitt(id) => format!("{b}/sectors/{id}/talk-groups/{sg}"),
             Ziel::Einheit(id) => format!("{b}/einheiten/{id}/sprechgruppen/{sg}"),
-            Ziel::Fuehrungsstelle => format!("{b}/fuehrungsstelle/sprechgruppen/{sg}"),
+            Ziel::Fuehrungsstelle => format!("{b}/command-post/talk-groups/{sg}"),
             Ziel::Stelle(id) => {
-                format!("{b}/stab/kommunikationsplan/stellen/{id}/sprechgruppen/{sg}")
+                format!("{b}/staff/comms-plan/positions/{id}/talk-groups/{sg}")
             }
         }
     }
@@ -127,18 +127,12 @@ impl Ziel {
             }
             Ziel::Fuehrungsstelle => {
                 let (_, json) =
-                    anfrage(app, "GET", &format!("{b}/fuehrungsstelle"), cookie, None).await;
+                    anfrage(app, "GET", &format!("{b}/command-post"), cookie, None).await;
                 json["sprechgruppen"].as_array().unwrap().clone()
             }
             Ziel::Stelle(id) => {
-                let (_, json) = anfrage(
-                    app,
-                    "GET",
-                    &format!("{b}/stab/kommunikationsplan"),
-                    cookie,
-                    None,
-                )
-                .await;
+                let (_, json) =
+                    anfrage(app, "GET", &format!("{b}/staff/comms-plan"), cookie, None).await;
                 let s = json
                     .as_array()
                     .unwrap()
@@ -314,7 +308,7 @@ async fn gleiches_live_und_etb_ausser_an_der_stelle() {
     anfrage_json(
         &a.app,
         "PATCH",
-        &format!("{b}/fuehrungsstelle"),
+        &format!("{b}/command-post"),
         &a.admin,
         Some(&ids),
     )
@@ -384,7 +378,7 @@ async fn etb_nennt_die_bezeichnung_der_fuehrungsstelle() {
     let (status, json) = anfrage_json(
         &a.app,
         "PATCH",
-        &format!("{b}/fuehrungsstelle"),
+        &format!("{b}/command-post"),
         &a.admin,
         Some(&json!({"bezeichnung": "ELW Musterstadt"})),
     )
@@ -590,7 +584,7 @@ async fn stelle_status_und_funktion_ohne_sprechgruppe() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let plan_pfad = format!("/api/einsaetze/{}/stab/kommunikationsplan", a.einsatz);
+    let plan_pfad = format!("/api/einsaetze/{}/staff/comms-plan", a.einsatz);
     let (_, plan) = anfrage(&a.app, "GET", &plan_pfad, &a.admin, None).await;
     let kanal = &plan[0]["sprechgruppen"][0];
     assert_eq!(kanal["status"], "geplant");
@@ -657,7 +651,7 @@ async fn stelle_mit_kanal_entfernen_nimmt_die_zuordnung_mit() {
         &a.app,
         "DELETE",
         &format!(
-            "/api/einsaetze/{}/stab/kommunikationsplan/stellen/{ils}",
+            "/api/einsaetze/{}/staff/comms-plan/positions/{ils}",
             a.einsatz
         ),
         &a.admin,

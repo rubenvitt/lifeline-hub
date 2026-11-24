@@ -138,7 +138,7 @@ function handlers(
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(abschnitte)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
+    http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
   ];
 }
 

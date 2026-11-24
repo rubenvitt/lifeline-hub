@@ -14,13 +14,13 @@ import type {
 
 /**
  * Informationstelefon (LFH-554): Anrufprotokoll, seit i6k6mzed ein eigenes Modul. Die Adresse
- * bleibt unter `…/stab/infotelefon` (Grenzwert-Regel, design.md D3). Name, Rückrufnummer und
+ * liegt unter `…/staff/info-line` (ADR-0085). Name, Rückrufnummer und
  * Notiz sind personenbezogen; sie erscheinen in keiner Ableitung (Lagebericht, Druck).
  *
  * Seit LLH-732 ist die Liste immer geblättert, und alle Zahlen kommen aus `…/zaehler` über den
  * ganzen Bestand, nie aus den geladenen Seiten.
  */
-const pfad = (einsatzId: number) => `/api/einsaetze/${einsatzId}/stab/infotelefon`;
+const pfad = (einsatzId: number) => `/api/einsaetze/${einsatzId}/staff/info-line`;
 
 /** Seitengröße der Anrufliste; der Server klemmt auf seine Obergrenze. */
 export const ANRUFE_PAGE_SIZE = 100;
@@ -87,7 +87,7 @@ export function anrufSeite(
 
 /** Zahlen über den ganzen Bestand: gesamt, offene Rückrufe, je Anliegen (LLH-732). */
 export function loadAnrufZaehler(einsatzId: number): Promise<InfotelefonZaehler> {
-  return apiGet<InfotelefonZaehler>(`${pfad(einsatzId)}/zaehler`);
+  return apiGet<InfotelefonZaehler>(`${pfad(einsatzId)}/counts`);
 }
 
 /** Ein Anruf, für den Deeplink auf eine nicht geladene Zeile (404 bei fremdem Einsatz). */
@@ -95,7 +95,7 @@ export function loadAnruf(einsatzId: number, anrufId: number): Promise<Infotelef
   return apiGet<InfotelefonAnruf>(`${pfad(einsatzId)}/${anrufId}`);
 }
 
-/** Kein Backend-Schema: Eingabe-Body von `POST …/stab/infotelefon`. */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/staff/info-line`. */
 export interface AnrufEingabe {
   anliegen: InfotelefonAnliegen;
   notiz?: string;

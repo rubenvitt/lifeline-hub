@@ -84,7 +84,7 @@ function handlers(
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
+    http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
     // Ohne aktive Vorlagen zeigt der Dialog „Einheit bilden“ kein Feld „Vorlage“ (LLH-1049).
     http.get('/api/unit-templates', () => HttpResponse.json([])),
   ];

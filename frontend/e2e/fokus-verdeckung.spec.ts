@@ -1644,7 +1644,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 16;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/staff/info-line`, {
       data: {
         anliegen: 'hinweis',
         notiz: `Probe ${n}: Wasser im Keller`,
