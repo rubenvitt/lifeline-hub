@@ -831,6 +831,7 @@ fn serde_wire_gleich_as_str() {
         Text => "text",
         Zahl => "zahl",
         Url => "url",
+        Host => "host",
     });
     enum_wire!(lifeline_hub::routes::adapter::GeheimnisspeicherZustand {
         Bereit => "bereit",

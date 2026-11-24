@@ -10157,7 +10157,8 @@
         "enum": [
           "text",
           "zahl",
-          "url"
+          "url",
+          "host"
         ]
       },
       "FeldVermerk": {

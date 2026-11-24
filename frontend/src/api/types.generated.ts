@@ -4062,7 +4062,7 @@ export interface components {
          * @description Typ eines Einstellungsfelds.
          * @enum {string}
          */
-        FeldTyp: "text" | "zahl" | "url";
+        FeldTyp: "text" | "zahl" | "url" | "host";
         /**
          * @description Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers
          *     (`None`, wenn der Benutzer fehlt).

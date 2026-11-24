@@ -109,6 +109,13 @@ impl AdapterArt for TestArt {
                 pflicht: false,
                 max: 40,
             },
+            Feld {
+                name: "server",
+                bezeichnung: "Server",
+                typ: FeldTyp::Host,
+                pflicht: false,
+                max: 100,
+            },
         ]
     }
     fn intervall_min_s(&self) -> i64 {

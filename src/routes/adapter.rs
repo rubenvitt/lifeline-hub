@@ -291,16 +291,19 @@ async fn anzeige(
     })
 }
 
-/// Host der ersten URL in den Einstellungen, für die Admin-Spur.
+/// Host der ersten URL oder des ersten Host-Felds in den Einstellungen, für die Admin-Spur.
 fn host_der_einstellungen(
     art: Option<&dyn AdapterArt>,
     einstellungen: &Map<String, Value>,
 ) -> Option<String> {
-    art?.felder()
-        .iter()
-        .filter(|f| f.typ == FeldTyp::Url)
-        .find_map(|f| einstellungen.get(f.name).and_then(Value::as_str))
-        .and_then(host_von)
+    art?.felder().iter().find_map(|f| {
+        let wert = einstellungen.get(f.name).and_then(Value::as_str)?;
+        match f.typ {
+            FeldTyp::Url => host_von(wert),
+            FeldTyp::Host => Some(wert.to_string()),
+            _ => None,
+        }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -250,7 +250,9 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
   (LLH-2025); sonst ändert nichts ein Chiffrat, ohne den Wert neu zu setzen.
   Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
-  URL), entfernt die Geheimnisse; eine neue Art mit URL-Feldern erbt das, ohne eigenen Code.
+  URL oder eines `Host`-Felds), entfernt die Geheimnisse; eine neue Art mit URL- oder Host-Feldern
+  erbt das, ohne eigenen Code. `Host` (`ziel::check_host`) ist ein Name oder eine IP ohne Schema,
+  Port und Pfad; ein Name wird erst beim Verbinden aufgelöst und geprüft.
 - **Fehlercodes:** ein neuer Code kommt in `AdapterFehler` samt Einteilung in
   `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert. Seine
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
